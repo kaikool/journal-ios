@@ -411,7 +411,14 @@ public final class The5ersService: ObservableObject {
         if let content = result["content"] as? [[String: Any]] {
             for block in content {
                 if let type = block["type"] as? String, type == "text", let text = block["text"] as? String {
-                    if let d = text.data(using: .utf8),
+                    let cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                    var jsonStr = cleaned
+                    if cleaned.hasPrefix("```json") {
+                        jsonStr = cleaned.replacingOccurrences(of: "```json", with: "").replacingOccurrences(of: "```", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
+                    } else if cleaned.hasPrefix("```") {
+                        jsonStr = cleaned.replacingOccurrences(of: "```", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
+                    }
+                    if let d = jsonStr.data(using: .utf8),
                        let obj = try? JSONSerialization.jsonObject(with: d) {
                         return obj
                     }
@@ -419,11 +426,21 @@ public final class The5ersService: ObservableObject {
                 }
             }
             if let first = content.first, let text = first["text"] as? String {
-                if let d = text.data(using: .utf8),
+                let cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                var jsonStr = cleaned
+                if cleaned.hasPrefix("```json") {
+                    jsonStr = cleaned.replacingOccurrences(of: "```json", with: "").replacingOccurrences(of: "```", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
+                } else if cleaned.hasPrefix("```") {
+                    jsonStr = cleaned.replacingOccurrences(of: "```", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
+                }
+                if let d = jsonStr.data(using: .utf8),
                    let obj = try? JSONSerialization.jsonObject(with: d) {
                     return obj
                 }
             }
+        }
+        if let res = result["result"] as? [String: Any] {
+            return unwrapMcpToolResult(res)
         }
         return result
     }
@@ -433,9 +450,9 @@ public final class The5ersService: ObservableObject {
         guard let unwrapped = unwrapped else { return [] }
         
         if let dict = unwrapped as? [String: Any] {
-            // Envelope có data dạng Dictionary (VD: { data: { accounts: [...] } })
+            // Envelope có data dạng Dictionary (VD: { data: { positions: [...] } })
             if let dataDict = dict["data"] as? [String: Any] {
-                if let items = (dataDict[collectionKey] ?? dataDict["items"] ?? dataDict["rows"]) as? [[String: Any]] {
+                if let items = (dataDict[collectionKey] ?? dataDict["items"] ?? dataDict["rows"] ?? dataDict["trades"]) as? [[String: Any]] {
                     return items
                 }
             }
@@ -443,7 +460,11 @@ public final class The5ersService: ObservableObject {
             if let dataArray = dict["data"] as? [[String: Any]] {
                 return dataArray
             }
-            // Top-level dictionary chứa key (VD: { accounts: [...] })
+            // Envelope lồng trường result
+            if let resDict = dict["result"] as? [String: Any] {
+                return extractMcpCollection(resDict, collectionKey: collectionKey)
+            }
+            // Top-level dictionary chứa key (VD: { positions: [...] })
             if let items = (dict[collectionKey] ?? dict["items"] ?? dict["rows"] ?? dict["trades"]) as? [[String: Any]] {
                 return items
             }
@@ -601,68 +622,72 @@ public final class The5ersService: ObservableObject {
                 }
             }
             
-            // 3. Smart Sync: Lọc thông minh chỉ tải lệnh cho tài khoản Active hoặc chưa từng có lệnh
-            // Tránh quét lại 50 tài khoản cũ đã đóng, giảm thời gian từ 90s xuống còn 2-3s!
-            let accountsToSyncPositions: [The5ersMcpAccount] = accountsList.filter { acc in
+            // 3. Smart Target Selection: Lọc tài khoản cần quét vị thế
+            // Ưu tiên toàn bộ tài khoản active / available / passed + tối đa 5 tài khoản gần nhất
+            var targetAccounts: [The5ersMcpAccount] = []
+            var seenTargetIds = Set<String>()
+            
+            for acc in accountsList {
                 let s = acc.status.lowercased()
-                let isActive = (s == "active" || s == "available" || s == "passed")
-                let hasLocalTrades = dataStore.trades.contains(where: { $0.accountId == acc.id })
-                return isActive || !hasLocalTrades
+                if (s == "active" || s == "available" || s == "passed") && !seenTargetIds.contains(acc.id) {
+                    seenTargetIds.insert(acc.id)
+                    targetAccounts.append(acc)
+                }
+            }
+            
+            for acc in accountsList.prefix(5) {
+                if !seenTargetIds.contains(acc.id) {
+                    seenTargetIds.insert(acc.id)
+                    targetAccounts.append(acc)
+                }
+            }
+            
+            if targetAccounts.isEmpty {
+                targetAccounts = Array(accountsList.prefix(5))
             }
             
             var importedPositionsCount = 0
-            let totalAccountsToScan = accountsToSyncPositions.count
-            var completedScans = 0
-            
-            // Tải lệnh song song có kiểm soát (tối đa 3 tài khoản đồng thời để không nghẽn mạng)
-            await withTaskGroup(of: (String, [[String: Any]]).self) { group in
-                var iterator = accountsToSyncPositions.makeIterator()
-                var running = 0
+            for (idx, acc) in targetAccounts.enumerated() {
+                lastStatus = "Đang đồng bộ lệnh (\(idx + 1)/\(targetAccounts.count)): \(acc.label)..."
+                await Task.yield()
                 
-                while running < 3, let nextAcc = iterator.next() {
-                    running += 1
-                    group.addTask {
-                        let posArgs: [String: Any] = [
-                            "operation": "list",
-                            "account_ref": nextAcc.ref,
-                            "view": "all",
-                            "page": 1,
-                            "limit": 100,
-                            "contract_version": "1.0",
-                            "request_context": ["timezone": "UTC", "locale": "en"]
-                        ]
-                        let posResult = try? await self.callMcpTool(name: "the5ers_positions", arguments: posArgs)
-                        let unwrappedPos = self.unwrapMcpToolResult(posResult ?? [:])
-                        let rawPositions = self.extractMcpCollection(unwrappedPos, collectionKey: "positions")
-                        return (nextAcc.id, rawPositions)
-                    }
-                }
+                let posArgs: [String: Any] = [
+                    "operation": "list",
+                    "account_ref": acc.ref,
+                    "view": "all",
+                    "page": 1,
+                    "limit": 50,
+                    "contract_version": "1.0",
+                    "request_context": ["timezone": "UTC", "locale": "en"]
+                ]
                 
-                while let (accId, rawPositions) = await group.next() {
-                    completedScans += 1
-                    self.lastStatus = "Đang đồng bộ lệnh: \(completedScans)/\(totalAccountsToScan) tài khoản..."
-                    
-                    if let acc = accountsList.first(where: { $0.id == accId }) {
-                        self.mergePositions(rawPositions, for: acc, into: dataStore, count: &importedPositionsCount)
+                do {
+                    let posResult = try await callMcpTool(name: "the5ers_positions", arguments: posArgs)
+                    if let isErr = posResult["isError"] as? Bool, isErr {
+                        AppLogger.error("The5ers MCP báo lỗi cho tài khoản \(acc.label) (\(acc.id)): \(posResult)")
+                        continue
                     }
+                    let unwrappedPos = unwrapMcpToolResult(posResult)
+                    let rawPositions = extractMcpCollection(unwrappedPos, collectionKey: "positions")
+                    mergePositions(rawPositions, for: acc, into: dataStore, count: &importedPositionsCount)
                     
-                    if let nextAcc = iterator.next() {
-                        group.addTask {
-                            let posArgs: [String: Any] = [
-                                "operation": "list",
-                                "account_ref": nextAcc.ref,
-                                "view": "all",
-                                "page": 1,
-                                "limit": 100,
-                                "contract_version": "1.0",
-                                "request_context": ["timezone": "UTC", "locale": "en"]
-                            ]
-                            let posResult = try? await self.callMcpTool(name: "the5ers_positions", arguments: posArgs)
-                            let unwrappedPos = self.unwrapMcpToolResult(posResult ?? [:])
-                            let rawPositions = self.extractMcpCollection(unwrappedPos, collectionKey: "positions")
-                            return (nextAcc.id, rawPositions)
+                    // Nếu trang 1 có đủ 50 vị thế, tiếp tục phân trang các trang tiếp theo
+                    if rawPositions.count >= 50 {
+                        var page = 2
+                        while page <= 10 {
+                            var pArgs = posArgs
+                            pArgs["page"] = page
+                            guard let nextRes = try? await callMcpTool(name: "the5ers_positions", arguments: pArgs) else { break }
+                            let nextUnwrapped = unwrapMcpToolResult(nextRes)
+                            let nextPositions = extractMcpCollection(nextUnwrapped, collectionKey: "positions")
+                            if nextPositions.isEmpty { break }
+                            mergePositions(nextPositions, for: acc, into: dataStore, count: &importedPositionsCount)
+                            if nextPositions.count < 50 { break }
+                            page += 1
                         }
                     }
+                } catch {
+                    AppLogger.error("Lỗi đồng bộ lệnh tài khoản \(acc.label) (\(acc.id)): \(error.localizedDescription)")
                 }
             }
             
@@ -739,7 +764,7 @@ public final class The5ersService: ObservableObject {
             let closeDate = FlexibleDateParser.parse(closeStr)
             let isClosed = (closeDate != nil) || (p["isClosed"] as? Bool == true) || (p["isclosed"] as? Bool == true)
             
-            let pId = String(describing: p["positionId"] ?? p["positionid"] ?? p["ticket"] ?? p["id"] ?? UUID().uuidString)
+            let pId = String(describing: p["position_ref"] ?? p["ref"] ?? p["positionId"] ?? p["positionid"] ?? p["ticket"] ?? p["id"] ?? p["deal_id"] ?? UUID().uuidString)
             let tradeKey = "the5ers_\(acc.id)_\(pId)"
             
             let status: TradeStatus = isClosed ? (netPnl > 0 ? .win : (netPnl < 0 ? .loss : .breakeven)) : .open

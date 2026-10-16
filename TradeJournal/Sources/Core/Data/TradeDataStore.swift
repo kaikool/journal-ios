@@ -217,6 +217,11 @@ public final class TradeDataStore: ObservableObject {
                 accounts.removeAll(where: { $0.id == "default-acc" && accounts.count > 1 })
             }
             
+            // 1b. Đẩy các tài khoản lên Supabase nếu có
+            if !accounts.isEmpty {
+                try? await SupabaseService.shared.upsertAccounts(accounts)
+            }
+            
             // 2. Tải TOÀN BỘ lệnh giao dịch từ Supabase (không lọc theo selectedAccountId để không bị sót dữ liệu)
             let remoteTrades = try await SupabaseService.shared.fetchTrades(accountId: nil)
             for rTrade in remoteTrades {

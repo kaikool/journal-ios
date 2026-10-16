@@ -539,7 +539,18 @@ public final class SupabaseService {
         let request = try makeRequest(endpoint: endpoint)
         let (data, response) = try await session.data(for: request)
         try validateResponse(response, data: data, endpoint: endpoint)
-        return try jsonDecoder.decode([Account].self, from: data)
+        let records = try jsonDecoder.decode([SupabaseAccountRecord].self, from: data)
+        return records.map { $0.toAccount() }
+    }
+    
+    public func upsertAccounts(_ items: [Account]) async throws {
+        guard isConfigured, !items.isEmpty else { return }
+        let dtos = items.map { SupabaseAccountRecord(account: $0) }
+        let body = try jsonEncoder.encode(dtos)
+        let endpoint = "accounts"
+        let request = try makeRequest(endpoint: endpoint, method: "POST", body: body, preferMerge: true)
+        let (data, response) = try await session.data(for: request)
+        try validateResponse(response, data: data, endpoint: endpoint)
     }
     
     public func fetchExecutions(accountId: String? = nil) async throws -> [Execution] {
@@ -638,12 +649,14 @@ public final class SupabaseService {
         let request = try makeRequest(endpoint: endpoint)
         let (data, response) = try await session.data(for: request)
         try validateResponse(response, data: data, endpoint: endpoint)
-        return try jsonDecoder.decode([PropAccountItem].self, from: data)
+        let records = try jsonDecoder.decode([SupabasePropAccountRecord].self, from: data)
+        return records.map { $0.toItem() }
     }
     
     public func upsertPropAccounts(_ items: [PropAccountItem]) async throws {
         guard isConfigured, !items.isEmpty else { return }
-        let body = try jsonEncoder.encode(items)
+        let dtos = items.map { SupabasePropAccountRecord(item: $0) }
+        let body = try jsonEncoder.encode(dtos)
         let endpoint = "prop_accounts"
         let request = try makeRequest(endpoint: endpoint, method: "POST", body: body, preferMerge: true)
         let (data, response) = try await session.data(for: request)
@@ -656,12 +669,14 @@ public final class SupabaseService {
         let request = try makeRequest(endpoint: endpoint)
         let (data, response) = try await session.data(for: request)
         try validateResponse(response, data: data, endpoint: endpoint)
-        return try jsonDecoder.decode([PropEntryItem].self, from: data)
+        let records = try jsonDecoder.decode([SupabasePropEntryRecord].self, from: data)
+        return records.map { $0.toItem() }
     }
     
     public func upsertPropEntries(_ items: [PropEntryItem]) async throws {
         guard isConfigured, !items.isEmpty else { return }
-        let body = try jsonEncoder.encode(items)
+        let dtos = items.map { SupabasePropEntryRecord(item: $0) }
+        let body = try jsonEncoder.encode(dtos)
         let endpoint = "prop_entries"
         let request = try makeRequest(endpoint: endpoint, method: "POST", body: body, preferMerge: true)
         let (data, response) = try await session.data(for: request)
@@ -674,12 +689,14 @@ public final class SupabaseService {
         let request = try makeRequest(endpoint: endpoint)
         let (data, response) = try await session.data(for: request)
         try validateResponse(response, data: data, endpoint: endpoint)
-        return try jsonDecoder.decode([PropReceiptItem].self, from: data)
+        let records = try jsonDecoder.decode([SupabasePropReceiptRecord].self, from: data)
+        return records.map { $0.toItem() }
     }
     
     public func upsertPropReceipts(_ items: [PropReceiptItem]) async throws {
         guard isConfigured, !items.isEmpty else { return }
-        let body = try jsonEncoder.encode(items)
+        let dtos = items.map { SupabasePropReceiptRecord(item: $0) }
+        let body = try jsonEncoder.encode(dtos)
         let endpoint = "prop_receipts"
         let request = try makeRequest(endpoint: endpoint, method: "POST", body: body, preferMerge: true)
         let (data, response) = try await session.data(for: request)
@@ -692,12 +709,14 @@ public final class SupabaseService {
         let request = try makeRequest(endpoint: endpoint)
         let (data, response) = try await session.data(for: request)
         try validateResponse(response, data: data, endpoint: endpoint)
-        return try jsonDecoder.decode([PropAuditItem].self, from: data)
+        let records = try jsonDecoder.decode([SupabasePropAuditRecord].self, from: data)
+        return records.map { $0.toItem() }
     }
     
     public func upsertPropAudits(_ items: [PropAuditItem]) async throws {
         guard isConfigured, !items.isEmpty else { return }
-        let body = try jsonEncoder.encode(items)
+        let dtos = items.map { SupabasePropAuditRecord(item: $0) }
+        let body = try jsonEncoder.encode(dtos)
         let endpoint = "prop_audit"
         let request = try makeRequest(endpoint: endpoint, method: "POST", body: body, preferMerge: true)
         let (data, response) = try await session.data(for: request)
@@ -712,12 +731,14 @@ public final class SupabaseService {
         let request = try makeRequest(endpoint: endpoint)
         let (data, response) = try await session.data(for: request)
         try validateResponse(response, data: data, endpoint: endpoint)
-        return try jsonDecoder.decode([Attachment].self, from: data)
+        let records = try jsonDecoder.decode([SupabaseAttachmentRecord].self, from: data)
+        return records.map { $0.toAttachment() }
     }
     
     public func upsertAttachments(_ items: [Attachment]) async throws {
         guard isConfigured, !items.isEmpty else { return }
-        let body = try jsonEncoder.encode(items)
+        let dtos = items.map { SupabaseAttachmentRecord(attachment: $0) }
+        let body = try jsonEncoder.encode(dtos)
         let endpoint = "attachments"
         let request = try makeRequest(endpoint: endpoint, method: "POST", body: body, preferMerge: true)
         let (data, response) = try await session.data(for: request)
@@ -1040,6 +1061,358 @@ public struct SupabasePlaybookRecord: Codable {
             description: description,
             rules: parsedRules,
             createdAt: FlexibleDateParser.parse(createdAt) ?? Date()
+        )
+    }
+}
+
+public struct SupabaseAccountRecord: Codable {
+    public let id: String
+    public let name: String
+    public let broker: String
+    public let kind: String
+    public let currency: String
+    public let initialBalance: Double
+    public let profitCalcMethod: String
+    public let autoSync: Bool
+    public let lastSyncAt: String?
+    public let archivedAt: String?
+    public let createdAt: String
+    
+    private enum CodingKeys: String, CodingKey {
+        case id, name, broker, kind, currency
+        case initialBalance = "initial_balance"
+        case profitCalcMethod = "profit_calc_method"
+        case autoSync = "auto_sync"
+        case lastSyncAt = "last_sync_at"
+        case archivedAt = "archived_at"
+        case createdAt = "created_at"
+    }
+    
+    public init(account: Account) {
+        let fmt = ISO8601DateFormatter()
+        self.id = account.id
+        self.name = account.name
+        self.broker = account.broker
+        self.kind = account.kind.rawValue
+        self.currency = account.currency
+        self.initialBalance = (account.initialBalance as NSDecimalNumber).doubleValue
+        self.profitCalcMethod = account.profitCalcMethod.rawValue
+        self.autoSync = account.autoSync
+        self.lastSyncAt = account.lastSyncAt.map { fmt.string(from: $0) }
+        self.archivedAt = account.archivedAt.map { fmt.string(from: $0) }
+        self.createdAt = fmt.string(from: account.createdAt)
+    }
+    
+    public func toAccount() -> Account {
+        let parsedLastSync = FlexibleDateParser.parse(lastSyncAt)
+        let parsedArchived = FlexibleDateParser.parse(archivedAt)
+        let parsedCreated = FlexibleDateParser.parse(createdAt) ?? Date()
+        
+        return Account(
+            id: id,
+            name: name,
+            broker: broker,
+            kind: AccountKind(rawValue: kind) ?? .manual,
+            currency: currency,
+            initialBalance: Decimal(initialBalance),
+            profitCalcMethod: ProfitCalcMethod(rawValue: profitCalcMethod) ?? .fifo,
+            autoSync: autoSync,
+            lastSyncAt: parsedLastSync,
+            archivedAt: parsedArchived,
+            createdAt: parsedCreated
+        )
+    }
+}
+
+public struct SupabasePropAccountRecord: Codable {
+    public let id: String
+    public let firm: String
+    public let name: String
+    public let program: String
+    public let status: String
+    public let currency: String
+    public let sizeMinor: Int64?
+    public let parentId: String?
+    public let journalAccountId: String?
+    public let openedOn: String
+    public let closedOn: String?
+    public let renewalOn: String?
+    public let renewalMinor: Int64?
+    public let notes: String
+    public let archived: Bool
+    public let revision: Int
+    public let createdAt: String?
+    public let updatedAt: String?
+    
+    private enum CodingKeys: String, CodingKey {
+        case id, firm, name, program, status, currency, notes, archived, revision
+        case sizeMinor = "size_minor"
+        case parentId = "parent_id"
+        case journalAccountId = "journal_account_id"
+        case openedOn = "opened_on"
+        case closedOn = "closed_on"
+        case renewalOn = "renewal_on"
+        case renewalMinor = "renewal_minor"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+    }
+    
+    public init(item: PropAccountItem) {
+        self.id = item.id
+        self.firm = item.firm
+        self.name = item.name
+        self.program = item.program.rawValue
+        self.status = item.status.rawValue
+        self.currency = item.currency
+        self.sizeMinor = item.sizeMinor
+        self.parentId = item.parentId
+        self.journalAccountId = item.journalAccountId
+        self.openedOn = item.openedOn
+        self.closedOn = item.closedOn
+        self.renewalOn = item.renewalOn
+        self.renewalMinor = item.renewalMinor
+        self.notes = item.notes
+        self.archived = item.archived
+        self.revision = item.revision
+        self.createdAt = item.createdAt
+        self.updatedAt = item.updatedAt
+    }
+    
+    public func toItem() -> PropAccountItem {
+        return PropAccountItem(
+            id: id,
+            firm: firm,
+            name: name,
+            program: PropProgram(rawValue: program) ?? .evaluation,
+            status: PropStatus(rawValue: status) ?? .active,
+            currency: currency,
+            sizeMinor: sizeMinor,
+            parentId: parentId,
+            journalAccountId: journalAccountId,
+            openedOn: openedOn,
+            closedOn: closedOn,
+            renewalOn: renewalOn,
+            renewalMinor: renewalMinor,
+            notes: notes,
+            archived: archived,
+            revision: revision,
+            createdAt: createdAt ?? JournalIds.nowIso(),
+            updatedAt: updatedAt ?? JournalIds.nowIso()
+        )
+    }
+}
+
+public struct SupabasePropEntryRecord: Codable {
+    public let id: String
+    public let accountId: String?
+    public let firm: String
+    public let kind: String
+    public let category: String
+    public let currency: String
+    public let amountMinor: Int64
+    public let splitBps: Int
+    public let feeMinor: Int64
+    public let occurredOn: String
+    public let dueOn: String?
+    public let status: String
+    public let parentId: String?
+    public let reference: String
+    public let notes: String
+    public let voided: Bool
+    public let revision: Int
+    public let createdAt: String?
+    public let updatedAt: String?
+    
+    private enum CodingKeys: String, CodingKey {
+        case id, firm, kind, category, currency, reference, notes, voided, revision
+        case accountId = "account_id"
+        case amountMinor = "amount_minor"
+        case splitBps = "split_bps"
+        case feeMinor = "fee_minor"
+        case occurredOn = "occurred_on"
+        case dueOn = "due_on"
+        case status
+        case parentId = "parent_id"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+    }
+    
+    public init(item: PropEntryItem) {
+        self.id = item.id
+        self.accountId = item.accountId
+        self.firm = item.firm
+        self.kind = item.kind
+        self.category = item.category
+        self.currency = item.currency
+        self.amountMinor = item.amountMinor
+        self.splitBps = item.splitBps
+        self.feeMinor = item.feeMinor
+        self.occurredOn = item.occurredOn
+        self.dueOn = item.dueOn
+        self.status = item.status.rawValue
+        self.parentId = item.parentId
+        self.reference = item.reference
+        self.notes = item.notes
+        self.voided = item.voided
+        self.revision = item.revision
+        self.createdAt = item.createdAt
+        self.updatedAt = item.updatedAt
+    }
+    
+    public func toItem() -> PropEntryItem {
+        return PropEntryItem(
+            id: id,
+            accountId: accountId,
+            firm: firm,
+            kind: kind,
+            category: category,
+            currency: currency,
+            amountMinor: amountMinor,
+            splitBps: splitBps,
+            feeMinor: feeMinor,
+            occurredOn: occurredOn,
+            dueOn: dueOn,
+            status: PayoutStatus(rawValue: status) ?? .completed,
+            parentId: parentId,
+            reference: reference,
+            notes: notes,
+            voided: voided,
+            revision: revision,
+            createdAt: createdAt ?? JournalIds.nowIso(),
+            updatedAt: updatedAt ?? JournalIds.nowIso()
+        )
+    }
+}
+
+public struct SupabasePropReceiptRecord: Codable {
+    public let id: String
+    public let payoutId: String
+    public let kind: String
+    public let amountMinor: Int64
+    public let occurredOn: String
+    public let reference: String
+    public let notes: String
+    public let voided: Bool
+    public let createdAt: String?
+    
+    private enum CodingKeys: String, CodingKey {
+        case id, kind, reference, notes, voided
+        case payoutId = "payout_id"
+        case amountMinor = "amount_minor"
+        case occurredOn = "occurred_on"
+        case createdAt = "created_at"
+    }
+    
+    public init(item: PropReceiptItem) {
+        self.id = item.id
+        self.payoutId = item.payoutId
+        self.kind = item.kind
+        self.amountMinor = item.amountMinor
+        self.occurredOn = item.occurredOn
+        self.reference = item.reference
+        self.notes = item.notes
+        self.voided = item.voided
+        self.createdAt = item.createdAt
+    }
+    
+    public func toItem() -> PropReceiptItem {
+        return PropReceiptItem(
+            id: id,
+            payoutId: payoutId,
+            kind: kind,
+            amountMinor: amountMinor,
+            occurredOn: occurredOn,
+            reference: reference,
+            notes: notes,
+            voided: voided,
+            createdAt: createdAt ?? JournalIds.nowIso()
+        )
+    }
+}
+
+public struct SupabasePropAuditRecord: Codable {
+    public let id: String
+    public let entityType: String
+    public let entityId: String
+    public let beforeJson: String?
+    public let afterJson: String
+    public let reason: String
+    public let createdAt: String?
+    
+    private enum CodingKeys: String, CodingKey {
+        case id, reason
+        case entityType = "entity_type"
+        case entityId = "entity_id"
+        case beforeJson = "before_json"
+        case afterJson = "after_json"
+        case createdAt = "created_at"
+    }
+    
+    public init(item: PropAuditItem) {
+        self.id = item.id
+        self.entityType = item.entityType
+        self.entityId = item.entityId
+        self.beforeJson = item.beforeJson
+        self.afterJson = item.afterJson
+        self.reason = item.reason
+        self.createdAt = item.createdAt
+    }
+    
+    public func toItem() -> PropAuditItem {
+        return PropAuditItem(
+            id: id,
+            entityType: entityType,
+            entityId: entityId,
+            beforeJson: beforeJson,
+            afterJson: afterJson,
+            reason: reason,
+            createdAt: createdAt ?? JournalIds.nowIso()
+        )
+    }
+}
+
+public struct SupabaseAttachmentRecord: Codable {
+    public let id: String
+    public let ownerType: String
+    public let ownerId: String
+    public let name: String
+    public let mime: String
+    public let size: Int
+    public let storagePath: String
+    public let status: String
+    public let createdAt: String?
+    
+    private enum CodingKeys: String, CodingKey {
+        case id, name, mime, size, status
+        case ownerType = "owner_type"
+        case ownerId = "owner_id"
+        case storagePath = "storage_path"
+        case createdAt = "created_at"
+    }
+    
+    public init(attachment: Attachment) {
+        self.id = attachment.id
+        self.ownerType = attachment.ownerType
+        self.ownerId = attachment.ownerId
+        self.name = attachment.name
+        self.mime = attachment.mime
+        self.size = attachment.size
+        self.storagePath = attachment.storagePath
+        self.status = attachment.status
+        self.createdAt = attachment.createdAt
+    }
+    
+    public func toAttachment() -> Attachment {
+        return Attachment(
+            id: id,
+            ownerType: ownerType,
+            ownerId: ownerId,
+            name: name,
+            mime: mime,
+            size: size,
+            storagePath: storagePath,
+            status: status,
+            createdAt: createdAt ?? JournalIds.nowIso()
         )
     }
 }
