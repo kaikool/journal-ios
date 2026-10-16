@@ -804,21 +804,16 @@ public final class The5ersService: ObservableObject {
             
             if let tIdx = dataStore.trades.firstIndex(where: { $0.key == tradeKey }) {
                 var existing = dataStore.trades[tIdx]
-                // Cập nhật các trường dữ liệu sàn thực tế
-                existing.symbol = symbol
-                existing.direction = dir
+                // Cập nhật các trường dữ liệu sàn thực tế có thể thay đổi khi đóng vị thế
                 existing.status = status
-                existing.openedAt = openDate
                 existing.closedAt = isClosed ? (closeDate ?? openDate) : nil
-                existing.quantity = qty
                 existing.openQuantity = isClosed ? 0 : qty
-                existing.avgEntry = entry
                 existing.avgExit = exit
                 existing.grossPnl = netPnl + fee + swap
                 existing.fees = -(abs(fee) + abs(swap))
                 existing.netPnl = netPnl
                 // Bảo toàn 100% annotations cá nhân của trader (notes, tags, mistakes, playbook, rating,...)
-                if existing.notes.isEmpty {
+                if existing.notes == nil || existing.notes?.isEmpty == true {
                     existing.notes = "Vị thế được đồng bộ từ The5ers Hub (Ticket: \(pId))"
                 }
                 dataStore.trades[tIdx] = existing
