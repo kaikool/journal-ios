@@ -1,13 +1,13 @@
 import Foundation
 
-public struct FeeRule: Codable, Equatable, Identifiable {
-    public let id: String
-    public let accountId: String
-    public let symbol: String
-    public let amount: Decimal
-    public let mode: String // "execution" | "unit"
+public struct FeeRule: Codable, Equatable, Identifiable, Sendable {
+    public var id: String
+    public var accountId: String
+    public var symbol: String
+    public var amount: Decimal
+    public var mode: String // "execution" | "unit"
     
-    public init(id: String = UUID().uuidString, accountId: String, symbol: String, amount: Decimal, mode: String = "unit") {
+    public init(id: String = UUID().uuidString, accountId: String = "", symbol: String = "", amount: Decimal = 0, mode: String = "unit") {
         self.id = id
         self.accountId = accountId
         self.symbol = symbol
@@ -16,15 +16,15 @@ public struct FeeRule: Codable, Equatable, Identifiable {
     }
 }
 
-public struct RiskRule: Codable, Equatable, Identifiable {
-    public let id: String
-    public let accountId: String
-    public let symbol: String
-    public let stop: Decimal
-    public let target: Decimal
-    public let mode: String // "price" | "percent"
+public struct RiskRule: Codable, Equatable, Identifiable, Sendable {
+    public var id: String
+    public var accountId: String
+    public var symbol: String
+    public var stop: Decimal
+    public var target: Decimal
+    public var mode: String // "price" | "percent"
     
-    public init(id: String = UUID().uuidString, accountId: String, symbol: String, stop: Decimal, target: Decimal, mode: String = "price") {
+    public init(id: String = UUID().uuidString, accountId: String = "", symbol: String = "", stop: Decimal = 1, target: Decimal = 2, mode: String = "price") {
         self.id = id
         self.accountId = accountId
         self.symbol = symbol

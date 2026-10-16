@@ -25,6 +25,10 @@ public final class TradeDataStore: ObservableObject {
     @Published public var playbooks: [Playbook] = []
     @Published public var playbookAssessments: [PlaybookRuleAssessment] = []
     @Published public var calendarNotes: [String: JournalNote] = [:]
+    @Published public var generalSettings: GeneralSettingsConfig = .default
+    @Published public var currencyConversion: CurrencyConversion = .default
+    @Published public var marketConnections: MarketConnectionConfig = .default
+    @Published public var aiSettings: AiSettingsConfig = .default
     @Published public var isSyncing: Bool = false
     @Published public var lastSyncError: String? = nil
     
@@ -713,6 +717,10 @@ public final class TradeDataStore: ObservableObject {
         let playbooks: [Playbook]?
         let playbookAssessments: [PlaybookRuleAssessment]?
         let calendarNotes: [String: JournalNote]?
+        let generalSettings: GeneralSettingsConfig?
+        let currencyConversion: CurrencyConversion?
+        let marketConnections: MarketConnectionConfig?
+        let aiSettings: AiSettingsConfig?
     }
     
     public func saveToDisk() {
@@ -733,7 +741,11 @@ public final class TradeDataStore: ObservableObject {
             attachments: attachments,
             playbooks: playbooks,
             playbookAssessments: playbookAssessments,
-            calendarNotes: calendarNotes
+            calendarNotes: calendarNotes,
+            generalSettings: generalSettings,
+            currencyConversion: currencyConversion,
+            marketConnections: marketConnections,
+            aiSettings: aiSettings
         )
         do {
             let data = try JSONEncoder().encode(store)
@@ -765,6 +777,10 @@ public final class TradeDataStore: ObservableObject {
             self.playbooks = store.playbooks ?? Self.defaultPlaybooks
             self.playbookAssessments = store.playbookAssessments ?? []
             self.calendarNotes = store.calendarNotes ?? [:]
+            self.generalSettings = store.generalSettings ?? .default
+            self.currencyConversion = store.currencyConversion ?? .default
+            self.marketConnections = store.marketConnections ?? .default
+            self.aiSettings = store.aiSettings ?? .default
             self.executionHashes = Set(store.executions.map { $0.contentHash })
             
             if self.propAccounts.isEmpty {
@@ -1223,4 +1239,39 @@ public final class TradeDataStore: ObservableObject {
         saveToDisk()
         AppLogger.info("Reset all trading data to blank state.")
     }
+    
+    /// Xuất danh sách giao dịch sang định dạng CSV 1:1 theo `api/export/route.ts`
+    public func exportTradesCsv() -> String {
+        let header = "key,account_id,symbol,direction,status,opened_at,closed_at,quantity,avg_entry,avg_exit,gross_pnl,fees,net_pnl,tags,notes"
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime]
+        
+        var lines = [header]
+        for t in trades {
+            let key = t.key
+            let accId = t.accountId
+            let symbol = t.symbol
+            let direction = t.direction.rawValue
+            let status = t.status.rawValue
+            let openedAt = iso.string(from: t.openedAt)
+            let closedAt = t.closedAt.map { iso.string(from: $0) } ?? ""
+            let qty = "\(t.quantity)"
+            let avgEntry = "\(t.avgEntry)"
+            let avgExit = t.avgExit.map { "\($0)" } ?? ""
+            let grossPnl = "\(t.grossPnl)"
+            let fees = "\(t.fees)"
+            let netPnl = "\(t.netPnl)"
+            
+            let tagsJson = (try? String(data: JSONEncoder().encode(t.tags), encoding: .utf8)) ?? "[]"
+            let tagsCell = "\"" + tagsJson.replacingOccurrences(of: "\"", with: "\"\"") + "\""
+            let notesCell = "\"" + (t.notes ?? "").replacingOccurrences(of: "\"", with: "\"\"") + "\""
+            
+            let row = [
+                key, accId, symbol, direction, status, openedAt, closedAt, qty, avgEntry, avgExit, grossPnl, fees, netPnl, tagsCell, notesCell
+            ].joined(separator: ",")
+            lines.append(row)
+        }
+        return lines.joined(separator: "\n")
+    }
 }
+
