@@ -22,6 +22,9 @@ public final class TradeDataStore: ObservableObject {
     @Published public var propReceipts: [PropReceiptItem] = []
     @Published public var propAudits: [PropAuditItem] = []
     @Published public var attachments: [Attachment] = []
+    @Published public var playbooks: [Playbook] = []
+    @Published public var playbookAssessments: [PlaybookRuleAssessment] = []
+    @Published public var calendarNotes: [String: JournalNote] = [:]
     @Published public var isSyncing: Bool = false
     @Published public var lastSyncError: String? = nil
     
@@ -39,6 +42,15 @@ public final class TradeDataStore: ObservableObject {
         }
         if folders.isEmpty {
             folders = NotebookEngine.defaultSystemFolders
+        }
+        if propAccounts.isEmpty {
+            createInitialPropDemoData()
+        }
+        if playbooks.isEmpty {
+            playbooks = Self.defaultPlaybooks
+        }
+        if executions.isEmpty && trades.isEmpty {
+            seedDemoTradingData()
         }
         rebuildAllAccounts()
     }
@@ -698,9 +710,12 @@ public final class TradeDataStore: ObservableObject {
         let propReceipts: [PropReceiptItem]?
         let propAudits: [PropAuditItem]?
         let attachments: [Attachment]?
+        let playbooks: [Playbook]?
+        let playbookAssessments: [PlaybookRuleAssessment]?
+        let calendarNotes: [String: JournalNote]?
     }
     
-    private func saveToDisk() {
+    public func saveToDisk() {
         let store = PersistedStore(
             accounts: accounts,
             executions: executions,
@@ -715,7 +730,10 @@ public final class TradeDataStore: ObservableObject {
             propEntries: propEntries,
             propReceipts: propReceipts,
             propAudits: propAudits,
-            attachments: attachments
+            attachments: attachments,
+            playbooks: playbooks,
+            playbookAssessments: playbookAssessments,
+            calendarNotes: calendarNotes
         )
         do {
             let data = try JSONEncoder().encode(store)
@@ -744,6 +762,9 @@ public final class TradeDataStore: ObservableObject {
             self.propReceipts = store.propReceipts ?? []
             self.propAudits = store.propAudits ?? []
             self.attachments = store.attachments ?? []
+            self.playbooks = store.playbooks ?? Self.defaultPlaybooks
+            self.playbookAssessments = store.playbookAssessments ?? []
+            self.calendarNotes = store.calendarNotes ?? [:]
             self.executionHashes = Set(store.executions.map { $0.contentHash })
             
             if self.propAccounts.isEmpty {
@@ -854,5 +875,352 @@ public final class TradeDataStore: ObservableObject {
         self.propEntries = [e1, e2, e3]
         self.propReceipts = [r1]
         saveToDisk()
+    }
+    
+    // MARK: - Manual Trade Management (Port from source-repo ManualTradeEntry)
+    
+    public func addManualTrade(
+        accountId: String,
+        symbol: String,
+        direction: TradeDirection,
+        quantity: Decimal,
+        entryPrice: Decimal,
+        exitPrice: Decimal?,
+        openedAt: Date,
+        closedAt: Date?,
+        fee: Decimal = 0,
+        notes: String? = nil,
+        tags: [String] = [],
+        mistakes: [String] = [],
+        rating: Int? = nil,
+        stopLoss: Decimal? = nil,
+        profitTarget: Decimal? = nil,
+        playbookId: String? = nil
+    ) {
+        let cleanSymbol = symbol.uppercased().trimmingCharacters(in: .whitespaces)
+        let entrySide: ExecutionSide = (direction == .long) ? .buy : .sell
+        let halfFee = (exitPrice != nil) ? (fee / 2) : fee
+        
+        let entryFill = Execution(
+            accountId: accountId,
+            symbol: cleanSymbol,
+            side: entrySide,
+            quantity: quantity,
+            price: entryPrice,
+            fee: halfFee,
+            executedAt: openedAt,
+            source: "manual"
+        )
+        
+        var newExecutions = [entryFill]
+        
+        if let exitP = exitPrice {
+            let exitSide: ExecutionSide = (direction == .long) ? .sell : .buy
+            let exitTime = closedAt ?? openedAt.addingTimeInterval(3600)
+            let exitFill = Execution(
+                accountId: accountId,
+                symbol: cleanSymbol,
+                side: exitSide,
+                quantity: quantity,
+                price: exitP,
+                fee: halfFee,
+                executedAt: exitTime,
+                source: "manual"
+            )
+            newExecutions.append(exitFill)
+        }
+        
+        for fill in newExecutions {
+            executionHashes.insert(fill.contentHash)
+            executions.append(fill)
+        }
+        
+        rebuildAccount(accountId: accountId)
+        
+        // Find the newly reconstructed trade and set user annotations
+        if let idx = trades.firstIndex(where: { t in
+            t.accountId == accountId &&
+            t.symbol == cleanSymbol &&
+            abs(t.openedAt.timeIntervalSince(openedAt)) < 2
+        }) {
+            trades[idx].notes = notes
+            trades[idx].tags = tags
+            trades[idx].mistakes = mistakes
+            trades[idx].rating = rating
+            trades[idx].stopLoss = stopLoss
+            trades[idx].profitTarget = profitTarget
+            trades[idx].playbookId = playbookId
+        }
+        
+        saveToDisk()
+        AppLogger.info("Added manual trade for \(cleanSymbol). Total trades now: \(trades.count)")
+    }
+    
+    public func deleteTrade(key: String) {
+        guard let trade = trades.first(where: { $0.key == key }) else { return }
+        let idsToDelete = Set(trade.executionIds)
+        
+        let deletedFills = executions.filter { idsToDelete.contains($0.id) }
+        for fill in deletedFills {
+            executionHashes.remove(fill.contentHash)
+        }
+        executions.removeAll { idsToDelete.contains($0.id) }
+        
+        rebuildAccount(accountId: trade.accountId)
+        saveToDisk()
+        AppLogger.info("Deleted trade \(key), remaining trades: \(trades.count)")
+    }
+    
+    // MARK: - Playbooks & Discipline Assessments
+    
+    public static let defaultPlaybooks: [Playbook] = [
+        Playbook(
+            id: "pb-fvg",
+            name: "Liquidity Sweep & FVG",
+            description: "Quét thanh khoản phiên Á hoặc đỉnh/đáy ngày hôm trước kết hợp Fair Value Gap.",
+            rules: [
+                "Giá đã quét liquidity pool rõ ràng",
+                "Khung M5/M15 xuất hiện Market Structure Shift (MSS)",
+                "Entry tại FVG hoặc Order Block",
+                "Stop loss đặt sau điểm swing high/low",
+                "RR tối thiểu 1:2"
+            ],
+            targetWinRate: 0.60
+        ),
+        Playbook(
+            id: "pb-london-breakout",
+            name: "London Open Breakout",
+            description: "Đánh theo đà bứt phá biên độ phiên Á khi phiên London mở cửa (08:00 UTC).",
+            rules: [
+                "Biên độ phiên Á hẹp (< 30 pips / điểm)",
+                "Cây nến H1 đầu tiên đóng dứt khoát ngoài biên độ",
+                "Volume đột biến xác nhận",
+                "Không giữ lệnh qua tin tức lớn"
+            ],
+            targetWinRate: 0.55
+        ),
+        Playbook(
+            id: "pb-trend-pullback",
+            name: "Trend Pullback EMA 20/50",
+            description: "Đánh thuận xu hướng khi giá hồi quy về cụm đường trung bình động EMA.",
+            rules: [
+                "Xu hướng khung H1 và M15 đồng thuận",
+                "Nến từ chối (Pinbar / Engulfing) xuất hiện tại vùng EMA 20",
+                "RSI không rơi vào trạng thái quá mua/quá bán nghịch chiều",
+                "Chốt lời từng phần tại đỉnh/đáy cũ"
+            ],
+            targetWinRate: 0.65
+        )
+    ]
+    
+    public func savePlaybook(_ playbook: Playbook) {
+        if let idx = playbooks.firstIndex(where: { $0.id == playbook.id }) {
+            playbooks[idx] = playbook
+        } else {
+            playbooks.append(playbook)
+        }
+        saveToDisk()
+    }
+    
+    public func deletePlaybook(id: String) {
+        playbooks.removeAll { $0.id == id }
+        playbookAssessments.removeAll { $0.playbookId == id }
+        saveToDisk()
+    }
+    
+    public func setRuleAssessment(tradeKey: String, playbookId: String, rule: String, followed: Bool) {
+        let assessment = PlaybookRuleAssessment(tradeKey: tradeKey, playbookId: playbookId, rule: rule, followed: followed)
+        if let idx = playbookAssessments.firstIndex(where: { $0.id == assessment.id }) {
+            playbookAssessments[idx] = assessment
+        } else {
+            playbookAssessments.append(assessment)
+        }
+        saveToDisk()
+    }
+    
+    // MARK: - Calendar Notes
+    
+    public func saveCalendarNote(_ note: JournalNote) {
+        calendarNotes[note.date] = note
+        saveToDisk()
+    }
+    
+    public func deleteCalendarNote(for date: String) {
+        calendarNotes.removeValue(forKey: date)
+        saveToDisk()
+    }
+    
+    // MARK: - Demo Seeding & Data Reset
+    
+    public func seedDemoTradingData() {
+        let targetAccount = selectedAccount ?? accounts.first
+        guard let account = targetAccount else { return }
+        
+        if playbooks.isEmpty {
+            playbooks = Self.defaultPlaybooks
+        }
+        
+        if notebookNotes.isEmpty {
+            let note1 = NotebookNote(
+                folderId: NotebookEngine.systemFolderMyNotes,
+                title: "Nguyên Tắc Quản Trị Rủi Ro Cốt Lõi",
+                content: """
+                # Kỷ luật giao dịch là sống còn
+                1. Rủi ro tối đa mỗi lệnh không vượt quá 1% số dư tài khoản.
+                2. Dừng giao dịch trong ngày nếu chạm Max Daily Loss (3%).
+                3. Không bao giờ dời Stop Loss ra xa khi giá đang chạy ngược chiều.
+                4. Luôn ghi chép nhật ký ngay sau khi đóng lệnh để tránh sai số tâm lý.
+                """
+            )
+            let note2 = NotebookNote(
+                folderId: NotebookEngine.systemFolderMyNotes,
+                title: "Nhận Định Phiên Giao Dịch Đầu Tuần",
+                content: """
+                Theo dõi sát vùng thanh khoản 20,200 của chỉ số NQ. Chờ phản ứng giá tại phiên New York trước khi quyết định mở vị thế swing.
+                """
+            )
+            notebookNotes = [note1, note2]
+        }
+        
+        if propAccounts.isEmpty {
+            createInitialPropDemoData()
+        }
+        
+        let now = Date()
+        let cal = Calendar.current
+        
+        struct DemoTradeDef {
+            let symbol: String
+            let dir: TradeDirection
+            let qty: Decimal
+            let entry: Decimal
+            let exit: Decimal
+            let fee: Decimal
+            let daysAgo: Int
+            let durationMin: Int
+            let notes: String
+            let tags: [String]
+            let mistakes: [String]
+            let rating: Int
+            let pbId: String?
+            let sl: Decimal
+            let tp: Decimal
+        }
+        
+        let demoDefs: [DemoTradeDef] = [
+            DemoTradeDef(
+                symbol: "NQ", dir: .long, qty: 2,
+                entry: Decimal(string: "19800.50")!, exit: Decimal(string: "19845.00")!, fee: 8,
+                daysAgo: 14, durationMin: 75,
+                notes: "Bắt đúng nhịp FVG M5 sau khi quét thanh khoản đáy phiên Á. Thoát lệnh tại đỉnh cũ.",
+                tags: ["ict", "fvg", "scalp"], mistakes: [], rating: 5, pbId: "pb-fvg",
+                sl: Decimal(string: "19780.00")!, tp: Decimal(string: "19850.00")!
+            ),
+            DemoTradeDef(
+                symbol: "NQ", dir: .short, qty: 1,
+                entry: Decimal(string: "19920.00")!, exit: Decimal(string: "19955.00")!, fee: 4,
+                daysAgo: 11, durationMin: 40,
+                notes: "Vào lệnh quá vội khi chưa có nến xác nhận MSS. Bị dính SL theo xu hướng tăng mạnh.",
+                tags: ["counter-trend"], mistakes: ["FOMO", "Vào lệnh sớm"], rating: 2, pbId: "pb-fvg",
+                sl: Decimal(string: "19950.00")!, tp: Decimal(string: "19850.00")!
+            ),
+            DemoTradeDef(
+                symbol: "ES", dir: .long, qty: 3,
+                entry: Decimal(string: "5620.25")!, exit: Decimal(string: "5632.75")!, fee: 12,
+                daysAgo: 8, durationMin: 90,
+                notes: "London breakout mở nến H1 rất đẹp, volume xác nhận dòng tiền vào rõ rệt.",
+                tags: ["breakout", "london"], mistakes: [], rating: 5, pbId: "pb-london-breakout",
+                sl: Decimal(string: "5612.00")!, tp: Decimal(string: "5635.00")!
+            ),
+            DemoTradeDef(
+                symbol: "EURUSD", dir: .long, qty: 50000,
+                entry: Decimal(string: "1.08500")!, exit: Decimal(string: "1.08585")!, fee: 3,
+                daysAgo: 6, durationMin: 120,
+                notes: "Pullback EMA 20 chuẩn xác trên M15, TP đúng target swing.",
+                tags: ["forex", "pullback"], mistakes: [], rating: 4, pbId: "pb-trend-pullback",
+                sl: Decimal(string: "1.08350")!, tp: Decimal(string: "1.08600")!
+            ),
+            DemoTradeDef(
+                symbol: "NVDA", dir: .long, qty: 50,
+                entry: Decimal(string: "128.50")!, exit: Decimal(string: "131.20")!, fee: 2,
+                daysAgo: 4, durationMin: 180,
+                notes: "Bứt phá khỏi nền giá tích lũy quanh 128 USD, chốt lời trước giờ đóng cửa.",
+                tags: ["stocks", "breakout"], mistakes: [], rating: 4, pbId: nil,
+                sl: Decimal(string: "126.00")!, tp: Decimal(string: "132.00")!
+            ),
+            DemoTradeDef(
+                symbol: "BTCUSDT", dir: .long, qty: Decimal(string: "0.2")!,
+                entry: Decimal(string: "64200.00")!, exit: Decimal(string: "65600.00")!, fee: 10,
+                daysAgo: 2, durationMin: 240,
+                notes: "Test vùng cầu khung H4, nến Pinbar rút chân mạnh.",
+                tags: ["crypto", "swing"], mistakes: [], rating: 5, pbId: "pb-fvg",
+                sl: Decimal(string: "63500.00")!, tp: Decimal(string: "66000.00")!
+            ),
+            DemoTradeDef(
+                symbol: "NQ", dir: .long, qty: 2,
+                entry: Decimal(string: "20150.00")!, exit: Decimal(string: "20185.00")!, fee: 8,
+                daysAgo: 1, durationMin: 45,
+                notes: "Sweep đáy phiên Á đầu giờ Mỹ, phản ứng mạnh tại mốc hỗ trợ.",
+                tags: ["ict", "scalp"], mistakes: [], rating: 4, pbId: "pb-fvg",
+                sl: Decimal(string: "20120.00")!, tp: Decimal(string: "20200.00")!
+            )
+        ]
+        
+        for def in demoDefs {
+            guard let openDate = cal.date(byAdding: .day, value: -def.daysAgo, to: now) else { continue }
+            let closeDate = cal.date(byAdding: .minute, value: def.durationMin, to: openDate) ?? openDate
+            
+            addManualTrade(
+                accountId: account.id,
+                symbol: def.symbol,
+                direction: def.dir,
+                quantity: def.qty,
+                entryPrice: def.entry,
+                exitPrice: def.exit,
+                openedAt: openDate,
+                closedAt: closeDate,
+                fee: def.fee,
+                notes: def.notes,
+                tags: def.tags,
+                mistakes: def.mistakes,
+                rating: def.rating,
+                stopLoss: def.sl,
+                profitTarget: def.tp,
+                playbookId: def.pbId
+            )
+        }
+        
+        let fmt = DateFormatter()
+        fmt.dateFormat = "yyyy-MM-dd"
+        let todayStr = fmt.string(from: now)
+        if let yesterday = cal.date(byAdding: .day, value: -1, to: now) {
+            let yestStr = fmt.string(from: yesterday)
+            calendarNotes[yestStr] = JournalNote(
+                date: yestStr,
+                content: "Tuân thủ kế hoạch kỷ luật tốt. Đợi đúng setup FVG phiên New York mới vào lệnh.",
+                rating: 5,
+                mood: "Bình tĩnh, tập trung",
+                tags: ["kỷ-luật", "chuẩn-bài"]
+            )
+        }
+        calendarNotes[todayStr] = JournalNote(
+            date: todayStr,
+            content: "Thị trường biến động nhẹ trước thềm tin tức CPI, kiên nhẫn quan sát và bảo toàn vốn.",
+            rating: 4,
+            mood: "Tỉnh táo",
+            tags: ["chờ-đợi"]
+        )
+        
+        saveToDisk()
+        AppLogger.info("Seeded full demo trading data successfully.")
+    }
+    
+    public func resetAllData() {
+        executions.removeAll()
+        executionHashes.removeAll()
+        trades.removeAll()
+        calendarNotes.removeAll()
+        saveToDisk()
+        AppLogger.info("Reset all trading data to blank state.")
     }
 }

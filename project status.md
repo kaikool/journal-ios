@@ -306,3 +306,21 @@
 5. **CI Build & Packaging IPA:**
    - Nâng cấp **Version 1.0.1 (Build 2)** trong `project.yml` và kích hoạt cờ `-y` zip symlinks, dọn sạch chữ ký cũ để tương thích 100% với các công cụ ký chứng chỉ và không bị lỗi kẹt tải về trên iOS.
 
+---
+
+## 5. BỔ SUNG & KHẮC PHỤC TRẢI NGHIỆM THỰC TẾ (ON-DEVICE UX REMEDIATION)
+- **Vấn đề phát hiện khi trải nghiệm thực tế trên iPhone:**
+  - Ứng dụng ban đầu chỉ tập trung kiểm thử các engine tính toán (Unit tests) mà thiếu các điểm chạm thao tác trực tiếp của người dùng.
+  - Không có màn hình nhập lệnh thủ công (`ManualTradeEntry` / `AddTradeDialog` từ web).
+  - Khởi tạo lần đầu trống trơn, mọi tab đều hiển thị 0 hoặc trắng xóa tạo cảm giác như "bản dựng cho có".
+  - Ghi chú phân tích, Playbooks, quy tắc kỷ luật và ghi chú lịch chưa được lưu bền vững (chỉ nằm ở `@State` tạm thời).
+- **Các giải pháp khắc phục triệt để đã triển khai:**
+  1. **Tạo mới `AddTradeSheet.swift`:** Port 1:1 từ `source-repo/apps/web/src/components/manual-trade-entry.tsx` & `add-trade-dialog.tsx`. Cho phép chọn tài khoản, nhập mã (Symbol với gợi ý nhanh NQ, ES, EURUSD...), hướng lệnh Long/Short, trạng thái Mở/Đóng, khối lượng, giá vào, giá ra, thời gian, phí, Stop Loss, Take Profit, Playbook, đánh giá sao, tags, sai lầm vi phạm và ghi chú tâm lý.
+  2. **Nâng cấp `TradesListView.swift`:** Bổ sung nút `+` trên thanh điều hướng, tìm kiếm theo mã/tag/ghi chú, bộ lọc Lãi/Lỗ/Đang mở, vuốt để xóa lệnh (Swipe to delete), và màn hình trống có nút thao tác nhanh.
+  3. **Nâng cấp `TradeDetailView.swift`:** Bổ sung bảng lịch sử khớp lệnh (Execution legs breakdown), tính toán R:R (Risk 1R, Planned R, Realized R), trình soạn thảo ghi chú lệnh lưu bền vững vào đĩa, checklist quy tắc Playbook, và nút xóa lệnh vĩnh viễn.
+  4. **Nâng cấp `JournalCalendarView.swift`:** Đồng bộ ghi chú ngày giao dịch vào `TradeDataStore` và lưu đĩa bền vững, bổ sung nút "+ Ghi nhận giao dịch ngày này" ngay trên bảng chi tiết ngày.
+  5. **Nâng cấp `PlaybooksView.swift`:** Chuyển toàn bộ Playbooks và đánh giá quy tắc kỷ luật sang `TradeDataStore` có lưu trữ đĩa, hỗ trợ tạo mới và xóa Playbook.
+  6. **Cơ chế nạp dữ liệu mẫu thực tế tự động (`seedDemoTradingData`):** Nếu mở app lần đầu trên thiết bị chưa có dữ liệu, app tự động nạp 7 lệnh giao dịch thực tế đa dạng (NQ, ES, EURUSD, NVDA, BTCUSDT) kèm Playbooks, ghi chú lịch và tài khoản quỹ, giúp Dashboard và các tab hoạt động sống động ngay từ giây đầu tiên.
+  7. **Cơ chế quản lý dữ liệu trong Cài đặt:** Bổ sung nút "Nạp lại dữ liệu mẫu" và "Xóa sạch dữ liệu (Bắt đầu nhật ký mới)" với cơ chế lưu đĩa đồng bộ.
+
+

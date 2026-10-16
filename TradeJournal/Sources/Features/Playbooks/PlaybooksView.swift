@@ -1,105 +1,79 @@
 import SwiftUI
 
+/// Màn hình quản lý chiến lược giao dịch & đo lường kỷ luật tuân thủ quy tắc
+/// Port 1:1 từ `source-repo/apps/web/src/app/playbooks` & `adherence.ts`
 public struct PlaybooksView: View {
     @EnvironmentObject private var env: AppEnvironment
     @ObservedObject private var dataStore = TradeDataStore.shared
     
-    @State private var playbooks: [Playbook] = [
-        Playbook(
-            id: "pb-1",
-            title: "Liquidity Sweep & FVG",
-            description: "Quét thanh khoản phiên Á hoặc đỉnh/đáy ngày hôm trước kết hợp Fair Value Gap.",
-            rules: [
-                "Giá đã quét liquidity pool rõ ràng",
-                "Khung M5/M15 xuất hiện Market Structure Shift (MSS)",
-                "Entry tại FVG hoặc Order Block",
-                "Stop loss đặt sau điểm swing high/low",
-                "RR tối thiểu 1:2"
-            ],
-            targetWinRate: 0.60
-        ),
-        Playbook(
-            id: "pb-2",
-            title: "London Open Breakout",
-            description: "Đánh theo đà bứt phá biên độ phiên Á khi phiên London mở cửa (08:00 UTC).",
-            rules: [
-                "Biên độ phiên Á hẹp (< 30 pips / điểm)",
-                "Cây nến H1 đầu tiên đóng dứt khoát ngoài biên độ",
-                "Volume đột biến xác nhận",
-                "Không giữ lệnh qua tin tức lớn"
-            ],
-            targetWinRate: 0.55
-        )
-    ]
-    
-    @State private var assessments: [PlaybookRuleAssessment] = []
     @State private var showNewPlaybookSheet: Bool = false
     
     public init() {}
     
     private var adherenceSummaries: [PlaybookAdherenceSummary] {
         AdherenceEngine.analyzeAdherence(
-            playbooks: playbooks,
+            playbooks: dataStore.playbooks,
             trades: dataStore.filteredTrades,
-            assessments: assessments
+            assessments: dataStore.playbookAssessments
         )
     }
     
     public var body: some View {
         ScrollView {
-                VStack(spacing: 16) {
-                    // Header card
-                    AppCard {
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack {
-                                Image(systemName: "book.pages.fill")
-                                    .foregroundColor(AppColors.accent)
-                                Text("Playbooks & Kỷ Luật Tuân Thủ")
-                                    .font(AppTypography.headline)
-                            }
-                            Text("Đo lường sự khác biệt về kết quả tài chính giữa việc tuân thủ 100% quy tắc và việc phá vỡ nguyên tắc.")
-                                .font(AppTypography.caption)
-                                .foregroundColor(AppColors.secondaryText)
+            VStack(spacing: 16) {
+                // Header card
+                AppCard {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Image(systemName: "book.pages.fill")
+                                .foregroundColor(AppColors.accent)
+                            Text("Playbooks & Kỷ Luật Tuân Thủ")
+                                .font(AppTypography.headline)
                         }
+                        Text("Đo lường sự khác biệt về kết quả tài chính giữa việc tuân thủ 100% quy tắc và việc phá vỡ nguyên tắc.")
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.secondaryText)
                     }
-                    
-                    if playbooks.isEmpty {
-                        EmptyStateView(
-                            icon: "book.closed",
-                            title: "Chưa có Playbook",
-                            message: "Tạo chiến lược giao dịch đầu tiên để theo dõi tỷ lệ tuân thủ kỷ luật."
-                        )
-                        .padding(.top, 40)
-                    } else {
-                        ForEach(adherenceSummaries) { summary in
-                            NavigationLink(destination: PlaybookDetailView(
-                                playbook: summary.playbook,
-                                summary: summary,
-                                trades: dataStore.filteredTrades.filter { $0.playbookId == summary.playbook.id },
-                                assessments: $assessments
-                            )) {
-                                playbookCard(summary: summary)
-                            }
-                            .buttonStyle(.plain)
+                }
+                
+                if dataStore.playbooks.isEmpty {
+                    EmptyStateView(
+                        icon: "book.closed",
+                        title: "Chưa có Playbook",
+                        message: "Tạo chiến lược giao dịch đầu tiên để theo dõi tỷ lệ tuân thủ kỷ luật."
+                    )
+                    .padding(.top, 40)
+                } else {
+                    ForEach(adherenceSummaries) { summary in
+                        NavigationLink(destination: PlaybookDetailView(
+                            playbook: summary.playbook,
+                            summary: summary,
+                            trades: dataStore.filteredTrades.filter { $0.playbookId == summary.playbook.id }
+                        )) {
+                            playbookCard(summary: summary)
                         }
-                    }
-                }
-                .padding()
-            }
-            .navigationTitle("Playbooks")
-            .background(AppColors.background)
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button(action: { showNewPlaybookSheet = true }) {
-                        Image(systemName: "plus")
+                        .buttonStyle(.plain)
                     }
                 }
             }
-            .sheet(isPresented: $showNewPlaybookSheet) {
-                NewPlaybookSheet { newPb in
-                    playbooks.append(newPb)
+            .padding()
+        }
+        .navigationTitle("Playbooks")
+        .background(AppColors.background)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button(action: { showNewPlaybookSheet = true }) {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.title3)
+                        .foregroundColor(AppColors.accent)
                 }
             }
+        }
+        .sheet(isPresented: $showNewPlaybookSheet) {
+            NewPlaybookSheet { newPb in
+                dataStore.savePlaybook(newPb)
+            }
+        }
     }
     
     private func playbookCard(summary: PlaybookAdherenceSummary) -> some View {
@@ -129,7 +103,6 @@ public struct PlaybooksView: View {
                 
                 Divider().background(AppColors.border.opacity(0.5))
                 
-                // Compare followed vs broken PnL
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Khi tuân thủ quy tắc")
@@ -159,11 +132,15 @@ public struct PlaybooksView: View {
 // MARK: - Playbook Detail View
 
 public struct PlaybookDetailView: View {
+    @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var env: AppEnvironment
+    @ObservedObject private var dataStore = TradeDataStore.shared
+    
     let playbook: Playbook
     let summary: PlaybookAdherenceSummary
     let trades: [Trade]
-    @Binding var assessments: [PlaybookRuleAssessment]
+    
+    @State private var showDeleteAlert = false
     
     public var body: some View {
         ScrollView {
@@ -196,7 +173,9 @@ public struct PlaybookDetailView: View {
                                     .foregroundColor(AppColors.primaryText)
                                 Spacer()
                             }
-                            Divider().background(AppColors.border.opacity(0.4))
+                            if index < playbook.rules.count - 1 {
+                                Divider().background(AppColors.border.opacity(0.4))
+                            }
                         }
                     }
                 }
@@ -221,7 +200,7 @@ public struct PlaybookDetailView: View {
                                             .font(AppTypography.subheadlineBold)
                                         AppBadge(
                                             text: trade.direction.rawValue.uppercased(),
-                                            color: trade.direction == .long ? AppColors.profit : AppColors.loss
+                                            color: trade.direction == .long ? AppColors.accent : AppColors.warning
                                         )
                                         Spacer()
                                         Text(Formatters.formatPnL(trade.netPnl, currency: env.currentCurrency))
@@ -232,7 +211,7 @@ public struct PlaybookDetailView: View {
                                     // Rule checkboxes for this trade
                                     VStack(alignment: .leading, spacing: 4) {
                                         ForEach(playbook.rules, id: \.self) { rule in
-                                            let followed = assessments.first(where: {
+                                            let followed = dataStore.playbookAssessments.first(where: {
                                                 $0.tradeKey == trade.key && $0.playbookId == playbook.id && $0.rule == rule
                                             })?.followed ?? false
                                             
@@ -240,7 +219,7 @@ public struct PlaybookDetailView: View {
                                                 Image(systemName: followed ? "checkmark.square.fill" : "square")
                                                     .foregroundColor(followed ? AppColors.profit : AppColors.secondaryText)
                                                     .onTapGesture {
-                                                        toggleRule(tradeKey: trade.key, rule: rule, current: followed)
+                                                        dataStore.setRuleAssessment(tradeKey: trade.key, playbookId: playbook.id, rule: rule, followed: !followed)
                                                     }
                                                 Text(rule)
                                                     .font(AppTypography.caption)
@@ -254,18 +233,34 @@ public struct PlaybookDetailView: View {
                         }
                     }
                 }
+                
+                // Delete Playbook Button
+                Button(role: .destructive, action: { showDeleteAlert = true }) {
+                    HStack {
+                        Image(systemName: "trash")
+                        Text("Xóa Playbook Này")
+                    }
+                    .font(AppTypography.captionBold)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(AppColors.loss.opacity(0.1))
+                    .foregroundColor(AppColors.loss)
+                    .cornerRadius(12)
+                }
+                .padding(.top, 8)
             }
             .padding()
         }
         .navigationTitle(playbook.title)
         .background(AppColors.background)
-    }
-    
-    private func toggleRule(tradeKey: String, rule: String, current: Bool) {
-        if let idx = assessments.firstIndex(where: { $0.tradeKey == tradeKey && $0.playbookId == playbook.id && $0.rule == rule }) {
-            assessments[idx] = PlaybookRuleAssessment(tradeKey: tradeKey, playbookId: playbook.id, rule: rule, followed: !current)
-        } else {
-            assessments.append(PlaybookRuleAssessment(tradeKey: tradeKey, playbookId: playbook.id, rule: rule, followed: true))
+        .alert("Xóa playbook “\(playbook.title)”? ", isPresented: $showDeleteAlert) {
+            Button("Hủy", role: .cancel) {}
+            Button("Xóa", role: .destructive) {
+                dataStore.deletePlaybook(id: playbook.id)
+                dismiss()
+            }
+        } message: {
+            Text("Chiến lược này và các đánh giá quy tắc liên quan sẽ bị xóa.")
         }
     }
 }
@@ -274,54 +269,65 @@ public struct PlaybookDetailView: View {
 
 public struct NewPlaybookSheet: View {
     @Environment(\.dismiss) private var dismiss
+    
     @State private var title: String = ""
     @State private var description: String = ""
-    @State private var newRuleText: String = ""
     @State private var rules: [String] = []
+    @State private var currentRuleInput: String = ""
     
     var onSave: (Playbook) -> Void
     
     public var body: some View {
         NavigationStack {
             Form {
-                Section("Thông tin chiến lược") {
-                    TextField("Tên Playbook (VD: ICT Silver Bullet)", text: $title)
-                    TextField("Mô tả tóm tắt", text: $description)
+                Section("Tên & Mô tả") {
+                    TextField("Tên Playbook (VD: London Breakout)", text: $title)
+                    TextField("Mô tả chiến lược...", text: $description)
                 }
                 
-                Section("Danh sách quy tắc") {
-                    ForEach(rules, id: \.self) { rule in
-                        Text(rule)
-                    }
-                    .onDelete { indices in
-                        rules.remove(atOffsets: indices)
+                Section("Quy tắc bắt buộc") {
+                    ForEach(Array(rules.enumerated()), id: \.offset) { index, rule in
+                        HStack {
+                            Text("\(index + 1). \(rule)")
+                                .font(AppTypography.caption)
+                            Spacer()
+                            Button(action: { rules.remove(at: index) }) {
+                                Image(systemName: "minus.circle.fill")
+                                    .foregroundColor(AppColors.loss)
+                            }
+                        }
                     }
                     
                     HStack {
-                        TextField("Thêm quy tắc mới...", text: $newRuleText)
+                        TextField("Thêm quy tắc mới...", text: $currentRuleInput)
                         Button("Thêm") {
-                            guard !newRuleText.trimmingCharacters(in: .whitespaces).isEmpty else { return }
-                            rules.append(newRuleText.trimmingCharacters(in: .whitespaces))
-                            newRuleText = ""
+                            let clean = currentRuleInput.trimmingCharacters(in: .whitespaces)
+                            if !clean.isEmpty {
+                                rules.append(clean)
+                                currentRuleInput = ""
+                            }
                         }
+                        .disabled(currentRuleInput.trimmingCharacters(in: .whitespaces).isEmpty)
                     }
                 }
             }
-            .navigationTitle("Tạo Playbook mới")
+            .navigationTitle("Tạo Playbook Mới")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Hủy") { dismiss() }
+                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Lưu") {
-                        let pb = Playbook(title: title, description: description, rules: rules)
+                        let pb = Playbook(
+                            title: title.isEmpty ? "New Playbook" : title,
+                            description: description,
+                            rules: rules
+                        )
                         onSave(pb)
                         dismiss()
                     }
                     .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty)
-                }
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Hủy") {
-                        dismiss()
-                    }
                 }
             }
         }

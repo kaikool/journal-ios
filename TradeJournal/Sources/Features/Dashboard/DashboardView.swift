@@ -28,6 +28,7 @@ public struct DashboardView: View {
     @State private var selectedChartTab: DashboardChartTab = .equity
     @State private var showEdgeScoreBreakdown: Bool = false
     @State private var showAIReflection: Bool = false
+    @State private var showAddTradeSheet: Bool = false
     
     public init() {}
     
@@ -99,6 +100,32 @@ public struct DashboardView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 16) {
+                    if dataStore.filteredTrades.isEmpty {
+                        AppCard {
+                            VStack(spacing: 12) {
+                                HStack {
+                                    Image(systemName: "sparkles")
+                                        .foregroundColor(AppColors.accent)
+                                    Text("Chào mừng đến với Trade Journal")
+                                        .font(AppTypography.headline)
+                                    Spacer()
+                                }
+                                Text("Chưa có giao dịch nào được ghi nhận. Bạn có thể nạp ngay bộ dữ liệu mẫu thực tế để trải nghiệm toàn bộ biểu đồ và phân tích.")
+                                    .font(AppTypography.caption)
+                                    .foregroundColor(AppColors.secondaryText)
+                                
+                                HStack(spacing: 12) {
+                                    AppButton("Nạp Dữ Liệu Mẫu", icon: "arrow.triangle.2.circlepath", style: .primary) {
+                                        dataStore.seedDemoTradingData()
+                                    }
+                                    AppButton("Ghi Nhận Lệnh", icon: "plus.circle", style: .secondary) {
+                                        showAddTradeSheet = true
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
                     // Time Range Selector
                     Picker("Khoảng thời gian", selection: $selectedTimeRange) {
                         ForEach(DashboardTimeRange.allCases) { range in
@@ -346,15 +373,25 @@ public struct DashboardView: View {
             .navigationTitle("Dashboard")
             .background(AppColors.background)
             .toolbar {
-                ToolbarItem(placement: .primaryAction) {
+                ToolbarItem(placement: .navigationBarLeading) {
                     Button(action: { showAIReflection = true }) {
                         Image(systemName: "sparkles")
+                            .foregroundColor(AppColors.accent)
+                    }
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    Button(action: { showAddTradeSheet = true }) {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.title3)
                             .foregroundColor(AppColors.accent)
                     }
                 }
             }
             .sheet(isPresented: $showAIReflection) {
                 AIReflectionView()
+            }
+            .sheet(isPresented: $showAddTradeSheet) {
+                AddTradeSheet()
             }
         }
     }

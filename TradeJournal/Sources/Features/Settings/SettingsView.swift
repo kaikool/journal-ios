@@ -78,13 +78,18 @@ public struct SettingsView: View {
                 }
                 
                 // Section: Backup & Export
-                Section("Sao Lưu Dữ Liệu & Xuất File") {
+                Section("Quản Lý Dữ Liệu & Sao Lưu") {
+                    Button(action: { dataStore.seedDemoTradingData() }) {
+                        Label("Nạp lại bộ dữ liệu giao dịch mẫu", systemImage: "arrow.triangle.2.circlepath")
+                            .foregroundColor(AppColors.accent)
+                    }
+                    
                     Button(action: { exportFullJsonBackup() }) {
                         Label("Xuất bản sao lưu JSON toàn bộ", systemImage: "square.and.arrow.up")
                     }
                     
                     Button(role: .destructive, action: { showResetConfirmation = true }) {
-                        Label("Xóa sạch dữ liệu mẫu & nạp lại", systemImage: "trash")
+                        Label("Xóa sạch dữ liệu (Bắt đầu nhật ký mới)", systemImage: "trash")
                     }
                 }
                 
@@ -136,21 +141,23 @@ public struct SettingsView: View {
             .navigationTitle("Cài Đặt")
             .sheet(isPresented: $showNewAccountSheet) {
                 NewTradingAccountSheet { newAcc in
-                    dataStore.accounts.append(newAcc)
-                    dataStore.selectAccount(id: newAcc.id)
+                    dataStore.addAccount(
+                        name: newAcc.name,
+                        currency: newAcc.currency,
+                        initialBalance: newAcc.initialBalance
+                    )
                 }
             }
             .sheet(isPresented: $showExportSheet) {
                 JsonShareSheet(jsonText: exportedJsonString)
             }
             .alert("Xác nhận xóa dữ liệu?", isPresented: $showResetConfirmation) {
-                Button("Xóa tất cả", role: .destructive) {
-                    dataStore.executions.removeAll()
-                    dataStore.trades.removeAll()
+                Button("Xóa toàn bộ", role: .destructive) {
+                    dataStore.resetAllData()
                 }
                 Button("Hủy", role: .cancel) {}
             } message: {
-                Text("Hành động này sẽ xóa các lệnh hiện tại trong bộ nhớ. Bạn có thể import lại file CSV bất cứ lúc nào.")
+                Text("Toàn bộ các giao dịch và ghi chú hiện tại sẽ bị xóa khỏi bộ nhớ và ổ đĩa.")
             }
         }
     }

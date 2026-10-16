@@ -7,7 +7,7 @@ public struct JournalCalendarView: View {
     @State private var currentMonth: Date = Date()
     @State private var selectedDateKey: String? = nil
     @State private var showDayDetailSheet: Bool = false
-    @State private var journalNotes: [String: JournalNote] = [:] // key: YYYY-MM-DD
+    @State private var showAddTradeForDate: Bool = false
     @State private var selectedJournalSection: JournalSection = .calendar
     
     public enum JournalSection: String, CaseIterable, Identifiable {
@@ -184,7 +184,7 @@ public struct JournalCalendarView: View {
                                     if let date = daysInMonth[index] {
                                         let key = dateKey(for: date)
                                         let stats = dailyStatsMap[key]
-                                        let hasNote = journalNotes[key] != nil
+                                        let hasNote = dataStore.calendarNotes[key] != nil
                                         
                                         dayCell(date: date, key: key, stats: stats, hasNote: hasNote)
                                             .onTapGesture {
@@ -228,11 +228,25 @@ public struct JournalCalendarView: View {
                         dateKey: key,
                         stats: dailyStatsMap[key],
                         trades: tradesForDay(key),
-                        note: journalNotes[key] ?? JournalNote(date: key),
+                        note: dataStore.calendarNotes[key] ?? JournalNote(date: key),
                         onSaveNote: { updatedNote in
-                            journalNotes[key] = updatedNote
+                            dataStore.saveCalendarNote(updatedNote)
+                        },
+                        onAddTrade: {
+                            showDayDetailSheet = false
+                            showAddTradeForDate = true
                         }
                     )
+                }
+            }
+            .sheet(isPresented: $showAddTradeForDate) {
+                if let key = selectedDateKey {
+                    let fmt = DateFormatter()
+                    fmt.dateFormat = "yyyy-MM-dd"
+                    let d = fmt.date(from: key) ?? Date()
+                    AddTradeSheet(initialDate: d)
+                } else {
+                    AddTradeSheet()
                 }
             }
         }
@@ -311,13 +325,22 @@ public struct DayDetailSheet: View {
     
     @State private var note: JournalNote
     var onSaveNote: (JournalNote) -> Void
+    var onAddTrade: (() -> Void)?
     
-    public init(dateKey: String, stats: DayStats?, trades: [Trade], note: JournalNote, onSaveNote: @escaping (JournalNote) -> Void) {
+    public init(
+        dateKey: String,
+        stats: DayStats?,
+        trades: [Trade],
+        note: JournalNote,
+        onSaveNote: @escaping (JournalNote) -> Void,
+        onAddTrade: (() -> Void)? = nil
+    ) {
         self.dateKey = dateKey
         self.stats = stats
         self.trades = trades
         self._note = State(initialValue: note)
         self.onSaveNote = onSaveNote
+        self.onAddTrade = onAddTrade
     }
     
     public var body: some View {
@@ -379,6 +402,21 @@ public struct DayDetailSheet: View {
                                     RoundedRectangle(cornerRadius: 8)
                                         .stroke(AppColors.border, lineWidth: 1)
                                 )
+                        }
+                    }
+                    
+                    if let onAdd = onAddTrade {
+                        Button(action: onAdd) {
+                            HStack {
+                                Image(systemName: "plus.circle.fill")
+                                Text("Ghi nhận giao dịch vào ngày này")
+                            }
+                            .font(AppTypography.captionBold)
+                            .foregroundColor(AppColors.accent)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                            .background(AppColors.cardBackground)
+                            .cornerRadius(8)
                         }
                     }
                     
