@@ -124,7 +124,7 @@ jobs:
           echo "==> Cleaning stale signatures..."
           rm -rf "$APP_PATH/_CodeSignature" || true
           echo "==> Applying clean ad-hoc signature..."
-          codesign --force --deep --sign - "$APP_PATH" || true
+          codesign --force --deep --sign - --timestamp=none "$APP_PATH"
           cp -R "$APP_PATH" build/Payload/
           cd build
           zip -r -9 -y -X TradeJournal.ipa Payload
@@ -132,6 +132,27 @@ jobs:
           shasum -a 256 TradeJournal.ipa > TradeJournal.ipa.sha256
           echo "SHA256 Checksum:"
           cat TradeJournal.ipa.sha256
+
+      - name: Verify IPA Integrity & Report Bundle Structure
+        run: |
+          echo "### 📦 IPA Bundle Inspection" >> $GITHUB_STEP_SUMMARY
+          echo "#### Info.plist Contents:" >> $GITHUB_STEP_SUMMARY
+          echo '```xml' >> $GITHUB_STEP_SUMMARY
+          plutil -p "build/Payload/TradeJournal.app/Info.plist" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "#### Mach-O Binary & Dylib Dependencies:" >> $GITHUB_STEP_SUMMARY
+          echo '```text' >> $GITHUB_STEP_SUMMARY
+          file "build/Payload/TradeJournal.app/TradeJournal" >> $GITHUB_STEP_SUMMARY
+          otool -L "build/Payload/TradeJournal.app/TradeJournal" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "#### Codesign Status:" >> $GITHUB_STEP_SUMMARY
+          echo '```text' >> $GITHUB_STEP_SUMMARY
+          codesign -dvvv "build/Payload/TradeJournal.app" 2>&1 | tee -a $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "#### Zip Archive Tree:" >> $GITHUB_STEP_SUMMARY
+          echo '```text' >> $GITHUB_STEP_SUMMARY
+          unzip -l build/TradeJournal.ipa >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
 
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
