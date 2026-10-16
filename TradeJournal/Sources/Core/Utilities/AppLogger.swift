@@ -3,7 +3,7 @@ import os.log
 
 /// Hệ thống logging chuẩn hóa, tuân thủ nguyên tắc R005 không làm lộ secrets hoặc thông tin nhạy cảm.
 public enum AppLogger {
-    private static let subsystem = Bundle.main.bundleIdentifier ?? "com.tradejournal.ios"
+    private static let subsystem = Bundle.main.bundleIdentifier ?? "com.kaikool.tradejournal"
     private static let logger = Logger(subsystem: subsystem, category: "TradeJournal")
     
     public static func debug(_ message: String) {
