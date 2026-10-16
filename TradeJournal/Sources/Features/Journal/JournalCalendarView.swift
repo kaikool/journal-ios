@@ -82,6 +82,14 @@ public struct JournalCalendarView: View {
             .reduce(Decimal.zero) { $0 + $1.value.netPnl }
     }
     
+    private var navigationTitleForSection: String {
+        switch selectedJournalSection {
+        case .calendar: return "Lịch P&L"
+        case .notebook: return "Sổ tay (Notebook)"
+        case .playbooks: return "Playbooks"
+        }
+    }
+    
     public var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
@@ -211,7 +219,8 @@ public struct JournalCalendarView: View {
                     }
                 }
             }
-            .navigationTitle("Nhật Ký")
+            .navigationTitle(navigationTitleForSection)
+            .navigationBarTitleDisplayMode(.inline)
             .background(AppColors.background)
             .sheet(isPresented: $showDayDetailSheet) {
                 if let key = selectedDateKey {

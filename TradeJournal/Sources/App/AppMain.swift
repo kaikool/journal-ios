@@ -3,6 +3,7 @@ import SwiftUI
 @main
 public struct TradeJournalApp: App {
     @StateObject private var env = AppEnvironment.shared
+    @StateObject private var dataStore = TradeDataStore.shared
     
     public init() {}
     
@@ -10,6 +11,7 @@ public struct TradeJournalApp: App {
         WindowGroup {
             RootTabView()
                 .environmentObject(env)
+                .environmentObject(dataStore)
         }
     }
 }

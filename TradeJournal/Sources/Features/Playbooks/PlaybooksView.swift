@@ -46,8 +46,7 @@ public struct PlaybooksView: View {
     }
     
     public var body: some View {
-        NavigationStack {
-            ScrollView {
+        ScrollView {
                 VStack(spacing: 16) {
                     // Header card
                     AppCard {
@@ -101,7 +100,6 @@ public struct PlaybooksView: View {
                     playbooks.append(newPb)
                 }
             }
-        }
     }
     
     private func playbookCard(summary: PlaybookAdherenceSummary) -> some View {

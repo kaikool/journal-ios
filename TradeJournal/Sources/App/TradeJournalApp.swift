@@ -52,12 +52,14 @@ import UIKit
 
 public struct TradeJournalAppView: View {
     @StateObject private var env = AppEnvironment.shared
+    @StateObject private var dataStore = TradeDataStore.shared
     
     public init() {}
     
     public var body: some View {
         RootTabView()
             .environmentObject(env)
+            .environmentObject(dataStore)
     }
 }
 #endif
