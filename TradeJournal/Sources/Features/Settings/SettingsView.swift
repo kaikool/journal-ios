@@ -998,7 +998,7 @@ public struct ConnectionsSettingsView: View {
                                 .font(AppTypography.caption)
                                 .foregroundColor(AppColors.secondaryText)
                             Spacer()
-                            Text("Lệnh đồng bộ: \(dataStore.trades.filter { $0.source == "the5ers" }.count)")
+                            Text("Lệnh đồng bộ: \(dataStore.trades.filter { $0.tags.contains("the5ers") }.count)")
                                 .font(AppTypography.caption)
                                 .foregroundColor(AppColors.secondaryText)
                         }

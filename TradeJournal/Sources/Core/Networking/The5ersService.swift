@@ -352,6 +352,7 @@ public final class The5ersService: ObservableObject {
                         status: mappedStatus,
                         currency: acc.currency,
                         sizeMinor: startingMinor,
+                        journalAccountId: acc.id,
                         openedOn: acc.createdAt ?? DateFormatter.localizedString(from: Date(), dateStyle: .short, timeStyle: .none),
                         notes: "Đồng bộ từ The5ers MCP Hub (Protocol 2025-03-26)",
                         archived: false
@@ -360,15 +361,13 @@ public final class The5ersService: ObservableObject {
                 }
                 
                 // Đồng bộ Account chính trong dataStore
-                if let accIdx = dataStore.accounts.firstIndex(where: { $0.id == acc.id || $0.the5ersSourceId == acc.id }) {
+                if let accIdx = dataStore.accounts.firstIndex(where: { $0.id == acc.id }) {
                     dataStore.accounts[accIdx].broker = "The5ers"
                     dataStore.accounts[accIdx].name = acc.label
                     dataStore.accounts[accIdx].currency = acc.currency
-                    dataStore.accounts[accIdx].the5ersSourceId = acc.id
                 } else {
                     let newAcc = Account(
                         id: acc.id,
-                        the5ersSourceId: acc.id,
                         name: acc.label,
                         broker: "The5ers",
                         kind: .sync,
