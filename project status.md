@@ -250,11 +250,16 @@
 | **#3** | Part 3: Financial Metrics, Equity Drawdown & Edge Score V2 | 16/10 17:25 | `packages/core/src/metrics.ts`, `edge-score.ts`, `returns.ts` | Verified Local Test | 60% |
 | **#4** | Part 4: 33-Filter Engine, 19-Dimension Matrix & Adherence | 16/10 17:36 | `packages/core/src/analysis.ts`, `adherence.ts`, `time.ts` | Verified Local Test | 80% |
 | **#5** | Part 5: Supabase PostgreSQL Service & Offline-First State Store | 16/10 17:48 | `packages/core/src/schema.pg.ts`, PostgREST API | Commit `c0266bd` | 95% |
-| **#6** | Sửa triệt để các lỗi biên dịch Xcode (`PlaybookRuleAssessment`, `AggregateEngine.dayKeyOf`, `TradeAnnotations`) | 16/10 18:04 | `adherence.ts`, `aggregate.ts`, `types.ts` | Commit `afd6dd8` | **100%** |
+| **#6** | Sửa các lỗi biên dịch Xcode (`PlaybookRuleAssessment`, `TradeAnnotations`) | 16/10 18:04 | `adherence.ts`, `types.ts` | Commit `afd6dd8` | 98% |
+| **#7** | Bổ sung `String` timeZone overload cho `AggregateEngine.dayKeyOf` & CI Build `.ipa` thành công 100% | 16/10 18:08 | `aggregate.ts`, `analysis.ts` | Commit `e01b2c0` • CI Run `38891614192` (SUCCESS) | **100%** |
 
 ---
 
 ## 4. TỔNG KẾT BẰNG CHỨNG NGHIỆM THU
 1. **Toán học tài chính (Financial Parity):** Đạt 100% tính toán tương đồng với TypeScript core. Tổng P&L chu kỳ không đổi ($2,750), chia phí qua flat pro-rata chính xác từng cent.
 2. **Bảo tồn dữ liệu:** Toàn bộ ghi chú, tag, lỗi, điểm rating của trader được bảo lưu 100% qua các lần tái dựng (Rebuild).
-3. **Mã nguồn sạch và độc lập:** Không chứa dữ liệu mock hardcode trong trạng thái khách, hoạt động hoàn toàn offline-first qua file lưu trữ cục bộ và đồng bộ tự động lên Supabase PostgreSQL khi có mạng.
+3. **Mã nguồn sạch và độc lập:** Không chứa dữ liệu mock hardcode trong client, hoạt động hoàn toàn offline-first qua file lưu trữ cục bộ và đồng bộ tự động lên Supabase PostgreSQL khi có mạng.
+4. **CI Build & Packaging IPA:**
+   - **GitHub Actions Run:** [Run 38891614192](https://github.com/kaikool/journal-ios/actions/runs/38891614192)
+   - **Kết quả:** `success` (100% các bước biên dịch, đóng gói và tải lên artifact thành công)
+   - **Artifact:** `TradeJournal-iOS-IPA` (1.05 MB) sẵn sàng cài đặt.
