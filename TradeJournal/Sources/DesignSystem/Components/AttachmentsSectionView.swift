@@ -1,5 +1,7 @@
 import SwiftUI
-import PhotosUI
+#if canImport(UIKit)
+import UIKit
+#endif
 
 /// Thành phần giao diện quản lý tệp đính kèm và ảnh chụp màn hình biểu đồ
 /// Port 1:1 từ `source-repo/apps/web/src/components/attachments.tsx`
@@ -10,7 +12,7 @@ public struct AttachmentsSectionView: View {
     public let ownerId: String
     public let title: String
     
-    @State private var selectedPhotoItem: PhotosPickerItem? = nil
+    @State private var showPhotoPicker: Bool = false
     @State private var showFileImporter: Bool = false
     @State private var previewAttachment: Attachment? = nil
     @State private var itemToDelete: Attachment? = nil
@@ -44,11 +46,9 @@ public struct AttachmentsSectionView: View {
             // Thanh công cụ thêm tệp
             HStack(spacing: 12) {
                 // 1. Thư viện ảnh / Ảnh chụp màn hình biểu đồ
-                PhotosPicker(
-                    selection: $selectedPhotoItem,
-                    matching: .images,
-                    photoLibrary: .shared()
-                ) {
+                Button {
+                    showPhotoPicker = true
+                } label: {
                     HStack(spacing: 6) {
                         Image(systemName: "photo.badge.plus")
                         Text("Thêm ảnh / Screenshot")
@@ -63,12 +63,6 @@ public struct AttachmentsSectionView: View {
                         RoundedRectangle(cornerRadius: 8)
                             .stroke(AppColors.border, lineWidth: 1)
                     )
-                }
-                .onChange(of: selectedPhotoItem) { newItem in
-                    guard let item = newItem else { return }
-                    Task {
-                        await handleSelectedPhoto(item)
-                    }
                 }
                 
                 // 2. Chọn file tài liệu / PDF từ Tệp
@@ -116,6 +110,22 @@ public struct AttachmentsSectionView: View {
                 }
             }
         }
+        .sheet(isPresented: $showPhotoPicker) {
+            #if canImport(UIKit)
+            UIKitImagePicker(isPresented: $showPhotoPicker) { data, name in
+                do {
+                    _ = try dataStore.addAttachment(
+                        ownerType: ownerType,
+                        ownerId: ownerId,
+                        name: name,
+                        data: data
+                    )
+                } catch {
+                    errorMessage = error.localizedDescription
+                }
+            }
+            #endif
+        }
         .fileImporter(
             isPresented: $showFileImporter,
             allowedContentTypes: [.pdf, .png, .jpeg],
@@ -141,26 +151,7 @@ public struct AttachmentsSectionView: View {
             Text("Tệp sẽ bị xóa khỏi nhật ký và bộ nhớ máy.")
         }
     }
-    
-    private func handleSelectedPhoto(_ item: PhotosPickerItem) async {
-        isProcessing = true
-        errorMessage = nil
-        do {
-            if let data = try await item.loadTransferable(type: Data.self) {
-                let name = "screenshot-\(Date().timeIntervalSince1970).png"
-                _ = try dataStore.addAttachment(
-                    ownerType: ownerType,
-                    ownerId: ownerId,
-                    name: name,
-                    data: data
-                )
-            }
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-        selectedPhotoItem = nil
-        isProcessing = false
-    }
+
     
     private func handleImportedFile(_ result: Result<[URL], Error>) {
         isProcessing = true
@@ -308,3 +299,50 @@ public struct AttachmentPreviewSheet: View {
         }
     }
 }
+
+#if canImport(UIKit)
+public struct UIKitImagePicker: UIViewControllerRepresentable {
+    @Binding public var isPresented: Bool
+    public var onImagePicked: (Data, String) -> Void
+    
+    public init(isPresented: Binding<Bool>, onImagePicked: @escaping (Data, String) -> Void) {
+        self._isPresented = isPresented
+        self.onImagePicked = onImagePicked
+    }
+    
+    public func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+    
+    public func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.delegate = context.coordinator
+        picker.sourceType = .photoLibrary
+        return picker
+    }
+    
+    public func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+    
+    public final class Coordinator: NSObject, UINavigationControllerDelegate, UIImagePickerControllerDelegate {
+        let parent: UIKitImagePicker
+        
+        init(_ parent: UIKitImagePicker) {
+            self.parent = parent
+        }
+        
+        public func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
+            if let image = info[.originalImage] as? UIImage,
+               let data = image.jpegData(compressionQuality: 0.85) {
+                let name = "screenshot-\(Int(Date().timeIntervalSince1970)).jpg"
+                parent.onImagePicked(data, name)
+            }
+            parent.isPresented = false
+        }
+        
+        public func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            parent.isPresented = false
+        }
+    }
+}
+#endif
+
