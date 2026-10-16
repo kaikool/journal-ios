@@ -70,17 +70,13 @@ public struct DashboardView: View {
     }
     
     private var chartEquityPoints: [EquityPointItem] {
-        let isoFormatter = ISO8601DateFormatter()
-        isoFormatter.formatOptions = [.withFullDate, .withDashSeparatorInDate]
-        
-        return overview.curve.compactMap { pt in
-            let date = isoFormatter.date(from: pt.date) ?? Date()
-            return EquityPointItem(
-                date: date,
-                dateKey: pt.date,
-                netPnl: Decimal(pt.netPnl),
-                cumulativePnl: Decimal(pt.cumulativePnl),
-                drawdown: Decimal(pt.drawdown)
+        overview.curve.map { pt in
+            EquityPointItem(
+                date: pt.timestamp,
+                dateKey: pt.dateString,
+                netPnl: pt.cumNetPnl,
+                cumulativePnl: pt.cumNetPnl,
+                drawdown: Decimal.zero
             )
         }
     }

@@ -17,6 +17,14 @@ public struct EdgeScore: Equatable {
     public let closedTrades: Int
 }
 
+public typealias EdgeScoreResult = EdgeScore
+
+extension EdgeScore {
+    public var breakdown: EdgeScoreComponents? {
+        score != nil ? components : nil
+    }
+}
+
 /// Engine tính toán điểm Edge Score v2.
 /// Port 1:1 từ `packages/core/src/edge-score.ts`.
 public enum EdgeScoreEngine {
