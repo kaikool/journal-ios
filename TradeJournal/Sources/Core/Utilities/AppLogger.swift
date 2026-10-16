@@ -20,6 +20,10 @@ public enum AppLogger {
         logger.warning("⚠️ [WARN] \(sanitize(message), privacy: .public)")
     }
     
+    public static func warn(_ message: String) {
+        warning(message)
+    }
+    
     public static func error(_ message: String, error: Error? = nil) {
         if let error = error {
             logger.error("🛑 [ERROR] \(sanitize(message), privacy: .public) | Details: \(sanitize(error.localizedDescription), privacy: .public)")

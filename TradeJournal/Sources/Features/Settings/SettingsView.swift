@@ -946,24 +946,11 @@ public struct ConnectionsSettingsView: View {
                         .disabled(isConnectingThe5ers)
                     } else {
                         HStack(spacing: 8) {
-                            Button {
-                                syncThe5ers()
-                            } label: {
-                                HStack {
-                                    if the5ers.isSyncing {
-                                        ProgressView().scaleEffect(0.8)
-                                    }
-                                    Text("Đồng bộ The5ers ngay")
-                                }
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .tint(AppColors.accent)
-                            .disabled(the5ers.isSyncing)
-                            
                             Button("Kiểm Tra MCP") {
                                 pingMcp()
                             }
-                            .buttonStyle(.bordered)
+                            .buttonStyle(.borderedProminent)
+                            .tint(AppColors.accent)
                             
                             Button("Ngắt kết nối") {
                                 the5ers.disconnect()
@@ -1125,25 +1112,6 @@ public struct ConnectionsSettingsView: View {
                         }
                     }
                     
-                    HStack(spacing: 12) {
-                        Button {
-                            syncSupabase()
-                        } label: {
-                            HStack {
-                                if dataStore.isSyncing {
-                                    ProgressView().scaleEffect(0.8)
-                                    Text("Đang đồng bộ...")
-                                } else {
-                                    Image(systemName: "arrow.triangle.2.circlepath")
-                                    Text("Đồng bộ 2 chiều ngay")
-                                }
-                            }
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(AppColors.accent)
-                        .disabled(dataStore.isSyncing || supabaseUrl.trimmingCharacters(in: .whitespaces).isEmpty)
-                    }
-                    
                     if let status = supabaseSyncStatus {
                         Text(status)
                             .font(AppTypography.caption)
@@ -1156,6 +1124,15 @@ public struct ConnectionsSettingsView: View {
             mcpToken = the5ers.mcpToken
             supabaseUrl = SupabaseService.shared.supabaseUrl
             supabaseAnonKey = SupabaseService.shared.supabaseAnonKey
+        }
+        .onChange(of: supabaseUrl) { val in
+            SupabaseService.shared.configure(url: val, anonKey: supabaseAnonKey)
+        }
+        .onChange(of: supabaseAnonKey) { val in
+            SupabaseService.shared.configure(url: supabaseUrl, anonKey: val)
+        }
+        .onChange(of: mcpToken) { val in
+            the5ers.configure(token: val)
         }
     }
     
@@ -1429,44 +1406,12 @@ public struct YourDataSettingsView: View {
                 }
             }
             
-            // Card 2: Sync & Reset Database
-            SettingsCard(title: "Database operations") {
+            // Card 2: Reset Database
+            SettingsCard(title: "Quản lý dữ liệu máy") {
                 VStack(alignment: .leading, spacing: 14) {
-                    Text("Đồng bộ dữ liệu hai chiều với Supabase, The5ers MCP hoặc xóa trắng dữ liệu cục bộ.")
+                    Text("Quản lý lưu trữ cục bộ trên thiết bị hoặc xóa sạch toàn bộ cơ sở dữ liệu.")
                         .font(AppTypography.caption)
                         .foregroundColor(AppColors.secondaryText)
-                    
-                    Button {
-                        Task {
-                            await dataStore.syncWithSupabase()
-                            seedMessage = "Đã hoàn tất đồng bộ với Supabase."
-                        }
-                    } label: {
-                        Label("Đồng bộ hai chiều với Supabase", systemImage: "arrow.triangle.2.circlepath")
-                            .foregroundColor(AppColors.accent)
-                    }
-                    
-                    Button {
-                        Task {
-                            do {
-                                let c = try await dataStore.syncWithThe5ers()
-                                seedMessage = "Đã đồng bộ \(c) tài khoản từ The5ers MCP."
-                            } catch {
-                                seedMessage = "Lỗi đồng bộ: \(error.localizedDescription)"
-                            }
-                        }
-                    } label: {
-                        Label("Đồng bộ toàn diện The5ers MCP", systemImage: "network")
-                            .foregroundColor(AppColors.accent)
-                    }
-                    
-                    if !seedMessage.isEmpty {
-                        Text(seedMessage)
-                            .font(AppTypography.caption)
-                            .foregroundColor(AppColors.profit)
-                    }
-                    
-                    Divider()
                     
                     Button(role: .destructive) {
                         showResetConfirmation = true

@@ -103,6 +103,13 @@ public struct TradesListView: View {
                     tradesList
                 }
             }
+            .refreshable {
+                if The5ersService.shared.isConfigured {
+                    _ = try? await dataStore.syncWithThe5ers()
+                } else if SupabaseService.shared.isConfigured {
+                    await dataStore.syncWithSupabase()
+                }
+            }
             .navigationTitle("Giao Dịch")
             .searchable(text: $searchText, prompt: "Tìm theo mã (symbol), tag hoặc ghi chú...")
             .toolbar {
@@ -135,7 +142,13 @@ public struct TradesListView: View {
                 ToolbarItem(placement: .primaryAction) {
                     HStack(spacing: 12) {
                         Button {
-                            Task { await dataStore.syncWithSupabase() }
+                            Task {
+                                if The5ersService.shared.isConfigured {
+                                    _ = try? await dataStore.syncWithThe5ers()
+                                } else if SupabaseService.shared.isConfigured {
+                                    await dataStore.syncWithSupabase()
+                                }
+                            }
                         } label: {
                             Image(systemName: dataStore.isSyncing ? "arrow.triangle.2.circlepath.circle.fill" : "arrow.triangle.2.circlepath")
                         }
@@ -198,7 +211,7 @@ public struct TradesListView: View {
                 VStack(spacing: 8) {
                     Text("Chưa Có Giao Dịch Nào")
                         .font(AppTypography.title)
-                    Text("Đồng bộ trực tiếp từ Supabase hoặc The5ers MCP Hub, hoặc nhập file sao kê CSV của bạn.")
+                    Text("Dữ liệu tự động đồng bộ từ The5ers Hub lên Supabase, hoặc nhập từ file sao kê CSV.")
                         .font(AppTypography.caption)
                         .foregroundColor(AppColors.secondaryText)
                         .multilineTextAlignment(.center)
@@ -206,15 +219,7 @@ public struct TradesListView: View {
                 }
                 
                 VStack(spacing: 12) {
-                    AppButton("Đồng Bộ Supabase", icon: "arrow.triangle.2.circlepath", style: .primary) {
-                        Task { await dataStore.syncWithSupabase() }
-                    }
-                    
-                    AppButton("Đồng Bộ The5ers MCP", icon: "network", style: .secondary) {
-                        Task { _ = try? await dataStore.syncWithThe5ers() }
-                    }
-                    
-                    AppButton("Ghi Nhận Giao Dịch Mới", icon: "plus.circle", style: .secondary) {
+                    AppButton("Ghi Nhận Giao Dịch Mới", icon: "plus.circle", style: .primary) {
                         showAddTradeSheet = true
                     }
                     

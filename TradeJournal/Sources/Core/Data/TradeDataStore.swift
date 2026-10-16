@@ -294,7 +294,7 @@ public final class TradeDataStore: ObservableObject {
                 try? await SupabaseService.shared.upsertPlaybooks(localUserPlaybooks)
             }
         } catch {
-            AppLogger.warn("Supabase playbooks sync warning: \(error.localizedDescription)")
+            AppLogger.warning("Supabase playbooks sync warning: \(error.localizedDescription)")
         }
 
         // 4. Đồng bộ Quỹ (Prop Firm Subsystem)
@@ -314,7 +314,7 @@ public final class TradeDataStore: ObservableObject {
                 try? await SupabaseService.shared.upsertPropAccounts(propAccounts)
             }
         } catch {
-            AppLogger.warn("Supabase prop accounts warning: \(error.localizedDescription)")
+            AppLogger.warning("Supabase prop accounts warning: \(error.localizedDescription)")
         }
 
         do {
@@ -332,7 +332,7 @@ public final class TradeDataStore: ObservableObject {
                 try? await SupabaseService.shared.upsertPropEntries(propEntries)
             }
         } catch {
-            AppLogger.warn("Supabase prop entries warning: \(error.localizedDescription)")
+            AppLogger.warning("Supabase prop entries warning: \(error.localizedDescription)")
         }
 
         do {
@@ -348,7 +348,7 @@ public final class TradeDataStore: ObservableObject {
                 try? await SupabaseService.shared.upsertPropReceipts(propReceipts)
             }
         } catch {
-            AppLogger.warn("Supabase prop receipts warning: \(error.localizedDescription)")
+            AppLogger.warning("Supabase prop receipts warning: \(error.localizedDescription)")
         }
 
         do {
@@ -362,7 +362,7 @@ public final class TradeDataStore: ObservableObject {
                 try? await SupabaseService.shared.upsertPropAudits(propAudits)
             }
         } catch {
-            AppLogger.warn("Supabase prop audits warning: \(error.localizedDescription)")
+            AppLogger.warning("Supabase prop audits warning: \(error.localizedDescription)")
         }
 
         // 5. Đồng bộ Tệp đính kèm (Attachments Sync)
@@ -374,7 +374,7 @@ public final class TradeDataStore: ObservableObject {
                 }
             }
         } catch {
-            AppLogger.warn("Supabase attachments warning: \(error.localizedDescription)")
+            AppLogger.warning("Supabase attachments warning: \(error.localizedDescription)")
         }
 
         saveToDisk()

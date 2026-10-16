@@ -194,7 +194,7 @@ public final class SupabaseService {
                 let item = try jsonDecoder.decode(T.self, from: itemData)
                 results.append(item)
             } catch {
-                AppLogger.warn("SupabaseService: Bỏ qua 1 dòng không hợp lệ của \(T.self): \(error.localizedDescription)")
+                AppLogger.warning("SupabaseService: Bỏ qua 1 dòng không hợp lệ của \(T.self): \(error.localizedDescription)")
             }
         }
         return results
