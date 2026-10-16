@@ -240,16 +240,16 @@ public struct JournalCalendarView: View {
                 }
             }
             .sheet(isPresented: $showAddTradeForDate) {
-                if let key = selectedDateKey {
-                    let fmt = DateFormatter()
-                    fmt.dateFormat = "yyyy-MM-dd"
-                    let d = fmt.date(from: key) ?? Date()
-                    AddTradeSheet(initialDate: d)
-                } else {
-                    AddTradeSheet()
-                }
+                AddTradeSheet(initialDate: initialDateForSelectedKey())
             }
         }
+    }
+    
+    private func initialDateForSelectedKey() -> Date {
+        guard let key = selectedDateKey else { return Date() }
+        let fmt = DateFormatter()
+        fmt.dateFormat = "yyyy-MM-dd"
+        return fmt.date(from: key) ?? Date()
     }
     
     // MARK: - Helper Views & Functions
