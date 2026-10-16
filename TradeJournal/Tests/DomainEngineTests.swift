@@ -1,5 +1,5 @@
 import XCTest
-@testable import TradeJournalKit
+@testable import TradeJournal
 
 final class DomainEngineTests: XCTestCase {
     
@@ -183,18 +183,110 @@ final class DomainEngineTests: XCTestCase {
             Execution(id: "e4", accountId: "acc-1", symbol: "TSLA", side: .sell, quantity: 150, price: 220, fee: 0, executedAt: parseDate("2026-05-01T16:00:00Z"))
         ]
         
-        let methods: [ProfitCalcMethod] = [.fifo, .lifo, .wavg]
-        let results = methods.map { method in
-            TradeReconstructionEngine.buildRoundTrips(
-                executions: executions,
-                options: .init(method: method)
-            )[0].netPnl
-        }
+        let fifoTrade = TradeReconstructionEngine.buildRoundTrips(executions: executions, options: .init(method: .fifo))[0]
+        let lifoTrade = TradeReconstructionEngine.buildRoundTrips(executions: executions, options: .init(method: .lifo))[0]
+        let wavgTrade = TradeReconstructionEngine.buildRoundTrips(executions: executions, options: .init(method: .wavg))[0]
         
         // Bất biến: Tổng P&L phải bằng 2750 dưới mọi phương pháp
-        XCTAssertEqual(results[0], 2750)
-        XCTAssertEqual(results[1], 2750)
-        XCTAssertEqual(results[2], 2750)
+        XCTAssertEqual(fifoTrade.netPnl, 2750)
+        XCTAssertEqual(lifoTrade.netPnl, 2750)
+        XCTAssertEqual(wavgTrade.netPnl, 2750)
+        
+        // Đối chiếu chi tiết từng exit attribution:
+        // FIFO: Exit 1 (50 @ 215) ăn lot 200 -> 750; Exit 2 ăn 50@200 + 100@210 -> 2000
+        XCTAssertEqual(fifoTrade.exits[0].grossPnl, 750)
+        XCTAssertEqual(fifoTrade.exits[1].grossPnl, 2000)
+        
+        // LIFO: Exit 1 ăn lot 210 -> 250; Exit 2 ăn 50@210 + 100@200 -> 2500
+        XCTAssertEqual(lifoTrade.exits[0].grossPnl, 250)
+        XCTAssertEqual(lifoTrade.exits[1].grossPnl, 2500)
+        
+        // WAVG: Entry avg = 205. Exit 1 (50 @ 215) -> 500; Exit 2 (150 @ 220) -> 2250
+        XCTAssertEqual(wavgTrade.exits[0].grossPnl, 500)
+        XCTAssertEqual(wavgTrade.exits[1].grossPnl, 2250)
+    }
+
+    func testFifoAndLifoAttributePartialExitToDifferentLots() {
+        let executions = [
+            Execution(id: "e1", accountId: "acc-1", symbol: "NQ", side: .buy, quantity: 1, price: 100, fee: 0, executedAt: parseDate("2026-06-01T14:00:00Z")),
+            Execution(id: "e2", accountId: "acc-1", symbol: "NQ", side: .buy, quantity: 1, price: 110, fee: 0, executedAt: parseDate("2026-06-01T14:10:00Z")),
+            Execution(id: "e3", accountId: "acc-1", symbol: "NQ", side: .sell, quantity: 1, price: 120, fee: 0, executedAt: parseDate("2026-06-01T14:20:00Z"))
+        ]
+        
+        let fifo = TradeReconstructionEngine.buildRoundTrips(executions: executions, options: .init(method: .fifo))[0]
+        let lifo = TradeReconstructionEngine.buildRoundTrips(executions: executions, options: .init(method: .lifo))[0]
+        
+        // FIFO khớp lot 100 -> grossPnl = (120 - 100) * 1 = 20
+        XCTAssertEqual(fifo.exits[0].grossPnl, 20)
+        // LIFO khớp lot 110 -> grossPnl = (120 - 110) * 1 = 10
+        XCTAssertEqual(lifo.exits[0].grossPnl, 10)
+    }
+
+    func testDeterministicRegardlessOfExecutionOrder() {
+        let executions = [
+            Execution(id: "e1", accountId: "acc-1", symbol: "SPY", side: .buy, quantity: 10, price: 500, fee: 0, executedAt: parseDate("2026-07-01T14:00:00Z")),
+            Execution(id: "e2", accountId: "acc-1", symbol: "SPY", side: .sell, quantity: 10, price: 505, fee: 0, executedAt: parseDate("2026-07-01T15:00:00Z")),
+            Execution(id: "e3", accountId: "acc-1", symbol: "SPY", side: .buy, quantity: 5, price: 501, fee: 0, executedAt: parseDate("2026-07-02T14:00:00Z")),
+            Execution(id: "e4", accountId: "acc-1", symbol: "SPY", side: .sell, quantity: 5, price: 499, fee: 0, executedAt: parseDate("2026-07-02T15:00:00Z"))
+        ]
+        
+        let forward = TradeReconstructionEngine.buildRoundTrips(executions: executions)
+        let backward = TradeReconstructionEngine.buildRoundTrips(executions: Array(executions.reversed()))
+        let shuffled = TradeReconstructionEngine.buildRoundTrips(executions: [executions[2], executions[0], executions[3], executions[1]])
+        
+        XCTAssertEqual(forward.count, 2)
+        XCTAssertEqual(forward.map { $0.key }, backward.map { $0.key })
+        XCTAssertEqual(forward.map { $0.netPnl }, backward.map { $0.netPnl })
+        XCTAssertEqual(forward.map { $0.key }, shuffled.map { $0.key })
+        XCTAssertEqual(forward.map { $0.netPnl }, shuffled.map { $0.netPnl })
+    }
+
+    @MainActor
+    func testRebuildAccountPreservesUserAnnotations() {
+        let store = TradeDataStore.shared
+        let accId = "acc-rebuild-test"
+        store.addAccount(name: "Rebuild Test Acc")
+        guard let account = store.accounts.first(where: { $0.name == "Rebuild Test Acc" }) else {
+            XCTFail("Account not created")
+            return
+        }
+        
+        let fills = [
+            Execution(id: "f1", accountId: account.id, symbol: "AAPL", side: .buy, quantity: 10, price: 100, fee: 1, executedAt: parseDate("2026-08-01T14:00:00Z")),
+            Execution(id: "f2", accountId: account.id, symbol: "AAPL", side: .sell, quantity: 10, price: 110, fee: 1, executedAt: parseDate("2026-08-01T15:00:00Z"))
+        ]
+        store.importExecutions(accountId: account.id, newExecutions: fills)
+        
+        let tradeBefore = store.filteredTrades.first(where: { $0.symbol == "AAPL" })!
+        XCTAssertEqual(tradeBefore.netPnl, 98)
+        
+        // Gán annotation thủ công của người dùng
+        store.updateTradeAnnotations(
+            key: tradeBefore.key,
+            notes: "Ghi chú A+ setup",
+            tags: ["Breakout", "Tech"],
+            mistakes: ["Late Entry"],
+            stopLoss: 95,
+            profitTarget: 120,
+            rating: 5,
+            playbookId: "pb-trend",
+            reviewedAt: Date()
+        )
+        
+        // Tái dựng lại account từ đầu (rebuildAccount)
+        store.rebuildAccount(accountId: account.id)
+        
+        let tradeAfter = store.filteredTrades.first(where: { $0.key == tradeBefore.key })!
+        // Kiểm chứng tính bảo toàn tuyệt đối theo rebuild.ts
+        XCTAssertEqual(tradeAfter.notes, "Ghi chú A+ setup")
+        XCTAssertEqual(tradeAfter.tags, ["Breakout", "Tech"])
+        XCTAssertEqual(tradeAfter.mistakes, ["Late Entry"])
+        XCTAssertEqual(tradeAfter.stopLoss, 95)
+        XCTAssertEqual(tradeAfter.profitTarget, 120)
+        XCTAssertEqual(tradeAfter.rating, 5)
+        XCTAssertEqual(tradeAfter.playbookId, "pb-trend")
+        XCTAssertNotNil(tradeAfter.reviewedAt)
+        XCTAssertEqual(tradeAfter.netPnl, 98)
     }
     
     // MARK: - 2. FINANCIAL METRICS TESTS (MATCHING metrics.test.ts)

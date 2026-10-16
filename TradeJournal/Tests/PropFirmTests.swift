@@ -1,5 +1,5 @@
 import XCTest
-@testable import TradeJournalKit
+@testable import TradeJournal
 
 final class PropFirmTests: XCTestCase {
     

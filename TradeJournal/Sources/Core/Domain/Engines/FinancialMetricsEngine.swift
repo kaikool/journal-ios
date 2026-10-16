@@ -78,6 +78,16 @@ public struct DrawdownStats: Equatable {
     public let peak: Decimal
 }
 
+public struct IntradayPoint: Equatable {
+    public let t: String
+    public let cumNetPnl: Decimal
+
+    public init(t: String, cumNetPnl: Decimal) {
+        self.t = t
+        self.cumNetPnl = cumNetPnl
+    }
+}
+
 /// Engine tính toán các chỉ số hiệu suất giao dịch và đường cong vốn.
 /// Port 1:1 từ `packages/core/src/metrics.ts` và `equity.ts`.
 public enum FinancialMetricsEngine {
@@ -164,6 +174,60 @@ public enum FinancialMetricsEngine {
         }
         
         return dayMap.values.sorted { $0.date < $1.date }
+    }
+    
+    /// Daily cumulative net P&L curve (1:1 port from equity.ts)
+    public static func dailyCumulative(trades: [Trade], timeZone: TimeZone = .current) -> [EquityPoint] {
+        dailyCumulativeFromDays(days: dailyStats(trades: trades, timeZone: timeZone))
+    }
+
+    /// Daily cumulative net P&L from pre-computed daily stats (1:1 port from equity.ts)
+    public static func dailyCumulativeFromDays(days: [DayStats]) -> [EquityPoint] {
+        var cum: Decimal = 0
+        return days.map { day in
+            cum += day.netPnl
+            return EquityPoint(timestamp: Date(), dateString: day.date, cumNetPnl: cum)
+        }
+    }
+
+    /// Running realized P&L across one day, built from per-exit attributions (1:1 port from equity.ts)
+    public static func intradayCurve(
+        trades: [Trade],
+        executionTimes: [String: Date],
+        date: String,
+        timeZone: TimeZone = TimeZone(identifier: "UTC")!
+    ) -> [IntradayPoint] {
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        dateFormatter.timeZone = timeZone
+
+        let isoFormatter = ISO8601DateFormatter()
+        isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+
+        var events: [(date: Date, t: String, pnl: Decimal)] = []
+
+        for trade in trades {
+            if trade.exits.isEmpty && trade.status != .open, let closedAt = trade.closedAt {
+                if dateFormatter.string(from: closedAt) == date {
+                    events.append((closedAt, isoFormatter.string(from: closedAt), trade.netPnl))
+                }
+                continue
+            }
+            let totalExitQty = trade.exits.reduce(Decimal.zero) { $0 + $1.quantity }
+            for exit in trade.exits {
+                guard let execTime = executionTimes[exit.executionId],
+                      dateFormatter.string(from: execTime) == date else { continue }
+                let feeShare = totalExitQty > 0 ? trade.fees * (exit.quantity / totalExitQty) : 0
+                events.append((execTime, isoFormatter.string(from: execTime), exit.grossPnl - feeShare))
+            }
+        }
+
+        events.sort { $0.date < $1.date }
+        var cum: Decimal = 0
+        return events.map { event in
+            cum += event.pnl
+            return IntradayPoint(t: event.t, cumNetPnl: cum)
+        }
     }
     
     /// Tính toán độ sụt giảm tối đa (Drawdown)
@@ -272,6 +336,9 @@ public enum FinancialMetricsEngine {
         let closedWithDuration = closed.compactMap { $0.durationMs }.count
         let avgDurationMs: Int64? = closedWithDuration > 0 ? (totalDuration / Int64(closedWithDuration)) : nil
         
+        let rMultiples = trades.compactMap { TradeAnalysisEngine.tradeR(trade: $0) }
+        let avgRealizedR: Double? = !rMultiples.isEmpty ? (rMultiples.reduce(0.0, +) / Double(rMultiples.count)) : nil
+        
         return TradeMetrics(
             totalTrades: trades.count,
             closedTrades: closed.count,
@@ -302,8 +369,21 @@ public enum FinancialMetricsEngine {
             maxDrawdownPct: dd.maxDrawdownPct,
             recoveryFactor: recoveryFactor,
             profitConcentration: profitConcentration,
-            avgRealizedR: nil,
-            tradesWithRisk: 0
+            avgRealizedR: avgRealizedR,
+            tradesWithRisk: rMultiples.count
         )
+    }
+    
+    /// Point-in-time relative drawdown for an underwater chart.
+    /// Port 1:1 từ `packages/core/src/equity.ts` `relativeDrawdownCurve`.
+    public static func relativeDrawdownCurve(curve: [EquityPoint], initialBalance: Decimal = 0) -> [(timestamp: Date, dateString: String, drawdownPct: Double?)] {
+        var peak: Decimal = 0
+        return curve.map { point in
+            if point.cumNetPnl > peak { peak = point.cumNetPnl }
+            let base = initialBalance + peak
+            let dd = peak - point.cumNetPnl
+            let pct: Double? = base > 0 ? (NSDecimalNumber(decimal: dd).doubleValue / NSDecimalNumber(decimal: base).doubleValue) : nil
+            return (timestamp: point.timestamp, dateString: point.dateString, drawdownPct: pct)
+        }
     }
 }

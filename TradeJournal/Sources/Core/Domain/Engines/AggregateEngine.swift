@@ -229,4 +229,141 @@ public enum AggregateEngine {
             return idxA < idxB
         }
     }
+
+    public static func byMonth(trades: [Trade], timeZone: TimeZone = TimeZone(identifier: "UTC")!) -> [BucketStats] {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM"
+        formatter.timeZone = timeZone
+        
+        let closedTrades = trades.filter { $0.closedAt != nil }
+        return group(trades: closedTrades) { trade in
+            guard let closed = trade.closedAt else { return [] }
+            return [formatter.string(from: closed)]
+        }.sorted { $0.key < $1.key }
+    }
+
+    // MARK: - Calendar Aggregations (1:1 port from aggregate.ts)
+
+    public static func calendarMonth(
+        trades: [Trade],
+        year: Int,
+        month: Int,
+        timeZone: TimeZone = TimeZone(identifier: "UTC")!
+    ) -> CalendarMonth {
+        calendarMonthFromDays(
+            dayStats: FinancialMetricsEngine.dailyStats(trades: trades, timeZone: timeZone),
+            year: year,
+            month: month
+        )
+    }
+
+    public static func calendarMonthFromDays(
+        dayStats: [DayStats],
+        year: Int,
+        month: Int
+    ) -> CalendarMonth {
+        let monthPrefix = String(format: "%04d-%02d", year, month)
+        var days: [String: DayStats] = [:]
+        for d in dayStats where d.date.hasPrefix(monthPrefix) {
+            days[d.date] = d
+        }
+
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "UTC")!
+        var comp = DateComponents()
+        comp.year = year
+        comp.month = month
+        comp.day = 1
+        let firstDate = cal.date(from: comp) ?? Date()
+        let leadingBlanks = (cal.component(.weekday, from: firstDate) - 1)
+        let daysInMonth = cal.range(of: .day, in: .month, for: firstDate)?.count ?? 30
+
+        var cells: [DayStats?] = Array(repeating: nil, count: leadingBlanks)
+        for day in 1...daysInMonth {
+            let dateKey = String(format: "%@-%02d", monthPrefix, day)
+            if let stat = days[dateKey] {
+                cells.append(stat)
+            } else {
+                cells.append(DayStats(
+                    date: dateKey,
+                    netPnl: 0,
+                    grossPnl: 0,
+                    fees: 0,
+                    trades: 0,
+                    wins: 0,
+                    losses: 0,
+                    breakevens: 0,
+                    volume: 0
+                ))
+            }
+        }
+        while cells.count % 7 != 0 {
+            cells.append(nil)
+        }
+
+        var weeks: [CalendarWeek] = []
+        for i in stride(from: 0, to: cells.count, by: 7) {
+            let weekDays = Array(cells[i..<i+7])
+            let weekNetPnl = weekDays.compactMap { $0?.netPnl }.reduce(Decimal.zero, +)
+            let weekTrades = weekDays.compactMap { $0?.trades }.reduce(0, +)
+            weeks.append(CalendarWeek(days: weekDays, weekNetPnl: weekNetPnl, weekTrades: weekTrades))
+        }
+
+        let traded = Array(days.values)
+        let monthNetPnl = traded.reduce(Decimal.zero) { $0 + $1.netPnl }
+        let monthTrades = traded.reduce(0) { $0 + $1.trades }
+        let tradingDays = traded.filter { $0.trades > 0 }.count
+        let winningDays = traded.filter { $0.netPnl > 0 }.count
+
+        return CalendarMonth(
+            year: year,
+            month: month,
+            weeks: weeks,
+            monthNetPnl: monthNetPnl,
+            monthTrades: monthTrades,
+            tradingDays: tradingDays,
+            winningDays: winningDays
+        )
+    }
 }
+
+public struct CalendarWeek: Equatable {
+    public let days: [DayStats?]
+    public let weekNetPnl: Decimal
+    public let weekTrades: Int
+
+    public init(days: [DayStats?], weekNetPnl: Decimal, weekTrades: Int) {
+        self.days = days
+        self.weekNetPnl = weekNetPnl
+        self.weekTrades = weekTrades
+    }
+}
+
+public struct CalendarMonth: Equatable {
+    public let year: Int
+    public let month: Int
+    public let weeks: [CalendarWeek]
+    public let monthNetPnl: Decimal
+    public let monthTrades: Int
+    public let tradingDays: Int
+    public let winningDays: Int
+
+    public init(
+        year: Int,
+        month: Int,
+        weeks: [CalendarWeek],
+        monthNetPnl: Decimal,
+        monthTrades: Int,
+        tradingDays: Int,
+        winningDays: Int
+    ) {
+        self.year = year
+        self.month = month
+        self.weeks = weeks
+        self.monthNetPnl = monthNetPnl
+        self.monthTrades = monthTrades
+        self.tradingDays = tradingDays
+        self.winningDays = winningDays
+    }
+}
+

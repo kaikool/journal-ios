@@ -47,10 +47,16 @@ public struct Execution: Identifiable, Codable, Equatable, Hashable {
         if let contentHash = contentHash {
             self.contentHash = contentHash
         } else {
-            // Sinh mã SHA-256 xác định
-            let isoTime = ISO8601DateFormatter().string(from: executedAt)
-            let rawString = "\(accountId)|\(symbol)|\(side.rawValue)|\(quantity)|\(price)|\(isoTime)"
-            self.contentHash = rawString // Trong SPM có thể tích hợp CryptoKit
+            let f = ISO8601DateFormatter()
+            f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            let isoTime = f.string(from: executedAt)
+            self.contentHash = JournalIds.executionHash(
+                symbol: symbol,
+                side: side.rawValue,
+                quantity: quantity,
+                price: price,
+                executedAt: isoTime
+            )
         }
     }
 }
@@ -200,22 +206,25 @@ public struct TradeAnnotations: Codable, Equatable {
     public var rating: Int?
     public var stopLoss: Decimal?
     public var profitTarget: Decimal?
+    public var reviewedAt: Date?
     
     public init(
-        tags: [String] = [],
-        mistakes: [String] = [],
-        playbook: String? = nil,
         notes: String? = nil,
+        tags: [String]? = nil,
+        mistakes: [String]? = nil,
+        playbook: String? = nil,
         rating: Int? = nil,
         stopLoss: Decimal? = nil,
-        profitTarget: Decimal? = nil
+        profitTarget: Decimal? = nil,
+        reviewedAt: Date? = nil
     ) {
-        self.tags = tags
-        self.mistakes = mistakes
-        self.playbook = playbook
         self.notes = notes
+        self.tags = tags ?? []
+        self.mistakes = mistakes ?? []
+        self.playbook = playbook
         self.rating = rating
         self.stopLoss = stopLoss
         self.profitTarget = profitTarget
+        self.reviewedAt = reviewedAt
     }
 }

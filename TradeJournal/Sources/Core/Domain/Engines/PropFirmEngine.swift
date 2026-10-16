@@ -81,7 +81,7 @@ public struct PropAccountItem: Identifiable, Codable, Equatable, Sendable {
     public var notes: String
     
     public init(
-        id: String = UUID().uuidString,
+        id: String = JournalIds.newId(),
         firm: String,
         name: String,
         program: PropProgram = .evaluation,
@@ -123,7 +123,7 @@ public struct PropEntryItem: Identifiable, Codable, Equatable, Sendable {
     public var voided: Bool
     
     public init(
-        id: String = UUID().uuidString,
+        id: String = JournalIds.newId(),
         accountId: String? = nil,
         firm: String,
         kind: String,

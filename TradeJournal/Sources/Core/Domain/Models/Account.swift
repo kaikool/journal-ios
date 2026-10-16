@@ -14,7 +14,7 @@ public struct Account: Identifiable, Codable, Equatable {
     public let createdAt: Date
     
     public init(
-        id: String = UUID().uuidString,
+        id: String = JournalIds.newId(),
         name: String,
         broker: String = "",
         kind: AccountKind = .manual,

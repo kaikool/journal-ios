@@ -1,74 +1,143 @@
 import Foundation
 
-/// Analyzes playbook discipline and rule adherence
+public struct PlaybookRuleAssessment: Codable, Equatable, Identifiable {
+    public var id: String { "\(tradeKey)|\(playbookId)|\(rule)" }
+    public let tradeKey: String
+    public let playbookId: String
+    public let rule: String
+    public let followed: Bool
+    
+    public init(tradeKey: String, playbookId: String, rule: String, followed: Bool) {
+        self.tradeKey = tradeKey
+        self.playbookId = playbookId
+        self.rule = rule
+        self.followed = followed
+    }
+}
+
+public struct RuleAdherenceStat: Equatable {
+    public let rule: String
+    public let evaluated: Int
+    public let rate: Double?
+    public let followed: GroupSummary
+    public let broken: GroupSummary
+}
+
+public struct PlaybookAdherenceSummary: Equatable {
+    public let id: String
+    public let total: Int
+    public let evaluated: Int
+    public let possible: Int
+    public let rate: Double?
+    public let accountIds: [String]
+    public let followed: GroupSummary
+    public let broken: GroupSummary
+    public let unassessed: Int
+    public let rules: [RuleAdherenceStat]
+    
+    // Compatibility helpers
+    public var totalTrades: Int { total }
+    public var followedTradesCount: Int { followed.trades }
+    public var brokenTradesCount: Int { broken.trades }
+    public var unassessedTradesCount: Int { unassessed }
+    public var overallAdherenceRate: Double? { rate }
+    public var netPnlWhenFollowed: Decimal { followed.netPnl }
+    public var netPnlWhenBroken: Decimal { broken.netPnl }
+}
+
+/// Port 1:1 từ `packages/core/src/adherence.ts`.
 public enum AdherenceEngine {
     
     public static func analyzeAdherence(
         playbooks: [Playbook],
         trades: [Trade],
-        assessments: [PlaybookRuleAssessment]
+        checks: [PlaybookRuleAssessment]
     ) -> [PlaybookAdherenceSummary] {
-        // Group trades by playbook
-        var tradesByPlaybook: [String: [Trade]] = [:]
+        var tradesByBook: [String: [Trade]] = [:]
         for trade in trades {
-            guard trade.status != .open, let pbId = trade.playbookId, !pbId.isEmpty else { continue }
-            tradesByPlaybook[pbId, default: []].append(trade)
+            guard let id = trade.playbookId, !id.isEmpty, trade.status != .open else { continue }
+            tradesByBook[id, default: []].append(trade)
         }
         
-        // Group assessments by playbook -> tradeKey -> rule -> followed
-        var assessMap: [String: [String: [String: Bool]]] = [:]
-        for a in assessments {
-            assessMap[a.playbookId, default: [:]][a.tradeKey, default: [:]][a.rule] = a.followed
+        var checksByBook: [String: [String: [String: Bool]]] = [:]
+        for check in checks {
+            checksByBook[check.playbookId, default: [:]][check.tradeKey, default: [:]][check.rule] = check.followed
         }
         
-        return playbooks.map { playbook in
-            let pbTrades = tradesByPlaybook[playbook.id] ?? []
-            let uniqueRules = Array(Set(playbook.rules))
+        return playbooks.map { book in
+            let ts = tradesByBook[book.id] ?? []
+            let uniqueRuleStrings = Array(Set(book.rules))
+            
+            var ruleFollowedMap: [String: [Trade]] = [:]
+            var ruleBrokenMap: [String: [Trade]] = [:]
+            for r in uniqueRuleStrings {
+                ruleFollowedMap[r] = []
+                ruleBrokenMap[r] = []
+            }
             
             var followedTrades: [Trade] = []
             var brokenTrades: [Trade] = []
-            var evaluatedCount = 0
-            var positiveCount = 0
+            var evaluated = 0
+            var positive = 0
             
-            for trade in pbTrades {
-                let tradeAssessed = assessMap[playbook.id]?[trade.key] ?? [:]
-                var isComplete = !uniqueRules.isEmpty
+            for trade in ts {
+                let assessed = checksByBook[book.id]?[trade.key] ?? [:]
+                var complete = !uniqueRuleStrings.isEmpty
                 var hasBroken = false
                 
-                for rule in uniqueRules {
-                    if let result = tradeAssessed[rule] {
-                        evaluatedCount += 1
+                for rule in uniqueRuleStrings {
+                    if let result = assessed[rule] {
+                        evaluated += 1
                         if result {
-                            positiveCount += 1
+                            positive += 1
+                            ruleFollowedMap[rule]?.append(trade)
                         } else {
                             hasBroken = true
+                            ruleBrokenMap[rule]?.append(trade)
                         }
                     } else {
-                        isComplete = false
+                        complete = false
                     }
                 }
                 
                 if hasBroken {
                     brokenTrades.append(trade)
-                } else if isComplete {
+                } else if complete {
                     followedTrades.append(trade)
                 }
             }
             
-            let rate: Double? = evaluatedCount > 0 ? Double(positiveCount) / Double(evaluatedCount) : nil
-            let pnlFollowed = followedTrades.reduce(Decimal.zero) { $0 + $1.netPnl }
-            let pnlBroken = brokenTrades.reduce(Decimal.zero) { $0 + $1.netPnl }
-            let unassessed = pbTrades.count - followedTrades.count - brokenTrades.count
+            let rate: Double? = evaluated > 0 ? Double(positive) / Double(evaluated) : nil
+            let accountIds = Array(Set(ts.map { $0.accountId }))
+            let followedSummary = TradeAnalysisEngine.summarizeGroup(all: followedTrades)
+            let brokenSummary = TradeAnalysisEngine.summarizeGroup(all: brokenTrades)
+            let unassessed = ts.count - followedTrades.count - brokenTrades.count
+            
+            let ruleStats: [RuleAdherenceStat] = uniqueRuleStrings.map { rule in
+                let fList = ruleFollowedMap[rule] ?? []
+                let bList = ruleBrokenMap[rule] ?? []
+                let totalEval = fList.count + bList.count
+                let rRate = totalEval > 0 ? Double(fList.count) / Double(totalEval) : nil
+                return RuleAdherenceStat(
+                    rule: rule,
+                    evaluated: totalEval,
+                    rate: rRate,
+                    followed: TradeAnalysisEngine.summarizeGroup(all: fList),
+                    broken: TradeAnalysisEngine.summarizeGroup(all: bList)
+                )
+            }
             
             return PlaybookAdherenceSummary(
-                playbook: playbook,
-                totalTrades: pbTrades.count,
-                followedTradesCount: followedTrades.count,
-                brokenTradesCount: brokenTrades.count,
-                unassessedTradesCount: max(0, unassessed),
-                overallAdherenceRate: rate,
-                netPnlWhenFollowed: pnlFollowed,
-                netPnlWhenBroken: pnlBroken
+                id: book.id,
+                total: ts.count,
+                evaluated: evaluated,
+                possible: ts.count * uniqueRuleStrings.count,
+                rate: rate,
+                accountIds: accountIds,
+                followed: followedSummary,
+                broken: brokenSummary,
+                unassessed: max(0, unassessed),
+                rules: ruleStats
             )
         }
     }

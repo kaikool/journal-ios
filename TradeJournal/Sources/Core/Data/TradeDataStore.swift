@@ -1,8 +1,9 @@
 import SwiftUI
 import Combine
 
-/// Quản lý dữ liệu tập trung phía Client (State & Data Store)
-/// Điều phối giữa bộ nhớ cục bộ, thuật toán tái dựng Trade và đồng bộ từ xa.
+/// Quản lý dữ liệu thực tế của ứng dụng, hỗ trợ lưu trữ cục bộ (Offline persistence)
+/// và đồng bộ hai chiều với Supabase PostgreSQL.
+/// Thuật toán tái dựng và băm dedup tuân thủ 100% `rebuild.ts` và `ids.ts`.
 @MainActor
 public final class TradeDataStore: ObservableObject {
     public static let shared = TradeDataStore()
@@ -11,11 +12,24 @@ public final class TradeDataStore: ObservableObject {
     @Published public var executions: [Execution] = []
     @Published public var trades: [Trade] = []
     @Published public var selectedAccountId: String = "default-acc"
+    @Published public var defaults: JournalDefaults = .empty
+    @Published public var multipliers: [String: Decimal] = [:]
+    @Published public var isSyncing: Bool = false
+    @Published public var lastSyncError: String? = nil
     
     private var executionHashes: Set<String> = []
     
+    private var persistenceUrl: URL {
+        let paths = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
+        return paths[0].appendingPathComponent("trade_journal_store_v1.json")
+    }
+    
     public init() {
-        seedSampleData()
+        loadFromDisk()
+        if accounts.isEmpty {
+            createInitialDefaultAccount()
+        }
+        rebuildAllAccounts()
     }
     
     public var selectedAccount: Account? {
@@ -31,7 +45,10 @@ public final class TradeDataStore: ObservableObject {
         Set(executions.filter { $0.accountId == selectedAccountId }.map { $0.contentHash })
     }
     
-    /// Thêm một tài khoản giao dịch mới
+    public func selectAccount(id: String) {
+        selectedAccountId = id
+    }
+    
     public func addAccount(name: String, broker: String = "", currency: String = "USD", initialBalance: Decimal = 0) {
         let newAccount = Account(
             name: name,
@@ -41,14 +58,12 @@ public final class TradeDataStore: ObservableObject {
         )
         accounts.append(newAccount)
         selectedAccountId = newAccount.id
-        AppLogger.info("Added new account: \(name) (\(newAccount.id))")
+        saveToDisk()
+        AppLogger.info("Added account: \(name) (\(newAccount.id))")
     }
     
-    public func selectAccount(id: String) {
-        selectedAccountId = id
-    }
-    
-    /// Nạp danh sách executions mới từ Import hoặc Sync và tự động kích hoạt Rebuild
+    /// Nạp danh sách executions mới từ Import hoặc Sync
+    /// Chống ghi trùng tuyệt đối theo `executionHash` chuẩn SHA-256 từ `ids.ts`
     public func importExecutions(accountId: String, newExecutions: [Execution]) {
         let uniqueNew = newExecutions.filter { !executionHashes.contains($0.contentHash) }
         guard !uniqueNew.isEmpty else {
@@ -62,72 +77,190 @@ public final class TradeDataStore: ObservableObject {
         }
         
         rebuildAccount(accountId: accountId)
+        saveToDisk()
         AppLogger.info("Imported \(uniqueNew.count) executions for account \(accountId). Rebuilt \(trades.count) trades.")
     }
     
     /// Tái dựng toàn bộ các Trades cho một account từ executions nguyên tử
+    /// Port 1:1 từ `source-repo/apps/web/src/server/rebuild.ts`
     public func rebuildAccount(accountId: String) {
         guard let account = accounts.first(where: { $0.id == accountId }) else { return }
         
         let accountFills = executions.filter { $0.accountId == accountId }
         let reconstructed = TradeReconstructionEngine.buildRoundTrips(
             executions: accountFills,
-            options: .init(method: account.profitCalcMethod)
+            options: .init(method: account.profitCalcMethod, multipliers: multipliers)
         )
         
-        // Lưu lại các annotation cũ nếu có
-        var existingAnnotations: [String: (notes: String?, tags: [String], rating: Int?, stopLoss: Decimal?)] = [:]
+        // Lưu lại các annotation người dùng đã ghi chú để bảo toàn khi rebuild
+        var existingAnnotations: [String: (notes: String?, tags: [String], mistakes: [String], rating: Int?, stopLoss: Decimal?, profitTarget: Decimal?, reviewedAt: Date?, playbookId: String?)] = [:]
         for t in trades where t.accountId == accountId {
-            existingAnnotations[t.key] = (t.notes, t.tags, t.rating, t.stopLoss)
+            existingAnnotations[t.key] = (t.notes, t.tags, t.mistakes, t.rating, t.stopLoss, t.profitTarget, t.reviewedAt, t.playbookId)
         }
         
-        var mergedTrades = reconstructed.map { trade -> Trade in
+        let mergedTrades = reconstructed.map { trade -> Trade in
             var t = trade
             if let ann = existingAnnotations[t.key] {
                 t.notes = ann.notes
                 t.tags = ann.tags
+                t.mistakes = ann.mistakes
                 t.rating = ann.rating
                 t.stopLoss = ann.stopLoss
+                t.profitTarget = ann.profitTarget
+                t.reviewedAt = ann.reviewedAt
+                t.playbookId = ann.playbookId
+            } else {
+                // Áp dụng defaultRisk nếu chưa có annotation
+                let defaultRisk = JournalDefaultsEngine.defaultRisk(
+                    entry: t.avgEntry,
+                    direction: t.direction,
+                    accountId: accountId,
+                    symbol: t.symbol,
+                    defaults: defaults
+                )
+                if t.stopLoss == nil { t.stopLoss = defaultRisk.stopLoss }
+                if t.profitTarget == nil { t.profitTarget = defaultRisk.profitTarget }
             }
             return t
         }
         
-        // Giữ lại các trades thuộc accounts khác
         let otherTrades = trades.filter { $0.accountId != accountId }
         trades = otherTrades + mergedTrades
     }
     
-    /// Cập nhật ghi chú và tag cho một Trade
-    public func updateTradeAnnotations(key: String, notes: String?, tags: [String], stopLoss: Decimal?, rating: Int?) {
+    public func rebuildAllAccounts() {
+        for acc in accounts {
+            rebuildAccount(accountId: acc.id)
+        }
+    }
+    
+    public func updateTradeAnnotations(
+        key: String,
+        notes: String?,
+        tags: [String],
+        mistakes: [String] = [],
+        stopLoss: Decimal?,
+        profitTarget: Decimal? = nil,
+        rating: Int?,
+        playbookId: String? = nil,
+        reviewedAt: Date? = nil
+    ) {
         guard let index = trades.firstIndex(where: { $0.key == key }) else { return }
         trades[index].notes = notes
         trades[index].tags = tags
+        trades[index].mistakes = mistakes
         trades[index].stopLoss = stopLoss
+        trades[index].profitTarget = profitTarget
         trades[index].rating = rating
+        trades[index].playbookId = playbookId
+        trades[index].reviewedAt = reviewedAt
+        saveToDisk()
         AppLogger.info("Updated trade annotations for key: \(key)")
     }
     
-    private func seedSampleData() {
+    // MARK: - Supabase Synchronization
+    
+    public func syncWithSupabase() async {
+        guard SupabaseService.shared.isConfigured else {
+            AppLogger.info("Supabase credentials not configured in settings, running in local-first mode.")
+            return
+        }
+        
+        isSyncing = true
+        lastSyncError = nil
+        
+        do {
+            // 1. Fetch remote accounts
+            let remoteAccounts = try await SupabaseService.shared.fetchAccounts()
+            if !remoteAccounts.isEmpty {
+                for rAcc in remoteAccounts {
+                    if !accounts.contains(where: { $0.id == rAcc.id }) {
+                        accounts.append(rAcc)
+                    }
+                }
+            }
+            
+            // 2. Fetch remote executions for selected account
+            let remoteExecutions = try await SupabaseService.shared.fetchExecutions(accountId: selectedAccountId)
+            if !remoteExecutions.isEmpty {
+                importExecutions(accountId: selectedAccountId, newExecutions: remoteExecutions)
+            }
+            
+            // 2b. Push local executions for selected account to Supabase
+            let localAccountFills = executions.filter { $0.accountId == selectedAccountId }
+            if !localAccountFills.isEmpty {
+                try await SupabaseService.shared.upsertExecutions(localAccountFills)
+            }
+            
+            // 3. Push local trades to Supabase
+            try await SupabaseService.shared.upsertTrades(filteredTrades)
+            
+            saveToDisk()
+            AppLogger.info("Supabase sync completed successfully.")
+        } catch {
+            lastSyncError = error.localizedDescription
+            AppLogger.error("Supabase sync failed: \(error.localizedDescription)")
+        }
+        
+        isSyncing = false
+    }
+    
+    // MARK: - Local Persistence
+    
+    private struct PersistedStore: Codable {
+        let accounts: [Account]
+        let executions: [Execution]
+        let trades: [Trade]
+        let selectedAccountId: String
+        let defaults: JournalDefaults
+        let multipliers: [String: Decimal]?
+    }
+    
+    private func saveToDisk() {
+        let store = PersistedStore(
+            accounts: accounts,
+            executions: executions,
+            trades: trades,
+            selectedAccountId: selectedAccountId,
+            defaults: defaults,
+            multipliers: multipliers
+        )
+        do {
+            let data = try JSONEncoder().encode(store)
+            try data.write(to: persistenceUrl, options: .atomic)
+        } catch {
+            AppLogger.error("Failed to save store to disk: \(error.localizedDescription)")
+        }
+    }
+    
+    private func loadFromDisk() {
+        guard FileManager.default.fileExists(atPath: persistenceUrl.path) else { return }
+        do {
+            let data = try Data(contentsOf: persistenceUrl)
+            let store = try JSONDecoder().decode(PersistedStore.self, from: data)
+            self.accounts = store.accounts
+            self.executions = store.executions
+            self.trades = store.trades
+            self.selectedAccountId = store.selectedAccountId
+            self.defaults = store.defaults
+            self.multipliers = store.multipliers ?? [:]
+            self.executionHashes = Set(store.executions.map { $0.contentHash })
+            AppLogger.info("Loaded \(store.accounts.count) accounts and \(store.executions.count) executions from persistent disk.")
+        } catch {
+            AppLogger.error("Failed to load store from disk: \(error.localizedDescription)")
+        }
+    }
+    
+    private func createInitialDefaultAccount() {
         let defaultAcc = Account(
             id: "default-acc",
-            name: "Tài khoản Chính (Demo)",
+            name: "Main Trading Account",
             broker: "Interactive Brokers",
             currency: "USD",
             initialBalance: 10000
         )
         accounts = [defaultAcc]
         selectedAccountId = defaultAcc.id
-        
-        let now = Date()
-        let sampleFills = [
-            Execution(accountId: defaultAcc.id, symbol: "AAPL", side: .buy, quantity: 100, price: 150, fee: 1, executedAt: now.addingTimeInterval(-86400 * 3)),
-            Execution(accountId: defaultAcc.id, symbol: "AAPL", side: .sell, quantity: 100, price: 155, fee: 1, executedAt: now.addingTimeInterval(-86400 * 3 + 3600)),
-            Execution(accountId: defaultAcc.id, symbol: "TSLA", side: .sell, quantity: 50, price: 210, fee: 1.5, executedAt: now.addingTimeInterval(-86400 * 2)),
-            Execution(accountId: defaultAcc.id, symbol: "TSLA", side: .buy, quantity: 50, price: 200, fee: 1.5, executedAt: now.addingTimeInterval(-86400 * 2 + 7200)),
-            Execution(accountId: defaultAcc.id, symbol: "NVDA", side: .buy, quantity: 40, price: 120, fee: 1, executedAt: now.addingTimeInterval(-86400 * 1)),
-            Execution(accountId: defaultAcc.id, symbol: "NVDA", side: .sell, quantity: 40, price: 115, fee: 1, executedAt: now.addingTimeInterval(-86400 * 1 + 1800))
-        ]
-        
-        importExecutions(accountId: defaultAcc.id, newExecutions: sampleFills)
+        saveToDisk()
     }
 }

@@ -2,7 +2,7 @@ import Foundation
 
 public struct Playbook: Identifiable, Codable, Equatable, Sendable {
     public let id: String
-    public var title: String
+    public var name: String
     public var description: String
     public var rules: [String]
     public var targetWinRate: Double?
@@ -10,9 +10,15 @@ public struct Playbook: Identifiable, Codable, Equatable, Sendable {
     public var createdAt: Date
     public var updatedAt: Date
     
+    public var title: String {
+        get { name }
+        set { name = newValue }
+    }
+    
     public init(
-        id: String = UUID().uuidString,
-        title: String,
+        id: String = JournalIds.newId(),
+        name: String = "",
+        title: String? = nil,
         description: String = "",
         rules: [String] = [],
         targetWinRate: Double? = nil,
@@ -21,7 +27,7 @@ public struct Playbook: Identifiable, Codable, Equatable, Sendable {
         updatedAt: Date = Date()
     ) {
         self.id = id
-        self.title = title
+        self.name = title ?? name
         self.description = description
         self.rules = rules
         self.targetWinRate = targetWinRate
