@@ -46,37 +46,48 @@ jobs:
           xcodegen generate
           ls -la TradeJournal.xcodeproj
 
-      - name: Build Xcode Release Archive
-        id: build_archive
+      - name: Build iOS App Binary
+        id: build_app
         run: |
-          echo "==> Building Release Archive for iOS..."
+          echo "==> Building Release Binary for iOS..."
           CONFIG="${{ github.event.inputs.configuration || 'Release' }}"
           mkdir -p build
           set -o pipefail
-          xcodebuild archive \
+          xcodebuild build \
             -project TradeJournal.xcodeproj \
             -scheme TradeJournal \
             -configuration "$CONFIG" \
             -destination "generic/platform=iOS" \
-            -archivePath build/TradeJournal.xcarchive \
+            -derivedDataPath build/DerivedData \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             COMPILER_INDEX_STORE_ENABLE=NO 2>&1 | tee build/xcodebuild.log
 
-      - name: Report Build Failure Log
-        if: failure() && steps.build_archive.outcome == 'failure'
+      - name: Echo Build Log on Failure
+        if: failure() && steps.build_app.outcome == 'failure'
         run: |
-          echo "### ❌ Xcode Build Failure Log" >> $GITHUB_STEP_SUMMARY
+          echo "==> Last 50 lines of build log:"
+          tail -n 50 build/xcodebuild.log
+          echo "### ❌ Xcode Build Failure Summary" >> $GITHUB_STEP_SUMMARY
           echo '```text' >> $GITHUB_STEP_SUMMARY
-          tail -n 120 build/xcodebuild.log >> $GITHUB_STEP_SUMMARY || true
+          grep -E "error:" build/xcodebuild.log | head -n 30 >> $GITHUB_STEP_SUMMARY || true
           echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload Build Log on Failure
+        if: failure() && steps.build_app.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcodebuild-failure-log
+          path: build/xcodebuild.log
 
       - name: Package IPA
         run: |
           echo "==> Packaging .app into .ipa..."
           mkdir -p build/Payload
-          cp -r "build/TradeJournal.xcarchive/Products/Applications/TradeJournal.app" build/Payload/
+          APP_PATH=$(find build/DerivedData -name "TradeJournal.app" -type d | head -n 1)
+          echo "Found app at: $APP_PATH"
+          cp -r "$APP_PATH" build/Payload/
           cd build
           zip -r -9 TradeJournal.ipa Payload
           ls -lh TradeJournal.ipa
