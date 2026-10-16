@@ -68,13 +68,23 @@ public final class SupabaseService {
     }
     
     public func configure(url: String, anonKey: String, token: String? = nil) {
-        self.supabaseUrl = url.trimmingCharacters(in: .whitespaces).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        self.supabaseAnonKey = anonKey.trimmingCharacters(in: .whitespaces)
-        self.accessToken = token
+        var cleanUrl = url.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "/\"'"))
+        if !cleanUrl.isEmpty && !cleanUrl.hasPrefix("http://") && !cleanUrl.hasPrefix("https://") {
+            cleanUrl = "https://" + cleanUrl
+        }
+        let cleanKey = anonKey.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "\"'\r\n "))
+        
+        self.supabaseUrl = cleanUrl
+        self.supabaseAnonKey = cleanKey
+        self.accessToken = token?.trimmingCharacters(in: .whitespacesAndNewlines)
         
         UserDefaults.standard.set(self.supabaseUrl, forKey: "supabase_url")
         UserDefaults.standard.set(self.supabaseAnonKey, forKey: "supabase_anon_key")
-        UserDefaults.standard.set(self.accessToken, forKey: "supabase_access_token")
+        if let t = self.accessToken, !t.isEmpty {
+            UserDefaults.standard.set(t, forKey: "supabase_access_token")
+        } else {
+            UserDefaults.standard.removeObject(forKey: "supabase_access_token")
+        }
     }
     
     private func makeRequest(endpoint: String, method: String = "GET", body: Data? = nil, preferMerge: Bool = false) throws -> URLRequest {
@@ -138,46 +148,72 @@ public final class SupabaseService {
         return encoder
     }
     
-    // MARK: - Chẩn Đoán Kết Nối (Connection Diagnostics)
+    // MARK: - Chẩn Đoán Kết Nối Chính Xác (Accurate Connection Diagnostics)
     
     public func pingConnection() async throws -> (success: Bool, message: String) {
         guard isConfigured else {
-            return (false, "Chưa cấu hình Supabase URL và Anon Key.")
-        }
-        guard let url = URL(string: "\(supabaseUrl)/rest/v1/") else {
-            return (false, "URL Supabase không đúng định dạng.")
+            return (false, "Vui lòng nhập đầy đủ Supabase Project URL và Anon Key.")
         }
         
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
-        let token = accessToken ?? supabaseAnonKey
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        // 1. Kiểm tra URL Auth Settings để xác thực Anon Key (Endpoint chuẩn của Supabase)
+        guard let authSettingsUrl = URL(string: "\(supabaseUrl)/auth/v1/settings") else {
+            return (false, "Project URL không đúng định dạng: \(supabaseUrl)")
+        }
+        
+        var authReq = URLRequest(url: authSettingsUrl)
+        authReq.httpMethod = "GET"
+        authReq.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
         
         do {
-            let (data, response) = try await session.data(for: request)
-            guard let http = response as? HTTPURLResponse else {
-                return (false, "Không có phản hồi từ máy chủ Supabase.")
+            let (authData, authResp) = try await session.data(for: authReq)
+            guard let authHttp = authResp as? HTTPURLResponse else {
+                return (false, "Không nhận được phản hồi mạng từ Supabase.")
             }
             
-            if (200...299).contains(http.statusCode) {
-                // Kiểm tra sự tồn tại của bảng accounts & trades
-                let tableCheck = await checkDatabaseTables()
-                if tableCheck.allExist {
-                    return (true, "Kết nối thành công! Đã tìm thấy đầy đủ các bảng dữ liệu trên Supabase.")
-                } else {
-                    return (false, "Kết nối URL & Key thành công, nhưng thiếu các bảng: \(tableCheck.missing.joined(separator: ", ")). Hãy bấm 'Sao Chép SQL Khởi Tạo' và chạy trên Supabase SQL Editor.")
-                }
-            } else if http.statusCode == 401 {
-                return (false, "Lỗi 401: Anon Key không hợp lệ hoặc đã hết hạn.")
-            } else if http.statusCode == 403 {
-                return (false, "Lỗi 403: Bị chặn bởi RLS. Hãy tạo Policy cho phép thao tác trên Supabase.")
-            } else {
-                let bodyStr = String(data: data, encoding: .utf8) ?? ""
-                return (false, "Supabase phản hồi mã HTTP \(http.statusCode): \(bodyStr)")
+            if authHttp.statusCode == 401 {
+                return (false, "Lỗi 401: Anon Key không khớp với Project URL này. Vui lòng vào Supabase Dashboard -> Project Settings -> API và copy đúng 'anon public' key.")
+            }
+            
+            if !(200...299).contains(authHttp.statusCode) {
+                let errStr = String(data: authData, encoding: .utf8) ?? ""
+                return (false, "Supabase phản hồi mã HTTP \(authHttp.statusCode): \(errStr)")
             }
         } catch {
-            return (false, "Lỗi mạng kết nối: \(error.localizedDescription)")
+            return (false, "Không thể kết nối tới Project URL: \(error.localizedDescription). Vui lòng kiểm tra lại kết nối mạng hoặc URL.")
+        }
+        
+        // 2. Xác thực PostgREST Database Tables
+        guard let restUrl = URL(string: "\(supabaseUrl)/rest/v1/accounts?select=id&limit=1") else {
+            return (false, "URL PostgREST không đúng định dạng.")
+        }
+        
+        var restReq = URLRequest(url: restUrl)
+        restReq.httpMethod = "GET"
+        restReq.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
+        restReq.setValue("Bearer \(supabaseAnonKey)", forHTTPHeaderField: "Authorization")
+        
+        do {
+            let (restData, restResp) = try await session.data(for: restReq)
+            guard let restHttp = restResp as? HTTPURLResponse else {
+                return (false, "Không có phản hồi từ máy chủ PostgREST.")
+            }
+            
+            if (200...299).contains(restHttp.statusCode) {
+                return (true, "Kết nối Supabase thành công 100%! Bảng 'accounts' và dữ liệu đã sẵn sàng đồng bộ.")
+            } else if restHttp.statusCode == 404 {
+                let err = try? JSONDecoder().decode(PostgrestErrorPayload.self, from: restData)
+                if err?.code == "42P01" || (err?.message?.contains("does not exist") ?? true) {
+                    return (true, "Xác thực URL và Anon Key thành công! Tuy nhiên database chưa có bảng 'accounts' (Mã 42P01). Hãy bấm 'Sao Chép SQL Khởi Tạo' và chạy trong Supabase SQL Editor.")
+                }
+                return (false, "Bảng accounts không tìm thấy: \(err?.message ?? "HTTP 404")")
+            } else if restHttp.statusCode == 403 {
+                return (true, "Xác thực URL và Anon Key thành công! Tuy nhiên bảng đang bật Row Level Security (RLS). Hãy tạo policy cho phép thao tác.")
+            } else {
+                let bodyStr = String(data: restData, encoding: .utf8) ?? ""
+                return (false, "PostgREST phản hồi HTTP \(restHttp.statusCode): \(bodyStr)")
+            }
+        } catch {
+            return (false, "Lỗi kiểm tra PostgREST: \(error.localizedDescription)")
         }
     }
     
@@ -204,6 +240,47 @@ public final class SupabaseService {
         }
         
         return (missing.isEmpty, missing)
+    }
+    
+    // MARK: - Email & Password Authentication (Native Không Cần Trình Duyệt Web)
+    
+    public func loginWithEmail(email: String, password: String) async throws -> String {
+        guard isConfigured else { throw SupabaseError.notConfigured }
+        guard let url = URL(string: "\(supabaseUrl)/auth/v1/token?grant_type=password") else {
+            throw SupabaseError.invalidUrl
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
+        
+        let payload = ["email": email.trimmingCharacters(in: .whitespacesAndNewlines), "password": password]
+        request.httpBody = try JSONSerialization.data(withJSONObject: payload)
+        
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse else {
+            throw SupabaseError.networkError("Không nhận được phản hồi từ Supabase.")
+        }
+        
+        guard (200...299).contains(http.statusCode) else {
+            let errJson = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+            let errMsg = errJson?["error_description"] as? String ?? errJson?["msg"] as? String ?? "Đăng nhập thất bại (HTTP \(http.statusCode))"
+            throw SupabaseError.unauthorized(message: errMsg)
+        }
+        
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let token = json["access_token"] as? String else {
+            throw SupabaseError.unauthorized(message: "Không tìm thấy access token trong phản hồi.")
+        }
+        
+        self.accessToken = token
+        UserDefaults.standard.set(token, forKey: "supabase_access_token")
+        return token
+    }
+    
+    public func logout() {
+        self.accessToken = nil
+        UserDefaults.standard.removeObject(forKey: "supabase_access_token")
     }
     
     // MARK: - Web OAuth Login Helper

@@ -26,6 +26,12 @@ targets:
     deploymentTarget: "17.0"
     sources:
       - path: TradeJournal/Sources
+    info:
+      properties:
+        CFBundleURLTypes:
+          - CFBundleURLName: com.kaikool.tradejournal
+            CFBundleURLSchemes:
+              - tradejournal
     settings:
       base:
         PRODUCT_NAME: "TradeJournal"

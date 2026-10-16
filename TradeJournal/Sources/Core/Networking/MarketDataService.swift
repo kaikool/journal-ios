@@ -247,6 +247,64 @@ public final class MarketDataService: Sendable {
         return bars
     }
     
+    // MARK: - 3b. Diagnostic Connection Tests
+    
+    public func testOandaConnection(
+        apiKey: String,
+        accountId: String,
+        environment: String
+    ) async -> (success: Bool, message: String) {
+        let cleanKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanAcc = accountId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanKey.isEmpty, !cleanAcc.isEmpty else {
+            return (false, "Vui lòng nhập đầy đủ OANDA Access Token và v20 Account ID.")
+        }
+        
+        let base = environment.lowercased() == "live" ? "https://api-fxtrade.oanda.com" : "https://api-fxpractice.oanda.com"
+        let urlStr = "\(base)/v3/accounts/\(cleanAcc)/instruments/EUR_USD/candles?count=1&granularity=M1&price=M"
+        guard let url = URL(string: urlStr) else {
+            return (false, "URL OANDA không hợp lệ.")
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(cleanKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("RFC3339", forHTTPHeaderField: "Accept-Datetime-Format")
+        
+        do {
+            let (data, response) = try await session.data(for: request)
+            guard let http = response as? HTTPURLResponse else {
+                return (false, "Không nhận được phản hồi từ máy chủ OANDA.")
+            }
+            if (200...299).contains(http.statusCode) {
+                return (true, "Kết nối OANDA v20 thành công! Tài khoản \(cleanAcc) (\(environment)) đã sẵn sàng tải nến.")
+            } else if http.statusCode == 401 {
+                return (false, "Lỗi 401: Access Token OANDA không hợp lệ hoặc đã hết hạn.")
+            } else if http.statusCode == 404 {
+                return (false, "Lỗi 404: Không tìm thấy v20 Account ID '\(cleanAcc)' trên môi trường \(environment).")
+            } else {
+                let errJson = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+                let errMsg = errJson?["errorMessage"] as? String ?? (String(data: data, encoding: .utf8) ?? "HTTP \(http.statusCode)")
+                return (false, "OANDA phản hồi lỗi: \(errMsg)")
+            }
+        } catch {
+            return (false, "Lỗi kết nối OANDA: \(error.localizedDescription)")
+        }
+    }
+    
+    public func testBinanceConnection() async -> (success: Bool, message: String) {
+        do {
+            let bars = try await fetchBinanceBars(symbol: "BTCUSDT", interval: "1m", limit: 1)
+            if !bars.isEmpty {
+                return (true, "Kết nối Binance Public Spot API thành công! Tải nến Crypto sẵn sàng.")
+            } else {
+                return (false, "Binance không trả về dữ liệu nến.")
+            }
+        } catch {
+            return (false, "Lỗi kết nối Binance: \(error.localizedDescription)")
+        }
+    }
+    
     // MARK: - 4. Unified Trade Candles Fetcher
     
     /// Tự động phát hiện nhà cung cấp thích hợp và tải nến thật cho một Trade
