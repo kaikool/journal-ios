@@ -69,9 +69,9 @@ jobs:
           set -o pipefail
           xcodebuild build \
             -project TradeJournal.xcodeproj \
-            -target TradeJournal \
+            -scheme TradeJournal \
+            -destination "generic/platform=iOS" \
             -configuration "$CONFIG" \
-            -sdk iphoneos \
             -derivedDataPath build/DerivedData \
             CODE_SIGNING_ALLOWED=YES \
             CODE_SIGNING_REQUIRED=NO \

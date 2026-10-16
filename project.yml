@@ -39,3 +39,9 @@ targets:
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
         GENERATE_INFOPLIST_FILE: "YES"
         ENABLE_BITCODE: "NO"
+
+schemes:
+  TradeJournal:
+    build:
+      targets:
+        TradeJournal: all
