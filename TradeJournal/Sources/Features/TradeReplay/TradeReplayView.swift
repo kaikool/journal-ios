@@ -285,3 +285,77 @@ public struct TradeReplayView: View {
         timer?.invalidate()
     }
 }
+
+/// View bao bọc màn hình Replay biểu đồ, cho phép chọn bất kỳ lệnh nào trong tài khoản để Replay
+public struct TradeReplayHubView: View {
+    @ObservedObject private var dataStore = TradeDataStore.shared
+    @State private var selectedTradeId: String = ""
+    
+    public init() {}
+    
+    private var trades: [Trade] {
+        dataStore.filteredTrades
+    }
+    
+    private var activeTrade: Trade? {
+        trades.first(where: { $0.id == selectedTradeId }) ?? trades.first
+    }
+    
+    private var tradeExecutions: [Execution] {
+        guard let t = activeTrade else { return [] }
+        return dataStore.executions.filter { t.executionIds.contains($0.id) }
+    }
+    
+    public var body: some View {
+        ScrollView {
+            VStack(spacing: 16) {
+                if trades.isEmpty {
+                    VStack(spacing: 12) {
+                        Image(systemName: "play.rectangle.on.rectangle")
+                            .font(.system(size: 40))
+                            .foregroundColor(AppColors.secondaryText.opacity(0.6))
+                        Text("Chưa có lệnh để Replay")
+                            .font(AppTypography.headline)
+                            .foregroundColor(AppColors.primaryText)
+                        Text("Hãy nhập lệnh hoặc đồng bộ tài khoản để sử dụng tính năng xem lại từng thanh nến.")
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.secondaryText)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 32)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 60)
+                } else {
+                    // Thanh chọn lệnh để Replay
+                    AppCard {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Chọn lệnh cần Replay:")
+                                .font(AppTypography.caption)
+                                .foregroundColor(AppColors.secondaryText)
+                            
+                            Picker("Lệnh", selection: Binding(
+                                get: { activeTrade?.id ?? "" },
+                                set: { selectedTradeId = $0 }
+                            )) {
+                                ForEach(trades) { t in
+                                    Text("\(t.symbol) - \(t.direction.rawValue.uppercased()) (\(t.netPnl >= 0 ? "+" : "")\(Formatters.currency(t.netPnl)))")
+                                        .tag(t.id)
+                                }
+                            }
+                            .pickerStyle(.menu)
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    
+                    if let trade = activeTrade {
+                        TradeReplayView(trade: trade, executions: tradeExecutions)
+                            .id(trade.id)
+                            .padding(.horizontal, 16)
+                    }
+                }
+            }
+            .padding(.vertical, 16)
+        }
+        .background(AppColors.background.ignoresSafeArea())
+    }
+}

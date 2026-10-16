@@ -13,31 +13,25 @@ public struct RootTabView: View {
                 }
                 .tag(AppTab.dashboard)
             
-            TradesListView()
+            TradesHubView()
                 .tabItem {
                     Label(AppTab.trades.rawValue, systemImage: AppTab.trades.iconName)
                 }
                 .tag(AppTab.trades)
             
-            ImportStatementView()
-                .tabItem {
-                    Label(AppTab.importStatement.rawValue, systemImage: AppTab.importStatement.iconName)
-                }
-                .tag(AppTab.importStatement)
-            
-            JournalCalendarView()
+            JournalHubView()
                 .tabItem {
                     Label(AppTab.journal.rawValue, systemImage: AppTab.journal.iconName)
                 }
                 .tag(AppTab.journal)
             
-            PropFirmLedgerView()
+            AnalyticsHubView()
                 .tabItem {
-                    Label(AppTab.propFirm.rawValue, systemImage: AppTab.propFirm.iconName)
+                    Label(AppTab.analytics.rawValue, systemImage: AppTab.analytics.iconName)
                 }
-                .tag(AppTab.propFirm)
+                .tag(AppTab.analytics)
             
-            SettingsView()
+            SettingsHubView()
                 .tabItem {
                     Label(AppTab.settings.rawValue, systemImage: AppTab.settings.iconName)
                 }

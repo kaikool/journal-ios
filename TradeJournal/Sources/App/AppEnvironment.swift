@@ -26,11 +26,10 @@ public final class AppEnvironment: ObservableObject {
 
 public enum AppTab: String, CaseIterable, Identifiable {
     case dashboard = "Dashboard"
-    case trades = "Trades"
-    case importStatement = "Import"
-    case journal = "Journal"
-    case propFirm = "Prop Firms"
-    case settings = "Settings"
+    case trades = "Lệnh GD"
+    case journal = "Nhật Ký"
+    case analytics = "Phân Tích"
+    case settings = "Cài Đặt"
     
     public var id: String { rawValue }
     
@@ -38,9 +37,8 @@ public enum AppTab: String, CaseIterable, Identifiable {
         switch self {
         case .dashboard: return "chart.xyaxis.line"
         case .trades: return "list.bullet.rectangle"
-        case .importStatement: return "square.and.arrow.down"
         case .journal: return "calendar"
-        case .propFirm: return "building.columns"
+        case .analytics: return "chart.bar.xaxis"
         case .settings: return "gearshape"
         }
     }

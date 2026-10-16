@@ -25,6 +25,9 @@ public final class TradeDataStore: ObservableObject {
     @Published public var playbooks: [Playbook] = []
     @Published public var playbookAssessments: [PlaybookRuleAssessment] = []
     @Published public var calendarNotes: [String: JournalNote] = [:]
+    @Published public var missedTrades: [MissedTrade] = []
+    @Published public var progressRules: [ProgressRule] = []
+    @Published public var progressChecks: [ProgressCheck] = []
     @Published public var generalSettings: GeneralSettingsConfig = .default
     @Published public var currencyConversion: CurrencyConversion = .default
     @Published public var marketConnections: MarketConnectionConfig = .default
@@ -74,17 +77,58 @@ public final class TradeDataStore: ObservableObject {
         selectedAccountId = id
     }
     
-    public func addAccount(name: String, broker: String = "", currency: String = "USD", initialBalance: Decimal = 0) {
+    public func addAccount(name: String, broker: String = "", currency: String = "USD", initialBalance: Decimal = 0, profitCalcMethod: ProfitCalcMethod = .fifo) {
         let newAccount = Account(
             name: name,
             broker: broker,
             currency: currency,
-            initialBalance: initialBalance
+            initialBalance: initialBalance,
+            profitCalcMethod: profitCalcMethod
         )
         accounts.append(newAccount)
         selectedAccountId = newAccount.id
         saveToDisk()
         AppLogger.info("Added account: \(name) (\(newAccount.id))")
+    }
+    
+    public func archiveAccount(id: String, archived: Bool) {
+        if let idx = accounts.firstIndex(where: { $0.id == id }) {
+            accounts[idx].archivedAt = archived ? Date() : nil
+            saveToDisk()
+        }
+    }
+    
+    public func deleteAccount(id: String) {
+        accounts.removeAll(where: { $0.id == id })
+        trades.removeAll(where: { $0.accountId == id })
+        executions.removeAll(where: { $0.accountId == id })
+        if selectedAccountId == id {
+            selectedAccountId = accounts.first?.id ?? "default-acc"
+        }
+        saveToDisk()
+    }
+    
+    public func toggleAccountAutoSync(id: String) {
+        if let idx = accounts.firstIndex(where: { $0.id == id }) {
+            accounts[idx].autoSync.toggle()
+            saveToDisk()
+        }
+    }
+    
+    public func setBulkAccountVisibility(action: String) {
+        for idx in accounts.indices {
+            switch action {
+            case "select-all":
+                accounts[idx].visibleInJournal = true
+            case "select-active":
+                accounts[idx].visibleInJournal = (accounts[idx].archivedAt == nil)
+            case "deselect-all":
+                accounts[idx].visibleInJournal = false
+            default:
+                break
+            }
+        }
+        saveToDisk()
     }
     
     /// Nạp danh sách executions mới từ Import hoặc Sync
@@ -837,6 +881,9 @@ public final class TradeDataStore: ObservableObject {
         let playbooks: [Playbook]?
         let playbookAssessments: [PlaybookRuleAssessment]?
         let calendarNotes: [String: JournalNote]?
+        let missedTrades: [MissedTrade]?
+        let progressRules: [ProgressRule]?
+        let progressChecks: [ProgressCheck]?
         let generalSettings: GeneralSettingsConfig?
         let currencyConversion: CurrencyConversion?
         let marketConnections: MarketConnectionConfig?
@@ -862,6 +909,9 @@ public final class TradeDataStore: ObservableObject {
             playbooks: playbooks,
             playbookAssessments: playbookAssessments,
             calendarNotes: calendarNotes,
+            missedTrades: missedTrades,
+            progressRules: progressRules,
+            progressChecks: progressChecks,
             generalSettings: generalSettings,
             currencyConversion: currencyConversion,
             marketConnections: marketConnections,
@@ -897,6 +947,9 @@ public final class TradeDataStore: ObservableObject {
             self.playbooks = store.playbooks ?? []
             self.playbookAssessments = store.playbookAssessments ?? []
             self.calendarNotes = store.calendarNotes ?? [:]
+            self.missedTrades = store.missedTrades ?? []
+            self.progressRules = store.progressRules ?? Self.defaultProgressRules
+            self.progressChecks = store.progressChecks ?? []
             self.generalSettings = store.generalSettings ?? .default
             self.currencyConversion = store.currencyConversion ?? .default
             self.marketConnections = store.marketConnections ?? .default
@@ -907,6 +960,78 @@ public final class TradeDataStore: ObservableObject {
         } catch {
             AppLogger.error("Failed to load store from disk: \(error.localizedDescription)")
         }
+    }
+    
+    // MARK: - Missed Trades & Progress Management
+    
+    public static var defaultProgressRules: [ProgressRule] {
+        [
+            ProgressRule(title: "Kiểm tra tin tức kinh tế hôm nay", stage: "Trước khi GD", weekdaysJson: "[1,2,3,4,5]"),
+            ProgressRule(title: "Xác định vùng FVG / Liquidity Sweep khung H1-H4", stage: "Trước khi GD", weekdaysJson: "[1,2,3,4,5]"),
+            ProgressRule(title: "Luôn đặt Stop Loss trước khi khớp lệnh", stage: "Trong khi GD", weekdaysJson: "[1,2,3,4,5]"),
+            ProgressRule(title: "Không dời SL hoặc gồng lỗ vượt kế hoạch R:R", stage: "Trong khi GD", weekdaysJson: "[1,2,3,4,5]"),
+            ProgressRule(title: "Ghi nhật ký cảm xúc & đánh giá sau lệnh", stage: "Sau khi GD", weekdaysJson: "[1,2,3,4,5]"),
+            ProgressRule(title: "Lưu ảnh chụp màn hình và chấm điểm Playbook", stage: "Sau khi GD", weekdaysJson: "[1,2,3,4,5]")
+        ]
+    }
+    
+    public func saveMissedTrade(_ trade: MissedTrade) {
+        if let idx = missedTrades.firstIndex(where: { $0.id == trade.id }) {
+            missedTrades[idx] = trade
+        } else {
+            missedTrades.append(trade)
+        }
+        saveToDisk()
+    }
+    
+    public func deleteMissedTrade(id: String) {
+        missedTrades.removeAll(where: { $0.id == id })
+        saveToDisk()
+    }
+    
+    public func toggleArchiveMissedTrade(id: String) {
+        if let idx = missedTrades.firstIndex(where: { $0.id == id }) {
+            if missedTrades[idx].archivedAt == nil {
+                missedTrades[idx].archivedAt = JournalIds.nowIso()
+            } else {
+                missedTrades[idx].archivedAt = nil
+            }
+            saveToDisk()
+        }
+    }
+    
+    public func saveProgressRule(_ rule: ProgressRule) {
+        if let idx = progressRules.firstIndex(where: { $0.id == rule.id }) {
+            progressRules[idx] = rule
+        } else {
+            progressRules.append(rule)
+        }
+        saveToDisk()
+    }
+    
+    public func deleteProgressRule(id: String) {
+        progressRules.removeAll(where: { $0.id == id })
+        progressChecks.removeAll(where: { $0.ruleId == id })
+        saveToDisk()
+    }
+    
+    public func toggleProgressCheck(ruleId: String, date: String) {
+        if let idx = progressChecks.firstIndex(where: { $0.ruleId == ruleId && $0.date == date }) {
+            progressChecks[idx].done.toggle()
+        } else {
+            progressChecks.append(ProgressCheck(ruleId: ruleId, date: date, done: true))
+        }
+        saveToDisk()
+    }
+    
+    public func progressScore(for date: String) -> (completed: Int, total: Int, percent: Double) {
+        let activeRules = progressRules.filter { $0.archivedAt == nil }
+        guard !activeRules.isEmpty else { return (0, 0, 0) }
+        let completed = activeRules.filter { r in
+            progressChecks.contains(where: { $0.ruleId == r.id && $0.date == date && $0.done })
+        }.count
+        let pct = Double(completed) / Double(activeRules.count)
+        return (completed, activeRules.count, pct)
     }
     
     private func createInitialDefaultAccount() {

@@ -11,6 +11,8 @@ public struct Account: Identifiable, Codable, Equatable {
     public var autoSync: Bool
     public var lastSyncAt: Date?
     public var archivedAt: Date?
+    public var visibleInJournal: Bool?
+    public var propProgram: String?
     public let createdAt: Date
     
     public init(
@@ -24,6 +26,8 @@ public struct Account: Identifiable, Codable, Equatable {
         autoSync: Bool = false,
         lastSyncAt: Date? = nil,
         archivedAt: Date? = nil,
+        visibleInJournal: Bool? = true,
+        propProgram: String? = nil,
         createdAt: Date = Date()
     ) {
         self.id = id
@@ -36,6 +40,8 @@ public struct Account: Identifiable, Codable, Equatable {
         self.autoSync = autoSync
         self.lastSyncAt = lastSyncAt
         self.archivedAt = archivedAt
+        self.visibleInJournal = visibleInJournal
+        self.propProgram = propProgram
         self.createdAt = createdAt
     }
 }

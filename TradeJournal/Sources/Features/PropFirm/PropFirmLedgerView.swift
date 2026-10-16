@@ -5,7 +5,8 @@ public enum PropLedgerTab: String, CaseIterable, Identifiable {
     case overview = "Tổng quan"
     case accounts = "Tài khoản"
     case payouts = "Payouts"
-    case transactions = "Sổ cái dòng tiền"
+    case transactions = "Sổ cái"
+    case activity = "Hoạt động"
     
     public var id: String { rawValue }
 }
@@ -130,6 +131,8 @@ public struct PropFirmLedgerView: View {
                             payoutsProgressView
                         case .transactions:
                             transactionsListView
+                        case .activity:
+                            activityAuditView
                         }
                     }
                     .padding()
@@ -669,6 +672,67 @@ public struct PropFirmLedgerView: View {
                                             .foregroundColor(AppColors.loss.opacity(0.8))
                                     }
                                 }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // MARK: - Activity / Audit Trail View (Port 1:1 từ tab activity trong web prop-firm-tracker)
+    private var activityAuditView: some View {
+        AppCard {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack {
+                    Text("Nhật ký hoạt động & Kiểm toán (Activity)")
+                        .font(AppTypography.headline)
+                        .foregroundColor(AppColors.primaryText)
+                    Spacer()
+                    Text("\(dataStore.propAudits.count) bản ghi")
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.secondaryText)
+                }
+                
+                Divider()
+                
+                if dataStore.propAudits.isEmpty {
+                    Text("Chưa có sự kiện kiểm toán hoặc thay đổi nào được ghi nhận.")
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.secondaryText)
+                        .padding(.vertical, 8)
+                } else {
+                    VStack(spacing: 12) {
+                        ForEach(dataStore.propAudits.reversed()) { a in
+                            HStack(alignment: .top, spacing: 12) {
+                                Image(systemName: "clock.arrow.circlepath")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(AppColors.accent)
+                                    .padding(.top, 2)
+                                
+                                VStack(alignment: .leading, spacing: 4) {
+                                    HStack {
+                                        Text(a.entityType.uppercased())
+                                            .font(.system(size: 11, weight: .bold))
+                                            .foregroundColor(AppColors.accent)
+                                        Spacer()
+                                        Text(a.createdAt.prefix(19))
+                                            .font(.system(size: 10))
+                                            .foregroundColor(AppColors.secondaryText)
+                                    }
+                                    
+                                    Text(a.reason)
+                                        .font(AppTypography.captionBold)
+                                        .foregroundColor(AppColors.primaryText)
+                                    
+                                    Text("ID: \(a.entityId)")
+                                        .font(.system(size: 10, design: .monospaced))
+                                        .foregroundColor(AppColors.secondaryText.opacity(0.8))
+                                }
+                            }
+                            
+                            if a.id != dataStore.propAudits.first?.id {
+                                Divider()
                             }
                         }
                     }

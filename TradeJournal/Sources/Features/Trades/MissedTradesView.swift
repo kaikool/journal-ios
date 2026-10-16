@@ -1,0 +1,328 @@
+import SwiftUI
+
+/// Màn hình quản lý Kèo Bị Lỡ (Missed Trades)
+/// Port 1:1 từ `source-repo/apps/web/src/app/missed/page.tsx`
+public struct MissedTradesView: View {
+    @EnvironmentObject private var env: AppEnvironment
+    @ObservedObject private var dataStore = TradeDataStore.shared
+    
+    @State private var searchText: String = ""
+    @State private var showArchived: Bool = false
+    @State private var showAddSheet: Bool = false
+    @State private var editingTrade: MissedTrade? = nil
+    
+    public init() {}
+    
+    private var filteredTrades: [MissedTrade] {
+        dataStore.missedTrades.filter { trade in
+            let isArchived = trade.archivedAt != nil
+            guard isArchived == showArchived else { return false }
+            
+            let query = searchText.trimmingCharacters(in: .whitespaces).lowercased()
+            if query.isEmpty { return true }
+            return trade.symbol.lowercased().contains(query) || trade.notes.lowercased().contains(query)
+        }.sorted { $0.observedAt > $1.observedAt }
+    }
+    
+    public var body: some View {
+        VStack(spacing: 0) {
+            // Filter Picker (Active vs Archived)
+            Picker("Trạng thái", selection: $showArchived) {
+                Text("Đang theo dõi").tag(false)
+                Text("Đã lưu trữ").tag(true)
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal)
+            .padding(.vertical, 8)
+            
+            if filteredTrades.isEmpty {
+                emptyStateView
+            } else {
+                List {
+                    ForEach(filteredTrades) { trade in
+                        missedTradeRow(trade)
+                            .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                            .listRowBackground(Color.clear)
+                            .listRowSeparator(.hidden)
+                    }
+                }
+                .listStyle(.plain)
+            }
+        }
+        .searchable(text: $searchText, prompt: "Tìm kèo lỡ theo mã hoặc ghi chú...")
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    editingTrade = nil
+                    showAddSheet = true
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "plus.circle.fill")
+                        Text("Thêm Kèo Lỡ")
+                    }
+                    .font(AppTypography.captionBold)
+                    .foregroundColor(AppColors.accent)
+                }
+            }
+        }
+        .sheet(isPresented: $showAddSheet) {
+            AddMissedTradeSheet(tradeToEdit: editingTrade)
+        }
+    }
+    
+    private var emptyStateView: some View {
+        VStack(spacing: 16) {
+            Spacer()
+            Image(systemName: "bookmark.slash")
+                .font(.system(size: 48))
+                .foregroundColor(AppColors.secondaryText)
+            
+            Text(showArchived ? "Không có kèo lỡ nào trong kho lưu trữ" : "Chưa có kèo giao dịch bị lỡ nào")
+                .font(AppTypography.headline)
+                .foregroundColor(AppColors.primaryText)
+            
+            Text("Ghi lại các cơ hội bạn đã thấy đúng tín hiệu nhưng bỏ lỡ hoặc ngần ngại không vào, để rút kinh nghiệm tâm lý.")
+                .font(AppTypography.caption)
+                .foregroundColor(AppColors.secondaryText)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 32)
+            
+            if !showArchived {
+                Button {
+                    editingTrade = nil
+                    showAddSheet = true
+                } label: {
+                    HStack {
+                        Image(systemName: "plus.circle")
+                        Text("Ghi Lại Kèo Bị Lỡ")
+                    }
+                    .font(AppTypography.subheadlineBold)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 10)
+                    .background(AppColors.accent)
+                    .foregroundColor(.white)
+                    .cornerRadius(8)
+                }
+            }
+            Spacer()
+        }
+    }
+    
+    private func missedTradeRow(_ trade: MissedTrade) -> some View {
+        AppCard {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Text(trade.symbol)
+                        .font(AppTypography.headline)
+                    
+                    AppBadge(
+                        text: trade.direction.uppercased(),
+                        color: trade.direction.lowercased() == "long" ? AppColors.accent : AppColors.warning
+                    )
+                    
+                    if let pbId = trade.playbookId, let pb = dataStore.playbooks.first(where: { $0.id == pbId }) {
+                        AppBadge(text: pb.name, color: AppColors.secondaryText)
+                    }
+                    
+                    Spacer()
+                    
+                    Text(formatDate(trade.observedAt))
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.secondaryText)
+                }
+                
+                // Pricing grid (Entry, Stop, Target, R:R)
+                HStack(spacing: 16) {
+                    if let entry = trade.entry {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Giá vào").font(AppTypography.caption).foregroundColor(AppColors.secondaryText)
+                            Text("\(entry)").font(AppTypography.captionBold)
+                        }
+                    }
+                    if let stop = trade.stop {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Stop Loss").font(AppTypography.caption).foregroundColor(AppColors.secondaryText)
+                            Text("\(stop)").font(AppTypography.captionBold).foregroundColor(AppColors.loss)
+                        }
+                    }
+                    if let target = trade.target {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Take Profit").font(AppTypography.caption).foregroundColor(AppColors.secondaryText)
+                            Text("\(target)").font(AppTypography.captionBold).foregroundColor(AppColors.profit)
+                        }
+                    }
+                    if let entry = trade.entry, let stop = trade.stop, let target = trade.target {
+                        let risk = abs(entry - stop)
+                        let reward = abs(target - entry)
+                        if risk > 0 {
+                            let rr = (reward as NSDecimalNumber).doubleValue / (risk as NSDecimalNumber).doubleValue
+                            Spacer()
+                            VStack(alignment: .trailing, spacing: 2) {
+                                Text("R : R").font(AppTypography.caption).foregroundColor(AppColors.secondaryText)
+                                Text(String(format: "1 : %.1f", rr)).font(AppTypography.captionBold).foregroundColor(AppColors.accent)
+                            }
+                        }
+                    }
+                }
+                
+                if !trade.notes.isEmpty {
+                    Divider().background(AppColors.border.opacity(0.4))
+                    Text(trade.notes)
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.primaryText)
+                        .lineLimit(3)
+                }
+            }
+        }
+        .contextMenu {
+            Button {
+                editingTrade = trade
+                showAddSheet = true
+            } label: {
+                Label("Chỉnh sửa", systemImage: "pencil")
+            }
+            
+            Button {
+                dataStore.toggleArchiveMissedTrade(id: trade.id)
+            } label: {
+                Label(trade.archivedAt == nil ? "Lưu trữ" : "Bỏ lưu trữ", systemImage: trade.archivedAt == nil ? "archivebox" : "arrow.up.bin")
+            }
+            
+            Button(role: .destructive) {
+                dataStore.deleteMissedTrade(id: trade.id)
+            } label: {
+                Label("Xóa", systemImage: "trash")
+            }
+        }
+    }
+    
+    private func formatDate(_ iso: String) -> String {
+        if let d = FlexibleDateParser.parse(iso) {
+            let f = DateFormatter()
+            f.dateFormat = "dd/MM/yyyy HH:mm"
+            return f.string(from: d)
+        }
+        return iso
+    }
+}
+
+/// Sheet thêm / sửa Kèo Bị Lỡ
+public struct AddMissedTradeSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var dataStore = TradeDataStore.shared
+    
+    private let tradeToEdit: MissedTrade?
+    
+    @State private var symbol: String = ""
+    @State private var direction: String = "long"
+    @State private var observedDate: Date = Date()
+    @State private var entryText: String = ""
+    @State private var stopText: String = ""
+    @State private var targetText: String = ""
+    @State private var selectedPlaybookId: String = ""
+    @State private var notes: String = ""
+    @State private var errorMessage: String? = nil
+    
+    public init(tradeToEdit: MissedTrade? = nil) {
+        self.tradeToEdit = tradeToEdit
+        if let t = tradeToEdit {
+            _symbol = State(initialValue: t.symbol)
+            _direction = State(initialValue: t.direction)
+            _entryText = State(initialValue: t.entry != nil ? "\(t.entry!)" : "")
+            _stopText = State(initialValue: t.stop != nil ? "\(t.stop!)" : "")
+            _targetText = State(initialValue: t.target != nil ? "\(t.target!)" : "")
+            _selectedPlaybookId = State(initialValue: t.playbookId ?? "")
+            _notes = State(initialValue: t.notes)
+            _observedDate = State(initialValue: FlexibleDateParser.parse(t.observedAt) ?? Date())
+        }
+    }
+    
+    public var body: some View {
+        NavigationStack {
+            Form {
+                Section("Thông Tin Kèo") {
+                    TextField("Mã cặp tiền / tài sản (VD: EURUSD, XAUUSD)", text: $symbol)
+                        .autocapitalization(.allCharacters)
+                    
+                    Picker("Chiều giao dịch", selection: $direction) {
+                        Text("Mua (Long)").tag("long")
+                        Text("Bán (Short)").tag("short")
+                    }
+                    .pickerStyle(.segmented)
+                    
+                    DatePicker("Thời điểm phát hiện", selection: $observedDate)
+                }
+                
+                Section("Kế Hoạch Giá") {
+                    TextField("Giá vào dự kiến (Entry)", text: $entryText)
+                        .keyboardType(.decimalPad)
+                    TextField("Stop Loss dự kiến", text: $stopText)
+                        .keyboardType(.decimalPad)
+                    TextField("Take Profit dự kiến", text: $targetText)
+                        .keyboardType(.decimalPad)
+                }
+                
+                Section("Chiến Lược (Playbook)") {
+                    Picker("Playbook liên kết", selection: $selectedPlaybookId) {
+                        Text("Không liên kết").tag("")
+                        ForEach(dataStore.playbooks) { pb in
+                            Text(pb.name).tag(pb.id)
+                        }
+                    }
+                }
+                
+                Section("Lý Do Bỏ Lỡ & Ghi Chú") {
+                    TextEditor(text: $notes)
+                        .frame(minHeight: 100)
+                }
+                
+                if let err = errorMessage {
+                    Section {
+                        Text(err).foregroundColor(AppColors.loss).font(AppTypography.caption)
+                    }
+                }
+            }
+            .navigationTitle(tradeToEdit == nil ? "Ghi Kèo Bị Lỡ" : "Sửa Kèo Lỡ")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Hủy") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Lưu") { save() }
+                        .font(AppTypography.captionBold)
+                        .foregroundColor(AppColors.accent)
+                }
+            }
+        }
+    }
+    
+    private func save() {
+        let cleanSymbol = symbol.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        guard !cleanSymbol.isEmpty else {
+            errorMessage = "Vui lòng nhập mã giao dịch (Symbol)."
+            return
+        }
+        
+        let fmt = ISO8601DateFormatter()
+        fmt.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let observedIso = fmt.string(from: observedDate)
+        
+        let item = MissedTrade(
+            id: tradeToEdit?.id ?? JournalIds.newId(),
+            symbol: cleanSymbol,
+            direction: direction,
+            observedAt: observedIso,
+            playbookId: selectedPlaybookId.isEmpty ? nil : selectedPlaybookId,
+            entry: Decimal(string: entryText.replacingOccurrences(of: ",", with: ".")),
+            stop: Decimal(string: stopText.replacingOccurrences(of: ",", with: ".")),
+            target: Decimal(string: targetText.replacingOccurrences(of: ",", with: ".")),
+            notes: notes,
+            createdAt: tradeToEdit?.createdAt ?? JournalIds.nowIso(),
+            archivedAt: tradeToEdit?.archivedAt
+        )
+        
+        dataStore.saveMissedTrade(item)
+        dismiss()
+    }
+}
