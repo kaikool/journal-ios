@@ -1491,6 +1491,29 @@ public struct SupabasePropEntryRecord: Codable {
         self.updatedAt = try? c.decode(String.self, forKey: .updatedAt)
     }
     
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encodeIfPresent(accountId, forKey: .accountId)
+        try c.encode(firm, forKey: .firm)
+        try c.encode(kind, forKey: .kind)
+        try c.encode(category, forKey: .category)
+        try c.encode(currency, forKey: .currency)
+        try c.encode(amountMinor, forKey: .amountMinor)
+        try c.encode(splitBps, forKey: .splitBps)
+        try c.encode(feeMinor, forKey: .feeMinor)
+        try c.encode(occurredOn, forKey: .occurredOn)
+        try c.encodeIfPresent(dueOn, forKey: .dueOn)
+        try c.encode(status, forKey: .status)
+        try c.encodeIfPresent(parentId, forKey: .parentId)
+        try c.encode(reference, forKey: .reference)
+        try c.encode(notes, forKey: .notes)
+        try c.encode(voided, forKey: .voided)
+        try c.encode(revision, forKey: .revision)
+        try c.encodeIfPresent(createdAt, forKey: .createdAt)
+        try c.encodeIfPresent(updatedAt, forKey: .updatedAt)
+    }
+    
     public func toItem() -> PropEntryItem {
         return PropEntryItem(
             id: id,
@@ -1562,6 +1585,19 @@ public struct SupabasePropReceiptRecord: Codable {
         self.notes = (try? c.decode(String.self, forKey: .notes)) ?? ""
         self.voided = (try? c.decode(Bool.self, forKey: .voided)) ?? false
         self.createdAt = try? c.decode(String.self, forKey: .createdAt)
+    }
+    
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(payoutId, forKey: .payoutId)
+        try c.encode(kind, forKey: .kind)
+        try c.encode(amountMinor, forKey: .amountMinor)
+        try c.encode(occurredOn, forKey: .occurredOn)
+        try c.encode(reference, forKey: .reference)
+        try c.encode(notes, forKey: .notes)
+        try c.encode(voided, forKey: .voided)
+        try c.encodeIfPresent(createdAt, forKey: .createdAt)
     }
     
     public func toItem() -> PropReceiptItem {
