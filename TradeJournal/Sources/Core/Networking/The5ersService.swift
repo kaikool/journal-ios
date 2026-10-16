@@ -104,7 +104,7 @@ public final class The5ersService: ObservableObject {
                     }
                 }()
                 
-                let startingMinor = Int64((acc.startingBalance ?? acc.balance) * 100)
+                let startingMinor = NSDecimalNumber(decimal: (acc.startingBalance ?? acc.balance) * 100).int64Value
                 
                 if let existingIndex = dataStore.propAccounts.firstIndex(where: { $0.id == acc.id || $0.name == acc.label }) {
                     var existing = dataStore.propAccounts[existingIndex]
@@ -117,12 +117,12 @@ public final class The5ersService: ObservableObject {
                         firm: "The5ers",
                         name: acc.label,
                         program: mappedProgram,
-                        startingBalanceMinor: startingMinor,
-                        currency: acc.currency,
                         status: mappedStatus,
-                        archived: false,
+                        currency: acc.currency,
+                        sizeMinor: startingMinor,
                         openedOn: acc.createdAt ?? DateFormatter.localizedString(from: Date(), dateStyle: .short, timeStyle: .none),
-                        notes: "Tự động đồng bộ từ The5ers API (ID: \(acc.id))"
+                        notes: "Tự động đồng bộ từ The5ers API (ID: \(acc.id))",
+                        archived: false
                     )
                     dataStore.propAccounts.append(newPropAccount)
                     importedCount += 1
