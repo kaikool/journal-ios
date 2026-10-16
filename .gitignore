@@ -1,0 +1,32 @@
+# Source repository cloned for auditing
+source-repo/
+
+# Xcode & Swift Build Artifacts
+.build/
+build/
+DerivedData/
+*.xcarchive
+*.ipa
+Payload/
+
+# Xcode User Data
+*.xcuserdata/
+xcuserdata/
+*.xcscmblueprint
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Node & Package Managers
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment & Secrets
+.env
+.env.*
+*.p12
+*.mobileprovision

@@ -1,0 +1,101 @@
+name: Build & Package iOS IPA
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+    inputs:
+      configuration:
+        description: 'Build Configuration (Release / Debug)'
+        required: true
+        default: 'Release'
+
+jobs:
+  build-ipa:
+    name: Build iOS IPA
+    runs-on: macos-14
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Select Xcode Version
+        run: |
+          echo "Available Xcode versions:"
+          ls -d /Applications/Xcode* || true
+          sudo xcode-select -s /Applications/Xcode_15.4.app || sudo xcode-select -s /Applications/Xcode.app
+          xcodebuild -version
+          swift --version
+
+      - name: Run Unit Tests
+        run: |
+          echo "==> Running Swift Package Unit Tests..."
+          swift test
+
+      - name: Install XcodeGen
+        run: |
+          echo "==> Installing XcodeGen via Homebrew..."
+          brew install xcodegen
+
+      - name: Generate Xcode Project
+        run: |
+          echo "==> Generating TradeJournal.xcodeproj..."
+          xcodegen generate
+          ls -la TradeJournal.xcodeproj
+
+      - name: Build Xcode Archive
+        run: |
+          echo "==> Building Release Archive for iOS..."
+          CONFIG="${{ github.event.inputs.configuration || 'Release' }}"
+          mkdir -p build
+          xcodebuild archive \
+            -project TradeJournal.xcodeproj \
+            -scheme TradeJournal \
+            -configuration "$CONFIG" \
+            -destination "generic/platform=iOS" \
+            -archivePath build/TradeJournal.xcarchive \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            COMPILER_INDEX_STORE_ENABLE=NO
+
+      - name: Package IPA
+        run: |
+          echo "==> Packaging .app into .ipa..."
+          mkdir -p build/Payload
+          cp -r "build/TradeJournal.xcarchive/Products/Applications/TradeJournal.app" build/Payload/
+          cd build
+          zip -r -9 TradeJournal.ipa Payload
+          ls -lh TradeJournal.ipa
+          shasum -a 256 TradeJournal.ipa > TradeJournal.ipa.sha256
+          echo "SHA256 Checksum:"
+          cat TradeJournal.ipa.sha256
+
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TradeJournal-iOS-IPA
+          path: |
+            build/TradeJournal.ipa
+            build/TradeJournal.ipa.sha256
+          retention-days: 14
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            build/TradeJournal.ipa
+            build/TradeJournal.ipa.sha256
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
