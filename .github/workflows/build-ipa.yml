@@ -46,6 +46,11 @@ jobs:
           xcodegen generate
           ls -la TradeJournal.xcodeproj
 
+      - name: Inspect Xcode Project
+        run: |
+          echo "==> Listing targets and schemes:"
+          xcodebuild -list -project TradeJournal.xcodeproj
+
       - name: Build iOS App Binary
         id: build_app
         run: |
@@ -55,7 +60,7 @@ jobs:
           set -o pipefail
           xcodebuild build \
             -project TradeJournal.xcodeproj \
-            -scheme TradeJournal \
+            -target TradeJournal \
             -configuration "$CONFIG" \
             -sdk iphoneos \
             -derivedDataPath build/DerivedData \
@@ -70,7 +75,7 @@ jobs:
         run: |
           echo "==> Last 50 lines of build log:"
           tail -n 50 build/xcodebuild.log || true
-          ERROR_SUMMARY=$(tail -n 15 build/xcodebuild.log | tr '\n' ' ' | cut -c 1-250)
+          ERROR_SUMMARY=$(grep -i "error:" build/xcodebuild.log | tr '\n' ' ' | cut -c 1-250 || tail -n 5 build/xcodebuild.log | tr '\n' ' ' | cut -c 1-250)
           echo "::error title=XcodeBuildError::$ERROR_SUMMARY"
 
       - name: Package IPA
