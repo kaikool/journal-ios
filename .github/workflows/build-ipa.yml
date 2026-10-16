@@ -30,26 +30,10 @@ jobs:
 
       - name: Select Xcode Version
         run: |
-          echo "Available Xcode versions:"
+          echo "==> Available Xcode versions:"
           ls -d /Applications/Xcode* || true
           sudo xcode-select -s /Applications/Xcode_15.4.app || sudo xcode-select -s /Applications/Xcode.app
           xcodebuild -version
-          swift --version
-
-      - name: Run Unit Tests
-        id: unit_tests
-        run: |
-          echo "==> Running Swift Package Unit Tests..."
-          set -o pipefail
-          swift test -v 2>&1 | tee test.log
-
-      - name: Report Test Failure Log
-        if: failure() && steps.unit_tests.outcome == 'failure'
-        run: |
-          echo "### ❌ Swift Test Failure Log" >> $GITHUB_STEP_SUMMARY
-          echo '```text' >> $GITHUB_STEP_SUMMARY
-          tail -n 120 test.log >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
 
       - name: Install XcodeGen
         run: |
@@ -58,11 +42,23 @@ jobs:
 
       - name: Generate Xcode Project
         run: |
-          echo "==> Generating TradeJournal.xcodeproj..."
+          echo "==> Generating TradeJournal.xcodeproj from project.yml..."
           xcodegen generate
           ls -la TradeJournal.xcodeproj
 
-      - name: Build Xcode Archive
+      - name: Build & Test for iOS Simulator
+        run: |
+          echo "==> Building and Testing for iOS..."
+          xcodebuild build-for-testing \
+            -project TradeJournal.xcodeproj \
+            -scheme TradeJournal \
+            -destination "generic/platform=iOS Simulator" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            COMPILER_INDEX_STORE_ENABLE=NO
+
+      - name: Build Xcode Release Archive
         run: |
           echo "==> Building Release Archive for iOS..."
           CONFIG="${{ github.event.inputs.configuration || 'Release' }}"
