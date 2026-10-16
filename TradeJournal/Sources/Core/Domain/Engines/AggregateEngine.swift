@@ -219,7 +219,7 @@ public enum AggregateEngine {
         let tradesWithDuration = trades.filter { $0.durationMs != nil }
         let buckets = group(trades: tradesWithDuration) { trade in
             let ms = trade.durationMs!
-            let found = DurationBucket.standard.first { ms < $0.maxMs }
+            let found = DurationBucket.standard.first { Double(ms) < $0.maxMs }
             return [found?.key ?? "> 1d"]
         }
         let order = DurationBucket.standard.map { $0.key }
