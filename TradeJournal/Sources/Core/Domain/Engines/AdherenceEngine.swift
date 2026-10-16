@@ -1,21 +1,6 @@
 import Foundation
 
-public struct PlaybookRuleAssessment: Codable, Equatable, Identifiable {
-    public var id: String { "\(tradeKey)|\(playbookId)|\(rule)" }
-    public let tradeKey: String
-    public let playbookId: String
-    public let rule: String
-    public let followed: Bool
-    
-    public init(tradeKey: String, playbookId: String, rule: String, followed: Bool) {
-        self.tradeKey = tradeKey
-        self.playbookId = playbookId
-        self.rule = rule
-        self.followed = followed
-    }
-}
-
-public struct RuleAdherenceStat: Equatable {
+public struct RuleAdherenceStat: Sendable, Equatable {
     public let rule: String
     public let evaluated: Int
     public let rate: Double?
@@ -23,8 +8,9 @@ public struct RuleAdherenceStat: Equatable {
     public let broken: GroupSummary
 }
 
-public struct PlaybookAdherenceSummary: Equatable {
+public struct PlaybookAdherenceSummary: Identifiable, Sendable, Equatable {
     public let id: String
+    public let playbook: Playbook
     public let total: Int
     public let evaluated: Int
     public let possible: Int
@@ -51,7 +37,7 @@ public enum AdherenceEngine {
     public static func analyzeAdherence(
         playbooks: [Playbook],
         trades: [Trade],
-        checks: [PlaybookRuleAssessment]
+        assessments: [PlaybookRuleAssessment] = []
     ) -> [PlaybookAdherenceSummary] {
         var tradesByBook: [String: [Trade]] = [:]
         for trade in trades {
@@ -60,7 +46,7 @@ public enum AdherenceEngine {
         }
         
         var checksByBook: [String: [String: [String: Bool]]] = [:]
-        for check in checks {
+        for check in assessments {
             checksByBook[check.playbookId, default: [:]][check.tradeKey, default: [:]][check.rule] = check.followed
         }
         
@@ -129,6 +115,7 @@ public enum AdherenceEngine {
             
             return PlaybookAdherenceSummary(
                 id: book.id,
+                playbook: book,
                 total: ts.count,
                 evaluated: evaluated,
                 possible: ts.count * uniqueRuleStrings.count,
@@ -140,5 +127,30 @@ public enum AdherenceEngine {
                 rules: ruleStats
             )
         }
+    }
+    
+    public static func analyzeAdherence(
+        playbooks: [Playbook],
+        trades: [Trade],
+        checks: [PlaybookRuleAssessment]
+    ) -> [PlaybookAdherenceSummary] {
+        analyzeAdherence(playbooks: playbooks, trades: trades, assessments: checks)
+    }
+    
+    public static func analyzeAdherence(
+        trades: [Trade],
+        playbooks: [PlaybookRuleSet],
+        checks: [PlaybookRuleAssessment]
+    ) -> [PlaybookAdherenceSummary] {
+        let converted = playbooks.map { Playbook(id: $0.id, title: $0.id, rules: $0.rules) }
+        return analyzeAdherence(playbooks: converted, trades: trades, assessments: checks)
+    }
+    
+    public static func analyzeAdherence(
+        trades: [Trade],
+        playbooks: [Playbook],
+        checks: [PlaybookRuleAssessment]
+    ) -> [PlaybookAdherenceSummary] {
+        analyzeAdherence(playbooks: playbooks, trades: trades, assessments: checks)
     }
 }

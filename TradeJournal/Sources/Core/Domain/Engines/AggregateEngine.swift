@@ -242,6 +242,13 @@ public enum AggregateEngine {
         }.sorted { $0.key < $1.key }
     }
 
+    public static func dayKeyOf(date: Date, timeZone: TimeZone = .current) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.timeZone = timeZone
+        return formatter.string(from: date)
+    }
+
     // MARK: - Calendar Aggregations (1:1 port from aggregate.ts)
 
     public static func calendarMonth(

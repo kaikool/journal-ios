@@ -48,7 +48,7 @@ public enum Dimension: String, CaseIterable, Equatable {
     }
 }
 
-public struct GroupSummary: Equatable {
+public struct GroupSummary: Equatable, Sendable {
     public let trades: Int
     public let netPnl: Decimal
     public let winRate: Double?
@@ -60,7 +60,7 @@ public struct GroupSummary: Equatable {
     public let noLosses: Bool
 }
 
-public struct GroupAnalysisResult: Equatable {
+public struct GroupAnalysisResult: Equatable, Sendable {
     public let row: String
     public let column: String
     public let summary: GroupSummary

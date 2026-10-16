@@ -4,7 +4,7 @@ public typealias AssetClass = String // "equity" | "option" | "futures" | "forex
 public typealias ExecutionSource = String // "sync" | "import" | "manual"
 
 /// Lần khớp lệnh nguyên tử (Execution Fill)
-public struct Execution: Identifiable, Codable, Equatable, Hashable {
+public struct Execution: Identifiable, Codable, Equatable, Hashable, Sendable {
     public let id: String
     public let accountId: String
     public let symbol: String
@@ -187,18 +187,19 @@ public struct Trade: Identifiable, Codable, Equatable {
     
     public var annotations: TradeAnnotations? {
         TradeAnnotations(
+            notes: notes,
             tags: tags,
             mistakes: mistakes,
             playbook: playbookId,
-            notes: notes,
             rating: rating,
             stopLoss: stopLoss,
-            profitTarget: profitTarget
+            profitTarget: profitTarget,
+            reviewedAt: reviewedAt
         )
     }
 }
 
-public struct TradeAnnotations: Codable, Equatable {
+public struct TradeAnnotations: Codable, Equatable, Sendable {
     public var tags: [String]
     public var mistakes: [String]
     public var playbook: String?

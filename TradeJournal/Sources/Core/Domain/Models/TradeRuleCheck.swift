@@ -22,3 +22,5 @@ public struct TradeRuleCheck: Identifiable, Codable, Sendable, Equatable {
         self.followed = followed
     }
 }
+
+public typealias RuleCheck = PlaybookRuleAssessment

@@ -52,34 +52,13 @@ public struct PlaybookRuleAssessment: Identifiable, Codable, Equatable, Sendable
     }
 }
 
-public struct PlaybookAdherenceSummary: Identifiable, Sendable {
-    public var id: String { playbook.id }
-    public let playbook: Playbook
-    public let totalTrades: Int
-    public let followedTradesCount: Int
-    public let brokenTradesCount: Int
-    public let unassessedTradesCount: Int
-    public let overallAdherenceRate: Double?
-    public let netPnlWhenFollowed: Decimal
-    public let netPnlWhenBroken: Decimal
+/// Tương đương `{ id: string; rules: string[] }` trong `packages/core/src/adherence.ts`
+public struct PlaybookRuleSet: Identifiable, Sendable, Equatable {
+    public let id: String
+    public let rules: [String]
     
-    public init(
-        playbook: Playbook,
-        totalTrades: Int,
-        followedTradesCount: Int,
-        brokenTradesCount: Int,
-        unassessedTradesCount: Int,
-        overallAdherenceRate: Double?,
-        netPnlWhenFollowed: Decimal,
-        netPnlWhenBroken: Decimal
-    ) {
-        self.playbook = playbook
-        self.totalTrades = totalTrades
-        self.followedTradesCount = followedTradesCount
-        self.brokenTradesCount = brokenTradesCount
-        self.unassessedTradesCount = unassessedTradesCount
-        self.overallAdherenceRate = overallAdherenceRate
-        self.netPnlWhenFollowed = netPnlWhenFollowed
-        self.netPnlWhenBroken = netPnlWhenBroken
+    public init(id: String, rules: [String]) {
+        self.id = id
+        self.rules = rules
     }
 }
