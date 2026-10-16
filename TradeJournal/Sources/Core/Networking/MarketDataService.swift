@@ -103,21 +103,29 @@ public final class MarketDataService: Sendable {
     public func fetchBinanceBars(
         symbol: String,
         interval: String = "15m",
-        startTimeMs: Int64,
-        endTimeMs: Int64
+        startTimeMs: Int64? = nil,
+        endTimeMs: Int64? = nil,
+        limit: Int = 1000
     ) async throws -> [MarketBar] {
         let normalized = normalizeMarketSymbol(symbol: symbol, provider: "binance")
         guard var components = URLComponents(string: "\(binanceBaseUrl)/api/v3/klines") else {
             throw URLError(.badURL)
         }
         
-        components.queryItems = [
+        var queryItems: [URLQueryItem] = [
             URLQueryItem(name: "symbol", value: normalized),
             URLQueryItem(name: "interval", value: interval),
-            URLQueryItem(name: "startTime", value: String(startTimeMs)),
-            URLQueryItem(name: "endTime", value: String(endTimeMs)),
-            URLQueryItem(name: "limit", value: "1000")
+            URLQueryItem(name: "limit", value: String(min(limit, 1000)))
         ]
+        
+        if let s = startTimeMs {
+            queryItems.append(URLQueryItem(name: "startTime", value: String(s)))
+        }
+        if let e = endTimeMs {
+            queryItems.append(URLQueryItem(name: "endTime", value: String(e)))
+        }
+        
+        components.queryItems = queryItems
         
         guard let url = components.url else {
             throw URLError(.badURL)
