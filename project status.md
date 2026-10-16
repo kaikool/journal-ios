@@ -169,7 +169,24 @@
 
 ---
 
-### Phần X — Iteration 07: Journal, Playbooks, Routine & Replay
+- [x] **Hệ thống Sổ tay & Thư mục (Notebook & Folders Engine):**
+  - Quản lý 3 thư mục hệ thống mặc định (`all`, `trade-notes`, `my-notes`) và các thư mục do user tự tạo.
+  - Invariant R004 (Bảo toàn dữ liệu): Khi xoá thư mục, toàn bộ ghi chú bên trong được tự động chuyển về `"my-notes"`; thư mục bị xoá chuyển thành soft-deleted (`deletedAt != nil`); cấm xoá `"all"` và `"my-notes"`.
+  - Bộ lọc ghi chú theo thư mục, tìm kiếm không phân biệt hoa thường theo cả `title` và `content`, lọc theo tag, sắp xếp theo `updated`, `created`, `title`.
+  - *Thời gian hoàn thành:* 16/10/2026 18:18:00+07:00
+  - *Đã đối chiếu mã nguồn gốc:* **CÓ** — Đối chiếu 1:1 với `apps/web/src/app/api/folders/`, `apps/web/src/app/api/notes/`, `notebook-postgres.test.ts`, `notebook-folder-delete.test.ts`.
+  - *Sản phẩm nghiệm thu:* `NotebookEngine.swift`, `NotebookView.swift`, `NotebookEngineTests.swift`.
+- [x] **Định dạng Markdown Inline (NoteFormattingEngine):**
+  - Thuật toán `formatInlineSelection`: Giữ khoảng trắng bên ngoài thẻ nhấn mạnh `**` (bold) và `*` (italic) theo CommonMark; tự chèn placeholder `"bold text"` / `"italic text"` khi không bôi đen.
+  - *Thời gian hoàn thành:* 16/10/2026 18:18:00+07:00
+  - *Đã đối chiếu mã nguồn gốc:* **CÓ** — Đối chiếu 1:1 với `apps/web/src/lib/note-formatting.ts` & `note-formatting.test.ts`.
+  - *Sản phẩm nghiệm thu:* `NoteFormattingEngine.swift`, `NotebookEngineTests.swift`.
+- [x] **Dòng thời gian nhật ký ngày (Journal Chronology & Day Details):**
+  - Hợp nhất tất cả các ngày có phát sinh giao dịch hoặc có ghi chú ngày, xếp mới nhất lên đầu.
+  - Hỗ trợ xem thống kê ngày, ghi chú ngày và đường cong intraday curve.
+  - *Thời gian hoàn thành:* 16/10/2026 18:18:00+07:00
+  - *Đã đối chiếu mã nguồn gốc:* **CÓ** — Đối chiếu 1:1 với `apps/web/src/app/api/journal/route.ts` & `apps/web/src/app/api/journal/[date]/route.ts`.
+  - *Sản phẩm nghiệm thu:* `NotebookEngine.swift`, `JournalCalendarView.swift`.
 - [x] **Lịch P&L tháng (Journal Calendar):** Hiển thị ô lịch với màu xanh/đỏ P&L, số lượng trade và tổng lãi lỗ từng ngày.
   - *Thời gian hoàn thành:* 16/10/2026 16:45:00+07:00
   - *Đã đối chiếu mã nguồn gốc:* **CÓ** — Đối chiếu calendar view trong `apps/web/`.
@@ -251,7 +268,8 @@
 | **#4** | Part 4: 33-Filter Engine, 19-Dimension Matrix & Adherence | 16/10 17:36 | `packages/core/src/analysis.ts`, `adherence.ts`, `time.ts` | Verified Local Test | 80% |
 | **#5** | Part 5: Supabase PostgreSQL Service & Offline-First State Store | 16/10 17:48 | `packages/core/src/schema.pg.ts`, PostgREST API | Commit `c0266bd` | 95% |
 | **#6** | Sửa các lỗi biên dịch Xcode (`PlaybookRuleAssessment`, `TradeAnnotations`) | 16/10 18:04 | `adherence.ts`, `types.ts` | Commit `afd6dd8` | 98% |
-| **#7** | Bổ sung `String` timeZone overload cho `AggregateEngine.dayKeyOf` & CI Build `.ipa` thành công 100% | 16/10 18:08 | `aggregate.ts`, `analysis.ts` | Commit `e01b2c0` • CI Run `38891614192` (SUCCESS) | **100%** |
+| **#7** | Bổ sung `String` timeZone overload cho `AggregateEngine.dayKeyOf` & CI Build `.ipa` thành công 100% | 16/10 18:08 | `aggregate.ts`, `analysis.ts` | Commit `e01b2c0` • CI Run `38891614192` (SUCCESS) | 98% |
+| **#8** | Port 100% hệ thống Sổ tay (Notebook, Folders soft-delete, NoteFormatting, Journal Chronology) & Tests | 16/10 18:18 | `note-formatting.ts`, `folders/`, `notes/`, `journal/` | `NotebookEngineTests.swift` | Commit pending |
 
 ---
 

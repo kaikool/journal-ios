@@ -14,6 +14,9 @@ public final class TradeDataStore: ObservableObject {
     @Published public var selectedAccountId: String = "default-acc"
     @Published public var defaults: JournalDefaults = .empty
     @Published public var multipliers: [String: Decimal] = [:]
+    @Published public var folders: [NotebookFolder] = []
+    @Published public var notebookNotes: [NotebookNote] = []
+    @Published public var journalDays: [String: String] = [:]
     @Published public var isSyncing: Bool = false
     @Published public var lastSyncError: String? = nil
     
@@ -28,6 +31,9 @@ public final class TradeDataStore: ObservableObject {
         loadFromDisk()
         if accounts.isEmpty {
             createInitialDefaultAccount()
+        }
+        if folders.isEmpty {
+            folders = NotebookEngine.defaultSystemFolders
         }
         rebuildAllAccounts()
     }
@@ -205,6 +211,96 @@ public final class TradeDataStore: ObservableObject {
         isSyncing = false
     }
     
+    // MARK: - Notebook & Journal Operations (1:1 port từ source-repo)
+    
+    public func createFolder(name: String) throws -> NotebookFolder {
+        let (folder, updated) = try NotebookEngine.createFolder(name: name, existingFolders: folders)
+        self.folders = updated
+        saveToDisk()
+        return folder
+    }
+    
+    public func deleteFolder(id: String) throws {
+        let (updatedFolders, updatedNotes) = try NotebookEngine.deleteFolder(id: id, folders: folders, notes: notebookNotes)
+        self.folders = updatedFolders
+        self.notebookNotes = updatedNotes
+        saveToDisk()
+    }
+    
+    public func createNote(
+        folderId: String? = nil,
+        title: String = "",
+        content: String = "",
+        tags: [String] = [],
+        tradeKey: String? = nil,
+        dayDate: String? = nil
+    ) throws -> NotebookNote {
+        let (note, updated) = try NotebookEngine.createNote(
+            folderId: folderId,
+            title: title,
+            content: content,
+            tags: tags,
+            tradeKey: tradeKey,
+            dayDate: dayDate,
+            folders: folders,
+            existingNotes: notebookNotes
+        )
+        self.notebookNotes = updated
+        saveToDisk()
+        return note
+    }
+    
+    public func patchNote(
+        id: String,
+        title: String? = nil,
+        content: String? = nil,
+        tags: [String]? = nil,
+        folderId: String? = nil
+    ) throws -> NotebookNote {
+        let (note, updated) = try NotebookEngine.patchNote(
+            id: id,
+            title: title,
+            content: content,
+            tags: tags,
+            folderId: folderId,
+            folders: folders,
+            notes: notebookNotes
+        )
+        self.notebookNotes = updated
+        saveToDisk()
+        return note
+    }
+    
+    public func deleteNote(id: String) {
+        self.notebookNotes = NotebookEngine.deleteNote(id: id, notes: notebookNotes)
+        saveToDisk()
+    }
+    
+    public func saveJournalDayNote(date: String, note: String) {
+        self.journalDays[date] = note
+        saveToDisk()
+    }
+    
+    public func getJournalDayNote(date: String) -> String {
+        self.journalDays[date] ?? ""
+    }
+    
+    public func filteredNotes(
+        folderId: String? = nil,
+        searchQuery: String? = nil,
+        tag: String? = nil,
+        sort: NoteSortOrder = .updated
+    ) -> (notes: [NotebookNote], folders: [NotebookFolder]) {
+        NotebookEngine.filterNotes(
+            notes: notebookNotes,
+            folders: folders,
+            folderId: folderId,
+            searchQuery: searchQuery,
+            tag: tag,
+            sort: sort
+        )
+    }
+    
     // MARK: - Local Persistence
     
     private struct PersistedStore: Codable {
@@ -214,6 +310,9 @@ public final class TradeDataStore: ObservableObject {
         let selectedAccountId: String
         let defaults: JournalDefaults
         let multipliers: [String: Decimal]?
+        let folders: [NotebookFolder]?
+        let notebookNotes: [NotebookNote]?
+        let journalDays: [String: String]?
     }
     
     private func saveToDisk() {
@@ -223,7 +322,10 @@ public final class TradeDataStore: ObservableObject {
             trades: trades,
             selectedAccountId: selectedAccountId,
             defaults: defaults,
-            multipliers: multipliers
+            multipliers: multipliers,
+            folders: folders,
+            notebookNotes: notebookNotes,
+            journalDays: journalDays
         )
         do {
             let data = try JSONEncoder().encode(store)
@@ -244,8 +346,11 @@ public final class TradeDataStore: ObservableObject {
             self.selectedAccountId = store.selectedAccountId
             self.defaults = store.defaults
             self.multipliers = store.multipliers ?? [:]
+            self.folders = store.folders ?? NotebookEngine.defaultSystemFolders
+            self.notebookNotes = store.notebookNotes ?? []
+            self.journalDays = store.journalDays ?? [:]
             self.executionHashes = Set(store.executions.map { $0.contentHash })
-            AppLogger.info("Loaded \(store.accounts.count) accounts and \(store.executions.count) executions from persistent disk.")
+            AppLogger.info("Loaded \(store.accounts.count) accounts, \(store.executions.count) executions, \(self.notebookNotes.count) notes from persistent disk.")
         } catch {
             AppLogger.error("Failed to load store from disk: \(error.localizedDescription)")
         }

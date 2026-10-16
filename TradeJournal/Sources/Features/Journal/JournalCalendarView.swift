@@ -12,6 +12,7 @@ public struct JournalCalendarView: View {
     
     public enum JournalSection: String, CaseIterable, Identifiable {
         case calendar = "Lịch P&L"
+        case notebook = "Sổ tay (Notebook)"
         case playbooks = "Playbooks"
         
         public var id: String { rawValue }
@@ -95,6 +96,8 @@ public struct JournalCalendarView: View {
                 
                 if selectedJournalSection == .playbooks {
                     PlaybooksView()
+                } else if selectedJournalSection == .notebook {
+                    NotebookView()
                 } else {
                     ScrollView {
                         VStack(spacing: 16) {
