@@ -337,10 +337,15 @@ public final class TradeDataStore: ObservableObject {
                 }
             }
             saveToDisk()
+            let totalRemoteFetched = remoteAccounts.count + remoteTrades.count + remoteExecutions.count + remotePropAccounts.count
             await MainActor.run {
-                self.lastSyncSummary = "Đã đồng bộ thành công \(trades.count) lệnh và \(accounts.count) tài khoản từ Supabase."
+                if totalRemoteFetched > 0 {
+                    self.lastSyncSummary = "Đồng bộ Supabase thành công: Tải về \(remoteAccounts.count) tài khoản, \(remoteTrades.count) lệnh, \(remoteExecutions.count) executions, \(remotePropAccounts.count) quỹ."
+                } else {
+                    self.lastSyncSummary = "Kết nối Supabase thành công nhưng trả về 0 bản ghi. Nếu trên Supabase đã có dữ liệu, hãy: (1) Nhập key 'service_role' (Secret key) thay cho 'anon' key; hoặc (2) Dán SQL mở quyền RLS vào Supabase SQL Editor."
+                }
             }
-            AppLogger.info("Supabase sync (Trades + Prop Firm + Attachments) completed successfully.")
+            AppLogger.info("Supabase sync (Trades: \(remoteTrades.count), Accounts: \(remoteAccounts.count)) completed successfully.")
         } catch {
             await MainActor.run {
                 self.lastSyncError = error.localizedDescription
@@ -356,7 +361,21 @@ public final class TradeDataStore: ObservableObject {
     // MARK: - The5ers MCP Synchronization
     
     public func syncWithThe5ers() async throws -> Int {
+        await MainActor.run {
+            self.isSyncing = true
+            self.lastSyncError = nil
+        }
+        defer {
+            Task { @MainActor in self.isSyncing = false }
+        }
         let count = try await The5ersService.shared.syncWithTradeStore(dataStore: self)
+        await MainActor.run {
+            if count > 0 {
+                self.lastSyncSummary = "Đã đồng bộ The5ers MCP thành công: \(count) tài khoản, \(self.trades.filter { $0.tags.contains("the5ers") }.count) lệnh."
+            } else {
+                self.lastSyncSummary = The5ersService.shared.lastStatus
+            }
+        }
         if SupabaseService.shared.isConfigured {
             await syncWithSupabase()
         }

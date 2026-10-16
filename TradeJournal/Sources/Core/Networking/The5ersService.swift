@@ -2,8 +2,10 @@ import Foundation
 import CryptoKit
 
 /// Model dữ liệu trả về từ The5ers MCP Protocol (the5ers_account)
+/// Model dữ liệu trả về từ The5ers MCP Protocol (the5ers_account)
 public struct The5ersMcpAccount: Identifiable, Codable, Sendable {
     public let id: String
+    public let ref: String
     public let label: String
     public let platform: String?
     public let balance: Decimal
@@ -13,6 +15,32 @@ public struct The5ersMcpAccount: Identifiable, Codable, Sendable {
     public let program: String // evaluation, verification, funded, instant_funded
     public let startingBalance: Decimal?
     public let createdAt: String?
+    
+    public init(
+        id: String,
+        ref: String? = nil,
+        label: String,
+        platform: String? = nil,
+        balance: Decimal,
+        equity: Decimal? = nil,
+        currency: String = "USD",
+        status: String = "active",
+        program: String = "funded",
+        startingBalance: Decimal? = nil,
+        createdAt: String? = nil
+    ) {
+        self.id = id
+        self.ref = ref ?? id
+        self.label = label
+        self.platform = platform
+        self.balance = balance
+        self.equity = equity
+        self.currency = currency
+        self.status = status
+        self.program = program
+        self.startingBalance = startingBalance
+        self.createdAt = createdAt
+    }
 }
 
 /// Trình kết nối chính thức với The5ers qua giao thức Model Context Protocol (MCP)
@@ -34,6 +62,7 @@ public final class The5ersService: ObservableObject {
     private let session = URLSession.shared
     private var rpcIdCounter: Int = 0
     private var mcpSessionId: String? = nil
+    private var isSessionInitialized: Bool = false
     
     public var isConfigured: Bool {
         !mcpToken.trimmingCharacters(in: .whitespaces).isEmpty
@@ -45,7 +74,12 @@ public final class The5ersService: ObservableObject {
     }
     
     public func configure(token: String) {
-        self.mcpToken = token.trimmingCharacters(in: .whitespaces)
+        let clean = token.trimmingCharacters(in: .whitespacesAndNewlines)
+        if clean != self.mcpToken {
+            self.isSessionInitialized = false
+            self.mcpSessionId = nil
+        }
+        self.mcpToken = clean
         self.isConnected = !self.mcpToken.isEmpty
         UserDefaults.standard.set(self.mcpToken, forKey: "the5ers_mcp_token")
     }
@@ -54,6 +88,7 @@ public final class The5ersService: ObservableObject {
         self.mcpToken = ""
         self.isConnected = false
         self.mcpSessionId = nil
+        self.isSessionInitialized = false
         UserDefaults.standard.removeObject(forKey: "the5ers_mcp_token")
         UserDefaults.standard.removeObject(forKey: "the5ers_mcp_refresh_token")
     }
@@ -203,8 +238,56 @@ public final class The5ersService: ObservableObject {
     
     // MARK: - 2. JSON-RPC 2.0 MCP Client (`https://mcp.the5ers.com/mcp`)
     
-    /// Gửi một yêu cầu JSON-RPC 2.0 tới The5ers MCP server tuân thủ chuẩn Model Context Protocol
-    public func sendMcpRpc(method: String, params: [String: Any]) async throws -> [String: Any] {
+    /// Đảm bảo phiên làm việc MCP đã được bắt tay khởi tạo theo đúng giao thức 2025-03-26 (Port 1:1 từ `The5ersMcp.initialize()` trong `mcp.ts`)
+    public func ensureInitialized() async throws {
+        guard !isSessionInitialized else { return }
+        guard isConfigured else { return }
+        
+        // Bước 1: Gửi RPC initialize kèm protocolVersion & clientInfo
+        _ = try await sendRawMcpRpc(method: "initialize", params: [
+            "protocolVersion": Self.protocolVersion,
+            "capabilities": [String: Any](),
+            "clientInfo": [
+                "name": "trade-journal",
+                "version": "1.0"
+            ]
+        ])
+        
+        // Bước 2: Gửi notification notifications/initialized xác nhận phiên
+        try await sendMcpNotification(method: "notifications/initialized")
+        self.isSessionInitialized = true
+    }
+    
+    /// Gửi một thông báo JSON-RPC 2.0 (không cần chờ id phản hồi)
+    public func sendMcpNotification(method: String, params: [String: Any]? = nil) async throws {
+        guard let url = URL(string: Self.mcpUrl) else { throw URLError(.badURL) }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json, text/event-stream", forHTTPHeaderField: "Accept")
+        request.setValue("Bearer \(mcpToken)", forHTTPHeaderField: "Authorization")
+        request.setValue(Self.protocolVersion, forHTTPHeaderField: "MCP-Protocol-Version")
+        if let sId = mcpSessionId {
+            request.setValue(sId, forHTTPHeaderField: "Mcp-Session-Id")
+        }
+        
+        var rpcPayload: [String: Any] = [
+            "jsonrpc": "2.0",
+            "method": method
+        ]
+        if let p = params {
+            rpcPayload["params"] = p
+        }
+        request.httpBody = try JSONSerialization.data(withJSONObject: rpcPayload)
+        
+        let (_, response) = try await session.data(for: request)
+        if let http = response as? HTTPURLResponse, let newSessionId = http.value(forHTTPHeaderField: "Mcp-Session-Id") {
+            self.mcpSessionId = newSessionId
+        }
+    }
+    
+    /// Gửi RPC thô (không tự động lặp lại ensureInitialized để tránh đệ quy khi gọi initialize)
+    private func sendRawMcpRpc(method: String, params: [String: Any]) async throws -> [String: Any] {
         guard isConfigured else {
             throw NSError(domain: "The5ersMCP", code: 401, userInfo: [NSLocalizedDescriptionKey: "Chưa kết nối The5ers. Hãy bấm 'Đăng Nhập The5ers Hub (OAuth)' hoặc nhập Session Token."])
         }
@@ -253,7 +336,7 @@ public final class The5ersService: ObservableObject {
             throw NSError(domain: "The5ersMCP", code: http.statusCode, userInfo: [NSLocalizedDescriptionKey: msg])
         }
         
-        // Trích xuất JSON từ định dạng Server-Sent Events (SSE) nếu cần
+        // Trích xuất JSON từ định dạng Server-Sent Events (SSE) nếu máy chủ gửi qua SSE
         var jsonData = data
         if let text = String(data: data, encoding: .utf8), text.contains("data:") {
             let lines = text.components(separatedBy: .newlines)
@@ -286,6 +369,14 @@ public final class The5ersService: ObservableObject {
         return result
     }
     
+    /// Gửi một yêu cầu JSON-RPC 2.0 tới The5ers MCP server, tự động bắt tay initialize nếu chưa
+    public func sendMcpRpc(method: String, params: [String: Any]) async throws -> [String: Any] {
+        if method != "initialize" {
+            try await ensureInitialized()
+        }
+        return try await sendRawMcpRpc(method: method, params: params)
+    }
+    
     /// Gửi một yêu cầu gọi MCP Tool tới The5ers MCP server
     public func callMcpTool(name: String, arguments: [String: Any] = [:]) async throws -> [String: Any] {
         return try await sendMcpRpc(method: "tools/call", params: [
@@ -310,7 +401,59 @@ public final class The5ersService: ObservableObject {
         }
     }
     
-    // MARK: - 3. Đồng Bộ Dữ Liệu Thực Tế Qua MCP Tools
+    // MARK: - 3. Trích Xuất Payload Dữ Liệu MCP (Port 1:1 từ `mcp.ts` và `data.ts`)
+    
+    /// Trích xuất nội dung thực tế từ phản hồi MCP tools/call
+    private func unwrapMcpToolResult(_ result: [String: Any]) -> Any? {
+        if let structured = result["structuredContent"] {
+            return structured
+        }
+        if let content = result["content"] as? [[String: Any]] {
+            for block in content {
+                if let type = block["type"] as? String, type == "text", let text = block["text"] as? String {
+                    if let d = text.data(using: .utf8),
+                       let obj = try? JSONSerialization.jsonObject(with: d) {
+                        return obj
+                    }
+                    return text
+                }
+            }
+            if let first = content.first, let text = first["text"] as? String {
+                if let d = text.data(using: .utf8),
+                   let obj = try? JSONSerialization.jsonObject(with: d) {
+                    return obj
+                }
+            }
+        }
+        return result
+    }
+    
+    /// Trích xuất danh sách hàng dữ liệu theo định dạng envelope The5ers
+    private func extractMcpCollection(_ unwrapped: Any?, collectionKey: String) -> [[String: Any]] {
+        guard let unwrapped = unwrapped else { return [] }
+        
+        if let dict = unwrapped as? [String: Any] {
+            // Envelope có data dạng Dictionary (VD: { data: { accounts: [...] } })
+            if let dataDict = dict["data"] as? [String: Any] {
+                if let items = (dataDict[collectionKey] ?? dataDict["items"] ?? dataDict["rows"]) as? [[String: Any]] {
+                    return items
+                }
+            }
+            // Envelope có data dạng Array (VD: { data: [...] })
+            if let dataArray = dict["data"] as? [[String: Any]] {
+                return dataArray
+            }
+            // Top-level dictionary chứa key (VD: { accounts: [...] })
+            if let items = (dict[collectionKey] ?? dict["items"] ?? dict["rows"] ?? dict["trades"]) as? [[String: Any]] {
+                return items
+            }
+        } else if let arr = unwrapped as? [[String: Any]] {
+            return arr
+        }
+        return []
+    }
+    
+    // MARK: - 4. Đồng Bộ Dữ Liệu Thực Tế Qua MCP Tools
     
     @MainActor
     public func syncWithTradeStore(dataStore: TradeDataStore) async throws -> Int {
@@ -319,52 +462,55 @@ public final class The5ersService: ObservableObject {
         }
         
         isSyncing = true
-        lastStatus = "Đang kết nối The5ers MCP và gọi the5ers_account (list)..."
+        lastStatus = "Đang kết nối The5ers MCP Hub (Protocol 2025-03-26)..."
         defer { isSyncing = false }
         
         do {
-            // 1. Gọi MCP tool the5ers_account
-            let accountResult = try await callMcpTool(name: "the5ers_account", arguments: ["operation": "list"])
+            // Đảm bảo handshake session trước khi thực thi tool
+            try await ensureInitialized()
+            
+            // 1. Gọi MCP tool the5ers_account kèm đầy đủ hợp đồng từ data.ts
+            lastStatus = "Đang gọi công cụ the5ers_account (list)..."
+            let accountToolArgs: [String: Any] = [
+                "operation": "list",
+                "page": 1,
+                "limit": 50,
+                "contract_version": "1.0",
+                "request_context": ["timezone": "UTC", "locale": "en"]
+            ]
+            let accountResult = try await callMcpTool(name: "the5ers_account", arguments: accountToolArgs)
+            let unwrappedAccounts = unwrapMcpToolResult(accountResult)
+            let rawAccountsList = extractMcpCollection(unwrappedAccounts, collectionKey: "accounts")
+            
             var accountsList: [The5ersMcpAccount] = []
-            
-            func parseMcpTextPayload(_ dict: [String: Any]) -> Data? {
-                if let content = dict["content"] as? [[String: Any]],
-                   let text = content.first?["text"] as? String {
-                    return text.data(using: .utf8)
-                }
-                return nil
+            for item in rawAccountsList {
+                let ref = String(describing: item["ref"] ?? item["account_ref"] ?? item["id"] ?? UUID().uuidString)
+                let label = String(describing: item["label"] ?? item["name"] ?? "The5ers Account")
+                let bal = Decimal(string: String(describing: item["balance"] ?? item["effectiveBalance"] ?? "0")) ?? 0
+                let eq = Decimal(string: String(describing: item["equity"] ?? bal)) ?? bal
+                let curr = String(describing: item["currency"] ?? "USD")
+                let status = String(describing: item["status"] ?? "active")
+                let prog = String(describing: item["type"] ?? item["accountType"] ?? item["program"] ?? "funded")
+                let startBal = Decimal(string: String(describing: item["startingBalance"] ?? item["initial_balance"] ?? bal)) ?? bal
+                let platform = String(describing: item["tradingPlatform"] ?? item["platform"] ?? item["tradingSystem"] ?? "MT5")
+                let createdAt = item["createdAt"] as? String ?? item["creationDate"] as? String ?? item["created_at"] as? String
+                
+                accountsList.append(The5ersMcpAccount(
+                    id: ref,
+                    ref: ref,
+                    label: label,
+                    platform: platform,
+                    balance: bal,
+                    equity: eq,
+                    currency: curr,
+                    status: status,
+                    program: prog,
+                    startingBalance: startBal,
+                    createdAt: createdAt
+                ))
             }
             
-            if let data = parseMcpTextPayload(accountResult),
-               let parsed = try? JSONDecoder().decode([The5ersMcpAccount].self, from: data) {
-                accountsList = parsed
-            } else if let directList = (accountResult["accounts"] ?? accountResult["items"]) as? [[String: Any]] {
-                for item in directList {
-                    let id = String(describing: item["id"] ?? item["account_id"] ?? UUID().uuidString)
-                    let label = String(describing: item["label"] ?? item["name"] ?? "The5ers Account")
-                    let bal = Decimal(string: String(describing: item["balance"] ?? "0")) ?? 0
-                    let eq = Decimal(string: String(describing: item["equity"] ?? bal)) ?? bal
-                    let curr = String(describing: item["currency"] ?? "USD")
-                    let status = String(describing: item["status"] ?? "active")
-                    let prog = String(describing: item["program"] ?? "funded")
-                    let startBal = Decimal(string: String(describing: item["startingBalance"] ?? item["initial_balance"] ?? bal)) ?? bal
-                    
-                    accountsList.append(The5ersMcpAccount(
-                        id: id,
-                        label: label,
-                        platform: String(describing: item["platform"] ?? "MT5"),
-                        balance: bal,
-                        equity: eq,
-                        currency: curr,
-                        status: status,
-                        program: prog,
-                        startingBalance: startBal,
-                        createdAt: item["createdAt"] as? String
-                    ))
-                }
-            }
-            
-            // Tuyệt đối không nạp dữ liệu giả/demo: nếu trống thì báo không có
+            // Tuyệt đối không nạp dữ liệu giả/demo: nếu trống thì thông báo rõ ràng
             if accountsList.isEmpty {
                 lastStatus = "Máy chủ The5ers MCP phản hồi thành công nhưng không tìm thấy tài khoản giao dịch nào."
                 return 0
@@ -435,21 +581,21 @@ public final class The5ersService: ObservableObject {
                     dataStore.accounts.append(newAcc)
                 }
                 
-                // 3. Gọi the5ers_positions để lấy các lệnh thực tế
+                // 3. Gọi the5ers_positions kèm account_ref chính xác từ hợp đồng The5ers
                 lastStatus = "Đang tải vị thế lệnh cho tài khoản \(acc.label)..."
-                if let posResult = try? await callMcpTool(name: "the5ers_positions", arguments: ["operation": "list", "accountId": acc.id]) {
-                    var rawPositions: [[String: Any]] = []
-                    if let data = parseMcpTextPayload(posResult),
-                       let jsonArray = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
-                        rawPositions = jsonArray
-                    } else if let direct = (posResult["positions"] ?? posResult["trades"] ?? posResult["items"]) as? [[String: Any]] {
-                        rawPositions = direct
-                    }
-                    
-                    let iso = ISO8601DateFormatter()
-                    iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-                    let isoFallback = ISO8601DateFormatter()
-                    isoFallback.formatOptions = [.withInternetDateTime]
+                let posArgs: [String: Any] = [
+                    "operation": "list",
+                    "account_ref": acc.ref,
+                    "view": "all",
+                    "page": 1,
+                    "limit": 100,
+                    "contract_version": "1.0",
+                    "request_context": ["timezone": "UTC", "locale": "en"]
+                ]
+                
+                if let posResult = try? await callMcpTool(name: "the5ers_positions", arguments: posArgs) {
+                    let unwrappedPos = unwrapMcpToolResult(posResult)
+                    let rawPositions = extractMcpCollection(unwrappedPos, collectionKey: "positions")
                     
                     for p in rawPositions {
                         let symbol = String(describing: p["symbol"] ?? "").trimmingCharacters(in: .whitespaces)
@@ -458,21 +604,21 @@ public final class The5ersService: ObservableObject {
                         let sideStr = String(describing: p["side"] ?? p["direction"] ?? "buy").lowercased()
                         let dir: TradeDirection = (sideStr.contains("sell") || sideStr.contains("short")) ? .short : .long
                         
-                        let qty = Decimal(string: String(describing: p["quantity"] ?? p["lots"] ?? p["size"] ?? "0")) ?? 0
-                        let entry = Decimal(string: String(describing: p["entry"] ?? p["openPrice"] ?? "0")) ?? 0
-                        let exit = Decimal(string: String(describing: p["exit"] ?? p["closePrice"] ?? ""))
-                        let netPnl = Decimal(string: String(describing: p["profitAndLoss"] ?? p["netPnl"] ?? p["pnl"] ?? "0")) ?? 0
+                        let qty = Decimal(string: String(describing: p["quantity"] ?? p["lots"] ?? p["volume"] ?? p["size"] ?? "0")) ?? 0
+                        let entry = Decimal(string: String(describing: p["entry"] ?? p["openPrice"] ?? p["open_price"] ?? "0")) ?? 0
+                        let exit = Decimal(string: String(describing: p["exit"] ?? p["closePrice"] ?? p["close_price"] ?? ""))
+                        let netPnl = Decimal(string: String(describing: p["profitAndLoss"] ?? p["profit"] ?? p["netPnl"] ?? p["pnl"] ?? "0")) ?? 0
                         let fee = Decimal(string: String(describing: p["fee"] ?? p["commission"] ?? "0")) ?? 0
                         let swap = Decimal(string: String(describing: p["swap"] ?? "0")) ?? 0
                         
-                        let openStr = String(describing: p["openDate"] ?? p["openedAt"] ?? "")
-                        let closeStr = String(describing: p["closeDate"] ?? p["closedAt"] ?? "")
+                        let openStr = String(describing: p["openDate"] ?? p["opendate"] ?? p["openedAt"] ?? p["open_time"] ?? "")
+                        let closeStr = String(describing: p["closeDate"] ?? p["closedate"] ?? p["closedAt"] ?? p["close_time"] ?? "")
                         
-                        let openDate = iso.date(from: openStr) ?? isoFallback.date(from: openStr) ?? Date()
-                        let closeDate = iso.date(from: closeStr) ?? isoFallback.date(from: closeStr)
-                        let isClosed = (closeDate != nil) || (p["isClosed"] as? Bool == true)
+                        let openDate = FlexibleDateParser.parse(openStr) ?? Date()
+                        let closeDate = FlexibleDateParser.parse(closeStr)
+                        let isClosed = (closeDate != nil) || (p["isClosed"] as? Bool == true) || (p["isclosed"] as? Bool == true)
                         
-                        let pId = String(describing: p["id"] ?? p["ticket"] ?? p["providerId"] ?? UUID().uuidString)
+                        let pId = String(describing: p["positionId"] ?? p["positionid"] ?? p["ticket"] ?? p["id"] ?? UUID().uuidString)
                         let tradeKey = "the5ers_\(acc.id)_\(pId)"
                         
                         let status: TradeStatus = isClosed ? (netPnl > 0 ? .win : (netPnl < 0 ? .loss : .breakeven)) : .open
@@ -510,18 +656,18 @@ public final class The5ersService: ObservableObject {
             
             // 4. Đồng bộ the5ers_payout
             lastStatus = "Đang tải lịch sử rút tiền the5ers_payout..."
-            if let payoutResult = try? await callMcpTool(name: "the5ers_payout", arguments: ["operation": "history"]) {
-                var rawPayouts: [[String: Any]] = []
-                if let data = parseMcpTextPayload(payoutResult),
-                   let arr = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
-                    rawPayouts = arr
-                } else if let direct = (payoutResult["payouts"] ?? payoutResult["withdrawals"] ?? payoutResult["items"]) as? [[String: Any]] {
-                    rawPayouts = direct
-                }
+            let payoutArgs: [String: Any] = [
+                "operation": "history",
+                "contract_version": "1.0",
+                "request_context": ["timezone": "UTC", "locale": "en"]
+            ]
+            if let payoutResult = try? await callMcpTool(name: "the5ers_payout", arguments: payoutArgs) {
+                let unwrappedPayout = unwrapMcpToolResult(payoutResult)
+                let rawPayouts = extractMcpCollection(unwrappedPayout, collectionKey: "payouts")
                 
                 for pay in rawPayouts {
-                    let id = String(describing: pay["id"] ?? UUID().uuidString)
-                    let amtMinor = Int64(Double(String(describing: pay["amount"] ?? "0")) ?? 0) * 100
+                    let id = String(describing: pay["id"] ?? pay["payout_id"] ?? UUID().uuidString)
+                    let amtMinor = Int64(Double(String(describing: pay["amount"] ?? pay["net_amount"] ?? "0")) ?? 0) * 100
                     let dateStr = String(describing: pay["paidAt"] ?? pay["date"] ?? pay["createdAt"] ?? "")
                     let rcptId = "the5ers_rcpt_\(id)"
                     

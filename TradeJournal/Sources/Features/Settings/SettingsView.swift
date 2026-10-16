@@ -1044,13 +1044,23 @@ public struct ConnectionsSettingsView: View {
                     }
                     
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("Anon / Public API Key:")
-                            .font(AppTypography.captionBold)
-                            .foregroundColor(AppColors.secondaryText)
-                        SecureField("eyJhbGciOiJIUzI1NiIsInR5...", text: $supabaseAnonKey)
+                        HStack {
+                            Text("Supabase API Key:")
+                                .font(AppTypography.captionBold)
+                                .foregroundColor(AppColors.secondaryText)
+                            Spacer()
+                            Text("Khuyến nghị: service_role key")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundColor(AppColors.accent)
+                        }
+                        SecureField("Dán anon key hoặc service_role key...", text: $supabaseAnonKey)
                             .textFieldStyle(.roundedBorder)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled(true)
+                        
+                        Text("💡 Mẹo: Dùng `service_role` (Secret key từ Project Settings → API) để đồng bộ mọi bảng dữ liệu không bị RLS chặn. Nếu dùng `anon` key, hãy bấm nút dưới để sao chép SQL mở quyền RLS.")
+                            .font(.system(size: 11))
+                            .foregroundColor(AppColors.secondaryText)
                     }
                     
                     HStack(spacing: 8) {
@@ -1189,7 +1199,11 @@ public struct ConnectionsSettingsView: View {
         Task {
             do {
                 let count = try await the5ers.syncWithTradeStore(dataStore: dataStore)
-                the5ersStatus = "Đã đồng bộ thành công \(count) tài khoản The5ers qua MCP!"
+                if count > 0 {
+                    the5ersStatus = "Đã đồng bộ thành công \(count) tài khoản The5ers qua MCP!"
+                } else {
+                    the5ersStatus = the5ers.lastStatus
+                }
             } catch {
                 the5ersStatus = "Lỗi đồng bộ: \(error.localizedDescription)"
             }
@@ -1236,6 +1250,8 @@ public struct ConnectionsSettingsView: View {
             await dataStore.syncWithSupabase()
             if let err = dataStore.lastSyncError {
                 supabaseSyncStatus = "Lỗi đồng bộ: \(err)"
+            } else if let summary = dataStore.lastSyncSummary {
+                supabaseSyncStatus = summary
             } else {
                 supabaseSyncStatus = "Đã hoàn tất đồng bộ 2 chiều với Supabase!"
             }

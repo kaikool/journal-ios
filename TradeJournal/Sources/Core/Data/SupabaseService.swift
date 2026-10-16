@@ -137,7 +137,22 @@ public final class SupabaseService {
     private var jsonDecoder: JSONDecoder {
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
-        decoder.dateDecodingStrategy = .iso8601
+        decoder.dateDecodingStrategy = .custom { decoder in
+            let container = try decoder.singleValueContainer()
+            if let dateStr = try? container.decode(String.self) {
+                if let d = FlexibleDateParser.parse(dateStr) {
+                    return d
+                }
+                throw DecodingError.dataCorruptedError(in: container, debugDescription: "Invalid date string: \(dateStr)")
+            }
+            if let timestamp = try? container.decode(Double.self) {
+                if timestamp > 1_000_000_000_000 {
+                    return Date(timeIntervalSince1970: timestamp / 1000.0)
+                }
+                return Date(timeIntervalSince1970: timestamp)
+            }
+            throw DecodingError.dataCorruptedError(in: container, debugDescription: "Cannot decode date")
+        }
         return decoder
     }
     
@@ -465,7 +480,17 @@ public final class SupabaseService {
             "updated_at" text NOT NULL
         );
 
-        -- Bật RLS và cấp quyền cho anon & authenticated
+        -- Gỡ bỏ các chính sách RLS hạn chế cũ nếu có (từ schema user_id)
+        DROP POLICY IF EXISTS "Users can only manage own accounts" ON accounts;
+        DROP POLICY IF EXISTS "Users can only manage own executions" ON executions;
+        DROP POLICY IF EXISTS "Users can only manage own trades" ON trades;
+        DROP POLICY IF EXISTS "Users can only manage own folders" ON folders;
+        DROP POLICY IF EXISTS "Users can only manage own notes" ON notes;
+        DROP POLICY IF EXISTS "Users can only manage own playbooks" ON playbooks;
+        DROP POLICY IF EXISTS "Users can only manage own prop_accounts" ON prop_accounts;
+        DROP POLICY IF EXISTS "Users can only manage own journal days" ON journal_days;
+
+        -- Bật RLS và cấp quyền cho anon, authenticated và service_role
         ALTER TABLE accounts ENABLE ROW LEVEL SECURITY;
         ALTER TABLE executions ENABLE ROW LEVEL SECURITY;
         ALTER TABLE trades ENABLE ROW LEVEL SECURITY;
@@ -478,17 +503,31 @@ public final class SupabaseService {
         ALTER TABLE settings ENABLE ROW LEVEL SECURITY;
         ALTER TABLE journal_days ENABLE ROW LEVEL SECURITY;
 
-        CREATE POLICY "Allow All For Anon" ON accounts FOR ALL USING (true);
-        CREATE POLICY "Allow All For Anon" ON executions FOR ALL USING (true);
-        CREATE POLICY "Allow All For Anon" ON trades FOR ALL USING (true);
-        CREATE POLICY "Allow All For Anon" ON folders FOR ALL USING (true);
-        CREATE POLICY "Allow All For Anon" ON notes FOR ALL USING (true);
-        CREATE POLICY "Allow All For Anon" ON playbooks FOR ALL USING (true);
-        CREATE POLICY "Allow All For Anon" ON prop_accounts FOR ALL USING (true);
-        CREATE POLICY "Allow All For Anon" ON prop_entries FOR ALL USING (true);
-        CREATE POLICY "Allow All For Anon" ON prop_receipts FOR ALL USING (true);
-        CREATE POLICY "Allow All For Anon" ON settings FOR ALL USING (true);
-        CREATE POLICY "Allow All For Anon" ON journal_days FOR ALL USING (true);
+        DROP POLICY IF EXISTS "Allow All For Anon" ON accounts;
+        CREATE POLICY "Allow All For Anon" ON accounts FOR ALL USING (true) WITH CHECK (true);
+        DROP POLICY IF EXISTS "Allow All For Anon" ON executions;
+        CREATE POLICY "Allow All For Anon" ON executions FOR ALL USING (true) WITH CHECK (true);
+        DROP POLICY IF EXISTS "Allow All For Anon" ON trades;
+        CREATE POLICY "Allow All For Anon" ON trades FOR ALL USING (true) WITH CHECK (true);
+        DROP POLICY IF EXISTS "Allow All For Anon" ON folders;
+        CREATE POLICY "Allow All For Anon" ON folders FOR ALL USING (true) WITH CHECK (true);
+        DROP POLICY IF EXISTS "Allow All For Anon" ON notes;
+        CREATE POLICY "Allow All For Anon" ON notes FOR ALL USING (true) WITH CHECK (true);
+        DROP POLICY IF EXISTS "Allow All For Anon" ON playbooks;
+        CREATE POLICY "Allow All For Anon" ON playbooks FOR ALL USING (true) WITH CHECK (true);
+        DROP POLICY IF EXISTS "Allow All For Anon" ON prop_accounts;
+        CREATE POLICY "Allow All For Anon" ON prop_accounts FOR ALL USING (true) WITH CHECK (true);
+        DROP POLICY IF EXISTS "Allow All For Anon" ON prop_entries;
+        CREATE POLICY "Allow All For Anon" ON prop_entries FOR ALL USING (true) WITH CHECK (true);
+        DROP POLICY IF EXISTS "Allow All For Anon" ON prop_receipts;
+        CREATE POLICY "Allow All For Anon" ON prop_receipts FOR ALL USING (true) WITH CHECK (true);
+        DROP POLICY IF EXISTS "Allow All For Anon" ON settings;
+        CREATE POLICY "Allow All For Anon" ON settings FOR ALL USING (true) WITH CHECK (true);
+        DROP POLICY IF EXISTS "Allow All For Anon" ON journal_days;
+        CREATE POLICY "Allow All For Anon" ON journal_days FOR ALL USING (true) WITH CHECK (true);
+
+        -- Cấp toàn quyền truy cập bảng cho anon và authenticated
+        GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
         """
     }
     
@@ -749,6 +788,29 @@ public struct SupabaseTradeRecord: Codable {
     public let profitTarget: Double?
     public let reviewedAt: String?
     
+    private enum CodingKeys: String, CodingKey {
+        case key, symbol, direction, status, quantity, fees, notes, rating
+        case accountId = "account_id"
+        case assetClass = "asset_class"
+        case openedAt = "opened_at"
+        case closedAt = "closed_at"
+        case openQuantity = "open_quantity"
+        case avgEntry = "avg_entry"
+        case avgExit = "avg_exit"
+        case grossPnl = "gross_pnl"
+        case netPnl = "net_pnl"
+        case executionCount = "execution_count"
+        case executionIdsJson = "execution_ids_json"
+        case exitsJson = "exits_json"
+        case durationMs = "duration_ms"
+        case tagsJson = "tags_json"
+        case mistakesJson = "mistakes_json"
+        case playbookId = "playbook_id"
+        case stopLoss = "stop_loss"
+        case profitTarget = "profit_target"
+        case reviewedAt = "reviewed_at"
+    }
+    
     public init(trade: Trade) {
         let fmt = ISO8601DateFormatter()
         self.key = trade.key
@@ -782,12 +844,74 @@ public struct SupabaseTradeRecord: Codable {
         self.reviewedAt = trade.reviewedAt.map { fmt.string(from: $0) }
     }
     
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.key = try c.decode(String.self, forKey: .key)
+        self.accountId = try c.decode(String.self, forKey: .accountId)
+        self.symbol = try c.decode(String.self, forKey: .symbol)
+        self.assetClass = try? c.decode(String.self, forKey: .assetClass)
+        self.direction = try c.decode(String.self, forKey: .direction)
+        self.status = try c.decode(String.self, forKey: .status)
+        self.openedAt = try c.decode(String.self, forKey: .openedAt)
+        self.closedAt = try? c.decode(String.self, forKey: .closedAt)
+        self.quantity = (try? c.decode(Double.self, forKey: .quantity)) ?? 0
+        self.openQuantity = (try? c.decode(Double.self, forKey: .openQuantity)) ?? 0
+        self.avgEntry = (try? c.decode(Double.self, forKey: .avgEntry)) ?? 0
+        self.avgExit = try? c.decode(Double.self, forKey: .avgExit)
+        self.grossPnl = (try? c.decode(Double.self, forKey: .grossPnl)) ?? 0
+        self.fees = (try? c.decode(Double.self, forKey: .fees)) ?? 0
+        self.netPnl = (try? c.decode(Double.self, forKey: .netPnl)) ?? 0
+        self.executionCount = (try? c.decode(Int.self, forKey: .executionCount)) ?? 0
+        
+        // Hỗ trợ cả string và array cho executionIdsJson
+        if let str = try? c.decode(String.self, forKey: .executionIdsJson) {
+            self.executionIdsJson = str
+        } else if let arr = try? c.decode([String].self, forKey: .executionIdsJson) {
+            self.executionIdsJson = (try? String(data: JSONEncoder().encode(arr), encoding: .utf8)) ?? "[]"
+        } else {
+            self.executionIdsJson = "[]"
+        }
+        
+        // Hỗ trợ cả string và array cho exitsJson
+        if let str = try? c.decode(String.self, forKey: .exitsJson) {
+            self.exitsJson = str
+        } else if let arr = try? c.decode([ExitAttribution].self, forKey: .exitsJson) {
+            self.exitsJson = (try? String(data: JSONEncoder().encode(arr), encoding: .utf8)) ?? "[]"
+        } else {
+            self.exitsJson = "[]"
+        }
+        
+        self.durationMs = try? c.decode(Int64.self, forKey: .durationMs)
+        self.notes = try? c.decode(String.self, forKey: .notes)
+        
+        if let str = try? c.decode(String.self, forKey: .tagsJson) {
+            self.tagsJson = str
+        } else if let arr = try? c.decode([String].self, forKey: .tagsJson) {
+            self.tagsJson = (try? String(data: JSONEncoder().encode(arr), encoding: .utf8)) ?? "[]"
+        } else {
+            self.tagsJson = nil
+        }
+        
+        if let str = try? c.decode(String.self, forKey: .mistakesJson) {
+            self.mistakesJson = str
+        } else if let arr = try? c.decode([String].self, forKey: .mistakesJson) {
+            self.mistakesJson = (try? String(data: JSONEncoder().encode(arr), encoding: .utf8)) ?? "[]"
+        } else {
+            self.mistakesJson = nil
+        }
+        
+        self.playbookId = try? c.decode(String.self, forKey: .playbookId)
+        self.rating = try? c.decode(Int.self, forKey: .rating)
+        self.stopLoss = try? c.decode(Double.self, forKey: .stopLoss)
+        self.profitTarget = try? c.decode(Double.self, forKey: .profitTarget)
+        self.reviewedAt = try? c.decode(String.self, forKey: .reviewedAt)
+    }
+    
     public func toTrade() -> Trade {
-        let fmt = ISO8601DateFormatter()
         let dec = JSONDecoder()
-        let parsedOpenedAt = fmt.date(from: openedAt) ?? Date()
-        let parsedClosedAt = closedAt.flatMap { fmt.date(from: $0) }
-        let parsedReviewedAt = reviewedAt.flatMap { fmt.date(from: $0) }
+        let parsedOpenedAt = FlexibleDateParser.parse(openedAt) ?? Date()
+        let parsedClosedAt = FlexibleDateParser.parse(closedAt)
+        let parsedReviewedAt = FlexibleDateParser.parse(reviewedAt)
         let parsedExecIds = (try? dec.decode([String].self, from: Data(executionIdsJson.utf8))) ?? []
         let parsedExits = (try? dec.decode([ExitAttribution].self, from: Data(exitsJson.utf8))) ?? []
         let parsedTags = tagsJson.flatMap { (try? dec.decode([String].self, from: Data($0.utf8))) } ?? []
@@ -840,6 +964,16 @@ public struct SupabaseExecutionRecord: Codable {
     public let contentHash: String
     public let createdAt: String
     
+    private enum CodingKeys: String, CodingKey {
+        case id, symbol, side, quantity, price, fee, source
+        case accountId = "account_id"
+        case executedAt = "executed_at"
+        case assetClass = "asset_class"
+        case importMetadataJson = "import_metadata_json"
+        case contentHash = "content_hash"
+        case createdAt = "created_at"
+    }
+    
     public init(execution: Execution) {
         let fmt = ISO8601DateFormatter()
         self.id = execution.id
@@ -858,8 +992,7 @@ public struct SupabaseExecutionRecord: Codable {
     }
     
     public func toExecution() -> Execution {
-        let fmt = ISO8601DateFormatter()
-        let parsedDate = fmt.date(from: executedAt) ?? Date()
+        let parsedDate = FlexibleDateParser.parse(executedAt) ?? Date()
         return Execution(
             id: id,
             accountId: accountId,
@@ -884,6 +1017,12 @@ public struct SupabasePlaybookRecord: Codable {
     public let rulesJson: String
     public let createdAt: String
     
+    private enum CodingKeys: String, CodingKey {
+        case id, name, description
+        case rulesJson = "rules_json"
+        case createdAt = "created_at"
+    }
+    
     public init(playbook: Playbook) {
         let fmt = ISO8601DateFormatter()
         self.id = playbook.id
@@ -894,14 +1033,13 @@ public struct SupabasePlaybookRecord: Codable {
     }
     
     public func toPlaybook() -> Playbook {
-        let fmt = ISO8601DateFormatter()
         let parsedRules = (try? JSONDecoder().decode([String].self, from: Data(rulesJson.utf8))) ?? []
         return Playbook(
             id: id,
             name: name,
             description: description,
             rules: parsedRules,
-            createdAt: fmt.date(from: createdAt) ?? Date()
+            createdAt: FlexibleDateParser.parse(createdAt) ?? Date()
         )
     }
 }
