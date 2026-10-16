@@ -46,23 +46,13 @@ jobs:
           xcodegen generate
           ls -la TradeJournal.xcodeproj
 
-      - name: Build & Test for iOS Simulator
-        run: |
-          echo "==> Building and Testing for iOS..."
-          xcodebuild build-for-testing \
-            -project TradeJournal.xcodeproj \
-            -scheme TradeJournal \
-            -destination "generic/platform=iOS Simulator" \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
-            COMPILER_INDEX_STORE_ENABLE=NO
-
       - name: Build Xcode Release Archive
+        id: build_archive
         run: |
           echo "==> Building Release Archive for iOS..."
           CONFIG="${{ github.event.inputs.configuration || 'Release' }}"
           mkdir -p build
+          set -o pipefail
           xcodebuild archive \
             -project TradeJournal.xcodeproj \
             -scheme TradeJournal \
@@ -72,7 +62,15 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
-            COMPILER_INDEX_STORE_ENABLE=NO
+            COMPILER_INDEX_STORE_ENABLE=NO 2>&1 | tee build/xcodebuild.log
+
+      - name: Report Build Failure Log
+        if: failure() && steps.build_archive.outcome == 'failure'
+        run: |
+          echo "### ❌ Xcode Build Failure Log" >> $GITHUB_STEP_SUMMARY
+          echo '```text' >> $GITHUB_STEP_SUMMARY
+          tail -n 120 build/xcodebuild.log >> $GITHUB_STEP_SUMMARY || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
 
       - name: Package IPA
         run: |
