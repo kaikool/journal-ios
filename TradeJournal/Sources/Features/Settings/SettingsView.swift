@@ -122,31 +122,51 @@ public struct SettingsView: View {
                             .autocorrectionDisabled(true)
                     }
                     
-                    Button {
-                        SupabaseService.shared.configure(url: supabaseUrl, anonKey: supabaseAnonKey)
-                        Task {
-                            supabaseSyncStatus = "Đang kiểm tra kết nối và đồng bộ..."
-                            await dataStore.syncWithSupabase()
-                            if let err = dataStore.lastSyncError {
-                                supabaseSyncStatus = "Lỗi: \(err)"
-                            } else {
-                                supabaseSyncStatus = "Đã đồng bộ 2 chiều thành công với Supabase!"
+                    HStack(spacing: 12) {
+                        Button {
+                            SupabaseService.shared.configure(url: supabaseUrl, anonKey: supabaseAnonKey)
+                            Task {
+                                supabaseSyncStatus = "Đang kiểm tra kết nối..."
+                                do {
+                                    let res = try await SupabaseService.shared.pingConnection()
+                                    supabaseSyncStatus = res.message
+                                } catch {
+                                    supabaseSyncStatus = "Lỗi kết nối: \(error.localizedDescription)"
+                                }
+                            }
+                        } label: {
+                            Text("Kiểm tra")
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(supabaseUrl.trimmingCharacters(in: .whitespaces).isEmpty)
+                        
+                        Button {
+                            SupabaseService.shared.configure(url: supabaseUrl, anonKey: supabaseAnonKey)
+                            Task {
+                                supabaseSyncStatus = "Đang đồng bộ 2 chiều với Supabase..."
+                                await dataStore.syncWithSupabase()
+                                if let err = dataStore.lastSyncError {
+                                    supabaseSyncStatus = "Lỗi: \(err)"
+                                } else {
+                                    supabaseSyncStatus = "Đã đồng bộ 2 chiều thành công với Supabase!"
+                                }
+                            }
+                        } label: {
+                            HStack {
+                                if dataStore.isSyncing {
+                                    ProgressView()
+                                        .scaleEffect(0.8)
+                                    Text("Đang đồng bộ...")
+                                } else {
+                                    Image(systemName: "arrow.triangle.2.circlepath")
+                                    Text("Đồng bộ ngay")
+                                }
                             }
                         }
-                    } label: {
-                        HStack {
-                            if dataStore.isSyncing {
-                                ProgressView()
-                                    .scaleEffect(0.8)
-                                Text("Đang đồng bộ...")
-                            } else {
-                                Image(systemName: "arrow.triangle.2.circlepath")
-                                Text("Lưu & Đồng bộ Supabase ngay")
-                            }
-                        }
-                        .foregroundColor(AppColors.accent)
+                        .buttonStyle(.borderedProminent)
+                        .tint(AppColors.accent)
+                        .disabled(dataStore.isSyncing || supabaseUrl.trimmingCharacters(in: .whitespaces).isEmpty)
                     }
-                    .disabled(dataStore.isSyncing || supabaseUrl.trimmingCharacters(in: .whitespaces).isEmpty)
                     
                     if let status = supabaseSyncStatus {
                         Text(status)
