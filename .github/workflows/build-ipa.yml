@@ -114,11 +114,13 @@ jobs:
             echo "::error::TradeJournal.app not found in build/DerivedData"
             exit 1
           fi
+          echo "==> Cleaning stale signatures..."
+          rm -rf "$APP_PATH/_CodeSignature" || true
           echo "==> Applying ad-hoc codesign signature to .app bundle..."
           codesign --force --deep --sign - "$APP_PATH" || true
           cp -r "$APP_PATH" build/Payload/
           cd build
-          zip -r -9 TradeJournal.ipa Payload
+          zip -r -9 -y TradeJournal.ipa Payload
           ls -lh TradeJournal.ipa
           shasum -a 256 TradeJournal.ipa > TradeJournal.ipa.sha256
           echo "SHA256 Checksum:"

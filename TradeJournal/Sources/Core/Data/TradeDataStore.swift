@@ -176,8 +176,10 @@ public final class TradeDataStore: ObservableObject {
             return
         }
         
-        isSyncing = true
-        lastSyncError = nil
+        await MainActor.run {
+            self.isSyncing = true
+            self.lastSyncError = nil
+        }
         
         do {
             // 1. Fetch remote accounts
@@ -205,14 +207,73 @@ public final class TradeDataStore: ObservableObject {
             // 3. Push local trades to Supabase
             try await SupabaseService.shared.upsertTrades(filteredTrades)
             
+            // 4. Đồng bộ Quỹ (Prop Firm Subsystem 2-way Sync)
+            // 4a. Prop Accounts Sync
+            let remotePropAccounts = try await SupabaseService.shared.fetchPropAccounts()
+            for rAcc in remotePropAccounts {
+                if let idx = propAccounts.firstIndex(where: { $0.id == rAcc.id }) {
+                    if rAcc.revision >= propAccounts[idx].revision {
+                        propAccounts[idx] = rAcc
+                    }
+                } else {
+                    propAccounts.append(rAcc)
+                }
+            }
+            if !propAccounts.isEmpty {
+                try await SupabaseService.shared.upsertPropAccounts(propAccounts)
+            }
+            
+            // 4b. Prop Entries Sync
+            let remotePropEntries = try await SupabaseService.shared.fetchPropEntries()
+            for rEntry in remotePropEntries {
+                if let idx = propEntries.firstIndex(where: { $0.id == rEntry.id }) {
+                    if rEntry.revision >= propEntries[idx].revision {
+                        propEntries[idx] = rEntry
+                    }
+                } else {
+                    propEntries.append(rEntry)
+                }
+            }
+            if !propEntries.isEmpty {
+                try await SupabaseService.shared.upsertPropEntries(propEntries)
+            }
+            
+            // 4c. Prop Receipts Sync
+            let remotePropReceipts = try await SupabaseService.shared.fetchPropReceipts()
+            for rRcpt in remotePropReceipts {
+                if let idx = propReceipts.firstIndex(where: { $0.id == rRcpt.id }) {
+                    propReceipts[idx] = rRcpt
+                } else {
+                    propReceipts.append(rRcpt)
+                }
+            }
+            if !propReceipts.isEmpty {
+                try await SupabaseService.shared.upsertPropReceipts(propReceipts)
+            }
+            
+            // 4d. Prop Audits Sync
+            let remotePropAudits = try await SupabaseService.shared.fetchPropAudits()
+            for rAudit in remotePropAudits {
+                if !propAudits.contains(where: { $0.id == rAudit.id }) {
+                    propAudits.append(rAudit)
+                }
+            }
+            if !propAudits.isEmpty {
+                try await SupabaseService.shared.upsertPropAudits(propAudits)
+            }
+            
             saveToDisk()
-            AppLogger.info("Supabase sync completed successfully.")
+            AppLogger.info("Supabase sync (Trades + Prop Firm) completed successfully.")
         } catch {
-            lastSyncError = error.localizedDescription
+            await MainActor.run {
+                self.lastSyncError = error.localizedDescription
+            }
             AppLogger.error("Supabase sync failed: \(error.localizedDescription)")
         }
         
-        isSyncing = false
+        await MainActor.run {
+            self.isSyncing = false
+        }
     }
     
     // MARK: - Notebook & Journal Operations (1:1 port từ source-repo)

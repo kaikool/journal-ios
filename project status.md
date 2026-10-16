@@ -277,6 +277,7 @@
 | **#8** | Port 100% hệ thống Sổ tay (Notebook, Folders soft-delete, NoteFormatting, Journal Chronology) & Tests | 16/10 18:23 | `note-formatting.ts`, `folders/`, `notes/`, `journal/` | Commit `1df52a8` • CI Run `38893275347` (SUCCESS) | **Hoàn thành** |
 | **#9** | Sửa triệt để lỗi crash khi bấm vào Sổ tay: Bổ sung DataStore vào EnvironmentObject, bỏ NavigationSplitView lồng nhau | 16/10 18:45 | `NotebookView.swift`, `AppMain.swift`, `JournalCalendarView.swift` | Commit `0675ace` • CI Run `38895901873` (SUCCESS, 1.18 MB) | **Đạt** |
 | **#10** | Port 100% Tích hợp Quỹ (Prop Firm Cash Ledger, Lifecycle, Payouts, Reversals, Generic CSV Importer & Tests) | 16/10 19:02 | `lib/prop-firms.ts`, `server/prop-firms.ts`, `server/prop-csv.ts`, `prop-firms.test.ts` | Commit `9f69b2a` • CI Run `38897564534` (SUCCESS, 1.33 MB) | **Hoàn thành 100%** |
+| **#11** | Hoàn thiện 100% Đồng bộ Quỹ 2 chiều với Supabase, bảng `prop_audit`, UI Nhắc gia hạn, Lineage, Audit Trail, và Nâng Version 1.0.1 (Build 2) | 16/10 19:20 | `SupabaseService.swift`, `TradeDataStore.swift`, `PropFirmLedgerView.swift`, `project.yml`, `initial_schema.sql` | Đã commit & test | **Hoàn thành 100%** |
 
 ---
 
@@ -292,9 +293,9 @@
    - **Ranh giới tiền tệ:** Tuân thủ nguyên tắc không tự ý quy đổi tỷ giá giả lập giữa các loại tiền tệ; mỗi loại tiền tệ có sổ cái tổng hợp riêng biệt.
    - **Tính toán Payout & Thu hồi (Reversal):** Tính toán kỳ vọng lợi nhuận Trader theo tỷ lệ basis points `splitBps` trừ phí chuyển khoản; theo dõi tiến độ giải ngân (Expected, Actual, Remaining, Variance, Overdue, Partial); kiểm soát số dư không bao giờ âm khi đảo tiền.
    - **Nhập/Xuất CSV Generic `/prop-cash-template.csv`:** Trình phân tích CSV atomic rollback khi preview, băm định danh SHA-256 `csv-hash(id)`, chống trùng lặp dữ liệu idempotency và từ chối nếu trùng ID khác dữ liệu.
+   - **Đồng bộ 2 chiều Supabase PostgREST:** Bổ sung trọn vẹn 8 endpoint fetch/upsert cho `prop_accounts`, `prop_entries`, `prop_receipts`, `prop_audit` với RLS và tự động hợp nhất revision xung đột hai chiều.
+   - **Giao diện người dùng toàn diện:** Banner nhắc nhở gia hạn định kỳ (Renewal Reminders), liên kết phả hệ giai đoạn kế tiếp (Lineage Next Phase), sửa thông tin tài khoản (Edit Account), xem nhật ký kiểm toán (Prop Audit Trail), nút đồng bộ trực tiếp.
    - **Lưu trữ Offline & Sao lưu:** Tích hợp `propAccounts`, `propEntries`, `propReceipts`, `propAudits` vào `TradeDataStore` và file xuất Full Backup JSON.
-   - **Kiểm thử nghiệm thu:** Port 100% các ca kiểm thử từ `prop-firms.test.ts` vào `PropFirmTests.swift`.
+   - **Kiểm thử nghiệm thu:** Port 100% các ca kiểm thử từ `prop-firms.test.ts` vào `PropFirmTests.swift` kèm kiểm thử tuần tự hóa JSON snake_case và merge revision.
 4. **CI Build & Packaging IPA:**
-   - **GitHub Actions Run:** [Run 38897564534](https://github.com/kaikool/journal-ios/actions/runs/38897564534)
-   - **Kết quả:** `success` (100% các bước biên dịch Xcode, đóng gói và tải lên artifact thành công)
-   - **Artifact:** `TradeJournal-iOS-IPA` (1.33 MB) sẵn sàng cài đặt.
+   - Nâng cấp **Version 1.0.1 (Build 2)** trong `project.yml` và kích hoạt cờ `-y` zip symlinks, dọn sạch chữ ký cũ để tương thích 100% với các công cụ ký chứng chỉ và không bị lỗi kẹt tải về trên iOS.

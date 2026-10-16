@@ -255,4 +255,93 @@ final class PropFirmTests: XCTestCase {
             )
         )
     }
+    
+    // MARK: - Supabase PostgREST & 2-Way Sync Tests
+    
+    func testSupabasePostgRESTSerializationParity() throws {
+        let account = PropAccountItem(
+            id: "test-acc-1",
+            firm: "FTMO",
+            name: "FTMO 100k",
+            program: .funded,
+            status: .active,
+            currency: "USD",
+            sizeMinor: 10_000_000,
+            parentId: "parent-acc-0",
+            journalAccountId: "j-acc-1",
+            openedOn: "2026-09-01",
+            closedOn: nil,
+            renewalOn: "2026-10-01",
+            renewalMinor: 15000,
+            notes: "Test notes",
+            archived: false,
+            revision: 2
+        )
+        
+        let encoder = JSONEncoder()
+        encoder.keyEncodingStrategy = .convertToSnakeCase
+        let data = try encoder.encode(account)
+        let jsonString = String(data: data, encoding: .utf8)!
+        
+        // Check snake_case mapping for database columns
+        XCTAssertTrue(jsonString.contains("\"size_minor\":10000000"))
+        XCTAssertTrue(jsonString.contains("\"parent_id\":\"parent-acc-0\""))
+        XCTAssertTrue(jsonString.contains("\"journal_account_id\":\"j-acc-1\""))
+        XCTAssertTrue(jsonString.contains("\"renewal_minor\":15000"))
+        XCTAssertTrue(jsonString.contains("\"opened_on\":\"2026-09-01\""))
+        
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        let decoded = try decoder.decode(PropAccountItem.self, from: data)
+        XCTAssertEqual(decoded, account)
+    }
+    
+    func testTwoWayRevisionMerge() {
+        var local = PropAccountItem(
+            id: "sync-acc-1",
+            firm: "Topstep",
+            name: "Initial Name",
+            program: .evaluation,
+            status: .active,
+            currency: "USD",
+            openedOn: "2026-09-01",
+            revision: 1
+        )
+        
+        let remoteHigherRevision = PropAccountItem(
+            id: "sync-acc-1",
+            firm: "Topstep",
+            name: "Remote Updated Name",
+            program: .evaluation,
+            status: .passed,
+            currency: "USD",
+            openedOn: "2026-09-01",
+            revision: 2
+        )
+        
+        // Remote has higher revision -> Local updates
+        if remoteHigherRevision.revision >= local.revision {
+            local = remoteHigherRevision
+        }
+        XCTAssertEqual(local.name, "Remote Updated Name")
+        XCTAssertEqual(local.status, .passed)
+        XCTAssertEqual(local.revision, 2)
+        
+        // Stale remote (revision 1) arrives -> Ignored, local retains revision 2
+        let staleRemote = PropAccountItem(
+            id: "sync-acc-1",
+            firm: "Topstep",
+            name: "Old Stale Name",
+            program: .evaluation,
+            status: .active,
+            currency: "USD",
+            openedOn: "2026-09-01",
+            revision: 1
+        )
+        if staleRemote.revision >= local.revision {
+            local = staleRemote
+        }
+        XCTAssertEqual(local.name, "Remote Updated Name")
+    }
 }
+

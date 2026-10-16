@@ -24,9 +24,12 @@ public struct PropFirmLedgerView: View {
     @State private var showRefundSheet: Bool = false
     @State private var showVoidAlert: Bool = false
     @State private var showCsvSheet: Bool = false
+    @State private var showAuditSheet: Bool = false
     
     @State private var selectedPayoutForReceipt: PropEntryItem? = nil
     @State private var selectedExpenseForRefund: PropEntryItem? = nil
+    @State private var selectedAccountForEdit: PropAccountItem? = nil
+    @State private var selectedAccountForNextPhase: PropAccountItem? = nil
     @State private var itemToVoid: (id: String, isEntry: Bool)? = nil
     @State private var voidReason: String = ""
     
@@ -136,6 +139,33 @@ public struct PropFirmLedgerView: View {
             .navigationBarTitleDisplayMode(.inline)
             .background(AppColors.background)
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    HStack(spacing: 12) {
+                        Button {
+                            Task {
+                                await dataStore.syncWithSupabase()
+                            }
+                        } label: {
+                            if dataStore.isSyncing {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: AppColors.accent))
+                                    .scaleEffect(0.8)
+                            } else {
+                                Image(systemName: "arrow.triangle.2.circlepath")
+                                    .foregroundColor(AppColors.accent)
+                            }
+                        }
+                        .disabled(dataStore.isSyncing)
+                        
+                        Button {
+                            showAuditSheet = true
+                        } label: {
+                            Image(systemName: "clock.arrow.circlepath")
+                                .foregroundColor(AppColors.secondaryText)
+                        }
+                    }
+                }
+                
                 ToolbarItem(placement: .primaryAction) {
                     Menu {
                         Button {
@@ -163,6 +193,25 @@ public struct PropFirmLedgerView: View {
                 NewPropAccountSheet(defaultCurrency: selectedCurrency) { newAcc in
                     dataStore.savePropAccount(item: newAcc, reason: "Tạo tài khoản mới")
                 }
+            }
+            .sheet(item: $selectedAccountForNextPhase) { parentAcc in
+                NewPropAccountSheet(
+                    defaultCurrency: parentAcc.currency,
+                    initialFirm: parentAcc.firm,
+                    initialProgram: parentAcc.program == .evaluation ? .verification : .funded,
+                    initialSizeText: "\(parentAcc.sizeMinor.map { $0 / 100 } ?? 50000)",
+                    parentId: parentAcc.id
+                ) { nextAcc in
+                    dataStore.savePropAccount(item: nextAcc, reason: "Tạo vòng thi / giai đoạn kế tiếp")
+                }
+            }
+            .sheet(item: $selectedAccountForEdit) { acc in
+                EditPropAccountSheet(account: acc) { updatedAcc in
+                    dataStore.savePropAccount(item: updatedAcc, reason: "Cập nhật thông tin tài khoản")
+                }
+            }
+            .sheet(isPresented: $showAuditSheet) {
+                PropAuditTrailSheet(audits: dataStore.propAudits)
             }
             .sheet(isPresented: $showNewEntrySheet) {
                 NewPropEntrySheet(accounts: filteredAccounts, defaultCurrency: selectedCurrency) { newEntry in
@@ -204,6 +253,33 @@ public struct PropFirmLedgerView: View {
     
     private var overviewView: some View {
         VStack(spacing: 16) {
+            // Renewal Reminders Banner
+            let upcomingRenewals = dataStore.propAccounts.filter {
+                $0.currency == selectedCurrency && !$0.archived && $0.status == .active && $0.renewalOn != nil && $0.renewalMinor != nil
+            }
+            if !upcomingRenewals.isEmpty {
+                VStack(spacing: 8) {
+                    ForEach(upcomingRenewals) { rAcc in
+                        AppCard {
+                            HStack(spacing: 12) {
+                                Image(systemName: "bell.badge.fill")
+                                    .foregroundColor(AppColors.accent)
+                                    .font(.title3)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Gia hạn sắp tới: \(rAcc.firm)")
+                                        .font(AppTypography.captionBold)
+                                        .foregroundColor(AppColors.primaryText)
+                                    Text("\(rAcc.name) • Đến hạn: \(rAcc.renewalOn ?? "") • Phí: \(Formatters.formatCurrency(Decimal(rAcc.renewalMinor ?? 0) / 100, currency: rAcc.currency))")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(AppColors.secondaryText)
+                                }
+                                Spacer()
+                            }
+                        }
+                    }
+                }
+            }
+            
             // Summary Card
             AppCard {
                 VStack(spacing: 12) {
@@ -363,6 +439,17 @@ public struct PropFirmLedgerView: View {
                                 .font(AppTypography.subheadlineBold)
                                 .foregroundColor(AppColors.primaryText)
                             
+                            if let parentId = acc.parentId, let parentAcc = dataStore.propAccounts.first(where: { $0.id == parentId }) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "arrow.turn.down.right")
+                                        .font(.system(size: 10))
+                                        .foregroundColor(AppColors.accent)
+                                    Text("Giai đoạn kế tiếp của: \(parentAcc.name)")
+                                        .font(.system(size: 10, weight: .medium))
+                                        .foregroundColor(AppColors.accent)
+                                }
+                            }
+                            
                             HStack {
                                 if let size = acc.sizeMinor {
                                     Text("Vốn: \(Formatters.formatCurrency(Decimal(size) / 100, currency: acc.currency))")
@@ -377,11 +464,34 @@ public struct PropFirmLedgerView: View {
                             
                             Divider().background(AppColors.border)
                             
-                            HStack {
-                                Text("Mở ngày: \(acc.openedOn)")
+                            HStack(spacing: 12) {
+                                Text("Mở: \(acc.openedOn)")
                                     .font(.system(size: 11))
                                     .foregroundColor(AppColors.secondaryText)
+                                if let closed = acc.closedOn {
+                                    Text("• Đóng: \(closed)")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(AppColors.secondaryText)
+                                }
                                 Spacer()
+                                
+                                if acc.status == .passed || acc.status == .breached || acc.status == .closed {
+                                    Button {
+                                        selectedAccountForNextPhase = acc
+                                    } label: {
+                                        Text("Vòng kế tiếp")
+                                            .font(.system(size: 11, weight: .semibold))
+                                            .foregroundColor(AppColors.accent)
+                                    }
+                                }
+                                
+                                Button {
+                                    selectedAccountForEdit = acc
+                                } label: {
+                                    Text("Sửa")
+                                        .font(.system(size: 11, weight: .semibold))
+                                        .foregroundColor(AppColors.accent)
+                                }
                                 
                                 Button {
                                     dataStore.archivePropAccount(id: acc.id, archived: !acc.archived, reason: "User toggle archive")
@@ -573,18 +683,53 @@ public struct PropFirmLedgerView: View {
 public struct NewPropAccountSheet: View {
     @Environment(\.dismiss) private var dismiss
     let defaultCurrency: String
+    var initialFirm: String = "Topstep"
+    var initialProgram: PropProgram = .evaluation
+    var initialSizeText: String = "50000"
+    var parentId: String? = nil
     
-    @State private var firm: String = "Topstep"
+    @State private var firm: String
     @State private var name: String = ""
-    @State private var program: PropProgram = .evaluation
-    @State private var sizeText: String = "50000"
+    @State private var program: PropProgram
+    @State private var sizeText: String
     @State private var notes: String = ""
     
     var onSave: (PropAccountItem) -> Void
     
+    public init(
+        defaultCurrency: String,
+        initialFirm: String = "Topstep",
+        initialProgram: PropProgram = .evaluation,
+        initialSizeText: String = "50000",
+        parentId: String? = nil,
+        onSave: @escaping (PropAccountItem) -> Void
+    ) {
+        self.defaultCurrency = defaultCurrency
+        self.initialFirm = initialFirm
+        self.initialProgram = initialProgram
+        self.initialSizeText = initialSizeText
+        self.parentId = parentId
+        self.onSave = onSave
+        _firm = State(initialValue: initialFirm)
+        _program = State(initialValue: initialProgram)
+        _sizeText = State(initialValue: initialSizeText)
+    }
+    
     public var body: some View {
         NavigationStack {
             Form {
+                if let pId = parentId {
+                    Section("Liên kết Lineage") {
+                        HStack {
+                            Image(systemName: "link")
+                                .foregroundColor(AppColors.accent)
+                            Text("Giai đoạn tiếp theo (Parent: \(pId))")
+                                .font(AppTypography.captionBold)
+                                .foregroundColor(AppColors.accent)
+                        }
+                    }
+                }
+                
                 Section("Quỹ & Tên tài khoản") {
                     TextField("Tên Quỹ (Topstep, FTMO, Apex...)", text: $firm)
                     TextField("Tên tài khoản gợi nhớ", text: $name)
@@ -604,7 +749,7 @@ public struct NewPropAccountSheet: View {
                     TextField("Quy tắc drawdown, mục tiêu lãi...", text: $notes)
                 }
             }
-            .navigationTitle("Thêm tài khoản quỹ")
+            .navigationTitle(parentId == nil ? "Thêm tài khoản quỹ" : "Vòng thi / Giai đoạn mới")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
@@ -621,6 +766,7 @@ public struct NewPropAccountSheet: View {
                             status: .active,
                             currency: defaultCurrency,
                             sizeMinor: sizeMinor,
+                            parentId: parentId,
                             openedOn: today,
                             notes: notes
                         )
@@ -630,6 +776,140 @@ public struct NewPropAccountSheet: View {
                 }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Hủy") { dismiss() }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Edit Prop Account Sheet
+
+public struct EditPropAccountSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let account: PropAccountItem
+    var onSave: (PropAccountItem) -> Void
+    
+    @State private var name: String
+    @State private var status: PropStatus
+    @State private var notes: String
+    @State private var renewalDateText: String
+    @State private var renewalAmountText: String
+    @State private var closedDateText: String
+    
+    public init(account: PropAccountItem, onSave: @escaping (PropAccountItem) -> Void) {
+        self.account = account
+        self.onSave = onSave
+        _name = State(initialValue: account.name)
+        _status = State(initialValue: account.status)
+        _notes = State(initialValue: account.notes)
+        _renewalDateText = State(initialValue: account.renewalOn ?? "")
+        _renewalAmountText = State(initialValue: account.renewalMinor.map { String($0 / 100) } ?? "")
+        _closedDateText = State(initialValue: account.closedOn ?? "")
+    }
+    
+    public var body: some View {
+        NavigationStack {
+            Form {
+                Section("Tên tài khoản & Quỹ") {
+                    Text("Quỹ: \(account.firm)")
+                        .foregroundColor(AppColors.secondaryText)
+                    TextField("Tên tài khoản", text: $name)
+                }
+                
+                Section("Trạng thái") {
+                    Picker("Trạng thái", selection: $status) {
+                        ForEach(PropStatus.allCases, id: \.self) { st in
+                            Text(st.label).tag(st)
+                        }
+                    }
+                    if status == .passed || status == .breached || status == .closed {
+                        TextField("Ngày kết thúc (YYYY-MM-DD)", text: $closedDateText)
+                    }
+                }
+                
+                Section("Nhắc nhở gia hạn định kỳ (Renewal)") {
+                    TextField("Ngày gia hạn tiếp theo (YYYY-MM-DD)", text: $renewalDateText)
+                    TextField("Phí gia hạn (\(account.currency))", text: $renewalAmountText)
+                        .keyboardType(.numberPad)
+                }
+                
+                Section("Ghi chú") {
+                    TextField("Ghi chú tài khoản...", text: $notes)
+                }
+            }
+            .navigationTitle("Sửa tài khoản")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Lưu") {
+                        var updated = account
+                        let cleanName = name.trimmingCharacters(in: .whitespaces)
+                        updated.name = cleanName.isEmpty ? account.name : cleanName
+                        updated.status = status
+                        updated.notes = notes
+                        let cleanClosed = closedDateText.trimmingCharacters(in: .whitespaces)
+                        updated.closedOn = cleanClosed.isEmpty ? nil : cleanClosed
+                        let cleanRenewal = renewalDateText.trimmingCharacters(in: .whitespaces)
+                        updated.renewalOn = cleanRenewal.isEmpty ? nil : cleanRenewal
+                        if let rAmt = Int64(renewalAmountText.trimmingCharacters(in: .whitespaces)) {
+                            updated.renewalMinor = rAmt * 100
+                        } else {
+                            updated.renewalMinor = nil
+                        }
+                        updated.revision += 1
+                        updated.updatedAt = JournalIds.nowIso()
+                        onSave(updated)
+                        dismiss()
+                    }
+                }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Hủy") { dismiss() }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Prop Audit Trail Sheet
+
+public struct PropAuditTrailSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let audits: [PropAuditItem]
+    
+    public var body: some View {
+        NavigationStack {
+            List {
+                if audits.isEmpty {
+                    Text("Chưa có lịch sử thay đổi kiểm toán.")
+                        .foregroundColor(AppColors.secondaryText)
+                } else {
+                    ForEach(audits.reversed()) { a in
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack {
+                                Text(a.entityType.uppercased())
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundColor(AppColors.accent)
+                                Spacer()
+                                Text(a.createdAt.prefix(19))
+                                    .font(.system(size: 10))
+                                    .foregroundColor(AppColors.secondaryText)
+                            }
+                            Text(a.reason)
+                                .font(AppTypography.captionBold)
+                                .foregroundColor(AppColors.primaryText)
+                            Text("ID: \(a.entityId)")
+                                .font(.system(size: 10, design: .monospaced))
+                                .foregroundColor(AppColors.secondaryText)
+                        }
+                        .padding(.vertical, 4)
+                    }
+                }
+            }
+            .navigationTitle("Lịch sử kiểm toán Quỹ")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Đóng") { dismiss() }
                 }
             }
         }

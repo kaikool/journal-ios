@@ -248,6 +248,24 @@ ALTER TABLE public.prop_receipts ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can only manage own prop receipts" ON public.prop_receipts
     FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
+CREATE TABLE IF NOT EXISTS public.prop_audit (
+    id TEXT NOT NULL,
+    user_id UUID NOT NULL DEFAULT auth.uid() REFERENCES auth.users(id) ON DELETE CASCADE,
+    entity_type TEXT NOT NULL,
+    entity_id TEXT NOT NULL,
+    before_json TEXT,
+    after_json TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
+    PRIMARY KEY (user_id, id)
+);
+
+ALTER TABLE public.prop_audit ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can only manage own prop audit" ON public.prop_audit
+    FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+
+CREATE INDEX IF NOT EXISTS prop_audit_entity_idx ON public.prop_audit(user_id, entity_type, entity_id);
+
 -- 8. BẢNG SETTINGS & ATTACHMENTS
 CREATE TABLE IF NOT EXISTS public.settings (
     key TEXT NOT NULL,

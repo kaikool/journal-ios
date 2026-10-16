@@ -146,4 +146,87 @@ public final class SupabaseService {
         }
         return try jsonDecoder.decode([JournalSettingRecord].self, from: data)
     }
+    
+    // MARK: - Prop Firm (Sổ cái Quỹ) PostgREST Sync
+    
+    public func fetchPropAccounts() async throws -> [PropAccountItem] {
+        guard isConfigured else { return [] }
+        let request = try makeRequest(endpoint: "prop_accounts?select=*")
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            throw URLError(.badServerResponse)
+        }
+        return try jsonDecoder.decode([PropAccountItem].self, from: data)
+    }
+    
+    public func upsertPropAccounts(_ items: [PropAccountItem]) async throws {
+        guard isConfigured, !items.isEmpty else { return }
+        let body = try jsonEncoder.encode(items)
+        let request = try makeRequest(endpoint: "prop_accounts", method: "POST", body: body, preferMerge: true)
+        let (_, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            throw URLError(.badServerResponse)
+        }
+    }
+    
+    public func fetchPropEntries() async throws -> [PropEntryItem] {
+        guard isConfigured else { return [] }
+        let request = try makeRequest(endpoint: "prop_entries?select=*")
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            throw URLError(.badServerResponse)
+        }
+        return try jsonDecoder.decode([PropEntryItem].self, from: data)
+    }
+    
+    public func upsertPropEntries(_ items: [PropEntryItem]) async throws {
+        guard isConfigured, !items.isEmpty else { return }
+        let body = try jsonEncoder.encode(items)
+        let request = try makeRequest(endpoint: "prop_entries", method: "POST", body: body, preferMerge: true)
+        let (_, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            throw URLError(.badServerResponse)
+        }
+    }
+    
+    public func fetchPropReceipts() async throws -> [PropReceiptItem] {
+        guard isConfigured else { return [] }
+        let request = try makeRequest(endpoint: "prop_receipts?select=*")
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            throw URLError(.badServerResponse)
+        }
+        return try jsonDecoder.decode([PropReceiptItem].self, from: data)
+    }
+    
+    public func upsertPropReceipts(_ items: [PropReceiptItem]) async throws {
+        guard isConfigured, !items.isEmpty else { return }
+        let body = try jsonEncoder.encode(items)
+        let request = try makeRequest(endpoint: "prop_receipts", method: "POST", body: body, preferMerge: true)
+        let (_, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            throw URLError(.badServerResponse)
+        }
+    }
+    
+    public func fetchPropAudits() async throws -> [PropAuditItem] {
+        guard isConfigured else { return [] }
+        let request = try makeRequest(endpoint: "prop_audit?select=*")
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            throw URLError(.badServerResponse)
+        }
+        return try jsonDecoder.decode([PropAuditItem].self, from: data)
+    }
+    
+    public func upsertPropAudits(_ items: [PropAuditItem]) async throws {
+        guard isConfigured, !items.isEmpty else { return }
+        let body = try jsonEncoder.encode(items)
+        let request = try makeRequest(endpoint: "prop_audit", method: "POST", body: body, preferMerge: true)
+        let (_, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            throw URLError(.badServerResponse)
+        }
+    }
 }
+
