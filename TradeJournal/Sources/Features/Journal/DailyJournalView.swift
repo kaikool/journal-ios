@@ -430,7 +430,7 @@ public struct DailyJournalDetailView: View {
                         
                         statItem(label: "Phí & Phí sàn", value: Formatters.currency(metrics.fees ?? 0))
                         statItem(label: "Khối lượng", value: "\(metrics.totalVolume.formatted())")
-                        statItem(label: "Profit Factor", value: metrics.profitFactorIsInfinite ? "∞" : (metrics.profitFactor != nil ? String(format: "%.2f", NSDecimalNumber(decimal: metrics.profitFactor!).doubleValue) : "–"))
+                        statItem(label: "Profit Factor", value: metrics.profitFactorIsInfinite ? "∞" : (metrics.profitFactor != nil ? String(format: "%.2f", metrics.profitFactor!) : "–"))
                         
                         statItem(label: "Kỳ vọng (Exp)", value: metrics.expectancy != nil ? Formatters.currency(metrics.expectancy!) : "–")
                     }

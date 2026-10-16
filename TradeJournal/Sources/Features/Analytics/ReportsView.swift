@@ -47,7 +47,7 @@ public struct ReportsView: View {
     
     private var summaryKPIs: [(label: String, value: String, isNet: Bool)] {
         let s = metrics
-        let pfStr: String = s.profitFactorIsInfinite ? "∞" : (s.profitFactor != nil ? String(format: "%.2f", NSDecimalNumber(decimal: s.profitFactor!).doubleValue) : "–")
+        let pfStr: String = s.profitFactorIsInfinite ? "∞" : (s.profitFactor != nil ? String(format: "%.2f", s.profitFactor!) : "–")
         let netStr = s.netPnl >= 0 ? "+\(Formatters.currency(s.netPnl))" : Formatters.currency(s.netPnl)
         let wrStr = s.winRate != nil ? Formatters.percent(s.winRate) : "–"
         let volStr = "\(s.totalVolume.formatted())"
