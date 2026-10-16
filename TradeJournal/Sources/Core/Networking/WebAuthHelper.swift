@@ -6,7 +6,8 @@ import UIKit
 #endif
 
 /// Trình quản lý luồng đăng nhập Web OAuth an toàn qua ASWebAuthenticationSession trên iOS
-public final class WebAuthHelper: NSObject, ASWebAuthenticationPresentationContextProviding, @unchecked Sendable {
+@MainActor
+public final class WebAuthHelper: NSObject, ASWebAuthenticationPresentationContextProviding {
     public static let shared = WebAuthHelper()
     
     private override init() {

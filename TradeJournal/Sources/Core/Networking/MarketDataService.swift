@@ -72,7 +72,7 @@ public final class MarketDataService: Sendable {
             clean = clean.replacingOccurrences(of: "[/\\-_\\.]", with: "", options: .regularExpression)
             let singleCrypto = ["BTC", "ETH", "SOL", "BNB", "XRP", "ADA", "DOGE", "AVAX", "LINK", "DOT", "NEAR", "LTC"]
             if singleCrypto.contains(clean) {
-                return "\(clean}USDT"
+                return "\(clean)USDT"
             }
             return clean
         }
