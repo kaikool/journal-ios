@@ -584,12 +584,27 @@ public final class The5ersService: ObservableObject {
                 let journalAccId = acc.id.hasPrefix("the5ers_") ? acc.id : "the5ers_\(acc.id)"
                 
                 if let existingIndex = dataStore.propAccounts.firstIndex(where: { $0.id == journalAccId || $0.id == acc.id || $0.name == acc.label }) {
-                    var existing = dataStore.propAccounts[existingIndex]
-                    existing.id = journalAccId
-                    existing.journalAccountId = journalAccId
-                    existing.status = mappedStatus
-                    existing.program = mappedProgram
-                    dataStore.propAccounts[existingIndex] = existing
+                    let old = dataStore.propAccounts[existingIndex]
+                    dataStore.propAccounts[existingIndex] = PropAccountItem(
+                        id: journalAccId,
+                        firm: "The5ers",
+                        name: acc.label,
+                        program: mappedProgram,
+                        status: mappedStatus,
+                        currency: acc.currency,
+                        sizeMinor: startingMinor,
+                        parentId: old.parentId,
+                        journalAccountId: journalAccId,
+                        openedOn: old.openedOn,
+                        closedOn: old.closedOn,
+                        renewalOn: old.renewalOn,
+                        renewalMinor: old.renewalMinor,
+                        notes: old.notes,
+                        archived: old.archived,
+                        revision: old.revision + 1,
+                        createdAt: old.createdAt,
+                        updatedAt: JournalIds.nowIso()
+                    )
                 } else {
                     let newPropAccount = PropAccountItem(
                         id: journalAccId,
@@ -608,10 +623,20 @@ public final class The5ersService: ObservableObject {
                 }
                 
                 if let accIdx = dataStore.accounts.firstIndex(where: { $0.id == journalAccId || $0.id == acc.id }) {
-                    dataStore.accounts[accIdx].id = journalAccId
-                    dataStore.accounts[accIdx].broker = "The5ers"
-                    dataStore.accounts[accIdx].name = acc.label
-                    dataStore.accounts[accIdx].currency = acc.currency
+                    let old = dataStore.accounts[accIdx]
+                    dataStore.accounts[accIdx] = Account(
+                        id: journalAccId,
+                        name: acc.label,
+                        broker: "The5ers",
+                        kind: .sync,
+                        currency: acc.currency,
+                        initialBalance: acc.startingBalance ?? acc.balance,
+                        profitCalcMethod: old.profitCalcMethod,
+                        autoSync: true,
+                        lastSyncAt: Date(),
+                        archivedAt: old.archivedAt,
+                        createdAt: old.createdAt
+                    )
                 } else {
                     let newAcc = Account(
                         id: journalAccId,
