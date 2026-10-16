@@ -48,37 +48,11 @@ public struct TradesListView: View {
     public var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                // Filter Segmented Bar
-                Picker("Lọc trạng thái", selection: $statusFilter) {
-                    ForEach(TradeStatusFilter.allCases) { f in
-                        Text(f.rawValue).tag(f)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .padding(.horizontal)
-                .padding(.vertical, 8)
-                
+                filterPicker
                 if filteredTrades.isEmpty {
                     emptyState
                 } else {
-                    List {
-                        ForEach(filteredTrades) { trade in
-                            NavigationLink(destination: TradeDetailView(trade: trade)) {
-                                TradeRowCard(trade: trade)
-                            }
-                            .buttonStyle(.plain)
-                            .listRowSeparator(.hidden)
-                            .listRowBackground(Color.clear)
-                            .swipeActions(edge: .destructive) {
-                                Button(role: .destructive) {
-                                    dataStore.deleteTrade(key: trade.key)
-                                } label: {
-                                    Label("Xóa", systemImage: "trash")
-                                }
-                            }
-                        }
-                    }
-                    .listStyle(.plain)
+                    tradesList
                 }
             }
             .navigationTitle("Giao Dịch")
@@ -87,7 +61,7 @@ public struct TradesListView: View {
                 ToolbarItem(placement: .primaryAction) {
                     Button(action: { showAddTradeSheet = true }) {
                         Image(systemName: "plus.circle.fill")
-                            .font(.title3)
+                            .font(.system(size: 20))
                             .foregroundColor(AppColors.accent)
                     }
                 }
@@ -96,6 +70,38 @@ public struct TradesListView: View {
                 AddTradeSheet()
             }
         }
+    }
+    
+    private var filterPicker: some View {
+        Picker("Lọc trạng thái", selection: $statusFilter) {
+            ForEach(TradeStatusFilter.allCases) { f in
+                Text(f.rawValue).tag(f)
+            }
+        }
+        .pickerStyle(.segmented)
+        .padding(.horizontal)
+        .padding(.vertical, 8)
+    }
+    
+    private var tradesList: some View {
+        List {
+            ForEach(filteredTrades) { trade in
+                NavigationLink(destination: TradeDetailView(trade: trade)) {
+                    TradeRowCard(trade: trade)
+                }
+                .buttonStyle(.plain)
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
+                .swipeActions(edge: .destructive) {
+                    Button(role: .destructive) {
+                        dataStore.deleteTrade(key: trade.key)
+                    } label: {
+                        Label("Xóa", systemImage: "trash")
+                    }
+                }
+            }
+        }
+        .listStyle(.plain)
     }
     
     private var emptyState: some View {
@@ -146,54 +152,60 @@ private struct TradeRowCard: View {
     var body: some View {
         AppCard {
             HStack(alignment: .center) {
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 8) {
-                        Text(trade.symbol)
-                            .font(AppTypography.headline)
-                        AppBadge(
-                            trade.direction == .long ? "LONG" : "SHORT",
-                            color: trade.direction == .long ? AppColors.accent : AppColors.warning
-                        )
-                        AppBadge(
-                            trade.status.rawValue.uppercased(),
-                            color: trade.status == .win ? AppColors.profit : (trade.status == .loss ? AppColors.loss : AppColors.breakeven)
-                        )
-                    }
-                    
-                    Text("Vào: \(Formatters.price(trade.avgEntry)) • KL: \(trade.quantity)")
-                        .font(AppTypography.caption)
-                        .foregroundColor(.secondary)
-                    
-                    if !trade.tags.isEmpty {
-                        HStack(spacing: 4) {
-                            ForEach(trade.tags.prefix(3), id: \.self) { tag in
-                                Text("#\(tag)")
-                                    .font(.system(size: 10, weight: .medium))
-                                    .foregroundColor(AppColors.accent)
-                            }
-                        }
+                tradeInfoColumn
+                Spacer()
+                tradeFinancialColumn
+            }
+        }
+    }
+    
+    private var tradeInfoColumn: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                Text(trade.symbol)
+                    .font(AppTypography.headline)
+                AppBadge(
+                    trade.direction == .long ? "LONG" : "SHORT",
+                    color: trade.direction == .long ? AppColors.accent : AppColors.warning
+                )
+                AppBadge(
+                    trade.status.rawValue.uppercased(),
+                    color: trade.status == .win ? AppColors.profit : (trade.status == .loss ? AppColors.loss : AppColors.breakeven)
+                )
+            }
+            
+            Text("Vào: \(Formatters.price(trade.avgEntry)) • KL: \(trade.quantity)")
+                .font(AppTypography.caption)
+                .foregroundColor(.secondary)
+            
+            if !trade.tags.isEmpty {
+                HStack(spacing: 4) {
+                    ForEach(trade.tags.prefix(3), id: \.self) { tag in
+                        Text("#\(tag)")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(AppColors.accent)
                     }
                 }
-                
-                Spacer()
-                
-                VStack(alignment: .trailing, spacing: 4) {
-                    Text(Formatters.pnl(trade.netPnl, currencyCode: env.currentCurrency, isPrivate: env.isPrivacyModeEnabled))
-                        .font(AppTypography.financialNumber(size: 16, weight: .bold))
-                        .foregroundColor(trade.netPnl >= 0 ? AppColors.profit : AppColors.loss)
-                    
-                    Text(Formatters.dateOnly(trade.openedAt, timeZone: env.currentTimeZone))
-                        .font(AppTypography.caption)
-                        .foregroundColor(.secondary)
-                    
-                    if let r = trade.rating, r > 0 {
-                        HStack(spacing: 2) {
-                            ForEach(1...r, id: \.self) { _ in
-                                Image(systemName: "star.fill")
-                                    .font(.system(size: 8))
-                                    .foregroundColor(.yellow)
-                            }
-                        }
+            }
+        }
+    }
+    
+    private var tradeFinancialColumn: some View {
+        VStack(alignment: .trailing, spacing: 4) {
+            Text(Formatters.pnl(trade.netPnl, currencyCode: env.currentCurrency, isPrivate: env.isPrivacyModeEnabled))
+                .font(AppTypography.financialNumber(size: 16, weight: .bold))
+                .foregroundColor(trade.netPnl >= 0 ? AppColors.profit : AppColors.loss)
+            
+            Text(Formatters.dateOnly(trade.openedAt, timeZone: env.currentTimeZone))
+                .font(AppTypography.caption)
+                .foregroundColor(.secondary)
+            
+            if let r = trade.rating, r > 0 {
+                HStack(spacing: 2) {
+                    ForEach(1...r, id: \.self) { _ in
+                        Image(systemName: "star.fill")
+                            .font(.system(size: 8))
+                            .foregroundColor(.yellow)
                     }
                 }
             }
