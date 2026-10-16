@@ -31,6 +31,7 @@ public final class TradeDataStore: ObservableObject {
     @Published public var aiSettings: AiSettingsConfig = .default
     @Published public var isSyncing: Bool = false
     @Published public var lastSyncError: String? = nil
+    @Published public var lastSyncSummary: String? = nil
     
     private var executionHashes: Set<String> = []
     
@@ -47,9 +48,6 @@ public final class TradeDataStore: ObservableObject {
         if folders.isEmpty {
             folders = NotebookEngine.defaultSystemFolders
         }
-        if playbooks.isEmpty {
-            playbooks = Self.defaultPlaybooks
-        }
         rebuildAllAccounts()
     }
     
@@ -58,8 +56,14 @@ public final class TradeDataStore: ObservableObject {
     }
     
     public var filteredTrades: [Trade] {
+        if selectedAccountId == "all" {
+            return trades
+        }
         guard let account = selectedAccount else { return trades }
-        return trades.filter { $0.accountId == account.id }
+        let accountTrades = trades.filter { $0.accountId == account.id }
+        // Nếu tài khoản được chọn không có lệnh nào nhưng kho dữ liệu lại có lệnh từ tài khoản khác,
+        // hiển thị toàn bộ lệnh để người dùng không bị trống màn hình
+        return accountTrades.isEmpty ? trades : accountTrades
     }
     
     public var existingHashesForSelectedAccount: Set<String> {
@@ -193,44 +197,67 @@ public final class TradeDataStore: ObservableObject {
         }
         
         do {
-            // 1. Fetch remote accounts
+            // 1. Đồng bộ danh sách tài khoản từ Supabase
             let remoteAccounts = try await SupabaseService.shared.fetchAccounts()
             if !remoteAccounts.isEmpty {
                 for rAcc in remoteAccounts {
-                    if !accounts.contains(where: { $0.id == rAcc.id }) {
+                    if let idx = accounts.firstIndex(where: { $0.id == rAcc.id }) {
+                        accounts[idx] = rAcc
+                    } else {
                         accounts.append(rAcc)
                     }
                 }
+                // Nếu đang trỏ vào default-acc hoặc account không tồn tại, trỏ sang account thật từ Supabase
+                if selectedAccountId == "default-acc" || !accounts.contains(where: { $0.id == selectedAccountId }) {
+                    if let first = remoteAccounts.first {
+                        selectedAccountId = first.id
+                    }
+                }
+                // Loại bỏ default-acc khi đã có tài khoản thực từ Supabase
+                accounts.removeAll(where: { $0.id == "default-acc" && accounts.count > 1 })
             }
             
-            // 2. Fetch remote trades for account
-            let remoteTrades = try await SupabaseService.shared.fetchTrades(accountId: selectedAccountId)
+            // 2. Tải TOÀN BỘ lệnh giao dịch từ Supabase (không lọc theo selectedAccountId để không bị sót dữ liệu)
+            let remoteTrades = try await SupabaseService.shared.fetchTrades(accountId: nil)
             for rTrade in remoteTrades {
                 if let idx = trades.firstIndex(where: { $0.key == rTrade.key }) {
                     trades[idx] = rTrade
                 } else {
                     trades.append(rTrade)
                 }
+                // Đảm bảo accountId của lệnh được đăng ký trong danh sách accounts
+                if !accounts.contains(where: { $0.id == rTrade.accountId }) {
+                    accounts.append(Account(id: rTrade.accountId, name: "Tài khoản \(rTrade.accountId)", kind: .sync))
+                }
             }
             
-            // 2b. Fetch remote executions for selected account
-            let remoteExecutions = try await SupabaseService.shared.fetchExecutions(accountId: selectedAccountId)
+            // Tự động chuyển selectedAccountId sang tài khoản có lệnh giao dịch nếu tài khoản hiện tại rỗng
+            if filteredTrades.isEmpty, let firstTrade = trades.first {
+                selectedAccountId = firstTrade.accountId
+            }
+            
+            // 2b. Tải TOÀN BỘ executions từ Supabase
+            let remoteExecutions = try await SupabaseService.shared.fetchExecutions(accountId: nil)
             if !remoteExecutions.isEmpty {
-                importExecutions(accountId: selectedAccountId, newExecutions: remoteExecutions)
+                let uniqueNew = remoteExecutions.filter { !executionHashes.contains($0.contentHash) }
+                for fill in uniqueNew {
+                    executionHashes.insert(fill.contentHash)
+                    executions.append(fill)
+                }
             }
             
-            // 2c. Push local executions for selected account to Supabase
-            let localAccountFills = executions.filter { $0.accountId == selectedAccountId }
-            if !localAccountFills.isEmpty {
-                try await SupabaseService.shared.upsertExecutions(localAccountFills)
+            // 2c. Đẩy các execution mới phát sinh từ local lên Supabase nếu có
+            let localFills = executions
+            if !localFills.isEmpty {
+                try? await SupabaseService.shared.upsertExecutions(localFills)
             }
             
-            // 3. Push local trades to Supabase
-            if !filteredTrades.isEmpty {
-                try await SupabaseService.shared.upsertTrades(filteredTrades)
+            // 3. Đẩy các trade local lên Supabase nếu có
+            if !trades.isEmpty {
+                try? await SupabaseService.shared.upsertTrades(trades)
             }
             
-            // 3b. Sync Playbooks
+            // 3b. Đồng bộ Playbooks (CHỈ tải về, không cố đẩy mock data gây vi phạm RLS)
             let remotePlaybooks = try await SupabaseService.shared.fetchPlaybooks()
             for rPb in remotePlaybooks {
                 if let idx = playbooks.firstIndex(where: { $0.id == rPb.id }) {
@@ -239,8 +266,12 @@ public final class TradeDataStore: ObservableObject {
                     playbooks.append(rPb)
                 }
             }
-            if !playbooks.isEmpty {
-                try await SupabaseService.shared.upsertPlaybooks(playbooks)
+            // Chỉ đẩy lên Supabase nếu là playbook do người dùng chủ động tạo (khác danh sách remote)
+            let localUserPlaybooks = playbooks.filter { pb in
+                !remotePlaybooks.contains(where: { $0.id == pb.id })
+            }
+            if !localUserPlaybooks.isEmpty {
+                try? await SupabaseService.shared.upsertPlaybooks(localUserPlaybooks)
             }
             
             // 4. Đồng bộ Quỹ (Prop Firm Subsystem 2-way Sync)
@@ -305,11 +336,10 @@ public final class TradeDataStore: ObservableObject {
                     attachments.append(rAtt)
                 }
             }
-            if !attachments.isEmpty {
-                try await SupabaseService.shared.upsertAttachments(attachments)
-            }
-            
             saveToDisk()
+            await MainActor.run {
+                self.lastSyncSummary = "Đã đồng bộ thành công \(trades.count) lệnh và \(accounts.count) tài khoản từ Supabase."
+            }
             AppLogger.info("Supabase sync (Trades + Prop Firm + Attachments) completed successfully.")
         } catch {
             await MainActor.run {
@@ -803,7 +833,7 @@ public final class TradeDataStore: ObservableObject {
             self.propReceipts = store.propReceipts ?? []
             self.propAudits = store.propAudits ?? []
             self.attachments = store.attachments ?? []
-            self.playbooks = store.playbooks ?? Self.defaultPlaybooks
+            self.playbooks = store.playbooks ?? []
             self.playbookAssessments = store.playbookAssessments ?? []
             self.calendarNotes = store.calendarNotes ?? [:]
             self.generalSettings = store.generalSettings ?? .default
@@ -926,46 +956,6 @@ public final class TradeDataStore: ObservableObject {
     }
     
     // MARK: - Playbooks & Discipline Assessments
-    
-    public static let defaultPlaybooks: [Playbook] = [
-        Playbook(
-            id: "pb-fvg",
-            name: "Liquidity Sweep & FVG",
-            description: "Quét thanh khoản phiên Á hoặc đỉnh/đáy ngày hôm trước kết hợp Fair Value Gap.",
-            rules: [
-                "Giá đã quét liquidity pool rõ ràng",
-                "Khung M5/M15 xuất hiện Market Structure Shift (MSS)",
-                "Entry tại FVG hoặc Order Block",
-                "Stop loss đặt sau điểm swing high/low",
-                "RR tối thiểu 1:2"
-            ],
-            targetWinRate: 0.60
-        ),
-        Playbook(
-            id: "pb-london-breakout",
-            name: "London Open Breakout",
-            description: "Đánh theo đà bứt phá biên độ phiên Á khi phiên London mở cửa (08:00 UTC).",
-            rules: [
-                "Biên độ phiên Á hẹp (< 30 pips / điểm)",
-                "Cây nến H1 đầu tiên đóng dứt khoát ngoài biên độ",
-                "Volume đột biến xác nhận",
-                "Không giữ lệnh qua tin tức lớn"
-            ],
-            targetWinRate: 0.55
-        ),
-        Playbook(
-            id: "pb-trend-pullback",
-            name: "Trend Pullback EMA 20/50",
-            description: "Đánh thuận xu hướng khi giá hồi quy về cụm đường trung bình động EMA.",
-            rules: [
-                "Xu hướng khung H1 và M15 đồng thuận",
-                "Nến từ chối (Pinbar / Engulfing) xuất hiện tại vùng EMA 20",
-                "RSI không rơi vào trạng thái quá mua/quá bán nghịch chiều",
-                "Chốt lời từng phần tại đỉnh/đáy cũ"
-            ],
-            targetWinRate: 0.65
-        )
-    ]
     
     public func savePlaybook(_ playbook: Playbook) {
         if let idx = playbooks.firstIndex(where: { $0.id == playbook.id }) {

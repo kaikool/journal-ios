@@ -49,6 +49,54 @@ public struct TradesListView: View {
         NavigationStack {
             VStack(spacing: 0) {
                 filterPicker
+                
+                if let summary = dataStore.lastSyncSummary {
+                    HStack {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(AppColors.profit)
+                        Text(summary)
+                            .font(AppTypography.caption)
+                        Spacer()
+                        Button {
+                            dataStore.lastSyncSummary = nil
+                        } label: {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 10))
+                                .foregroundColor(AppColors.secondaryText)
+                        }
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(AppColors.profit.opacity(0.12))
+                    .cornerRadius(6)
+                    .padding(.horizontal)
+                    .padding(.bottom, 6)
+                }
+                
+                if let err = dataStore.lastSyncError {
+                    HStack {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundColor(AppColors.loss)
+                        Text(err)
+                            .font(AppTypography.caption)
+                            .lineLimit(2)
+                        Spacer()
+                        Button {
+                            dataStore.lastSyncError = nil
+                        } label: {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 10))
+                                .foregroundColor(AppColors.secondaryText)
+                        }
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(AppColors.loss.opacity(0.12))
+                    .cornerRadius(6)
+                    .padding(.horizontal)
+                    .padding(.bottom, 6)
+                }
+                
                 if filteredTrades.isEmpty {
                     emptyState
                 } else {
@@ -58,11 +106,45 @@ public struct TradesListView: View {
             .navigationTitle("Giao Dịch")
             .searchable(text: $searchText, prompt: "Tìm theo mã (symbol), tag hoặc ghi chú...")
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Menu {
+                        Button("Tất cả tài khoản") {
+                            dataStore.selectedAccountId = "all"
+                        }
+                        ForEach(dataStore.accounts) { acc in
+                            Button(acc.name.isEmpty ? acc.id : acc.name) {
+                                dataStore.selectedAccountId = acc.id
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "person.crop.circle")
+                            Text(dataStore.selectedAccountId == "all" ? "Tất cả" : (dataStore.selectedAccount?.name ?? "Tài khoản"))
+                                .font(AppTypography.caption)
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 10))
+                        }
+                        .foregroundColor(AppColors.primaryText)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(AppColors.secondaryBackground)
+                        .cornerRadius(6)
+                    }
+                }
+                
                 ToolbarItem(placement: .primaryAction) {
-                    Button(action: { showAddTradeSheet = true }) {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.system(size: 20))
-                            .foregroundColor(AppColors.accent)
+                    HStack(spacing: 12) {
+                        Button {
+                            Task { await dataStore.syncWithSupabase() }
+                        } label: {
+                            Image(systemName: dataStore.isSyncing ? "arrow.triangle.2.circlepath.circle.fill" : "arrow.triangle.2.circlepath")
+                        }
+                        
+                        Button(action: { showAddTradeSheet = true }) {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.system(size: 20))
+                                .foregroundColor(AppColors.accent)
+                        }
                     }
                 }
             }

@@ -100,6 +100,49 @@ public struct DashboardView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 16) {
+                    if let summary = dataStore.lastSyncSummary {
+                        HStack {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(AppColors.profit)
+                            Text(summary)
+                                .font(AppTypography.caption)
+                            Spacer()
+                            Button {
+                                dataStore.lastSyncSummary = nil
+                            } label: {
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 10))
+                                    .foregroundColor(AppColors.secondaryText)
+                            }
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(AppColors.profit.opacity(0.12))
+                        .cornerRadius(8)
+                    }
+                    
+                    if let err = dataStore.lastSyncError {
+                        HStack {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundColor(AppColors.loss)
+                            Text(err)
+                                .font(AppTypography.caption)
+                                .lineLimit(2)
+                            Spacer()
+                            Button {
+                                dataStore.lastSyncError = nil
+                            } label: {
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 10))
+                                    .foregroundColor(AppColors.secondaryText)
+                            }
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(AppColors.loss.opacity(0.12))
+                        .cornerRadius(8)
+                    }
+                    
                     if dataStore.filteredTrades.isEmpty {
                         AppCard {
                             VStack(alignment: .leading, spacing: 12) {
@@ -379,16 +422,50 @@ public struct DashboardView: View {
             .background(AppColors.background)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button(action: { showAIReflection = true }) {
-                        Image(systemName: "sparkles")
-                            .foregroundColor(AppColors.accent)
+                    HStack(spacing: 8) {
+                        Menu {
+                            Button("Tất cả tài khoản") {
+                                dataStore.selectedAccountId = "all"
+                            }
+                            ForEach(dataStore.accounts) { acc in
+                                Button(acc.name.isEmpty ? acc.id : acc.name) {
+                                    dataStore.selectedAccountId = acc.id
+                                }
+                            }
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "person.crop.circle")
+                                Text(dataStore.selectedAccountId == "all" ? "Tất cả" : (dataStore.selectedAccount?.name ?? "Tài khoản"))
+                                    .font(AppTypography.caption)
+                                Image(systemName: "chevron.down")
+                                    .font(.system(size: 10))
+                            }
+                            .foregroundColor(AppColors.primaryText)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(AppColors.secondaryBackground)
+                            .cornerRadius(6)
+                        }
+                        
+                        Button(action: { showAIReflection = true }) {
+                            Image(systemName: "sparkles")
+                                .foregroundColor(AppColors.accent)
+                        }
                     }
                 }
                 ToolbarItem(placement: .primaryAction) {
-                    Button(action: { showAddTradeSheet = true }) {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.title3)
-                            .foregroundColor(AppColors.accent)
+                    HStack(spacing: 12) {
+                        Button {
+                            Task { await dataStore.syncWithSupabase() }
+                        } label: {
+                            Image(systemName: dataStore.isSyncing ? "arrow.triangle.2.circlepath.circle.fill" : "arrow.triangle.2.circlepath")
+                        }
+                        
+                        Button(action: { showAddTradeSheet = true }) {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.title3)
+                                .foregroundColor(AppColors.accent)
+                        }
                     }
                 }
             }
