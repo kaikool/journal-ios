@@ -143,7 +143,7 @@ public final class SupabaseService {
                 if let d = FlexibleDateParser.parse(dateStr) {
                     return d
                 }
-                throw DecodingError.dataCorruptedError(in: container, debugDescription: "Invalid date string: \(dateStr)")
+                return Date()
             }
             if let timestamp = try? container.decode(Double.self) {
                 if timestamp > 1_000_000_000_000 {
@@ -151,7 +151,7 @@ public final class SupabaseService {
                 }
                 return Date(timeIntervalSince1970: timestamp)
             }
-            throw DecodingError.dataCorruptedError(in: container, debugDescription: "Cannot decode date")
+            return Date()
         }
         return decoder
     }
@@ -161,6 +161,43 @@ public final class SupabaseService {
         encoder.keyEncodingStrategy = .convertToSnakeCase
         encoder.dateEncodingStrategy = .iso8601
         return encoder
+    }
+    
+    /// Giải mã mảng dữ liệu PostgREST với khả năng phục hồi lỗi tối đa (Permissive Decoder)
+    /// Đảm bảo không bao giờ ném DecodingError.keyNotFound hoặc valueNotFound làm sập luồng đồng bộ.
+    public func decodeArray<T: Decodable>(_ type: T.Type, from data: Data) -> [T] {
+        if data.isEmpty { return [] }
+        if let str = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+           str == "null" || str == "[]" || str.isEmpty {
+            return []
+        }
+        
+        // Fast path: Thử parse toàn bộ mảng
+        if let decoded = try? jsonDecoder.decode([T].self, from: data) {
+            return decoded
+        }
+        
+        // Nếu PostgREST trả về 1 object đơn lẻ thay vì mảng
+        if let singleItem = try? jsonDecoder.decode(T.self, from: data) {
+            return [singleItem]
+        }
+        
+        // Lossy path: Parse từng bản ghi độc lập để 1 dòng lỗi không vứt bỏ toàn bộ hàng trăm bản ghi khác
+        guard let jsonArray = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
+            return []
+        }
+        
+        var results: [T] = []
+        for itemDict in jsonArray {
+            do {
+                let itemData = try JSONSerialization.data(withJSONObject: itemDict)
+                let item = try jsonDecoder.decode(T.self, from: itemData)
+                results.append(item)
+            } catch {
+                AppLogger.warn("SupabaseService: Bỏ qua 1 dòng không hợp lệ của \(T.self): \(error.localizedDescription)")
+            }
+        }
+        return results
     }
     
     // MARK: - Chẩn Đoán Kết Nối Chính Xác (Accurate Connection Diagnostics)
@@ -441,32 +478,74 @@ public final class SupabaseService {
             "program" text NOT NULL,
             "status" text NOT NULL,
             "currency" text NOT NULL,
-            "size_minor" bigint NOT NULL,
+            "size_minor" bigint,
+            "parent_id" text,
+            "journal_account_id" text,
             "opened_on" text NOT NULL,
+            "closed_on" text,
+            "renewal_on" text,
+            "renewal_minor" bigint,
             "notes" text DEFAULT '' NOT NULL,
-            "archived" boolean DEFAULT false NOT NULL
+            "archived" boolean DEFAULT false NOT NULL,
+            "revision" integer DEFAULT 1 NOT NULL,
+            "created_at" text,
+            "updated_at" text
         );
 
         CREATE TABLE IF NOT EXISTS "prop_entries" (
             "id" text PRIMARY KEY NOT NULL,
-            "firm" text NOT NULL,
             "account_id" text,
+            "firm" text NOT NULL,
             "kind" text NOT NULL,
-            "amount_minor" bigint NOT NULL,
+            "category" text DEFAULT '' NOT NULL,
             "currency" text NOT NULL,
-            "incurred_on" text NOT NULL,
+            "amount_minor" bigint NOT NULL,
+            "split_bps" integer DEFAULT 8000 NOT NULL,
+            "fee_minor" bigint DEFAULT 0 NOT NULL,
+            "occurred_on" text NOT NULL,
+            "due_on" text,
+            "status" text DEFAULT 'completed' NOT NULL,
+            "parent_id" text,
+            "reference" text DEFAULT '' NOT NULL,
             "notes" text DEFAULT '' NOT NULL,
-            "receipt_id" text
+            "voided" boolean DEFAULT false NOT NULL,
+            "revision" integer DEFAULT 1 NOT NULL,
+            "created_at" text,
+            "updated_at" text
         );
 
         CREATE TABLE IF NOT EXISTS "prop_receipts" (
             "id" text PRIMARY KEY NOT NULL,
-            "firm" text NOT NULL,
-            "account_id" text,
-            "net_amount_minor" bigint NOT NULL,
-            "currency" text NOT NULL,
-            "received_on" text NOT NULL,
-            "notes" text DEFAULT '' NOT NULL
+            "payout_id" text DEFAULT '' NOT NULL,
+            "kind" text DEFAULT 'payout' NOT NULL,
+            "amount_minor" bigint DEFAULT 0 NOT NULL,
+            "occurred_on" text NOT NULL,
+            "reference" text DEFAULT '' NOT NULL,
+            "notes" text DEFAULT '' NOT NULL,
+            "voided" boolean DEFAULT false NOT NULL,
+            "created_at" text
+        );
+
+        CREATE TABLE IF NOT EXISTS "prop_audit" (
+            "id" text PRIMARY KEY NOT NULL,
+            "entity_type" text NOT NULL,
+            "entity_id" text NOT NULL,
+            "before_json" text,
+            "after_json" text NOT NULL,
+            "reason" text NOT NULL,
+            "created_at" text
+        );
+
+        CREATE TABLE IF NOT EXISTS "attachments" (
+            "id" text PRIMARY KEY NOT NULL,
+            "owner_type" text NOT NULL,
+            "owner_id" text NOT NULL,
+            "name" text NOT NULL,
+            "mime" text NOT NULL,
+            "size" integer NOT NULL,
+            "storage_path" text NOT NULL,
+            "status" text DEFAULT 'ready' NOT NULL,
+            "created_at" text
         );
 
         CREATE TABLE IF NOT EXISTS "settings" (
@@ -479,6 +558,59 @@ public final class SupabaseService {
             "note" text DEFAULT '' NOT NULL,
             "updated_at" text NOT NULL
         );
+
+        -- Tự động vá bổ sung các cột nếu bảng đã được tạo trước đó
+        DO $$
+        BEGIN
+            -- accounts
+            ALTER TABLE IF EXISTS accounts ADD COLUMN IF NOT EXISTS broker text DEFAULT '' NOT NULL;
+            ALTER TABLE IF EXISTS accounts ADD COLUMN IF NOT EXISTS kind text DEFAULT 'trading' NOT NULL;
+            ALTER TABLE IF EXISTS accounts ADD COLUMN IF NOT EXISTS currency text DEFAULT 'USD' NOT NULL;
+            ALTER TABLE IF EXISTS accounts ADD COLUMN IF NOT EXISTS initial_balance double precision DEFAULT 0 NOT NULL;
+            ALTER TABLE IF EXISTS accounts ADD COLUMN IF NOT EXISTS profit_calc_method text DEFAULT 'fifo' NOT NULL;
+            ALTER TABLE IF EXISTS accounts ADD COLUMN IF NOT EXISTS auto_sync boolean DEFAULT false NOT NULL;
+            ALTER TABLE IF EXISTS accounts ADD COLUMN IF NOT EXISTS last_sync_at text;
+            ALTER TABLE IF EXISTS accounts ADD COLUMN IF NOT EXISTS archived_at text;
+            ALTER TABLE IF EXISTS accounts ADD COLUMN IF NOT EXISTS created_at text DEFAULT '';
+
+            -- executions
+            ALTER TABLE IF EXISTS executions ADD COLUMN IF NOT EXISTS asset_class text;
+            ALTER TABLE IF EXISTS executions ADD COLUMN IF NOT EXISTS fee double precision DEFAULT 0 NOT NULL;
+            ALTER TABLE IF EXISTS executions ADD COLUMN IF NOT EXISTS import_metadata_json text;
+
+            -- trades
+            ALTER TABLE IF EXISTS trades ADD COLUMN IF NOT EXISTS asset_class text;
+            ALTER TABLE IF EXISTS trades ADD COLUMN IF NOT EXISTS duration_ms bigint;
+            ALTER TABLE IF EXISTS trades ADD COLUMN IF NOT EXISTS notes text;
+            ALTER TABLE IF EXISTS trades ADD COLUMN IF NOT EXISTS tags_json text;
+            ALTER TABLE IF EXISTS trades ADD COLUMN IF NOT EXISTS mistakes_json text;
+            ALTER TABLE IF EXISTS trades ADD COLUMN IF NOT EXISTS playbook_id text;
+            ALTER TABLE IF EXISTS trades ADD COLUMN IF NOT EXISTS rating integer;
+            ALTER TABLE IF EXISTS trades ADD COLUMN IF NOT EXISTS stop_loss double precision;
+            ALTER TABLE IF EXISTS trades ADD COLUMN IF NOT EXISTS profit_target double precision;
+            ALTER TABLE IF EXISTS trades ADD COLUMN IF NOT EXISTS reviewed_at text;
+
+            -- prop_entries
+            ALTER TABLE IF EXISTS prop_entries ADD COLUMN IF NOT EXISTS category text DEFAULT '' NOT NULL;
+            ALTER TABLE IF EXISTS prop_entries ADD COLUMN IF NOT EXISTS split_bps integer DEFAULT 8000 NOT NULL;
+            ALTER TABLE IF EXISTS prop_entries ADD COLUMN IF NOT EXISTS fee_minor bigint DEFAULT 0 NOT NULL;
+            ALTER TABLE IF EXISTS prop_entries ADD COLUMN IF NOT EXISTS occurred_on text DEFAULT '' NOT NULL;
+            ALTER TABLE IF EXISTS prop_entries ADD COLUMN IF NOT EXISTS due_on text;
+            ALTER TABLE IF EXISTS prop_entries ADD COLUMN IF NOT EXISTS status text DEFAULT 'completed' NOT NULL;
+            ALTER TABLE IF EXISTS prop_entries ADD COLUMN IF NOT EXISTS reference text DEFAULT '' NOT NULL;
+            ALTER TABLE IF EXISTS prop_entries ADD COLUMN IF NOT EXISTS voided boolean DEFAULT false NOT NULL;
+            ALTER TABLE IF EXISTS prop_entries ADD COLUMN IF NOT EXISTS revision integer DEFAULT 1 NOT NULL;
+            ALTER TABLE IF EXISTS prop_entries ADD COLUMN IF NOT EXISTS created_at text;
+            ALTER TABLE IF EXISTS prop_entries ADD COLUMN IF NOT EXISTS updated_at text;
+
+            -- prop_receipts
+            ALTER TABLE IF EXISTS prop_receipts ADD COLUMN IF NOT EXISTS payout_id text DEFAULT '' NOT NULL;
+            ALTER TABLE IF EXISTS prop_receipts ADD COLUMN IF NOT EXISTS kind text DEFAULT 'payout' NOT NULL;
+            ALTER TABLE IF EXISTS prop_receipts ADD COLUMN IF NOT EXISTS amount_minor bigint DEFAULT 0 NOT NULL;
+            ALTER TABLE IF EXISTS prop_receipts ADD COLUMN IF NOT EXISTS occurred_on text DEFAULT '' NOT NULL;
+            ALTER TABLE IF EXISTS prop_receipts ADD COLUMN IF NOT EXISTS reference text DEFAULT '' NOT NULL;
+            ALTER TABLE IF EXISTS prop_receipts ADD COLUMN IF NOT EXISTS voided boolean DEFAULT false NOT NULL;
+        END $$;
 
         -- Gỡ bỏ các chính sách RLS hạn chế cũ nếu có (từ schema user_id)
         DROP POLICY IF EXISTS "Users can only manage own accounts" ON accounts;
@@ -500,6 +632,8 @@ public final class SupabaseService {
         ALTER TABLE prop_accounts ENABLE ROW LEVEL SECURITY;
         ALTER TABLE prop_entries ENABLE ROW LEVEL SECURITY;
         ALTER TABLE prop_receipts ENABLE ROW LEVEL SECURITY;
+        ALTER TABLE prop_audit ENABLE ROW LEVEL SECURITY;
+        ALTER TABLE attachments ENABLE ROW LEVEL SECURITY;
         ALTER TABLE settings ENABLE ROW LEVEL SECURITY;
         ALTER TABLE journal_days ENABLE ROW LEVEL SECURITY;
 
@@ -521,6 +655,10 @@ public final class SupabaseService {
         CREATE POLICY "Allow All For Anon" ON prop_entries FOR ALL USING (true) WITH CHECK (true);
         DROP POLICY IF EXISTS "Allow All For Anon" ON prop_receipts;
         CREATE POLICY "Allow All For Anon" ON prop_receipts FOR ALL USING (true) WITH CHECK (true);
+        DROP POLICY IF EXISTS "Allow All For Anon" ON prop_audit;
+        CREATE POLICY "Allow All For Anon" ON prop_audit FOR ALL USING (true) WITH CHECK (true);
+        DROP POLICY IF EXISTS "Allow All For Anon" ON attachments;
+        CREATE POLICY "Allow All For Anon" ON attachments FOR ALL USING (true) WITH CHECK (true);
         DROP POLICY IF EXISTS "Allow All For Anon" ON settings;
         CREATE POLICY "Allow All For Anon" ON settings FOR ALL USING (true) WITH CHECK (true);
         DROP POLICY IF EXISTS "Allow All For Anon" ON journal_days;
@@ -539,7 +677,7 @@ public final class SupabaseService {
         let request = try makeRequest(endpoint: endpoint)
         let (data, response) = try await session.data(for: request)
         try validateResponse(response, data: data, endpoint: endpoint)
-        let records = try jsonDecoder.decode([SupabaseAccountRecord].self, from: data)
+        let records = decodeArray(SupabaseAccountRecord.self, from: data)
         return records.map { $0.toAccount() }
     }
     
@@ -564,7 +702,7 @@ public final class SupabaseService {
         let request = try makeRequest(endpoint: endpoint)
         let (data, response) = try await session.data(for: request)
         try validateResponse(response, data: data, endpoint: endpoint)
-        let records = try jsonDecoder.decode([SupabaseExecutionRecord].self, from: data)
+        let records = decodeArray(SupabaseExecutionRecord.self, from: data)
         return records.map { $0.toExecution() }
     }
     
@@ -589,7 +727,7 @@ public final class SupabaseService {
         let request = try makeRequest(endpoint: endpoint)
         let (data, response) = try await session.data(for: request)
         try validateResponse(response, data: data, endpoint: endpoint)
-        let records = try jsonDecoder.decode([SupabaseTradeRecord].self, from: data)
+        let records = decodeArray(SupabaseTradeRecord.self, from: data)
         return records.map { $0.toTrade() }
     }
 
@@ -609,7 +747,7 @@ public final class SupabaseService {
         let request = try makeRequest(endpoint: endpoint)
         let (data, response) = try await session.data(for: request)
         try validateResponse(response, data: data, endpoint: endpoint)
-        let records = try jsonDecoder.decode([SupabasePlaybookRecord].self, from: data)
+        let records = decodeArray(SupabasePlaybookRecord.self, from: data)
         return records.map { $0.toPlaybook() }
     }
 
@@ -629,7 +767,7 @@ public final class SupabaseService {
         let request = try makeRequest(endpoint: endpoint)
         let (data, response) = try await session.data(for: request)
         try validateResponse(response, data: data, endpoint: endpoint)
-        return try jsonDecoder.decode([JournalSettingRecord].self, from: data)
+        return decodeArray(JournalSettingRecord.self, from: data)
     }
     
     public func upsertSettings(_ items: [JournalSettingRecord]) async throws {
@@ -649,7 +787,7 @@ public final class SupabaseService {
         let request = try makeRequest(endpoint: endpoint)
         let (data, response) = try await session.data(for: request)
         try validateResponse(response, data: data, endpoint: endpoint)
-        let records = try jsonDecoder.decode([SupabasePropAccountRecord].self, from: data)
+        let records = decodeArray(SupabasePropAccountRecord.self, from: data)
         return records.map { $0.toItem() }
     }
     
@@ -669,7 +807,7 @@ public final class SupabaseService {
         let request = try makeRequest(endpoint: endpoint)
         let (data, response) = try await session.data(for: request)
         try validateResponse(response, data: data, endpoint: endpoint)
-        let records = try jsonDecoder.decode([SupabasePropEntryRecord].self, from: data)
+        let records = decodeArray(SupabasePropEntryRecord.self, from: data)
         return records.map { $0.toItem() }
     }
     
@@ -689,7 +827,7 @@ public final class SupabaseService {
         let request = try makeRequest(endpoint: endpoint)
         let (data, response) = try await session.data(for: request)
         try validateResponse(response, data: data, endpoint: endpoint)
-        let records = try jsonDecoder.decode([SupabasePropReceiptRecord].self, from: data)
+        let records = decodeArray(SupabasePropReceiptRecord.self, from: data)
         return records.map { $0.toItem() }
     }
     
@@ -709,7 +847,7 @@ public final class SupabaseService {
         let request = try makeRequest(endpoint: endpoint)
         let (data, response) = try await session.data(for: request)
         try validateResponse(response, data: data, endpoint: endpoint)
-        let records = try jsonDecoder.decode([SupabasePropAuditRecord].self, from: data)
+        let records = decodeArray(SupabasePropAuditRecord.self, from: data)
         return records.map { $0.toItem() }
     }
     
@@ -731,7 +869,7 @@ public final class SupabaseService {
         let request = try makeRequest(endpoint: endpoint)
         let (data, response) = try await session.data(for: request)
         try validateResponse(response, data: data, endpoint: endpoint)
-        let records = try jsonDecoder.decode([SupabaseAttachmentRecord].self, from: data)
+        let records = decodeArray(SupabaseAttachmentRecord.self, from: data)
         return records.map { $0.toAttachment() }
     }
     
@@ -867,13 +1005,13 @@ public struct SupabaseTradeRecord: Codable {
     
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        self.key = try c.decode(String.self, forKey: .key)
-        self.accountId = try c.decode(String.self, forKey: .accountId)
-        self.symbol = try c.decode(String.self, forKey: .symbol)
+        self.key = (try? c.decode(String.self, forKey: .key)) ?? UUID().uuidString
+        self.accountId = (try? c.decode(String.self, forKey: .accountId)) ?? ""
+        self.symbol = (try? c.decode(String.self, forKey: .symbol)) ?? "UNKNOWN"
         self.assetClass = try? c.decode(String.self, forKey: .assetClass)
-        self.direction = try c.decode(String.self, forKey: .direction)
-        self.status = try c.decode(String.self, forKey: .status)
-        self.openedAt = try c.decode(String.self, forKey: .openedAt)
+        self.direction = (try? c.decode(String.self, forKey: .direction)) ?? "long"
+        self.status = (try? c.decode(String.self, forKey: .status)) ?? "open"
+        self.openedAt = (try? c.decode(String.self, forKey: .openedAt)) ?? JournalIds.nowIso()
         self.closedAt = try? c.decode(String.self, forKey: .closedAt)
         self.quantity = (try? c.decode(Double.self, forKey: .quantity)) ?? 0
         self.openQuantity = (try? c.decode(Double.self, forKey: .openQuantity)) ?? 0
@@ -1012,6 +1150,23 @@ public struct SupabaseExecutionRecord: Codable {
         self.createdAt = fmt.string(from: execution.executedAt)
     }
     
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = (try? c.decode(String.self, forKey: .id)) ?? UUID().uuidString
+        self.accountId = (try? c.decode(String.self, forKey: .accountId)) ?? ""
+        self.symbol = (try? c.decode(String.self, forKey: .symbol)) ?? "UNKNOWN"
+        self.side = (try? c.decode(String.self, forKey: .side)) ?? "buy"
+        self.quantity = (try? c.decode(Double.self, forKey: .quantity)) ?? 0
+        self.price = (try? c.decode(Double.self, forKey: .price)) ?? 0
+        self.fee = (try? c.decode(Double.self, forKey: .fee)) ?? 0
+        self.executedAt = (try? c.decode(String.self, forKey: .executedAt)) ?? JournalIds.nowIso()
+        self.assetClass = try? c.decode(String.self, forKey: .assetClass)
+        self.source = (try? c.decode(String.self, forKey: .source)) ?? "manual"
+        self.importMetadataJson = try? c.decode(String.self, forKey: .importMetadataJson)
+        self.contentHash = (try? c.decode(String.self, forKey: .contentHash)) ?? UUID().uuidString
+        self.createdAt = (try? c.decode(String.self, forKey: .createdAt)) ?? JournalIds.nowIso()
+    }
+    
     public func toExecution() -> Execution {
         let parsedDate = FlexibleDateParser.parse(executedAt) ?? Date()
         return Execution(
@@ -1051,6 +1206,21 @@ public struct SupabasePlaybookRecord: Codable {
         self.description = playbook.description
         self.rulesJson = (try? String(data: JSONEncoder().encode(playbook.rules), encoding: .utf8)) ?? "[]"
         self.createdAt = fmt.string(from: playbook.createdAt)
+    }
+    
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = (try? c.decode(String.self, forKey: .id)) ?? UUID().uuidString
+        self.name = (try? c.decode(String.self, forKey: .name)) ?? "Playbook"
+        self.description = (try? c.decode(String.self, forKey: .description)) ?? ""
+        if let str = try? c.decode(String.self, forKey: .rulesJson) {
+            self.rulesJson = str
+        } else if let arr = try? c.decode([String].self, forKey: .rulesJson) {
+            self.rulesJson = (try? String(data: JSONEncoder().encode(arr), encoding: .utf8)) ?? "[]"
+        } else {
+            self.rulesJson = "[]"
+        }
+        self.createdAt = (try? c.decode(String.self, forKey: .createdAt)) ?? JournalIds.nowIso()
     }
     
     public func toPlaybook() -> Playbook {
@@ -1101,6 +1271,21 @@ public struct SupabaseAccountRecord: Codable {
         self.lastSyncAt = account.lastSyncAt.map { fmt.string(from: $0) }
         self.archivedAt = account.archivedAt.map { fmt.string(from: $0) }
         self.createdAt = fmt.string(from: account.createdAt)
+    }
+    
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = (try? c.decode(String.self, forKey: .id)) ?? UUID().uuidString
+        self.name = (try? c.decode(String.self, forKey: .name)) ?? "Account"
+        self.broker = (try? c.decode(String.self, forKey: .broker)) ?? ""
+        self.kind = (try? c.decode(String.self, forKey: .kind)) ?? "trading"
+        self.currency = (try? c.decode(String.self, forKey: .currency)) ?? "USD"
+        self.initialBalance = (try? c.decode(Double.self, forKey: .initialBalance)) ?? 0
+        self.profitCalcMethod = (try? c.decode(String.self, forKey: .profitCalcMethod)) ?? "fifo"
+        self.autoSync = (try? c.decode(Bool.self, forKey: .autoSync)) ?? false
+        self.lastSyncAt = try? c.decode(String.self, forKey: .lastSyncAt)
+        self.archivedAt = try? c.decode(String.self, forKey: .archivedAt)
+        self.createdAt = (try? c.decode(String.self, forKey: .createdAt)) ?? JournalIds.nowIso()
     }
     
     public func toAccount() -> Account {
@@ -1178,6 +1363,28 @@ public struct SupabasePropAccountRecord: Codable {
         self.updatedAt = item.updatedAt
     }
     
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = (try? c.decode(String.self, forKey: .id)) ?? UUID().uuidString
+        self.firm = (try? c.decode(String.self, forKey: .firm)) ?? "The5ers"
+        self.name = (try? c.decode(String.self, forKey: .name)) ?? "Prop Account"
+        self.program = (try? c.decode(String.self, forKey: .program)) ?? "evaluation"
+        self.status = (try? c.decode(String.self, forKey: .status)) ?? "active"
+        self.currency = (try? c.decode(String.self, forKey: .currency)) ?? "USD"
+        self.sizeMinor = try? c.decode(Int64.self, forKey: .sizeMinor)
+        self.parentId = try? c.decode(String.self, forKey: .parentId)
+        self.journalAccountId = try? c.decode(String.self, forKey: .journalAccountId)
+        self.openedOn = (try? c.decode(String.self, forKey: .openedOn)) ?? JournalIds.nowIso()
+        self.closedOn = try? c.decode(String.self, forKey: .closedOn)
+        self.renewalOn = try? c.decode(String.self, forKey: .renewalOn)
+        self.renewalMinor = try? c.decode(Int64.self, forKey: .renewalMinor)
+        self.notes = (try? c.decode(String.self, forKey: .notes)) ?? ""
+        self.archived = (try? c.decode(Bool.self, forKey: .archived)) ?? false
+        self.revision = (try? c.decode(Int.self, forKey: .revision)) ?? 1
+        self.createdAt = try? c.decode(String.self, forKey: .createdAt)
+        self.updatedAt = try? c.decode(String.self, forKey: .updatedAt)
+    }
+    
     public func toItem() -> PropAccountItem {
         return PropAccountItem(
             id: id,
@@ -1230,6 +1437,7 @@ public struct SupabasePropEntryRecord: Codable {
         case splitBps = "split_bps"
         case feeMinor = "fee_minor"
         case occurredOn = "occurred_on"
+        case incurredOn = "incurred_on"
         case dueOn = "due_on"
         case status
         case parentId = "parent_id"
@@ -1257,6 +1465,30 @@ public struct SupabasePropEntryRecord: Codable {
         self.revision = item.revision
         self.createdAt = item.createdAt
         self.updatedAt = item.updatedAt
+    }
+    
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = (try? c.decode(String.self, forKey: .id)) ?? UUID().uuidString
+        self.accountId = try? c.decode(String.self, forKey: .accountId)
+        self.firm = (try? c.decode(String.self, forKey: .firm)) ?? "The5ers"
+        self.kind = (try? c.decode(String.self, forKey: .kind)) ?? "fee"
+        self.category = (try? c.decode(String.self, forKey: .category)) ?? "eval_fee"
+        self.currency = (try? c.decode(String.self, forKey: .currency)) ?? "USD"
+        self.amountMinor = (try? c.decode(Int64.self, forKey: .amountMinor)) ?? 0
+        self.splitBps = (try? c.decode(Int.self, forKey: .splitBps)) ?? 8000
+        self.feeMinor = (try? c.decode(Int64.self, forKey: .feeMinor)) ?? 0
+        let occ = (try? c.decode(String.self, forKey: .occurredOn)) ?? (try? c.decode(String.self, forKey: .incurredOn))
+        self.occurredOn = occ ?? JournalIds.nowIso()
+        self.dueOn = try? c.decode(String.self, forKey: .dueOn)
+        self.status = (try? c.decode(String.self, forKey: .status)) ?? "completed"
+        self.parentId = try? c.decode(String.self, forKey: .parentId)
+        self.reference = (try? c.decode(String.self, forKey: .reference)) ?? ""
+        self.notes = (try? c.decode(String.self, forKey: .notes)) ?? ""
+        self.voided = (try? c.decode(Bool.self, forKey: .voided)) ?? false
+        self.revision = (try? c.decode(Int.self, forKey: .revision)) ?? 1
+        self.createdAt = try? c.decode(String.self, forKey: .createdAt)
+        self.updatedAt = try? c.decode(String.self, forKey: .updatedAt)
     }
     
     public func toItem() -> PropEntryItem {
@@ -1298,8 +1530,11 @@ public struct SupabasePropReceiptRecord: Codable {
     private enum CodingKeys: String, CodingKey {
         case id, kind, reference, notes, voided
         case payoutId = "payout_id"
+        case accountId = "account_id"
         case amountMinor = "amount_minor"
+        case netAmountMinor = "net_amount_minor"
         case occurredOn = "occurred_on"
+        case receivedOn = "received_on"
         case createdAt = "created_at"
     }
     
@@ -1313,6 +1548,20 @@ public struct SupabasePropReceiptRecord: Codable {
         self.notes = item.notes
         self.voided = item.voided
         self.createdAt = item.createdAt
+    }
+    
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = (try? c.decode(String.self, forKey: .id)) ?? UUID().uuidString
+        self.payoutId = (try? c.decode(String.self, forKey: .payoutId)) ?? (try? c.decode(String.self, forKey: .accountId)) ?? ""
+        self.kind = (try? c.decode(String.self, forKey: .kind)) ?? "payout"
+        self.amountMinor = (try? c.decode(Int64.self, forKey: .amountMinor)) ?? (try? c.decode(Int64.self, forKey: .netAmountMinor)) ?? 0
+        let occ = (try? c.decode(String.self, forKey: .occurredOn)) ?? (try? c.decode(String.self, forKey: .receivedOn))
+        self.occurredOn = occ ?? JournalIds.nowIso()
+        self.reference = (try? c.decode(String.self, forKey: .reference)) ?? ""
+        self.notes = (try? c.decode(String.self, forKey: .notes)) ?? ""
+        self.voided = (try? c.decode(Bool.self, forKey: .voided)) ?? false
+        self.createdAt = try? c.decode(String.self, forKey: .createdAt)
     }
     
     public func toItem() -> PropReceiptItem {
@@ -1358,6 +1607,17 @@ public struct SupabasePropAuditRecord: Codable {
         self.createdAt = item.createdAt
     }
     
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = (try? c.decode(String.self, forKey: .id)) ?? UUID().uuidString
+        self.entityType = (try? c.decode(String.self, forKey: .entityType)) ?? "entry"
+        self.entityId = (try? c.decode(String.self, forKey: .entityId)) ?? ""
+        self.beforeJson = try? c.decode(String.self, forKey: .beforeJson)
+        self.afterJson = (try? c.decode(String.self, forKey: .afterJson)) ?? "{}"
+        self.reason = (try? c.decode(String.self, forKey: .reason)) ?? "sync"
+        self.createdAt = try? c.decode(String.self, forKey: .createdAt)
+    }
+    
     public func toItem() -> PropAuditItem {
         return PropAuditItem(
             id: id,
@@ -1400,6 +1660,19 @@ public struct SupabaseAttachmentRecord: Codable {
         self.storagePath = attachment.storagePath
         self.status = attachment.status
         self.createdAt = attachment.createdAt
+    }
+    
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = (try? c.decode(String.self, forKey: .id)) ?? UUID().uuidString
+        self.ownerType = (try? c.decode(String.self, forKey: .ownerType)) ?? "trade"
+        self.ownerId = (try? c.decode(String.self, forKey: .ownerId)) ?? ""
+        self.name = (try? c.decode(String.self, forKey: .name)) ?? "Attachment"
+        self.mime = (try? c.decode(String.self, forKey: .mime)) ?? "image/png"
+        self.size = (try? c.decode(Int.self, forKey: .size)) ?? 0
+        self.storagePath = (try? c.decode(String.self, forKey: .storagePath)) ?? ""
+        self.status = (try? c.decode(String.self, forKey: .status)) ?? "ready"
+        self.createdAt = try? c.decode(String.self, forKey: .createdAt)
     }
     
     public func toAttachment() -> Attachment {

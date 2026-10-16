@@ -732,12 +732,8 @@ public final class The5ersService: ObservableObject {
             // 5. Tự động kích hoạt luồng đẩy lên Supabase Cloud (Auto-Pipeline: The5ers -> Local -> Supabase)
             if SupabaseService.shared.isConfigured {
                 lastStatus = "The5ers hoàn tất (\(importedPositionsCount) lệnh). Đang tự động sao lưu lên đám mây Supabase..."
-                Task {
-                    await dataStore.syncWithSupabase()
-                    await MainActor.run {
-                        self.lastStatus = "Đã đồng bộ thành công \(accountsList.count) tài khoản (\(activeCount) đang hoạt động), \(importedPositionsCount) vị thế lệnh từ The5ers và tự động sao lưu lên Supabase."
-                    }
-                }
+                await dataStore.syncWithSupabase()
+                lastStatus = "Đã đồng bộ thành công \(accountsList.count) tài khoản (\(activeCount) đang hoạt động), \(importedPositionsCount) vị thế lệnh từ The5ers và tự động sao lưu lên Supabase."
             }
             
             return accountsList.count

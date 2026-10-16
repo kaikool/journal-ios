@@ -196,9 +196,16 @@ public final class TradeDataStore: ObservableObject {
             self.lastSyncError = nil
         }
         
+        var fetchedAccountsCount = 0
+        var fetchedTradesCount = 0
+        var fetchedExecutionsCount = 0
+        var fetchedPropCount = 0
+        var syncWarnings: [String] = []
+
+        // 1. Đồng bộ Accounts (Tải về và đẩy lên)
         do {
-            // 1. Đồng bộ danh sách tài khoản từ Supabase
             let remoteAccounts = try await SupabaseService.shared.fetchAccounts()
+            fetchedAccountsCount = remoteAccounts.count
             if !remoteAccounts.isEmpty {
                 for rAcc in remoteAccounts {
                     if let idx = accounts.firstIndex(where: { $0.id == rAcc.id }) {
@@ -216,14 +223,18 @@ public final class TradeDataStore: ObservableObject {
                 // Loại bỏ default-acc khi đã có tài khoản thực từ Supabase
                 accounts.removeAll(where: { $0.id == "default-acc" && accounts.count > 1 })
             }
-            
-            // 1b. Đẩy các tài khoản lên Supabase nếu có
             if !accounts.isEmpty {
                 try? await SupabaseService.shared.upsertAccounts(accounts)
             }
-            
-            // 2. Tải TOÀN BỘ lệnh giao dịch từ Supabase (không lọc theo selectedAccountId để không bị sót dữ liệu)
+        } catch {
+            AppLogger.error("Supabase accounts sync warning: \(error.localizedDescription)")
+            syncWarnings.append("Tài khoản: \(error.localizedDescription)")
+        }
+
+        // 2. Tải TOÀN BỘ lệnh giao dịch từ Supabase
+        do {
             let remoteTrades = try await SupabaseService.shared.fetchTrades(accountId: nil)
+            fetchedTradesCount = remoteTrades.count
             for rTrade in remoteTrades {
                 if let idx = trades.firstIndex(where: { $0.key == rTrade.key }) {
                     trades[idx] = rTrade
@@ -235,14 +246,22 @@ public final class TradeDataStore: ObservableObject {
                     accounts.append(Account(id: rTrade.accountId, name: "Tài khoản \(rTrade.accountId)", kind: .sync))
                 }
             }
-            
             // Tự động chuyển selectedAccountId sang tài khoản có lệnh giao dịch nếu tài khoản hiện tại rỗng
             if filteredTrades.isEmpty, let firstTrade = trades.first {
                 selectedAccountId = firstTrade.accountId
             }
-            
-            // 2b. Tải TOÀN BỘ executions từ Supabase
+            if !trades.isEmpty {
+                try? await SupabaseService.shared.upsertTrades(trades)
+            }
+        } catch {
+            AppLogger.error("Supabase trades sync warning: \(error.localizedDescription)")
+            syncWarnings.append("Lệnh giao dịch: \(error.localizedDescription)")
+        }
+
+        // 2b. Tải TOÀN BỘ executions từ Supabase
+        do {
             let remoteExecutions = try await SupabaseService.shared.fetchExecutions(accountId: nil)
+            fetchedExecutionsCount = remoteExecutions.count
             if !remoteExecutions.isEmpty {
                 let uniqueNew = remoteExecutions.filter { !executionHashes.contains($0.contentHash) }
                 for fill in uniqueNew {
@@ -250,19 +269,16 @@ public final class TradeDataStore: ObservableObject {
                     executions.append(fill)
                 }
             }
-            
-            // 2c. Đẩy các execution mới phát sinh từ local lên Supabase nếu có
-            let localFills = executions
-            if !localFills.isEmpty {
-                try? await SupabaseService.shared.upsertExecutions(localFills)
+            if !executions.isEmpty {
+                try? await SupabaseService.shared.upsertExecutions(executions)
             }
-            
-            // 3. Đẩy các trade local lên Supabase nếu có
-            if !trades.isEmpty {
-                try? await SupabaseService.shared.upsertTrades(trades)
-            }
-            
-            // 3b. Đồng bộ Playbooks (CHỈ tải về, không cố đẩy mock data gây vi phạm RLS)
+        } catch {
+            AppLogger.error("Supabase executions sync warning: \(error.localizedDescription)")
+            syncWarnings.append("Khớp lệnh (Executions): \(error.localizedDescription)")
+        }
+
+        // 3. Đồng bộ Playbooks
+        do {
             let remotePlaybooks = try await SupabaseService.shared.fetchPlaybooks()
             for rPb in remotePlaybooks {
                 if let idx = playbooks.firstIndex(where: { $0.id == rPb.id }) {
@@ -271,17 +287,20 @@ public final class TradeDataStore: ObservableObject {
                     playbooks.append(rPb)
                 }
             }
-            // Chỉ đẩy lên Supabase nếu là playbook do người dùng chủ động tạo (khác danh sách remote)
             let localUserPlaybooks = playbooks.filter { pb in
                 !remotePlaybooks.contains(where: { $0.id == pb.id })
             }
             if !localUserPlaybooks.isEmpty {
                 try? await SupabaseService.shared.upsertPlaybooks(localUserPlaybooks)
             }
-            
-            // 4. Đồng bộ Quỹ (Prop Firm Subsystem 2-way Sync)
-            // 4a. Prop Accounts Sync
+        } catch {
+            AppLogger.warn("Supabase playbooks sync warning: \(error.localizedDescription)")
+        }
+
+        // 4. Đồng bộ Quỹ (Prop Firm Subsystem)
+        do {
             let remotePropAccounts = try await SupabaseService.shared.fetchPropAccounts()
+            fetchedPropCount = remotePropAccounts.count
             for rAcc in remotePropAccounts {
                 if let idx = propAccounts.firstIndex(where: { $0.id == rAcc.id }) {
                     if rAcc.revision >= propAccounts[idx].revision {
@@ -292,10 +311,13 @@ public final class TradeDataStore: ObservableObject {
                 }
             }
             if !propAccounts.isEmpty {
-                try await SupabaseService.shared.upsertPropAccounts(propAccounts)
+                try? await SupabaseService.shared.upsertPropAccounts(propAccounts)
             }
-            
-            // 4b. Prop Entries Sync
+        } catch {
+            AppLogger.warn("Supabase prop accounts warning: \(error.localizedDescription)")
+        }
+
+        do {
             let remotePropEntries = try await SupabaseService.shared.fetchPropEntries()
             for rEntry in remotePropEntries {
                 if let idx = propEntries.firstIndex(where: { $0.id == rEntry.id }) {
@@ -307,10 +329,13 @@ public final class TradeDataStore: ObservableObject {
                 }
             }
             if !propEntries.isEmpty {
-                try await SupabaseService.shared.upsertPropEntries(propEntries)
+                try? await SupabaseService.shared.upsertPropEntries(propEntries)
             }
-            
-            // 4c. Prop Receipts Sync
+        } catch {
+            AppLogger.warn("Supabase prop entries warning: \(error.localizedDescription)")
+        }
+
+        do {
             let remotePropReceipts = try await SupabaseService.shared.fetchPropReceipts()
             for rRcpt in remotePropReceipts {
                 if let idx = propReceipts.firstIndex(where: { $0.id == rRcpt.id }) {
@@ -320,10 +345,13 @@ public final class TradeDataStore: ObservableObject {
                 }
             }
             if !propReceipts.isEmpty {
-                try await SupabaseService.shared.upsertPropReceipts(propReceipts)
+                try? await SupabaseService.shared.upsertPropReceipts(propReceipts)
             }
-            
-            // 4d. Prop Audits Sync
+        } catch {
+            AppLogger.warn("Supabase prop receipts warning: \(error.localizedDescription)")
+        }
+
+        do {
             let remotePropAudits = try await SupabaseService.shared.fetchPropAudits()
             for rAudit in remotePropAudits {
                 if !propAudits.contains(where: { $0.id == rAudit.id }) {
@@ -331,36 +359,44 @@ public final class TradeDataStore: ObservableObject {
                 }
             }
             if !propAudits.isEmpty {
-                try await SupabaseService.shared.upsertPropAudits(propAudits)
+                try? await SupabaseService.shared.upsertPropAudits(propAudits)
             }
-            
-            // 5. Đồng bộ Tệp đính kèm (Attachments Sync)
+        } catch {
+            AppLogger.warn("Supabase prop audits warning: \(error.localizedDescription)")
+        }
+
+        // 5. Đồng bộ Tệp đính kèm (Attachments Sync)
+        do {
             let remoteAttachments = try await SupabaseService.shared.fetchAttachments()
             for rAtt in remoteAttachments {
                 if !attachments.contains(where: { $0.id == rAtt.id }) {
                     attachments.append(rAtt)
                 }
             }
-            saveToDisk()
-            let totalRemoteFetched = remoteAccounts.count + remoteTrades.count + remoteExecutions.count + remotePropAccounts.count
-            await MainActor.run {
-                if totalRemoteFetched > 0 {
-                    self.lastSyncSummary = "Đồng bộ Supabase thành công: Tải về \(remoteAccounts.count) tài khoản, \(remoteTrades.count) lệnh, \(remoteExecutions.count) executions, \(remotePropAccounts.count) quỹ."
-                } else {
-                    self.lastSyncSummary = "Kết nối Supabase thành công nhưng trả về 0 bản ghi. Nếu trên Supabase đã có dữ liệu, hãy: (1) Nhập key 'service_role' (Secret key) thay cho 'anon' key; hoặc (2) Dán SQL mở quyền RLS vào Supabase SQL Editor."
-                }
-            }
-            AppLogger.info("Supabase sync (Trades: \(remoteTrades.count), Accounts: \(remoteAccounts.count)) completed successfully.")
         } catch {
-            await MainActor.run {
-                self.lastSyncError = error.localizedDescription
-            }
-            AppLogger.error("Supabase sync failed: \(error.localizedDescription)")
+            AppLogger.warn("Supabase attachments warning: \(error.localizedDescription)")
         }
-        
+
+        saveToDisk()
+
+        let totalRecords = fetchedAccountsCount + fetchedTradesCount + fetchedExecutionsCount + fetchedPropCount
         await MainActor.run {
+            if totalRecords > 0 {
+                var summary = "Đồng bộ Supabase thành công: Tải về \(fetchedAccountsCount) tài khoản, \(fetchedTradesCount) lệnh, \(fetchedExecutionsCount) executions, \(fetchedPropCount) quỹ."
+                if !syncWarnings.isEmpty {
+                    summary += " (Cảnh báo: \(syncWarnings.joined(separator: "; ")))"
+                }
+                self.lastSyncSummary = summary
+                self.lastSyncError = nil
+            } else if !syncWarnings.isEmpty {
+                self.lastSyncError = syncWarnings.joined(separator: "\n")
+            } else {
+                self.lastSyncSummary = "Kết nối Supabase thành công. Dữ liệu local và đám mây đã đồng bộ (0 bản ghi mới)."
+                self.lastSyncError = nil
+            }
             self.isSyncing = false
         }
+        AppLogger.info("Supabase sync completed: Accounts=\(fetchedAccountsCount), Trades=\(fetchedTradesCount), Executions=\(fetchedExecutionsCount)")
     }
     
     // MARK: - The5ers MCP Synchronization
@@ -380,9 +416,6 @@ public final class TradeDataStore: ObservableObject {
             } else {
                 self.lastSyncSummary = The5ersService.shared.lastStatus
             }
-        }
-        if SupabaseService.shared.isConfigured {
-            await syncWithSupabase()
         }
         return count
     }

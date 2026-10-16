@@ -10,6 +10,16 @@ public struct JournalSettingRecord: Identifiable, Codable, Equatable, Sendable {
         self.key = key
         self.value = value
     }
+    
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.key = (try? c.decode(String.self, forKey: .key)) ?? ""
+        self.value = (try? c.decode(String.self, forKey: .value)) ?? ""
+    }
+    
+    private enum CodingKeys: String, CodingKey {
+        case key, value
+    }
 }
 
 // MARK: - 1. General Settings (TimeZones)
