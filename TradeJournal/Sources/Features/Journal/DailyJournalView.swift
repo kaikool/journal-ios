@@ -683,7 +683,7 @@ public struct DailyJournalDetailView: View {
         
         Task {
             let prompt = "Hãy tổng kết ngày giao dịch \(date) gồm \(metrics.closedTrades) lệnh, Net P&L: \(metrics.netPnl), Tỷ lệ thắng: \(metrics.winRate?.description ?? "0"). Chỉ ra 2 điểm tốt và 1 điểm cần cải thiện trong kỷ luật."
-            let recap = await AIReflectionService.shared.generateReflection(prompt: prompt, trades: dayTrades)
+            let recap = (try? await AIReflectionService.shared.requestReflection(action: .recap, prompt: prompt, metrics: metrics)) ?? "Đã ghi nhận tổng kết ngày \(date)."
             
             await MainActor.run {
                 self.isGeneratingAiRecap = false
