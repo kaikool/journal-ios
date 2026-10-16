@@ -27,7 +27,7 @@ public struct SettingsView: View {
         NavigationStack {
             Form {
                 // Section: Active Account
-                Section(header: Text("Tài Khoản Giao Dịch")) {
+                Section("Tài Khoản Giao Dịch") {
                     if let selected = dataStore.selectedAccount {
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
@@ -59,7 +59,7 @@ public struct SettingsView: View {
                 }
                 
                 // Section: Display & Timezone
-                Section(header: Text("Tùy Chọn Hiển Thị & Múi Giờ")) {
+                Section("Tùy Chọn Hiển Thị & Múi Giờ") {
                     Toggle("Chế độ riêng tư (Ẩn số dư)", isOn: $env.isPrivacyModeEnabled)
                     
                     Picker("Đơn vị tiền tệ chính", selection: $env.currentCurrency) {
@@ -81,7 +81,7 @@ public struct SettingsView: View {
                 }
                 
                 // Section: Backup & Export
-                Section(header: Text("Sao Lưu Dữ Liệu & Xuất File")) {
+                Section("Sao Lưu Dữ Liệu & Xuất File") {
                     Button(action: { exportFullJsonBackup() }) {
                         Label("Xuất bản sao lưu JSON toàn bộ", systemImage: "square.and.arrow.up")
                     }
@@ -92,7 +92,7 @@ public struct SettingsView: View {
                 }
                 
                 // Section: Supabase & Auth
-                Section(header: Text("Hạ Tầng & Backend")) {
+                Section("Hạ Tầng & Backend") {
                     HStack {
                         Text("Trạng thái phiên")
                         Spacer()
@@ -119,7 +119,7 @@ public struct SettingsView: View {
                 }
                 
                 // Section: App Info
-                Section(header: Text("Thông Tin Ứng Dụng")) {
+                Section("Thông Tin Ứng Dụng") {
                     HStack {
                         Text("Phiên bản")
                         Spacer()
