@@ -275,6 +275,8 @@
 | **#6** | Sửa các lỗi biên dịch Xcode (`PlaybookRuleAssessment`, `TradeAnnotations`) | 16/10 18:04 | `adherence.ts`, `types.ts` | Commit `afd6dd8` | 98% |
 | **#7** | Bổ sung `String` timeZone overload cho `AggregateEngine.dayKeyOf` & CI Build `.ipa` | 16/10 18:08 | `aggregate.ts`, `analysis.ts` | Commit `e01b2c0` • CI Run `38891614192` | Đạt |
 | **#8** | Port 100% hệ thống Sổ tay (Notebook, Folders soft-delete, NoteFormatting, Journal Chronology) & Tests | 16/10 18:23 | `note-formatting.ts`, `folders/`, `notes/`, `journal/` | Commit `1df52a8` • CI Run `38893275347` (SUCCESS) | **Hoàn thành** |
+| **#9** | Sửa triệt để lỗi crash khi bấm vào Sổ tay: Bổ sung DataStore vào EnvironmentObject, bỏ NavigationSplitView lồng nhau | 16/10 18:45 | `NotebookView.swift`, `AppMain.swift`, `JournalCalendarView.swift` | Commit `0675ace` • CI Run `38895901873` (SUCCESS, 1.18 MB) | **Đạt** |
+| **#10** | Port 100% Tích hợp Quỹ (Prop Firm Cash Ledger, Lifecycle, Payouts, Reversals, Generic CSV Importer & Tests) | 16/10 19:02 | `lib/prop-firms.ts`, `server/prop-firms.ts`, `server/prop-csv.ts`, `prop-firms.test.ts` | Commit `9f69b2a` • CI Run `38897564534` (SUCCESS, 1.33 MB) | **Hoàn thành 100%** |
 
 ---
 
@@ -284,9 +286,15 @@
    - Đạt 100% quy tắc bảo toàn ghi chú khi xóa folder (tự động chuyển về `my-notes` theo `notebook-postgres.test.ts`).
    - Đạt 100% thuật toán định dạng inline Markdown giữ whitespace bên ngoài markers (`NoteFormattingEngine`).
    - Đạt 100% quy tắc dòng thời gian nhật ký kết hợp giữa ngày có giao dịch và ngày chỉ có ghi chú (`journalChronology`).
-3. **Bảo tồn dữ liệu:** Toàn bộ ghi chú, tag, lỗi, điểm rating của trader được bảo lưu 100% qua các lần tái dựng (Rebuild).
-4. **Mã nguồn sạch và độc lập:** Không chứa dữ liệu mock hardcode trong client, hoạt động hoàn toàn offline-first qua file lưu trữ cục bộ và đồng bộ tự động lên Supabase PostgreSQL khi có mạng.
-5. **CI Build & Packaging IPA:**
-   - **GitHub Actions Run:** [Run 38893275347](https://github.com/kaikool/journal-ios/actions/runs/38893275347)
-   - **Kết quả:** `success` (100% các bước biên dịch, đóng gói và tải lên artifact thành công)
-   - **Artifact:** `TradeJournal-iOS-IPA` (1.15 MB) sẵn sàng cài đặt.
+   - Khắc phục triệt để lỗi văng app, giao diện chuẩn iPhone native.
+3. **Hệ thống Tích hợp Quỹ (Prop Firm Subsystem) — 100% Hoàn chỉnh:**
+   - **Đơn vị tiền tệ chính xác tuyệt đối:** Lưu trữ toàn bộ số tiền bằng số nguyên minor units (`Int64`), hỗ trợ chuẩn ISO 4217 (0 decimals cho JPY/VND, 3 decimals cho KWD/BHD, 2 decimals cho USD/EUR/GBP), từ chối làm tròn âm thầm.
+   - **Ranh giới tiền tệ:** Tuân thủ nguyên tắc không tự ý quy đổi tỷ giá giả lập giữa các loại tiền tệ; mỗi loại tiền tệ có sổ cái tổng hợp riêng biệt.
+   - **Tính toán Payout & Thu hồi (Reversal):** Tính toán kỳ vọng lợi nhuận Trader theo tỷ lệ basis points `splitBps` trừ phí chuyển khoản; theo dõi tiến độ giải ngân (Expected, Actual, Remaining, Variance, Overdue, Partial); kiểm soát số dư không bao giờ âm khi đảo tiền.
+   - **Nhập/Xuất CSV Generic `/prop-cash-template.csv`:** Trình phân tích CSV atomic rollback khi preview, băm định danh SHA-256 `csv-hash(id)`, chống trùng lặp dữ liệu idempotency và từ chối nếu trùng ID khác dữ liệu.
+   - **Lưu trữ Offline & Sao lưu:** Tích hợp `propAccounts`, `propEntries`, `propReceipts`, `propAudits` vào `TradeDataStore` và file xuất Full Backup JSON.
+   - **Kiểm thử nghiệm thu:** Port 100% các ca kiểm thử từ `prop-firms.test.ts` vào `PropFirmTests.swift`.
+4. **CI Build & Packaging IPA:**
+   - **GitHub Actions Run:** [Run 38897564534](https://github.com/kaikool/journal-ios/actions/runs/38897564534)
+   - **Kết quả:** `success` (100% các bước biên dịch Xcode, đóng gói và tải lên artifact thành công)
+   - **Artifact:** `TradeJournal-iOS-IPA` (1.33 MB) sẵn sàng cài đặt.
