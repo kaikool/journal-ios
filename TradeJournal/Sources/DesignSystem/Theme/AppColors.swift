@@ -24,11 +24,13 @@ public enum AppColors {
     #if canImport(UIKit)
     public static let background = Color(UIColor.systemBackground)
     public static let secondaryBackground = Color(UIColor.secondarySystemBackground)
+    public static let surface = Color(UIColor.secondarySystemBackground)
     public static let cardBackground = Color(UIColor.tertiarySystemBackground)
     public static let border = Color(UIColor.separator)
     #else
     public static let background = Color(NSColor.windowBackgroundColor)
     public static let secondaryBackground = Color(NSColor.underPageBackgroundColor)
+    public static let surface = Color(NSColor.underPageBackgroundColor)
     public static let cardBackground = Color(NSColor.controlBackgroundColor)
     public static let border = Color(NSColor.separatorColor)
     #endif
