@@ -32,7 +32,19 @@ jobs:
         run: |
           echo "==> Available Xcode versions:"
           ls -d /Applications/Xcode* || true
-          sudo xcode-select -s /Applications/Xcode.app
+          if [ -d "/Applications/Xcode_16.2.app" ]; then
+            XCODE_DIR="/Applications/Xcode_16.2.app"
+          elif [ -d "/Applications/Xcode_16.1.app" ]; then
+            XCODE_DIR="/Applications/Xcode_16.1.app"
+          elif [ -d "/Applications/Xcode_16.0.app" ]; then
+            XCODE_DIR="/Applications/Xcode_16.0.app"
+          else
+            XCODE_DIR="/Applications/Xcode.app"
+          fi
+          echo "==> Activating Xcode: $XCODE_DIR"
+          sudo xcode-select -s "$XCODE_DIR/Contents/Developer"
+          echo "DEVELOPER_DIR=$XCODE_DIR/Contents/Developer" >> $GITHUB_ENV
+          export DEVELOPER_DIR="$XCODE_DIR/Contents/Developer"
           xcodebuild -version
 
       - name: Install XcodeGen
@@ -50,6 +62,7 @@ jobs:
         id: inspect_project
         run: |
           mkdir -p build
+          set -o pipefail
           echo "==> Listing targets and schemes:"
           xcodebuild -list -project TradeJournal.xcodeproj 2>&1 | tee build/list.log
 
