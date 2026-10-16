@@ -150,13 +150,14 @@ public final class The5ersService: ObservableObject {
         
         let callbackUrl = try await WebAuthHelper.shared.startSession(url: authorizeUrl, callbackScheme: callbackScheme)
         
-        // Trích xuất mã authorization code từ redirect query
-        guard let components = URLComponents(url: callbackUrl, resolvingAgainstBaseURL: false),
-              let code = components.queryItems?.first(where: { $0.name == "code" })?.value else {
-            if let err = components.queryItems?.first(where: { $0.name == "error_description" || $0.name == "error" })?.value {
-                throw NSError(domain: "The5ersOAuth", code: -1, userInfo: [NSLocalizedDescriptionKey: "The5ers Hub từ chối xác thực: \(err)"])
-            }
-            throw NSError(domain: "The5ersOAuth", code: -1, userInfo: [NSLocalizedDescriptionKey: "Không nhận được mã xác thực code từ The5ers Hub."])
+        // Trích xuất mã authorization code từ callback URL
+        guard let components = URLComponents(url: callbackUrl, resolvingAgainstBaseURL: false) else {
+            throw NSError(domain: "The5ersOAuth", code: -1, userInfo: [NSLocalizedDescriptionKey: "URL phản hồi từ The5ers Hub không hợp lệ."])
+        }
+        
+        guard let code = components.queryItems?.first(where: { $0.name == "code" })?.value else {
+            let err = components.queryItems?.first(where: { $0.name == "error_description" || $0.name == "error" })?.value ?? "Không nhận được mã xác thực code từ The5ers Hub."
+            throw NSError(domain: "The5ersOAuth", code: -1, userInfo: [NSLocalizedDescriptionKey: err])
         }
         
         // Trao đổi token bằng mã code và verifier PKCE
