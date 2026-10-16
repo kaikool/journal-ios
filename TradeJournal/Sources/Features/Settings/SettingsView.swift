@@ -228,8 +228,8 @@ public struct NewTradingAccountSheet: View {
                         let bal = Decimal(string: initialBalanceText) ?? 10000
                         let acc = Account(
                             name: name.isEmpty ? "New Account" : name,
-                            initialBalance: bal,
                             currency: currency,
+                            initialBalance: bal,
                             profitCalcMethod: calcMethod
                         )
                         onSave(acc)
