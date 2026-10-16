@@ -43,10 +43,7 @@ public struct SettingsView: View {
                         }
                     }
                     
-                    Picker("Chọn tài khoản", selection: Binding(
-                        get: { dataStore.selectedAccount?.id ?? "" },
-                        set: { newId in dataStore.selectAccount(id: newId) }
-                    )) {
+                    Picker("Chọn tài khoản", selection: $dataStore.selectedAccountId) {
                         ForEach(dataStore.accounts) { acc in
                             Text(acc.name).tag(acc.id)
                         }

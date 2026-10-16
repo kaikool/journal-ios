@@ -44,6 +44,10 @@ public final class TradeDataStore: ObservableObject {
         AppLogger.info("Added new account: \(name) (\(newAccount.id))")
     }
     
+    public func selectAccount(id: String) {
+        selectedAccountId = id
+    }
+    
     /// Nạp danh sách executions mới từ Import hoặc Sync và tự động kích hoạt Rebuild
     public func importExecutions(accountId: String, newExecutions: [Execution]) {
         let uniqueNew = newExecutions.filter { !executionHashes.contains($0.contentHash) }
