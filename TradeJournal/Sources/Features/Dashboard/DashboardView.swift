@@ -102,23 +102,28 @@ public struct DashboardView: View {
                 VStack(spacing: 16) {
                     if dataStore.filteredTrades.isEmpty {
                         AppCard {
-                            VStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 12) {
                                 HStack {
-                                    Image(systemName: "sparkles")
+                                    Image(systemName: "icloud.and.arrow.down")
                                         .foregroundColor(AppColors.accent)
-                                    Text("Chào mừng đến với Trade Journal")
+                                    Text("Chưa Có Dữ Liệu Giao Dịch")
                                         .font(AppTypography.headline)
                                     Spacer()
                                 }
-                                Text("Chưa có giao dịch nào được ghi nhận. Bạn có thể nạp ngay bộ dữ liệu mẫu thực tế để trải nghiệm toàn bộ biểu đồ và phân tích.")
+                                Text("Mọi dữ liệu trong app được đồng bộ trực tiếp 2 chiều với Supabase hoặc kết nối The5ers MCP Hub, hoặc nhập từ file sao kê CSV thực tế.")
                                     .font(AppTypography.caption)
                                     .foregroundColor(AppColors.secondaryText)
                                 
-                                HStack(spacing: 12) {
-                                    AppButton("Nạp Dữ Liệu Mẫu", icon: "arrow.triangle.2.circlepath", style: .primary) {
-                                        dataStore.seedDemoTradingData()
+                                HStack(spacing: 10) {
+                                    AppButton("Đồng Bộ Supabase", icon: "arrow.triangle.2.circlepath", style: .primary) {
+                                        Task { await dataStore.syncWithSupabase() }
                                     }
-                                    AppButton("Ghi Nhận Lệnh", icon: "plus.circle", style: .secondary) {
+                                    
+                                    AppButton("Đồng Bộ The5ers", icon: "network", style: .secondary) {
+                                        Task { _ = try? await dataStore.syncWithThe5ers() }
+                                    }
+                                    
+                                    AppButton("Ghi Lệnh", icon: "plus.circle", style: .secondary) {
                                         showAddTradeSheet = true
                                     }
                                 }

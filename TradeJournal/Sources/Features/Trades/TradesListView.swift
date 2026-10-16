@@ -114,9 +114,9 @@ public struct TradesListView: View {
                     .foregroundColor(AppColors.accent)
                 
                 VStack(spacing: 8) {
-                    Text("Chưa có giao dịch nào")
+                    Text("Chưa Có Giao Dịch Nào")
                         .font(AppTypography.title)
-                    Text("Bắt đầu ghi nhận lệnh giao dịch thủ công, hoặc nạp bộ dữ liệu mẫu thực tế để trải nghiệm toàn bộ hệ thống phân tích.")
+                    Text("Đồng bộ trực tiếp từ Supabase hoặc The5ers MCP Hub, hoặc nhập file sao kê CSV của bạn.")
                         .font(AppTypography.caption)
                         .foregroundColor(AppColors.secondaryText)
                         .multilineTextAlignment(.center)
@@ -124,12 +124,16 @@ public struct TradesListView: View {
                 }
                 
                 VStack(spacing: 12) {
-                    AppButton("Ghi Nhận Giao Dịch Mới", icon: "plus.circle", style: .primary) {
-                        showAddTradeSheet = true
+                    AppButton("Đồng Bộ Supabase", icon: "arrow.triangle.2.circlepath", style: .primary) {
+                        Task { await dataStore.syncWithSupabase() }
                     }
                     
-                    AppButton("Nạp Dữ Liệu Mẫu Thực Tế", icon: "arrow.triangle.2.circlepath", style: .secondary) {
-                        dataStore.seedDemoTradingData()
+                    AppButton("Đồng Bộ The5ers MCP", icon: "network", style: .secondary) {
+                        Task { _ = try? await dataStore.syncWithThe5ers() }
+                    }
+                    
+                    AppButton("Ghi Nhận Giao Dịch Mới", icon: "plus.circle", style: .secondary) {
+                        showAddTradeSheet = true
                     }
                     
                     AppButton("Nhập File CSV Sao Kê", icon: "doc.text", style: .secondary) {

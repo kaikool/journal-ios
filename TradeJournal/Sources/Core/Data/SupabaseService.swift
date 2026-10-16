@@ -446,9 +446,14 @@ public final class SupabaseService {
         try validateResponse(response, data: data, endpoint: endpoint)
     }
     
-    public func fetchTrades(accountId: String) async throws -> [Trade] {
+    public func fetchTrades(accountId: String? = nil) async throws -> [Trade] {
         guard isConfigured else { return [] }
-        let endpoint = "trades?account_id=eq.\(accountId)&select=*"
+        let endpoint: String
+        if let acc = accountId, !acc.isEmpty {
+            endpoint = "trades?account_id=eq.\(acc)&select=*"
+        } else {
+            endpoint = "trades?select=*"
+        }
         let request = try makeRequest(endpoint: endpoint)
         let (data, response) = try await session.data(for: request)
         try validateResponse(response, data: data, endpoint: endpoint)

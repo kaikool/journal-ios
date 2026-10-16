@@ -58,10 +58,6 @@ public struct ImportStatementView: View {
                                 AppButton("Chọn File CSV", icon: "folder", style: .primary) {
                                     isFileImporterPresented = true
                                 }
-                                
-                                AppButton("Nạp Mẫu Demo", icon: "arrow.counterclockwise", style: .secondary) {
-                                    loadDemoCSV()
-                                }
                             }
                         }
                         .frame(maxWidth: .infinity)
@@ -238,21 +234,6 @@ public struct ImportStatementView: View {
         }
     }
     
-    private func loadDemoCSV() {
-        let demo = """
-        symbol,side,quantity,price,fee,date
-        AAPL,buy,100,150.00,1.00,2026-04-01 14:30:00
-        AAPL,sell,100,156.50,1.00,2026-04-01 15:30:00
-        MSFT,buy,50,420.00,1.50,2026-04-02 14:30:00
-        MSFT,sell,50,415.00,1.50,2026-04-02 16:00:00
-        NVDA,buy,20,130.00,1.00,2026-04-03 14:30:00
-        NVDA,sell,20,138.00,1.00,2026-04-03 15:00:00
-        BAD_LINE,buy,invalid_qty,100,0,2026-04-03 15:00:00
-        """
-        importedFileName = "demo_trades.csv"
-        csvContent = demo
-        generatePreview(demo)
-    }
     
     private func generatePreview(_ content: String) {
         isImportSuccess = false

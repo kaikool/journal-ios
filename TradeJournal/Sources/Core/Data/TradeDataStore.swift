@@ -47,14 +47,8 @@ public final class TradeDataStore: ObservableObject {
         if folders.isEmpty {
             folders = NotebookEngine.defaultSystemFolders
         }
-        if propAccounts.isEmpty {
-            createInitialPropDemoData()
-        }
         if playbooks.isEmpty {
             playbooks = Self.defaultPlaybooks
-        }
-        if executions.isEmpty && trades.isEmpty {
-            seedDemoTradingData()
         }
         rebuildAllAccounts()
     }
@@ -209,20 +203,45 @@ public final class TradeDataStore: ObservableObject {
                 }
             }
             
-            // 2. Fetch remote executions for selected account
+            // 2. Fetch remote trades for account
+            let remoteTrades = try await SupabaseService.shared.fetchTrades(accountId: selectedAccountId)
+            for rTrade in remoteTrades {
+                if let idx = trades.firstIndex(where: { $0.key == rTrade.key }) {
+                    trades[idx] = rTrade
+                } else {
+                    trades.append(rTrade)
+                }
+            }
+            
+            // 2b. Fetch remote executions for selected account
             let remoteExecutions = try await SupabaseService.shared.fetchExecutions(accountId: selectedAccountId)
             if !remoteExecutions.isEmpty {
                 importExecutions(accountId: selectedAccountId, newExecutions: remoteExecutions)
             }
             
-            // 2b. Push local executions for selected account to Supabase
+            // 2c. Push local executions for selected account to Supabase
             let localAccountFills = executions.filter { $0.accountId == selectedAccountId }
             if !localAccountFills.isEmpty {
                 try await SupabaseService.shared.upsertExecutions(localAccountFills)
             }
             
             // 3. Push local trades to Supabase
-            try await SupabaseService.shared.upsertTrades(filteredTrades)
+            if !filteredTrades.isEmpty {
+                try await SupabaseService.shared.upsertTrades(filteredTrades)
+            }
+            
+            // 3b. Sync Playbooks
+            let remotePlaybooks = try await SupabaseService.shared.fetchPlaybooks()
+            for rPb in remotePlaybooks {
+                if let idx = playbooks.firstIndex(where: { $0.id == rPb.id }) {
+                    playbooks[idx] = rPb
+                } else {
+                    playbooks.append(rPb)
+                }
+            }
+            if !playbooks.isEmpty {
+                try await SupabaseService.shared.upsertPlaybooks(playbooks)
+            }
             
             // 4. Đồng bộ Quỹ (Prop Firm Subsystem 2-way Sync)
             // 4a. Prop Accounts Sync
@@ -302,6 +321,16 @@ public final class TradeDataStore: ObservableObject {
         await MainActor.run {
             self.isSyncing = false
         }
+    }
+    
+    // MARK: - The5ers MCP Synchronization
+    
+    public func syncWithThe5ers() async throws -> Int {
+        let count = try await The5ersService.shared.syncWithTradeStore(dataStore: self)
+        if SupabaseService.shared.isConfigured {
+            await syncWithSupabase()
+        }
+        return count
     }
     
     // MARK: - Notebook & Journal Operations (1:1 port từ source-repo)
@@ -783,10 +812,6 @@ public final class TradeDataStore: ObservableObject {
             self.aiSettings = store.aiSettings ?? .default
             self.executionHashes = Set(store.executions.map { $0.contentHash })
             
-            if self.propAccounts.isEmpty {
-                createInitialPropDemoData()
-            }
-            
             AppLogger.info("Loaded \(store.accounts.count) accounts, \(store.executions.count) executions, \(self.notebookNotes.count) notes, \(self.propAccounts.count) prop accounts, \(self.attachments.count) attachments from persistent disk.")
         } catch {
             AppLogger.error("Failed to load store from disk: \(error.localizedDescription)")
@@ -796,100 +821,13 @@ public final class TradeDataStore: ObservableObject {
     private func createInitialDefaultAccount() {
         let defaultAcc = Account(
             id: "default-acc",
-            name: "Main Trading Account",
-            broker: "Interactive Brokers",
+            name: "Tài Khoản Giao Dịch",
+            broker: "",
             currency: "USD",
-            initialBalance: 10000
+            initialBalance: 0
         )
         accounts = [defaultAcc]
         selectedAccountId = defaultAcc.id
-        saveToDisk()
-    }
-    
-    private func createInitialPropDemoData() {
-        let acc1 = PropAccountItem(
-            id: "prop-topstep-50k",
-            firm: "Topstep",
-            name: "Topstep 50K Express Funded",
-            program: .funded,
-            status: .active,
-            currency: "USD",
-            sizeMinor: 5_000_000,
-            openedOn: "2026-09-01",
-            notes: "Tài khoản Live Funded, tuân thủ giới hạn daily loss 1,000 USD."
-        )
-        let acc2 = PropAccountItem(
-            id: "prop-ftmo-100k",
-            firm: "FTMO",
-            name: "FTMO 100K Normal Challenge",
-            program: .evaluation,
-            status: .passed,
-            currency: "USD",
-            sizeMinor: 10_000_000,
-            openedOn: "2026-08-15",
-            closedOn: "2026-09-01",
-            notes: "Đã đỗ vòng 1 với lợi nhuận +10.2%."
-        )
-        let acc3 = PropAccountItem(
-            id: "prop-ftmo-100k-v2",
-            firm: "FTMO",
-            name: "FTMO 100K Verification (Vòng 2)",
-            program: .verification,
-            status: .active,
-            currency: "USD",
-            sizeMinor: 10_000_000,
-            parentId: "prop-ftmo-100k",
-            openedOn: "2026-09-02",
-            notes: "Đang thi vòng 2 Verification."
-        )
-        let e1 = PropEntryItem(
-            id: "prop-entry-topstep-act",
-            accountId: "prop-topstep-50k",
-            firm: "Topstep",
-            kind: "expense",
-            category: "activation",
-            currency: "USD",
-            amountMinor: 14900,
-            occurredOn: "2026-09-01",
-            notes: "Phí kích hoạt tài khoản Express Funded"
-        )
-        let e2 = PropEntryItem(
-            id: "prop-entry-ftmo-eval",
-            accountId: "prop-ftmo-100k",
-            firm: "FTMO",
-            kind: "expense",
-            category: "evaluation",
-            currency: "USD",
-            amountMinor: 54000,
-            occurredOn: "2026-08-15",
-            notes: "Phí thi gói Challenge 100k"
-        )
-        let e3 = PropEntryItem(
-            id: "prop-entry-topstep-payout-1",
-            accountId: "prop-topstep-50k",
-            firm: "Topstep",
-            kind: "payout",
-            category: "payout",
-            currency: "USD",
-            amountMinor: 250000,
-            splitBps: 9000,
-            feeMinor: 2500,
-            occurredOn: "2026-10-01",
-            status: .completed,
-            notes: "Kỳ payout đầu tiên sau 30 ngày funded"
-        )
-        let r1 = PropReceiptItem(
-            id: "prop-rcpt-topstep-1",
-            payoutId: "prop-entry-topstep-payout-1",
-            kind: "receipt",
-            amountMinor: 222500,
-            occurredOn: "2026-10-03",
-            reference: "DEEL-PAY-98124",
-            notes: "Đã nhận tiền vào tài khoản ngân hàng"
-        )
-        self.propAccounts = [acc1, acc2, acc3]
-        self.propEntries = [e1, e2, e3]
-        self.propReceipts = [r1]
         saveToDisk()
     }
     
@@ -1066,178 +1004,22 @@ public final class TradeDataStore: ObservableObject {
         saveToDisk()
     }
     
-    // MARK: - Demo Seeding & Data Reset
-    
-    public func seedDemoTradingData() {
-        let targetAccount = selectedAccount ?? accounts.first
-        guard let account = targetAccount else { return }
-        
-        if playbooks.isEmpty {
-            playbooks = Self.defaultPlaybooks
-        }
-        
-        if notebookNotes.isEmpty {
-            let note1 = NotebookNote(
-                folderId: NotebookEngine.systemFolderMyNotes,
-                title: "Nguyên Tắc Quản Trị Rủi Ro Cốt Lõi",
-                content: """
-                # Kỷ luật giao dịch là sống còn
-                1. Rủi ro tối đa mỗi lệnh không vượt quá 1% số dư tài khoản.
-                2. Dừng giao dịch trong ngày nếu chạm Max Daily Loss (3%).
-                3. Không bao giờ dời Stop Loss ra xa khi giá đang chạy ngược chiều.
-                4. Luôn ghi chép nhật ký ngay sau khi đóng lệnh để tránh sai số tâm lý.
-                """
-            )
-            let note2 = NotebookNote(
-                folderId: NotebookEngine.systemFolderMyNotes,
-                title: "Nhận Định Phiên Giao Dịch Đầu Tuần",
-                content: """
-                Theo dõi sát vùng thanh khoản 20,200 của chỉ số NQ. Chờ phản ứng giá tại phiên New York trước khi quyết định mở vị thế swing.
-                """
-            )
-            notebookNotes = [note1, note2]
-        }
-        
-        if propAccounts.isEmpty {
-            createInitialPropDemoData()
-        }
-        
-        let now = Date()
-        let cal = Calendar.current
-        
-        struct DemoTradeDef {
-            let symbol: String
-            let dir: TradeDirection
-            let qty: Decimal
-            let entry: Decimal
-            let exit: Decimal
-            let fee: Decimal
-            let daysAgo: Int
-            let durationMin: Int
-            let notes: String
-            let tags: [String]
-            let mistakes: [String]
-            let rating: Int
-            let pbId: String?
-            let sl: Decimal
-            let tp: Decimal
-        }
-        
-        let demoDefs: [DemoTradeDef] = [
-            DemoTradeDef(
-                symbol: "NQ", dir: .long, qty: 2,
-                entry: Decimal(string: "19800.50")!, exit: Decimal(string: "19845.00")!, fee: 8,
-                daysAgo: 14, durationMin: 75,
-                notes: "Bắt đúng nhịp FVG M5 sau khi quét thanh khoản đáy phiên Á. Thoát lệnh tại đỉnh cũ.",
-                tags: ["ict", "fvg", "scalp"], mistakes: [], rating: 5, pbId: "pb-fvg",
-                sl: Decimal(string: "19780.00")!, tp: Decimal(string: "19850.00")!
-            ),
-            DemoTradeDef(
-                symbol: "NQ", dir: .short, qty: 1,
-                entry: Decimal(string: "19920.00")!, exit: Decimal(string: "19955.00")!, fee: 4,
-                daysAgo: 11, durationMin: 40,
-                notes: "Vào lệnh quá vội khi chưa có nến xác nhận MSS. Bị dính SL theo xu hướng tăng mạnh.",
-                tags: ["counter-trend"], mistakes: ["FOMO", "Vào lệnh sớm"], rating: 2, pbId: "pb-fvg",
-                sl: Decimal(string: "19950.00")!, tp: Decimal(string: "19850.00")!
-            ),
-            DemoTradeDef(
-                symbol: "ES", dir: .long, qty: 3,
-                entry: Decimal(string: "5620.25")!, exit: Decimal(string: "5632.75")!, fee: 12,
-                daysAgo: 8, durationMin: 90,
-                notes: "London breakout mở nến H1 rất đẹp, volume xác nhận dòng tiền vào rõ rệt.",
-                tags: ["breakout", "london"], mistakes: [], rating: 5, pbId: "pb-london-breakout",
-                sl: Decimal(string: "5612.00")!, tp: Decimal(string: "5635.00")!
-            ),
-            DemoTradeDef(
-                symbol: "EURUSD", dir: .long, qty: 50000,
-                entry: Decimal(string: "1.08500")!, exit: Decimal(string: "1.08585")!, fee: 3,
-                daysAgo: 6, durationMin: 120,
-                notes: "Pullback EMA 20 chuẩn xác trên M15, TP đúng target swing.",
-                tags: ["forex", "pullback"], mistakes: [], rating: 4, pbId: "pb-trend-pullback",
-                sl: Decimal(string: "1.08350")!, tp: Decimal(string: "1.08600")!
-            ),
-            DemoTradeDef(
-                symbol: "NVDA", dir: .long, qty: 50,
-                entry: Decimal(string: "128.50")!, exit: Decimal(string: "131.20")!, fee: 2,
-                daysAgo: 4, durationMin: 180,
-                notes: "Bứt phá khỏi nền giá tích lũy quanh 128 USD, chốt lời trước giờ đóng cửa.",
-                tags: ["stocks", "breakout"], mistakes: [], rating: 4, pbId: nil,
-                sl: Decimal(string: "126.00")!, tp: Decimal(string: "132.00")!
-            ),
-            DemoTradeDef(
-                symbol: "BTCUSDT", dir: .long, qty: Decimal(string: "0.2")!,
-                entry: Decimal(string: "64200.00")!, exit: Decimal(string: "65600.00")!, fee: 10,
-                daysAgo: 2, durationMin: 240,
-                notes: "Test vùng cầu khung H4, nến Pinbar rút chân mạnh.",
-                tags: ["crypto", "swing"], mistakes: [], rating: 5, pbId: "pb-fvg",
-                sl: Decimal(string: "63500.00")!, tp: Decimal(string: "66000.00")!
-            ),
-            DemoTradeDef(
-                symbol: "NQ", dir: .long, qty: 2,
-                entry: Decimal(string: "20150.00")!, exit: Decimal(string: "20185.00")!, fee: 8,
-                daysAgo: 1, durationMin: 45,
-                notes: "Sweep đáy phiên Á đầu giờ Mỹ, phản ứng mạnh tại mốc hỗ trợ.",
-                tags: ["ict", "scalp"], mistakes: [], rating: 4, pbId: "pb-fvg",
-                sl: Decimal(string: "20120.00")!, tp: Decimal(string: "20200.00")!
-            )
-        ]
-        
-        for def in demoDefs {
-            guard let openDate = cal.date(byAdding: .day, value: -def.daysAgo, to: now) else { continue }
-            let closeDate = cal.date(byAdding: .minute, value: def.durationMin, to: openDate) ?? openDate
-            
-            addManualTrade(
-                accountId: account.id,
-                symbol: def.symbol,
-                direction: def.dir,
-                quantity: def.qty,
-                entryPrice: def.entry,
-                exitPrice: def.exit,
-                openedAt: openDate,
-                closedAt: closeDate,
-                fee: def.fee,
-                notes: def.notes,
-                tags: def.tags,
-                mistakes: def.mistakes,
-                rating: def.rating,
-                stopLoss: def.sl,
-                profitTarget: def.tp,
-                playbookId: def.pbId
-            )
-        }
-        
-        let fmt = DateFormatter()
-        fmt.dateFormat = "yyyy-MM-dd"
-        let todayStr = fmt.string(from: now)
-        if let yesterday = cal.date(byAdding: .day, value: -1, to: now) {
-            let yestStr = fmt.string(from: yesterday)
-            calendarNotes[yestStr] = JournalNote(
-                date: yestStr,
-                content: "Tuân thủ kế hoạch kỷ luật tốt. Đợi đúng setup FVG phiên New York mới vào lệnh.",
-                rating: 5,
-                mood: "Bình tĩnh, tập trung",
-                tags: ["kỷ-luật", "chuẩn-bài"]
-            )
-        }
-        calendarNotes[todayStr] = JournalNote(
-            date: todayStr,
-            content: "Thị trường biến động nhẹ trước thềm tin tức CPI, kiên nhẫn quan sát và bảo toàn vốn.",
-            rating: 4,
-            mood: "Tỉnh táo",
-            tags: ["chờ-đợi"]
-        )
-        
-        saveToDisk()
-        AppLogger.info("Seeded full demo trading data successfully.")
-    }
+    // MARK: - Data Reset
     
     public func resetAllData() {
         executions.removeAll()
         executionHashes.removeAll()
         trades.removeAll()
         calendarNotes.removeAll()
+        propAccounts.removeAll()
+        propEntries.removeAll()
+        propReceipts.removeAll()
+        propAudits.removeAll()
+        attachments.removeAll()
+        createInitialDefaultAccount()
+        rebuildAllAccounts()
         saveToDisk()
-        AppLogger.info("Reset all trading data to blank state.")
+        AppLogger.info("Reset all trading data to 100% clean blank state.")
     }
     
     /// Xuất danh sách giao dịch sang định dạng CSV 1:1 theo `api/export/route.ts`

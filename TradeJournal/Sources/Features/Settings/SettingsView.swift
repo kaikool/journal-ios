@@ -1351,18 +1351,34 @@ public struct YourDataSettingsView: View {
                 }
             }
             
-            // Card 2: Sample Data & Reset Database
+            // Card 2: Sync & Reset Database
             SettingsCard(title: "Database operations") {
                 VStack(alignment: .leading, spacing: 14) {
-                    Text("Restore sample journal records or clear existing disk database.")
+                    Text("Đồng bộ dữ liệu hai chiều với Supabase, The5ers MCP hoặc xóa trắng dữ liệu cục bộ.")
                         .font(AppTypography.caption)
                         .foregroundColor(AppColors.secondaryText)
                     
                     Button {
-                        dataStore.seedDemoTradingData()
-                        seedMessage = "Đã nạp lại bộ dữ liệu giao dịch mẫu thành công."
+                        Task {
+                            await dataStore.syncWithSupabase()
+                            seedMessage = "Đã hoàn tất đồng bộ với Supabase."
+                        }
                     } label: {
-                        Label("Nạp lại bộ dữ liệu giao dịch mẫu", systemImage: "arrow.triangle.2.circlepath")
+                        Label("Đồng bộ hai chiều với Supabase", systemImage: "arrow.triangle.2.circlepath")
+                            .foregroundColor(AppColors.accent)
+                    }
+                    
+                    Button {
+                        Task {
+                            do {
+                                let c = try await dataStore.syncWithThe5ers()
+                                seedMessage = "Đã đồng bộ \(c) tài khoản từ The5ers MCP."
+                            } catch {
+                                seedMessage = "Lỗi đồng bộ: \(error.localizedDescription)"
+                            }
+                        }
+                    } label: {
+                        Label("Đồng bộ toàn diện The5ers MCP", systemImage: "network")
                             .foregroundColor(AppColors.accent)
                     }
                     
@@ -1377,7 +1393,7 @@ public struct YourDataSettingsView: View {
                     Button(role: .destructive) {
                         showResetConfirmation = true
                     } label: {
-                        Label("Xóa sạch dữ liệu (Bắt đầu nhật ký mới)", systemImage: "trash")
+                        Label("Xóa sạch toàn bộ dữ liệu trên máy", systemImage: "trash")
                             .foregroundColor(AppColors.loss)
                     }
                 }

@@ -258,11 +258,11 @@ public final class The5ersService: ObservableObject {
     @MainActor
     public func syncWithTradeStore(dataStore: TradeDataStore) async throws -> Int {
         guard isConfigured else {
-            throw NSError(domain: "The5ersMCP", code: 401, userInfo: [NSLocalizedDescriptionKey: "Chưa cấu hình Token The5ers MCP."])
+            throw NSError(domain: "The5ersMCP", code: 401, userInfo: [NSLocalizedDescriptionKey: "Chưa cấu hình Token The5ers MCP. Vui lòng bấm 'Đăng Nhập The5ers Hub (OAuth PKCE)'. "])
         }
         
         isSyncing = true
-        lastStatus = "Đang kết nối The5ers MCP và gọi the5ers_account..."
+        lastStatus = "Đang kết nối The5ers MCP và gọi the5ers_account (list)..."
         defer { isSyncing = false }
         
         do {
@@ -270,66 +270,52 @@ public final class The5ersService: ObservableObject {
             let accountResult = try await callMcpTool(name: "the5ers_account", arguments: ["operation": "list"])
             var accountsList: [The5ersMcpAccount] = []
             
-            if let content = accountResult["content"] as? [[String: Any]],
-               let text = content.first?["text"] as? String,
-               let data = text.data(using: .utf8),
+            func parseMcpTextPayload(_ dict: [String: Any]) -> Data? {
+                if let content = dict["content"] as? [[String: Any]],
+                   let text = content.first?["text"] as? String {
+                    return text.data(using: .utf8)
+                }
+                return nil
+            }
+            
+            if let data = parseMcpTextPayload(accountResult),
                let parsed = try? JSONDecoder().decode([The5ersMcpAccount].self, from: data) {
                 accountsList = parsed
-            } else if let directList = accountResult["accounts"] as? [[String: Any]] {
+            } else if let directList = (accountResult["accounts"] ?? accountResult["items"]) as? [[String: Any]] {
                 for item in directList {
-                    let id = String(describing: item["id"] ?? UUID().uuidString)
-                    let label = String(describing: item["label"] ?? "The5ers Account")
-                    let bal = Decimal(string: String(describing: item["balance"] ?? "10000")) ?? 10000
+                    let id = String(describing: item["id"] ?? item["account_id"] ?? UUID().uuidString)
+                    let label = String(describing: item["label"] ?? item["name"] ?? "The5ers Account")
+                    let bal = Decimal(string: String(describing: item["balance"] ?? "0")) ?? 0
+                    let eq = Decimal(string: String(describing: item["equity"] ?? bal)) ?? bal
                     let curr = String(describing: item["currency"] ?? "USD")
                     let status = String(describing: item["status"] ?? "active")
                     let prog = String(describing: item["program"] ?? "funded")
+                    let startBal = Decimal(string: String(describing: item["startingBalance"] ?? item["initial_balance"] ?? bal)) ?? bal
                     
                     accountsList.append(The5ersMcpAccount(
                         id: id,
                         label: label,
-                        platform: "MT5",
+                        platform: String(describing: item["platform"] ?? "MT5"),
                         balance: bal,
-                        equity: bal,
+                        equity: eq,
                         currency: curr,
                         status: status,
                         program: prog,
-                        startingBalance: bal,
-                        createdAt: nil
+                        startingBalance: startBal,
+                        createdAt: item["createdAt"] as? String
                     ))
                 }
             }
             
-            // Nếu MCP chưa trả về danh sách thực (hoặc đang dùng mock test), cung cấp demo dự phòng
+            // Tuyệt đối không nạp dữ liệu giả/demo: nếu trống thì báo không có
             if accountsList.isEmpty {
-                accountsList = [
-                    The5ersMcpAccount(
-                        id: "the5ers_hyper_growth_10k",
-                        label: "The5ers Hyper Growth #102938",
-                        platform: "MT5",
-                        balance: 10450,
-                        equity: 10450,
-                        currency: "USD",
-                        status: "active",
-                        program: "funded",
-                        startingBalance: 10000,
-                        createdAt: "2026-03-01"
-                    ),
-                    The5ersMcpAccount(
-                        id: "the5ers_high_stakes_100k",
-                        label: "The5ers High Stakes #948271",
-                        platform: "MT5",
-                        balance: 102800,
-                        equity: 102800,
-                        currency: "USD",
-                        status: "active",
-                        program: "funded",
-                        startingBalance: 100000,
-                        createdAt: "2026-02-15"
-                    )
-                ]
+                lastStatus = "Máy chủ The5ers MCP phản hồi thành công nhưng không tìm thấy tài khoản giao dịch nào."
+                return 0
             }
             
-            var importedCount = 0
+            var importedPositionsCount = 0
+            
+            // 2. Đồng bộ từng tài khoản và lấy các vị thế thực tế qua the5ers_positions
             for acc in accountsList {
                 let mappedStatus: PropStatus = {
                     switch acc.status.lowercased() {
@@ -351,6 +337,7 @@ public final class The5ersService: ObservableObject {
                 
                 let startingMinor = NSDecimalNumber(decimal: (acc.startingBalance ?? acc.balance) * 100).int64Value
                 
+                // Đồng bộ Quỹ (Prop Firm Subsystem)
                 if let existingIndex = dataStore.propAccounts.firstIndex(where: { $0.id == acc.id || $0.name == acc.label }) {
                     var existing = dataStore.propAccounts[existingIndex]
                     existing.status = mappedStatus
@@ -370,17 +357,137 @@ public final class The5ersService: ObservableObject {
                         archived: false
                     )
                     dataStore.propAccounts.append(newPropAccount)
-                    importedCount += 1
+                }
+                
+                // Đồng bộ Account chính trong dataStore
+                if let accIdx = dataStore.accounts.firstIndex(where: { $0.id == acc.id || $0.the5ersSourceId == acc.id }) {
+                    dataStore.accounts[accIdx].broker = "The5ers"
+                    dataStore.accounts[accIdx].name = acc.label
+                    dataStore.accounts[accIdx].currency = acc.currency
+                    dataStore.accounts[accIdx].the5ersSourceId = acc.id
+                } else {
+                    let newAcc = Account(
+                        id: acc.id,
+                        the5ersSourceId: acc.id,
+                        name: acc.label,
+                        broker: "The5ers",
+                        kind: .sync,
+                        currency: acc.currency,
+                        initialBalance: acc.startingBalance ?? acc.balance,
+                        autoSync: true
+                    )
+                    dataStore.accounts.append(newAcc)
+                }
+                
+                // 3. Gọi the5ers_positions để lấy các lệnh thực tế
+                lastStatus = "Đang tải vị thế lệnh cho tài khoản \(acc.label)..."
+                if let posResult = try? await callMcpTool(name: "the5ers_positions", arguments: ["operation": "list", "accountId": acc.id]) {
+                    var rawPositions: [[String: Any]] = []
+                    if let data = parseMcpTextPayload(posResult),
+                       let jsonArray = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
+                        rawPositions = jsonArray
+                    } else if let direct = (posResult["positions"] ?? posResult["trades"] ?? posResult["items"]) as? [[String: Any]] {
+                        rawPositions = direct
+                    }
+                    
+                    let iso = ISO8601DateFormatter()
+                    iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                    let isoFallback = ISO8601DateFormatter()
+                    isoFallback.formatOptions = [.withInternetDateTime]
+                    
+                    for p in rawPositions {
+                        let symbol = String(describing: p["symbol"] ?? "").trimmingCharacters(in: .whitespaces)
+                        guard !symbol.isEmpty else { continue }
+                        
+                        let sideStr = String(describing: p["side"] ?? p["direction"] ?? "buy").lowercased()
+                        let dir: TradeDirection = (sideStr.contains("sell") || sideStr.contains("short")) ? .short : .long
+                        
+                        let qty = Decimal(string: String(describing: p["quantity"] ?? p["lots"] ?? p["size"] ?? "0")) ?? 0
+                        let entry = Decimal(string: String(describing: p["entry"] ?? p["openPrice"] ?? "0")) ?? 0
+                        let exit = Decimal(string: String(describing: p["exit"] ?? p["closePrice"] ?? ""))
+                        let netPnl = Decimal(string: String(describing: p["profitAndLoss"] ?? p["netPnl"] ?? p["pnl"] ?? "0")) ?? 0
+                        let fee = Decimal(string: String(describing: p["fee"] ?? p["commission"] ?? "0")) ?? 0
+                        let swap = Decimal(string: String(describing: p["swap"] ?? "0")) ?? 0
+                        
+                        let openStr = String(describing: p["openDate"] ?? p["openedAt"] ?? "")
+                        let closeStr = String(describing: p["closeDate"] ?? p["closedAt"] ?? "")
+                        
+                        let openDate = iso.date(from: openStr) ?? isoFallback.date(from: openStr) ?? Date()
+                        let closeDate = iso.date(from: closeStr) ?? isoFallback.date(from: closeStr)
+                        let isClosed = (closeDate != nil) || (p["isClosed"] as? Bool == true)
+                        
+                        let pId = String(describing: p["id"] ?? p["ticket"] ?? p["providerId"] ?? UUID().uuidString)
+                        let tradeKey = "the5ers_\(acc.id)_\(pId)"
+                        
+                        let status: TradeStatus = isClosed ? (netPnl > 0 ? .win : (netPnl < 0 ? .loss : .breakeven)) : .open
+                        
+                        let trade = Trade(
+                            key: tradeKey,
+                            accountId: acc.id,
+                            symbol: symbol,
+                            direction: dir,
+                            status: status,
+                            openedAt: openDate,
+                            closedAt: isClosed ? (closeDate ?? openDate) : nil,
+                            quantity: qty,
+                            openQuantity: isClosed ? 0 : qty,
+                            avgEntry: entry,
+                            avgExit: exit,
+                            grossPnl: netPnl + fee + swap,
+                            fees: -(abs(fee) + abs(swap)),
+                            netPnl: netPnl,
+                            executionCount: 0,
+                            executionIds: [],
+                            notes: "Vị thế được đồng bộ từ The5ers Hub (Ticket: \(pId))",
+                            tags: ["the5ers", acc.program.lowercased()]
+                        )
+                        
+                        if let tIdx = dataStore.trades.firstIndex(where: { $0.key == tradeKey }) {
+                            dataStore.trades[tIdx] = trade
+                        } else {
+                            dataStore.trades.append(trade)
+                            importedPositionsCount += 1
+                        }
+                    }
                 }
             }
             
-            // 2. Gọi MCP tool the5ers_payout để đồng bộ biên nhận rút tiền
+            // 4. Đồng bộ the5ers_payout
             lastStatus = "Đang tải lịch sử rút tiền the5ers_payout..."
-            _ = try? await callMcpTool(name: "the5ers_payout", arguments: ["operation": "history"])
+            if let payoutResult = try? await callMcpTool(name: "the5ers_payout", arguments: ["operation": "history"]) {
+                var rawPayouts: [[String: Any]] = []
+                if let data = parseMcpTextPayload(payoutResult),
+                   let arr = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
+                    rawPayouts = arr
+                } else if let direct = (payoutResult["payouts"] ?? payoutResult["withdrawals"] ?? payoutResult["items"]) as? [[String: Any]] {
+                    rawPayouts = direct
+                }
+                
+                for pay in rawPayouts {
+                    let id = String(describing: pay["id"] ?? UUID().uuidString)
+                    let amtMinor = Int64(Double(String(describing: pay["amount"] ?? "0")) ?? 0) * 100
+                    let dateStr = String(describing: pay["paidAt"] ?? pay["date"] ?? pay["createdAt"] ?? "")
+                    let rcptId = "the5ers_rcpt_\(id)"
+                    
+                    if !dataStore.propReceipts.contains(where: { $0.id == rcptId }) {
+                        let rcpt = PropReceiptItem(
+                            id: rcptId,
+                            payoutId: id,
+                            kind: "receipt",
+                            amountMinor: amtMinor,
+                            occurredOn: dateStr,
+                            reference: "THE5ERS-\(id)",
+                            notes: "Biên nhận rút tiền The5ers MCP"
+                        )
+                        dataStore.propReceipts.append(rcpt)
+                    }
+                }
+            }
             
             lastSyncTime = Date()
+            dataStore.rebuildAllAccounts()
             dataStore.saveToDisk()
-            lastStatus = "Đã đồng bộ thành công \(accountsList.count) tài khoản The5ers qua giao thức MCP!"
+            lastStatus = "Đã đồng bộ thành công \(accountsList.count) tài khoản và \(importedPositionsCount) vị thế thực tế từ The5ers MCP."
             return accountsList.count
         } catch {
             lastStatus = "Lỗi đồng bộ The5ers MCP: \(error.localizedDescription)"
