@@ -73,18 +73,22 @@ jobs:
             -destination "generic/platform=iOS" \
             -configuration "$CONFIG" \
             -derivedDataPath build/DerivedData \
-            CODE_SIGNING_ALLOWED=YES \
+            CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="-" \
-            AD_HOC_CODE_SIGNING_ALLOWED=YES \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGN_ENTITLEMENTS="" \
+            CODE_SIGNING_INJECT_BASE_ENTITLEMENTS=NO \
             COMPILER_INDEX_STORE_ENABLE=NO 2>&1 | tee build/xcodebuild.log
 
       - name: Report Build Error via Workflow Annotation
         if: failure() && steps.build_app.outcome == 'failure'
         run: |
-          echo "==> Last 50 lines of build log:"
-          tail -n 50 build/xcodebuild.log || true
-          ERROR_SUMMARY=$(tail -n 15 build/xcodebuild.log | tr '\n' ' ' | cut -c 1-250)
+          echo "==> Full build log:"
+          cat build/xcodebuild.log || true
+          ERROR_SUMMARY=$(grep -E -i "(error:|fatal error:)" build/xcodebuild.log | head -n 3 | tr '\n' ' ' | cut -c 1-250)
+          if [ -z "$ERROR_SUMMARY" ]; then
+            ERROR_SUMMARY=$(tail -n 10 build/xcodebuild.log | tr '\n' ' ' | cut -c 1-250)
+          fi
           echo "::error title=XcodeBuildError::$ERROR_SUMMARY"
 
       - name: Package IPA
@@ -97,6 +101,8 @@ jobs:
             echo "::error::TradeJournal.app not found in build/DerivedData"
             exit 1
           fi
+          echo "==> Applying ad-hoc codesign signature to .app bundle..."
+          codesign --force --deep --sign - "$APP_PATH" || true
           cp -r "$APP_PATH" build/Payload/
           cd build
           zip -r -9 TradeJournal.ipa Payload
