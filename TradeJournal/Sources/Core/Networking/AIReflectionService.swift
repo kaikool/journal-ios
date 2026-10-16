@@ -46,11 +46,11 @@ public actor AIReflectionService {
         if let m = metrics {
             payload["scopeSummary"] = [
                 "totalTrades": m.totalTrades,
-                "winRate": (m.winRate as NSDecimalNumber).doubleValue,
-                "profitFactor": m.profitFactor,
-                "netPnl": (m.netPnl as NSDecimalNumber).doubleValue,
-                "maxDrawdownPct": m.maxDrawdownPct,
-                "edgeScore": edgeScore
+                "winRate": m.winRate ?? 0.0,
+                "profitFactor": m.profitFactor ?? 0.0,
+                "netPnl": NSDecimalNumber(decimal: m.netPnl).doubleValue,
+                "maxDrawdownPct": m.maxDrawdownPct ?? 0.0,
+                "edgeScore": edgeScore ?? 0.0
             ]
         }
         
@@ -75,7 +75,7 @@ public actor AIReflectionService {
             return "Chưa có đủ dữ liệu giao dịch để phân tích. Hãy thực hiện hoặc import ít nhất một chu kỳ giao dịch."
         }
         
-        let wr = (m.winRate as NSDecimalNumber).doubleValue * 100
+        let wr = (m.winRate ?? 0.0) * 100
         let pf = m.profitFactor != nil ? String(format: "%.2f", m.profitFactor!) : "N/A"
         let score = edgeScore != nil ? "\(Int(edgeScore!))" : "N/A"
         
@@ -87,20 +87,20 @@ public actor AIReflectionService {
             
             Dữ liệu thực tế:
             - Tổng số lệnh: \(m.totalTrades) lệnh
-            - Tỷ lệ thắng (Win Rate): \(String(format: "%.1f%%", wr)) (\(m.winningTrades)W / \(m.losingTrades)L / \(m.breakevenTrades)BE)
+            - Tỷ lệ thắng (Win Rate): \(String(format: "%.1f%%", wr)) (\(m.wins)W / \(m.losses)L / \(m.breakevens)BE)
             - Profit Factor: \(pf)
             - Điểm Edge Score v2: \(score)/100
             
             Nhận định:
             \(wr >= 50.0 ? "Hệ thống đang có tỷ lệ thắng ổn định." : "Tỷ lệ thắng dưới 50%, cần tối ưu lại điểm vào lệnh và quản lý tỷ lệ R:R.")
-            \(m.loss > 0 ? "Tổng lỗ lũy kế hiện tại là \(m.loss). Cắt lỗ nghiêm ngặt là yếu tố then chốt." : "Chưa có lệnh lỗ nào được ghi nhận.")
+            \(m.losses > 0 ? "Lệnh lỗ lớn nhất ghi nhận là \(m.largestLoss). Cắt lỗ nghiêm ngặt là yếu tố then chốt." : "Chưa có lệnh lỗ nào được ghi nhận.")
             """
             
         case .critique:
             return """
             [Góc nhìn Huấn luyện viên]
             Nhìn vào bức tranh tổng thể:
-            1. Chuỗi lệnh: Chuỗi thắng dài nhất là \(m.maxConsecutiveWins) lệnh, chuỗi thua dài nhất là \(m.maxConsecutiveLosses) lệnh.
+            1. Chuỗi lệnh: Chuỗi thắng dài nhất là \(m.maxWinStreak) lệnh, chuỗi thua dài nhất là \(m.maxLossStreak) lệnh.
             2. Điểm Edge Score đạt \(score)/100.
             3. Khuyến nghị: Giữ kỷ luật kích thước vị thế (position sizing), không tăng khối lượng sau chuỗi thua để tránh hiện tượng Revenge Trading.
             """
@@ -109,8 +109,8 @@ public actor AIReflectionService {
             return """
             [Tổng kết hiệu suất]
             - Tổng lợi nhuận ròng: \(m.netPnl >= 0 ? "+" : "")\(m.netPnl)
-            - Lãi gộp: \(m.profit) | Lỗ gộp: \(m.loss)
-            - Phí giao dịch đã trả: \(m.fees)
+            - Lệnh thắng lớn nhất: \(m.largestWin) | Lệnh thua lớn nhất: \(m.largestLoss)
+            - Phí giao dịch đã trả: \(m.fees != nil ? "\(m.fees!)" : "0")
             - Khối lượng giao dịch: \(m.totalVolume)
             
             Đánh giá: \(m.netPnl >= 0 ? "Kỳ giao dịch sinh lời dương. Tiếp tục duy trì quy tắc của Playbook." : "Kỳ giao dịch đang âm ròng. Đề xuất rà soát lại các lệnh vi phạm quy tắc.")

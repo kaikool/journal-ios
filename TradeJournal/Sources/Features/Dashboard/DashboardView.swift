@@ -261,7 +261,7 @@ public struct DashboardView: View {
                             title: "Max Drawdown",
                             value: metrics.maxDrawdownPct != nil ? String(format: "-%.1f%%", metrics.maxDrawdownPct! * 100) : "0.0%",
                             color: AppColors.loss,
-                            subtitle: metrics.maxDrawdown != nil ? Formatters.formatCurrency(metrics.maxDrawdown!, currency: env.currentCurrency) : "-"
+                            subtitle: Formatters.formatCurrency(metrics.maxDrawdown, currency: env.currentCurrency)
                         )
                         
                         statTile(

@@ -34,6 +34,20 @@ public struct TradeMetrics: Equatable {
     public let tradesWithRisk: Int
 }
 
+extension TradeMetrics {
+    public var profit: Decimal {
+        grossPnl != nil ? max(0, grossPnl!) : (netPnl > 0 ? netPnl : 0)
+    }
+    public var loss: Decimal {
+        grossPnl != nil ? max(0, -min(0, grossPnl!)) : (netPnl < 0 ? abs(netPnl) : 0)
+    }
+    public var winningTrades: Int { wins }
+    public var losingTrades: Int { losses }
+    public var breakevenTrades: Int { breakevens }
+    public var maxConsecutiveWins: Int { maxWinStreak }
+    public var maxConsecutiveLosses: Int { maxLossStreak }
+}
+
 public struct EquityPoint: Equatable {
     public let timestamp: Date
     public let dateString: String

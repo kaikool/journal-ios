@@ -38,6 +38,11 @@ public enum Formatters {
         Formatters.currency(amount, currencyCode: currency, isPrivate: isPrivate)
     }
     
+    public static func formatCurrency(_ amount: Decimal?, currency: String = "USD", isPrivate: Bool = false) -> String {
+        guard let a = amount else { return "-" }
+        return Formatters.currency(a, currencyCode: currency, isPrivate: isPrivate)
+    }
+    
     /// Định dạng P&L có dấu cộng/trừ rõ ràng
     public static func pnl(_ amount: Decimal, currencyCode: String = "USD", isPrivate: Bool = false) -> String {
         if isPrivate { return "••••••" }
@@ -47,6 +52,11 @@ public enum Formatters {
     
     public static func formatPnL(_ amount: Decimal, currency: String = "USD", isPrivate: Bool = false) -> String {
         Formatters.pnl(amount, currencyCode: currency, isPrivate: isPrivate)
+    }
+    
+    public static func formatPnL(_ amount: Decimal?, currency: String = "USD", isPrivate: Bool = false) -> String {
+        guard let a = amount else { return "-" }
+        return Formatters.pnl(a, currencyCode: currency, isPrivate: isPrivate)
     }
     
     /// Định dạng tỷ lệ phần trăm (ví dụ: 0.542 -> "54.2%")
