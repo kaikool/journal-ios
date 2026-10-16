@@ -688,7 +688,7 @@ public struct NewPropEntrySheet: View {
                     if kind == "payout" {
                         TextField("Tỷ lệ Trader nhận (%) (VD: 90)", text: $splitText)
                             .keyboardType(.numberPad)
-                        TextField("Phí khấu trừ chuyển khoản (\(defaultCurrency))", text: feeText)
+                        TextField("Phí khấu trừ chuyển khoản (\(defaultCurrency))", text: $feeText)
                             .keyboardType(.decimalPad)
                     }
                 }
