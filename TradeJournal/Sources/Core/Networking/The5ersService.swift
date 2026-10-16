@@ -203,8 +203,8 @@ public final class The5ersService: ObservableObject {
     
     // MARK: - 2. JSON-RPC 2.0 MCP Client (`https://mcp.the5ers.com/mcp`)
     
-    /// Gửi một yêu cầu JSON-RPC 2.0 tới The5ers MCP server
-    public func callMcpTool(name: String, arguments: [String: Any] = [:]) async throws -> [String: Any] {
+    /// Gửi một yêu cầu JSON-RPC 2.0 tới The5ers MCP server tuân thủ chuẩn Model Context Protocol
+    public func sendMcpRpc(method: String, params: [String: Any]) async throws -> [String: Any] {
         guard isConfigured else {
             throw NSError(domain: "The5ersMCP", code: 401, userInfo: [NSLocalizedDescriptionKey: "Chưa kết nối The5ers. Hãy bấm 'Đăng Nhập The5ers Hub (OAuth)' hoặc nhập Session Token."])
         }
@@ -216,6 +216,7 @@ public final class The5ersService: ObservableObject {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        // Yêu cầu bắt buộc của The5ers MCP: chấp nhận cả application/json và text/event-stream
         request.setValue("application/json, text/event-stream", forHTTPHeaderField: "Accept")
         request.setValue("Bearer \(mcpToken)", forHTTPHeaderField: "Authorization")
         request.setValue(Self.protocolVersion, forHTTPHeaderField: "MCP-Protocol-Version")
@@ -226,11 +227,8 @@ public final class The5ersService: ObservableObject {
         let rpcPayload: [String: Any] = [
             "jsonrpc": "2.0",
             "id": currentId,
-            "method": "tools/call",
-            "params": [
-                "name": name,
-                "arguments": arguments
-            ]
+            "method": method,
+            "params": params
         ]
         request.httpBody = try JSONSerialization.data(withJSONObject: rpcPayload)
         
@@ -288,43 +286,25 @@ public final class The5ersService: ObservableObject {
         return result
     }
     
-    /// Kiểm tra kết nối The5ers MCP qua phương thức ping discovery `tools/list`
+    /// Gửi một yêu cầu gọi MCP Tool tới The5ers MCP server
+    public func callMcpTool(name: String, arguments: [String: Any] = [:]) async throws -> [String: Any] {
+        return try await sendMcpRpc(method: "tools/call", params: [
+            "name": name,
+            "arguments": arguments
+        ])
+    }
+    
+    /// Kiểm tra kết nối The5ers MCP qua phương thức discovery `tools/list`
     public func pingMcpConnection() async throws -> (success: Bool, message: String) {
         guard isConfigured else {
-            return (false, "Chưa kết nối The5ers MCP. Hãy bấm 'Connect The5ers (OAuth PKCE)'.")
+            return (false, "Chưa kết nối The5ers MCP. Hãy bấm 'Đăng Nhập The5ers Hub (OAuth)'.")
         }
         
-        rpcIdCounter += 1
-        guard let url = URL(string: Self.mcpUrl) else { throw URLError(.badURL) }
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(mcpToken)", forHTTPHeaderField: "Authorization")
-        request.setValue(Self.protocolVersion, forHTTPHeaderField: "MCP-Protocol-Version")
-        
-        let pingPayload: [String: Any] = [
-            "jsonrpc": "2.0",
-            "id": rpcIdCounter,
-            "method": "tools/list",
-            "params": [:]
-        ]
-        request.httpBody = try JSONSerialization.data(withJSONObject: pingPayload)
-        
         do {
-            let (data, response) = try await session.data(for: request)
-            guard let http = response as? HTTPURLResponse else {
-                return (false, "Không có phản hồi từ máy chủ The5ers MCP.")
-            }
-            if (200...299).contains(http.statusCode) {
-                self.isConnected = true
-                return (true, "Kết nối The5ers MCP Server thành công! Giao thức 2025-03-26 hoạt động.")
-            } else if http.statusCode == 401 {
-                self.isConnected = false
-                return (false, "Lỗi 401: Token ủy quyền The5ers MCP đã hết hạn.")
-            } else {
-                let errText = String(data: data, encoding: .utf8) ?? "Lỗi HTTP \(http.statusCode)"
-                return (false, "The5ers MCP phản hồi lỗi: \(errText)")
-            }
+            let res = try await sendMcpRpc(method: "tools/list", params: [:])
+            self.isConnected = true
+            let tools = res["tools"] as? [[String: Any]] ?? []
+            return (true, "Kết nối The5ers MCP Server thành công! Giao thức 2025-03-26 hoạt động (\(tools.count) công cụ sẵn sàng).")
         } catch {
             return (false, "Lỗi kết nối The5ers MCP: \(error.localizedDescription)")
         }
