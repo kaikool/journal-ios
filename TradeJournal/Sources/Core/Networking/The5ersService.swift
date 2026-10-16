@@ -22,6 +22,7 @@ public final class The5ersService: ObservableObject {
     
     public static let mcpUrl = "https://mcp.the5ers.com/mcp"
     public static let authHost = "https://auth.hub.the5ers.com"
+    public static let tenantPath = "P37sOCdLJjVCAuLgqv2zMvS61Xbo/RS3HzAPk1eHIYMvTuvNbOQUYZQOZo"
     public static let protocolVersion = "2025-03-26"
     
     @Published public var mcpToken: String = ""
@@ -54,9 +55,49 @@ public final class The5ersService: ObservableObject {
         self.isConnected = false
         self.mcpSessionId = nil
         UserDefaults.standard.removeObject(forKey: "the5ers_mcp_token")
+        UserDefaults.standard.removeObject(forKey: "the5ers_mcp_refresh_token")
     }
     
     // MARK: - 1. OAuth 2.0 PKCE Flow (Official The5ers Hub OAuth)
+    
+    /// Đăng ký dynamic client RFC 7591 với máy chủ The5ers Descope Hub
+    private func getOrRegisterClientId(redirectUri: String) async throws -> String {
+        let key = "the5ers_mcp_client_id"
+        if let cached = UserDefaults.standard.string(forKey: key), !cached.isEmpty {
+            return cached
+        }
+        
+        guard let url = URL(string: "\(Self.authHost)/v1/mgmt/mcp/client/\(Self.tenantPath)/register") else {
+            throw URLError(.badURL)
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        
+        let payload: [String: Any] = [
+            "client_name": "Trade Journal iOS",
+            "redirect_uris": [redirectUri],
+            "response_types": ["code"],
+            "grant_types": ["authorization_code", "refresh_token"],
+            "token_endpoint_auth_method": "none"
+        ]
+        request.httpBody = try JSONSerialization.data(withJSONObject: payload)
+        
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            let err = String(data: data, encoding: .utf8) ?? "HTTP \((response as? HTTPURLResponse)?.statusCode ?? -1)"
+            throw NSError(domain: "The5ersOAuth", code: -1, userInfo: [NSLocalizedDescriptionKey: "Lỗi đăng ký dynamic client: \(err)"])
+        }
+        
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let clientId = json["client_id"] as? String else {
+            throw NSError(domain: "The5ersOAuth", code: -1, userInfo: [NSLocalizedDescriptionKey: "Phản hồi đăng ký The5ers không chứa client_id."])
+        }
+        
+        UserDefaults.standard.set(clientId, forKey: key)
+        return clientId
+    }
     
     @MainActor
     public func startOAuthLogin() async throws -> String {
@@ -78,22 +119,24 @@ public final class The5ersService: ObservableObject {
         let callbackScheme = "tradejournal"
         let redirectUri = "\(callbackScheme)://the5ers-callback"
         
+        let clientId = try await getOrRegisterClientId(redirectUri: redirectUri)
+        
         let scopes = [
             "mcp:accounts.read",
             "mcp:balance.read",
             "mcp:performance.read",
+            "mcp:positions.read",
             "mcp:programs.read",
             "mcp:consistency.read",
             "mcp:payouts.read",
-            "mcp:positions.read",
             "mcp:purchases.read"
         ].joined(separator: " ")
         
-        var comp = URLComponents(string: "\(Self.authHost)/oauth2/v1/authorize")!
+        var comp = URLComponents(string: "\(Self.authHost)/oauth2/v1/apps/agentic/\(Self.tenantPath)/authorize")!
         comp.queryItems = [
             URLQueryItem(name: "response_type", value: "code"),
             URLQueryItem(name: "resource", value: Self.mcpUrl),
-            URLQueryItem(name: "client_id", value: "trade-journal-ios"),
+            URLQueryItem(name: "client_id", value: clientId),
             URLQueryItem(name: "redirect_uri", value: redirectUri),
             URLQueryItem(name: "scope", value: scopes),
             URLQueryItem(name: "state", value: state),
@@ -110,17 +153,20 @@ public final class The5ersService: ObservableObject {
         // Trích xuất mã authorization code từ redirect query
         guard let components = URLComponents(url: callbackUrl, resolvingAgainstBaseURL: false),
               let code = components.queryItems?.first(where: { $0.name == "code" })?.value else {
+            if let err = components.queryItems?.first(where: { $0.name == "error_description" || $0.name == "error" })?.value {
+                throw NSError(domain: "The5ersOAuth", code: -1, userInfo: [NSLocalizedDescriptionKey: "The5ers Hub từ chối xác thực: \(err)"])
+            }
             throw NSError(domain: "The5ersOAuth", code: -1, userInfo: [NSLocalizedDescriptionKey: "Không nhận được mã xác thực code từ The5ers Hub."])
         }
         
         // Trao đổi token bằng mã code và verifier PKCE
-        let token = try await exchangeCodeForToken(code: code, verifier: verifier, redirectUri: redirectUri)
+        let token = try await exchangeCodeForToken(code: code, verifier: verifier, clientId: clientId, redirectUri: redirectUri)
         configure(token: token)
         return token
     }
     
-    private func exchangeCodeForToken(code: String, verifier: String, redirectUri: String) async throws -> String {
-        guard let url = URL(string: "\(Self.authHost)/oauth2/v1/token") else { throw URLError(.badURL) }
+    private func exchangeCodeForToken(code: String, verifier: String, clientId: String, redirectUri: String) async throws -> String {
+        guard let url = URL(string: "\(Self.authHost)/oauth2/v1/apps/agentic/\(Self.tenantPath)/token") else { throw URLError(.badURL) }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
@@ -128,22 +174,27 @@ public final class The5ersService: ObservableObject {
         
         let bodyParams = [
             "grant_type=authorization_code",
-            "client_id=trade-journal-ios",
-            "code=\(code)",
+            "client_id=\(clientId.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? clientId)",
+            "code=\(code.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? code)",
             "redirect_uri=\(redirectUri.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? redirectUri)",
-            "code_verifier=\(verifier)"
+            "code_verifier=\(verifier.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? verifier)",
+            "resource=\(Self.mcpUrl.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? Self.mcpUrl)"
         ].joined(separator: "&")
         request.httpBody = bodyParams.data(using: .utf8)
         
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            let errStr = String(data: data, encoding: .utf8) ?? "HTTP \( (response as? HTTPURLResponse)?.statusCode ?? -1 )"
+            let errStr = String(data: data, encoding: .utf8) ?? "HTTP \((response as? HTTPURLResponse)?.statusCode ?? -1)"
             throw NSError(domain: "The5ersOAuth", code: -1, userInfo: [NSLocalizedDescriptionKey: "Lỗi trao đổi token: \(errStr)"])
         }
         
         guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
               let accessToken = json["access_token"] as? String else {
             throw NSError(domain: "The5ersOAuth", code: -1, userInfo: [NSLocalizedDescriptionKey: "Không tìm thấy access_token trong phản hồi The5ers."])
+        }
+        
+        if let refreshToken = json["refresh_token"] as? String {
+            UserDefaults.standard.set(refreshToken, forKey: "the5ers_mcp_refresh_token")
         }
         
         return accessToken
@@ -154,7 +205,7 @@ public final class The5ersService: ObservableObject {
     /// Gửi một yêu cầu JSON-RPC 2.0 tới The5ers MCP server
     public func callMcpTool(name: String, arguments: [String: Any] = [:]) async throws -> [String: Any] {
         guard isConfigured else {
-            throw NSError(domain: "The5ersMCP", code: 401, userInfo: [NSLocalizedDescriptionKey: "Chưa kết nối The5ers. Hãy bấm 'Connect The5ers (OAuth PKCE) hoặc nhập Session Token."])
+            throw NSError(domain: "The5ersMCP", code: 401, userInfo: [NSLocalizedDescriptionKey: "Chưa kết nối The5ers. Hãy bấm 'Đăng Nhập The5ers Hub (OAuth)' hoặc nhập Session Token."])
         }
         
         rpcIdCounter += 1
@@ -203,9 +254,34 @@ public final class The5ersService: ObservableObject {
             throw NSError(domain: "The5ersMCP", code: http.statusCode, userInfo: [NSLocalizedDescriptionKey: msg])
         }
         
-        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let result = json["result"] as? [String: Any] else {
+        // Trích xuất JSON từ định dạng Server-Sent Events (SSE) nếu cần
+        var jsonData = data
+        if let text = String(data: data, encoding: .utf8), text.contains("data:") {
+            let lines = text.components(separatedBy: .newlines)
+            for line in lines {
+                let trimmed = line.trimmingCharacters(in: .whitespaces)
+                if trimmed.hasPrefix("data:") {
+                    let jsonSub = String(trimmed.dropFirst(5)).trimmingCharacters(in: .whitespaces)
+                    if let d = jsonSub.data(using: .utf8),
+                       (try? JSONSerialization.jsonObject(with: d)) != nil {
+                        jsonData = d
+                        break
+                    }
+                }
+            }
+        }
+        
+        guard let json = try JSONSerialization.jsonObject(with: jsonData) as? [String: Any] else {
             throw NSError(domain: "The5ersMCP", code: -1, userInfo: [NSLocalizedDescriptionKey: "Phản hồi MCP JSON-RPC không đúng định dạng."])
+        }
+        
+        if let rpcError = json["error"] as? [String: Any],
+           let errorMsg = rpcError["message"] as? String {
+            throw NSError(domain: "The5ersMCP", code: -1, userInfo: [NSLocalizedDescriptionKey: "The5ers MCP báo lỗi: \(errorMsg)"])
+        }
+        
+        guard let result = json["result"] as? [String: Any] else {
+            throw NSError(domain: "The5ersMCP", code: -1, userInfo: [NSLocalizedDescriptionKey: "Phản hồi MCP JSON-RPC thiếu trường result."])
         }
         
         return result

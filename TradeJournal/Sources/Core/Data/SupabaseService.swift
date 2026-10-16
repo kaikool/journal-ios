@@ -503,9 +503,14 @@ public final class SupabaseService {
         return try jsonDecoder.decode([Account].self, from: data)
     }
     
-    public func fetchExecutions(accountId: String) async throws -> [Execution] {
+    public func fetchExecutions(accountId: String? = nil) async throws -> [Execution] {
         guard isConfigured else { return [] }
-        let endpoint = "executions?account_id=eq.\(accountId)&select=*"
+        let endpoint: String
+        if let acc = accountId, !acc.isEmpty {
+            endpoint = "executions?account_id=eq.\(acc)&select=*"
+        } else {
+            endpoint = "executions?select=*"
+        }
         let request = try makeRequest(endpoint: endpoint)
         let (data, response) = try await session.data(for: request)
         try validateResponse(response, data: data, endpoint: endpoint)

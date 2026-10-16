@@ -105,11 +105,21 @@ public struct TradeReplayView: View {
                     }
                     
                     if frame.visibleBars.isEmpty {
-                        EmptyStateView(
-                            icon: "waveform.path.ecg",
-                            title: "Đang tải dữ liệu nến",
-                            message: "Chuẩn bị nến lịch sử cho quá trình Replay."
-                        )
+                        VStack(spacing: 12) {
+                            EmptyStateView(
+                                icon: isLoadingCandles ? "waveform.path.ecg" : "chart.line.uptrend.xyaxis",
+                                title: isLoadingCandles ? "Đang tải nến lịch sử" : "Chưa có dữ liệu nến",
+                                message: isLoadingCandles ? "Đang kết nối sàn giao dịch để tải nến cho \(trade.symbol)..." : (candleErrorMessage.isEmpty ? "Không có dữ liệu nến từ sàn giao dịch." : candleErrorMessage)
+                            )
+                            if !isLoadingCandles {
+                                Button {
+                                    Task { await loadMarketCandles() }
+                                } label: {
+                                    Label("Tải lại nến", systemImage: "arrow.clockwise")
+                                }
+                                .buttonStyle(.bordered)
+                            }
+                        }
                         .frame(height: 220)
                     } else {
                         Chart {
@@ -232,12 +242,10 @@ public struct TradeReplayView: View {
                 self.dataSourceName = provider
                 self.currentStep = min(5, fetchedBars.count)
             } else {
-                candleErrorMessage = "Không có nến lịch sử từ sàn. Đang dùng mô phỏng."
-                generateSyntheticBarsFallback()
+                candleErrorMessage = "Sàn giao dịch (\(provider)) không có dữ liệu nến cho khoảng thời gian vào lệnh này."
             }
         } catch {
-            candleErrorMessage = "\(error.localizedDescription) • Đang dùng mô phỏng."
-            generateSyntheticBarsFallback()
+            candleErrorMessage = error.localizedDescription
         }
         isLoadingCandles = false
     }
@@ -275,42 +283,5 @@ public struct TradeReplayView: View {
         currentStep = bars.count
         isPlaying = false
         timer?.invalidate()
-    }
-    
-    /// Dự phòng mô phỏng khi chưa có mạng hoặc chưa nhập OANDA
-    private func generateSyntheticBarsFallback() {
-        guard bars.isEmpty else { return }
-        self.dataSourceName = "Mô phỏng nội suy"
-        
-        let entryPrice = (trade.avgEntry as NSDecimalNumber).doubleValue
-        let exitPrice = ((trade.avgExit ?? trade.avgEntry) as NSDecimalNumber).doubleValue
-        let startTime = Int64(trade.openedAt.timeIntervalSince1970 * 1000)
-        let totalBars = 30
-        
-        var generated: [MarketBar] = []
-        var currentPrice = entryPrice
-        let priceStep = (exitPrice - entryPrice) / Double(totalBars)
-        
-        for i in 0..<totalBars {
-            let t = startTime + Int64(i * 60_000)
-            let wiggle = (Double(i % 3) - 1.0) * (abs(exitPrice - entryPrice) * 0.15 + 0.5)
-            let open = currentPrice
-            let close = currentPrice + priceStep + wiggle
-            let high = max(open, close) + abs(wiggle) * 0.5 + 0.2
-            let low = min(open, close) - abs(wiggle) * 0.5 - 0.2
-            currentPrice = close
-            
-            generated.append(MarketBar(
-                timestamp: t,
-                open: Decimal(open),
-                high: Decimal(high),
-                low: Decimal(low),
-                close: Decimal(close),
-                volume: Decimal(100)
-            ))
-        }
-        
-        self.bars = generated
-        self.currentStep = min(5, generated.count)
     }
 }

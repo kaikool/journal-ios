@@ -895,6 +895,8 @@ public struct ConnectionsSettingsView: View {
     
     @State private var mcpToken: String = The5ersService.shared.mcpToken
     @State private var the5ersStatus: String = ""
+    @State private var isConnectingThe5ers: Bool = false
+    @State private var showManualThe5ersToken: Bool = false
     
     @State private var supabaseUrl: String = SupabaseService.shared.supabaseUrl
     @State private var supabaseAnonKey: String = SupabaseService.shared.supabaseAnonKey
@@ -917,40 +919,52 @@ public struct ConnectionsSettingsView: View {
                             .foregroundColor(the5ers.isConnected ? AppColors.profit : AppColors.secondaryText)
                     }
                     
-                    Text("Official The5ers MCP Service tại `https://mcp.the5ers.com/mcp` (Giao thức 2025-03-26). Sử dụng Bearer Access Token để thực thi JSON-RPC 2.0 (read-only) lấy tài khoản, vị thế lệnh và lịch sử rút tiền.")
+                    Text("Official The5ers MCP Service tại `https://mcp.the5ers.com/mcp` (Giao thức 2025-03-26). Xác thực qua cổng OAuth 2.0 PKCE của The5ers Hub để đồng bộ tài khoản, vị thế lệnh và lịch sử rút tiền.")
                         .font(AppTypography.caption)
                         .foregroundColor(AppColors.secondaryText)
                     
-                    // Session Token Manual Override (Dành cho người dùng nhập token từ Hub)
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("The5ers MCP Bearer Token:")
-                            .font(AppTypography.captionBold)
-                            .foregroundColor(AppColors.secondaryText)
-                        
-                        HStack {
-                            SecureField("Dán The5ers MCP Bearer token...", text: $mcpToken)
-                                .textFieldStyle(.roundedBorder)
-                                .textInputAutocapitalization(.never)
-                                .autocorrectionDisabled(true)
-                            
-                            Button("Lưu token") {
-                                the5ers.configure(token: mcpToken)
-                                the5ersStatus = "Đã lưu Session Token The5ers MCP."
+                    // Main Action: OAuth Login vs Connected Actions
+                    if !the5ers.isConnected {
+                        Button {
+                            loginThe5ersOAuth()
+                        } label: {
+                            HStack {
+                                if isConnectingThe5ers {
+                                    ProgressView().scaleEffect(0.8)
+                                    Text("Đang kết nối The5ers Hub...")
+                                } else {
+                                    Image(systemName: "person.badge.key.fill")
+                                    Text("Đăng Nhập The5ers Hub (OAuth)")
+                                        .font(AppTypography.headline)
+                                }
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(AppColors.accent)
+                        .disabled(isConnectingThe5ers)
+                    } else {
+                        HStack(spacing: 8) {
+                            Button {
+                                syncThe5ers()
+                            } label: {
+                                HStack {
+                                    if the5ers.isSyncing {
+                                        ProgressView().scaleEffect(0.8)
+                                    }
+                                    Text("Đồng bộ The5ers ngay")
+                                }
                             }
                             .buttonStyle(.borderedProminent)
                             .tint(AppColors.accent)
-                            .disabled(mcpToken.trimmingCharacters(in: .whitespaces).isEmpty)
-                        }
-                    }
-                    
-                    HStack(spacing: 8) {
-                        Button("Kiểm Tra MCP Server") {
-                            pingMcp()
-                        }
-                        .buttonStyle(.bordered)
-                        .disabled(mcpToken.trimmingCharacters(in: .whitespaces).isEmpty)
-                        
-                        if the5ers.isConnected {
+                            .disabled(the5ers.isSyncing)
+                            
+                            Button("Kiểm Tra MCP") {
+                                pingMcp()
+                            }
+                            .buttonStyle(.bordered)
+                            
                             Button("Ngắt kết nối") {
                                 the5ers.disconnect()
                                 mcpToken = ""
@@ -967,32 +981,35 @@ public struct ConnectionsSettingsView: View {
                             .foregroundColor(the5ersStatus.contains("Lỗi") ? AppColors.loss : AppColors.profit)
                     }
                     
-                    // Sync Box
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Đồng bộ dữ liệu thực tế The5ers MCP")
-                                    .font(AppTypography.subheadlineBold)
-                                Text("Gọi `the5ers_account`, `the5ers_positions`, `the5ers_payout` cập nhật vị thế và sổ cái.")
-                                    .font(AppTypography.caption)
-                                    .foregroundColor(AppColors.secondaryText)
-                            }
-                            Spacer()
-                            Button {
-                                syncThe5ers()
-                            } label: {
-                                HStack {
-                                    if the5ers.isSyncing {
-                                        ProgressView().scaleEffect(0.8)
-                                    }
-                                    Text("Sync MCP now")
+                    // Collapsible Advanced: Session Token Manual Override
+                    DisclosureGroup("Cài đặt token thủ công (Nâng cao)", isExpanded: $showManualThe5ersToken) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("The5ers MCP Bearer Token:")
+                                .font(AppTypography.captionBold)
+                                .foregroundColor(AppColors.secondaryText)
+                            
+                            HStack {
+                                SecureField("Dán The5ers MCP Bearer token...", text: $mcpToken)
+                                    .textFieldStyle(.roundedBorder)
+                                    .textInputAutocapitalization(.never)
+                                    .autocorrectionDisabled(true)
+                                
+                                Button("Lưu token") {
+                                    the5ers.configure(token: mcpToken)
+                                    the5ersStatus = "Đã lưu Session Token The5ers MCP."
                                 }
+                                .buttonStyle(.borderedProminent)
+                                .tint(AppColors.accent)
+                                .disabled(mcpToken.trimmingCharacters(in: .whitespaces).isEmpty)
                             }
-                            .buttonStyle(.borderedProminent)
-                            .tint(AppColors.accent)
-                            .disabled(the5ers.isSyncing || mcpToken.trimmingCharacters(in: .whitespaces).isEmpty)
                         }
-                        
+                        .padding(.top, 6)
+                    }
+                    .font(AppTypography.caption)
+                    .foregroundColor(AppColors.secondaryText)
+                    
+                    // Sync Info Box
+                    VStack(alignment: .leading, spacing: 8) {
                         HStack {
                             Text("Tài khoản The5ers: \(dataStore.propAccounts.filter { $0.firm.contains("The5ers") }.count)")
                                 .font(AppTypography.caption)
@@ -1133,6 +1150,26 @@ public struct ConnectionsSettingsView: View {
     }
     
     // MARK: - Actions
+    
+    private func loginThe5ersOAuth() {
+        isConnectingThe5ers = true
+        the5ersStatus = "Đang mở trang đăng nhập ủy quyền The5ers Hub..."
+        Task {
+            do {
+                let token = try await the5ers.startOAuthLogin()
+                await MainActor.run {
+                    self.mcpToken = token
+                    self.isConnectingThe5ers = false
+                    self.the5ersStatus = "Đăng nhập The5ers Hub thành công! Đã kết nối MCP Server."
+                }
+            } catch {
+                await MainActor.run {
+                    self.isConnectingThe5ers = false
+                    self.the5ersStatus = "Lỗi xác thực OAuth: \(error.localizedDescription)"
+                }
+            }
+        }
+    }
     
     private func pingMcp() {
         the5ers.configure(token: mcpToken)
