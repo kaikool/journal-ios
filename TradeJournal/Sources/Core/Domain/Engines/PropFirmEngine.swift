@@ -1,4 +1,7 @@
 import Foundation
+import CryptoKit
+
+// MARK: - Core Enums
 
 public enum PropProgram: String, CaseIterable, Codable, Sendable {
     case evaluation = "evaluation"
@@ -42,6 +45,16 @@ public enum PayoutStatus: String, CaseIterable, Codable, Sendable {
     case completed = "completed"
     case rejected = "rejected"
     case cancelled = "cancelled"
+    
+    public var label: String {
+        switch self {
+        case .requested: return "Đã yêu cầu"
+        case .approved: return "Đã duyệt"
+        case .completed: return "Hoàn tất"
+        case .rejected: return "Từ chối"
+        case .cancelled: return "Đã hủy"
+        }
+    }
 }
 
 public enum PropExpenseCategory: String, CaseIterable, Codable, Sendable {
@@ -68,17 +81,27 @@ public enum PropExpenseCategory: String, CaseIterable, Codable, Sendable {
     }
 }
 
+// MARK: - Domain Models
+
 public struct PropAccountItem: Identifiable, Codable, Equatable, Sendable {
     public let id: String
-    public var firm: String // Topstep, FTMO, The5ers, FundingPips...
+    public var firm: String
     public var name: String
     public var program: PropProgram
     public var status: PropStatus
     public var currency: String
-    public var sizeMinor: Int64? // 50,000 USD = 5,000,000 cents
+    public var sizeMinor: Int64?
+    public var parentId: String?
+    public var journalAccountId: String?
     public var openedOn: String
     public var closedOn: String?
+    public var renewalOn: String?
+    public var renewalMinor: Int64?
     public var notes: String
+    public var archived: Bool
+    public var revision: Int
+    public let createdAt: String
+    public var updatedAt: String
     
     public init(
         id: String = JournalIds.newId(),
@@ -88,9 +111,17 @@ public struct PropAccountItem: Identifiable, Codable, Equatable, Sendable {
         status: PropStatus = .active,
         currency: String = "USD",
         sizeMinor: Int64? = nil,
+        parentId: String? = nil,
+        journalAccountId: String? = nil,
         openedOn: String,
         closedOn: String? = nil,
-        notes: String = ""
+        renewalOn: String? = nil,
+        renewalMinor: Int64? = nil,
+        notes: String = "",
+        archived: Bool = false,
+        revision: Int = 0,
+        createdAt: String = JournalIds.nowIso(),
+        updatedAt: String = JournalIds.nowIso()
     ) {
         self.id = id
         self.firm = firm
@@ -99,9 +130,17 @@ public struct PropAccountItem: Identifiable, Codable, Equatable, Sendable {
         self.status = status
         self.currency = currency
         self.sizeMinor = sizeMinor
+        self.parentId = parentId
+        self.journalAccountId = journalAccountId
         self.openedOn = openedOn
         self.closedOn = closedOn
+        self.renewalOn = renewalOn
+        self.renewalMinor = renewalMinor
         self.notes = notes
+        self.archived = archived
+        self.revision = revision
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
     }
 }
 
@@ -109,7 +148,7 @@ public struct PropEntryItem: Identifiable, Codable, Equatable, Sendable {
     public let id: String
     public var accountId: String?
     public var firm: String
-    public var kind: String // "expense", "refund", "payout"
+    public var kind: String // "expense" | "refund" | "payout"
     public var category: String
     public var currency: String
     public var amountMinor: Int64
@@ -118,9 +157,13 @@ public struct PropEntryItem: Identifiable, Codable, Equatable, Sendable {
     public var occurredOn: String
     public var dueOn: String?
     public var status: PayoutStatus
+    public var parentId: String?
     public var reference: String
     public var notes: String
     public var voided: Bool
+    public var revision: Int
+    public let createdAt: String
+    public var updatedAt: String
     
     public init(
         id: String = JournalIds.newId(),
@@ -130,14 +173,18 @@ public struct PropEntryItem: Identifiable, Codable, Equatable, Sendable {
         category: String,
         currency: String = "USD",
         amountMinor: Int64,
-        splitBps: Int = 8000,
+        splitBps: Int = 10000,
         feeMinor: Int64 = 0,
         occurredOn: String,
         dueOn: String? = nil,
         status: PayoutStatus = .completed,
+        parentId: String? = nil,
         reference: String = "",
         notes: String = "",
-        voided: Bool = false
+        voided: Bool = false,
+        revision: Int = 0,
+        createdAt: String = JournalIds.nowIso(),
+        updatedAt: String = JournalIds.nowIso()
     ) {
         self.id = id
         self.accountId = accountId
@@ -151,9 +198,13 @@ public struct PropEntryItem: Identifiable, Codable, Equatable, Sendable {
         self.occurredOn = occurredOn
         self.dueOn = dueOn
         self.status = status
+        self.parentId = parentId
         self.reference = reference
         self.notes = notes
         self.voided = voided
+        self.revision = revision
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
     }
 }
 
@@ -166,16 +217,18 @@ public struct PropReceiptItem: Identifiable, Codable, Equatable, Sendable {
     public var reference: String
     public var notes: String
     public var voided: Bool
+    public let createdAt: String
     
     public init(
-        id: String = UUID().uuidString,
+        id: String = JournalIds.newId(),
         payoutId: String,
         kind: String = "receipt",
         amountMinor: Int64,
         occurredOn: String,
         reference: String = "",
         notes: String = "",
-        voided: Bool = false
+        voided: Bool = false,
+        createdAt: String = JournalIds.nowIso()
     ) {
         self.id = id
         self.payoutId = payoutId
@@ -185,10 +238,39 @@ public struct PropReceiptItem: Identifiable, Codable, Equatable, Sendable {
         self.reference = reference
         self.notes = notes
         self.voided = voided
+        self.createdAt = createdAt
     }
 }
 
-public struct CashMovementItem: Identifiable, Sendable {
+public struct PropAuditItem: Identifiable, Codable, Equatable, Sendable {
+    public let id: String
+    public let entityType: String
+    public let entityId: String
+    public let beforeJson: String?
+    public let afterJson: String
+    public let reason: String
+    public let createdAt: String
+    
+    public init(
+        id: String = JournalIds.newId(),
+        entityType: String,
+        entityId: String,
+        beforeJson: String?,
+        afterJson: String,
+        reason: String,
+        createdAt: String = JournalIds.nowIso()
+    ) {
+        self.id = id
+        self.entityType = entityType
+        self.entityId = entityId
+        self.beforeJson = beforeJson
+        self.afterJson = afterJson
+        self.reason = reason
+        self.createdAt = createdAt
+    }
+}
+
+public struct CashMovementItem: Identifiable, Equatable, Sendable {
     public let id: String
     public let entryId: String
     public let accountId: String?
@@ -199,6 +281,30 @@ public struct CashMovementItem: Identifiable, Sendable {
     public let amountMinor: Int64
     public let category: String
     public let reference: String
+    
+    public init(
+        id: String,
+        entryId: String,
+        accountId: String?,
+        firm: String,
+        currency: String,
+        date: String?,
+        kind: String,
+        amountMinor: Int64,
+        category: String,
+        reference: String
+    ) {
+        self.id = id
+        self.entryId = entryId
+        self.accountId = accountId
+        self.firm = firm
+        self.currency = currency
+        self.date = date
+        self.kind = kind
+        self.amountMinor = amountMinor
+        self.category = category
+        self.reference = reference
+    }
 }
 
 public struct CashSummaryResult: Sendable, Equatable {
@@ -208,6 +314,32 @@ public struct CashSummaryResult: Sendable, Equatable {
     public let receivedMinor: Int64
     public let netMinor: Int64
     public let roi: Double?
+    
+    public init(
+        spentMinor: Int64,
+        refundsMinor: Int64,
+        netSpendMinor: Int64,
+        receivedMinor: Int64,
+        netMinor: Int64,
+        roi: Double?
+    ) {
+        self.spentMinor = spentMinor
+        self.refundsMinor = refundsMinor
+        self.netSpendMinor = netSpendMinor
+        self.receivedMinor = receivedMinor
+        self.netMinor = netMinor
+        self.roi = roi
+    }
+}
+
+public struct CashTimelinePoint: Equatable, Sendable {
+    public let date: String
+    public let netMinor: Int64
+    
+    public init(date: String, netMinor: Int64) {
+        self.date = date
+        self.netMinor = netMinor
+    }
 }
 
 public struct PayoutProgressResult: Identifiable, Sendable {
@@ -221,29 +353,96 @@ public struct PayoutProgressResult: Identifiable, Sendable {
     public let isOverdue: Bool
 }
 
-/// Strict minor-unit arithmetic engine porting `lib/prop-firms.ts`
+public struct PropCsvImportResult: Sendable {
+    public let imported: Int
+    public let skipped: Int
+    public let sample: [[String: String]]
+}
+
+public enum PropFirmError: LocalizedError, Equatable {
+    case validation(String)
+    case notFound(String)
+    case conflict(String)
+    
+    public var errorDescription: String? {
+        switch self {
+        case .validation(let msg): return msg
+        case .notFound(let msg): return msg
+        case .conflict(let msg): return msg
+        }
+    }
+}
+
+// MARK: - Engine Functions & Financial Math
+
 public enum PropFirmEngine {
     
-    /// Parses decimal string into minor currency units without float loss (e.g. "120.50" USD -> 12050)
-    public static func toMinor(value: String, digits: Int = 2) throws -> Int64 {
-        let trimmed = value.trimmingCharacters(in: .whitespaces)
-        guard let decimal = Decimal(string: trimmed), decimal >= 0 else {
-            throw NSError(domain: "PropFirmEngine", code: 1, userInfo: [NSLocalizedDescriptionKey: "Enter a nonnegative decimal amount."])
+    private static let zeroDecimalCurrencies: Set<String> = [
+        "BIF", "CLP", "DJF", "GNF", "JPY", "KMF", "KRW", "MGA",
+        "PYG", "RWF", "UGX", "VND", "VUV", "XAF", "XOF", "XPF"
+    ]
+    
+    private static let threeDecimalCurrencies: Set<String> = [
+        "BHD", "IQD", "JOD", "KWD", "LYD", "OMR", "TND"
+    ]
+    
+    /// Trả về số chữ số thập phân chuẩn ISO 4217 cho mã tiền tệ
+    public static func currencyDigits(_ currency: String) throws -> Int {
+        let code = currency.trimmingCharacters(in: .whitespaces).uppercased()
+        guard code.count == 3, code.range(of: "^[A-Z]{3}$", options: .regularExpression) != nil else {
+            throw PropFirmError.validation("Choose a supported three-letter currency code.")
         }
-        let factor = pow(Decimal(10), digits)
-        let minorDecimal = decimal * factor
-        return (minorDecimal as NSDecimalNumber).int64Value
+        if zeroDecimalCurrencies.contains(code) { return 0 }
+        if threeDecimalCurrencies.contains(code) { return 3 }
+        return 2
     }
     
-    /// Formats integer minor units back to decimal string
-    public static func fromMinor(_ value: Int64, digits: Int = 2) -> String {
+    /// Chuyển đổi chính xác chuỗi thập phân sang đơn vị tiền tệ nhỏ nhất (Minor unit cents/pence),
+    /// cấm làm tròn âm thầm (silent rounding), cấm số âm hoặc format lỗi.
+    public static func toMinor(value: Any?, currency: String) throws -> Int64 {
+        let digits = try currencyDigits(currency)
+        guard let str = value as? String else {
+            throw PropFirmError.validation("Enter a nonnegative decimal amount.")
+        }
+        let trimmed = str.trimmingCharacters(in: .whitespaces)
+        guard let regex = try? NSRegularExpression(pattern: "^\\d+(?:\\.\\d+)?$"),
+              regex.firstMatch(in: trimmed, range: NSRange(location: 0, length: (trimmed as NSString).length)) != nil else {
+            throw PropFirmError.validation("Enter a nonnegative decimal amount.")
+        }
+        
+        let parts = trimmed.split(separator: ".", omittingEmptySubsequences: false)
+        let wholeStr = String(parts[0])
+        let fractionStr = parts.count > 1 ? String(parts[1]) : ""
+        
+        if fractionStr.count > digits {
+            throw PropFirmError.validation("\(currency) accepts \(digits) decimal places.")
+        }
+        
+        guard let whole = Int64(wholeStr) else {
+            throw PropFirmError.validation("Amount is too large.")
+        }
+        
+        let paddedFraction = fractionStr.padding(toLength: digits, withPad: "0", startingAt: 0)
+        let fraction = Int64(paddedFraction) ?? 0
+        let factor = Int64(pow(10.0, Double(digits)))
+        let result = whole * factor + fraction
+        
+        if result > 10_000_000_000 || result < 0 {
+            throw PropFirmError.validation("Amount is too large.")
+        }
+        return result
+    }
+    
+    /// Định dạng số nguyên minor units về chuỗi thập phân
+    public static func fromMinor(_ value: Int64, currency: String) throws -> String {
+        let digits = try currencyDigits(currency)
         let factor = pow(10.0, Double(digits))
         let doubleVal = Double(value) / factor
         return String(format: "%.\(digits)f", doubleVal)
     }
     
-    /// Exact expected payout formula from source:
-    /// `Number((BigInt(entry.amountMinor) * BigInt(entry.splitBps) + 5000n) / 10000n) - entry.feeMinor`
+    /// Tính toán kỳ vọng lợi nhuận ròng Payout của Trader theo tỷ lệ basis points:
+    /// `((amountMinor * splitBps + 5000) / 10000) - feeMinor`
     public static func expectedPayout(entry: PropEntryItem) -> Int64 {
         let amount = entry.amountMinor
         let split = Int64(entry.splitBps)
@@ -251,7 +450,7 @@ public enum PropFirmEngine {
         return calc - entry.feeMinor
     }
     
-    /// Sum of all valid receipts minus reversals for a given payout entry
+    /// Tổng số tiền thực nhận từ các biên lai thanh toán (trừ các khoản đảo/reversal)
     public static func receivedPayout(id: String, receipts: [PropReceiptItem]) -> Int64 {
         receipts.reduce(0) { sum, row in
             guard !row.voided && row.payoutId == id else { return sum }
@@ -260,12 +459,19 @@ public enum PropFirmEngine {
         }
     }
     
-    /// Reconstructs unified timeline of cash movements (expenses, refunds, payout receipts)
+    public static func receiptSettlementDate(receipt: PropReceiptItem) -> String? {
+        if receipt.notes.hasPrefix("[settlement-date-unknown]") {
+            return nil
+        }
+        return receipt.occurredOn
+    }
+    
+    /// Hợp nhất tất cả các chuyển dịch tiền tệ (Chi phí, Hoàn tiền, Biên lai nhận tiền, Đảo tiền)
     public static func cashMovements(entries: [PropEntryItem], receipts: [PropReceiptItem]) -> [CashMovementItem] {
         let activeEntries = entries.filter { !$0.voided }
         let entryMap = Dictionary(uniqueKeysWithValues: activeEntries.map { ($0.id, $0) })
         
-        let directMovements: [CashMovementItem] = activeEntries
+        let direct: [CashMovementItem] = activeEntries
             .filter { $0.kind != "payout" }
             .map { e in
                 CashMovementItem(
@@ -290,7 +496,7 @@ public enum PropFirmEngine {
                 accountId: entry.accountId,
                 firm: entry.firm,
                 currency: entry.currency,
-                date: r.occurredOn,
+                date: receiptSettlementDate(receipt: r),
                 kind: r.kind,
                 amountMinor: r.amountMinor,
                 category: "payout",
@@ -298,7 +504,7 @@ public enum PropFirmEngine {
             )
         }
         
-        return (directMovements + receiptMovements).sorted {
+        return (direct + receiptMovements).sorted {
             let dateA = $0.date ?? ""
             let dateB = $1.date ?? ""
             if dateA != dateB {
@@ -308,8 +514,13 @@ public enum PropFirmEngine {
         }
     }
     
-    /// Aggregates net cash spend, received payouts, and cash ROI
-    public static func cashSummary(rows: [CashMovementItem]) -> CashSummaryResult {
+    /// Tổng hợp số liệu tiền mặt (Spent, Refunds, Net Spend, Received, Net, ROI).
+    /// Bắt buộc chọn đúng 1 loại tiền tệ, từ chối việc cộng dồn tiền tệ khác nhau mà không có tỷ giá chứng từ.
+    public static func cashSummary(rows: [CashMovementItem]) throws -> CashSummaryResult {
+        let currencies = Set(rows.map { $0.currency })
+        if currencies.count > 1 {
+            throw PropFirmError.validation("Select one currency before combining cash amounts.")
+        }
         var spent: Int64 = 0
         var refunds: Int64 = 0
         var received: Int64 = 0
@@ -338,7 +549,25 @@ public enum PropFirmEngine {
         )
     }
     
-    /// Computes payout progress, remaining balance, and variance
+    /// Tính đường cong tích lũy dòng tiền ròng theo ngày (Cash Timeline)
+    public static func cashTimeline(rows: [CashMovementItem]) throws -> [CashTimelinePoint] {
+        _ = try cashSummary(rows: rows) // Kiểm tra tiền tệ đồng nhất
+        var daysMap: [String: Int64] = [:]
+        for row in rows where row.date != nil {
+            let mult: Int64 = (row.kind == "expense" || row.kind == "reversal") ? -1 : 1
+            daysMap[row.date!, default: 0] += row.amountMinor * mult
+        }
+        let sortedDates = daysMap.keys.sorted()
+        var runningNet: Int64 = 0
+        var points: [CashTimelinePoint] = []
+        for d in sortedDates {
+            runningNet += daysMap[d]!
+            points.append(CashTimelinePoint(date: d, netMinor: runningNet))
+        }
+        return points
+    }
+    
+    /// Tiến độ xử lý của từng khoản Payout (Actual, Expected, Remaining, Variance, Overdue, Partial)
     public static func payoutProgress(
         entries: [PropEntryItem],
         receipts: [PropReceiptItem],
@@ -371,5 +600,201 @@ public enum PropFirmEngine {
                     isOverdue: isOverdue
                 )
             }
+    }
+    
+    /// Tính tỷ lệ đỗ các vòng đánh giá: passed / (passed + breached)
+    public static func resolvedPhasePassRate(accounts: [PropAccountItem]) -> Double? {
+        let relevant = accounts.filter {
+            ($0.program == .evaluation || $0.program == .verification) &&
+            ($0.status == .passed || $0.status == .breached)
+        }
+        if relevant.isEmpty { return nil }
+        let passed = relevant.filter { $0.status == .passed }.count
+        return Double(passed) / Double(relevant.count)
+    }
+    
+    // MARK: - Generic Prop CSV Import
+    
+    /// Import file CSV tiền mặt Quỹ theo mẫu chuẩn `/prop-cash-template.csv`:
+    /// `id,kind,firm,account_id,currency,date,amount,category,expense_id,reference,notes`
+    public static func importPropCsv(
+        csvText: String,
+        preview: Bool,
+        existingAccounts: [PropAccountItem],
+        existingEntries: [PropEntryItem],
+        existingReceipts: [PropReceiptItem],
+        existingAudits: [PropAuditItem]
+    ) throws -> (result: PropCsvImportResult, entries: [PropEntryItem], receipts: [PropReceiptItem], audits: [PropAuditItem]) {
+        guard let data = csvText.data(using: .utf8), data.count <= 2 * 1024 * 1024 else {
+            throw PropFirmError.validation("CSV must be 2 MB or smaller.")
+        }
+        let quoteCount = csvText.filter { $0 == "\"" }.count
+        guard quoteCount % 2 == 0 else {
+            throw PropFirmError.validation("CSV has an unterminated quoted field.")
+        }
+        
+        let parsedRows = CSVParser.parse(csvText)
+        guard let header = parsedRows.first else {
+            throw PropFirmError.validation("Use the generic prop cash CSV header template.")
+        }
+        
+        let requiredColumns = [
+            "id", "kind", "firm", "account_id", "currency", "date",
+            "amount", "category", "expense_id", "reference", "notes"
+        ]
+        
+        guard header.count == requiredColumns.count &&
+              Set(header).count == requiredColumns.count &&
+              requiredColumns.allSatisfy({ header.contains($0) }) else {
+            throw PropFirmError.validation("Use the generic prop cash CSV header template.")
+        }
+        
+        let dataRows = Array(parsedRows.dropFirst()).filter { !$0.allSatisfy { $0.trimmingCharacters(in: .whitespaces).isEmpty } }
+        guard !dataRows.isEmpty && dataRows.count <= 1000 else {
+            throw PropFirmError.validation("Import 1–1,000 rows at a time.")
+        }
+        
+        var records: [[String: String]] = []
+        for (i, row) in dataRows.enumerated() {
+            guard row.count == header.count else {
+                throw PropFirmError.validation("Row \(i + 2): column count differs from the header.")
+            }
+            var dict: [String: String] = [:]
+            for (idx, col) in header.enumerated() {
+                dict[col] = row[idx].trimmingCharacters(in: .whitespaces)
+            }
+            records.append(dict)
+        }
+        
+        var seenIds = Set<String>()
+        for row in records {
+            let rowId = row["id"] ?? ""
+            guard rowId.range(of: "^[a-zA-Z0-9_-]{1,100}$", options: .regularExpression) != nil && !seenIds.contains(rowId) else {
+                throw PropFirmError.validation("Each CSV row needs a unique stable ID.")
+            }
+            seenIds.insert(rowId)
+        }
+        
+        var updatedEntries = existingEntries
+        var updatedReceipts = existingReceipts
+        var updatedAudits = existingAudits
+        var importedCount = 0
+        var skippedCount = 0
+        
+        let accountMap = Dictionary(uniqueKeysWithValues: existingAccounts.map { ($0.id, $0) })
+        
+        for (index, row) in records.enumerated() {
+            let kind = row["kind"] ?? ""
+            guard ["expense", "refund", "payout"].contains(kind) else {
+                throw PropFirmError.validation("Row \(index + 2): Kind must be expense, refund or payout (actual cash received).")
+            }
+            
+            let rowId = row["id"]!
+            let idHash = JournalIds.sha256(rowId)
+            let entryId = "csv-\(idHash)"
+            let rowJson = (try? String(data: JSONEncoder().encode(row), encoding: .utf8)) ?? ""
+            let fingerprint = "CSV import \(JournalIds.sha256(rowJson))"
+            
+            if let oldEntry = updatedEntries.first(where: { $0.id == entryId }) {
+                let matchedAudit = updatedAudits.first { $0.entityId == entryId && $0.reason == fingerprint }
+                guard matchedAudit != nil else {
+                    throw PropFirmError.validation("Row \(index + 2): This CSV ID was already imported with different data. Edit the existing record or use a new ID for a separate transaction.")
+                }
+                skippedCount += 1
+                continue
+            }
+            
+            let accountId = row["account_id"]?.isEmpty == false ? row["account_id"]! : nil
+            if kind == "payout" {
+                guard let accId = accountId, let acc = accountMap[accId],
+                      acc.program == .funded || acc.program == .instantFunded || acc.program == .live else {
+                    throw PropFirmError.validation("Row \(index + 2): Payouts need a funded, instant-funded or live prop account.")
+                }
+            }
+            
+            let currency = row["currency"] ?? "USD"
+            let amountMinor: Int64
+            do {
+                amountMinor = try toMinor(value: row["amount"], currency: currency)
+            } catch {
+                throw PropFirmError.validation("Row \(index + 2): \(error.localizedDescription)")
+            }
+            
+            var parentIdValue: String? = nil
+            if let expenseId = row["expense_id"], !expenseId.isEmpty {
+                if updatedEntries.contains(where: { $0.id == expenseId }) {
+                    parentIdValue = expenseId
+                } else {
+                    parentIdValue = "csv-\(JournalIds.sha256(expenseId))"
+                }
+            }
+            
+            if kind == "refund" {
+                guard let pId = parentIdValue, let parentExpense = updatedEntries.first(where: { $0.id == pId }) else {
+                    throw PropFirmError.validation("Row \(index + 2): Link this refund to a matching expense in the same account, firm and currency.")
+                }
+                let priorRefunds = updatedEntries
+                    .filter { $0.parentId == pId && !$0.voided && $0.id != entryId }
+                    .reduce(0) { $0 + $1.amountMinor }
+                guard priorRefunds + amountMinor <= parentExpense.amountMinor else {
+                    throw PropFirmError.validation("Row \(index + 2): Refunds cannot exceed the original expense.")
+                }
+            }
+            
+            let newEntry = PropEntryItem(
+                id: entryId,
+                accountId: accountId,
+                firm: row["firm"] ?? "",
+                kind: kind,
+                category: kind == "expense" ? (row["category"] ?? "evaluation") : kind,
+                currency: currency,
+                amountMinor: amountMinor,
+                splitBps: 10000,
+                feeMinor: 0,
+                occurredOn: row["date"] ?? "",
+                status: kind == "payout" ? .completed : .completed,
+                parentId: parentIdValue,
+                reference: row["reference"] ?? "",
+                notes: row["notes"] ?? "",
+                voided: false,
+                revision: kind == "payout" ? 2 : 1
+            )
+            
+            updatedEntries.append(newEntry)
+            
+            if kind == "payout" {
+                let receipt = PropReceiptItem(
+                    id: "\(entryId)-cash",
+                    payoutId: entryId,
+                    kind: "receipt",
+                    amountMinor: amountMinor,
+                    occurredOn: row["date"] ?? "",
+                    reference: row["reference"] ?? "",
+                    notes: row["notes"] ?? "",
+                    voided: false
+                )
+                updatedReceipts.append(receipt)
+            }
+            
+            let audit = PropAuditItem(
+                entityType: "entry",
+                entityId: entryId,
+                beforeJson: nil,
+                afterJson: rowJson,
+                reason: fingerprint
+            )
+            updatedAudits.append(audit)
+            importedCount += 1
+        }
+        
+        let sample = Array(records.prefix(5))
+        let importResult = PropCsvImportResult(imported: importedCount, skipped: skippedCount, sample: sample)
+        
+        if preview {
+            // Rollback — không lưu thay đổi vào data
+            return (importResult, existingEntries, existingReceipts, existingAudits)
+        }
+        
+        return (importResult, updatedEntries, updatedReceipts, updatedAudits)
     }
 }

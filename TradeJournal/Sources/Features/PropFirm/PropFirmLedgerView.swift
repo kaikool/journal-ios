@@ -1,201 +1,158 @@
 import SwiftUI
+import Charts
 
 public enum PropLedgerTab: String, CaseIterable, Identifiable {
+    case overview = "Tổng quan"
     case accounts = "Tài khoản"
-    case cashFlow = "Dòng tiền"
     case payouts = "Payouts"
+    case transactions = "Sổ cái dòng tiền"
     
     public var id: String { rawValue }
 }
 
 public struct PropFirmLedgerView: View {
-    @EnvironmentObject private var env: AppEnvironment
+    @ObservedObject private var dataStore = TradeDataStore.shared
+    @ObservedObject private var env = AppEnvironment.shared
     
-    @State private var selectedTab: PropLedgerTab = .accounts
-    @State private var accounts: [PropAccountItem] = [
-        PropAccountItem(
-            id: "prop-1",
-            firm: "Topstep",
-            name: "Topstep 50K Express Funded",
-            program: .funded,
-            status: .active,
-            currency: "USD",
-            sizeMinor: 50_000_00,
-            openedOn: "2026-09-01",
-            notes: "Tài khoản live Funded, quy tắc daily loss 1,000 USD."
-        ),
-        PropAccountItem(
-            id: "prop-2",
-            firm: "FTMO",
-            name: "FTMO 100K Normal Challenge",
-            program: .evaluation,
-            status: .passed,
-            currency: "USD",
-            sizeMinor: 100_000_00,
-            openedOn: "2026-08-15",
-            notes: "Đã qua vòng 1 với lợi nhuận 10.2%."
-        )
-    ]
-    
-    @State private var entries: [PropEntryItem] = [
-        PropEntryItem(
-            id: "entry-1",
-            accountId: "prop-1",
-            firm: "Topstep",
-            kind: "expense",
-            category: "activation",
-            currency: "USD",
-            amountMinor: 149_00,
-            occurredOn: "2026-09-01",
-            notes: "Phí kích hoạt tài khoản Express Funded"
-        ),
-        PropEntryItem(
-            id: "entry-2",
-            accountId: "prop-2",
-            firm: "FTMO",
-            kind: "expense",
-            category: "evaluation",
-            currency: "USD",
-            amountMinor: 540_00,
-            occurredOn: "2026-08-15",
-            notes: "Phí thi gói 100k"
-        ),
-        PropEntryItem(
-            id: "entry-3",
-            accountId: "prop-1",
-            firm: "Topstep",
-            kind: "payout",
-            category: "payout",
-            currency: "USD",
-            amountMinor: 2_500_00,
-            splitBps: 9000, // 90%
-            feeMinor: 25_00,
-            occurredOn: "2026-10-01",
-            status: .completed,
-            notes: "Payout kỳ đầu tiên"
-        )
-    ]
-    
-    @State private var receipts: [PropReceiptItem] = [
-        PropReceiptItem(
-            id: "rcpt-1",
-            payoutId: "entry-3",
-            kind: "receipt",
-            amountMinor: 2_225_00, // 2500 * 90% - 25 = 2225
-            occurredOn: "2026-10-03",
-            notes: "Đã nhận tiền qua Deel"
-        )
-    ]
+    @State private var selectedTab: PropLedgerTab = .overview
+    @State private var selectedCurrency: String = "USD"
+    @State private var showArchivedAccounts: Bool = false
     
     @State private var showNewAccountSheet: Bool = false
     @State private var showNewEntrySheet: Bool = false
+    @State private var showAddReceiptSheet: Bool = false
+    @State private var showRefundSheet: Bool = false
+    @State private var showVoidAlert: Bool = false
+    @State private var showCsvSheet: Bool = false
+    
+    @State private var selectedPayoutForReceipt: PropEntryItem? = nil
+    @State private var selectedExpenseForRefund: PropEntryItem? = nil
+    @State private var itemToVoid: (id: String, isEntry: Bool)? = nil
+    @State private var voidReason: String = ""
     
     public init() {}
     
+    private var availableCurrencies: [String] {
+        let set = Set(dataStore.propAccounts.map { $0.currency } + dataStore.propEntries.map { $0.currency })
+        return set.isEmpty ? ["USD"] : Array(set).sorted()
+    }
+    
+    private var filteredAccounts: [PropAccountItem] {
+        dataStore.propAccounts.filter {
+            (showArchivedAccounts || !$0.archived) && ($0.currency == selectedCurrency)
+        }
+    }
+    
+    private var filteredEntries: [PropEntryItem] {
+        dataStore.propEntries.filter { $0.currency == selectedCurrency }
+    }
+    
     private var movements: [CashMovementItem] {
-        PropFirmEngine.cashMovements(entries: entries, receipts: receipts)
+        PropFirmEngine.cashMovements(entries: filteredEntries, receipts: dataStore.propReceipts)
+            .filter { $0.currency == selectedCurrency }
     }
     
     private var summary: CashSummaryResult {
-        PropFirmEngine.cashSummary(rows: movements)
+        (try? PropFirmEngine.cashSummary(rows: movements)) ?? CashSummaryResult(
+            spentMinor: 0, refundsMinor: 0, netSpendMinor: 0, receivedMinor: 0, netMinor: 0, roi: nil
+        )
+    }
+    
+    private var timelinePoints: [CashTimelinePoint] {
+        (try? PropFirmEngine.cashTimeline(rows: movements)) ?? []
     }
     
     private var payoutItems: [PayoutProgressResult] {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
         let today = formatter.string(from: Date())
-        return PropFirmEngine.payoutProgress(entries: entries, receipts: receipts, today: today)
+        return PropFirmEngine.payoutProgress(
+            entries: filteredEntries,
+            receipts: dataStore.propReceipts,
+            today: today
+        )
+    }
+    
+    private var passRate: Double? {
+        PropFirmEngine.resolvedPhasePassRate(accounts: dataStore.propAccounts.filter { $0.currency == selectedCurrency })
     }
     
     public var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 16) {
-                    // Cash Ledger Summary Card
-                    AppCard {
-                        VStack(spacing: 12) {
-                            HStack {
-                                Text("TỔNG QUAN TIỀN MẶT QUỸ (CASH LEDGER)")
-                                    .font(AppTypography.caption)
-                                    .foregroundColor(AppColors.secondaryText)
-                                Spacer()
-                                if let roi = summary.roi {
-                                    AppBadge(
-                                        text: String(format: "ROI: %+.1f%%", roi * 100),
-                                        color: roi >= 0 ? AppColors.profit : AppColors.loss
-                                    )
-                                }
-                            }
-                            
-                            HStack(alignment: .firstTextBaseline) {
-                                let netDecimal = Decimal(summary.netMinor) / 100
-                                Text(Formatters.formatPnL(netDecimal, currency: env.currentCurrency))
-                                    .font(AppTypography.financialNumber(size: 30, weight: .bold))
-                                    .foregroundColor(Formatters.pnlColor(netDecimal))
-                                
-                                Spacer()
-                                
-                                Text("Lợi nhuận ròng quỹ")
-                                    .font(AppTypography.caption)
-                                    .foregroundColor(AppColors.secondaryText)
-                            }
-                            
-                            Divider().background(AppColors.border)
-                            
-                            HStack {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("Tổng chi (Thi + Phí)")
-                                        .font(AppTypography.caption)
-                                        .foregroundColor(AppColors.secondaryText)
-                                    Text(Formatters.formatCurrency(Decimal(summary.netSpendMinor) / 100, currency: env.currentCurrency))
-                                        .font(AppTypography.captionBold)
-                                        .foregroundColor(AppColors.loss)
-                                }
-                                
-                                Spacer()
-                                
-                                VStack(alignment: .trailing, spacing: 2) {
-                                    Text("Đã nhận (Payout)")
-                                        .font(AppTypography.caption)
-                                        .foregroundColor(AppColors.secondaryText)
-                                    Text(Formatters.formatCurrency(Decimal(summary.receivedMinor) / 100, currency: env.currentCurrency))
-                                        .font(AppTypography.captionBold)
-                                        .foregroundColor(AppColors.profit)
-                                }
-                            }
-                        }
-                    }
-                    
-                    // Segmented Tab Picker
-                    Picker("Mục quỹ", selection: $selectedTab) {
-                        ForEach(PropLedgerTab.allCases) { tab in
-                            Text(tab.rawValue).tag(tab)
+            VStack(spacing: 0) {
+                // Currency Selector Bar
+                HStack {
+                    Text("Tiền tệ:")
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.secondaryText)
+                    Picker("Tiền tệ", selection: $selectedCurrency) {
+                        ForEach(availableCurrencies, id: \.self) { c in
+                            Text(c).tag(c)
                         }
                     }
                     .pickerStyle(.segmented)
                     
-                    // Content by Tab
-                    switch selectedTab {
-                    case .accounts:
-                        accountsListView
-                    case .cashFlow:
-                        cashFlowListView
-                    case .payouts:
-                        payoutsProgressView
+                    Spacer()
+                    
+                    if selectedTab == .accounts {
+                        Toggle("Lưu trữ", isOn: $showArchivedAccounts)
+                            .toggleStyle(.button)
+                            .font(.system(size: 11, weight: .medium))
+                            .tint(AppColors.accent)
                     }
                 }
-                .padding()
+                .padding(.horizontal)
+                .padding(.vertical, 8)
+                .background(AppColors.cardBackground.opacity(0.6))
+                
+                // Segmented Tab Picker
+                Picker("Mục quỹ", selection: $selectedTab) {
+                    ForEach(PropLedgerTab.allCases) { tab in
+                        Text(tab.rawValue).tag(tab)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal)
+                .padding(.vertical, 6)
+                
+                // Content Switcher
+                ScrollView {
+                    VStack(spacing: 16) {
+                        switch selectedTab {
+                        case .overview:
+                            overviewView
+                        case .accounts:
+                            accountsListView
+                        case .payouts:
+                            payoutsProgressView
+                        case .transactions:
+                            transactionsListView
+                        }
+                    }
+                    .padding()
+                }
             }
-            .navigationTitle("Prop Firms")
+            .navigationTitle("Tích hợp Quỹ (Prop Firm)")
+            .navigationBarTitleDisplayMode(.inline)
             .background(AppColors.background)
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Menu {
-                        Button(action: { showNewAccountSheet = true }) {
+                        Button {
+                            showNewAccountSheet = true
+                        } label: {
                             Label("Thêm tài khoản quỹ", systemImage: "plus.circle")
                         }
-                        Button(action: { showNewEntrySheet = true }) {
+                        Button {
+                            showNewEntrySheet = true
+                        } label: {
                             Label("Thêm chi phí / Payout", systemImage: "dollarsign.circle")
+                        }
+                        Divider()
+                        Button {
+                            showCsvSheet = true
+                        } label: {
+                            Label("Import CSV Quỹ", systemImage: "square.and.arrow.down")
                         }
                     } label: {
                         Image(systemName: "plus")
@@ -203,36 +160,198 @@ public struct PropFirmLedgerView: View {
                 }
             }
             .sheet(isPresented: $showNewAccountSheet) {
-                NewPropAccountSheet { newAcc in
-                    accounts.append(newAcc)
+                NewPropAccountSheet(defaultCurrency: selectedCurrency) { newAcc in
+                    dataStore.savePropAccount(item: newAcc, reason: "Tạo tài khoản mới")
                 }
             }
             .sheet(isPresented: $showNewEntrySheet) {
-                NewPropEntrySheet(accounts: accounts) { newEntry in
-                    entries.append(newEntry)
+                NewPropEntrySheet(accounts: filteredAccounts, defaultCurrency: selectedCurrency) { newEntry in
+                    dataStore.savePropEntry(item: newEntry, reason: "Ghi nhận giao dịch")
+                }
+            }
+            .sheet(item: $selectedPayoutForReceipt) { payout in
+                AddReceiptSheet(payout: payout) { receipt in
+                    try? dataStore.addPropReceipt(item: receipt, reason: "Thanh toán tiền về")
+                }
+            }
+            .sheet(item: $selectedExpenseForRefund) { expense in
+                AddRefundSheet(expense: expense) { refundEntry in
+                    dataStore.savePropEntry(item: refundEntry, reason: "Hoàn tiền phí thi")
+                }
+            }
+            .sheet(isPresented: $showCsvSheet) {
+                PropCsvImportSheet()
+            }
+            .alert("Hủy giao dịch (Void)", isPresented: $showVoidAlert) {
+                TextField("Lý do hủy (bắt buộc)...", text: $voidReason)
+                Button("Hủy", role: .cancel) { itemToVoid = nil; voidReason = "" }
+                Button("Xác nhận hủy", role: .destructive) {
+                    if let target = itemToVoid {
+                        if target.isEntry {
+                            try? dataStore.voidPropEntry(id: target.id, voided: true, reason: voidReason.isEmpty ? "Hủy giao dịch" : voidReason)
+                        }
+                        itemToVoid = nil
+                        voidReason = ""
+                    }
+                }
+            } message: {
+                Text("Giao dịch sẽ được đánh dấu void và không tính vào dòng tiền, nhưng vẫn được lưu vết kiểm toán.")
+            }
+        }
+    }
+    
+    // MARK: - 1. Overview Tab
+    
+    private var overviewView: some View {
+        VStack(spacing: 16) {
+            // Summary Card
+            AppCard {
+                VStack(spacing: 12) {
+                    HStack {
+                        Text("LỢI NHUẬN RÒNG QUỸ (\(selectedCurrency))")
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.secondaryText)
+                        Spacer()
+                        if let roi = summary.roi {
+                            AppBadge(
+                                text: String(format: "ROI: %+.1f%%", roi * 100),
+                                color: roi >= 0 ? AppColors.profit : AppColors.loss
+                            )
+                        }
+                    }
+                    
+                    HStack(alignment: .firstTextBaseline) {
+                        let netDecimal = Decimal(summary.netMinor) / 100
+                        Text(Formatters.formatPnL(netDecimal, currency: selectedCurrency))
+                            .font(AppTypography.financialNumber(size: 32, weight: .bold))
+                            .foregroundColor(Formatters.pnlColor(netDecimal))
+                        Spacer()
+                    }
+                    
+                    Divider().background(AppColors.border)
+                    
+                    // Chi phí vs Nhận về
+                    Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 8) {
+                        GridRow {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Tổng chi")
+                                    .font(AppTypography.caption)
+                                    .foregroundColor(AppColors.secondaryText)
+                                Text(Formatters.formatCurrency(Decimal(summary.spentMinor) / 100, currency: selectedCurrency))
+                                    .font(AppTypography.captionBold)
+                                    .foregroundColor(AppColors.loss)
+                            }
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Được hoàn lại")
+                                    .font(AppTypography.caption)
+                                    .foregroundColor(AppColors.secondaryText)
+                                Text(Formatters.formatCurrency(Decimal(summary.refundsMinor) / 100, currency: selectedCurrency))
+                                    .font(AppTypography.captionBold)
+                                    .foregroundColor(AppColors.profit)
+                            }
+                        }
+                        GridRow {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Chi thực tế (Net Spend)")
+                                    .font(AppTypography.caption)
+                                    .foregroundColor(AppColors.secondaryText)
+                                Text(Formatters.formatCurrency(Decimal(summary.netSpendMinor) / 100, currency: selectedCurrency))
+                                    .font(AppTypography.subheadlineBold)
+                                    .foregroundColor(AppColors.primaryText)
+                            }
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Tiền Payout đã nhận")
+                                    .font(AppTypography.caption)
+                                    .foregroundColor(AppColors.secondaryText)
+                                Text(Formatters.formatCurrency(Decimal(summary.receivedMinor) / 100, currency: selectedCurrency))
+                                    .font(AppTypography.subheadlineBold)
+                                    .foregroundColor(AppColors.profit)
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Pass Rate & Account Outcomes Card
+            if let pr = passRate {
+                AppCard {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Tỷ lệ đỗ thi Quỹ (Pass Rate)")
+                                .font(AppTypography.caption)
+                                .foregroundColor(AppColors.secondaryText)
+                            Text(String(format: "%.1f%%", pr * 100))
+                                .font(AppTypography.headline)
+                                .foregroundColor(pr >= 0.5 ? AppColors.profit : AppColors.accent)
+                        }
+                        Spacer()
+                        Image(systemName: "trophy.fill")
+                            .font(.system(size: 28))
+                            .foregroundColor(AppColors.accent)
+                    }
+                }
+            }
+            
+            // Cumulative Net Cash Chart
+            if !timelinePoints.isEmpty {
+                AppCard {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("ĐƯỜNG CONG TÍCH LŨY DÒNG TIỀN")
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.secondaryText)
+                        
+                        Chart {
+                            ForEach(timelinePoints, id: \.date) { pt in
+                                LineMark(
+                                    x: .value("Ngày", pt.date),
+                                    y: .value("Lợi nhuận ròng", Double(pt.netMinor) / 100.0)
+                                )
+                                .interpolationMethod(.monotone)
+                                .foregroundStyle(AppColors.accent)
+                                
+                                AreaMark(
+                                    x: .value("Ngày", pt.date),
+                                    y: .value("Lợi nhuận ròng", Double(pt.netMinor) / 100.0)
+                                )
+                                .foregroundStyle(
+                                    LinearGradient(
+                                        colors: [AppColors.accent.opacity(0.3), Color.clear],
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    )
+                                )
+                            }
+                        }
+                        .frame(height: 180)
+                    }
                 }
             }
         }
     }
     
-    // MARK: - Subviews
+    // MARK: - 2. Accounts Tab
     
     private var accountsListView: some View {
         VStack(spacing: 12) {
-            if accounts.isEmpty {
+            if filteredAccounts.isEmpty {
                 EmptyStateView(
                     icon: "building.columns",
-                    title: "Chưa có tài khoản quỹ",
-                    message: "Thêm tài khoản Topstep, FTMO, The5ers... để quản lý chi phí thi và trạng thái."
+                    title: "Chưa có tài khoản quỹ \(selectedCurrency)",
+                    message: "Nhấn nút '+' ở trên để thêm tài khoản Topstep, FTMO, The5ers..."
                 )
             } else {
-                ForEach(accounts) { acc in
+                ForEach(filteredAccounts) { acc in
                     AppCard {
                         VStack(alignment: .leading, spacing: 8) {
                             HStack {
                                 Text(acc.firm)
                                     .font(AppTypography.captionBold)
                                     .foregroundColor(AppColors.accent)
+                                if acc.archived {
+                                    Text("[Đã lưu trữ]")
+                                        .font(.system(size: 10))
+                                        .foregroundColor(AppColors.secondaryText)
+                                }
                                 Spacer()
                                 AppBadge(
                                     text: acc.status.label,
@@ -246,7 +365,7 @@ public struct PropFirmLedgerView: View {
                             
                             HStack {
                                 if let size = acc.sizeMinor {
-                                    Text("Size: \(Formatters.formatCurrency(Decimal(size) / 100, currency: acc.currency))")
+                                    Text("Vốn: \(Formatters.formatCurrency(Decimal(size) / 100, currency: acc.currency))")
                                         .font(AppTypography.caption)
                                         .foregroundColor(AppColors.secondaryText)
                                 }
@@ -255,6 +374,23 @@ public struct PropFirmLedgerView: View {
                                     .font(AppTypography.caption)
                                     .foregroundColor(AppColors.secondaryText)
                             }
+                            
+                            Divider().background(AppColors.border)
+                            
+                            HStack {
+                                Text("Mở ngày: \(acc.openedOn)")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(AppColors.secondaryText)
+                                Spacer()
+                                
+                                Button {
+                                    dataStore.archivePropAccount(id: acc.id, archived: !acc.archived, reason: "User toggle archive")
+                                } label: {
+                                    Text(acc.archived ? "Khôi phục" : "Lưu trữ")
+                                        .font(.system(size: 11, weight: .semibold))
+                                        .foregroundColor(AppColors.secondaryText)
+                                }
+                            }
                         }
                     }
                 }
@@ -262,45 +398,7 @@ public struct PropFirmLedgerView: View {
         }
     }
     
-    private var cashFlowListView: some View {
-        VStack(spacing: 12) {
-            if movements.isEmpty {
-                EmptyStateView(
-                    icon: "arrow.left.arrow.right",
-                    title: "Chưa có dòng tiền",
-                    message: "Các khoản phí thi, reset, hoàn tiền và payout nhận về sẽ hiển thị tại đây."
-                )
-            } else {
-                ForEach(movements) { m in
-                    AppCard {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                HStack {
-                                    Text(m.firm)
-                                        .font(AppTypography.subheadlineBold)
-                                    AppBadge(
-                                        text: m.category.capitalized,
-                                        color: m.kind == "payout" || m.kind == "receipt" ? AppColors.profit : AppColors.secondaryText
-                                    )
-                                }
-                                Text(m.date ?? "Không rõ ngày")
-                                    .font(AppTypography.caption)
-                                    .foregroundColor(AppColors.secondaryText)
-                            }
-                            
-                            Spacer()
-                            
-                            let isIncoming = m.kind == "receipt" || m.kind == "refund"
-                            let amountDecimal = Decimal(m.amountMinor) / 100
-                            Text("\(isIncoming ? "+" : "-")\(Formatters.formatCurrency(amountDecimal, currency: m.currency))")
-                                .font(AppTypography.subheadlineBold)
-                                .foregroundColor(isIncoming ? AppColors.profit : AppColors.loss)
-                        }
-                    }
-                }
-            }
-        }
-    }
+    // MARK: - 3. Payouts Tab
     
     private var payoutsProgressView: some View {
         VStack(spacing: 12) {
@@ -318,15 +416,20 @@ public struct PropFirmLedgerView: View {
                                 Text("\(p.entry.firm) Payout")
                                     .font(AppTypography.subheadlineBold)
                                 Spacer()
+                                if p.isOverdue {
+                                    AppBadge(text: "Quá hạn", color: AppColors.loss)
+                                } else if p.isPartial {
+                                    AppBadge(text: "Đã nhận 1 phần", color: AppColors.accent)
+                                }
                                 AppBadge(
-                                    text: p.entry.status.rawValue.capitalized,
+                                    text: p.entry.status.label,
                                     color: p.entry.status == .completed ? AppColors.profit : AppColors.accent
                                 )
                             }
                             
                             HStack {
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text("Dự kiến nhận:")
+                                    Text("Dự kiến nhận (sau chia split):")
                                         .font(AppTypography.caption)
                                         .foregroundColor(AppColors.secondaryText)
                                     Text(Formatters.formatCurrency(Decimal(p.expectedMinor) / 100, currency: p.entry.currency))
@@ -342,6 +445,121 @@ public struct PropFirmLedgerView: View {
                                         .foregroundColor(AppColors.profit)
                                 }
                             }
+                            
+                            if p.remainingMinor > 0 {
+                                HStack {
+                                    Text("Còn chờ giải ngân:")
+                                        .font(AppTypography.caption)
+                                        .foregroundColor(AppColors.secondaryText)
+                                    Spacer()
+                                    Text(Formatters.formatCurrency(Decimal(p.remainingMinor) / 100, currency: p.entry.currency))
+                                        .font(AppTypography.captionBold)
+                                        .foregroundColor(AppColors.loss)
+                                }
+                            }
+                            
+                            if p.varianceMinor != 0 && p.entry.status == .completed {
+                                HStack {
+                                    Text("Chênh lệch thanh toán (Variance):")
+                                        .font(AppTypography.caption)
+                                        .foregroundColor(AppColors.secondaryText)
+                                    Spacer()
+                                    Text(Formatters.formatCurrency(Decimal(p.varianceMinor) / 100, currency: p.entry.currency))
+                                        .font(AppTypography.captionBold)
+                                        .foregroundColor(p.varianceMinor >= 0 ? AppColors.profit : AppColors.loss)
+                                }
+                            }
+                            
+                            Divider().background(AppColors.border)
+                            
+                            HStack {
+                                Text("Yêu cầu ngày: \(p.entry.occurredOn)")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(AppColors.secondaryText)
+                                Spacer()
+                                Button {
+                                    selectedPayoutForReceipt = p.entry
+                                } label: {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "plus.circle")
+                                        Text("Ghi nhận tiền về")
+                                    }
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundColor(AppColors.accent)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // MARK: - 4. Transactions Tab
+    
+    private var transactionsListView: some View {
+        VStack(spacing: 12) {
+            if movements.isEmpty {
+                EmptyStateView(
+                    icon: "arrow.left.arrow.right",
+                    title: "Chưa có dòng tiền",
+                    message: "Các khoản phí thi, hoàn tiền và tiền payout nhận về sẽ hiển thị tại đây."
+                )
+            } else {
+                ForEach(movements) { m in
+                    AppCard {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                HStack(spacing: 6) {
+                                    Text(m.firm)
+                                        .font(AppTypography.subheadlineBold)
+                                    AppBadge(
+                                        text: m.category.capitalized,
+                                        color: m.kind == "payout" || m.kind == "receipt" ? AppColors.profit : AppColors.secondaryText
+                                    )
+                                }
+                                Text(m.date ?? "Chưa giải ngân")
+                                    .font(AppTypography.caption)
+                                    .foregroundColor(AppColors.secondaryText)
+                                if !m.reference.isEmpty {
+                                    Text("Ref: \(m.reference)")
+                                        .font(.system(size: 10))
+                                        .foregroundColor(AppColors.secondaryText.opacity(0.8))
+                                }
+                            }
+                            
+                            Spacer()
+                            
+                            VStack(alignment: .trailing, spacing: 4) {
+                                let isIncoming = m.kind == "receipt" || m.kind == "refund"
+                                let amountDecimal = Decimal(m.amountMinor) / 100
+                                Text("\(isIncoming ? "+" : "-")\(Formatters.formatCurrency(amountDecimal, currency: m.currency))")
+                                    .font(AppTypography.subheadlineBold)
+                                    .foregroundColor(isIncoming ? AppColors.profit : AppColors.loss)
+                                
+                                HStack(spacing: 8) {
+                                    if m.kind == "expense" {
+                                        Button {
+                                            if let entry = dataStore.propEntries.first(where: { $0.id == m.entryId }) {
+                                                selectedExpenseForRefund = entry
+                                            }
+                                        } label: {
+                                            Text("Hoàn tiền")
+                                                .font(.system(size: 10, weight: .semibold))
+                                                .foregroundColor(AppColors.accent)
+                                        }
+                                    }
+                                    
+                                    Button {
+                                        itemToVoid = (id: m.entryId, isEntry: true)
+                                        showVoidAlert = true
+                                    } label: {
+                                        Image(systemName: "trash")
+                                            .font(.system(size: 10))
+                                            .foregroundColor(AppColors.loss.opacity(0.8))
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -354,6 +572,7 @@ public struct PropFirmLedgerView: View {
 
 public struct NewPropAccountSheet: View {
     @Environment(\.dismiss) private var dismiss
+    let defaultCurrency: String
     
     @State private var firm: String = "Topstep"
     @State private var name: String = ""
@@ -377,7 +596,7 @@ public struct NewPropAccountSheet: View {
                             Text(prog.label).tag(prog)
                         }
                     }
-                    TextField("Quy mô tài khoản USD", text: $sizeText)
+                    TextField("Quy mô tài khoản (\(defaultCurrency))", text: $sizeText)
                         .keyboardType(.numberPad)
                 }
                 
@@ -400,6 +619,7 @@ public struct NewPropAccountSheet: View {
                             name: name.isEmpty ? "\(firm) Account" : name,
                             program: program,
                             status: .active,
+                            currency: defaultCurrency,
                             sizeMinor: sizeMinor,
                             openedOn: today,
                             notes: notes
@@ -409,9 +629,7 @@ public struct NewPropAccountSheet: View {
                     }
                 }
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Hủy") {
-                        dismiss()
-                    }
+                    Button("Hủy") { dismiss() }
                 }
             }
         }
@@ -423,11 +641,15 @@ public struct NewPropAccountSheet: View {
 public struct NewPropEntrySheet: View {
     @Environment(\.dismiss) private var dismiss
     let accounts: [PropAccountItem]
+    let defaultCurrency: String
     
     @State private var selectedAccountId: String = ""
+    @State private var firm: String = "Topstep"
     @State private var kind: String = "expense"
     @State private var category: PropExpenseCategory = .evaluation
     @State private var amountText: String = ""
+    @State private var splitText: String = "90"
+    @State private var feeText: String = "0"
     @State private var notes: String = ""
     
     var onSave: (PropEntryItem) -> Void
@@ -435,11 +657,19 @@ public struct NewPropEntrySheet: View {
     public var body: some View {
         NavigationStack {
             Form {
+                Section("Tài khoản liên kết") {
+                    Picker("Tài khoản quỹ", selection: $selectedAccountId) {
+                        Text("Chi phí chung toàn quỹ").tag("")
+                        ForEach(accounts) { acc in
+                            Text("\(acc.firm) - \(acc.name)").tag(acc.id)
+                        }
+                    }
+                }
+                
                 Section("Phân loại") {
                     Picker("Loại giao dịch", selection: $kind) {
                         Text("Chi phí (Phí thi, reset...)").tag("expense")
-                        Text("Payout nhận về").tag("payout")
-                        Text("Hoàn tiền (Refund)").tag("refund")
+                        Text("Yêu cầu Payout").tag("payout")
                     }
                     
                     if kind == "expense" {
@@ -452,12 +682,19 @@ public struct NewPropEntrySheet: View {
                 }
                 
                 Section("Số tiền") {
-                    TextField("Số tiền (VD: 149.00)", text: $amountText)
+                    TextField("Số tiền (\(defaultCurrency))", text: $amountText)
                         .keyboardType(.decimalPad)
+                    
+                    if kind == "payout" {
+                        TextField("Tỷ lệ Trader nhận (%) (VD: 90)", text: $splitText)
+                            .keyboardType(.numberPad)
+                        TextField("Phí khấu trừ chuyển khoản (\(defaultCurrency))", text: feeText)
+                            .keyboardType(.decimalPad)
+                    }
                 }
                 
                 Section("Ghi chú") {
-                    TextField("Ghi chú đợt thanh toán", text: $notes)
+                    TextField("Số hóa đơn, context...", text: $notes)
                 }
             }
             .navigationTitle("Ghi nhận chi phí / Payout")
@@ -468,14 +705,24 @@ public struct NewPropEntrySheet: View {
                         let formatter = DateFormatter()
                         formatter.dateFormat = "yyyy-MM-dd"
                         let today = formatter.string(from: Date())
-                        let minor = (try? PropFirmEngine.toMinor(value: amountText)) ?? 0
+                        let minor = (try? PropFirmEngine.toMinor(value: amountText, currency: defaultCurrency)) ?? 0
+                        let feeMinor = (try? PropFirmEngine.toMinor(value: feeText, currency: defaultCurrency)) ?? 0
+                        let splitBps = ((Int(splitText) ?? 100) * 100)
+                        
+                        let linkedAcc = accounts.first(where: { $0.id == selectedAccountId })
+                        let firmName = linkedAcc?.firm ?? firm
                         
                         let entry = PropEntryItem(
-                            firm: "Prop Firm",
+                            accountId: selectedAccountId.isEmpty ? nil : selectedAccountId,
+                            firm: firmName,
                             kind: kind,
-                            category: category.rawValue,
+                            category: kind == "payout" ? "payout" : category.rawValue,
+                            currency: defaultCurrency,
                             amountMinor: minor,
+                            splitBps: splitBps,
+                            feeMinor: feeMinor,
                             occurredOn: today,
+                            status: kind == "payout" ? .requested : .completed,
                             notes: notes
                         )
                         onSave(entry)
@@ -484,8 +731,205 @@ public struct NewPropEntrySheet: View {
                     .disabled(amountText.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Hủy") {
+                    Button("Hủy") { dismiss() }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Add Receipt Sheet
+
+public struct AddReceiptSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let payout: PropEntryItem
+    
+    @State private var amountText: String = ""
+    @State private var isReversal: Bool = false
+    @State private var reference: String = ""
+    @State private var notes: String = ""
+    
+    var onAdd: (PropReceiptItem) -> Void
+    
+    public var body: some View {
+        NavigationStack {
+            Form {
+                Section("Thông tin Payout") {
+                    Text("Quỹ: \(payout.firm)")
+                    Text("Số tiền dự kiến: \(Formatters.formatCurrency(Decimal(PropFirmEngine.expectedPayout(entry: payout)) / 100, currency: payout.currency))")
+                }
+                
+                Section("Thanh toán tiền mặt") {
+                    Toggle("Là khoản đảo tiền / trả lại (Reversal)?", isOn: $isReversal)
+                    TextField("Số tiền thực tế nhận (\(payout.currency))", text: $amountText)
+                        .keyboardType(.decimalPad)
+                    TextField("Mã tham chiếu ngân hàng (Deel, Wise...)", text: $reference)
+                }
+                
+                Section("Ghi chú") {
+                    TextField("Ghi chú bổ sung...", text: $notes)
+                }
+            }
+            .navigationTitle("Ghi nhận biên lai Payout")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Xác nhận") {
+                        let formatter = DateFormatter()
+                        formatter.dateFormat = "yyyy-MM-dd"
+                        let today = formatter.string(from: Date())
+                        let minor = (try? PropFirmEngine.toMinor(value: amountText, currency: payout.currency)) ?? 0
+                        
+                        let rcpt = PropReceiptItem(
+                            payoutId: payout.id,
+                            kind: isReversal ? "reversal" : "receipt",
+                            amountMinor: minor,
+                            occurredOn: today,
+                            reference: reference,
+                            notes: notes
+                        )
+                        onAdd(rcpt)
                         dismiss()
+                    }
+                    .disabled(amountText.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Hủy") { dismiss() }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Add Refund Sheet
+
+public struct AddRefundSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let expense: PropEntryItem
+    
+    @State private var amountText: String = ""
+    @State private var notes: String = "Hoàn lại phí thi sau khi đỗ"
+    
+    var onRefund: (PropEntryItem) -> Void
+    
+    public var body: some View {
+        NavigationStack {
+            Form {
+                Section("Khoản chi phí gốc") {
+                    Text("Quỹ: \(expense.firm)")
+                    Text("Số tiền đã chi: \(Formatters.formatCurrency(Decimal(expense.amountMinor) / 100, currency: expense.currency))")
+                }
+                
+                Section("Số tiền hoàn trả (Refund)") {
+                    TextField("Số tiền được hoàn (\(expense.currency))", text: $amountText)
+                        .keyboardType(.decimalPad)
+                    TextField("Ghi chú...", text: $notes)
+                }
+            }
+            .navigationTitle("Ghi nhận hoàn tiền (Refund)")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Lưu") {
+                        let formatter = DateFormatter()
+                        formatter.dateFormat = "yyyy-MM-dd"
+                        let today = formatter.string(from: Date())
+                        let minor = (try? PropFirmEngine.toMinor(value: amountText, currency: expense.currency)) ?? 0
+                        
+                        let refundEntry = PropEntryItem(
+                            accountId: expense.accountId,
+                            firm: expense.firm,
+                            kind: "refund",
+                            category: "refund",
+                            currency: expense.currency,
+                            amountMinor: minor,
+                            occurredOn: today,
+                            status: .completed,
+                            parentId: expense.id,
+                            notes: notes
+                        )
+                        onRefund(refundEntry)
+                        dismiss()
+                    }
+                    .disabled(amountText.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Hủy") { dismiss() }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Prop CSV Import Sheet
+
+public struct PropCsvImportSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var dataStore = TradeDataStore.shared
+    
+    @State private var csvContent: String = ""
+    @State private var importResult: PropCsvImportResult? = nil
+    @State private var errorMessage: String? = nil
+    @State private var isImporting: Bool = false
+    
+    public var body: some View {
+        NavigationStack {
+            Form {
+                Section("Mẫu CSV chuẩn (/prop-cash-template.csv)") {
+                    Text("id,kind,firm,account_id,currency,date,amount,category,expense_id,reference,notes")
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundColor(AppColors.secondaryText)
+                }
+                
+                Section("Nội dung CSV") {
+                    TextEditor(text: $csvContent)
+                        .frame(minHeight: 160)
+                        .font(.system(size: 12, design: .monospaced))
+                    
+                    if let err = errorMessage {
+                        Text(err)
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.loss)
+                    }
+                }
+                
+                if let res = importResult {
+                    Section("Kết quả kiểm tra (Preview)") {
+                        Text("Số dòng hợp lệ sẽ nạp: \(res.imported)")
+                            .foregroundColor(AppColors.profit)
+                        Text("Số dòng trùng lặp bỏ qua: \(res.skipped)")
+                            .foregroundColor(AppColors.secondaryText)
+                    }
+                }
+            }
+            .navigationTitle("Import CSV Quỹ")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Đóng") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    if importResult == nil {
+                        Button("Kiểm tra (Preview)") {
+                            do {
+                                errorMessage = nil
+                                let res = try dataStore.importPropCsvData(csvText: csvContent, preview: true)
+                                importResult = res
+                            } catch {
+                                errorMessage = error.localizedDescription
+                            }
+                        }
+                        .disabled(csvContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    } else {
+                        Button("Tiến hành nạp") {
+                            do {
+                                errorMessage = nil
+                                _ = try dataStore.importPropCsvData(csvText: csvContent, preview: false)
+                                dismiss()
+                            } catch {
+                                errorMessage = error.localizedDescription
+                            }
+                        }
                     }
                 }
             }

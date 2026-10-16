@@ -206,11 +206,16 @@
 
 ---
 
-### Phần XI — Iteration 08: Broker, Market Data, Prop Firm & AI Reflection
-- [x] **Prop Firm Cash Ledger:** Quản lý sổ cái tiền mặt quỹ thi với đơn vị minor units (`Int64`), tính phí thi, refund, đợt payout, ROI.
-  - *Thời gian hoàn thành:* 16/10/2026 16:50:00+07:00
-  - *Đã đối chiếu mã nguồn gốc:* **CÓ** — Đối chiếu `packages/core/src/prop-firm.ts`.
-  - *Sản phẩm nghiệm thu:* `TradeJournal/Sources/Core/Domain/Engines/PropFirmEngine.swift`, `PropFirmLedgerView.swift`, `PropFirmTests.swift`.
+- [x] **Prop Firm Cash Ledger & Lifecycle Engine (Tích hợp Quỹ):**
+  - Quản lý sổ cái tiền mặt quỹ độc lập hoàn toàn với P&L giao dịch, lưu trữ tiền bằng số nguyên minor units (`Int64`) chuẩn ISO 4217, cấm làm tròn âm thầm (`silent rounding`), cấm trộn lẫn các loại tiền tệ mà không có tỷ giá chứng từ.
+  - Vòng đời tài khoản (`PropAccountItem`): `evaluation`, `verification`, `funded`, `instant_funded`, `live`; trạng thái `active`, `inactive`, `passed`, `breached`, `closed`; bảo toàn lịch sử chuỗi các vòng thi (`parentId` lineage) và tính tỷ lệ đỗ quỹ `resolvedPhasePassRate`.
+  - Phân loại chi phí (`PropEntryItem`): 8 hạng mục chi phí thi/reset/kích hoạt; tính toán kỳ vọng Payout chia sẻ lợi nhuận `splitBps` (basis points) trừ phí khấu trừ chuyển khoản `feeMinor`; theo dõi các kỳ thanh toán `payoutProgress` với cờ quá hạn `overdue` và nhận một phần `partial`.
+  - Toàn vẹn biên lai (`PropReceiptItem`): Biên lai nhận tiền thực tế `receipt` và khoản đảo/trả lại `reversal`; giới hạn trần hoàn tiền (refund caps <= original charge), ngăn chặn số dư tiền đã nhận âm tại mọi mốc lịch sử.
+  - Phân tích & Nạp CSV Quỹ mẫu `/prop-cash-template.csv`: Cơ chế kiểm tra trước (Preview Rollback), băm SHA-256 định danh `csv-hash(id)`, chống trùng lặp dữ liệu idempotency và từ chối nếu trùng ID khác dữ liệu.
+  - Tích hợp DataStore & Sao lưu toàn diện: Lưu trữ offline JSON và đưa vào file xuất bản sao lưu đầy đủ `exportFullJsonBackup`.
+  - *Thời gian hoàn thành:* 16/10/2026 18:55:00+07:00
+  - *Đã đối chiếu mã nguồn gốc:* **CÓ** — Đối chiếu 1:1 với `apps/web/src/lib/prop-firms.ts`, `server/prop-firms.ts`, `server/prop-csv.ts`, `prop-firms.test.ts`.
+  - *Sản phẩm nghiệm thu:* `PropFirmEngine.swift`, `PropFirmLedgerView.swift`, `PropFirmTests.swift`, `TradeDataStore.swift`.
 - [x] **Supabase Edge Function AI Reflection:** Edge Function server-side bảo vệ API Key nhà cung cấp AI theo nguyên tắc R005.
   - *Thời gian hoàn thành:* 16/10/2026 17:00:00+07:00
   - *Đã đối chiếu mã nguồn gốc:* **CÓ** — Đối chiếu route `apps/web/app/api/ai/reflection/route.ts`.

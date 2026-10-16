@@ -161,13 +161,25 @@ public struct SettingsView: View {
             let accounts: [Account]
             let executions: [Execution]
             let trades: [Trade]
+            let folders: [NotebookFolder]
+            let notebookNotes: [NotebookNote]
+            let propAccounts: [PropAccountItem]
+            let propEntries: [PropEntryItem]
+            let propReceipts: [PropReceiptItem]
+            let propAudits: [PropAuditItem]
         }
         
         let backup = FullBackup(
             exportedAt: Date(),
             accounts: dataStore.accounts,
             executions: dataStore.executions,
-            trades: dataStore.trades
+            trades: dataStore.trades,
+            folders: dataStore.folders,
+            notebookNotes: dataStore.notebookNotes,
+            propAccounts: dataStore.propAccounts,
+            propEntries: dataStore.propEntries,
+            propReceipts: dataStore.propReceipts,
+            propAudits: dataStore.propAudits
         )
         
         let encoder = JSONEncoder()
