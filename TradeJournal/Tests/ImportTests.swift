@@ -87,29 +87,30 @@ final class ImportTests: XCTestCase {
         XCTAssertEqual(preview2.duplicateCount, 1)
     }
     
-    @MainActor
-    func testTradeDataStoreImportAndRebuildIntegration() {
-        let store = TradeDataStore()
-        let accountId = "test-store-acc"
-        store.addAccount(name: "Test Acc", currency: "USD")
-        
-        let csv = """
-        symbol,side,quantity,price,fee,date
-        NVDA,buy,50,100.00,1.00,2026-04-10 14:30:00
-        NVDA,sell,50,110.00,1.00,2026-04-10 15:30:00
-        """
-        
-        let preview = StandardCSVImporter.preview(csvText: csv, accountId: accountId)
-        XCTAssertEqual(preview.usableExecutions.count, 2)
-        
-        store.importExecutions(accountId: accountId, newExecutions: preview.usableExecutions)
-        
-        let accTrades = store.trades.filter { $0.accountId == accountId }
-        XCTAssertEqual(accTrades.count, 1)
-        
-        let trade = accTrades[0]
-        XCTAssertEqual(trade.symbol, "NVDA")
-        XCTAssertEqual(trade.status, .win)
-        XCTAssertEqual(trade.netPnl, 498) // (110 - 100)*50 - 2 fee = 500 - 2 = 498
+    func testTradeDataStoreImportAndRebuildIntegration() async throws {
+        await MainActor.run {
+            let store = TradeDataStore()
+            let accountId = "test-store-acc"
+            store.addAccount(name: "Test Acc", currency: "USD")
+            
+            let csv = """
+            symbol,side,quantity,price,fee,date
+            NVDA,buy,50,100.00,1.00,2026-04-10 14:30:00
+            NVDA,sell,50,110.00,1.00,2026-04-10 15:30:00
+            """
+            
+            let preview = StandardCSVImporter.preview(csvText: csv, accountId: accountId)
+            XCTAssertEqual(preview.usableExecutions.count, 2)
+            
+            store.importExecutions(accountId: accountId, newExecutions: preview.usableExecutions)
+            
+            let accTrades = store.trades.filter { $0.accountId == accountId }
+            XCTAssertEqual(accTrades.count, 1)
+            
+            let trade = accTrades[0]
+            XCTAssertEqual(trade.symbol, "NVDA")
+            XCTAssertEqual(trade.status, .win)
+            XCTAssertEqual(trade.netPnl, 498) // (110 - 100)*50 - 2 fee = 500 - 2 = 498
+        }
     }
 }
