@@ -32,7 +32,7 @@ jobs:
         run: |
           echo "==> Available Xcode versions:"
           ls -d /Applications/Xcode* || true
-          sudo xcode-select -s /Applications/Xcode_15.4.app || sudo xcode-select -s /Applications/Xcode.app
+          sudo xcode-select -s /Applications/Xcode.app
           xcodebuild -version
 
       - name: Install XcodeGen
@@ -47,9 +47,18 @@ jobs:
           ls -la TradeJournal.xcodeproj
 
       - name: Inspect Xcode Project
+        id: inspect_project
         run: |
+          mkdir -p build
           echo "==> Listing targets and schemes:"
-          xcodebuild -list -project TradeJournal.xcodeproj
+          xcodebuild -list -project TradeJournal.xcodeproj 2>&1 | tee build/list.log
+
+      - name: Report Inspect Error via Workflow Annotation
+        if: failure() && steps.inspect_project.outcome == 'failure'
+        run: |
+          cat build/list.log || true
+          ERROR_MSG=$(cat build/list.log | head -n 5 | tr '\n' ' ' | cut -c 1-250)
+          echo "::error title=XcodeListError::$ERROR_MSG"
 
       - name: Build iOS App Binary
         id: build_app
@@ -75,7 +84,7 @@ jobs:
         run: |
           echo "==> Last 50 lines of build log:"
           tail -n 50 build/xcodebuild.log || true
-          ERROR_SUMMARY=$(grep -i "error:" build/xcodebuild.log | tr '\n' ' ' | cut -c 1-250 || tail -n 5 build/xcodebuild.log | tr '\n' ' ' | cut -c 1-250)
+          ERROR_SUMMARY=$(tail -n 15 build/xcodebuild.log | tr '\n' ' ' | cut -c 1-250)
           echo "::error title=XcodeBuildError::$ERROR_SUMMARY"
 
       - name: Package IPA
@@ -84,6 +93,10 @@ jobs:
           mkdir -p build/Payload
           APP_PATH=$(find build/DerivedData -name "TradeJournal.app" -type d | head -n 1)
           echo "Found app at: $APP_PATH"
+          if [ -z "$APP_PATH" ]; then
+            echo "::error::TradeJournal.app not found in build/DerivedData"
+            exit 1
+          fi
           cp -r "$APP_PATH" build/Payload/
           cd build
           zip -r -9 TradeJournal.ipa Payload
