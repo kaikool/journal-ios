@@ -107,20 +107,27 @@ jobs:
       - name: Package IPA
         run: |
           echo "==> Packaging .app into .ipa..."
+          rm -rf build/Payload build/TradeJournal.ipa
           mkdir -p build/Payload
-          APP_PATH=$(find build/DerivedData -name "TradeJournal.app" -type d | head -n 1)
+          APP_PATH=$(find build/DerivedData/Build/Products -name "TradeJournal.app" -type d | head -n 1)
+          if [ -z "$APP_PATH" ]; then
+            APP_PATH=$(find build/DerivedData -name "TradeJournal.app" -type d | head -n 1)
+          fi
           echo "Found app at: $APP_PATH"
           if [ -z "$APP_PATH" ]; then
             echo "::error::TradeJournal.app not found in build/DerivedData"
             exit 1
           fi
+          echo "==> Normalizing bundle permissions and stripping extended attributes..."
+          xattr -cr "$APP_PATH" || true
+          chmod -R 755 "$APP_PATH" || true
           echo "==> Cleaning stale signatures..."
           rm -rf "$APP_PATH/_CodeSignature" || true
-          echo "==> Applying ad-hoc codesign signature to .app bundle..."
+          echo "==> Applying clean ad-hoc signature..."
           codesign --force --deep --sign - "$APP_PATH" || true
-          cp -r "$APP_PATH" build/Payload/
+          cp -R "$APP_PATH" build/Payload/
           cd build
-          zip -r -9 -y TradeJournal.ipa Payload
+          zip -r -9 -y -X TradeJournal.ipa Payload
           ls -lh TradeJournal.ipa
           shasum -a 256 TradeJournal.ipa > TradeJournal.ipa.sha256
           echo "SHA256 Checksum:"
