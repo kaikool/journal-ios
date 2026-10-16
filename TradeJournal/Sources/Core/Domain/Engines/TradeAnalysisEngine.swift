@@ -51,7 +51,7 @@ public enum TradeAnalysisEngine {
     
     /// Tính toán Realized R: Net P&L chia cho số tiền rủi ro tại điểm stoploss
     public static func tradeR(trade: Trade) -> Double? {
-        guard let risk = tradeRisk(trade), risk > 0, trade.status != .open else { return nil }
+        guard let risk = tradeRisk(trade: trade), risk > 0, trade.status != .open else { return nil }
         return NSDecimalNumber(decimal: trade.netPnl).doubleValue / NSDecimalNumber(decimal: risk).doubleValue
     }
     
