@@ -149,8 +149,12 @@ public final class TradeDataStore: ObservableObject {
             return t
         }
         
+        // Port 1:1 từ `source-repo/apps/web/src/server/rebuild.ts` (lines 44-48):
+        // Các vị thế có key bắt đầu bằng "the5ers_" (hoặc vị thế được báo cáo không qua atomic fills)
+        // tuyệt đối KHÔNG bị đánh dấu obsolete hay xóa mất khi tái dựng round-trips từ executions.
+        let preservedThe5ers = trades.filter { $0.accountId == accountId && $0.key.hasPrefix("the5ers_") }
         let otherTrades = trades.filter { $0.accountId != accountId }
-        trades = otherTrades + mergedTrades
+        trades = otherTrades + preservedThe5ers + mergedTrades
     }
     
     public func rebuildAllAccounts() {

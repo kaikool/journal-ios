@@ -581,22 +581,25 @@ public final class The5ersService: ObservableObject {
                 }()
                 
                 let startingMinor = NSDecimalNumber(decimal: (acc.startingBalance ?? acc.balance) * 100).int64Value
+                let journalAccId = acc.id.hasPrefix("the5ers_") ? acc.id : "the5ers_\(acc.id)"
                 
-                if let existingIndex = dataStore.propAccounts.firstIndex(where: { $0.id == acc.id || $0.name == acc.label }) {
+                if let existingIndex = dataStore.propAccounts.firstIndex(where: { $0.id == journalAccId || $0.id == acc.id || $0.name == acc.label }) {
                     var existing = dataStore.propAccounts[existingIndex]
+                    existing.id = journalAccId
+                    existing.journalAccountId = journalAccId
                     existing.status = mappedStatus
                     existing.program = mappedProgram
                     dataStore.propAccounts[existingIndex] = existing
                 } else {
                     let newPropAccount = PropAccountItem(
-                        id: acc.id,
+                        id: journalAccId,
                         firm: "The5ers",
                         name: acc.label,
                         program: mappedProgram,
                         status: mappedStatus,
                         currency: acc.currency,
                         sizeMinor: startingMinor,
-                        journalAccountId: acc.id,
+                        journalAccountId: journalAccId,
                         openedOn: acc.createdAt ?? DateFormatter.localizedString(from: Date(), dateStyle: .short, timeStyle: .none),
                         notes: "Đồng bộ từ The5ers MCP Hub (Protocol 2025-03-26)",
                         archived: false
@@ -604,13 +607,14 @@ public final class The5ersService: ObservableObject {
                     dataStore.propAccounts.append(newPropAccount)
                 }
                 
-                if let accIdx = dataStore.accounts.firstIndex(where: { $0.id == acc.id }) {
+                if let accIdx = dataStore.accounts.firstIndex(where: { $0.id == journalAccId || $0.id == acc.id }) {
+                    dataStore.accounts[accIdx].id = journalAccId
                     dataStore.accounts[accIdx].broker = "The5ers"
                     dataStore.accounts[accIdx].name = acc.label
                     dataStore.accounts[accIdx].currency = acc.currency
                 } else {
                     let newAcc = Account(
-                        id: acc.id,
+                        id: journalAccId,
                         name: acc.label,
                         broker: "The5ers",
                         kind: .sync,
@@ -725,6 +729,12 @@ public final class The5ersService: ObservableObject {
             
             lastSyncTime = Date()
             dataStore.rebuildAllAccounts()
+            
+            // Đảm bảo selectedAccountId trỏ vào tài khoản có lệnh giao dịch nếu hiện tại đang rỗng
+            if dataStore.filteredTrades.isEmpty, let firstWithTrade = dataStore.accounts.first(where: { acc in dataStore.trades.contains(where: { $0.accountId == acc.id }) }) {
+                dataStore.selectedAccountId = firstWithTrade.id
+            }
+            
             dataStore.saveToDisk()
             let activeCount = accountsList.filter { $0.status.lowercased() == "active" || $0.status.lowercased() == "available" }.count
             lastStatus = "Đã đồng bộ thành công \(accountsList.count) tài khoản (\(activeCount) đang hoạt động) và \(importedPositionsCount) vị thế lệnh từ The5ers MCP."
@@ -743,7 +753,138 @@ public final class The5ersService: ObservableObject {
         }
     }
     
+    // MARK: - 5. Source Normalization & Grouping (Port 1:1 từ the5ers-normalize.ts và journal.ts)
+    
+    private struct SourcePosition {
+        var identityDiscriminator: String?
+        let providerId: String?
+        let symbol: String
+        let direction: TradeDirection
+        let openedAtIso: String
+        let openedAtDate: Date
+        let closedAtIso: String?
+        let closedAtDate: Date?
+        let quantity: Decimal
+        let entry: Decimal
+        let exit: Decimal?
+        let netPnl: Decimal
+        let fee: Decimal?
+        let swap: Decimal?
+        let isValid: Bool?
+    }
+    
+    /// Chuyển đổi nhãn thuộc tính provider (camelCase, snake_case, v.v.) về chuẩn không dấu cách/gạch dưới chữ thường
+    /// Port 1:1 từ `the5ers-normalize.ts` `sourceFields`
+    private func sourceFields(_ dict: [String: Any]) -> [String: Any] {
+        var result: [String: Any] = [:]
+        for (key, val) in dict {
+            let cleanKey = key.replacingOccurrences(of: " ", with: "")
+                .replacingOccurrences(of: "_", with: "")
+                .replacingOccurrences(of: "-", with: "")
+                .lowercased()
+            result[cleanKey] = val
+        }
+        return result
+    }
+    
+    private func sourceNumber(_ val: Any?) -> Decimal? {
+        guard let val = val else { return nil }
+        if let num = val as? NSNumber {
+            return Decimal(string: num.stringValue)
+        }
+        let str = String(describing: val).trimmingCharacters(in: .whitespaces)
+        return Decimal(string: str)
+    }
+    
+    private func sourceBoolean(_ val: Any?) -> Bool? {
+        guard let val = val else { return nil }
+        if let b = val as? Bool { return b }
+        let str = String(describing: val).trimmingCharacters(in: .whitespaces).lowercased()
+        if ["yes", "true", "1"].contains(str) { return true }
+        if ["no", "false", "0"].contains(str) { return false }
+        return nil
+    }
+    
+    private func sourceInstant(_ val: Any?) -> (iso: String, date: Date)? {
+        guard let val = val else { return nil }
+        let str = String(describing: val).trimmingCharacters(in: .whitespaces)
+        guard let date = FlexibleDateParser.parse(str) else { return nil }
+        let fmt = ISO8601DateFormatter()
+        fmt.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return (fmt.string(from: date), date)
+    }
+    
+    /// Chuẩn hóa vị thế The5ers (Port 1:1 từ `the5ers-normalize.ts` `normalizePosition`)
+    private func normalizePosition(from raw: [String: Any]) -> SourcePosition? {
+        let row = sourceFields(raw)
+        
+        let symbol = String(describing: row["symbol"] ?? "").trimmingCharacters(in: .whitespaces)
+        guard !symbol.isEmpty && symbol.count <= 100 else { return nil }
+        
+        let sideStr = String(describing: row["side"] ?? row["direction"] ?? "").lowercased()
+        let direction: TradeDirection? = {
+            if sideStr.contains("buy") || sideStr == "long" { return .long }
+            if sideStr.contains("sell") || sideStr == "short" { return .short }
+            return nil
+        }()
+        guard let dir = direction else { return nil }
+        
+        guard let (openedAtIso, openedAtDate) = sourceInstant(row["opendate"] ?? row["openedat"] ?? row["opentime"] ?? row["open_date"] ?? row["opendatetime"]) else {
+            return nil
+        }
+        guard let quantity = sourceNumber(row["quantity"] ?? row["lots"] ?? row["volume"] ?? row["size"]), quantity > 0 else {
+            return nil
+        }
+        guard let entry = sourceNumber(row["entry"] ?? row["openprice"] ?? row["entryprice"] ?? row["open_price"]) else {
+            return nil
+        }
+        
+        let isClosed = sourceBoolean(row["isclosed"]) ?? (row["closedate"] != nil || row["exit"] != nil || row["closetime"] != nil)
+        
+        let closedAtTuple = isClosed ? sourceInstant(row["closedate"] ?? row["closedat"] ?? row["closetime"] ?? row["close_date"] ?? row["closedatetime"]) : nil
+        let exit = isClosed ? sourceNumber(row["exit"] ?? row["closeprice"] ?? row["exitprice"] ?? row["close_price"]) : nil
+        let netPnl = isClosed ? (sourceNumber(row["profitandloss"] ?? row["profit"] ?? row["netpnl"] ?? row["pnl"] ?? row["net_pnl"]) ?? 0) : 0
+        
+        if isClosed && (closedAtTuple == nil || exit == nil) {
+            return nil
+        }
+        if let cl = closedAtTuple, cl.date < openedAtDate {
+            return nil
+        }
+        
+        let providerId: String? = {
+            if let p = row["positionid"] ?? row["ticket"] ?? row["id"] ?? row["dealid"] ?? row["positionref"] {
+                let s = String(describing: p).trimmingCharacters(in: .whitespaces)
+                return s.isEmpty ? nil : s
+            }
+            return nil
+        }()
+        
+        let fee = sourceNumber(row["fee"] ?? row["commission"])
+        let swap = sourceNumber(row["swap"])
+        let isValid = sourceBoolean(row["isvalid"])
+        
+        return SourcePosition(
+            identityDiscriminator: nil,
+            providerId: providerId,
+            symbol: symbol,
+            direction: dir,
+            openedAtIso: openedAtIso,
+            openedAtDate: openedAtDate,
+            closedAtIso: closedAtTuple?.iso,
+            closedAtDate: closedAtTuple?.date,
+            quantity: quantity,
+            entry: entry,
+            exit: exit,
+            netPnl: netPnl,
+            fee: fee,
+            swap: swap,
+            isValid: isValid
+        )
+    }
+    
     /// Hợp nhất các vị thế giao dịch thực tế vào TradeDataStore
+    /// Port 1:1 từ `source-repo/apps/web/src/server/the5ers/journal.ts` (`saveJournalPositions` & `journalTradeRow`)
     @MainActor
     private func mergePositions(
         _ rawPositions: [[String: Any]],
@@ -751,69 +892,111 @@ public final class The5ersService: ObservableObject {
         into dataStore: TradeDataStore,
         count: inout Int
     ) {
-        for p in rawPositions {
-            let symbol = String(describing: p["symbol"] ?? "").trimmingCharacters(in: .whitespaces)
-            guard !symbol.isEmpty else { continue }
-            
-            let sideStr = String(describing: p["side"] ?? p["direction"] ?? "buy").lowercased()
-            let dir: TradeDirection = (sideStr.contains("sell") || sideStr.contains("short")) ? .short : .long
-            
-            let qty = Decimal(string: String(describing: p["quantity"] ?? p["lots"] ?? p["volume"] ?? p["size"] ?? "0")) ?? 0
-            let entry = Decimal(string: String(describing: p["entry"] ?? p["openPrice"] ?? p["open_price"] ?? "0")) ?? 0
-            let exit = Decimal(string: String(describing: p["exit"] ?? p["closePrice"] ?? p["close_price"] ?? ""))
-            let netPnl = Decimal(string: String(describing: p["profitAndLoss"] ?? p["profit"] ?? p["netPnl"] ?? p["pnl"] ?? "0")) ?? 0
-            let fee = Decimal(string: String(describing: p["fee"] ?? p["commission"] ?? "0")) ?? 0
-            let swap = Decimal(string: String(describing: p["swap"] ?? "0")) ?? 0
-            
-            let openStr = String(describing: p["openDate"] ?? p["opendate"] ?? p["openedAt"] ?? p["open_time"] ?? "")
-            let closeStr = String(describing: p["closeDate"] ?? p["closedate"] ?? p["closedAt"] ?? p["close_time"] ?? "")
-            
-            let openDate = FlexibleDateParser.parse(openStr) ?? Date()
-            let closeDate = FlexibleDateParser.parse(closeStr)
-            let isClosed = (closeDate != nil) || (p["isClosed"] as? Bool == true) || (p["isclosed"] as? Bool == true)
-            
-            let pId = String(describing: p["position_ref"] ?? p["ref"] ?? p["positionId"] ?? p["positionid"] ?? p["ticket"] ?? p["id"] ?? p["deal_id"] ?? UUID().uuidString)
-            let tradeKey = "the5ers_\(acc.id)_\(pId)"
-            
-            let status: TradeStatus = isClosed ? (netPnl > 0 ? .win : (netPnl < 0 ? .loss : .breakeven)) : .open
-            
-            let trade = Trade(
-                key: tradeKey,
-                accountId: acc.id,
-                symbol: symbol,
-                direction: dir,
-                status: status,
-                openedAt: openDate,
-                closedAt: isClosed ? (closeDate ?? openDate) : nil,
-                quantity: qty,
-                openQuantity: isClosed ? 0 : qty,
-                avgEntry: entry,
-                avgExit: exit,
-                grossPnl: netPnl + fee + swap,
-                fees: -(abs(fee) + abs(swap)),
-                netPnl: netPnl,
-                executionCount: 0,
-                executionIds: [],
-                notes: "Vị thế được đồng bộ từ The5ers Hub (Ticket: \(pId))",
-                tags: ["the5ers", acc.program.lowercased()]
+        let parsed = rawPositions.compactMap { normalizePosition(from: $0) }
+        guard !parsed.isEmpty else { return }
+        
+        let journalAccId = acc.id.hasPrefix("the5ers_") ? acc.id : "the5ers_\(acc.id)"
+        
+        // Nhóm các vị thế theo base identity = sha256([symbol, direction, openedAt])
+        var groups: [String: [SourcePosition]] = [:]
+        for p in parsed {
+            let baseKey = JournalIds.positionIdentity(symbol: p.symbol, direction: p.direction.rawValue, openedAt: p.openedAtIso, discriminator: nil)
+            groups[baseKey, default: []].append(p)
+        }
+        
+        var valid: [SourcePosition] = []
+        for (_, group) in groups {
+            if group.count == 1 {
+                valid.append(group[0])
+                continue
+            }
+            // Trường hợp có nhiều vị thế trùng (symbol, direction, openedAt), phân biệt bằng providerId hoặc entry
+            for p in group {
+                var item = p
+                let disc: String
+                if let pid = p.providerId, !pid.isEmpty {
+                    disc = "provider:\(pid)"
+                } else {
+                    disc = "entry:\(JournalIds.sha256Hex([p.quantity, p.entry]))"
+                }
+                item.identityDiscriminator = disc
+                valid.append(item)
+            }
+        }
+        
+        // Chuyển đổi SourcePosition thành TradeRow chuẩn
+        for position in valid {
+            let posIdentity = JournalIds.positionIdentity(
+                symbol: position.symbol,
+                direction: position.direction.rawValue,
+                openedAt: position.openedAtIso,
+                discriminator: position.identityDiscriminator
             )
+            // Khóa chuẩn: "the5ers_" + sha256([sourceAccountId, positionIdentity])
+            let tradeKey = JournalIds.the5ersTradeKey(sourceAccountId: acc.id, positionIdentity: posIdentity)
+            
+            let isClosed = position.closedAtDate != nil
+            let status: TradeStatus = isClosed
+                ? (position.netPnl > 0 ? .win : (position.netPnl < 0 ? .loss : .breakeven))
+                : .open
+            
+            // Công thức Gross P&L & Fees toán học port 1:1 từ `journal.ts` (lines 68-75):
+            // Broker The5ers báo netPnl đã tính cả fee và swap (mang dấu âm).
+            // Do đó costsReversed = -fee - swap (thành số dương).
+            // grossPnl = netPnl + costsReversed
+            // fees = costsReversed
+            // netPnl = netPnl
+            // Bất biến luôn thỏa mãn: grossPnl - fees == netPnl
+            let fee = position.fee ?? 0
+            let swap = position.swap ?? 0
+            let hasCosts = (position.fee != nil && position.swap != nil)
+            let costsReversed = hasCosts ? (-fee - swap) : 0
+            let grossPnl = position.netPnl + costsReversed
+            let fees = hasCosts ? costsReversed : 0
+            let netPnl = position.netPnl
+            
+            let durationMs: Int64? = (isClosed && position.closedAtDate != nil)
+                ? Int64(position.closedAtDate!.timeIntervalSince(position.openedAtDate) * 1000)
+                : nil
             
             if let tIdx = dataStore.trades.firstIndex(where: { $0.key == tradeKey }) {
                 var existing = dataStore.trades[tIdx]
-                // Cập nhật các trường dữ liệu sàn thực tế có thể thay đổi khi đóng vị thế
+                // Cập nhật các trường kinh tế sàn có thể cập nhật khi đóng vị thế
                 existing.status = status
-                existing.closedAt = isClosed ? (closeDate ?? openDate) : nil
-                existing.openQuantity = isClosed ? 0 : qty
-                existing.avgExit = exit
-                existing.grossPnl = netPnl + fee + swap
-                existing.fees = -(abs(fee) + abs(swap))
+                existing.closedAt = position.closedAtDate
+                existing.openQuantity = isClosed ? 0 : position.quantity
+                existing.avgExit = position.exit
+                existing.grossPnl = grossPnl
+                existing.fees = fees
                 existing.netPnl = netPnl
+                existing.durationMs = durationMs
                 // Bảo toàn 100% annotations cá nhân của trader (notes, tags, mistakes, playbook, rating,...)
                 if existing.notes == nil || existing.notes?.isEmpty == true {
-                    existing.notes = "Vị thế được đồng bộ từ The5ers Hub (Ticket: \(pId))"
+                    existing.notes = "Vị thế được đồng bộ từ The5ers Hub (Ticket: \(position.providerId ?? ""))"
                 }
                 dataStore.trades[tIdx] = existing
             } else {
+                let trade = Trade(
+                    key: tradeKey,
+                    accountId: journalAccId,
+                    symbol: position.symbol,
+                    direction: position.direction,
+                    status: status,
+                    openedAt: position.openedAtDate,
+                    closedAt: position.closedAtDate,
+                    quantity: position.quantity,
+                    openQuantity: isClosed ? 0 : position.quantity,
+                    avgEntry: position.entry,
+                    avgExit: position.exit,
+                    grossPnl: grossPnl,
+                    fees: fees,
+                    netPnl: netPnl,
+                    executionCount: 0,
+                    executionIds: [],
+                    durationMs: durationMs,
+                    notes: "Vị thế được đồng bộ từ The5ers Hub (Ticket: \(position.providerId ?? ""))",
+                    tags: ["the5ers", acc.program.lowercased()]
+                )
                 dataStore.trades.append(trade)
                 count += 1
             }
