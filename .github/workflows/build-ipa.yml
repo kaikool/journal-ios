@@ -69,8 +69,8 @@ jobs:
         if: failure() && steps.build_app.outcome == 'failure'
         run: |
           echo "==> Last 50 lines of build log:"
-          tail -n 50 build/xcodebuild.log
-          ERROR_SUMMARY=$(grep -E "error:" build/xcodebuild.log | head -n 3 | tr '\n' ' ' || tail -n 5 build/xcodebuild.log | tr '\n' ' ')
+          tail -n 50 build/xcodebuild.log || true
+          ERROR_SUMMARY=$(cat build/xcodebuild.log | head -n 10 | tr '\n' ' ' | cut -c 1-250)
           echo "::error title=XcodeBuildError::$ERROR_SUMMARY"
 
       - name: Package IPA
