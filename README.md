@@ -6,6 +6,7 @@
 ![Swift 5.10+](https://img.shields.io/badge/Swift-5.10%2B-orange.svg)
 ![Supabase](https://img.shields.io/badge/Backend-Supabase-green.svg)
 ![License MIT](https://img.shields.io/badge/License-MIT-lightgrey.svg)
+[![Tải trực tiếp TradeJournal.ipa](https://img.shields.io/badge/Tải_IPA-TradeJournal.ipa-007AFF?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/kaikool/journal-ios/releases/latest/download/TradeJournal.ipa)
 
 ---
 
