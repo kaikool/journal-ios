@@ -74,6 +74,14 @@ public enum Formatters {
         percentage(value)
     }
     
+    public static func percent(_ value: Double?) -> String {
+        formatPercent(value)
+    }
+    
+    public static func percent(_ value: Decimal?) -> String {
+        formatPercent(value)
+    }
+    
     public static func pnlColor(_ amount: Decimal) -> Color {
         if amount > 0 {
             return AppColors.profit
