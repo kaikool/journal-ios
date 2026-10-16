@@ -96,6 +96,11 @@ public struct AppBadge: View {
         self.color = color
     }
     
+    public init(text: String, color: Color) {
+        self.text = text
+        self.color = color
+    }
+    
     public var body: some View {
         Text(text)
             .font(.system(size: 11, weight: .bold, design: .rounded))
@@ -124,6 +129,20 @@ public struct EmptyStateView: View {
     ) {
         self.title = title
         self.description = description
+        self.iconName = icon
+        self.actionTitle = actionTitle
+        self.action = action
+    }
+    
+    public init(
+        icon: String = "tray",
+        title: String,
+        message: String = "",
+        actionTitle: String? = nil,
+        action: (() -> Void)? = nil
+    ) {
+        self.title = title
+        self.description = message
         self.iconName = icon
         self.actionTitle = actionTitle
         self.action = action

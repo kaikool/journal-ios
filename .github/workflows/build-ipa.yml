@@ -39,7 +39,7 @@ jobs:
       - name: Run Unit Tests
         run: |
           echo "==> Running Swift Package Unit Tests..."
-          swift test
+          swift test -v
 
       - name: Install XcodeGen
         run: |

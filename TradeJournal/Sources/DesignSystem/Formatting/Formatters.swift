@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 public enum Formatters {
     private static let currencyFormatter: NumberFormatter = {
@@ -33,6 +34,10 @@ public enum Formatters {
         return currencyFormatter.string(from: amount as NSDecimalNumber) ?? "$\(amount)"
     }
     
+    public static func formatCurrency(_ amount: Decimal, currency: String = "USD", isPrivate: Bool = false) -> String {
+        Formatters.currency(amount, currencyCode: currency, isPrivate: isPrivate)
+    }
+    
     /// Định dạng P&L có dấu cộng/trừ rõ ràng
     public static func pnl(_ amount: Decimal, currencyCode: String = "USD", isPrivate: Bool = false) -> String {
         if isPrivate { return "••••••" }
@@ -40,10 +45,33 @@ public enum Formatters {
         return "\(sign)\(currency(amount, currencyCode: currencyCode, isPrivate: false))"
     }
     
+    public static func formatPnL(_ amount: Decimal, currency: String = "USD", isPrivate: Bool = false) -> String {
+        Formatters.pnl(amount, currencyCode: currency, isPrivate: isPrivate)
+    }
+    
     /// Định dạng tỷ lệ phần trăm (ví dụ: 0.542 -> "54.2%")
     public static func percentage(_ value: Double?) -> String {
         guard let value = value, value.isFinite else { return "n/a" }
         return percentFormatter.string(from: NSNumber(value: value)) ?? "\(value * 100)%"
+    }
+    
+    public static func formatPercent(_ value: Decimal?) -> String {
+        guard let val = value else { return "n/a" }
+        return percentage((val as NSDecimalNumber).doubleValue)
+    }
+    
+    public static func formatPercent(_ value: Double?) -> String {
+        percentage(value)
+    }
+    
+    public static func pnlColor(_ amount: Decimal) -> Color {
+        if amount > 0 {
+            return AppColors.profit
+        } else if amount < 0 {
+            return AppColors.loss
+        } else {
+            return AppColors.breakeven
+        }
     }
     
     /// Định dạng giá thực hiện lệnh (linh hoạt từ 2 tới 5 số lẻ cho Forex/Crypto)
@@ -58,6 +86,10 @@ public enum Formatters {
         f.timeStyle = .short
         f.timeZone = timeZone
         return f.string(from: date)
+    }
+    
+    public static func formatDateTime(_ date: Date, timeZone: TimeZone = .current) -> String {
+        dateTime(date, timeZone: timeZone)
     }
     
     public static func dateOnly(_ date: Date, timeZone: TimeZone = .current) -> String {

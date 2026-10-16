@@ -1,5 +1,11 @@
 import SwiftUI
 
+#if canImport(UIKit)
+import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
+
 public enum AppColors {
     // Semantic Financial Colors
     public static let profit = Color(red: 34/255, green: 197/255, blue: 94/255)   // Emerald green (#22c55e)
@@ -10,11 +16,20 @@ public enum AppColors {
     public static let accent = Color(red: 59/255, green: 130/255, blue: 246/255)   // Blue (#3b82f6)
     public static let warning = Color(red: 245/255, green: 158/255, blue: 11/255)  // Amber (#f59e0b)
     
+    // Text
+    public static let primaryText = Color.primary
+    public static let secondaryText = Color.secondary
+    
     // Backgrounds & Surfaces
+    #if canImport(UIKit)
     public static let background = Color(UIColor.systemBackground)
     public static let secondaryBackground = Color(UIColor.secondarySystemBackground)
     public static let cardBackground = Color(UIColor.tertiarySystemBackground)
-    
-    // Borders & Dividers
     public static let border = Color(UIColor.separator)
+    #else
+    public static let background = Color(NSColor.windowBackgroundColor)
+    public static let secondaryBackground = Color(NSColor.underPageBackgroundColor)
+    public static let cardBackground = Color(NSColor.controlBackgroundColor)
+    public static let border = Color(NSColor.separatorColor)
+    #endif
 }

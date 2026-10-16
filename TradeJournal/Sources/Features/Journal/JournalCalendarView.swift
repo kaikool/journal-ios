@@ -224,6 +224,7 @@ public struct JournalCalendarView: View {
             }
         }
     }
+    }
     
     // MARK: - Helper Views & Functions
     
