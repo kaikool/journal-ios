@@ -9,6 +9,13 @@ public struct SettingsView: View {
     @State private var exportedJsonString: String = ""
     @State private var showResetConfirmation: Bool = false
     
+    @State private var supabaseUrl: String = SupabaseService.shared.supabaseUrl
+    @State private var supabaseAnonKey: String = SupabaseService.shared.supabaseAnonKey
+    @State private var supabaseSyncStatus: String? = nil
+    
+    @State private var the5ersToken: String = The5ersService.shared.apiToken
+    @State private var the5ersSyncStatus: String? = nil
+    
     private let timeZones: [String] = [
         "UTC",
         "America/New_York",
@@ -93,30 +100,103 @@ public struct SettingsView: View {
                     }
                 }
                 
-                // Section: Supabase & Auth
-                Section("Hạ Tầng & Backend") {
-                    HStack {
-                        Text("Trạng thái phiên")
-                        Spacer()
-                        Text("Khách / Cục bộ (Chưa bắt buộc đăng nhập)")
+                // Section: Supabase Cloud Sync
+                Section("Đồng Bộ Đám Mây (Supabase PostgreSQL + RLS)") {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Project URL:")
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText)
+                        TextField("https://xyz.supabase.co", text: $supabaseUrl)
+                            .textFieldStyle(.roundedBorder)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled(true)
                     }
                     
-                    HStack {
-                        Text("Nền tảng")
-                        Spacer()
-                        Text("iOS 17+ Native SwiftUI")
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Anon / Public API Key:")
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText)
+                        SecureField("eyJhbGciOiJIUzI1NiIsInR5...", text: $supabaseAnonKey)
+                            .textFieldStyle(.roundedBorder)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled(true)
                     }
                     
-                    HStack {
-                        Text("Backend")
-                        Spacer()
-                        Text("Supabase PostgreSQL + RLS")
+                    Button {
+                        SupabaseService.shared.configure(url: supabaseUrl, anonKey: supabaseAnonKey)
+                        Task {
+                            supabaseSyncStatus = "Đang kiểm tra kết nối và đồng bộ..."
+                            await dataStore.syncWithSupabase()
+                            if let err = dataStore.lastSyncError {
+                                supabaseSyncStatus = "Lỗi: \(err)"
+                            } else {
+                                supabaseSyncStatus = "Đã đồng bộ 2 chiều thành công với Supabase!"
+                            }
+                        }
+                    } label: {
+                        HStack {
+                            if dataStore.isSyncing {
+                                ProgressView()
+                                    .scaleEffect(0.8)
+                                Text("Đang đồng bộ...")
+                            } else {
+                                Image(systemName: "arrow.triangle.2.circlepath")
+                                Text("Lưu & Đồng bộ Supabase ngay")
+                            }
+                        }
+                        .foregroundColor(AppColors.accent)
+                    }
+                    .disabled(dataStore.isSyncing || supabaseUrl.trimmingCharacters(in: .whitespaces).isEmpty)
+                    
+                    if let status = supabaseSyncStatus {
+                        Text(status)
+                            .font(AppTypography.caption)
+                            .foregroundColor(status.contains("Lỗi") ? AppColors.loss : AppColors.profit)
+                    }
+                }
+                
+                // Section: The5ers Prop Firm Integration
+                Section("Tích Hợp Quỹ The5ers (Direct API Sync)") {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("The5ers API Key / Bearer Token:")
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText)
+                        SecureField("Nhập API Token của The5ers...", text: $the5ersToken)
+                            .textFieldStyle(.roundedBorder)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled(true)
+                    }
+                    
+                    Button {
+                        The5ersService.shared.configure(token: the5ersToken)
+                        Task {
+                            the5ersSyncStatus = "Đang kết nối The5ers API..."
+                            do {
+                                let imported = try await The5ersService.shared.syncWithTradeStore(dataStore: dataStore)
+                                the5ersSyncStatus = "Đã đồng bộ thành công \(imported) tài khoản The5ers vào Sổ cái Quỹ!"
+                            } catch {
+                                the5ersSyncStatus = "Lỗi kết nối The5ers: \(error.localizedDescription)"
+                            }
+                        }
+                    } label: {
+                        HStack {
+                            if The5ersService.shared.isSyncing {
+                                ProgressView()
+                                    .scaleEffect(0.8)
+                                Text("Đang tải dữ liệu The5ers...")
+                            } else {
+                                Image(systemName: "link.badge.plus")
+                                Text("Lưu & Đồng bộ The5ers ngay")
+                            }
+                        }
+                        .foregroundColor(AppColors.accent)
+                    }
+                    .disabled(The5ersService.shared.isSyncing || the5ersToken.trimmingCharacters(in: .whitespaces).isEmpty)
+                    
+                    if let status = the5ersSyncStatus {
+                        Text(status)
+                            .font(AppTypography.caption)
+                            .foregroundColor(status.contains("Lỗi") ? AppColors.loss : AppColors.profit)
                     }
                 }
                 
