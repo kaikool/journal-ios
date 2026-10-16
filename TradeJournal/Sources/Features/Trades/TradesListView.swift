@@ -224,7 +224,7 @@ public struct TradesListView: View {
                     }
                     
                     AppButton("Nhập File CSV Sao Kê", icon: "doc.text", style: .secondary) {
-                        env.selectedTab = .importStatement
+                        env.selectedTab = .settings
                     }
                 }
                 .padding(.horizontal, 40)
