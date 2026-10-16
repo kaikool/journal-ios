@@ -51,13 +51,3 @@ public enum ProfitCalcMethod: String, Codable, Equatable {
     case lifo = "lifo"
     case wavg = "wavg"
 }
-
-public enum FinancialInvariants {
-    /// Ngưỡng số học để xác định một vị thế đã phẳng hoàn toàn (tránh sai số số thập phân nhỏ)
-    public static let flatEpsilon: Decimal = Decimal(string: "0.000000001")!
-    
-    /// Bất biến kiểm tra trạng thái hòa vốn
-    public static func isBreakeven(netPnl: Decimal) -> Bool {
-        return abs(netPnl) <= flatEpsilon
-    }
-}
