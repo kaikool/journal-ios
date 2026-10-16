@@ -92,7 +92,7 @@ public struct TradesListView: View {
                 .buttonStyle(.plain)
                 .listRowSeparator(.hidden)
                 .listRowBackground(Color.clear)
-                .swipeActions(edge: .destructive) {
+                .swipeActions(edge: .trailing) {
                     Button(role: .destructive) {
                         dataStore.deleteTrade(key: trade.key)
                     } label: {

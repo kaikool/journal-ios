@@ -428,34 +428,37 @@ public struct DayDetailSheet: View {
                                 .padding(.horizontal, 4)
                             
                             ForEach(trades) { trade in
-                                AppCard {
-                                    HStack {
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            HStack {
-                                                Text(trade.symbol)
-                                                    .font(AppTypography.subheadlineBold)
-                                                AppBadge(
-                                                    text: trade.direction.rawValue.uppercased(),
-                                                    color: trade.direction == .long ? AppColors.profit : AppColors.loss
-                                                )
+                                NavigationLink(destination: TradeDetailView(trade: trade)) {
+                                    AppCard {
+                                        HStack {
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                HStack {
+                                                    Text(trade.symbol)
+                                                        .font(AppTypography.subheadlineBold)
+                                                    AppBadge(
+                                                        text: trade.direction.rawValue.uppercased(),
+                                                        color: trade.direction == .long ? AppColors.profit : AppColors.loss
+                                                    )
+                                                }
+                                                Text("KL: \(trade.quantity) • Giá vào: \(trade.avgEntry)")
+                                                    .font(AppTypography.caption)
+                                                    .foregroundColor(AppColors.secondaryText)
                                             }
-                                            Text("KL: \(trade.quantity) • Giá vào: \(trade.avgEntry)")
-                                                .font(AppTypography.caption)
-                                                .foregroundColor(AppColors.secondaryText)
-                                        }
-                                        
-                                        Spacer()
-                                        
-                                        VStack(alignment: .trailing, spacing: 2) {
-                                            Text(Formatters.formatPnL(trade.netPnl, currency: env.currentCurrency))
-                                                .font(AppTypography.subheadlineBold)
-                                                .foregroundColor(Formatters.pnlColor(trade.netPnl))
-                                            Text(trade.status.rawValue.capitalized)
-                                                .font(AppTypography.caption)
-                                                .foregroundColor(Formatters.pnlColor(trade.netPnl))
+                                            
+                                            Spacer()
+                                            
+                                            VStack(alignment: .trailing, spacing: 2) {
+                                                Text(Formatters.formatPnL(trade.netPnl, currency: env.currentCurrency))
+                                                    .font(AppTypography.subheadlineBold)
+                                                    .foregroundColor(Formatters.pnlColor(trade.netPnl))
+                                                Text(trade.status.rawValue.capitalized)
+                                                    .font(AppTypography.caption)
+                                                    .foregroundColor(Formatters.pnlColor(trade.netPnl))
+                                            }
                                         }
                                     }
                                 }
+                                .buttonStyle(.plain)
                             }
                         }
                     }
