@@ -728,6 +728,18 @@ public final class The5ersService: ObservableObject {
             dataStore.saveToDisk()
             let activeCount = accountsList.filter { $0.status.lowercased() == "active" || $0.status.lowercased() == "available" }.count
             lastStatus = "Đã đồng bộ thành công \(accountsList.count) tài khoản (\(activeCount) đang hoạt động) và \(importedPositionsCount) vị thế lệnh từ The5ers MCP."
+            
+            // 5. Tự động kích hoạt luồng đẩy lên Supabase Cloud (Auto-Pipeline: The5ers -> Local -> Supabase)
+            if SupabaseService.shared.isConfigured {
+                lastStatus = "The5ers hoàn tất (\(importedPositionsCount) lệnh). Đang tự động sao lưu lên đám mây Supabase..."
+                Task {
+                    await dataStore.syncWithSupabase()
+                    await MainActor.run {
+                        self.lastStatus = "Đã đồng bộ thành công \(accountsList.count) tài khoản (\(activeCount) đang hoạt động), \(importedPositionsCount) vị thế lệnh từ The5ers và tự động sao lưu lên Supabase."
+                    }
+                }
+            }
+            
             return accountsList.count
         } catch {
             lastStatus = "Lỗi đồng bộ The5ers MCP: \(error.localizedDescription)"
@@ -791,7 +803,25 @@ public final class The5ersService: ObservableObject {
             )
             
             if let tIdx = dataStore.trades.firstIndex(where: { $0.key == tradeKey }) {
-                dataStore.trades[tIdx] = trade
+                var existing = dataStore.trades[tIdx]
+                // Cập nhật các trường dữ liệu sàn thực tế
+                existing.symbol = symbol
+                existing.direction = dir
+                existing.status = status
+                existing.openedAt = openDate
+                existing.closedAt = isClosed ? (closeDate ?? openDate) : nil
+                existing.quantity = qty
+                existing.openQuantity = isClosed ? 0 : qty
+                existing.avgEntry = entry
+                existing.avgExit = exit
+                existing.grossPnl = netPnl + fee + swap
+                existing.fees = -(abs(fee) + abs(swap))
+                existing.netPnl = netPnl
+                // Bảo toàn 100% annotations cá nhân của trader (notes, tags, mistakes, playbook, rating,...)
+                if existing.notes.isEmpty {
+                    existing.notes = "Vị thế được đồng bộ từ The5ers Hub (Ticket: \(pId))"
+                }
+                dataStore.trades[tIdx] = existing
             } else {
                 dataStore.trades.append(trade)
                 count += 1
