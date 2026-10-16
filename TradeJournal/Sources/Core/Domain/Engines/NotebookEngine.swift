@@ -347,9 +347,13 @@ public enum NotebookEngine {
         }
         
         let metrics = FinancialMetricsEngine.computeMetrics(trades: dayTrades)
+        var execTimes: [String: Date] = [:]
+        for exec in executions {
+            execTimes[exec.id] = exec.executedAt
+        }
         let intraday = FinancialMetricsEngine.intradayCurve(
             trades: dayTrades,
-            executions: executions,
+            executionTimes: execTimes,
             date: date,
             timeZone: tz
         )
