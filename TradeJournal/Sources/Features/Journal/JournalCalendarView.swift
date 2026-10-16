@@ -203,9 +203,10 @@ public struct JournalCalendarView: View {
                                 .foregroundColor(AppColors.secondaryText)
                         }
                     }
+                        }
+                        .padding()
+                    }
                 }
-                .padding()
-            }
             }
             .navigationTitle("Nhật Ký")
             .background(AppColors.background)
@@ -223,7 +224,6 @@ public struct JournalCalendarView: View {
                 }
             }
         }
-    }
     }
     
     // MARK: - Helper Views & Functions
