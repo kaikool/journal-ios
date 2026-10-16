@@ -203,6 +203,15 @@ public struct TradeDetailView: View {
                         }
                     }
                 }
+                
+                // Attachments & Screenshots
+                AppCard {
+                    AttachmentsSectionView(
+                        ownerType: "trade",
+                        ownerId: trade.key,
+                        title: "Ảnh biểu đồ & Bằng chứng vào lệnh"
+                    )
+                }
             }
             .padding()
         }

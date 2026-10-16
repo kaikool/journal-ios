@@ -21,6 +21,7 @@ public final class TradeDataStore: ObservableObject {
     @Published public var propEntries: [PropEntryItem] = []
     @Published public var propReceipts: [PropReceiptItem] = []
     @Published public var propAudits: [PropAuditItem] = []
+    @Published public var attachments: [Attachment] = []
     @Published public var isSyncing: Bool = false
     @Published public var lastSyncError: String? = nil
     
@@ -262,8 +263,19 @@ public final class TradeDataStore: ObservableObject {
                 try await SupabaseService.shared.upsertPropAudits(propAudits)
             }
             
+            // 5. Đồng bộ Tệp đính kèm (Attachments Sync)
+            let remoteAttachments = try await SupabaseService.shared.fetchAttachments()
+            for rAtt in remoteAttachments {
+                if !attachments.contains(where: { $0.id == rAtt.id }) {
+                    attachments.append(rAtt)
+                }
+            }
+            if !attachments.isEmpty {
+                try await SupabaseService.shared.upsertAttachments(attachments)
+            }
+            
             saveToDisk()
-            AppLogger.info("Supabase sync (Trades + Prop Firm) completed successfully.")
+            AppLogger.info("Supabase sync (Trades + Prop Firm + Attachments) completed successfully.")
         } catch {
             await MainActor.run {
                 self.lastSyncError = error.localizedDescription
@@ -568,6 +580,107 @@ public final class TradeDataStore: ObservableObject {
         return res
     }
 
+    // MARK: - Attachments & Screenshots (1:1 port từ source-repo)
+    
+    private var attachmentsBaseUrl: URL {
+        let paths = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
+        let dir = paths[0].appendingPathComponent("attachments")
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }
+    
+    public func attachmentsFor(ownerType: String, ownerId: String) -> [Attachment] {
+        attachments.filter { $0.ownerType == ownerType && $0.ownerId == ownerId }
+    }
+    
+    public func addAttachment(
+        ownerType: String,
+        ownerId: String,
+        name: String,
+        data: Data
+    ) throws -> Attachment {
+        let validation = try AttachmentEngine.validateAttachment(data: data, declaredName: name)
+        let attId = JournalIds.newId()
+        let relativePath = AttachmentEngine.storagePath(
+            ownerType: ownerType,
+            ownerId: ownerId,
+            id: attId,
+            name: validation.cleanName
+        )
+        
+        let fileUrl = attachmentsBaseUrl.appendingPathComponent(relativePath)
+        try FileManager.default.createDirectory(
+            at: fileUrl.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try data.write(to: fileUrl, options: .atomic)
+        
+        let attachment = Attachment(
+            id: attId,
+            ownerType: ownerType,
+            ownerId: ownerId,
+            name: validation.cleanName,
+            mime: validation.mime,
+            size: data.count,
+            storagePath: relativePath,
+            status: "ready"
+        )
+        
+        attachments.append(attachment)
+        saveToDisk()
+        
+        if SupabaseService.shared.isConfigured {
+            Task {
+                try? await SupabaseService.shared.uploadAttachmentFile(
+                    storagePath: relativePath,
+                    data: data,
+                    mime: validation.mime
+                )
+                try? await SupabaseService.shared.upsertAttachments([attachment])
+            }
+        }
+        
+        return attachment
+    }
+    
+    public func saveChartScreenshot(
+        tradeKey: String,
+        symbol: String,
+        dataUrl: String
+    ) throws -> Attachment {
+        let data = try AttachmentEngine.validateChartScreenshotPng(dataUrl: dataUrl)
+        let safeSymbol = symbol
+            .replacingOccurrences(of: #"[^a-zA-Z0-9._-]+"#, with: "-", options: .regularExpression)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "-"))
+        let filename = "chart-\(safeSymbol.isEmpty ? "trade" : safeSymbol).png"
+        return try addAttachment(
+            ownerType: "trade",
+            ownerId: tradeKey,
+            name: filename,
+            data: data
+        )
+    }
+    
+    public func deleteAttachment(id: String) throws {
+        guard let index = attachments.firstIndex(where: { $0.id == id }) else { return }
+        let att = attachments[index]
+        let fileUrl = attachmentsBaseUrl.appendingPathComponent(att.storagePath)
+        try? FileManager.default.removeItem(at: fileUrl)
+        attachments.remove(at: index)
+        saveToDisk()
+        
+        if SupabaseService.shared.isConfigured {
+            Task {
+                try? await SupabaseService.shared.deleteAttachmentFile(storagePath: att.storagePath)
+            }
+        }
+    }
+    
+    public func attachmentFileData(storagePath: String) -> Data? {
+        let fileUrl = attachmentsBaseUrl.appendingPathComponent(storagePath)
+        return try? Data(contentsOf: fileUrl)
+    }
+
     // MARK: - Local Persistence
     
     private struct PersistedStore: Codable {
@@ -584,6 +697,7 @@ public final class TradeDataStore: ObservableObject {
         let propEntries: [PropEntryItem]?
         let propReceipts: [PropReceiptItem]?
         let propAudits: [PropAuditItem]?
+        let attachments: [Attachment]?
     }
     
     private func saveToDisk() {
@@ -600,7 +714,8 @@ public final class TradeDataStore: ObservableObject {
             propAccounts: propAccounts,
             propEntries: propEntries,
             propReceipts: propReceipts,
-            propAudits: propAudits
+            propAudits: propAudits,
+            attachments: attachments
         )
         do {
             let data = try JSONEncoder().encode(store)
@@ -628,13 +743,14 @@ public final class TradeDataStore: ObservableObject {
             self.propEntries = store.propEntries ?? []
             self.propReceipts = store.propReceipts ?? []
             self.propAudits = store.propAudits ?? []
+            self.attachments = store.attachments ?? []
             self.executionHashes = Set(store.executions.map { $0.contentHash })
             
             if self.propAccounts.isEmpty {
                 createInitialPropDemoData()
             }
             
-            AppLogger.info("Loaded \(store.accounts.count) accounts, \(store.executions.count) executions, \(self.notebookNotes.count) notes, \(self.propAccounts.count) prop accounts from persistent disk.")
+            AppLogger.info("Loaded \(store.accounts.count) accounts, \(store.executions.count) executions, \(self.notebookNotes.count) notes, \(self.propAccounts.count) prop accounts, \(self.attachments.count) attachments from persistent disk.")
         } catch {
             AppLogger.error("Failed to load store from disk: \(error.localizedDescription)")
         }

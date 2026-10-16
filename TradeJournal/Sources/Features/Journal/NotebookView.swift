@@ -477,39 +477,47 @@ public struct NotebookEditorSheet: View {
                 .background(AppColors.cardBackground)
                 
                 // Content View
-                if isPreviewMode {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 8) {
-                            if title.isEmpty && content.isEmpty {
-                                Text("*(Ghi chú trống)*")
-                                    .foregroundColor(AppColors.secondaryText)
-                                    .font(AppTypography.body)
-                            } else {
-                                if !title.isEmpty {
-                                    Text(title)
-                                        .font(AppTypography.title)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 12) {
+                        if isPreviewMode {
+                            VStack(alignment: .leading, spacing: 8) {
+                                if title.isEmpty && content.isEmpty {
+                                    Text("*(Ghi chú trống)*")
+                                        .foregroundColor(AppColors.secondaryText)
+                                        .font(AppTypography.body)
+                                } else {
+                                    if !title.isEmpty {
+                                        Text(title)
+                                            .font(AppTypography.title)
+                                            .foregroundColor(AppColors.primaryText)
+                                            .padding(.bottom, 4)
+                                    }
+                                    Text(content)
+                                        .font(AppTypography.body)
                                         .foregroundColor(AppColors.primaryText)
-                                        .padding(.bottom, 4)
                                 }
-                                Text(content)
-                                    .font(AppTypography.body)
-                                    .foregroundColor(AppColors.primaryText)
                             }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        } else {
+                            TextEditor(text: $content)
+                                .font(AppTypography.body)
+                                .foregroundColor(AppColors.primaryText)
+                                .scrollContentBackground(.hidden)
+                                .frame(minHeight: 180)
+                                .onChange(of: content) { _ in autoSave() }
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding()
+                        
+                        Divider().background(AppColors.border)
+                        
+                        AttachmentsSectionView(
+                            ownerType: "note",
+                            ownerId: noteId,
+                            title: "Hình ảnh & Tệp đính kèm ghi chú"
+                        )
                     }
-                    .background(AppColors.background)
-                } else {
-                    TextEditor(text: $content)
-                        .font(AppTypography.body)
-                        .foregroundColor(AppColors.primaryText)
-                        .scrollContentBackground(.hidden)
-                        .background(AppColors.background)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .onChange(of: content) { _ in autoSave() }
+                    .padding()
                 }
+                .background(AppColors.background)
             }
             .navigationTitle("Ghi chú")
             .navigationBarTitleDisplayMode(.inline)

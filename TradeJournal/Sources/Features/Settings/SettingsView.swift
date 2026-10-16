@@ -167,6 +167,7 @@ public struct SettingsView: View {
             let propEntries: [PropEntryItem]
             let propReceipts: [PropReceiptItem]
             let propAudits: [PropAuditItem]
+            let attachments: [Attachment]
         }
         
         let backup = FullBackup(
@@ -179,7 +180,8 @@ public struct SettingsView: View {
             propAccounts: dataStore.propAccounts,
             propEntries: dataStore.propEntries,
             propReceipts: dataStore.propReceipts,
-            propAudits: dataStore.propAudits
+            propAudits: dataStore.propAudits,
+            attachments: dataStore.attachments
         )
         
         let encoder = JSONEncoder()

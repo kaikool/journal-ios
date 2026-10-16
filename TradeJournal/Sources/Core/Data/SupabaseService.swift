@@ -228,5 +228,64 @@ public final class SupabaseService {
             throw URLError(.badServerResponse)
         }
     }
+    
+    // MARK: - Attachments & Storage API
+    
+    public func fetchAttachments() async throws -> [Attachment] {
+        guard isConfigured else { return [] }
+        let request = try makeRequest(endpoint: "attachments?select=*")
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            throw URLError(.badServerResponse)
+        }
+        return try jsonDecoder.decode([Attachment].self, from: data)
+    }
+    
+    public func upsertAttachments(_ items: [Attachment]) async throws {
+        guard isConfigured, !items.isEmpty else { return }
+        let body = try jsonEncoder.encode(items)
+        let request = try makeRequest(endpoint: "attachments", method: "POST", body: body, preferMerge: true)
+        let (_, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            throw URLError(.badServerResponse)
+        }
+    }
+    
+    public func uploadAttachmentFile(storagePath: String, data: Data, mime: String) async throws {
+        guard isConfigured else { return }
+        guard let url = URL(string: "\(supabaseUrl)/storage/v1/object/journal-attachments/\(storagePath)") else {
+            throw URLError(.badURL)
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue(mime, forHTTPHeaderField: "Content-Type")
+        request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
+        let token = accessToken ?? supabaseAnonKey
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.httpBody = data
+        
+        let (_, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            throw URLError(.badServerResponse)
+        }
+    }
+    
+    public func deleteAttachmentFile(storagePath: String) async throws {
+        guard isConfigured else { return }
+        guard let url = URL(string: "\(supabaseUrl)/storage/v1/object/journal-attachments/\(storagePath)") else {
+            throw URLError(.badURL)
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
+        let token = accessToken ?? supabaseAnonKey
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        
+        let (_, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            throw URLError(.badServerResponse)
+        }
+    }
 }
+
 
