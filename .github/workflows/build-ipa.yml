@@ -107,52 +107,22 @@ jobs:
       - name: Package IPA
         run: |
           echo "==> Packaging .app into .ipa..."
-          rm -rf build/Payload build/TradeJournal.ipa
           mkdir -p build/Payload
-          APP_PATH=$(find build/DerivedData/Build/Products -name "TradeJournal.app" -type d | head -n 1)
-          if [ -z "$APP_PATH" ]; then
-            APP_PATH=$(find build/DerivedData -name "TradeJournal.app" -type d | head -n 1)
-          fi
+          APP_PATH=$(find build/DerivedData -name "TradeJournal.app" -type d | head -n 1)
           echo "Found app at: $APP_PATH"
           if [ -z "$APP_PATH" ]; then
             echo "::error::TradeJournal.app not found in build/DerivedData"
             exit 1
           fi
-          echo "==> Normalizing bundle permissions and stripping extended attributes..."
-          xattr -cr "$APP_PATH" || true
-          chmod -R 755 "$APP_PATH" || true
-          echo "==> Cleaning stale signatures..."
-          rm -rf "$APP_PATH/_CodeSignature" || true
-          echo "==> Applying clean ad-hoc signature..."
-          codesign --force --deep --sign - --timestamp=none "$APP_PATH"
-          cp -R "$APP_PATH" build/Payload/
+          echo "==> Applying ad-hoc codesign signature to .app bundle..."
+          codesign --force --deep --sign - "$APP_PATH" || true
+          cp -r "$APP_PATH" build/Payload/
           cd build
-          zip -r -9 -y -X TradeJournal.ipa Payload
+          zip -r -9 TradeJournal.ipa Payload
           ls -lh TradeJournal.ipa
           shasum -a 256 TradeJournal.ipa > TradeJournal.ipa.sha256
           echo "SHA256 Checksum:"
           cat TradeJournal.ipa.sha256
-
-      - name: Verify IPA Integrity & Report Bundle Structure
-        run: |
-          echo "### 📦 IPA Bundle Inspection" >> $GITHUB_STEP_SUMMARY
-          echo "#### Info.plist Contents:" >> $GITHUB_STEP_SUMMARY
-          echo '```xml' >> $GITHUB_STEP_SUMMARY
-          plutil -p "build/Payload/TradeJournal.app/Info.plist" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          echo "#### Mach-O Binary & Dylib Dependencies:" >> $GITHUB_STEP_SUMMARY
-          echo '```text' >> $GITHUB_STEP_SUMMARY
-          file "build/Payload/TradeJournal.app/TradeJournal" >> $GITHUB_STEP_SUMMARY
-          otool -L "build/Payload/TradeJournal.app/TradeJournal" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          echo "#### Codesign Status:" >> $GITHUB_STEP_SUMMARY
-          echo '```text' >> $GITHUB_STEP_SUMMARY
-          codesign -dvvv "build/Payload/TradeJournal.app" 2>&1 | tee -a $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          echo "#### Zip Archive Tree:" >> $GITHUB_STEP_SUMMARY
-          echo '```text' >> $GITHUB_STEP_SUMMARY
-          unzip -l build/TradeJournal.ipa >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
 
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
