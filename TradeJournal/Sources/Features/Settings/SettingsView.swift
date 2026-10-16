@@ -889,13 +889,13 @@ public struct MarketDataSettingsView: View {
 }
 
 // MARK: - 5. Connections Settings View
-// Port 1:1 từ `The5ersConnection` trong `the5ers.tsx` & Supabase Cloud
+// Port 1:1 từ `The5ersConnection` (Model Context Protocol JSON-RPC) & Supabase Cloud
 public struct ConnectionsSettingsView: View {
     @ObservedObject private var dataStore = TradeDataStore.shared
+    @ObservedObject private var the5ers = The5ersService.shared
     
-    @State private var the5ersToken: String = The5ersService.shared.apiToken
+    @State private var mcpToken: String = The5ersService.shared.mcpToken
     @State private var the5ersStatus: String = ""
-    @State private var the5ersConnected: Bool = false
     
     @State private var supabaseUrl: String = SupabaseService.shared.supabaseUrl
     @State private var supabaseAnonKey: String = SupabaseService.shared.supabaseAnonKey
@@ -903,61 +903,82 @@ public struct ConnectionsSettingsView: View {
     
     public var body: some View {
         VStack(spacing: 20) {
-            // Card 1: The5ers Connection
-            SettingsCard(title: "The5ers connection") {
+            // Card 1: The5ers MCP Connection
+            SettingsCard(title: "The5ers MCP connection") {
                 VStack(alignment: .leading, spacing: 14) {
-                    Text("Read-only The5ers Hub connection. Use the sync button below to import all accounts, expenses, payouts, and trade history into the database. Manage account visibility in Accounts.")
+                    HStack {
+                        Text("Model Context Protocol (MCP)")
+                            .font(AppTypography.headline)
+                        Spacer()
+                        Text(the5ers.isConnected ? "MCP Connected · Active" : "Not connected")
+                            .font(AppTypography.captionBold)
+                            .foregroundColor(the5ers.isConnected ? AppColors.profit : AppColors.secondaryText)
+                    }
+                    
+                    Text("Official The5ers MCP Service tại `https://mcp.the5ers.com/mcp` (Protocol 2025-03-26). Sử dụng quy trình OAuth 2.0 PKCE qua máy chủ ủy quyền `https://auth.hub.the5ers.com`. Hoàn toàn chỉ đọc (read-only).")
                         .font(AppTypography.caption)
                         .foregroundColor(AppColors.secondaryText)
                     
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("API Key / Bearer Token")
-                            .font(AppTypography.captionBold)
-                            .foregroundColor(AppColors.secondaryText)
-                        
-                        SecureField("Enter The5ers API token", text: $the5ersToken)
-                            .textFieldStyle(.roundedBorder)
-                    }
-                    
                     HStack(spacing: 8) {
-                        Button(the5ersConnected ? "Reconnect The5ers" : "Connect The5ers") {
-                            The5ersService.shared.configure(token: the5ersToken)
-                            the5ersConnected = !the5ersToken.isEmpty
-                            the5ersStatus = "The5ers credentials saved."
+                        Button {
+                            connectThe5ersOAuth()
+                        } label: {
+                            HStack {
+                                Image(systemName: "safari")
+                                Text(the5ers.isConnected ? "Reconnect The5ers (OAuth)" : "Connect The5ers (OAuth PKCE)")
+                            }
                         }
                         .buttonStyle(.borderedProminent)
                         .tint(AppColors.accent)
                         
-                        Button("Check connection") {
-                            the5ersStatus = the5ersToken.isEmpty ? "Missing API Token" : "Connection verified. The5ers API Hub endpoint is reachable."
+                        Button("Ping MCP") {
+                            pingMcp()
                         }
                         .buttonStyle(.bordered)
                         
-                        if the5ersConnected {
+                        if the5ers.isConnected {
                             Button("Disconnect") {
-                                the5ersToken = ""
-                                The5ersService.shared.configure(token: "")
-                                the5ersConnected = false
-                                the5ersStatus = "Disconnected from The5ers."
+                                the5ers.disconnect()
+                                mcpToken = ""
+                                the5ersStatus = "Đã ngắt kết nối The5ers MCP."
                             }
                             .buttonStyle(.bordered)
                             .tint(AppColors.loss)
                         }
                     }
                     
+                    // Session Token Manual Override (Dành cho người dùng đã có token từ Hub)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Session Bearer Token (Tùy chọn nhập tay nếu đã có token):")
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.secondaryText)
+                        
+                        HStack {
+                            SecureField("Dán Bearer token nếu đã có sẵn...", text: $mcpToken)
+                                .textFieldStyle(.roundedBorder)
+                            
+                            Button("Lưu token") {
+                                the5ers.configure(token: mcpToken)
+                                the5ersStatus = "Đã lưu Session Token The5ers MCP."
+                            }
+                            .buttonStyle(.bordered)
+                            .disabled(mcpToken.trimmingCharacters(in: .whitespaces).isEmpty)
+                        }
+                    }
+                    
                     if !the5ersStatus.isEmpty {
                         Text(the5ersStatus)
                             .font(AppTypography.caption)
-                            .foregroundColor(the5ersStatus.contains("Error") || the5ersStatus.contains("Missing") ? AppColors.loss : AppColors.profit)
+                            .foregroundColor(the5ersStatus.contains("Lỗi") ? AppColors.loss : AppColors.profit)
                     }
                     
                     // Sync Box
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("Synchronize The5ers data")
+                                Text("Đồng bộ dữ liệu qua The5ers MCP")
                                     .font(AppTypography.subheadlineBold)
-                                Text("Sync accounts, challenge expenses, payouts, and trading positions into the database.")
+                                Text("Gọi các MCP tools (`the5ers_account`, `the5ers_positions`, `the5ers_payout`) để cập nhật tài khoản và sổ cái quỹ.")
                                     .font(AppTypography.caption)
                                     .foregroundColor(AppColors.secondaryText)
                             }
@@ -966,23 +987,23 @@ public struct ConnectionsSettingsView: View {
                                 syncThe5ers()
                             } label: {
                                 HStack {
-                                    if The5ersService.shared.isSyncing {
+                                    if the5ers.isSyncing {
                                         ProgressView().scaleEffect(0.8)
                                     }
-                                    Text("Sync now")
+                                    Text("Sync MCP now")
                                 }
                             }
                             .buttonStyle(.borderedProminent)
                             .tint(AppColors.accent)
-                            .disabled(The5ersService.shared.isSyncing)
+                            .disabled(the5ers.isSyncing)
                         }
                         
                         HStack {
-                            Text("Synced accounts: \(dataStore.propAccounts.filter { $0.firm.contains("The5ers") }.count)")
+                            Text("Tài khoản The5ers: \(dataStore.propAccounts.filter { $0.firm.contains("The5ers") }.count)")
                                 .font(AppTypography.caption)
                                 .foregroundColor(AppColors.secondaryText)
                             Spacer()
-                            Text("Payout receipts recorded: \(dataStore.propReceipts.count)")
+                            Text("Biên nhận rút tiền: \(dataStore.propReceipts.count)")
                                 .font(AppTypography.caption)
                                 .foregroundColor(AppColors.secondaryText)
                         }
@@ -996,7 +1017,7 @@ public struct ConnectionsSettingsView: View {
             // Card 2: Supabase Cloud Database Sync
             SettingsCard(title: "Supabase Cloud Database (PostgreSQL + RLS)") {
                 VStack(alignment: .leading, spacing: 14) {
-                    Text("Direct 2-way cloud synchronization with Supabase PostgreSQL and Row Level Security.")
+                    Text("Đồng bộ dữ liệu 2 chiều với Supabase PostgreSQL qua chuẩn PostgREST API.")
                         .font(AppTypography.caption)
                         .foregroundColor(AppColors.secondaryText)
                     
@@ -1020,33 +1041,32 @@ public struct ConnectionsSettingsView: View {
                             .autocorrectionDisabled(true)
                     }
                     
-                    HStack(spacing: 12) {
-                        Button("Kiểm tra kết nối") {
-                            SupabaseService.shared.configure(url: supabaseUrl, anonKey: supabaseAnonKey)
-                            Task {
-                                supabaseSyncStatus = "Đang kiểm tra kết nối..."
-                                do {
-                                    let res = try await SupabaseService.shared.pingConnection()
-                                    supabaseSyncStatus = res.message
-                                } catch {
-                                    supabaseSyncStatus = "Lỗi kết nối: \(error.localizedDescription)"
-                                }
-                            }
+                    HStack(spacing: 8) {
+                        Button("Kiểm tra bảng dữ liệu") {
+                            checkSupabaseConnection()
                         }
                         .buttonStyle(.bordered)
                         .disabled(supabaseUrl.trimmingCharacters(in: .whitespaces).isEmpty)
                         
                         Button {
-                            SupabaseService.shared.configure(url: supabaseUrl, anonKey: supabaseAnonKey)
-                            Task {
-                                supabaseSyncStatus = "Đang đồng bộ 2 chiều với Supabase..."
-                                await dataStore.syncWithSupabase()
-                                if let err = dataStore.lastSyncError {
-                                    supabaseSyncStatus = "Lỗi: \(err)"
-                                } else {
-                                    supabaseSyncStatus = "Đã đồng bộ 2 chiều thành công với Supabase!"
-                                }
-                            }
+                            copySqlScript()
+                        } label: {
+                            Label("Sao chép SQL Khởi Tạo", systemImage: "doc.on.doc")
+                        }
+                        .buttonStyle(.bordered)
+                        
+                        Button {
+                            startSupabaseWebLogin()
+                        } label: {
+                            Label("Web OAuth Login", systemImage: "person.crop.circle.badge.checkmark")
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(supabaseUrl.trimmingCharacters(in: .whitespaces).isEmpty)
+                    }
+                    
+                    HStack(spacing: 12) {
+                        Button {
+                            syncSupabase()
                         } label: {
                             HStack {
                                 if dataStore.isSyncing {
@@ -1066,25 +1086,96 @@ public struct ConnectionsSettingsView: View {
                     if let status = supabaseSyncStatus {
                         Text(status)
                             .font(AppTypography.caption)
-                            .foregroundColor(status.contains("Lỗi") ? AppColors.loss : AppColors.profit)
+                            .foregroundColor(status.contains("Lỗi") || status.contains("thiếu") ? AppColors.loss : AppColors.profit)
                     }
                 }
             }
         }
         .onAppear {
-            the5ersConnected = !The5ersService.shared.apiToken.isEmpty
+            mcpToken = the5ers.mcpToken
+        }
+    }
+    
+    // MARK: - Actions
+    
+    private func connectThe5ersOAuth() {
+        the5ersStatus = "Đang mở cửa sổ ủy quyền OAuth tới The5ers Hub..."
+        Task {
+            do {
+                _ = try await the5ers.startOAuthLogin()
+                the5ersStatus = "Ủy quyền OAuth thành công! Đã kết nối The5ers MCP Hub."
+                mcpToken = the5ers.mcpToken
+            } catch {
+                the5ersStatus = "Lỗi OAuth: \(error.localizedDescription)"
+            }
+        }
+    }
+    
+    private func pingMcp() {
+        the5ersStatus = "Đang kiểm tra kết nối MCP Server..."
+        Task {
+            do {
+                let res = try await the5ers.pingMcpConnection()
+                the5ersStatus = res.message
+            } catch {
+                the5ersStatus = "Lỗi ping MCP: \(error.localizedDescription)"
+            }
         }
     }
     
     private func syncThe5ers() {
-        The5ersService.shared.configure(token: the5ersToken)
         Task {
             do {
-                let count = try await The5ersService.shared.syncWithTradeStore(dataStore: dataStore)
-                the5ersStatus = "Successfully synced \(count) The5ers account(s), trades, and payouts."
-                the5ersConnected = true
+                let count = try await the5ers.syncWithTradeStore(dataStore: dataStore)
+                the5ersStatus = "Đã đồng bộ thành công \(count) tài khoản The5ers qua MCP!"
             } catch {
-                the5ersStatus = "The5ers sync failed: \(error.localizedDescription)"
+                the5ersStatus = "Lỗi: \(error.localizedDescription)"
+            }
+        }
+    }
+    
+    private func checkSupabaseConnection() {
+        SupabaseService.shared.configure(url: supabaseUrl, anonKey: supabaseAnonKey)
+        Task {
+            supabaseSyncStatus = "Đang kiểm tra kết nối và các bảng PostgreSQL..."
+            do {
+                let res = try await SupabaseService.shared.pingConnection()
+                supabaseSyncStatus = res.message
+            } catch {
+                supabaseSyncStatus = error.localizedDescription
+            }
+        }
+    }
+    
+    private func copySqlScript() {
+        #if canImport(UIKit)
+        UIPasteboard.general.string = SupabaseService.shared.generateDatabaseInitSql()
+        supabaseSyncStatus = "Đã sao chép SQL DDL khởi tạo (23 bảng + RLS) vào Clipboard! Hãy dán vào Supabase SQL Editor và bấm Run."
+        #endif
+    }
+    
+    private func startSupabaseWebLogin() {
+        SupabaseService.shared.configure(url: supabaseUrl, anonKey: supabaseAnonKey)
+        Task {
+            supabaseSyncStatus = "Đang mở trình duyệt đăng nhập Supabase Web OAuth..."
+            do {
+                _ = try await SupabaseService.shared.startWebOAuthLogin(provider: "google")
+                supabaseSyncStatus = "Đăng nhập OAuth thành công! JWT Token đã lưu."
+            } catch {
+                supabaseSyncStatus = "Lỗi OAuth Supabase: \(error.localizedDescription)"
+            }
+        }
+    }
+    
+    private func syncSupabase() {
+        SupabaseService.shared.configure(url: supabaseUrl, anonKey: supabaseAnonKey)
+        Task {
+            supabaseSyncStatus = "Đang đồng bộ 2 chiều với Supabase..."
+            await dataStore.syncWithSupabase()
+            if let err = dataStore.lastSyncError {
+                supabaseSyncStatus = "Lỗi: \(err)"
+            } else {
+                supabaseSyncStatus = "Đã đồng bộ 2 chiều thành công với Supabase!"
             }
         }
     }

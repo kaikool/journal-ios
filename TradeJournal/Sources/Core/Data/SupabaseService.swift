@@ -1,5 +1,50 @@
 import Foundation
 
+/// Lỗi chi tiết từ Supabase PostgREST API giúp người dùng chẩn đoán chính xác nguyên nhân
+public enum SupabaseError: LocalizedError {
+    case notConfigured
+    case invalidUrl
+    case tableNotFound(table: String, message: String)
+    case unauthorized(message: String)
+    case rlsBlocked(table: String, message: String)
+    case postgrestError(statusCode: Int, code: String?, message: String, hint: String?)
+    case networkError(String)
+    case decodingError(String)
+    
+    public var errorDescription: String? {
+        switch self {
+        case .notConfigured:
+            return "Chưa cấu hình Supabase Project URL và Anon Key."
+        case .invalidUrl:
+            return "Supabase Project URL không đúng định dạng."
+        case .tableNotFound(let table, let msg):
+            return "Bảng '\(table)' chưa tồn tại trên Supabase PostgreSQL (\(msg)). Hãy bấm 'Sao Chép SQL Khởi Tạo' và chạy trên Supabase SQL Editor để tạo bảng."
+        case .unauthorized(let msg):
+            return "Lỗi xác thực (HTTP 401): \(msg). Vui lòng kiểm tra lại Anon Key hoặc JWT Access Token."
+        case .rlsBlocked(let table, let msg):
+            return "Bị chặn bởi Row Level Security (RLS) trên bảng '\(table)' (HTTP 403: \(msg)). Cần thêm Policy cho phép quyền thao tác hoặc dùng Service Role Key."
+        case .postgrestError(let code, let pgCode, let msg, let hint):
+            var res = "Supabase lỗi HTTP \(code)"
+            if let p = pgCode, !p.isEmpty { res += " (Mã: \(p))" }
+            res += ": \(msg)"
+            if let h = hint, !h.isEmpty { res += " • Gợi ý: \(h)" }
+            return res
+        case .networkError(let msg):
+            return "Lỗi kết nối mạng: \(msg)"
+        case .decodingError(let msg):
+            return "Lỗi phân tích dữ liệu từ Supabase: \(msg)"
+        }
+    }
+}
+
+/// Cấu trúc phản hồi lỗi chuẩn từ Supabase PostgREST
+private struct PostgrestErrorPayload: Decodable {
+    let code: String?
+    let details: String?
+    let hint: String?
+    let message: String?
+}
+
 /// Dịch vụ kết nối trực tiếp với Supabase PostgreSQL qua chuẩn PostgREST API.
 /// Hỗ trợ Auth, Multi-tenancy RLS, và đồng bộ dữ liệu hai chiều.
 public final class SupabaseService {
@@ -17,7 +62,6 @@ public final class SupabaseService {
     }
     
     private init() {
-        // Load cấu hình lưu trong UserDefaults nếu có
         self.supabaseUrl = UserDefaults.standard.string(forKey: "supabase_url") ?? ""
         self.supabaseAnonKey = UserDefaults.standard.string(forKey: "supabase_anon_key") ?? ""
         self.accessToken = UserDefaults.standard.string(forKey: "supabase_access_token")
@@ -35,7 +79,7 @@ public final class SupabaseService {
     
     private func makeRequest(endpoint: String, method: String = "GET", body: Data? = nil, preferMerge: Bool = false) throws -> URLRequest {
         guard let url = URL(string: "\(supabaseUrl)/rest/v1/\(endpoint)") else {
-            throw URLError(.badURL)
+            throw SupabaseError.invalidUrl
         }
         var request = URLRequest(url: url)
         request.httpMethod = method
@@ -53,6 +97,33 @@ public final class SupabaseService {
         return request
     }
     
+    /// Kiểm tra phản hồi HTTP và ném lỗi có mô tả cụ thể thay vì lỗi -1011
+    private func validateResponse(_ response: URLResponse, data: Data, endpoint: String) throws {
+        guard let http = response as? HTTPURLResponse else {
+            throw SupabaseError.networkError("Không nhận được phản hồi HTTP từ Supabase.")
+        }
+        
+        if (200...299).contains(http.statusCode) {
+            return
+        }
+        
+        let tableName = endpoint.components(separatedBy: "?").first ?? endpoint
+        let errPayload = try? JSONDecoder().decode(PostgrestErrorPayload.self, from: data)
+        let msg = errPayload?.message ?? (String(data: data, encoding: .utf8) ?? "HTTP \(http.statusCode)")
+        let code = errPayload?.code
+        let hint = errPayload?.hint
+        
+        if http.statusCode == 404 || code == "42P01" || msg.contains("does not exist") {
+            throw SupabaseError.tableNotFound(table: tableName, message: msg)
+        } else if http.statusCode == 401 || code == "PGRST301" {
+            throw SupabaseError.unauthorized(message: msg)
+        } else if http.statusCode == 403 || msg.contains("row-level security") {
+            throw SupabaseError.rlsBlocked(table: tableName, message: msg)
+        } else {
+            throw SupabaseError.postgrestError(statusCode: http.statusCode, code: code, message: msg, hint: hint)
+        }
+    }
+    
     private var jsonDecoder: JSONDecoder {
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
@@ -67,51 +138,300 @@ public final class SupabaseService {
         return encoder
     }
     
-    public func fetchAccounts() async throws -> [Account] {
-        guard isConfigured else { return [] }
-        let request = try makeRequest(endpoint: "accounts?select=*")
-        let (data, response) = try await session.data(for: request)
-        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            throw URLError(.badServerResponse)
-        }
-        return try jsonDecoder.decode([Account].self, from: data)
-    }
+    // MARK: - Chẩn Đoán Kết Nối (Connection Diagnostics)
     
     public func pingConnection() async throws -> (success: Bool, message: String) {
         guard isConfigured else {
-            return (false, "Chưa cấu hình Supabase URL và Key.")
+            return (false, "Chưa cấu hình Supabase URL và Anon Key.")
         }
         guard let url = URL(string: "\(supabaseUrl)/rest/v1/") else {
             return (false, "URL Supabase không đúng định dạng.")
         }
+        
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
         let token = accessToken ?? supabaseAnonKey
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         
-        let (_, response) = try await session.data(for: request)
-        if let http = response as? HTTPURLResponse {
+        do {
+            let (data, response) = try await session.data(for: request)
+            guard let http = response as? HTTPURLResponse else {
+                return (false, "Không có phản hồi từ máy chủ Supabase.")
+            }
+            
             if (200...299).contains(http.statusCode) {
-                return (true, "Kết nối Supabase thành công! (HTTP \(http.statusCode))")
+                // Kiểm tra sự tồn tại của bảng accounts & trades
+                let tableCheck = await checkDatabaseTables()
+                if tableCheck.allExist {
+                    return (true, "Kết nối thành công! Đã tìm thấy đầy đủ các bảng dữ liệu trên Supabase.")
+                } else {
+                    return (false, "Kết nối URL & Key thành công, nhưng thiếu các bảng: \(tableCheck.missing.joined(separator: ", ")). Hãy bấm 'Sao Chép SQL Khởi Tạo' và chạy trên Supabase SQL Editor.")
+                }
             } else if http.statusCode == 401 {
-                return (false, "Lỗi 401: API Key hoặc Token không hợp lệ.")
+                return (false, "Lỗi 401: Anon Key không hợp lệ hoặc đã hết hạn.")
             } else if http.statusCode == 403 {
-                return (false, "Lỗi 403: Bị chặn bởi RLS. Hãy cấp quyền Policy hoặc dùng Service Role Key.")
+                return (false, "Lỗi 403: Bị chặn bởi RLS. Hãy tạo Policy cho phép thao tác trên Supabase.")
             } else {
-                return (false, "Supabase phản hồi mã HTTP \(http.statusCode)")
+                let bodyStr = String(data: data, encoding: .utf8) ?? ""
+                return (false, "Supabase phản hồi mã HTTP \(http.statusCode): \(bodyStr)")
+            }
+        } catch {
+            return (false, "Lỗi mạng kết nối: \(error.localizedDescription)")
+        }
+    }
+    
+    /// Kiểm tra trạng thái tồn tại của các bảng cốt lõi
+    public func checkDatabaseTables() async -> (allExist: Bool, missing: [String]) {
+        let tables = ["accounts", "trades", "executions", "playbooks", "prop_accounts"]
+        var missing: [String] = []
+        
+        for table in tables {
+            do {
+                let req = try makeRequest(endpoint: "\(table)?limit=1")
+                let (data, response) = try await session.data(for: req)
+                if let http = response as? HTTPURLResponse, http.statusCode == 404 {
+                    missing.append(table)
+                } else if let http = response as? HTTPURLResponse, http.statusCode >= 400 {
+                    let err = try? JSONDecoder().decode(PostgrestErrorPayload.self, from: data)
+                    if err?.code == "42P01" || (err?.message?.contains("does not exist") ?? false) {
+                        missing.append(table)
+                    }
+                }
+            } catch {
+                missing.append(table)
             }
         }
-        return (false, "Không có phản hồi từ máy chủ.")
+        
+        return (missing.isEmpty, missing)
+    }
+    
+    // MARK: - Web OAuth Login Helper
+    
+    /// Đăng nhập qua trình duyệt web an toàn (Google, GitHub, Apple) để lấy Session Token
+    @MainActor
+    public func startWebOAuthLogin(provider: String = "google") async throws -> String {
+        guard !supabaseUrl.isEmpty else { throw SupabaseError.notConfigured }
+        let callbackScheme = "tradejournal"
+        let authUrlStr = "\(supabaseUrl)/auth/v1/authorize?provider=\(provider)&redirect_to=\(callbackScheme)://auth-callback"
+        guard let authUrl = URL(string: authUrlStr) else { throw SupabaseError.invalidUrl }
+        
+        let callbackUrl = try await WebAuthHelper.shared.startSession(url: authUrl, callbackScheme: callbackScheme)
+        
+        // Trích xuất access_token từ URL hash (VD: tradejournal://auth-callback#access_token=...&refresh_token=...)
+        guard let fragment = callbackUrl.fragment, !fragment.isEmpty else {
+            throw SupabaseError.unauthorized(message: "Không tìm thấy token trong phản hồi xác thực.")
+        }
+        
+        var params: [String: String] = [:]
+        for item in fragment.components(separatedBy: "&") {
+            let pair = item.components(separatedBy: "=")
+            if pair.count == 2 {
+                params[pair[0]] = pair[1].removingPercentEncoding ?? pair[1]
+            }
+        }
+        
+        guard let token = params["access_token"], !token.isEmpty else {
+            throw SupabaseError.unauthorized(message: "Access token không có trong callback URL.")
+        }
+        
+        self.accessToken = token
+        UserDefaults.standard.set(token, forKey: "supabase_access_token")
+        return token
+    }
+    
+    // MARK: - SQL Migration Script Generator
+    
+    /// Tạo mã SQL hoàn chỉnh 1:1 từ `schema.pg.ts` và `0000_ancient_starjammers.sql`
+    /// để người dùng có thể dán trực tiếp vào Supabase SQL Editor và chạy khởi tạo
+    public func generateDatabaseInitSql() -> String {
+        return """
+        -- ========================================================
+        -- Trade Journal: Supabase PostgreSQL DDL Initialization
+        -- Port 1:1 từ schema.pg.ts và drizzle migrations
+        -- ========================================================
+
+        CREATE TABLE IF NOT EXISTS "accounts" (
+            "id" text PRIMARY KEY NOT NULL,
+            "name" text NOT NULL,
+            "broker" text DEFAULT '' NOT NULL,
+            "kind" text DEFAULT 'trading' NOT NULL,
+            "currency" text DEFAULT 'USD' NOT NULL,
+            "initial_balance" double precision DEFAULT 0 NOT NULL,
+            "profit_calc_method" text DEFAULT 'fifo' NOT NULL,
+            "credentials_enc" text,
+            "auto_sync" boolean DEFAULT false NOT NULL,
+            "last_sync_at" text,
+            "ibkr_sync_time_zone" text,
+            "snapshot_json" text,
+            "archived_at" text,
+            "created_at" text NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS "executions" (
+            "id" text PRIMARY KEY NOT NULL,
+            "account_id" text NOT NULL,
+            "symbol" text NOT NULL,
+            "side" text NOT NULL,
+            "quantity" double precision NOT NULL,
+            "price" double precision NOT NULL,
+            "fee" double precision DEFAULT 0 NOT NULL,
+            "executed_at" text NOT NULL,
+            "asset_class" text,
+            "source" text NOT NULL,
+            "import_metadata_json" text,
+            "content_hash" text NOT NULL,
+            "created_at" text NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS "trades" (
+            "key" text PRIMARY KEY NOT NULL,
+            "account_id" text NOT NULL,
+            "symbol" text NOT NULL,
+            "asset_class" text,
+            "direction" text NOT NULL,
+            "status" text NOT NULL,
+            "opened_at" text NOT NULL,
+            "closed_at" text,
+            "quantity" double precision NOT NULL,
+            "open_quantity" double precision DEFAULT 0 NOT NULL,
+            "avg_entry" double precision NOT NULL,
+            "avg_exit" double precision,
+            "gross_pnl" double precision DEFAULT 0 NOT NULL,
+            "fees" double precision DEFAULT 0 NOT NULL,
+            "net_pnl" double precision DEFAULT 0 NOT NULL,
+            "execution_count" integer DEFAULT 0 NOT NULL,
+            "execution_ids_json" text NOT NULL,
+            "exits_json" text NOT NULL,
+            "duration_ms" bigint,
+            "notes" text,
+            "tags_json" text,
+            "mistakes_json" text,
+            "playbook_id" text,
+            "rating" integer,
+            "stop_loss" double precision,
+            "profit_target" double precision,
+            "reviewed_at" text
+        );
+
+        CREATE TABLE IF NOT EXISTS "folders" (
+            "id" text PRIMARY KEY NOT NULL,
+            "name" text NOT NULL,
+            "kind" text DEFAULT 'user' NOT NULL,
+            "created_at" text NOT NULL,
+            "deleted_at" text
+        );
+
+        CREATE TABLE IF NOT EXISTS "notes" (
+            "id" text PRIMARY KEY NOT NULL,
+            "folder_id" text NOT NULL,
+            "title" text NOT NULL,
+            "content" text NOT NULL,
+            "tags_json" text,
+            "pinned" boolean DEFAULT false NOT NULL,
+            "archived" boolean DEFAULT false NOT NULL,
+            "created_at" text NOT NULL,
+            "updated_at" text NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS "playbooks" (
+            "id" text PRIMARY KEY NOT NULL,
+            "name" text NOT NULL,
+            "description" text NOT NULL,
+            "rules_json" text NOT NULL,
+            "created_at" text NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS "prop_accounts" (
+            "id" text PRIMARY KEY NOT NULL,
+            "firm" text NOT NULL,
+            "name" text NOT NULL,
+            "program" text NOT NULL,
+            "status" text NOT NULL,
+            "currency" text NOT NULL,
+            "size_minor" bigint NOT NULL,
+            "opened_on" text NOT NULL,
+            "notes" text DEFAULT '' NOT NULL,
+            "archived" boolean DEFAULT false NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS "prop_entries" (
+            "id" text PRIMARY KEY NOT NULL,
+            "firm" text NOT NULL,
+            "account_id" text,
+            "kind" text NOT NULL,
+            "amount_minor" bigint NOT NULL,
+            "currency" text NOT NULL,
+            "incurred_on" text NOT NULL,
+            "notes" text DEFAULT '' NOT NULL,
+            "receipt_id" text
+        );
+
+        CREATE TABLE IF NOT EXISTS "prop_receipts" (
+            "id" text PRIMARY KEY NOT NULL,
+            "firm" text NOT NULL,
+            "account_id" text,
+            "net_amount_minor" bigint NOT NULL,
+            "currency" text NOT NULL,
+            "received_on" text NOT NULL,
+            "notes" text DEFAULT '' NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS "settings" (
+            "key" text PRIMARY KEY NOT NULL,
+            "value" text NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS "journal_days" (
+            "date" text PRIMARY KEY NOT NULL,
+            "note" text DEFAULT '' NOT NULL,
+            "updated_at" text NOT NULL
+        );
+
+        -- Bật RLS và cấp quyền cho anon & authenticated
+        ALTER TABLE accounts ENABLE ROW LEVEL SECURITY;
+        ALTER TABLE executions ENABLE ROW LEVEL SECURITY;
+        ALTER TABLE trades ENABLE ROW LEVEL SECURITY;
+        ALTER TABLE folders ENABLE ROW LEVEL SECURITY;
+        ALTER TABLE notes ENABLE ROW LEVEL SECURITY;
+        ALTER TABLE playbooks ENABLE ROW LEVEL SECURITY;
+        ALTER TABLE prop_accounts ENABLE ROW LEVEL SECURITY;
+        ALTER TABLE prop_entries ENABLE ROW LEVEL SECURITY;
+        ALTER TABLE prop_receipts ENABLE ROW LEVEL SECURITY;
+        ALTER TABLE settings ENABLE ROW LEVEL SECURITY;
+        ALTER TABLE journal_days ENABLE ROW LEVEL SECURITY;
+
+        CREATE POLICY "Allow All For Anon" ON accounts FOR ALL USING (true);
+        CREATE POLICY "Allow All For Anon" ON executions FOR ALL USING (true);
+        CREATE POLICY "Allow All For Anon" ON trades FOR ALL USING (true);
+        CREATE POLICY "Allow All For Anon" ON folders FOR ALL USING (true);
+        CREATE POLICY "Allow All For Anon" ON notes FOR ALL USING (true);
+        CREATE POLICY "Allow All For Anon" ON playbooks FOR ALL USING (true);
+        CREATE POLICY "Allow All For Anon" ON prop_accounts FOR ALL USING (true);
+        CREATE POLICY "Allow All For Anon" ON prop_entries FOR ALL USING (true);
+        CREATE POLICY "Allow All For Anon" ON prop_receipts FOR ALL USING (true);
+        CREATE POLICY "Allow All For Anon" ON settings FOR ALL USING (true);
+        CREATE POLICY "Allow All For Anon" ON journal_days FOR ALL USING (true);
+        """
+    }
+    
+    // MARK: - API Operations
+    
+    public func fetchAccounts() async throws -> [Account] {
+        guard isConfigured else { return [] }
+        let endpoint = "accounts?select=*"
+        let request = try makeRequest(endpoint: endpoint)
+        let (data, response) = try await session.data(for: request)
+        try validateResponse(response, data: data, endpoint: endpoint)
+        return try jsonDecoder.decode([Account].self, from: data)
     }
     
     public func fetchExecutions(accountId: String) async throws -> [Execution] {
         guard isConfigured else { return [] }
-        let request = try makeRequest(endpoint: "executions?account_id=eq.\(accountId)&select=*")
+        let endpoint = "executions?account_id=eq.\(accountId)&select=*"
+        let request = try makeRequest(endpoint: endpoint)
         let (data, response) = try await session.data(for: request)
-        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            throw URLError(.badServerResponse)
-        }
+        try validateResponse(response, data: data, endpoint: endpoint)
         let records = try jsonDecoder.decode([SupabaseExecutionRecord].self, from: data)
         return records.map { $0.toExecution() }
     }
@@ -120,20 +440,18 @@ public final class SupabaseService {
         guard isConfigured, !items.isEmpty else { return }
         let dtos = items.map { SupabaseExecutionRecord(execution: $0) }
         let body = try jsonEncoder.encode(dtos)
-        let request = try makeRequest(endpoint: "executions", method: "POST", body: body, preferMerge: true)
-        let (_, response) = try await session.data(for: request)
-        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            throw URLError(.badServerResponse)
-        }
+        let endpoint = "executions"
+        let request = try makeRequest(endpoint: endpoint, method: "POST", body: body, preferMerge: true)
+        let (data, response) = try await session.data(for: request)
+        try validateResponse(response, data: data, endpoint: endpoint)
     }
     
     public func fetchTrades(accountId: String) async throws -> [Trade] {
         guard isConfigured else { return [] }
-        let request = try makeRequest(endpoint: "trades?account_id=eq.\(accountId)&select=*")
+        let endpoint = "trades?account_id=eq.\(accountId)&select=*"
+        let request = try makeRequest(endpoint: endpoint)
         let (data, response) = try await session.data(for: request)
-        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            throw URLError(.badServerResponse)
-        }
+        try validateResponse(response, data: data, endpoint: endpoint)
         let records = try jsonDecoder.decode([SupabaseTradeRecord].self, from: data)
         return records.map { $0.toTrade() }
     }
@@ -142,152 +460,148 @@ public final class SupabaseService {
         guard isConfigured, !items.isEmpty else { return }
         let dtos = items.map { SupabaseTradeRecord(trade: $0) }
         let body = try jsonEncoder.encode(dtos)
-        let request = try makeRequest(endpoint: "trades", method: "POST", body: body, preferMerge: true)
-        let (_, response) = try await session.data(for: request)
-        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            throw URLError(.badServerResponse)
-        }
+        let endpoint = "trades"
+        let request = try makeRequest(endpoint: endpoint, method: "POST", body: body, preferMerge: true)
+        let (data, response) = try await session.data(for: request)
+        try validateResponse(response, data: data, endpoint: endpoint)
     }
 
     public func fetchPlaybooks() async throws -> [Playbook] {
         guard isConfigured else { return [] }
-        let request = try makeRequest(endpoint: "playbooks?select=*")
+        let endpoint = "playbooks?select=*"
+        let request = try makeRequest(endpoint: endpoint)
         let (data, response) = try await session.data(for: request)
-        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            throw URLError(.badServerResponse)
-        }
+        try validateResponse(response, data: data, endpoint: endpoint)
         let records = try jsonDecoder.decode([SupabasePlaybookRecord].self, from: data)
         return records.map { $0.toPlaybook() }
     }
 
-    public func fetchJournalDays() async throws -> [JournalNote] {
-        guard isConfigured else { return [] }
-        let request = try makeRequest(endpoint: "journal_days?select=*")
+    public func upsertPlaybooks(_ items: [Playbook]) async throws {
+        guard isConfigured, !items.isEmpty else { return }
+        let dtos = items.map { SupabasePlaybookRecord(playbook: $0) }
+        let body = try jsonEncoder.encode(dtos)
+        let endpoint = "playbooks"
+        let request = try makeRequest(endpoint: endpoint, method: "POST", body: body, preferMerge: true)
         let (data, response) = try await session.data(for: request)
-        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            throw URLError(.badServerResponse)
-        }
-        return try jsonDecoder.decode([JournalNote].self, from: data)
+        try validateResponse(response, data: data, endpoint: endpoint)
     }
-
+    
     public func fetchSettings() async throws -> [JournalSettingRecord] {
         guard isConfigured else { return [] }
-        let request = try makeRequest(endpoint: "settings?select=*")
+        let endpoint = "settings?select=*"
+        let request = try makeRequest(endpoint: endpoint)
         let (data, response) = try await session.data(for: request)
-        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            throw URLError(.badServerResponse)
-        }
+        try validateResponse(response, data: data, endpoint: endpoint)
         return try jsonDecoder.decode([JournalSettingRecord].self, from: data)
     }
     
-    // MARK: - Prop Firm (Sổ cái Quỹ) PostgREST Sync
+    public func upsertSettings(_ items: [JournalSettingRecord]) async throws {
+        guard isConfigured, !items.isEmpty else { return }
+        let body = try jsonEncoder.encode(items)
+        let endpoint = "settings"
+        let request = try makeRequest(endpoint: endpoint, method: "POST", body: body, preferMerge: true)
+        let (data, response) = try await session.data(for: request)
+        try validateResponse(response, data: data, endpoint: endpoint)
+    }
+    
+    // MARK: - Prop Firms Sync
     
     public func fetchPropAccounts() async throws -> [PropAccountItem] {
         guard isConfigured else { return [] }
-        let request = try makeRequest(endpoint: "prop_accounts?select=*")
+        let endpoint = "prop_accounts?select=*"
+        let request = try makeRequest(endpoint: endpoint)
         let (data, response) = try await session.data(for: request)
-        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            throw URLError(.badServerResponse)
-        }
+        try validateResponse(response, data: data, endpoint: endpoint)
         return try jsonDecoder.decode([PropAccountItem].self, from: data)
     }
     
     public func upsertPropAccounts(_ items: [PropAccountItem]) async throws {
         guard isConfigured, !items.isEmpty else { return }
         let body = try jsonEncoder.encode(items)
-        let request = try makeRequest(endpoint: "prop_accounts", method: "POST", body: body, preferMerge: true)
-        let (_, response) = try await session.data(for: request)
-        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            throw URLError(.badServerResponse)
-        }
+        let endpoint = "prop_accounts"
+        let request = try makeRequest(endpoint: endpoint, method: "POST", body: body, preferMerge: true)
+        let (data, response) = try await session.data(for: request)
+        try validateResponse(response, data: data, endpoint: endpoint)
     }
     
     public func fetchPropEntries() async throws -> [PropEntryItem] {
         guard isConfigured else { return [] }
-        let request = try makeRequest(endpoint: "prop_entries?select=*")
+        let endpoint = "prop_entries?select=*"
+        let request = try makeRequest(endpoint: endpoint)
         let (data, response) = try await session.data(for: request)
-        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            throw URLError(.badServerResponse)
-        }
+        try validateResponse(response, data: data, endpoint: endpoint)
         return try jsonDecoder.decode([PropEntryItem].self, from: data)
     }
     
     public func upsertPropEntries(_ items: [PropEntryItem]) async throws {
         guard isConfigured, !items.isEmpty else { return }
         let body = try jsonEncoder.encode(items)
-        let request = try makeRequest(endpoint: "prop_entries", method: "POST", body: body, preferMerge: true)
-        let (_, response) = try await session.data(for: request)
-        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            throw URLError(.badServerResponse)
-        }
+        let endpoint = "prop_entries"
+        let request = try makeRequest(endpoint: endpoint, method: "POST", body: body, preferMerge: true)
+        let (data, response) = try await session.data(for: request)
+        try validateResponse(response, data: data, endpoint: endpoint)
     }
     
     public func fetchPropReceipts() async throws -> [PropReceiptItem] {
         guard isConfigured else { return [] }
-        let request = try makeRequest(endpoint: "prop_receipts?select=*")
+        let endpoint = "prop_receipts?select=*"
+        let request = try makeRequest(endpoint: endpoint)
         let (data, response) = try await session.data(for: request)
-        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            throw URLError(.badServerResponse)
-        }
+        try validateResponse(response, data: data, endpoint: endpoint)
         return try jsonDecoder.decode([PropReceiptItem].self, from: data)
     }
     
     public func upsertPropReceipts(_ items: [PropReceiptItem]) async throws {
         guard isConfigured, !items.isEmpty else { return }
         let body = try jsonEncoder.encode(items)
-        let request = try makeRequest(endpoint: "prop_receipts", method: "POST", body: body, preferMerge: true)
-        let (_, response) = try await session.data(for: request)
-        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            throw URLError(.badServerResponse)
-        }
+        let endpoint = "prop_receipts"
+        let request = try makeRequest(endpoint: endpoint, method: "POST", body: body, preferMerge: true)
+        let (data, response) = try await session.data(for: request)
+        try validateResponse(response, data: data, endpoint: endpoint)
     }
     
     public func fetchPropAudits() async throws -> [PropAuditItem] {
         guard isConfigured else { return [] }
-        let request = try makeRequest(endpoint: "prop_audit?select=*")
+        let endpoint = "prop_audit?select=*"
+        let request = try makeRequest(endpoint: endpoint)
         let (data, response) = try await session.data(for: request)
-        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            throw URLError(.badServerResponse)
-        }
+        try validateResponse(response, data: data, endpoint: endpoint)
         return try jsonDecoder.decode([PropAuditItem].self, from: data)
     }
     
     public func upsertPropAudits(_ items: [PropAuditItem]) async throws {
         guard isConfigured, !items.isEmpty else { return }
         let body = try jsonEncoder.encode(items)
-        let request = try makeRequest(endpoint: "prop_audit", method: "POST", body: body, preferMerge: true)
-        let (_, response) = try await session.data(for: request)
-        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            throw URLError(.badServerResponse)
-        }
+        let endpoint = "prop_audit"
+        let request = try makeRequest(endpoint: endpoint, method: "POST", body: body, preferMerge: true)
+        let (data, response) = try await session.data(for: request)
+        try validateResponse(response, data: data, endpoint: endpoint)
     }
     
-    // MARK: - Attachments & Storage API
+    // MARK: - Attachments & Storage
     
     public func fetchAttachments() async throws -> [Attachment] {
         guard isConfigured else { return [] }
-        let request = try makeRequest(endpoint: "attachments?select=*")
+        let endpoint = "attachments?select=*"
+        let request = try makeRequest(endpoint: endpoint)
         let (data, response) = try await session.data(for: request)
-        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            throw URLError(.badServerResponse)
-        }
+        try validateResponse(response, data: data, endpoint: endpoint)
         return try jsonDecoder.decode([Attachment].self, from: data)
     }
     
     public func upsertAttachments(_ items: [Attachment]) async throws {
         guard isConfigured, !items.isEmpty else { return }
         let body = try jsonEncoder.encode(items)
-        let request = try makeRequest(endpoint: "attachments", method: "POST", body: body, preferMerge: true)
-        let (_, response) = try await session.data(for: request)
-        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            throw URLError(.badServerResponse)
-        }
+        let endpoint = "attachments"
+        let request = try makeRequest(endpoint: endpoint, method: "POST", body: body, preferMerge: true)
+        let (data, response) = try await session.data(for: request)
+        try validateResponse(response, data: data, endpoint: endpoint)
     }
     
     public func uploadAttachmentFile(storagePath: String, data: Data, mime: String) async throws {
         guard isConfigured else { return }
         guard let url = URL(string: "\(supabaseUrl)/storage/v1/object/journal-attachments/\(storagePath)") else {
-            throw URLError(.badURL)
+            throw SupabaseError.invalidUrl
         }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -297,16 +611,14 @@ public final class SupabaseService {
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.httpBody = data
         
-        let (_, response) = try await session.data(for: request)
-        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            throw URLError(.badServerResponse)
-        }
+        let (respData, response) = try await session.data(for: request)
+        try validateResponse(response, data: respData, endpoint: "storage/upload")
     }
     
     public func deleteAttachmentFile(storagePath: String) async throws {
         guard isConfigured else { return }
         guard let url = URL(string: "\(supabaseUrl)/storage/v1/object/journal-attachments/\(storagePath)") else {
-            throw URLError(.badURL)
+            throw SupabaseError.invalidUrl
         }
         var request = URLRequest(url: url)
         request.httpMethod = "DELETE"
@@ -314,10 +626,8 @@ public final class SupabaseService {
         let token = accessToken ?? supabaseAnonKey
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         
-        let (_, response) = try await session.data(for: request)
-        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            throw URLError(.badServerResponse)
-        }
+        let (respData, response) = try await session.data(for: request)
+        try validateResponse(response, data: respData, endpoint: "storage/delete")
     }
 }
 
@@ -508,5 +818,3 @@ public struct SupabasePlaybookRecord: Codable {
         )
     }
 }
-
-

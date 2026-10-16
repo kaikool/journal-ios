@@ -10,6 +10,9 @@ public struct TradeReplayView: View {
     @State private var currentStep: Int = 1
     @State private var isPlaying: Bool = false
     @State private var timer: Timer? = nil
+    @State private var dataSourceName: String = ""
+    @State private var isLoadingCandles: Bool = false
+    @State private var candleErrorMessage: String = ""
     
     public init(trade: Trade, executions: [Execution]) {
         self.trade = trade
@@ -39,6 +42,12 @@ public struct TradeReplayView: View {
                                 text: trade.direction.rawValue.uppercased(),
                                 color: trade.direction == .long ? AppColors.profit : AppColors.loss
                             )
+                            if !dataSourceName.isEmpty {
+                                AppBadge(
+                                    text: dataSourceName,
+                                    color: AppColors.accent
+                                )
+                            }
                         }
                         Text("Vào lệnh: \(trade.avgEntry) • KL: \(trade.quantity)")
                             .font(AppTypography.caption)
@@ -62,15 +71,37 @@ public struct TradeReplayView: View {
             AppCard {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
-                        Text("Nến hiện tại: \(currentStep) / \(bars.count)")
-                            .font(AppTypography.caption)
-                            .foregroundColor(AppColors.secondaryText)
+                        if isLoadingCandles {
+                            ProgressView()
+                                .scaleEffect(0.7)
+                            Text("Đang tải nến lịch sử từ sàn...")
+                                .font(AppTypography.caption)
+                                .foregroundColor(AppColors.secondaryText)
+                        } else {
+                            Text("Nến hiện tại: \(currentStep) / \(bars.count)")
+                                .font(AppTypography.caption)
+                                .foregroundColor(AppColors.secondaryText)
+                        }
+                        
                         Spacer()
                         if let lastBar = frame.visibleBars.last {
                             Text("Giá: \(lastBar.close)")
                                 .font(AppTypography.captionBold)
                                 .foregroundColor(AppColors.primaryText)
                         }
+                    }
+                    
+                    if !candleErrorMessage.isEmpty {
+                        HStack {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundColor(AppColors.warning)
+                            Text(candleErrorMessage)
+                                .font(AppTypography.caption)
+                                .foregroundColor(AppColors.secondaryText)
+                        }
+                        .padding(6)
+                        .background(AppColors.secondaryBackground)
+                        .cornerRadius(6)
                     }
                     
                     if frame.visibleBars.isEmpty {
@@ -99,47 +130,43 @@ public struct TradeReplayView: View {
                                 let l = (bar.low as NSDecimalNumber).doubleValue
                                 let isUp = c >= o
                                 
-                                // Candle wick
-                                RuleMark(
-                                    x: .value("Index", bar.id),
+                                BarMark(
+                                    x: .value("Index", bar.timestamp),
                                     yStart: .value("Low", l),
-                                    yEnd: .value("High", h)
+                                    yEnd: .value("High", h),
+                                    width: 1.5
                                 )
                                 .foregroundStyle(isUp ? AppColors.profit : AppColors.loss)
-                                .lineStyle(StrokeStyle(lineWidth: 1.2))
                                 
-                                // Candle body
                                 BarMark(
-                                    x: .value("Index", bar.id),
+                                    x: .value("Index", bar.timestamp),
                                     yStart: .value("Open", o),
                                     yEnd: .value("Close", c),
-                                    width: .fixed(6)
+                                    width: 8
                                 )
                                 .foregroundStyle(isUp ? AppColors.profit : AppColors.loss)
                             }
                         }
+                        .chartYScale(domain: .automatic(includesZero: false))
                         .chartXAxis(.hidden)
                         .frame(height: 220)
                     }
-                }
-            }
-            
-            // Replay Controls Card
-            AppCard {
-                VStack(spacing: 12) {
-                    // Slider
-                    Slider(
-                        value: Binding(
-                            get: { Double(currentStep) },
-                            set: { currentStep = Int($0) }
-                        ),
-                        in: 1...Double(max(1, bars.count)),
-                        step: 1
-                    )
-                    .tint(AppColors.accent)
                     
-                    // Buttons
-                    HStack(spacing: 24) {
+                    // Slider scrubber
+                    if bars.count > 1 {
+                        Slider(
+                            value: Binding(
+                                get: { Double(currentStep) },
+                                set: { currentStep = Int($0) }
+                            ),
+                            in: 1...Double(bars.count),
+                            step: 1
+                        )
+                        .tint(AppColors.accent)
+                    }
+                    
+                    // Playback Controls
+                    HStack(spacing: 20) {
                         Button(action: { resetReplay() }) {
                             Image(systemName: "backward.end.fill")
                                 .font(.title3)
@@ -154,7 +181,7 @@ public struct TradeReplayView: View {
                         
                         Button(action: { togglePlay() }) {
                             Image(systemName: isPlaying ? "pause.circle.fill" : "play.circle.fill")
-                                .font(.system(size: 40))
+                                .font(.system(size: 38))
                                 .foregroundColor(AppColors.accent)
                         }
                         
@@ -170,6 +197,7 @@ public struct TradeReplayView: View {
                                 .foregroundColor(AppColors.primaryText)
                         }
                     }
+                    .frame(maxWidth: .infinity, alignment: .center)
                 }
             }
             
@@ -179,15 +207,40 @@ public struct TradeReplayView: View {
         .navigationTitle("Trade Replay")
         .navigationBarTitleDisplayMode(.inline)
         .background(AppColors.background)
-        .onAppear {
-            generateSyntheticBarsIfNeeded()
+        .task {
+            await loadMarketCandles()
         }
         .onDisappear {
             timer?.invalidate()
         }
     }
     
-    // MARK: - Replay Actions
+    // MARK: - Market Data & Replay Actions
+    
+    private func loadMarketCandles() async {
+        guard bars.isEmpty else { return }
+        isLoadingCandles = true
+        candleErrorMessage = ""
+        
+        do {
+            let (provider, fetchedBars) = try await MarketDataService.shared.fetchBarsForTrade(
+                trade: trade,
+                config: TradeDataStore.shared.marketConnections
+            )
+            if !fetchedBars.isEmpty {
+                self.bars = fetchedBars
+                self.dataSourceName = provider
+                self.currentStep = min(5, fetchedBars.count)
+            } else {
+                candleErrorMessage = "Không có nến lịch sử từ sàn. Đang dùng mô phỏng."
+                generateSyntheticBarsFallback()
+            }
+        } catch {
+            candleErrorMessage = "\(error.localizedDescription) • Đang dùng mô phỏng."
+            generateSyntheticBarsFallback()
+        }
+        isLoadingCandles = false
+    }
     
     private func togglePlay() {
         if isPlaying {
@@ -224,9 +277,10 @@ public struct TradeReplayView: View {
         timer?.invalidate()
     }
     
-    /// Generates accurate path bars traversing the trade from entry price to exit price
-    private func generateSyntheticBarsIfNeeded() {
+    /// Dự phòng mô phỏng khi chưa có mạng hoặc chưa nhập OANDA
+    private func generateSyntheticBarsFallback() {
         guard bars.isEmpty else { return }
+        self.dataSourceName = "Mô phỏng nội suy"
         
         let entryPrice = (trade.avgEntry as NSDecimalNumber).doubleValue
         let exitPrice = ((trade.avgExit ?? trade.avgEntry) as NSDecimalNumber).doubleValue
