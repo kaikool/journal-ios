@@ -135,23 +135,36 @@ jobs:
             build/TradeJournal.ipa.sha256
           retention-days: 14
 
+      - name: Prepare Release Metadata
+        if: (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch') && github.event_name != 'pull_request'
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            RELEASE_TAG="${{ github.ref_name }}"
+            RELEASE_NAME="TradeJournal iOS ${{ github.ref_name }}"
+          else
+            RELEASE_TAG="v1.0.0-b${{ github.run_number }}"
+            RELEASE_NAME="TradeJournal iOS Build ${{ github.run_number }}"
+          fi
+          echo "RELEASE_TAG=$RELEASE_TAG" >> $GITHUB_ENV
+          echo "RELEASE_NAME=$RELEASE_NAME" >> $GITHUB_ENV
+          
+          cat << 'EOF' > build/release_notes.md
+          ### 📱 TradeJournal iOS - Direct IPA Download
+          
+          > Tải trực tiếp file `.ipa` bên dưới để cài đặt qua **TrollStore**, **AltStore**, **Scarlet**, hoặc **Sideloadly** (không cần giải nén file zip).
+          
+          - **File:** `TradeJournal.ipa`
+          - **Phiên bản:** Native iOS 17.0+ (SwiftUI, Swift Charts)
+          - **Build:** ${{ github.run_number }} (${{ github.sha }})
+          EOF
+
       - name: Publish Direct IPA to GitHub Releases
         if: (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch') && github.event_name != 'pull_request'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('v1.0.0-b{0}', github.run_number) }}
-          name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('TradeJournal iOS (Build #{0})', github.run_number) }}
-          body: |
-            ### 📱 TradeJournal iOS - Direct IPA Download
-            
-            - **Commit:** `${{ github.sha }}`
-            - **Branch:** `${{ github.ref_name }}`
-            - **Build Run:** [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
-            
-            #### 📥 Tải trực tiếp file IPA (Không cần giải nén zip):
-            👉 **[TradeJournal.ipa](https://github.com/${{ github.repository }}/releases/download/${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('v1.0.0-b{0}', github.run_number) }}/TradeJournal.ipa)**
-            
-            > Mở trực tiếp link trên Safari iPhone để cài đặt qua **TrollStore**, **AltStore**, **Scarlet**, hoặc **Sideloadly**!
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: ${{ env.RELEASE_NAME }}
+          body_path: build/release_notes.md
           files: |
             build/TradeJournal.ipa
             build/TradeJournal.ipa.sha256
