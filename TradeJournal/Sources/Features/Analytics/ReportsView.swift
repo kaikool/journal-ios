@@ -10,6 +10,17 @@ public enum ReportMode: String, CaseIterable, Identifiable {
     case compare = "Compare groups"
     
     public var id: String { rawValue }
+    
+    public var iconName: String {
+        switch self {
+        case .overview: return "chart.pie"
+        case .trends: return "chart.line.uptrend.xyaxis"
+        case .explorer: return "list.bullet.rectangle"
+        case .breakdown: return "square.grid.2x2"
+        case .cross: return "arrow.triangle.swap"
+        case .compare: return "person.2"
+        }
+    }
 }
 
 /// Comprehensive Performance Reports and Deep Analytics view.
@@ -32,6 +43,7 @@ public struct ReportsView: View {
     @State private var showAiReflectionSheet: Bool = false
     @State private var showExportSheet: Bool = false
     @State private var exportText: String = ""
+    @Namespace private var reportModeNamespace
     
     public init() {}
     
@@ -98,6 +110,20 @@ public struct ReportsView: View {
         ]
     }
     
+    // MARK: - Apple HIG Card Container
+    private func cardContainer<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        content()
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(AppColors.cardBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(AppColors.border.opacity(0.5), lineWidth: 0.5)
+            )
+            .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 2)
+    }
+    
     public var body: some View {
         VStack(spacing: 0) {
             // FilterBar matching reports/page.tsx
@@ -107,59 +133,66 @@ public struct ReportsView: View {
                 showFilters: true
             ) {
                 Button {
-                    #if os(iOS)
+                    #if canImport(UIKit)
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                     #endif
                     showAiReflectionSheet = true
                 } label: {
-                    HStack(spacing: 4) {
+                    HStack(spacing: 5) {
                         Image(systemName: "sparkles")
                         Text("Ask AI")
                     }
                     .font(AppTypography.captionBold)
-                    .padding(.horizontal, 11)
+                    .padding(.horizontal, 12)
                     .padding(.vertical, 6)
                     .background(AppColors.brand)
                     .foregroundColor(AppColors.brandTextOnDark)
                     .clipShape(Capsule())
-                    .shadow(color: AppColors.brand.opacity(0.3), radius: 4, x: 0, y: 2)
+                    .shadow(color: AppColors.brand.opacity(0.25), radius: 4, x: 0, y: 1.5)
                 }
                 .buttonStyle(ApplePressableButtonStyle())
             }
             
             ScrollView {
-                VStack(spacing: 12) {
-                    // Mode Selector (6 modes matching reports/page.tsx line 285-304)
+                VStack(spacing: 14) {
+                    // Apple HIG Mode Sliding Bar
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 6) {
                             ForEach(ReportMode.allCases) { mode in
+                                let isSelected = selectedMode == mode
                                 Button {
-                                    if selectedMode != mode {
-                                        #if os(iOS)
-                                        UISelectionFeedbackGenerator().selectionChanged()
-                                        #endif
-                                        withAnimation(.spring(response: 0.28, dampingFraction: 0.72)) {
-                                            selectedMode = mode
-                                        }
+                                    #if canImport(UIKit)
+                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                    #endif
+                                    withAnimation(.spring(response: 0.28, dampingFraction: 0.76)) {
+                                        selectedMode = mode
                                     }
                                 } label: {
-                                    Text(mode.rawValue)
-                                        .font(.system(size: 12, weight: selectedMode == mode ? .bold : .medium, design: .rounded))
-                                        .padding(.horizontal, 11)
-                                        .padding(.vertical, 6)
-                                        .background(selectedMode == mode ? AppColors.brand : AppColors.cardBackground)
-                                        .foregroundColor(selectedMode == mode ? AppColors.brandTextOnDark : AppColors.primaryText)
-                                        .clipShape(Capsule())
-                                        .overlay(
-                                            Capsule()
-                                                .stroke(selectedMode == mode ? Color.clear : AppColors.border.opacity(0.6), lineWidth: 0.8)
-                                        )
-                                        .shadow(color: selectedMode == mode ? AppColors.brand.opacity(0.25) : Color.clear, radius: 4, x: 0, y: 2)
+                                    HStack(spacing: 5) {
+                                        Image(systemName: mode.iconName)
+                                            .font(.system(size: 11))
+                                        Text(mode.rawValue)
+                                            .font(AppTypography.captionBold)
+                                    }
+                                    .foregroundColor(isSelected ? AppColors.brand : AppColors.secondaryText)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 7)
+                                    .background {
+                                        if isSelected {
+                                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                                .fill(AppColors.cardBackground)
+                                                .shadow(color: Color.black.opacity(0.08), radius: 4, x: 0, y: 1.5)
+                                                .matchedGeometryEffect(id: "ReportModePill", in: reportModeNamespace)
+                                        }
+                                    }
                                 }
                                 .buttonStyle(ApplePressableButtonStyle())
                             }
                         }
-                        .padding(.horizontal, 14)
+                        .padding(4)
+                        .background(AppColors.secondaryBackground)
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .padding(.horizontal, 16)
                         .padding(.top, 10)
                     }
                     
@@ -198,25 +231,29 @@ public struct ReportsView: View {
     // MARK: - Sections
     
     private var overviewSection: some View {
-        VStack(spacing: 16) {
-            // 8 KPI Summary Grid matching report-overview.tsx & reports/page.tsx line 61-85
-            AppCard {
+        VStack(spacing: 14) {
+            // 8 KPI Summary Grid
+            cardContainer {
                 VStack(alignment: .leading, spacing: 14) {
                     HStack {
+                        Image(systemName: "chart.pie")
+                            .font(.system(size: 13))
+                            .foregroundColor(AppColors.brand)
                         Text("Performance Summary")
                             .font(AppTypography.headline)
                             .foregroundColor(AppColors.primaryText)
                         Spacer()
                     }
                     
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 14) {
+                    LazyVGrid(columns: [GridItem(.flexible(), spacing: 14), GridItem(.flexible(), spacing: 14)], spacing: 14) {
                         ForEach(summaryKPIs, id: \.label) { kpi in
-                            VStack(alignment: .leading, spacing: 2) {
+                            VStack(alignment: .leading, spacing: 3) {
                                 Text(kpi.label)
-                                    .font(.system(size: 11))
+                                    .font(AppTypography.caption)
                                     .foregroundColor(AppColors.secondaryText)
                                 Text(kpi.value)
                                     .font(AppTypography.bodyBold)
+                                    .monospacedDigit()
                                     .foregroundColor(kpi.isNet ? (metrics.netPnl >= 0 ? AppColors.profit : AppColors.loss) : AppColors.primaryText)
                             }
                         }
@@ -238,7 +275,7 @@ public struct ReportsView: View {
     }
     
     private var trendsSection: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 14) {
             // Cumulative Net Equity Curve
             let overview = FinancialMetricsEngine.computeOverview(trades: trades, timeZone: env.currentTimeZone)
             var runningPeak: Decimal = 0
@@ -254,11 +291,16 @@ public struct ReportsView: View {
                 )
             }
             
-            AppCard {
+            cardContainer {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Equity Curve")
-                        .font(AppTypography.headline)
-                        .foregroundColor(AppColors.primaryText)
+                    HStack {
+                        Image(systemName: "chart.line.uptrend.xyaxis")
+                            .font(.system(size: 13))
+                            .foregroundColor(AppColors.brand)
+                        Text("Equity Curve")
+                            .font(AppTypography.headline)
+                            .foregroundColor(AppColors.primaryText)
+                    }
                     
                     EquityCurveChart(points: equityPoints, currency: env.currentCurrency, height: 200)
                 }
@@ -266,8 +308,17 @@ public struct ReportsView: View {
             .padding(.horizontal, 16)
             
             // Drawdown Chart
-            AppCard {
+            cardContainer {
                 VStack(alignment: .leading, spacing: 10) {
+                    HStack {
+                        Image(systemName: "chart.bar.xaxis")
+                            .font(.system(size: 13))
+                            .foregroundColor(AppColors.loss)
+                        Text("Drawdown Analysis")
+                            .font(AppTypography.headline)
+                            .foregroundColor(AppColors.primaryText)
+                    }
+                    
                     DrawdownChart(points: equityPoints, height: 120)
                 }
             }
@@ -276,10 +327,13 @@ public struct ReportsView: View {
     }
     
     private var explorerSection: some View {
-        VStack(spacing: 16) {
-            AppCard {
+        VStack(spacing: 14) {
+            cardContainer {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
+                        Image(systemName: "list.bullet.rectangle")
+                            .font(.system(size: 13))
+                            .foregroundColor(AppColors.brand)
                         Text("Trade explorer (\(trades.count))")
                             .font(AppTypography.headline)
                             .foregroundColor(AppColors.primaryText)
@@ -295,12 +349,12 @@ public struct ReportsView: View {
                             ForEach(trades.prefix(30)) { t in
                                 HStack {
                                     Text(t.status.rawValue.uppercased())
-                                        .font(.system(size: 10, weight: .bold))
+                                        .font(.system(size: 9, weight: .bold))
                                         .padding(.horizontal, 6)
                                         .padding(.vertical, 2)
-                                        .background(t.netPnl >= 0 ? AppColors.profit.opacity(0.15) : AppColors.loss.opacity(0.15))
+                                        .background(t.netPnl >= 0 ? AppColors.profit.opacity(0.12) : AppColors.loss.opacity(0.12))
                                         .foregroundColor(t.netPnl >= 0 ? AppColors.profit : AppColors.loss)
-                                        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                                        .clipShape(Capsule())
                                     
                                     Text(t.symbol)
                                         .font(AppTypography.bodyBold)
@@ -310,12 +364,13 @@ public struct ReportsView: View {
                                     
                                     Text(t.netPnl >= 0 ? "+\(Formatters.currency(t.netPnl))" : Formatters.currency(t.netPnl))
                                         .font(AppTypography.bodyBold)
+                                        .monospacedDigit()
                                         .foregroundColor(t.netPnl >= 0 ? AppColors.profit : AppColors.loss)
                                 }
                                 .padding(.vertical, 4)
                                 
                                 if t.id != trades.prefix(30).last?.id {
-                                    Divider()
+                                    Divider().background(AppColors.border.opacity(0.3))
                                 }
                             }
                         }
@@ -327,13 +382,18 @@ public struct ReportsView: View {
     }
     
     private var breakdownAndCrossSection: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 14) {
             // Dimension Pickers matching reports/page.tsx line 320-328
-            AppCard {
+            cardContainer {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Analysis Dimensions")
-                        .font(AppTypography.headline)
-                        .foregroundColor(AppColors.primaryText)
+                    HStack {
+                        Image(systemName: "slider.horizontal.3")
+                            .font(.system(size: 13))
+                            .foregroundColor(AppColors.brand)
+                        Text("Analysis Dimensions")
+                            .font(AppTypography.headline)
+                            .foregroundColor(AppColors.primaryText)
+                    }
                     
                     HStack(spacing: 12) {
                         VStack(alignment: .leading, spacing: 4) {
@@ -372,10 +432,13 @@ public struct ReportsView: View {
             .padding(.horizontal, 16)
             
             // Detailed breakdown results table matching reports/page.tsx line 200-250
-            AppCard {
+            cardContainer {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
-                        Text(selectedMode == .cross ? "\(primaryDimension.label) × \(secondaryDimension.label)" : "\(primaryDimension.label) performance")
+                        Image(systemName: "tablecells")
+                            .font(.system(size: 13))
+                            .foregroundColor(AppColors.brand)
+                        Text(selectedMode == .cross ? "\(primaryDimension.label) × \(secondaryDimension.label)" : "\(primaryDimension.label) Performance")
                             .font(AppTypography.headline)
                             .foregroundColor(AppColors.primaryText)
                         Spacer()
@@ -398,17 +461,20 @@ public struct ReportsView: View {
                                         HStack(spacing: 6) {
                                             Text("\(g.summary.trades) trades")
                                                 .font(.system(size: 11))
+                                                .monospacedDigit()
                                                 .foregroundColor(AppColors.secondaryText)
                                             
                                             if let wr = g.summary.winRate {
                                                 Text("• Win \(Int(wr * 100))%")
                                                     .font(.system(size: 11, weight: .semibold))
+                                                    .monospacedDigit()
                                                     .foregroundColor(AppColors.primaryText)
                                             }
                                             
                                             if let r = g.summary.avgRealizedR {
                                                 Text("• \(String(format: "%.1f", r))R")
                                                     .font(.system(size: 11))
+                                                    .monospacedDigit()
                                                     .foregroundColor(AppColors.secondaryText)
                                             }
                                         }
@@ -418,11 +484,12 @@ public struct ReportsView: View {
                                     
                                     Text(g.summary.netPnl >= 0 ? "+\(Formatters.currency(g.summary.netPnl))" : Formatters.currency(g.summary.netPnl))
                                         .font(AppTypography.bodyBold)
+                                        .monospacedDigit()
                                         .foregroundColor(g.summary.netPnl >= 0 ? AppColors.profit : AppColors.loss)
                                 }
                                 
                                 if g.row != groupResults.last?.row {
-                                    Divider()
+                                    Divider().background(AppColors.border.opacity(0.3))
                                 }
                             }
                         }
@@ -434,12 +501,17 @@ public struct ReportsView: View {
     }
     
     private var compareSection: some View {
-        VStack(spacing: 16) {
-            AppCard {
+        VStack(spacing: 14) {
+            cardContainer {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Playbooks Comparison")
-                        .font(AppTypography.headline)
-                        .foregroundColor(AppColors.primaryText)
+                    HStack {
+                        Image(systemName: "person.2")
+                            .font(.system(size: 13))
+                            .foregroundColor(AppColors.brand)
+                        Text("Playbooks Comparison")
+                            .font(AppTypography.headline)
+                            .foregroundColor(AppColors.primaryText)
+                    }
                     
                     let pResults = TradeAnalysisEngine.analyzeGroups(trades: trades, primary: .playbook)
                     if pResults.isEmpty {
@@ -455,9 +527,13 @@ public struct ReportsView: View {
                                 Spacer()
                                 Text(item.summary.netPnl >= 0 ? "+\(Formatters.currency(item.summary.netPnl))" : Formatters.currency(item.summary.netPnl))
                                     .font(AppTypography.bodyBold)
+                                    .monospacedDigit()
                                     .foregroundColor(item.summary.netPnl >= 0 ? AppColors.profit : AppColors.loss)
                             }
-                            Divider()
+                            
+                            if item.row != pResults.last?.row {
+                                Divider().background(AppColors.border.opacity(0.3))
+                            }
                         }
                     }
                 }

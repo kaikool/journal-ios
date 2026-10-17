@@ -58,14 +58,14 @@ public struct MissedTradesView: View {
                             }
                         }
                     }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 7)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
                     .background(AppColors.cardBackground)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .stroke(AppColors.border, lineWidth: 1)
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .stroke(AppColors.border.opacity(0.5), lineWidth: 0.5)
                     )
-                    .cornerRadius(6)
                     
                     // Show archived toggle
                     Button {
@@ -105,6 +105,9 @@ public struct MissedTradesView: View {
         .background(AppColors.background)
         .sheet(isPresented: $showAddSheet) {
             AddMissedTradeSheet(tradeToEdit: editingTrade)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(28)
         }
     }
     
@@ -127,91 +130,119 @@ public struct MissedTradesView: View {
             
             if !showArchived {
                 Button {
+                    #if canImport(UIKit)
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    #endif
                     editingTrade = nil
                     showAddSheet = true
                 } label: {
-                    HStack {
+                    HStack(spacing: 6) {
                         Image(systemName: "plus.circle")
                         Text("Log Missed Opportunity")
                     }
                     .font(AppTypography.subheadlineBold)
                     .padding(.horizontal, 20)
-                    .padding(.vertical, 10)
-                    .background(AppColors.accent)
+                    .padding(.vertical, 11)
+                    .background(AppColors.brand)
                     .foregroundColor(.white)
-                    .cornerRadius(8)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 }
+                .buttonStyle(ApplePressableButtonStyle())
             }
             Spacer()
         }
     }
     
     private func missedTradeRow(_ trade: MissedTrade) -> some View {
-        AppCard {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    Text(trade.symbol)
-                        .font(AppTypography.headline)
-                    
-                    AppBadge(
-                        text: trade.direction.uppercased(),
-                        color: trade.direction.lowercased() == "long" ? AppColors.accent : AppColors.warning
-                    )
-                    
-                    if let pbId = trade.playbookId, let pb = dataStore.playbooks.first(where: { $0.id == pbId }) {
-                        AppBadge(text: pb.name, color: AppColors.secondaryText)
-                    }
-                    
-                    Spacer()
-                    
-                    Text(formatDate(trade.observedAt))
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.secondaryText)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text(trade.symbol)
+                    .font(AppTypography.headline)
+                    .foregroundColor(AppColors.primaryText)
+                
+                Text(trade.direction.uppercased())
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundColor(trade.direction.lowercased() == "long" ? AppColors.brand : AppColors.warning)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background((trade.direction.lowercased() == "long" ? AppColors.brand : AppColors.warning).opacity(0.12))
+                    .clipShape(Capsule())
+                
+                if let pbId = trade.playbookId, let pb = dataStore.playbooks.first(where: { $0.id == pbId }) {
+                    AppBadge(text: pb.name, color: AppColors.secondaryText)
                 }
                 
-                // Pricing grid (Entry, Stop, Target, R:R)
-                HStack(spacing: 16) {
-                    if let entry = trade.entry {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Entry").font(AppTypography.caption).foregroundColor(AppColors.secondaryText)
-                            Text("\(entry)").font(AppTypography.captionBold)
-                        }
-                    }
-                    if let stop = trade.stop {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Stop").font(AppTypography.caption).foregroundColor(AppColors.secondaryText)
-                            Text("\(stop)").font(AppTypography.captionBold).foregroundColor(AppColors.loss)
-                        }
-                    }
-                    if let target = trade.target {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Target").font(AppTypography.caption).foregroundColor(AppColors.secondaryText)
-                            Text("\(target)").font(AppTypography.captionBold).foregroundColor(AppColors.profit)
-                        }
-                    }
-                    if let entry = trade.entry, let stop = trade.stop, let target = trade.target {
-                        let risk = abs(entry - stop)
-                        let reward = abs(target - entry)
-                        if risk > 0 {
-                            let rr = (reward as NSDecimalNumber).doubleValue / (risk as NSDecimalNumber).doubleValue
-                            Spacer()
-                            VStack(alignment: .trailing, spacing: 2) {
-                                Text("R : R").font(AppTypography.caption).foregroundColor(AppColors.secondaryText)
-                                Text(String(format: "1 : %.1f", rr)).font(AppTypography.captionBold).foregroundColor(AppColors.accent)
-                            }
-                        }
+                Spacer()
+                
+                Text(formatDate(trade.observedAt))
+                    .font(AppTypography.caption)
+                    .monospacedDigit()
+                    .foregroundColor(AppColors.secondaryText)
+            }
+            
+            // Pricing grid (Entry, Stop, Target, R:R)
+            HStack(spacing: 16) {
+                if let entry = trade.entry {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Entry").font(AppTypography.caption).foregroundColor(AppColors.secondaryText)
+                        Text("\(entry)")
+                            .font(AppTypography.captionBold)
+                            .monospacedDigit()
+                            .foregroundColor(AppColors.primaryText)
                     }
                 }
-                
-                if !trade.notes.isEmpty {
-                    Divider().background(AppColors.border.opacity(0.4))
-                    Text(trade.notes)
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.primaryText)
-                        .lineLimit(3)
+                if let stop = trade.stop {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Stop").font(AppTypography.caption).foregroundColor(AppColors.secondaryText)
+                        Text("\(stop)")
+                            .font(AppTypography.captionBold)
+                            .monospacedDigit()
+                            .foregroundColor(AppColors.loss)
+                    }
+                }
+                if let target = trade.target {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Target").font(AppTypography.caption).foregroundColor(AppColors.secondaryText)
+                        Text("\(target)")
+                            .font(AppTypography.captionBold)
+                            .monospacedDigit()
+                            .foregroundColor(AppColors.profit)
+                    }
+                }
+                if let entry = trade.entry, let stop = trade.stop, let target = trade.target {
+                    let risk = abs(entry - stop)
+                    let reward = abs(target - entry)
+                    if risk > 0 {
+                        let rr = (reward as NSDecimalNumber).doubleValue / (risk as NSDecimalNumber).doubleValue
+                        Spacer()
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text("R : R").font(AppTypography.caption).foregroundColor(AppColors.secondaryText)
+                            Text(String(format: "1 : %.1f", rr))
+                                .font(AppTypography.captionBold)
+                                .monospacedDigit()
+                                .foregroundColor(AppColors.brand)
+                        }
+                    }
                 }
             }
+            
+            if !trade.notes.isEmpty {
+                Divider().background(AppColors.border.opacity(0.4))
+                Text(trade.notes)
+                    .font(AppTypography.caption)
+                    .foregroundColor(AppColors.primaryText)
+                    .lineLimit(3)
+            }
         }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(AppColors.cardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(AppColors.border.opacity(0.5), lineWidth: 0.5)
+        )
+        .shadow(color: Color.black.opacity(0.03), radius: 6, x: 0, y: 1.5)
         .contextMenu {
             Button {
                 editingTrade = trade

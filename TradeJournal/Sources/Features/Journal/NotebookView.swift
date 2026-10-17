@@ -43,6 +43,20 @@ public struct NotebookView: View {
         activeFolders.first(where: { $0.id == selectedFolderId })?.name ?? "Notes"
     }
     
+    // MARK: - Apple HIG Card Container
+    private func cardContainer<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        content()
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(AppColors.cardBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(AppColors.border.opacity(0.5), lineWidth: 0.5)
+            )
+            .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 2)
+    }
+    
     public var body: some View {
         VStack(spacing: 0) {
             FilterBarView(
@@ -59,17 +73,15 @@ public struct NotebookView: View {
                 .padding(.vertical, 8)
                 .background(AppColors.cardBackground)
             
-            Divider()
-                .overlay(AppColors.border)
+            Divider().background(AppColors.border.opacity(0.5))
             
-            // Search field matching notebook/page.tsx line 301
+            // Search field
             searchBar
-                .padding(.horizontal, 14)
+                .padding(.horizontal, 16)
                 .padding(.vertical, 8)
                 .background(AppColors.background)
             
-            Divider()
-                .overlay(AppColors.border)
+            Divider().background(AppColors.border.opacity(0.5))
             
             // Notes Content List
             if filteredNotes.isEmpty {
@@ -133,7 +145,7 @@ public struct NotebookView: View {
                 .font(.system(size: 13))
             
             TextField("Search notes", text: $searchQuery)
-                .font(AppTypography.caption)
+                .font(AppTypography.body)
                 .foregroundColor(AppColors.primaryText)
             
             if !searchQuery.isEmpty {
@@ -146,13 +158,13 @@ public struct NotebookView: View {
                 }
             }
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 7)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
         .background(AppColors.secondaryBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(AppColors.border.opacity(0.5), lineWidth: 0.5)
         )
     }
     
@@ -169,8 +181,8 @@ public struct NotebookView: View {
                     
                     Button {
                         if selectedFolderId != folder.id {
-                            #if os(iOS)
-                            UISelectionFeedbackGenerator().selectionChanged()
+                            #if canImport(UIKit)
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
                             #endif
                             withAnimation(.spring(response: 0.28, dampingFraction: 0.72)) {
                                 selectedFolderId = folder.id
@@ -181,12 +193,13 @@ public struct NotebookView: View {
                             Image(systemName: folderIcon(for: folder))
                                 .font(.system(size: 12))
                             Text(folder.name)
-                                .font(.system(size: 12, weight: isSelected ? .bold : .medium, design: .rounded))
+                                .font(AppTypography.captionBold)
                             Text("\(count)")
                                 .font(.system(size: 10, weight: .bold))
+                                .monospacedDigit()
                                 .padding(.horizontal, 5)
                                 .padding(.vertical, 1)
-                                .background(isSelected ? Color.white.opacity(0.25) : AppColors.cardBackground)
+                                .background(isSelected ? Color.white.opacity(0.22) : AppColors.secondaryText.opacity(0.12))
                                 .clipShape(Capsule())
                             
                             // Delete folder button for custom user folders
@@ -207,14 +220,14 @@ public struct NotebookView: View {
                         .background(isSelected ? AppColors.brand : AppColors.secondaryBackground)
                         .foregroundColor(isSelected ? AppColors.brandTextOnDark : AppColors.primaryText)
                         .clipShape(Capsule())
-                        .shadow(color: isSelected ? AppColors.brand.opacity(0.25) : Color.clear, radius: 4, x: 0, y: 2)
+                        .shadow(color: isSelected ? AppColors.brand.opacity(0.2) : Color.clear, radius: 4, x: 0, y: 1.5)
                     }
                     .buttonStyle(ApplePressableButtonStyle())
                 }
                 
                 // Add new folder button
                 Button {
-                    #if os(iOS)
+                    #if canImport(UIKit)
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     #endif
                     newFolderName = ""
@@ -225,9 +238,9 @@ public struct NotebookView: View {
                         Image(systemName: "plus")
                             .font(.system(size: 11, weight: .bold))
                         Text("New folder")
-                            .font(.system(size: 12, weight: .medium, design: .rounded))
+                            .font(AppTypography.captionBold)
                     }
-                    .padding(.horizontal, 11)
+                    .padding(.horizontal, 12)
                     .padding(.vertical, 6)
                     .background(AppColors.secondaryBackground)
                     .foregroundColor(AppColors.brand)
@@ -239,7 +252,7 @@ public struct NotebookView: View {
                 }
                 .buttonStyle(ApplePressableButtonStyle())
             }
-            .padding(.horizontal, 14)
+            .padding(.horizontal, 16)
         }
     }
     
@@ -247,16 +260,16 @@ public struct NotebookView: View {
     
     private var notesScrollView: some View {
         ScrollView {
-            LazyVStack(spacing: 10) {
+            LazyVStack(spacing: 12) {
                 ForEach(filteredNotes) { note in
                     Button {
-                        #if os(iOS)
+                        #if canImport(UIKit)
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         #endif
                         editingNote = note
                     } label: {
-                        AppCard {
-                            VStack(alignment: .leading, spacing: 6) {
+                        cardContainer {
+                            VStack(alignment: .leading, spacing: 8) {
                                 HStack(alignment: .top) {
                                     Text(note.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Untitled" : note.title)
                                         .font(AppTypography.bodyBold)
@@ -266,11 +279,11 @@ public struct NotebookView: View {
                                     if let folder = activeFolders.first(where: { $0.id == note.folderId }) {
                                         Text(folder.name)
                                             .font(.system(size: 10, weight: .semibold))
-                                            .padding(.horizontal, 6)
-                                            .padding(.vertical, 2)
+                                            .padding(.horizontal, 7)
+                                            .padding(.vertical, 3)
                                             .background(AppColors.secondaryBackground)
                                             .foregroundColor(AppColors.secondaryText)
-                                            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                                            .clipShape(Capsule())
                                     }
                                 }
                                 
@@ -285,9 +298,13 @@ public struct NotebookView: View {
                                 HStack {
                                     Text(String(note.updatedAt.prefix(10)))
                                         .font(.system(size: 11))
+                                        .monospacedDigit()
                                         .foregroundColor(AppColors.secondaryText.opacity(0.8))
                                     Spacer()
                                     Button {
+                                        #if canImport(UIKit)
+                                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                        #endif
                                         noteToDelete = note
                                         showDeleteNoteAlert = true
                                     } label: {
@@ -303,35 +320,39 @@ public struct NotebookView: View {
                     .buttonStyle(ApplePressableButtonStyle())
                 }
             }
-            .padding(14)
+            .padding(16)
         }
     }
     
     // MARK: - Empty State
     
     private var emptyNotesState: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 14) {
             Spacer()
             Image(systemName: "note.text")
                 .font(.system(size: 40))
                 .foregroundColor(AppColors.secondaryText.opacity(0.5))
             Text("No notes here yet.")
-                .font(AppTypography.bodyBold)
+                .font(AppTypography.headline)
                 .foregroundColor(AppColors.primaryText)
             Text("Create your first note in this folder to begin.")
                 .font(AppTypography.caption)
                 .foregroundColor(AppColors.secondaryText)
             Button {
+                #if canImport(UIKit)
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                #endif
                 createNewNote()
             } label: {
                 Text("New note")
                     .font(AppTypography.captionBold)
                     .foregroundColor(AppColors.brandTextOnDark)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 10)
                     .background(AppColors.brand)
-                    .cornerRadius(8)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
+            .buttonStyle(ApplePressableButtonStyle())
             Spacer()
         }
         .frame(maxWidth: .infinity)
@@ -431,8 +452,8 @@ public struct NotebookEditorSheet: View {
                     TextField("Title", text: $title)
                         .font(AppTypography.headline)
                         .foregroundColor(AppColors.primaryText)
-                        .padding(.horizontal)
-                        .padding(.top, 12)
+                        .padding(.horizontal, 16)
+                        .padding(.top, 14)
                         .onChange(of: title) { _ in autoSave() }
                     
                     HStack {
@@ -456,58 +477,70 @@ public struct NotebookEditorSheet: View {
                         .pickerStyle(.segmented)
                         .frame(width: 170)
                     }
-                    .padding(.horizontal)
+                    .padding(.horizontal, 16)
                     
-                    Divider().background(AppColors.border)
+                    Divider().background(AppColors.border.opacity(0.5))
                     
                     // Formatting Toolbar (Bold, Italic, Bullet)
                     if !isPreviewMode {
                         HStack(spacing: 12) {
                             Button {
+                                #if canImport(UIKit)
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                #endif
                                 applyFormat(marker: "**")
                             } label: {
                                 Text("B")
-                                    .font(.system(size: 15, weight: .black))
-                                    .frame(width: 32, height: 28)
+                                    .font(.system(size: 14, weight: .black))
+                                    .frame(width: 34, height: 30)
                                     .background(AppColors.secondaryBackground)
                                     .foregroundColor(AppColors.primaryText)
-                                    .cornerRadius(6)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                             }
+                            .buttonStyle(ApplePressableButtonStyle())
                             
                             Button {
+                                #if canImport(UIKit)
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                #endif
                                 applyFormat(marker: "*")
                             } label: {
                                 Text("I")
-                                    .font(.system(size: 15, weight: .semibold, design: .serif))
+                                    .font(.system(size: 14, weight: .bold, design: .serif))
                                     .italic()
-                                    .frame(width: 32, height: 28)
+                                    .frame(width: 34, height: 30)
                                     .background(AppColors.secondaryBackground)
                                     .foregroundColor(AppColors.primaryText)
-                                    .cornerRadius(6)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                             }
+                            .buttonStyle(ApplePressableButtonStyle())
                             
                             Button {
+                                #if canImport(UIKit)
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                #endif
                                 insertBullet()
                             } label: {
                                 Image(systemName: "list.bullet")
-                                    .font(.system(size: 13, weight: .semibold))
-                                    .frame(width: 32, height: 28)
+                                    .font(.system(size: 13, weight: .bold))
+                                    .frame(width: 34, height: 30)
                                     .background(AppColors.secondaryBackground)
                                     .foregroundColor(AppColors.primaryText)
-                                    .cornerRadius(6)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                             }
+                            .buttonStyle(ApplePressableButtonStyle())
                             
                             Spacer()
                         }
-                        .padding(.horizontal)
-                        .padding(.bottom, 4)
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 6)
                     }
                 }
                 .background(AppColors.cardBackground)
                 
                 // Content View
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 14) {
                         if isPreviewMode {
                             VStack(alignment: .leading, spacing: 8) {
                                 if title.isEmpty && content.isEmpty {
@@ -536,7 +569,7 @@ public struct NotebookEditorSheet: View {
                                 .onChange(of: content) { _ in autoSave() }
                         }
                         
-                        Divider().background(AppColors.border)
+                        Divider().background(AppColors.border.opacity(0.5))
                         
                         AttachmentsSectionView(
                             ownerType: "note",
@@ -544,7 +577,7 @@ public struct NotebookEditorSheet: View {
                             title: "Attachments & Screenshots"
                         )
                     }
-                    .padding()
+                    .padding(16)
                 }
                 .background(AppColors.background)
             }
@@ -553,6 +586,9 @@ public struct NotebookEditorSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button {
+                        #if canImport(UIKit)
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        #endif
                         showDeleteConfirmation = true
                     } label: {
                         Image(systemName: "trash")

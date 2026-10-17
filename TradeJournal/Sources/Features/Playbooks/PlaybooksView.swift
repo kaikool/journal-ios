@@ -23,6 +23,20 @@ public struct PlaybooksView: View {
         )
     }
     
+    // MARK: - Apple HIG Card Container
+    private func cardContainer<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        content()
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(AppColors.cardBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(AppColors.border.opacity(0.5), lineWidth: 0.5)
+            )
+            .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 2)
+    }
+    
     public var body: some View {
         VStack(spacing: 0) {
             FilterBarView(
@@ -35,14 +49,14 @@ public struct PlaybooksView: View {
             }
             
             ScrollView {
-                VStack(spacing: 12) {
+                VStack(spacing: 14) {
                     if dataStore.playbooks.isEmpty {
                         emptyState
                     } else {
                         playbooksList
                     }
                 }
-                .padding(14)
+                .padding(16)
             }
             .background(AppColors.background)
         }
@@ -69,11 +83,21 @@ public struct PlaybooksView: View {
     
     @ViewBuilder
     private var emptyState: some View {
-        AppCard {
-            VStack(spacing: 12) {
-                Image(systemName: "book.closed")
-                    .font(.system(size: 36))
-                    .foregroundColor(AppColors.secondaryText.opacity(0.6))
+        cardContainer {
+            VStack(spacing: 14) {
+                ZStack {
+                    Circle()
+                        .fill(AppColors.brand.opacity(0.12))
+                        .frame(width: 64, height: 64)
+                    Image(systemName: "book.pages")
+                        .font(.system(size: 28))
+                        .foregroundColor(AppColors.brand)
+                }
+                .padding(.top, 8)
+                
+                Text("Build Trading Playbooks")
+                    .font(AppTypography.headline)
+                    .foregroundColor(AppColors.primaryText)
                 
                 Text("A playbook is a setup you trade on purpose — name it, write its rules, then tag trades with it and let Reports tell you if it actually pays.")
                     .font(AppTypography.caption)
@@ -82,26 +106,28 @@ public struct PlaybooksView: View {
                     .padding(.horizontal, 16)
                 
                 Button {
-                    #if os(iOS)
+                    #if canImport(UIKit)
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                     #endif
                     showNewPlaybookSheet = true
                 } label: {
-                    Text("New playbook")
-                        .font(AppTypography.captionBold)
-                        .foregroundColor(AppColors.brandTextOnDark)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .background(AppColors.brand)
-                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                        .shadow(color: AppColors.brand.opacity(0.3), radius: 4, x: 0, y: 2)
+                    HStack(spacing: 6) {
+                        Image(systemName: "plus.circle")
+                        Text("New Playbook")
+                    }
+                    .font(AppTypography.captionBold)
+                    .foregroundColor(AppColors.brandTextOnDark)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 10)
+                    .background(AppColors.brand)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 }
                 .buttonStyle(ApplePressableButtonStyle())
+                .padding(.bottom, 8)
             }
-            .padding(.vertical, 32)
             .frame(maxWidth: .infinity)
         }
-        .padding(.top, 20)
+        .padding(.top, 16)
     }
     
     @ViewBuilder
@@ -124,21 +150,30 @@ public struct PlaybooksView: View {
     }
     
     private func playbookCard(summary: PlaybookAdherenceSummary) -> some View {
-        AppCard {
-            VStack(alignment: .leading, spacing: 10) {
-                // Header matching playbooks/page.tsx line 73-97
+        cardContainer {
+            VStack(alignment: .leading, spacing: 12) {
+                // Header
                 HStack(alignment: .center) {
-                    Text(summary.playbook.title)
-                        .font(AppTypography.bodyBold)
-                        .foregroundColor(AppColors.primaryText)
+                    HStack(spacing: 6) {
+                        Image(systemName: "book.pages")
+                            .font(.system(size: 13))
+                            .foregroundColor(AppColors.brand)
+                        Text(summary.playbook.title)
+                            .font(AppTypography.headline)
+                            .foregroundColor(AppColors.primaryText)
+                    }
                     
                     Spacer()
                     
                     Text("\(summary.totalTrades) trades")
                         .font(AppTypography.caption)
+                        .monospacedDigit()
                         .foregroundColor(AppColors.secondaryText)
                     
                     Button {
+                        #if canImport(UIKit)
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        #endif
                         playbookToDelete = summary.playbook
                         showDeleteConfirmation = true
                     } label: {
@@ -157,12 +192,12 @@ public struct PlaybooksView: View {
                 }
                 
                 if !summary.playbook.rules.isEmpty {
-                    VStack(alignment: .leading, spacing: 3) {
+                    VStack(alignment: .leading, spacing: 4) {
                         ForEach(Array(summary.playbook.rules.prefix(4).enumerated()), id: \.offset) { index, rule in
                             HStack(alignment: .top, spacing: 6) {
                                 Text("\(index + 1).")
-                                    .font(AppTypography.caption)
-                                    .foregroundColor(AppColors.secondaryText)
+                                    .font(AppTypography.captionBold)
+                                    .foregroundColor(AppColors.brand)
                                 Text(rule)
                                     .font(AppTypography.caption)
                                     .foregroundColor(AppColors.primaryText)
@@ -181,7 +216,8 @@ public struct PlaybooksView: View {
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText)
                         Text(Formatters.formatPnL(summary.netPnlWhenFollowed, currency: env.currentCurrency))
-                            .font(AppTypography.captionBold)
+                            .font(AppTypography.bodyBold)
+                            .monospacedDigit()
                             .foregroundColor(Formatters.pnlColor(summary.netPnlWhenFollowed))
                     }
                     
@@ -192,7 +228,8 @@ public struct PlaybooksView: View {
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText)
                         Text(Formatters.formatPnL(summary.netPnlWhenBroken, currency: env.currentCurrency))
-                            .font(AppTypography.captionBold)
+                            .font(AppTypography.bodyBold)
+                            .monospacedDigit()
                             .foregroundColor(Formatters.pnlColor(summary.netPnlWhenBroken))
                     }
                 }
@@ -214,15 +251,29 @@ public struct PlaybookDetailView: View {
     
     @State private var showDeleteAlert = false
     
+    // MARK: - Apple HIG Card Container
+    private func cardContainer<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        content()
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(AppColors.cardBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(AppColors.border.opacity(0.5), lineWidth: 0.5)
+            )
+            .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 2)
+    }
+    
     public var body: some View {
         ScrollView {
-            VStack(spacing: 16) {
+            VStack(spacing: 14) {
                 infoCard
                 rulesCard
                 tradesSection
                 deleteButton
             }
-            .padding()
+            .padding(16)
         }
         .navigationTitle(playbook.title)
         .background(AppColors.background)
@@ -239,7 +290,7 @@ public struct PlaybookDetailView: View {
     
     @ViewBuilder
     private var infoCard: some View {
-        AppCard {
+        cardContainer {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Strategy Description")
                     .font(AppTypography.caption)
@@ -253,10 +304,11 @@ public struct PlaybookDetailView: View {
     
     @ViewBuilder
     private var rulesCard: some View {
-        AppCard {
+        cardContainer {
             VStack(alignment: .leading, spacing: 10) {
                 Text("Checklist Rules (\(playbook.rules.count))")
                     .font(AppTypography.headline)
+                    .foregroundColor(AppColors.primaryText)
                 
                 ForEach(Array(playbook.rules.enumerated()), id: \.offset) { index, rule in
                     HStack(alignment: .top, spacing: 8) {
@@ -278,16 +330,18 @@ public struct PlaybookDetailView: View {
     
     @ViewBuilder
     private var tradesSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             Text("Assigned Trades (\(trades.count))")
                 .font(AppTypography.headline)
+                .foregroundColor(AppColors.primaryText)
                 .padding(.horizontal, 4)
             
             if trades.isEmpty {
-                Text("No trades currently assigned to this playbook.")
-                    .font(AppTypography.caption)
-                    .foregroundColor(AppColors.secondaryText)
-                    .padding(.horizontal, 4)
+                cardContainer {
+                    Text("No trades currently assigned to this playbook.")
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.secondaryText)
+                }
             } else {
                 ForEach(trades) { trade in
                     tradeCard(trade)
@@ -301,11 +355,12 @@ public struct PlaybookDetailView: View {
         let isLong = trade.direction == .long
         let dirColor = isLong ? AppColors.brand : AppColors.warning
         
-        AppCard {
-            VStack(alignment: .leading, spacing: 6) {
+        cardContainer {
+            VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Text(trade.symbol)
                         .font(AppTypography.subheadlineBold)
+                        .foregroundColor(AppColors.primaryText)
                     AppBadge(
                         trade.direction.rawValue.uppercased(),
                         color: dirColor
@@ -313,11 +368,12 @@ public struct PlaybookDetailView: View {
                     Spacer()
                     Text(Formatters.formatPnL(trade.netPnl, currency: env.currentCurrency))
                         .font(AppTypography.subheadlineBold)
+                        .monospacedDigit()
                         .foregroundColor(Formatters.pnlColor(trade.netPnl))
                 }
                 
                 // Rule checkboxes for this trade
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 6) {
                     ForEach(playbook.rules, id: \.self) { rule in
                         ruleCheckboxRow(trade: trade, rule: rule)
                     }
@@ -333,33 +389,46 @@ public struct PlaybookDetailView: View {
             $0.tradeKey == trade.key && $0.playbookId == playbook.id && $0.rule == rule
         })?.followed ?? false
         
-        HStack {
-            Image(systemName: followed ? "checkmark.square.fill" : "square")
-                .foregroundColor(followed ? AppColors.profit : AppColors.secondaryText)
-                .onTapGesture {
-                    dataStore.setRuleAssessment(tradeKey: trade.key, playbookId: playbook.id, rule: rule, followed: !followed)
-                }
-            Text(rule)
-                .font(AppTypography.caption)
-                .foregroundColor(AppColors.primaryText)
+        Button {
+            #if canImport(UIKit)
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            #endif
+            dataStore.setRuleAssessment(tradeKey: trade.key, playbookId: playbook.id, rule: rule, followed: !followed)
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: followed ? "checkmark.circle.fill" : "circle")
+                    .foregroundColor(followed ? AppColors.profit : AppColors.secondaryText)
+                    .font(.system(size: 15))
+                Text(rule)
+                    .font(AppTypography.caption)
+                    .foregroundColor(AppColors.primaryText)
+                Spacer()
+            }
         }
+        .buttonStyle(.plain)
     }
     
     @ViewBuilder
     private var deleteButton: some View {
-        Button(role: .destructive, action: { showDeleteAlert = true }) {
-            HStack {
+        Button {
+            #if canImport(UIKit)
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            #endif
+            showDeleteAlert = true
+        } label: {
+            HStack(spacing: 6) {
                 Image(systemName: "trash")
                 Text("Delete Playbook")
             }
             .font(AppTypography.captionBold)
             .frame(maxWidth: .infinity)
-            .padding()
-            .background(AppColors.loss.opacity(0.1))
+            .padding(.vertical, 14)
+            .background(AppColors.loss.opacity(0.12))
             .foregroundColor(AppColors.loss)
-            .cornerRadius(12)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
-        .padding(.top, 8)
+        .buttonStyle(ApplePressableButtonStyle())
+        .padding(.top, 4)
     }
 }
 

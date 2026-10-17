@@ -57,6 +57,20 @@ public struct TradeDetailView: View {
         return targetPerUnit / riskPerUnit
     }
     
+    // MARK: - Apple HIG Card Container
+    private func cardContainer<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        content()
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(AppColors.cardBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(AppColors.border.opacity(0.5), lineWidth: 0.5)
+            )
+            .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 2)
+    }
+    
     public var body: some View {
         VStack(spacing: 0) {
             FilterBarView(
@@ -69,419 +83,600 @@ public struct TradeDetailView: View {
             }
             
             ScrollView {
-                VStack(spacing: 12) {
-                // Header PnL Card
-                AppCard {
-                    VStack(alignment: .leading, spacing: 10) {
-                        HStack {
-                            Text(trade.symbol)
-                                .font(AppTypography.headline)
-                            AppBadge(
-                                text: trade.direction.rawValue.uppercased(),
-                                color: trade.direction == .long ? AppColors.accent : AppColors.warning
-                            )
-                            AppBadge(
-                                text: trade.status.rawValue.uppercased(),
-                                color: trade.status == .win ? AppColors.profit : (trade.status == .loss ? AppColors.loss : AppColors.breakeven)
-                            )
-                            Spacer()
-                            Button {
-                                #if os(iOS)
-                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                                #endif
-                                showReplayView = true
-                            } label: {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "play.circle.fill")
-                                    Text("Replay")
-                                }
-                                .font(AppTypography.captionBold)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 4)
-                                .background(AppColors.brand.opacity(0.15))
-                                .foregroundColor(AppColors.brand)
-                                .clipShape(Capsule())
-                            }
-                            .buttonStyle(ApplePressableButtonStyle())
-                        }
-                        
-                        Divider().background(AppColors.border)
-                        
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Net P&L")
-                                    .font(AppTypography.caption)
-                                    .foregroundColor(AppColors.secondaryText)
-                                AppMonetaryText(
-                                    Formatters.formatPnL(trade.netPnl, currency: env.currentCurrency),
-                                    isPrivate: env.isPrivacyModeEnabled,
-                                    font: AppTypography.financialNumber(size: 24, weight: .bold),
-                                    color: Formatters.pnlColor(trade.netPnl)
+                VStack(spacing: 14) {
+                    // Header PnL Card
+                    cardContainer {
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                Text(trade.symbol)
+                                    .font(AppTypography.headline)
+                                    .foregroundColor(AppColors.primaryText)
+                                
+                                Text(trade.direction.rawValue.uppercased())
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundColor(trade.direction == .long ? AppColors.brand : AppColors.warning)
+                                    .padding(.horizontal, 7)
+                                    .padding(.vertical, 3)
+                                    .background((trade.direction == .long ? AppColors.brand : AppColors.warning).opacity(0.12))
+                                    .clipShape(Capsule())
+                                
+                                AppBadge(
+                                    text: trade.status.rawValue.uppercased(),
+                                    color: trade.status == .win ? AppColors.profit : (trade.status == .loss ? AppColors.loss : AppColors.breakeven)
                                 )
+                                
+                                Spacer()
+                                
+                                Button {
+                                    #if canImport(UIKit)
+                                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                    #endif
+                                    showReplayView = true
+                                } label: {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "play.circle.fill")
+                                        Text("Replay")
+                                    }
+                                    .font(AppTypography.captionBold)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 5)
+                                    .background(AppColors.brand.opacity(0.12))
+                                    .foregroundColor(AppColors.brand)
+                                    .clipShape(Capsule())
+                                }
+                                .buttonStyle(ApplePressableButtonStyle())
                             }
-                            Spacer()
-                            VStack(alignment: .trailing, spacing: 2) {
-                                Text("Volume")
+                            
+                            Divider().background(AppColors.border.opacity(0.5))
+                            
+                            HStack(alignment: .firstTextBaseline) {
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text("Net P&L")
+                                        .font(AppTypography.caption)
+                                        .foregroundColor(AppColors.secondaryText)
+                                    AppMonetaryText(
+                                        Formatters.formatPnL(trade.netPnl, currency: env.currentCurrency),
+                                        isPrivate: env.isPrivacyModeEnabled,
+                                        font: AppTypography.financialNumber(size: 26, weight: .bold),
+                                        color: Formatters.pnlColor(trade.netPnl)
+                                    )
+                                }
+                                Spacer()
+                                VStack(alignment: .trailing, spacing: 3) {
+                                    Text("Volume")
+                                        .font(AppTypography.caption)
+                                        .foregroundColor(AppColors.secondaryText)
+                                    Text("\(trade.quantity)")
+                                        .font(AppTypography.financialNumber(size: 22, weight: .bold))
+                                        .monospacedDigit()
+                                        .foregroundColor(AppColors.primaryText)
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Pricing & Execution Details
+                    cardContainer {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Execution Details")
+                                .font(AppTypography.headline)
+                                .foregroundColor(AppColors.primaryText)
+                            
+                            HStack {
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text("Avg entry")
+                                        .font(AppTypography.caption)
+                                        .foregroundColor(AppColors.secondaryText)
+                                    Text("\(trade.avgEntry)")
+                                        .font(AppTypography.subheadlineBold)
+                                        .monospacedDigit()
+                                        .foregroundColor(AppColors.primaryText)
+                                }
+                                Spacer()
+                                VStack(alignment: .center, spacing: 3) {
+                                    Text("Avg exit")
+                                        .font(AppTypography.caption)
+                                        .foregroundColor(AppColors.secondaryText)
+                                    Text(trade.avgExit != nil ? "\(trade.avgExit!)" : "Open")
+                                        .font(AppTypography.subheadlineBold)
+                                        .monospacedDigit()
+                                        .foregroundColor(AppColors.primaryText)
+                                }
+                                Spacer()
+                                VStack(alignment: .trailing, spacing: 3) {
+                                    Text("Fees")
+                                        .font(AppTypography.caption)
+                                        .foregroundColor(AppColors.secondaryText)
+                                    Text(Formatters.formatCurrency(trade.fees, currency: env.currentCurrency))
+                                        .font(AppTypography.subheadlineBold)
+                                        .monospacedDigit()
+                                        .foregroundColor(AppColors.primaryText)
+                                }
+                            }
+                            
+                            Divider().background(AppColors.border.opacity(0.5))
+                            
+                            HStack {
+                                Text("Opened at:")
                                     .font(AppTypography.caption)
                                     .foregroundColor(AppColors.secondaryText)
-                                Text("\(trade.quantity)")
-                                    .font(AppTypography.financialNumber(size: 20, weight: .bold))
+                                Spacer()
+                                Text(Formatters.formatDateTime(trade.openedAt, timeZone: env.currentTimeZone))
+                                    .font(AppTypography.caption)
                                     .monospacedDigit()
                                     .foregroundColor(AppColors.primaryText)
                             }
-                        }
-                    }
-                }
-                
-                // Pricing & Execution Details
-                AppCard {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("Execution details")
-                            .font(AppTypography.headline)
-                        
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Avg entry")
-                                    .font(AppTypography.caption)
-                                    .foregroundColor(AppColors.secondaryText)
-                                Text("\(trade.avgEntry)")
-                                    .font(AppTypography.subheadlineBold)
-                            }
-                            Spacer()
-                            VStack(alignment: .center, spacing: 2) {
-                                Text("Avg exit")
-                                    .font(AppTypography.caption)
-                                    .foregroundColor(AppColors.secondaryText)
-                                Text(trade.avgExit != nil ? "\(trade.avgExit!)" : "Open")
-                                    .font(AppTypography.subheadlineBold)
-                            }
-                            Spacer()
-                            VStack(alignment: .trailing, spacing: 2) {
-                                Text("Fees")
-                                    .font(AppTypography.caption)
-                                    .foregroundColor(AppColors.secondaryText)
-                                Text(Formatters.formatCurrency(trade.fees, currency: env.currentCurrency))
-                                    .font(AppTypography.subheadlineBold)
-                            }
-                        }
-                        
-                        Divider().background(AppColors.border.opacity(0.5))
-                        
-                        HStack {
-                            Text("Opened at:")
-                                .font(AppTypography.caption)
-                                .foregroundColor(AppColors.secondaryText)
-                            Spacer()
-                            Text(Formatters.formatDateTime(trade.openedAt, timeZone: env.currentTimeZone))
-                                .font(AppTypography.caption)
-                        }
-                        
-                        if let closedAt = trade.closedAt {
-                            HStack {
-                                Text("Closed at:")
-                                .font(AppTypography.caption)
-                                .foregroundColor(AppColors.secondaryText)
-                                Spacer()
-                                Text(Formatters.formatDateTime(closedAt, timeZone: env.currentTimeZone))
-                                    .font(AppTypography.caption)
-                            }
-                        }
-                    }
-                }
-                
-                // Execution Legs List (Port 1:1 from source-repo Execution table)
-                if !fills.isEmpty {
-                    AppCard {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Executions (\(fills.count) legs)")
-                                .font(AppTypography.headline)
                             
-                            ForEach(fills) { fill in
+                            if let closedAt = trade.closedAt {
                                 HStack {
-                                    AppBadge(
-                                        fill.side == .buy ? "BUY" : "SELL",
-                                        color: fill.side == .buy ? AppColors.accent : AppColors.warning
-                                    )
-                                    Text("\(fill.quantity) @ \(fill.price)")
-                                        .font(AppTypography.captionBold)
+                                    Text("Closed at:")
+                                        .font(AppTypography.caption)
+                                        .foregroundColor(AppColors.secondaryText)
                                     Spacer()
-                                    VStack(alignment: .trailing, spacing: 2) {
-                                        Text(Formatters.formatCurrency(fill.fee, currency: env.currentCurrency))
-                                            .font(AppTypography.caption)
-                                            .foregroundColor(AppColors.secondaryText)
-                                        Text(Formatters.formatDateTime(fill.executedAt, timeZone: env.currentTimeZone))
-                                            .font(.system(size: 9))
-                                            .foregroundColor(.secondary)
+                                    Text(Formatters.formatDateTime(closedAt, timeZone: env.currentTimeZone))
+                                        .font(AppTypography.caption)
+                                        .monospacedDigit()
+                                        .foregroundColor(AppColors.primaryText)
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Execution Legs List
+                    if !fills.isEmpty {
+                        cardContainer {
+                            VStack(alignment: .leading, spacing: 10) {
+                                HStack {
+                                    Image(systemName: "arrow.triangle.swap")
+                                        .font(.system(size: 13))
+                                        .foregroundColor(AppColors.brand)
+                                    Text("Executions (\(fills.count) legs)")
+                                        .font(AppTypography.headline)
+                                        .foregroundColor(AppColors.primaryText)
+                                }
+                                
+                                ForEach(fills) { fill in
+                                    HStack {
+                                        Text(fill.side == .buy ? "BUY" : "SELL")
+                                            .font(.system(size: 9, weight: .bold))
+                                            .foregroundColor(fill.side == .buy ? AppColors.brand : AppColors.warning)
+                                            .padding(.horizontal, 6)
+                                            .padding(.vertical, 2)
+                                            .background((fill.side == .buy ? AppColors.brand : AppColors.warning).opacity(0.12))
+                                            .clipShape(Capsule())
+                                        
+                                        Text("\(fill.quantity) @ \(fill.price)")
+                                            .font(AppTypography.captionBold)
+                                            .monospacedDigit()
+                                            .foregroundColor(AppColors.primaryText)
+                                        
+                                        Spacer()
+                                        
+                                        VStack(alignment: .trailing, spacing: 2) {
+                                            Text(Formatters.formatCurrency(fill.fee, currency: env.currentCurrency))
+                                                .font(AppTypography.caption)
+                                                .monospacedDigit()
+                                                .foregroundColor(AppColors.secondaryText)
+                                            Text(Formatters.formatDateTime(fill.executedAt, timeZone: env.currentTimeZone))
+                                                .font(.system(size: 9))
+                                                .monospacedDigit()
+                                                .foregroundColor(AppColors.secondaryText)
+                                        }
+                                    }
+                                    .padding(.vertical, 3)
+                                    
+                                    if fill.id != fills.last?.id {
+                                        Divider().background(AppColors.border.opacity(0.3))
                                     }
                                 }
-                                .padding(.vertical, 4)
-                                if fill.id != fills.last?.id {
-                                    Divider().background(AppColors.border.opacity(0.3))
+                            }
+                        }
+                    }
+                    
+                    // Risk & Reward Section
+                    cardContainer {
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                Image(systemName: "chart.line.uptrend.xyaxis")
+                                    .font(.system(size: 13))
+                                    .foregroundColor(AppColors.brand)
+                                Text("Risk & Reward (R:R)")
+                                    .font(AppTypography.headline)
+                                    .foregroundColor(AppColors.primaryText)
+                            }
+                            
+                            HStack(spacing: 12) {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Stop Loss")
+                                        .font(AppTypography.caption)
+                                        .foregroundColor(AppColors.secondaryText)
+                                    TextField("Not set", text: $stopLossText)
+                                        .font(AppTypography.body)
+                                        .monospacedDigit()
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 7)
+                                        .background(AppColors.secondaryBackground)
+                                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                        .keyboardType(.decimalPad)
+                                }
+                                
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Profit Target")
+                                        .font(AppTypography.caption)
+                                        .foregroundColor(AppColors.secondaryText)
+                                    TextField("Not set", text: $profitTargetText)
+                                        .font(AppTypography.body)
+                                        .monospacedDigit()
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 7)
+                                        .background(AppColors.secondaryBackground)
+                                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                        .keyboardType(.decimalPad)
+                                }
+                                
+                                VStack {
+                                    Text(" ")
+                                        .font(AppTypography.caption)
+                                    Button {
+                                        #if canImport(UIKit)
+                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                        #endif
+                                        persistTradeUpdates()
+                                    } label: {
+                                        Text("Save")
+                                            .font(AppTypography.captionBold)
+                                            .foregroundColor(.white)
+                                            .padding(.horizontal, 14)
+                                            .padding(.vertical, 8)
+                                            .background(AppColors.brand)
+                                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                    }
+                                    .buttonStyle(ApplePressableButtonStyle())
+                                }
+                            }
+                            
+                            Divider().background(AppColors.border.opacity(0.5))
+                            
+                            HStack(spacing: 18) {
+                                if let risk = riskAmount {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("Risk (1R):")
+                                            .font(AppTypography.caption)
+                                            .foregroundColor(AppColors.secondaryText)
+                                        Text(Formatters.formatCurrency(risk, currency: env.currentCurrency))
+                                            .font(AppTypography.captionBold)
+                                            .monospacedDigit()
+                                            .foregroundColor(AppColors.loss)
+                                    }
+                                }
+                                if let pR = plannedR {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("Planned R:")
+                                            .font(AppTypography.caption)
+                                            .foregroundColor(AppColors.secondaryText)
+                                        Text(String(format: "%.2fR", (pR as NSDecimalNumber).doubleValue))
+                                            .font(AppTypography.captionBold)
+                                            .monospacedDigit()
+                                            .foregroundColor(AppColors.brand)
+                                    }
+                                }
+                                if let rR = realizedR {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("Realized R:")
+                                            .font(AppTypography.caption)
+                                            .foregroundColor(AppColors.secondaryText)
+                                        Text(String(format: "%.2fR", (rR as NSDecimalNumber).doubleValue))
+                                            .font(AppTypography.captionBold)
+                                            .monospacedDigit()
+                                            .foregroundColor(rR >= 0 ? AppColors.profit : AppColors.loss)
+                                    }
                                 }
                             }
                         }
                     }
-                }
-                
-                // Risk & Reward Section
-                AppCard {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("Risk & Reward (R:R)")
-                            .font(AppTypography.headline)
-                        
-                        HStack(spacing: 12) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Stop Loss")
-                                    .font(AppTypography.caption)
-                                    .foregroundColor(AppColors.secondaryText)
-                                TextField("Not set", text: $stopLossText)
-                                    .textFieldStyle(.roundedBorder)
-                                    .keyboardType(.decimalPad)
-                            }
-                            
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Profit Target")
-                                    .font(AppTypography.caption)
-                                    .foregroundColor(AppColors.secondaryText)
-                                TextField("Not set", text: $profitTargetText)
-                                    .textFieldStyle(.roundedBorder)
-                                    .keyboardType(.decimalPad)
-                            }
-                            
-                            VStack {
-                                Text(" ")
-                                    .font(AppTypography.caption)
-                                Button("Save") {
+                    
+                    // Playbook Checklist
+                    cardContainer {
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "book.pages")
+                                        .font(.system(size: 13))
+                                        .foregroundColor(AppColors.brand)
+                                    Text("Playbook")
+                                        .font(AppTypography.headline)
+                                        .foregroundColor(AppColors.primaryText)
+                                }
+                                Spacer()
+                                Picker("Playbook", selection: $selectedPlaybookId) {
+                                    Text("None").tag("")
+                                    ForEach(dataStore.playbooks) { pb in
+                                        Text(pb.name).tag(pb.id)
+                                    }
+                                }
+                                .pickerStyle(.menu)
+                                .onChange(of: selectedPlaybookId) {
+                                    trade.playbookId = selectedPlaybookId.isEmpty ? nil : selectedPlaybookId
                                     persistTradeUpdates()
                                 }
-                                .buttonStyle(.borderedProminent)
-                                .tint(AppColors.accent)
                             }
-                        }
-                        
-                        HStack(spacing: 16) {
-                            if let risk = riskAmount {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("Risk (1R):")
-                                        .font(AppTypography.caption)
-                                        .foregroundColor(AppColors.secondaryText)
-                                    Text(Formatters.formatCurrency(risk, currency: env.currentCurrency))
+                            
+                            if let pb = activePlaybook {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text("Rule Checklist:")
                                         .font(AppTypography.captionBold)
-                                        .foregroundColor(AppColors.loss)
-                                }
-                            }
-                            if let pR = plannedR {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("Planned R:")
-                                        .font(AppTypography.caption)
                                         .foregroundColor(AppColors.secondaryText)
-                                    Text(String(format: "%.2fR", (pR as NSDecimalNumber).doubleValue))
-                                        .font(AppTypography.captionBold)
-                                        .foregroundColor(AppColors.accent)
-                                }
-                            }
-                            if let rR = realizedR {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("Realized R:")
-                                        .font(AppTypography.caption)
-                                        .foregroundColor(AppColors.secondaryText)
-                                    Text(String(format: "%.2fR", (rR as NSDecimalNumber).doubleValue))
-                                        .font(AppTypography.captionBold)
-                                        .foregroundColor(rR >= 0 ? AppColors.profit : AppColors.loss)
+                                    
+                                    ForEach(pb.rules, id: \.self) { rule in
+                                        let isChecked = dataStore.playbookAssessments.first(where: {
+                                            $0.tradeKey == trade.key && $0.playbookId == pb.id && $0.rule == rule
+                                        })?.followed ?? false
+                                        
+                                        Button {
+                                            #if canImport(UIKit)
+                                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                            #endif
+                                            dataStore.setRuleAssessment(
+                                                tradeKey: trade.key,
+                                                playbookId: pb.id,
+                                                rule: rule,
+                                                followed: !isChecked
+                                            )
+                                        } label: {
+                                            HStack(spacing: 8) {
+                                                Image(systemName: isChecked ? "checkmark.circle.fill" : "circle")
+                                                    .foregroundColor(isChecked ? AppColors.profit : AppColors.secondaryText)
+                                                    .font(.system(size: 16))
+                                                Text(rule)
+                                                    .font(AppTypography.caption)
+                                                    .foregroundColor(AppColors.primaryText)
+                                                Spacer()
+                                            }
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
                                 }
                             }
                         }
                     }
-                }
-                
-                // Playbook Checklist
-                AppCard {
-                    VStack(alignment: .leading, spacing: 10) {
-                        HStack {
-                            Text("Playbook")
-                                .font(AppTypography.headline)
-                            Spacer()
-                            Picker("Playbook", selection: $selectedPlaybookId) {
-                                Text("None").tag("")
-                                ForEach(dataStore.playbooks) { pb in
-                                    Text(pb.name).tag(pb.id)
+                    
+                    // Annotations: Mistakes, Tags & Rating
+                    cardContainer {
+                        VStack(alignment: .leading, spacing: 14) {
+                            HStack {
+                                Image(systemName: "flame")
+                                    .font(.system(size: 13))
+                                    .foregroundColor(AppColors.brand)
+                                Text("Discipline & Execution Review")
+                                    .font(AppTypography.headline)
+                                    .foregroundColor(AppColors.primaryText)
+                            }
+                            
+                            // Rating
+                            HStack(spacing: 8) {
+                                Text("Rating:")
+                                    .font(AppTypography.caption)
+                                    .foregroundColor(AppColors.secondaryText)
+                                ForEach(1...5, id: \.self) { star in
+                                    Image(systemName: star <= (trade.rating ?? 0) ? "star.fill" : "star")
+                                        .foregroundColor(star <= (trade.rating ?? 0) ? .yellow : AppColors.secondaryText.opacity(0.4))
+                                        .font(.system(size: 16))
+                                        .onTapGesture {
+                                            #if canImport(UIKit)
+                                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                            #endif
+                                            trade.rating = (trade.rating == star) ? nil : star
+                                            persistTradeUpdates()
+                                        }
                                 }
                             }
-                            .onChange(of: selectedPlaybookId) {
-                                trade.playbookId = selectedPlaybookId.isEmpty ? nil : selectedPlaybookId
-                                persistTradeUpdates()
-                            }
-                        }
-                        
-                        if let pb = activePlaybook {
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text("Rule checklist:")
+                            
+                            Divider().background(AppColors.border.opacity(0.5))
+                            
+                            // Tags
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Tags:")
                                     .font(AppTypography.caption)
                                     .foregroundColor(AppColors.secondaryText)
                                 
-                                ForEach(pb.rules, id: \.self) { rule in
-                                    let isChecked = dataStore.playbookAssessments.first(where: {
-                                        $0.tradeKey == trade.key && $0.playbookId == pb.id && $0.rule == rule
-                                    })?.followed ?? false
+                                if !trade.tags.isEmpty {
+                                    ScrollView(.horizontal, showsIndicators: false) {
+                                        HStack(spacing: 6) {
+                                            ForEach(trade.tags, id: \.self) { tag in
+                                                HStack(spacing: 4) {
+                                                    Text("#\(tag)")
+                                                    Image(systemName: "xmark")
+                                                        .font(.system(size: 8, weight: .bold))
+                                                }
+                                                .font(.system(size: 11, weight: .semibold))
+                                                .foregroundColor(AppColors.brand)
+                                                .padding(.horizontal, 8)
+                                                .padding(.vertical, 4)
+                                                .background(AppColors.brand.opacity(0.12))
+                                                .clipShape(Capsule())
+                                                .onTapGesture {
+                                                    #if canImport(UIKit)
+                                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                                    #endif
+                                                    trade.tags.removeAll { $0 == tag }
+                                                    persistTradeUpdates()
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                
+                                HStack(spacing: 8) {
+                                    TextField("Add tag...", text: $newTag)
+                                        .font(AppTypography.caption)
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 7)
+                                        .background(AppColors.secondaryBackground)
+                                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                                     
-                                    HStack {
-                                        Image(systemName: isChecked ? "checkmark.square.fill" : "square")
-                                            .foregroundColor(isChecked ? AppColors.profit : AppColors.secondaryText)
-                                            .onTapGesture {
-                                                dataStore.setRuleAssessment(
-                                                    tradeKey: trade.key,
-                                                    playbookId: pb.id,
-                                                    rule: rule,
-                                                    followed: !isChecked
-                                                )
-                                            }
-                                        Text(rule)
-                                            .font(AppTypography.caption)
-                                        Spacer()
+                                    Button {
+                                        #if canImport(UIKit)
+                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                        #endif
+                                        let clean = newTag.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: "#", with: "")
+                                        if !clean.isEmpty && !trade.tags.contains(clean) {
+                                            trade.tags.append(clean)
+                                            newTag = ""
+                                            persistTradeUpdates()
+                                        }
+                                    } label: {
+                                        Text("Add")
+                                            .font(AppTypography.captionBold)
+                                            .foregroundColor(.white)
+                                            .padding(.horizontal, 12)
+                                            .padding(.vertical, 7)
+                                            .background(AppColors.brand)
+                                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                                     }
+                                    .buttonStyle(ApplePressableButtonStyle())
+                                }
+                            }
+                            
+                            Divider().background(AppColors.border.opacity(0.5))
+                            
+                            // Mistakes
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Mistakes:")
+                                    .font(AppTypography.caption)
+                                    .foregroundColor(AppColors.secondaryText)
+                                
+                                if !trade.mistakes.isEmpty {
+                                    ScrollView(.horizontal, showsIndicators: false) {
+                                        HStack(spacing: 6) {
+                                            ForEach(trade.mistakes, id: \.self) { mistake in
+                                                HStack(spacing: 4) {
+                                                    Text("⚠️ \(mistake)")
+                                                    Image(systemName: "xmark")
+                                                        .font(.system(size: 8, weight: .bold))
+                                                }
+                                                .font(.system(size: 11, weight: .semibold))
+                                                .foregroundColor(AppColors.loss)
+                                                .padding(.horizontal, 8)
+                                                .padding(.vertical, 4)
+                                                .background(AppColors.loss.opacity(0.12))
+                                                .clipShape(Capsule())
+                                                .onTapGesture {
+                                                    #if canImport(UIKit)
+                                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                                    #endif
+                                                    trade.mistakes.removeAll { $0 == mistake }
+                                                    persistTradeUpdates()
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                
+                                HStack(spacing: 8) {
+                                    TextField("e.g. FOMO, Moved SL...", text: $newMistake)
+                                        .font(AppTypography.caption)
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 7)
+                                        .background(AppColors.secondaryBackground)
+                                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                    
+                                    Button {
+                                        #if canImport(UIKit)
+                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                        #endif
+                                        let clean = newMistake.trimmingCharacters(in: .whitespaces)
+                                        if !clean.isEmpty && !trade.mistakes.contains(clean) {
+                                            trade.mistakes.append(clean)
+                                            newMistake = ""
+                                            persistTradeUpdates()
+                                        }
+                                    } label: {
+                                        Text("Add")
+                                            .font(AppTypography.captionBold)
+                                            .foregroundColor(.white)
+                                            .padding(.horizontal, 12)
+                                            .padding(.vertical, 7)
+                                            .background(AppColors.loss)
+                                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                    }
+                                    .buttonStyle(ApplePressableButtonStyle())
                                 }
                             }
                         }
                     }
-                }
-                
-                // Annotations: Mistakes, Tags & Rating
-                AppCard {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Discipline & Mistakes")
-                            .font(AppTypography.headline)
-                        
-                        // Rating
-                        HStack {
-                            Text("Rating:")
-                                .font(AppTypography.caption)
-                                .foregroundColor(AppColors.secondaryText)
-                            ForEach(1...5, id: \.self) { star in
-                                Image(systemName: star <= (trade.rating ?? 0) ? "star.fill" : "star")
-                                    .foregroundColor(star <= (trade.rating ?? 0) ? .yellow : AppColors.secondaryText)
-                                    .onTapGesture {
-                                        trade.rating = (trade.rating == star) ? nil : star
-                                        persistTradeUpdates()
-                                    }
-                            }
-                        }
-                        
-                        // Tags
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("Tags:")
-                                .font(AppTypography.caption)
-                                .foregroundColor(AppColors.secondaryText)
-                            
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack {
-                                    ForEach(trade.tags, id: \.self) { tag in
-                                        AppBadge(text: "#\(tag)", color: AppColors.accent)
-                                            .onTapGesture {
-                                                trade.tags.removeAll { $0 == tag }
-                                                persistTradeUpdates()
-                                            }
-                                    }
-                                }
-                            }
-                            
+                    
+                    // Notes Section (TextEditor with persistent save)
+                    cardContainer {
+                        VStack(alignment: .leading, spacing: 10) {
                             HStack {
-                                TextField("Add tag...", text: $newTag)
-                                    .textFieldStyle(.roundedBorder)
-                                Button("Add") {
-                                    let clean = newTag.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: "#", with: "")
-                                    if !clean.isEmpty && !trade.tags.contains(clean) {
-                                        trade.tags.append(clean)
-                                        newTag = ""
-                                        persistTradeUpdates()
-                                    }
+                                Image(systemName: "note.text")
+                                    .font(.system(size: 13))
+                                    .foregroundColor(AppColors.brand)
+                                Text("Trade Notes & Analysis")
+                                    .font(AppTypography.headline)
+                                    .foregroundColor(AppColors.primaryText)
+                                Spacer()
+                                Button {
+                                    #if canImport(UIKit)
+                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                    #endif
+                                    persistTradeUpdates()
+                                } label: {
+                                    Text("Save notes")
+                                        .font(AppTypography.captionBold)
+                                        .foregroundColor(AppColors.brand)
                                 }
-                            }
-                        }
-                        
-                        // Mistakes
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("Mistakes:")
-                                .font(AppTypography.caption)
-                                .foregroundColor(AppColors.secondaryText)
-                            
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack {
-                                    ForEach(trade.mistakes, id: \.self) { mistake in
-                                        AppBadge(text: "⚠️ \(mistake)", color: AppColors.loss)
-                                            .onTapGesture {
-                                                trade.mistakes.removeAll { $0 == mistake }
-                                                persistTradeUpdates()
-                                            }
-                                    }
-                                }
+                                .buttonStyle(ApplePressableButtonStyle())
                             }
                             
-                            HStack {
-                                TextField("e.g. FOMO, Moved SL...", text: $newMistake)
-                                    .textFieldStyle(.roundedBorder)
-                                Button("Add") {
-                                    let clean = newMistake.trimmingCharacters(in: .whitespaces)
-                                    if !clean.isEmpty && !trade.mistakes.contains(clean) {
-                                        trade.mistakes.append(clean)
-                                        newMistake = ""
-                                        persistTradeUpdates()
-                                    }
-                                }
-                            }
+                            TextEditor(text: $noteContent)
+                                .frame(minHeight: 100)
+                                .padding(8)
+                                .background(AppColors.secondaryBackground)
+                                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                        .stroke(AppColors.border.opacity(0.5), lineWidth: 0.5)
+                                    )
                         }
                     }
-                }
-                
-                // Notes Section (TextEditor with persistent save)
-                AppCard {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text("Trade notes & analysis")
-                                .font(AppTypography.headline)
-                            Spacer()
-                            Button("Save notes") {
-                                persistTradeUpdates()
-                            }
-                            .font(AppTypography.captionBold)
-                            .foregroundColor(AppColors.accent)
+                    
+                    // Attachments & Screenshots
+                    cardContainer {
+                        AttachmentsSectionView(
+                            ownerType: "trade",
+                            ownerId: trade.key,
+                            title: "Attachments & Screenshots"
+                        )
+                    }
+                    
+                    // Delete Trade Button
+                    Button {
+                        #if canImport(UIKit)
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        #endif
+                        showDeleteAlert = true
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "trash")
+                            Text("Delete trade")
                         }
-                        
-                        TextEditor(text: $noteContent)
-                            .frame(minHeight: 90)
-                            .overlay(RoundedRectangle(cornerRadius: 6).stroke(AppColors.border.opacity(0.5), lineWidth: 1))
+                        .font(AppTypography.captionBold)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(AppColors.loss.opacity(0.12))
+                        .foregroundColor(AppColors.loss)
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                     }
+                    .buttonStyle(ApplePressableButtonStyle())
+                    .padding(.top, 4)
                 }
-                
-                // Attachments & Screenshots
-                AppCard {
-                    AttachmentsSectionView(
-                        ownerType: "trade",
-                        ownerId: trade.key,
-                        title: "Attachments & Screenshots"
-                    )
-                }
-                
-                // Delete Trade Button
-                Button(role: .destructive, action: { showDeleteAlert = true }) {
-                    HStack {
-                        Image(systemName: "trash")
-                        Text("Delete trade")
-                    }
-                    .font(AppTypography.captionBold)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(AppColors.loss.opacity(0.1))
-                    .foregroundColor(AppColors.loss)
-                    .cornerRadius(12)
-                }
-                .padding(.top, 8)
+                .padding(16)
             }
-            .padding(14)
+            .background(AppColors.background)
         }
         .background(AppColors.background)
-    }
-    .background(AppColors.background)
-    .navigationDestination(isPresented: $showReplayView) {
+        .navigationDestination(isPresented: $showReplayView) {
             TradeReplayView(trade: trade, executions: fills)
         }
         .alert("Delete trade \(trade.symbol)?", isPresented: $showDeleteAlert) {

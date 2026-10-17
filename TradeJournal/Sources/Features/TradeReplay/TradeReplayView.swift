@@ -79,10 +79,24 @@ public struct TradeReplayView: View {
         }
     }
     
+    // MARK: - Apple HIG Card Container
+    private func cardContainer<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        content()
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(AppColors.cardBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(AppColors.border.opacity(0.5), lineWidth: 0.5)
+            )
+            .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 2)
+    }
+    
     // MARK: - 1. Header Card
     
     private var headerCard: some View {
-        AppCard {
+        cardContainer {
             VStack(spacing: 8) {
                 HStack {
                     HStack(spacing: 6) {
@@ -203,7 +217,7 @@ public struct TradeReplayView: View {
     // MARK: - 4. Playback Controls Card
     
     private var playbackControlsCard: some View {
-        AppCard {
+        cardContainer {
             VStack(spacing: 12) {
                 // Scrubber Slider
                 if bars.count > 1 {
@@ -371,7 +385,7 @@ public struct TradeReplayView: View {
     // MARK: - 5. Excursion Metrics (MAE / MFE)
     
     private var excursionMetricsCard: some View {
-        AppCard {
+        cardContainer {
             VStack(alignment: .leading, spacing: 8) {
                 Text("EXCURSION ESTIMATES (MAE & MFE)")
                     .font(AppTypography.cardTitle)
@@ -580,6 +594,20 @@ public struct TradeReplayHubView: View {
         return dataStore.executions.filter { t.executionIds.contains($0.id) }
     }
     
+    // MARK: - Apple HIG Card Container
+    private func cardContainer<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        content()
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(AppColors.cardBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(AppColors.border.opacity(0.5), lineWidth: 0.5)
+            )
+            .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 2)
+    }
+    
     public var body: some View {
         VStack(spacing: 0) {
             if trades.isEmpty {
@@ -600,11 +628,16 @@ public struct TradeReplayHubView: View {
                 .padding(.vertical, 60)
             } else {
                 // Select Trade Card
-                AppCard {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("SELECT TRADE TO REPLAY")
-                            .font(AppTypography.cardTitle)
-                            .foregroundColor(AppColors.secondaryText)
+                cardContainer {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "play.circle")
+                                .font(.system(size: 13))
+                                .foregroundColor(AppColors.brand)
+                            Text("Select Trade to Replay")
+                                .font(AppTypography.captionBold)
+                                .foregroundColor(AppColors.secondaryText)
+                        }
                         
                         Picker("Trade", selection: Binding(
                             get: { activeTrade?.id ?? "" },
@@ -617,10 +650,14 @@ public struct TradeReplayHubView: View {
                             }
                         }
                         .pickerStyle(.menu)
-                        .tint(AppColors.accent)
+                        .tint(AppColors.brand)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(AppColors.secondaryBackground)
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                     }
                 }
-                .padding(.horizontal, 14)
+                .padding(.horizontal, 16)
                 .padding(.top, 10)
                 
                 if let trade = activeTrade {

@@ -101,42 +101,101 @@ public struct PropFirmLedgerView: View {
                     }
                 }
                 
-                // Currency Selector Bar
-                HStack {
-                    Text("Currency:")
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.secondaryText)
-                    Picker("Currency", selection: $selectedCurrency) {
-                        ForEach(availableCurrencies, id: \.self) { c in
-                            Text(c).tag(c)
+            // Apple HIG Sliding Pill Section Bar
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    ForEach(PropLedgerTab.allCases) { tab in
+                        let isSelected = selectedTab == tab
+                        Button {
+                            #if canImport(UIKit)
+                            UISelectionFeedbackGenerator().selectionChanged()
+                            #endif
+                            withAnimation(.spring(response: 0.28, dampingFraction: 0.75)) {
+                                selectedTab = tab
+                            }
+                        } label: {
+                            Text(tab.rawValue)
+                                .font(.system(size: 13, weight: isSelected ? .semibold : .medium))
+                                .foregroundColor(isSelected ? AppColors.primaryText : AppColors.secondaryText)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 7)
+                                .background(
+                                    isSelected ? AppColors.cardBackground : Color.clear
+                                )
+                                .clipShape(Capsule())
+                                .overlay(
+                                    Capsule().stroke(isSelected ? AppColors.border.opacity(0.8) : Color.clear, lineWidth: 0.8)
+                                )
+                                .shadow(color: isSelected ? Color.black.opacity(0.06) : Color.clear, radius: 4, x: 0, y: 1)
                         }
-                    }
-                    .pickerStyle(.segmented)
-                    
-                    Spacer()
-                    
-                    if selectedTab == .accounts {
-                        Toggle("Archived", isOn: $showArchivedAccounts)
-                            .toggleStyle(.button)
-                            .font(.system(size: 11, weight: .medium))
-                            .tint(AppColors.brand)
+                        .buttonStyle(.plain)
                     }
                 }
                 .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-                .background(AppColors.cardBackground.opacity(0.6))
-                
-                // Segmented Tab Picker
-                Picker("Section", selection: $selectedTab) {
-                    ForEach(PropLedgerTab.allCases) { tab in
-                        Text(tab.rawValue).tag(tab)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .padding(.horizontal)
                 .padding(.vertical, 6)
+            }
+            .background(AppColors.secondaryBackground.opacity(0.4))
+            
+            // Sub-Toolbar: Currency Pill & Archived Toggle
+            HStack {
+                Menu {
+                    ForEach(availableCurrencies, id: \.self) { c in
+                        Button(c) {
+                            #if canImport(UIKit)
+                            UISelectionFeedbackGenerator().selectionChanged()
+                            #endif
+                            selectedCurrency = c
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "dollarsign.circle")
+                            .font(.system(size: 11))
+                            .foregroundColor(AppColors.brand)
+                        Text(selectedCurrency)
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(AppColors.primaryText)
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundColor(AppColors.secondaryText)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(AppColors.cardBackground)
+                    .clipShape(Capsule())
+                    .overlay(Capsule().stroke(AppColors.border.opacity(0.6), lineWidth: 0.5))
+                }
                 
-                // Content Switcher
+                Spacer()
+                
+                if selectedTab == .accounts {
+                    Button {
+                        #if canImport(UIKit)
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        #endif
+                        showArchivedAccounts.toggle()
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: showArchivedAccounts ? "archivebox.fill" : "archivebox")
+                                .font(.system(size: 11))
+                            Text("Archived")
+                                .font(.system(size: 12, weight: showArchivedAccounts ? .semibold : .medium))
+                        }
+                        .foregroundColor(showArchivedAccounts ? AppColors.brand : AppColors.secondaryText)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(showArchivedAccounts ? AppColors.brand.opacity(0.12) : AppColors.cardBackground)
+                        .clipShape(Capsule())
+                        .overlay(Capsule().stroke(showArchivedAccounts ? AppColors.brand.opacity(0.4) : AppColors.border.opacity(0.6), lineWidth: 0.5))
+                    }
+                    .buttonStyle(ApplePressableButtonStyle())
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.top, 6)
+            .padding(.bottom, 2)
+            
+            // Content Switcher
                 ScrollView {
                     VStack(spacing: 16) {
                         switch selectedTab {
@@ -157,47 +216,71 @@ public struct PropFirmLedgerView: View {
             }
             .background(AppColors.background)
         .sheet(isPresented: $showNewAccountSheet) {
-                NewPropAccountSheet(defaultCurrency: selectedCurrency) { newAcc in
-                    dataStore.savePropAccount(item: newAcc, reason: "Create new account")
-                }
+            NewPropAccountSheet(defaultCurrency: selectedCurrency) { newAcc in
+                dataStore.savePropAccount(item: newAcc, reason: "Create new account")
             }
-            .sheet(item: $selectedAccountForNextPhase) { parentAcc in
-                NewPropAccountSheet(
-                    defaultCurrency: parentAcc.currency,
-                    initialFirm: parentAcc.firm,
-                    initialProgram: parentAcc.program == .evaluation ? .verification : .funded,
-                    initialSizeText: "\(parentAcc.sizeMinor.map { $0 / 100 } ?? 50000)",
-                    parentId: parentAcc.id
-                ) { nextAcc in
-                    dataStore.savePropAccount(item: nextAcc, reason: "Next stage / phase")
-                }
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+            .presentationCornerRadius(28)
+        }
+        .sheet(item: $selectedAccountForNextPhase) { parentAcc in
+            NewPropAccountSheet(
+                defaultCurrency: parentAcc.currency,
+                initialFirm: parentAcc.firm,
+                initialProgram: parentAcc.program == .evaluation ? .verification : .funded,
+                initialSizeText: "\(parentAcc.sizeMinor.map { $0 / 100 } ?? 50000)",
+                parentId: parentAcc.id
+            ) { nextAcc in
+                dataStore.savePropAccount(item: nextAcc, reason: "Next stage / phase")
             }
-            .sheet(item: $selectedAccountForEdit) { acc in
-                EditPropAccountSheet(account: acc) { updatedAcc in
-                    dataStore.savePropAccount(item: updatedAcc, reason: "Update account details")
-                }
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+            .presentationCornerRadius(28)
+        }
+        .sheet(item: $selectedAccountForEdit) { acc in
+            EditPropAccountSheet(account: acc) { updatedAcc in
+                dataStore.savePropAccount(item: updatedAcc, reason: "Update account details")
             }
-            .sheet(isPresented: $showAuditSheet) {
-                PropAuditTrailSheet(audits: dataStore.propAudits)
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+            .presentationCornerRadius(28)
+        }
+        .sheet(isPresented: $showAuditSheet) {
+            PropAuditTrailSheet(audits: dataStore.propAudits)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(28)
+        }
+        .sheet(isPresented: $showNewEntrySheet) {
+            NewPropEntrySheet(accounts: filteredAccounts, defaultCurrency: selectedCurrency) { newEntry in
+                dataStore.savePropEntry(item: newEntry, reason: "Record transaction")
             }
-            .sheet(isPresented: $showNewEntrySheet) {
-                NewPropEntrySheet(accounts: filteredAccounts, defaultCurrency: selectedCurrency) { newEntry in
-                    dataStore.savePropEntry(item: newEntry, reason: "Record transaction")
-                }
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+            .presentationCornerRadius(28)
+        }
+        .sheet(item: $selectedPayoutForReceipt) { payout in
+            AddReceiptSheet(payout: payout) { receipt in
+                try? dataStore.addPropReceipt(item: receipt, reason: "Payout receipt settlement")
             }
-            .sheet(item: $selectedPayoutForReceipt) { payout in
-                AddReceiptSheet(payout: payout) { receipt in
-                    try? dataStore.addPropReceipt(item: receipt, reason: "Payout receipt settlement")
-                }
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+            .presentationCornerRadius(28)
+        }
+        .sheet(item: $selectedExpenseForRefund) { expense in
+            AddRefundSheet(expense: expense) { refundEntry in
+                dataStore.savePropEntry(item: refundEntry, reason: "Evaluation fee refund")
             }
-            .sheet(item: $selectedExpenseForRefund) { expense in
-                AddRefundSheet(expense: expense) { refundEntry in
-                    dataStore.savePropEntry(item: refundEntry, reason: "Evaluation fee refund")
-                }
-            }
-            .sheet(isPresented: $showCsvSheet) {
-                PropCsvImportSheet()
-            }
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+            .presentationCornerRadius(28)
+        }
+        .sheet(isPresented: $showCsvSheet) {
+            PropCsvImportSheet()
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(28)
+        }
             .alert("Void transaction", isPresented: $showVoidAlert) {
                 TextField("Void reason (required)...", text: $voidReason)
                 Button("Cancel", role: .cancel) { itemToVoid = nil; voidReason = "" }
@@ -226,10 +309,10 @@ public struct PropFirmLedgerView: View {
             if !upcomingRenewals.isEmpty {
                 VStack(spacing: 8) {
                     ForEach(upcomingRenewals) { rAcc in
-                        AppCard {
+                        cardContainer {
                             HStack(spacing: 12) {
                                 Image(systemName: "bell.badge.fill")
-                                    .foregroundColor(AppColors.accent)
+                                    .foregroundColor(AppColors.brand)
                                     .font(.title3)
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text("Upcoming renewal: \(rAcc.firm)")
@@ -237,6 +320,7 @@ public struct PropFirmLedgerView: View {
                                         .foregroundColor(AppColors.primaryText)
                                     Text("\(rAcc.name) • Due: \(rAcc.renewalOn ?? "") • Fee: \(Formatters.formatCurrency(Decimal(rAcc.renewalMinor ?? 0) / 100, currency: rAcc.currency))")
                                         .font(.system(size: 11))
+                                        .monospacedDigit()
                                         .foregroundColor(AppColors.secondaryText)
                                 }
                                 Spacer()
@@ -246,19 +330,23 @@ public struct PropFirmLedgerView: View {
                 }
             }
             
-            // Summary Card
-            AppCard {
+            // Summary Hero Card
+            cardContainer {
                 VStack(spacing: 12) {
                     HStack {
-                        Text("NET PROP CASH (\(selectedCurrency))")
-                            .font(AppTypography.caption)
-                            .foregroundColor(AppColors.secondaryText)
+                        Text("Net Prop Cash")
+                            .font(AppTypography.cardTitle)
+                            .foregroundColor(AppColors.primaryText)
                         Spacer()
                         if let roi = summary.roi {
-                            AppBadge(
-                                text: String(format: "ROI: %+.1f%%", roi * 100),
-                                color: roi >= 0 ? AppColors.profit : AppColors.loss
-                            )
+                            Text(String(format: "ROI %+.1f%%", roi * 100))
+                                .font(AppTypography.captionBold)
+                                .monospacedDigit()
+                                .foregroundColor(roi >= 0 ? AppColors.profit : AppColors.loss)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(roi >= 0 ? AppColors.profit.opacity(0.12) : AppColors.loss.opacity(0.12))
+                                .clipShape(Capsule())
                         }
                     }
                     
@@ -266,49 +354,38 @@ public struct PropFirmLedgerView: View {
                         let netDecimal = Decimal(summary.netMinor) / 100
                         Text(Formatters.formatPnL(netDecimal, currency: selectedCurrency))
                             .font(AppTypography.financialNumber(size: 32, weight: .bold))
+                            .monospacedDigit()
                             .foregroundColor(Formatters.pnlColor(netDecimal))
                         Spacer()
                     }
                     
-                    Divider().background(AppColors.border)
+                    Divider().background(AppColors.border.opacity(0.5))
                     
-                    // Spending vs Received
-                    Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 8) {
+                    // Spending vs Received Grid
+                    Grid(alignment: .leading, horizontalSpacing: 20, verticalSpacing: 12) {
                         GridRow {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Gross spent")
-                                    .font(AppTypography.caption)
-                                    .foregroundColor(AppColors.secondaryText)
-                                Text(Formatters.formatCurrency(Decimal(summary.spentMinor) / 100, currency: selectedCurrency))
-                                    .font(AppTypography.captionBold)
-                                    .foregroundColor(AppColors.loss)
-                            }
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Refunded")
-                                    .font(AppTypography.caption)
-                                    .foregroundColor(AppColors.secondaryText)
-                                Text(Formatters.formatCurrency(Decimal(summary.refundsMinor) / 100, currency: selectedCurrency))
-                                    .font(AppTypography.captionBold)
-                                    .foregroundColor(AppColors.profit)
-                            }
+                            subMetricBlock(
+                                title: "Gross spent",
+                                value: Formatters.formatCurrency(Decimal(summary.spentMinor) / 100, currency: selectedCurrency),
+                                color: AppColors.loss
+                            )
+                            subMetricBlock(
+                                title: "Refunded",
+                                value: Formatters.formatCurrency(Decimal(summary.refundsMinor) / 100, currency: selectedCurrency),
+                                color: AppColors.profit
+                            )
                         }
                         GridRow {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Net spend")
-                                    .font(AppTypography.caption)
-                                    .foregroundColor(AppColors.secondaryText)
-                                Text(Formatters.formatCurrency(Decimal(summary.netSpendMinor) / 100, currency: selectedCurrency))
-                                    .font(AppTypography.subheadlineBold)
-                                    .foregroundColor(AppColors.primaryText)
-                            }
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Payouts received")
-                                    .font(AppTypography.caption)
-                                    .foregroundColor(AppColors.secondaryText)
-                                Text(Formatters.formatCurrency(Decimal(summary.receivedMinor) / 100, currency: selectedCurrency))
-                                    .font(AppTypography.subheadlineBold)
-                                    .foregroundColor(AppColors.profit)
-                            }
+                            subMetricBlock(
+                                title: "Net spend",
+                                value: Formatters.formatCurrency(Decimal(summary.netSpendMinor) / 100, currency: selectedCurrency),
+                                color: AppColors.primaryText
+                            )
+                            subMetricBlock(
+                                title: "Payouts received",
+                                value: Formatters.formatCurrency(Decimal(summary.receivedMinor) / 100, currency: selectedCurrency),
+                                color: AppColors.profit
+                            )
                         }
                     }
                 }
@@ -316,7 +393,7 @@ public struct PropFirmLedgerView: View {
             
             // Pass Rate & Account Outcomes Card
             if let pr = passRate {
-                AppCard {
+                cardContainer {
                     HStack {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Phase pass rate")
@@ -324,23 +401,27 @@ public struct PropFirmLedgerView: View {
                                 .foregroundColor(AppColors.secondaryText)
                             Text(String(format: "%.1f%%", pr * 100))
                                 .font(AppTypography.headline)
-                                .foregroundColor(pr >= 0.5 ? AppColors.profit : AppColors.accent)
+                                .monospacedDigit()
+                                .foregroundColor(pr >= 0.5 ? AppColors.profit : AppColors.brand)
                         }
                         Spacer()
                         Image(systemName: "trophy.fill")
-                            .font(.system(size: 28))
-                            .foregroundColor(AppColors.accent)
+                            .font(.system(size: 24))
+                            .foregroundColor(AppColors.brand)
+                            .frame(width: 44, height: 44)
+                            .background(AppColors.brand.opacity(0.12))
+                            .clipShape(Circle())
                     }
                 }
             }
             
             // Cumulative Net Cash Chart
             if !timelinePoints.isEmpty {
-                AppCard {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("CUMULATIVE CASH TIMELINE")
-                            .font(AppTypography.caption)
-                            .foregroundColor(AppColors.secondaryText)
+                cardContainer {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Cumulative cash timeline")
+                            .font(AppTypography.cardTitle)
+                            .foregroundColor(AppColors.primaryText)
                         
                         Chart {
                             RuleMark(y: .value("Zero", 0))
@@ -404,6 +485,33 @@ public struct PropFirmLedgerView: View {
         }
     }
     
+    // MARK: - Apple HIG Helper Views
+    
+    private func cardContainer<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        content()
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(AppColors.cardBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(AppColors.border.opacity(0.5), lineWidth: 0.5)
+            )
+            .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 2)
+    }
+    
+    private func subMetricBlock(title: String, value: String, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title)
+                .font(AppTypography.caption)
+                .foregroundColor(AppColors.secondaryText)
+            Text(value)
+                .font(AppTypography.bodyBold)
+                .monospacedDigit()
+                .foregroundColor(color)
+        }
+    }
+    
     // MARK: - 2. Accounts Tab
     
     private var accountsListView: some View {
@@ -416,18 +524,30 @@ public struct PropFirmLedgerView: View {
                 )
             } else {
                 ForEach(filteredAccounts) { acc in
-                    AppCard {
-                        VStack(alignment: .leading, spacing: 8) {
+                    cardContainer {
+                        VStack(alignment: .leading, spacing: 10) {
                             HStack {
-                                Text(acc.firm)
-                                    .font(AppTypography.captionBold)
-                                    .foregroundColor(AppColors.accent)
-                                if acc.archived {
-                                    Text("[Archived]")
-                                        .font(.system(size: 10))
-                                        .foregroundColor(AppColors.secondaryText)
+                                HStack(spacing: 6) {
+                                    Image(systemName: "building.columns")
+                                        .font(.system(size: 13))
+                                        .foregroundColor(AppColors.brand)
+                                    Text(acc.firm)
+                                        .font(AppTypography.captionBold)
+                                        .foregroundColor(AppColors.primaryText)
                                 }
+                                
+                                if acc.archived {
+                                    Text("Archived")
+                                        .font(.system(size: 10, weight: .semibold))
+                                        .foregroundColor(AppColors.secondaryText)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2)
+                                        .background(AppColors.secondaryBackground)
+                                        .clipShape(Capsule())
+                                }
+                                
                                 Spacer()
+                                
                                 AppBadge(
                                     text: acc.status.label,
                                     color: acc.status == .active || acc.status == .passed ? AppColors.profit : AppColors.loss
@@ -435,17 +555,17 @@ public struct PropFirmLedgerView: View {
                             }
                             
                             Text(acc.name)
-                                .font(AppTypography.subheadlineBold)
+                                .font(AppTypography.headline)
                                 .foregroundColor(AppColors.primaryText)
                             
                             if let parentId = acc.parentId, let parentAcc = dataStore.propAccounts.first(where: { $0.id == parentId }) {
                                 HStack(spacing: 4) {
                                     Image(systemName: "arrow.turn.down.right")
                                         .font(.system(size: 10))
-                                        .foregroundColor(AppColors.accent)
+                                        .foregroundColor(AppColors.brand)
                                     Text("Next phase of: \(parentAcc.name)")
-                                        .font(.system(size: 10, weight: .medium))
-                                        .foregroundColor(AppColors.accent)
+                                        .font(.system(size: 11, weight: .medium))
+                                        .foregroundColor(AppColors.brand)
                                 }
                             }
                             
@@ -453,6 +573,7 @@ public struct PropFirmLedgerView: View {
                                 if let size = acc.sizeMinor {
                                     Text("Size: \(Formatters.formatCurrency(Decimal(size) / 100, currency: acc.currency))")
                                         .font(AppTypography.caption)
+                                        .monospacedDigit()
                                         .foregroundColor(AppColors.secondaryText)
                                 }
                                 Spacer()
@@ -461,7 +582,7 @@ public struct PropFirmLedgerView: View {
                                     .foregroundColor(AppColors.secondaryText)
                             }
                             
-                            Divider().background(AppColors.border)
+                            Divider().background(AppColors.border.opacity(0.5))
                             
                             HStack(spacing: 12) {
                                 Text("Opened: \(acc.openedOn)")
@@ -476,29 +597,44 @@ public struct PropFirmLedgerView: View {
                                 
                                 if acc.status == .passed || acc.status == .breached || acc.status == .closed {
                                     Button {
+                                        #if canImport(UIKit)
+                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                        #endif
                                         selectedAccountForNextPhase = acc
                                     } label: {
-                                        Text("Next phase")
-                                            .font(.system(size: 11, weight: .semibold))
-                                            .foregroundColor(AppColors.accent)
+                                        HStack(spacing: 4) {
+                                            Image(systemName: "arrow.right.circle")
+                                            Text("Next phase")
+                                        }
+                                        .font(.system(size: 11, weight: .semibold))
+                                        .foregroundColor(AppColors.brand)
                                     }
+                                    .buttonStyle(ApplePressableButtonStyle())
                                 }
                                 
                                 Button {
+                                    #if canImport(UIKit)
+                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                    #endif
                                     selectedAccountForEdit = acc
                                 } label: {
                                     Text("Edit")
                                         .font(.system(size: 11, weight: .semibold))
-                                        .foregroundColor(AppColors.accent)
+                                        .foregroundColor(AppColors.brand)
                                 }
+                                .buttonStyle(ApplePressableButtonStyle())
                                 
                                 Button {
+                                    #if canImport(UIKit)
+                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                    #endif
                                     dataStore.archivePropAccount(id: acc.id, archived: !acc.archived, reason: "User toggle archive")
                                 } label: {
                                     Text(acc.archived ? "Restore" : "Archive")
                                         .font(.system(size: 11, weight: .semibold))
                                         .foregroundColor(AppColors.secondaryText)
                                 }
+                                .buttonStyle(ApplePressableButtonStyle())
                             }
                         }
                     }
@@ -519,11 +655,17 @@ public struct PropFirmLedgerView: View {
                 )
             } else {
                 ForEach(payoutItems) { p in
-                    AppCard {
-                        VStack(alignment: .leading, spacing: 8) {
+                    cardContainer {
+                        VStack(alignment: .leading, spacing: 10) {
                             HStack {
-                                Text("\(p.entry.firm) Payout")
-                                    .font(AppTypography.subheadlineBold)
+                                HStack(spacing: 6) {
+                                    Image(systemName: "banknote")
+                                        .font(.system(size: 13))
+                                        .foregroundColor(AppColors.brand)
+                                    Text("\(p.entry.firm) Payout")
+                                        .font(AppTypography.subheadlineBold)
+                                        .foregroundColor(AppColors.primaryText)
+                                }
                                 Spacer()
                                 if p.isOverdue {
                                     AppBadge(text: "Overdue", color: AppColors.loss)
@@ -532,7 +674,7 @@ public struct PropFirmLedgerView: View {
                                 }
                                 AppBadge(
                                     text: p.entry.status.label,
-                                    color: p.entry.status == .completed ? AppColors.profit : AppColors.accent
+                                    color: p.entry.status == .completed ? AppColors.profit : AppColors.brand
                                 )
                             }
                             
@@ -543,6 +685,8 @@ public struct PropFirmLedgerView: View {
                                         .foregroundColor(AppColors.secondaryText)
                                     Text(Formatters.formatCurrency(Decimal(p.expectedMinor) / 100, currency: p.entry.currency))
                                         .font(AppTypography.captionBold)
+                                        .monospacedDigit()
+                                        .foregroundColor(AppColors.primaryText)
                                 }
                                 Spacer()
                                 VStack(alignment: .trailing, spacing: 2) {
@@ -551,6 +695,7 @@ public struct PropFirmLedgerView: View {
                                         .foregroundColor(AppColors.secondaryText)
                                     Text(Formatters.formatCurrency(Decimal(p.actualMinor) / 100, currency: p.entry.currency))
                                         .font(AppTypography.captionBold)
+                                        .monospacedDigit()
                                         .foregroundColor(AppColors.profit)
                                 }
                             }
@@ -563,6 +708,7 @@ public struct PropFirmLedgerView: View {
                                     Spacer()
                                     Text(Formatters.formatCurrency(Decimal(p.remainingMinor) / 100, currency: p.entry.currency))
                                         .font(AppTypography.captionBold)
+                                        .monospacedDigit()
                                         .foregroundColor(AppColors.loss)
                                 }
                             }
@@ -575,11 +721,12 @@ public struct PropFirmLedgerView: View {
                                     Spacer()
                                     Text(Formatters.formatCurrency(Decimal(p.varianceMinor) / 100, currency: p.entry.currency))
                                         .font(AppTypography.captionBold)
+                                        .monospacedDigit()
                                         .foregroundColor(p.varianceMinor >= 0 ? AppColors.profit : AppColors.loss)
                                 }
                             }
                             
-                            Divider().background(AppColors.border)
+                            Divider().background(AppColors.border.opacity(0.5))
                             
                             HStack {
                                 Text("Requested: \(p.entry.occurredOn)")
@@ -587,6 +734,9 @@ public struct PropFirmLedgerView: View {
                                     .foregroundColor(AppColors.secondaryText)
                                 Spacer()
                                 Button {
+                                    #if canImport(UIKit)
+                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                    #endif
                                     selectedPayoutForReceipt = p.entry
                                 } label: {
                                     HStack(spacing: 4) {
@@ -594,8 +744,9 @@ public struct PropFirmLedgerView: View {
                                         Text("Record receipt")
                                     }
                                     .font(.system(size: 12, weight: .semibold))
-                                    .foregroundColor(AppColors.accent)
+                                    .foregroundColor(AppColors.brand)
                                 }
+                                .buttonStyle(ApplePressableButtonStyle())
                             }
                         }
                     }
@@ -616,12 +767,13 @@ public struct PropFirmLedgerView: View {
                 )
             } else {
                 ForEach(movements) { m in
-                    AppCard {
+                    cardContainer {
                         HStack {
-                            VStack(alignment: .leading, spacing: 2) {
+                            VStack(alignment: .leading, spacing: 4) {
                                 HStack(spacing: 6) {
                                     Text(m.firm)
                                         .font(AppTypography.subheadlineBold)
+                                        .foregroundColor(AppColors.primaryText)
                                     AppBadge(
                                         text: m.category.capitalized,
                                         color: m.kind == "payout" || m.kind == "receipt" ? AppColors.profit : AppColors.secondaryText
@@ -632,41 +784,50 @@ public struct PropFirmLedgerView: View {
                                     .foregroundColor(AppColors.secondaryText)
                                 if !m.reference.isEmpty {
                                     Text("Ref: \(m.reference)")
-                                        .font(.system(size: 10))
+                                        .font(.system(size: 10, design: .monospaced))
                                         .foregroundColor(AppColors.secondaryText.opacity(0.8))
                                 }
                             }
                             
                             Spacer()
                             
-                            VStack(alignment: .trailing, spacing: 4) {
+                            VStack(alignment: .trailing, spacing: 6) {
                                 let isIncoming = m.kind == "receipt" || m.kind == "refund"
                                 let amountDecimal = Decimal(m.amountMinor) / 100
                                 Text("\(isIncoming ? "+" : "-")\(Formatters.formatCurrency(amountDecimal, currency: m.currency))")
                                     .font(AppTypography.subheadlineBold)
+                                    .monospacedDigit()
                                     .foregroundColor(isIncoming ? AppColors.profit : AppColors.loss)
                                 
-                                HStack(spacing: 8) {
+                                HStack(spacing: 12) {
                                     if m.kind == "expense" {
                                         Button {
+                                            #if canImport(UIKit)
+                                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                            #endif
                                             if let entry = dataStore.propEntries.first(where: { $0.id == m.entryId }) {
                                                 selectedExpenseForRefund = entry
                                             }
                                         } label: {
                                             Text("Refund")
-                                                .font(.system(size: 10, weight: .semibold))
-                                                .foregroundColor(AppColors.accent)
+                                                .font(.system(size: 11, weight: .semibold))
+                                                .foregroundColor(AppColors.brand)
                                         }
+                                        .buttonStyle(ApplePressableButtonStyle())
                                     }
                                     
                                     Button {
+                                        #if canImport(UIKit)
+                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                        #endif
                                         itemToVoid = (id: m.entryId, isEntry: true)
                                         showVoidAlert = true
                                     } label: {
                                         Image(systemName: "trash")
-                                            .font(.system(size: 10))
+                                            .font(.system(size: 12))
                                             .foregroundColor(AppColors.loss.opacity(0.8))
                                     }
+                                    .buttonStyle(ApplePressableButtonStyle())
                                 }
                             }
                         }
@@ -678,19 +839,25 @@ public struct PropFirmLedgerView: View {
     
     // MARK: - Activity / Audit Trail View
     private var activityAuditView: some View {
-        AppCard {
+        cardContainer {
             VStack(alignment: .leading, spacing: 14) {
                 HStack {
-                    Text("Activity & Audit Trail")
-                        .font(AppTypography.headline)
-                        .foregroundColor(AppColors.primaryText)
+                    HStack(spacing: 6) {
+                        Image(systemName: "clock.arrow.circlepath")
+                            .font(.system(size: 14))
+                            .foregroundColor(AppColors.brand)
+                        Text("Activity & Audit Trail")
+                            .font(AppTypography.headline)
+                            .foregroundColor(AppColors.primaryText)
+                    }
                     Spacer()
                     Text("\(dataStore.propAudits.count) events")
                         .font(AppTypography.caption)
+                        .monospacedDigit()
                         .foregroundColor(AppColors.secondaryText)
                 }
                 
-                Divider()
+                Divider().background(AppColors.border.opacity(0.5))
                 
                 if dataStore.propAudits.isEmpty {
                     Text("No audit events recorded yet.")
@@ -701,19 +868,24 @@ public struct PropFirmLedgerView: View {
                     VStack(spacing: 12) {
                         ForEach(dataStore.propAudits.reversed()) { a in
                             HStack(alignment: .top, spacing: 12) {
-                                Image(systemName: "clock.arrow.circlepath")
-                                    .font(.system(size: 14))
-                                    .foregroundColor(AppColors.accent)
-                                    .padding(.top, 2)
+                                Image(systemName: "circle.fill")
+                                    .font(.system(size: 6))
+                                    .foregroundColor(AppColors.brand)
+                                    .padding(.top, 5)
                                 
                                 VStack(alignment: .leading, spacing: 4) {
                                     HStack {
                                         Text(a.entityType.uppercased())
-                                            .font(.system(size: 11, weight: .bold))
-                                            .foregroundColor(AppColors.accent)
+                                            .font(.system(size: 10, weight: .bold))
+                                            .foregroundColor(AppColors.brand)
+                                            .padding(.horizontal, 6)
+                                            .padding(.vertical, 2)
+                                            .background(AppColors.brand.opacity(0.12))
+                                            .clipShape(Capsule())
                                         Spacer()
                                         Text(a.createdAt.prefix(19))
                                             .font(.system(size: 10))
+                                            .monospacedDigit()
                                             .foregroundColor(AppColors.secondaryText)
                                     }
                                     
@@ -728,7 +900,7 @@ public struct PropFirmLedgerView: View {
                             }
                             
                             if a.id != dataStore.propAudits.first?.id {
-                                Divider()
+                                Divider().background(AppColors.border.opacity(0.3))
                             }
                         }
                     }

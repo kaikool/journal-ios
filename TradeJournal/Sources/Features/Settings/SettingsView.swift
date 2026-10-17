@@ -64,6 +64,7 @@ public struct SettingsView: View {
     @ObservedObject private var dataStore = TradeDataStore.shared
     
     @State private var activeSection: SettingsSection = .general
+    @Namespace private var settingsSectionNamespace
     
     public init() {}
     
@@ -74,13 +75,12 @@ public struct SettingsView: View {
                 showFilters: false
             )
             
-            // Section Selector Tabs (Pills)
+            // Section Selector Tabs (Apple HIG Sliding Bar)
             sectionSelectorBar
                 .padding(.vertical, 8)
                 .background(AppColors.cardBackground)
             
-            Divider()
-                .overlay(AppColors.border)
+            Divider().background(AppColors.border.opacity(0.5))
             
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
@@ -98,7 +98,7 @@ public struct SettingsView: View {
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText)
                     }
-                    .padding(.horizontal, 14)
+                    .padding(.horizontal, 16)
                     .padding(.top, 10)
                     
                     // Active Section Content (Preserving State)
@@ -120,7 +120,7 @@ public struct SettingsView: View {
                             YourDataSettingsView()
                         }
                     }
-                    .padding(.horizontal, 14)
+                    .padding(.horizontal, 16)
                     .padding(.bottom, 32)
                 }
             }
@@ -130,38 +130,44 @@ public struct SettingsView: View {
     
     private var sectionSelectorBar: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
+            HStack(spacing: 6) {
                 ForEach(SettingsSection.allCases) { section in
+                    let isSelected = activeSection == section
                     Button {
                         if activeSection != section {
-                            #if os(iOS)
-                            UISelectionFeedbackGenerator().selectionChanged()
+                            #if canImport(UIKit)
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
                             #endif
-                            withAnimation(.spring(response: 0.28, dampingFraction: 0.72)) {
+                            withAnimation(.spring(response: 0.28, dampingFraction: 0.76)) {
                                 activeSection = section
                             }
                         }
                     } label: {
                         HStack(spacing: 6) {
                             Image(systemName: section.iconName)
+                                .font(.system(size: 11))
                             Text(section.label)
+                                .font(AppTypography.captionBold)
                         }
-                        .font(.system(size: 13, weight: activeSection == section ? .bold : .medium, design: .rounded))
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .background(activeSection == section ? AppColors.brand : AppColors.cardBackground)
-                        .foregroundColor(activeSection == section ? AppColors.brandTextOnDark : AppColors.primaryText)
-                        .clipShape(Capsule())
-                        .overlay(
-                            Capsule()
-                                .stroke(activeSection == section ? Color.clear : AppColors.border.opacity(0.6), lineWidth: 0.8)
-                        )
-                        .shadow(color: activeSection == section ? AppColors.brand.opacity(0.25) : Color.clear, radius: 4, x: 0, y: 2)
+                        .foregroundColor(isSelected ? AppColors.brand : AppColors.secondaryText)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 7)
+                        .background {
+                            if isSelected {
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .fill(AppColors.cardBackground)
+                                    .shadow(color: Color.black.opacity(0.08), radius: 4, x: 0, y: 1.5)
+                                    .matchedGeometryEffect(id: "SettingsSectionPill", in: settingsSectionNamespace)
+                            }
+                        }
                     }
                     .buttonStyle(ApplePressableButtonStyle())
                 }
             }
-            .padding(.horizontal)
+            .padding(4)
+            .background(AppColors.secondaryBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .padding(.horizontal, 16)
         }
     }
 }
@@ -315,12 +321,12 @@ public struct TradingSettingsView: View {
                     TextEditor(text: $multipliersText)
                         .font(.system(size: 13, design: .monospaced))
                         .frame(minHeight: 90)
-                        .padding(6)
+                        .padding(8)
                         .background(AppColors.secondaryBackground)
-                        .cornerRadius(8)
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(AppColors.border, lineWidth: 1)
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .stroke(AppColors.border.opacity(0.5), lineWidth: 0.5)
                         )
                     
                     Text("Use the exact symbol shown on your imported trades, including the contract month when present.")

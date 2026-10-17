@@ -25,6 +25,7 @@ public struct AccountsManagerView: View {
     @State private var accountToDelete: Account? = nil
     @State private var showDeleteAlert: Bool = false
     @State private var syncingAccountId: String? = nil
+    @Namespace private var accountsFilterNamespace
     
     public init() {}
     
@@ -72,6 +73,20 @@ public struct AccountsManagerView: View {
         }
     }
     
+    // MARK: - Apple HIG Card Container
+    private func cardContainer<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        content()
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(AppColors.cardBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(AppColors.border.opacity(0.5), lineWidth: 0.5)
+            )
+            .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 2)
+    }
+    
     public var body: some View {
         VStack(spacing: 0) {
             FilterBarView(
@@ -84,11 +99,11 @@ public struct AccountsManagerView: View {
             }
             
             ScrollView {
-                VStack(spacing: 12) {
-                    // Filter & Search Controls matching accounts/page.tsx line 182-228
+                VStack(spacing: 14) {
+                    // Filter & Search Controls
                     filterAndSearchHeader
                     
-                    // Bulk Visibility Actions matching accounts/page.tsx line 229-250
+                    // Bulk Visibility Actions
                     bulkVisibilityBar
                     
                     // Account Cards List
@@ -100,9 +115,10 @@ public struct AccountsManagerView: View {
                                 accountCard(acc)
                             }
                         }
-                        .padding(.horizontal, 14)
+                        .padding(.horizontal, 16)
                     }
                 }
+                .padding(.bottom, 24)
             }
             .background(AppColors.background)
         }
@@ -126,66 +142,87 @@ public struct AccountsManagerView: View {
     
     private var filterAndSearchHeader: some View {
         VStack(spacing: 10) {
-            // Filter Pills
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    filterButton(title: "Default (\(defaultCount))", tab: .default)
-                    filterButton(title: "Active (\(activeCount))", tab: .active)
-                    filterButton(title: "Displayed (\(visibleCount))", tab: .visible)
-                    filterButton(title: "All (\(accounts.count))", tab: .all)
+            // Apple HIG Sliding Filter Bar
+            HStack(spacing: 4) {
+                ForEach(AccountFilterTab.allCases) { tab in
+                    let isSelected = filterTab == tab
+                    let count: Int = {
+                        switch tab {
+                        case .default: return defaultCount
+                        case .active: return activeCount
+                        case .visible: return visibleCount
+                        case .all: return accounts.count
+                        }
+                    }()
+                    
+                    Button {
+                        #if canImport(UIKit)
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        #endif
+                        withAnimation(.spring(response: 0.28, dampingFraction: 0.76)) {
+                            filterTab = tab
+                        }
+                    } label: {
+                        HStack(spacing: 5) {
+                            Text(tab.rawValue)
+                                .font(AppTypography.captionBold)
+                            Text("\(count)")
+                                .font(.system(size: 10, weight: .bold))
+                                .monospacedDigit()
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 1)
+                                .background(isSelected ? AppColors.brand.opacity(0.15) : AppColors.secondaryText.opacity(0.12))
+                                .clipShape(Capsule())
+                        }
+                        .foregroundColor(isSelected ? AppColors.brand : AppColors.secondaryText)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 7)
+                        .frame(maxWidth: .infinity)
+                        .background {
+                            if isSelected {
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .fill(AppColors.cardBackground)
+                                    .shadow(color: Color.black.opacity(0.08), radius: 4, x: 0, y: 1.5)
+                                    .matchedGeometryEffect(id: "AccountFilterPill", in: accountsFilterNamespace)
+                            }
+                        }
+                    }
+                    .buttonStyle(ApplePressableButtonStyle())
                 }
-                .padding(.horizontal, 16)
             }
+            .padding(4)
+            .background(AppColors.secondaryBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .padding(.horizontal, 16)
             
             // Search Input
-            HStack {
+            HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass")
                     .foregroundColor(AppColors.secondaryText)
+                    .font(.system(size: 13))
                 TextField("Search by name, broker, ID...", text: $searchText)
                     .font(AppTypography.body)
+                    .foregroundColor(AppColors.primaryText)
                 if !searchText.isEmpty {
                     Button {
                         searchText = ""
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundColor(AppColors.secondaryText)
+                            .font(.system(size: 13))
                     }
                 }
             }
             .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(AppColors.secondaryBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .padding(.vertical, 9)
+            .background(AppColors.cardBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(AppColors.border.opacity(0.5), lineWidth: 0.5)
             )
             .padding(.horizontal, 16)
         }
-    }
-    
-    @ViewBuilder
-    private func filterButton(title: String, tab: AccountFilterTab) -> some View {
-        Button {
-            if filterTab != tab {
-                #if os(iOS)
-                UISelectionFeedbackGenerator().selectionChanged()
-                #endif
-                withAnimation(.spring(response: 0.28, dampingFraction: 0.72)) {
-                    filterTab = tab
-                }
-            }
-        } label: {
-            Text(title)
-                .font(.system(size: 12, weight: filterTab == tab ? .bold : .medium, design: .rounded))
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(filterTab == tab ? AppColors.brand : AppColors.secondaryBackground)
-                .foregroundColor(filterTab == tab ? AppColors.brandTextOnDark : AppColors.primaryText)
-                .clipShape(Capsule())
-                .shadow(color: filterTab == tab ? AppColors.brand.opacity(0.25) : Color.clear, radius: 4, x: 0, y: 2)
-        }
-        .buttonStyle(ApplePressableButtonStyle())
     }
     
     private var bulkVisibilityBar: some View {
@@ -194,58 +231,61 @@ public struct AccountsManagerView: View {
                 .font(.system(size: 11))
                 .foregroundColor(AppColors.secondaryText)
             
-            Button("Active only") {
-                #if os(iOS)
+            Button {
+                #if canImport(UIKit)
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 #endif
                 dataStore.setBulkAccountVisibility(action: "select-active")
+            } label: {
+                Text("Active only")
+                    .font(.system(size: 11, weight: .semibold))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(AppColors.cardBackground)
+                    .foregroundColor(AppColors.primaryText)
+                    .clipShape(Capsule())
+                    .overlay(
+                        Capsule().stroke(AppColors.border.opacity(0.5), lineWidth: 0.5)
+                    )
             }
-            .font(.system(size: 11, weight: .medium))
-            .padding(.horizontal, 9)
-            .padding(.vertical, 5)
-            .background(AppColors.cardBackground)
-            .foregroundColor(AppColors.primaryText)
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
-            )
             .buttonStyle(ApplePressableButtonStyle())
             
-            Button("Show all") {
-                #if os(iOS)
+            Button {
+                #if canImport(UIKit)
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 #endif
                 dataStore.setBulkAccountVisibility(action: "select-all")
+            } label: {
+                Text("Show all")
+                    .font(.system(size: 11, weight: .semibold))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(AppColors.cardBackground)
+                    .foregroundColor(AppColors.primaryText)
+                    .clipShape(Capsule())
+                    .overlay(
+                        Capsule().stroke(AppColors.border.opacity(0.5), lineWidth: 0.5)
+                    )
             }
-            .font(.system(size: 11, weight: .medium))
-            .padding(.horizontal, 9)
-            .padding(.vertical, 5)
-            .background(AppColors.cardBackground)
-            .foregroundColor(AppColors.primaryText)
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
-            )
             .buttonStyle(ApplePressableButtonStyle())
             
-            Button("Hide all") {
-                #if os(iOS)
+            Button {
+                #if canImport(UIKit)
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 #endif
                 dataStore.setBulkAccountVisibility(action: "deselect-all")
+            } label: {
+                Text("Hide all")
+                    .font(.system(size: 11, weight: .semibold))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(AppColors.cardBackground)
+                    .foregroundColor(AppColors.secondaryText)
+                    .clipShape(Capsule())
+                    .overlay(
+                        Capsule().stroke(AppColors.border.opacity(0.5), lineWidth: 0.5)
+                    )
             }
-            .font(.system(size: 11, weight: .medium))
-            .padding(.horizontal, 9)
-            .padding(.vertical, 5)
-            .background(AppColors.cardBackground)
-            .foregroundColor(AppColors.secondaryText)
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
-            )
             .buttonStyle(ApplePressableButtonStyle())
             
             Spacer()
@@ -254,21 +294,24 @@ public struct AccountsManagerView: View {
     }
     
     private var emptyStateView: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "creditcard.and.123")
-                .font(.system(size: 40))
-                .foregroundColor(AppColors.secondaryText.opacity(0.6))
-            Text("No accounts found")
-                .font(AppTypography.headline)
-                .foregroundColor(AppColors.primaryText)
-            Text("Create a new account or connect your broker sync credentials in Settings.")
-                .font(AppTypography.caption)
-                .foregroundColor(AppColors.secondaryText)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 32)
+        cardContainer {
+            VStack(spacing: 12) {
+                Image(systemName: "creditcard.and.123")
+                    .font(.system(size: 40))
+                    .foregroundColor(AppColors.secondaryText.opacity(0.6))
+                Text("No accounts found")
+                    .font(AppTypography.headline)
+                    .foregroundColor(AppColors.primaryText)
+                Text("Create a new account or connect your broker sync credentials in Settings.")
+                    .font(AppTypography.caption)
+                    .foregroundColor(AppColors.secondaryText)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 32)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 40)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 60)
+        .padding(.horizontal, 16)
     }
     
     @ViewBuilder
@@ -278,30 +321,33 @@ public struct AccountsManagerView: View {
         let tradeCount = dataStore.trades.filter { $0.accountId == acc.id }.count
         let isVisible = acc.visibleInJournal ?? true
         
-        AppCard {
+        cardContainer {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(alignment: .top) {
                     // Journal visibility toggle button
                     Button {
+                        #if canImport(UIKit)
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        #endif
                         dataStore.toggleAccountVisibility(id: acc.id)
                     } label: {
-                        Image(systemName: isVisible ? "checkmark.square.fill" : "square")
+                        Image(systemName: isVisible ? "checkmark.circle.fill" : "circle")
                             .font(.system(size: 18))
                             .foregroundColor(isVisible ? AppColors.brand : AppColors.secondaryText)
                     }
                     .buttonStyle(.plain)
                     .padding(.top, 2)
                     
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: 3) {
                         HStack(spacing: 6) {
                             Text(acc.name)
                                 .font(AppTypography.headline)
                                 .foregroundColor(AppColors.primaryText)
                             
                             if isSelected {
-                                Image(systemName: "checkmark.circle.fill")
+                                Image(systemName: "checkmark.seal.fill")
                                     .foregroundColor(AppColors.profit)
-                                    .font(.system(size: 14))
+                                    .font(.system(size: 13))
                             }
                         }
                         
@@ -315,15 +361,15 @@ public struct AccountsManagerView: View {
                     // Primary active view button
                     if !isSelected {
                         Button {
-                            #if os(iOS)
+                            #if canImport(UIKit)
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
                             #endif
                             dataStore.selectAccount(id: acc.id)
                         } label: {
                             Text("Select")
                                 .font(.system(size: 11, weight: .semibold))
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 4)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 5)
                                 .background(AppColors.brand.opacity(0.12))
                                 .foregroundColor(AppColors.brand)
                                 .clipShape(Capsule())
@@ -332,8 +378,8 @@ public struct AccountsManagerView: View {
                     } else {
                         Text("Viewing")
                             .font(.system(size: 11, weight: .semibold))
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 4)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 5)
                             .background(AppColors.profit.opacity(0.15))
                             .foregroundColor(AppColors.profit)
                             .clipShape(Capsule())
@@ -360,32 +406,34 @@ public struct AccountsManagerView: View {
                     }
                 }
                 
-                Divider()
+                Divider().background(AppColors.border.opacity(0.5))
                 
                 // Balance and Trades Info
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Initial balance")
+                        Text("Initial Balance")
                             .font(.system(size: 10))
                             .foregroundColor(AppColors.secondaryText)
                         Text(Formatters.formatCurrency(acc.initialBalance, currency: acc.currency))
                             .font(AppTypography.bodyBold)
+                            .monospacedDigit()
                             .foregroundColor(AppColors.primaryText)
                     }
                     
                     Spacer()
                     
                     VStack(alignment: .trailing, spacing: 2) {
-                        Text("Total trades")
+                        Text("Total Trades")
                             .font(.system(size: 10))
                             .foregroundColor(AppColors.secondaryText)
                         Text("\(tradeCount) trades")
                             .font(AppTypography.bodyBold)
+                            .monospacedDigit()
                             .foregroundColor(AppColors.primaryText)
                     }
                 }
                 
-                Divider()
+                Divider().background(AppColors.border.opacity(0.5))
                 
                 // Action row
                 HStack(spacing: 12) {
@@ -394,22 +442,29 @@ public struct AccountsManagerView: View {
                         get: { acc.autoSync },
                         set: { _ in dataStore.toggleAccountAutoSync(id: acc.id) }
                     ))
-                    .font(.system(size: 11))
+                    .font(.system(size: 11, weight: .medium))
                     .tint(AppColors.brand)
                     
                     Spacer()
                     
                     // Archive / Restore
                     Button {
+                        #if canImport(UIKit)
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        #endif
                         dataStore.archiveAccount(id: acc.id, archived: !isArchived)
                     } label: {
                         Image(systemName: isArchived ? "tray.and.arrow.up" : "archivebox")
                             .font(.system(size: 14))
                             .foregroundColor(AppColors.secondaryText)
                     }
+                    .buttonStyle(ApplePressableButtonStyle())
                     
                     // Delete
                     Button {
+                        #if canImport(UIKit)
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        #endif
                         accountToDelete = acc
                         showDeleteAlert = true
                     } label: {
@@ -417,6 +472,7 @@ public struct AccountsManagerView: View {
                             .font(.system(size: 14))
                             .foregroundColor(AppColors.loss.opacity(0.8))
                     }
+                    .buttonStyle(ApplePressableButtonStyle())
                 }
             }
         }
@@ -427,11 +483,11 @@ public struct AccountsManagerView: View {
     private func badgeView(_ text: String, color: Color) -> some View {
         Text(text)
             .font(.system(size: 10, weight: .semibold))
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3)
             .background(color.opacity(0.12))
             .foregroundColor(color)
-            .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+            .clipShape(Capsule())
     }
 }
 
@@ -473,6 +529,7 @@ public struct CreateAccountSheet: View {
                     
                     TextField("Initial balance", text: $initialBalanceText)
                         .keyboardType(.decimalPad)
+                        .monospacedDigit()
                     
                     Picker("P&L Method", selection: $calcMethod) {
                         Text("FIFO (First In First Out)").tag(ProfitCalcMethod.fifo)

@@ -88,16 +88,25 @@ public struct AddTradeSheet: View {
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 6) {
                                 ForEach(commonSymbols, id: \.self) { sym in
-                                    Button(action: { symbol = sym }) {
+                                    Button {
+                                        #if canImport(UIKit)
+                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                        #endif
+                                        symbol = sym
+                                    } label: {
                                         Text(sym)
-                                            .font(AppTypography.caption)
-                                            .padding(.horizontal, 8)
-                                            .padding(.vertical, 4)
-                                            .background(symbol == sym ? AppColors.accent : AppColors.cardBackground)
+                                            .font(AppTypography.captionBold)
+                                            .padding(.horizontal, 10)
+                                            .padding(.vertical, 5)
+                                            .background(symbol == sym ? AppColors.brand : AppColors.cardBackground)
                                             .foregroundColor(symbol == sym ? .white : AppColors.primaryText)
-                                            .cornerRadius(6)
+                                            .clipShape(Capsule())
+                                            .overlay(
+                                                Capsule()
+                                                    .stroke(symbol == sym ? Color.clear : AppColors.border.opacity(0.5), lineWidth: 0.5)
+                                            )
                                     }
-                                    .buttonStyle(.plain)
+                                    .buttonStyle(ApplePressableButtonStyle())
                                 }
                             }
                         }
@@ -273,18 +282,25 @@ public struct AddTradeSheet: View {
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 6) {
                                 ForEach(commonMistakes, id: \.self) { m in
-                                    Button(action: {
+                                    Button {
+                                        #if canImport(UIKit)
+                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                        #endif
                                         if !mistakes.contains(m) { mistakes.append(m) }
-                                    }) {
+                                    } label: {
                                         Text(m)
-                                            .font(AppTypography.caption)
-                                            .padding(.horizontal, 8)
-                                            .padding(.vertical, 4)
-                                            .background(AppColors.cardBackground)
-                                            .foregroundColor(AppColors.secondaryText)
-                                            .cornerRadius(6)
+                                            .font(AppTypography.captionBold)
+                                            .padding(.horizontal, 10)
+                                            .padding(.vertical, 5)
+                                            .background(mistakes.contains(m) ? AppColors.loss.opacity(0.15) : AppColors.cardBackground)
+                                            .foregroundColor(mistakes.contains(m) ? AppColors.loss : AppColors.secondaryText)
+                                            .clipShape(Capsule())
+                                            .overlay(
+                                                Capsule()
+                                                    .stroke(mistakes.contains(m) ? AppColors.loss.opacity(0.4) : AppColors.border.opacity(0.5), lineWidth: 0.5)
+                                            )
                                     }
-                                    .buttonStyle(.plain)
+                                    .buttonStyle(ApplePressableButtonStyle())
                                 }
                             }
                         }

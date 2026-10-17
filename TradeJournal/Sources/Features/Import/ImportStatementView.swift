@@ -16,6 +16,20 @@ public struct ImportStatementView: View {
     
     public init() {}
     
+    // MARK: - Apple HIG Card Container
+    private func cardContainer<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        content()
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(AppColors.cardBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(AppColors.border.opacity(0.5), lineWidth: 0.5)
+            )
+            .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 2)
+    }
+    
     public var body: some View {
         VStack(spacing: 0) {
             FilterBarView(
@@ -26,11 +40,16 @@ public struct ImportStatementView: View {
             ScrollView {
                 VStack(spacing: 14) {
                     // Target Account Selector
-                    AppCard {
+                    cardContainer {
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("Target account")
-                                .font(AppTypography.caption)
-                                .foregroundColor(AppColors.secondaryText)
+                            HStack(spacing: 6) {
+                                Image(systemName: "creditcard")
+                                    .font(.system(size: 13))
+                                    .foregroundColor(AppColors.brand)
+                                Text("Target Account")
+                                    .font(AppTypography.captionBold)
+                                    .foregroundColor(AppColors.secondaryText)
+                            }
                             
                             Picker("Select account", selection: $dataStore.selectedAccountId) {
                                 ForEach(dataStore.accounts) { acc in
@@ -38,52 +57,86 @@ public struct ImportStatementView: View {
                                 }
                             }
                             .pickerStyle(.menu)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(AppColors.secondaryBackground)
+                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                         }
                     }
                     
-                    // Upload / Select Box
-                    AppCard {
-                        VStack(spacing: 16) {
-                            Image(systemName: "doc.badge.plus")
-                                .font(.system(size: 40))
-                                .foregroundColor(AppColors.brand)
+                    // Upload / Select Box (Apple HIG Drop Zone)
+                    cardContainer {
+                        VStack(spacing: 14) {
+                            ZStack {
+                                Circle()
+                                    .fill(AppColors.brand.opacity(0.12))
+                                    .frame(width: 64, height: 64)
+                                Image(systemName: "doc.badge.plus")
+                                    .font(.system(size: 28))
+                                    .foregroundColor(AppColors.brand)
+                            }
+                            .padding(.top, 4)
                             
                             if let fileName = importedFileName {
-                                Text("Selected file: \(fileName)")
-                                    .font(AppTypography.headline)
-                                    .foregroundColor(AppColors.primaryText)
+                                VStack(spacing: 4) {
+                                    Text("Selected File")
+                                        .font(AppTypography.caption)
+                                        .foregroundColor(AppColors.secondaryText)
+                                    Text(fileName)
+                                        .font(AppTypography.headline)
+                                        .foregroundColor(AppColors.primaryText)
+                                }
                             } else {
-                                Text("Choose trade statement file (.csv)")
-                                    .font(AppTypography.headline)
-                                Text("Supports standard columns: Symbol, Side (Buy/Sell), Quantity, Price, Fee, Executed Date")
-                                    .font(AppTypography.caption)
-                                    .foregroundColor(AppColors.secondaryText)
-                                    .multilineTextAlignment(.center)
-                            }
-                            
-                            HStack(spacing: 12) {
-                                AppButton("Choose CSV file", icon: "folder", style: .primary) {
-                                    isFileImporterPresented = true
+                                VStack(spacing: 4) {
+                                    Text("Choose trade statement (.csv)")
+                                        .font(AppTypography.headline)
+                                        .foregroundColor(AppColors.primaryText)
+                                    Text("Standard columns: Symbol, Side (Buy/Sell), Quantity, Price, Fee, Executed Date")
+                                        .font(AppTypography.caption)
+                                        .foregroundColor(AppColors.secondaryText)
+                                        .multilineTextAlignment(.center)
+                                        .padding(.horizontal, 8)
                                 }
                             }
+                            
+                            Button {
+                                #if canImport(UIKit)
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                #endif
+                                isFileImporterPresented = true
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "folder")
+                                    Text("Choose CSV File")
+                                }
+                                .font(AppTypography.captionBold)
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 18)
+                                .padding(.vertical, 10)
+                                .background(AppColors.brand)
+                                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                            }
+                            .buttonStyle(ApplePressableButtonStyle())
+                            .padding(.bottom, 4)
                         }
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
                     }
                     
                     // Success Banner
                     if isImportSuccess {
-                        AppCard {
+                        cardContainer {
                             HStack(spacing: 12) {
                                 Image(systemName: "checkmark.circle.fill")
                                     .font(.title2)
                                     .foregroundColor(AppColors.profit)
                                 
-                                VStack(alignment: .leading, spacing: 4) {
+                                VStack(alignment: .leading, spacing: 3) {
                                     Text("Import completed successfully!")
                                         .font(AppTypography.headline)
+                                        .foregroundColor(AppColors.primaryText)
                                     Text("Added \(successCount) executions and updated trades.")
                                         .font(AppTypography.caption)
+                                        .monospacedDigit()
                                         .foregroundColor(AppColors.secondaryText)
                                 }
                                 Spacer()
@@ -93,57 +146,75 @@ public struct ImportStatementView: View {
                     
                     // Preview Result
                     if let preview = previewResult {
-                        VStack(spacing: 16) {
+                        VStack(spacing: 14) {
                             // Summary Grid
-                            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                                AppCard {
-                                    Text("Usable fills")
-                                        .font(AppTypography.caption)
-                                        .foregroundColor(AppColors.secondaryText)
-                                    Text("\(preview.usableExecutions.count)")
-                                        .font(AppTypography.financialNumber(size: 24, weight: .bold))
-                                        .foregroundColor(AppColors.profit)
+                            LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
+                                cardContainer {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text("Usable fills")
+                                            .font(AppTypography.caption)
+                                            .foregroundColor(AppColors.secondaryText)
+                                        Text("\(preview.usableExecutions.count)")
+                                            .font(AppTypography.financialNumber(size: 24, weight: .bold))
+                                            .monospacedDigit()
+                                            .foregroundColor(AppColors.profit)
+                                    }
                                 }
                                 
-                                AppCard {
-                                    Text("Duplicate fills")
-                                        .font(AppTypography.caption)
-                                        .foregroundColor(AppColors.secondaryText)
-                                    Text("\(preview.duplicateCount)")
-                                        .font(AppTypography.financialNumber(size: 24, weight: .bold))
-                                        .foregroundColor(AppColors.warning)
+                                cardContainer {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text("Duplicate fills")
+                                            .font(AppTypography.caption)
+                                            .foregroundColor(AppColors.secondaryText)
+                                        Text("\(preview.duplicateCount)")
+                                            .font(AppTypography.financialNumber(size: 24, weight: .bold))
+                                            .monospacedDigit()
+                                            .foregroundColor(AppColors.warning)
+                                    }
                                 }
                                 
-                                AppCard {
-                                    Text("Problem rows")
-                                        .font(AppTypography.caption)
-                                        .foregroundColor(AppColors.secondaryText)
-                                    Text("\(preview.problems.count)")
-                                        .font(AppTypography.financialNumber(size: 24, weight: .bold))
-                                        .foregroundColor(preview.problems.isEmpty ? AppColors.secondaryText : AppColors.loss)
+                                cardContainer {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text("Problem rows")
+                                            .font(AppTypography.caption)
+                                            .foregroundColor(AppColors.secondaryText)
+                                        Text("\(preview.problems.count)")
+                                            .font(AppTypography.financialNumber(size: 24, weight: .bold))
+                                            .monospacedDigit()
+                                            .foregroundColor(preview.problems.isEmpty ? AppColors.secondaryText : AppColors.loss)
+                                    }
                                 }
                                 
-                                AppCard {
-                                    Text("Total file rows")
-                                        .font(AppTypography.caption)
-                                        .foregroundColor(AppColors.secondaryText)
-                                    Text("\(preview.totalRows)")
-                                        .font(AppTypography.financialNumber(size: 24, weight: .bold))
+                                cardContainer {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text("Total file rows")
+                                            .font(AppTypography.caption)
+                                            .foregroundColor(AppColors.secondaryText)
+                                        Text("\(preview.totalRows)")
+                                            .font(AppTypography.financialNumber(size: 24, weight: .bold))
+                                            .monospacedDigit()
+                                            .foregroundColor(AppColors.primaryText)
+                                    }
                                 }
                             }
                             
                             // Error / Problem details
                             if !preview.problems.isEmpty {
-                                AppCard {
-                                    VStack(alignment: .leading, spacing: 8) {
-                                        Label("Warnings & Problems (\(preview.problems.count))", systemImage: "exclamationmark.triangle.fill")
-                                            .font(AppTypography.headline)
-                                            .foregroundColor(AppColors.loss)
+                                cardContainer {
+                                    VStack(alignment: .leading, spacing: 10) {
+                                        HStack(spacing: 6) {
+                                            Image(systemName: "exclamationmark.triangle.fill")
+                                                .foregroundColor(AppColors.loss)
+                                            Text("Warnings & Problems (\(preview.problems.count))")
+                                                .font(AppTypography.headline)
+                                                .foregroundColor(AppColors.loss)
+                                        }
                                         
                                         ForEach(preview.problems.prefix(5)) { p in
                                             HStack(alignment: .top, spacing: 6) {
                                                 Text("Line \(p.lineNumber):")
                                                     .font(AppTypography.caption.bold())
+                                                    .monospacedDigit()
                                                     .foregroundColor(AppColors.secondaryText)
                                                 Text(p.reason)
                                                     .font(AppTypography.caption)
@@ -162,53 +233,83 @@ public struct ImportStatementView: View {
                             
                             // Sample Preview Rows
                             if !preview.usableExecutions.isEmpty {
-                                AppCard {
-                                    VStack(alignment: .leading, spacing: 10) {
-                                        Text("Execution Preview (\(min(3, preview.usableExecutions.count))/\(preview.usableExecutions.count))")
-                                            .font(AppTypography.headline)
+                                cardContainer {
+                                    VStack(alignment: .leading, spacing: 12) {
+                                        HStack {
+                                            Image(systemName: "list.clipboard")
+                                                .font(.system(size: 13))
+                                                .foregroundColor(AppColors.brand)
+                                            Text("Execution Preview (\(min(3, preview.usableExecutions.count))/\(preview.usableExecutions.count))")
+                                                .font(AppTypography.headline)
+                                                .foregroundColor(AppColors.primaryText)
+                                        }
                                         
                                         ForEach(preview.usableExecutions.prefix(3)) { fill in
                                             HStack {
-                                                VStack(alignment: .leading, spacing: 2) {
+                                                VStack(alignment: .leading, spacing: 3) {
                                                     HStack(spacing: 6) {
-                                                        Text(fill.symbol).font(AppTypography.headline)
-                                                        AppBadge(
-                                                            fill.side.rawValue.uppercased(),
-                                                            color: fill.side == .buy ? AppColors.brand : AppColors.warning
-                                                        )
+                                                        Text(fill.symbol)
+                                                            .font(AppTypography.bodyBold)
+                                                            .foregroundColor(AppColors.primaryText)
+                                                        Text(fill.side.rawValue.uppercased())
+                                                            .font(.system(size: 9, weight: .bold))
+                                                            .foregroundColor(fill.side == .buy ? AppColors.brand : AppColors.warning)
+                                                            .padding(.horizontal, 6)
+                                                            .padding(.vertical, 2)
+                                                            .background((fill.side == .buy ? AppColors.brand : AppColors.warning).opacity(0.12))
+                                                            .clipShape(Capsule())
                                                     }
                                                     Text("Qty: \(fill.quantity) @ \(Formatters.price(fill.price))")
                                                         .font(AppTypography.caption)
+                                                        .monospacedDigit()
                                                         .foregroundColor(AppColors.secondaryText)
                                                 }
                                                 Spacer()
-                                                VStack(alignment: .trailing, spacing: 2) {
+                                                VStack(alignment: .trailing, spacing: 3) {
                                                     Text("Fee: \(Formatters.currency(fill.fee, isPrivate: false))")
                                                         .font(AppTypography.caption)
+                                                        .monospacedDigit()
                                                         .foregroundColor(AppColors.secondaryText)
                                                     Text(Formatters.dateOnly(fill.executedAt, timeZone: env.currentTimeZone))
                                                         .font(AppTypography.caption)
+                                                        .monospacedDigit()
                                                         .foregroundColor(AppColors.secondaryText)
                                                 }
                                             }
-                                            Divider()
+                                            .padding(.vertical, 2)
+                                            
+                                            if fill.id != preview.usableExecutions.prefix(3).last?.id {
+                                                Divider().background(AppColors.border.opacity(0.3))
+                                            }
                                         }
                                     }
                                 }
                                 
                                 // Confirm Button
-                                AppButton(
-                                    "Confirm Import \(preview.usableExecutions.count) Fills",
-                                    icon: "arrow.up.circle.fill",
-                                    style: .primary
-                                ) {
+                                Button {
+                                    #if canImport(UIKit)
+                                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                    #endif
                                     commitImport(preview.usableExecutions)
+                                } label: {
+                                    HStack(spacing: 8) {
+                                        Image(systemName: "arrow.up.circle.fill")
+                                        Text("Confirm Import \(preview.usableExecutions.count) Fills")
+                                    }
+                                    .font(AppTypography.subheadlineBold)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 14)
+                                    .background(AppColors.brand)
+                                    .foregroundColor(.white)
+                                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                    .shadow(color: AppColors.brand.opacity(0.25), radius: 6, x: 0, y: 2)
                                 }
+                                .buttonStyle(ApplePressableButtonStyle())
                             }
                         }
                     }
                 }
-                .padding(14)
+                .padding(16)
             }
             .fileImporter(
                 isPresented: $isFileImporterPresented,
