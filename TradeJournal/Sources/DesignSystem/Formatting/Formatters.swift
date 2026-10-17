@@ -92,6 +92,19 @@ public enum Formatters {
         }
     }
     
+    public static func statusColor(_ status: TradeStatus) -> Color {
+        switch status {
+        case .win:
+            return AppColors.profit
+        case .loss:
+            return AppColors.loss
+        case .breakeven:
+            return AppColors.breakeven
+        case .open:
+            return AppColors.brand
+        }
+    }
+    
     /// Định dạng giá thực hiện lệnh (linh hoạt từ 2 tới 5 số lẻ cho Forex/Crypto)
     public static func price(_ value: Decimal) -> String {
         return priceFormatter.string(from: value as NSDecimalNumber) ?? "\(value)"
@@ -116,5 +129,9 @@ public enum Formatters {
         f.timeStyle = .none
         f.timeZone = timeZone
         return f.string(from: date)
+    }
+    
+    public static func formatDate(_ date: Date, timeZone: TimeZone = .current) -> String {
+        dateOnly(date, timeZone: timeZone)
     }
 }
