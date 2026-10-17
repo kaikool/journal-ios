@@ -30,13 +30,13 @@ public struct JournalHubView: View {
     
     public var body: some View {
         VStack(spacing: 0) {
-            // Segmented Navigation Header adhering to Apple HIG
-            Picker("Journal Section", selection: $selectedSubTab) {
-                ForEach(JournalSubTab.allCases) { tab in
-                    Text(tab.rawValue).tag(tab)
-                }
-            }
-            .pickerStyle(.segmented)
+            // Apple HIG iOS 27 Sliding Segmented Bar
+            AppleSlidingSegmentedBar(
+                selection: $selectedSubTab,
+                items: JournalSubTab.allCases,
+                titleFor: { $0.rawValue },
+                iconFor: { $0.iconName }
+            )
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
             .background(AppColors.background)

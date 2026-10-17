@@ -116,18 +116,18 @@ public struct DailyJournalListView: View {
                     showFilters: false
                 ) {
                     NavigationLink(destination: DailyJournalDetailView(date: todayKey)) {
-                        HStack(spacing: 6) {
+                        HStack(spacing: 5) {
                             Image(systemName: "sun.max")
-                                .font(.system(size: 13, weight: .semibold))
+                                .font(.system(size: 11, weight: .semibold))
                             Text("View my day")
-                                .font(AppTypography.captionBold)
+                                .font(AppTypography.actionPill)
                         }
                         .padding(.horizontal, 12)
-                        .padding(.vertical, 7)
+                        .padding(.vertical, 6)
                         .background(AppColors.brand)
                         .foregroundColor(AppColors.brandTextOnDark)
-                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                        .shadow(color: AppColors.brand.opacity(0.25), radius: 4, x: 0, y: 2)
+                        .clipShape(Capsule())
+                        .shadow(color: AppColors.brand.opacity(0.25), radius: 4, x: 0, y: 1.5)
                     }
                     .buttonStyle(ApplePressableButtonStyle())
                 }

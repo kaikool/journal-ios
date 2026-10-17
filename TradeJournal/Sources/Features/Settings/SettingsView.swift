@@ -209,16 +209,14 @@ public struct GeneralSettingsView: View {
                         .font(AppTypography.captionBold)
                         .foregroundColor(AppColors.secondaryText)
                     
-                    Picker("Display timezone", selection: $displayTz) {
+                    AppleMenuChip(title: "Timezone", selectionText: displayTz, icon: "globe") {
                         ForEach(commonTimeZones, id: \.self) { tz in
-                            Text(tz).tag(tz)
+                            Button(tz) {
+                                displayTz = tz
+                                isSaved = false
+                            }
                         }
                     }
-                    .pickerStyle(.menu)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(8)
-                    .background(AppColors.secondaryBackground)
-                    .cornerRadius(8)
                     
                     Text("Trade times, calendars, journal days, and analytics use this timezone.")
                         .font(AppTypography.caption)
@@ -243,16 +241,14 @@ public struct GeneralSettingsView: View {
                         .font(AppTypography.captionBold)
                         .foregroundColor(AppColors.secondaryText)
                     
-                    Picker("Default import timezone", selection: $importTz) {
+                    AppleMenuChip(title: "Import timezone", selectionText: importTz, icon: "clock") {
                         ForEach(commonTimeZones, id: \.self) { tz in
-                            Text(tz).tag(tz)
+                            Button(tz) {
+                                importTz = tz
+                                isSaved = false
+                            }
                         }
                     }
-                    .pickerStyle(.menu)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(8)
-                    .background(AppColors.secondaryBackground)
-                    .cornerRadius(8)
                     
                     Text("Used for timestamps without an offset in file imports and IBKR broker sync. You can override it for each file. Existing trades are not changed; correcting an IBKR account's timezone requires a separate account for recovery.")
                         .font(AppTypography.caption)
@@ -260,7 +256,7 @@ public struct GeneralSettingsView: View {
                 }
                 
                 HStack(spacing: 12) {
-                    Button {
+                    AppButton("Save timezones", icon: "checkmark", style: .primary, size: .compact) {
                         dataStore.generalSettings.displayTimeZone = displayTz
                         dataStore.generalSettings.defaultImportTimeZone = importTz
                         if let tz = TimeZone(identifier: displayTz) {
@@ -269,14 +265,7 @@ public struct GeneralSettingsView: View {
                         dataStore.saveToDisk()
                         isSaved = true
                         statusMessage = "Timezones saved."
-                    } label: {
-                        Text("Save timezones")
-                            .font(AppTypography.subheadlineBold)
-                            .frame(minWidth: 120)
-                            .padding(.vertical, 8)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(AppColors.accent)
                     
                     if isSaved {
                         Text(statusMessage)
@@ -338,11 +327,9 @@ public struct TradingSettingsView: View {
                         .foregroundColor(AppColors.secondaryText)
                     
                     HStack(spacing: 12) {
-                        Button("Save multipliers") {
+                        AppButton("Save multipliers", icon: "checkmark", style: .primary, size: .compact) {
                             saveMultipliers()
                         }
-                        .buttonStyle(.borderedProminent)
-                        .tint(AppColors.accent)
                         
                         if !multiplierStatus.isEmpty {
                             Text(multiplierStatus)
@@ -442,13 +429,9 @@ public struct TradingSettingsView: View {
                             .cornerRadius(8)
                         }
                         
-                        Button {
+                        AppButton("Add fee rule", icon: "plus", style: .outline, size: .compact) {
                             feeRules.append(FeeRule(accountId: "", symbol: "", amount: 0, mode: "execution"))
-                        } label: {
-                            Label("Add fee rule", systemImage: "plus")
-                                .font(AppTypography.captionBold)
                         }
-                        .buttonStyle(.bordered)
                     }
                     
                     Divider()
@@ -518,17 +501,13 @@ public struct TradingSettingsView: View {
                             .cornerRadius(8)
                         }
                         
-                        Button {
+                        AppButton("Add risk rule", icon: "plus", style: .outline, size: .compact) {
                             riskRules.append(RiskRule(accountId: "", symbol: "", stop: 1, target: 2, mode: "price"))
-                        } label: {
-                            Label("Add risk rule", systemImage: "plus")
-                                .font(AppTypography.captionBold)
                         }
-                        .buttonStyle(.bordered)
                     }
                     
                     HStack(spacing: 12) {
-                        Button("Save defaults") {
+                        AppButton("Save defaults", icon: "checkmark", style: .primary, size: .compact) {
                             let be = Decimal(string: breakevenText) ?? 0
                             dataStore.defaults = JournalDefaults(
                                 breakeven: be,
@@ -539,8 +518,6 @@ public struct TradingSettingsView: View {
                             dataStore.saveToDisk()
                             defaultsStatus = "Defaults saved."
                         }
-                        .buttonStyle(.borderedProminent)
-                        .tint(AppColors.accent)
                         
                         if !defaultsStatus.isEmpty {
                             Text(defaultsStatus)
@@ -619,15 +596,13 @@ public struct CurrencyConversionSettingsView: View {
                         .font(AppTypography.captionBold)
                         .foregroundColor(AppColors.secondaryText)
                     
-                    Picker("Reporting currency", selection: $reportingCurrency) {
+                    AppleMenuChip(title: "Reporting currency", selectionText: reportingCurrency, icon: "dollarsign.circle") {
                         ForEach(availableCurrencies, id: \.self) { c in
-                            Text(c).tag(c)
+                            Button(c) {
+                                reportingCurrency = c
+                            }
                         }
                     }
-                    .pickerStyle(.menu)
-                    .padding(8)
-                    .background(AppColors.secondaryBackground)
-                    .cornerRadius(8)
                     
                     Text("Changing the reporting currency clears the draft rates. Enter new rates before saving.")
                         .font(AppTypography.caption)
@@ -665,11 +640,9 @@ public struct CurrencyConversionSettingsView: View {
                     .foregroundColor(AppColors.secondaryText)
                 
                 HStack(spacing: 12) {
-                    Button("Save conversion settings") {
+                    AppButton("Save conversion settings", icon: "checkmark", style: .primary, size: .compact) {
                         saveConversion()
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(AppColors.accent)
                     
                     if !statusMessage.isEmpty {
                         Text(statusMessage)
@@ -767,28 +740,23 @@ public struct MarketDataSettingsView: View {
                         
                         HStack(spacing: 8) {
                             if !binanceEnabled {
-                                Button("Enable source") {
+                                AppButton("Enable source", icon: "checkmark.circle", style: .primary, size: .compact) {
                                     binanceEnabled = true
                                     dataStore.marketConnections.binanceEnabled = true
                                     dataStore.saveToDisk()
                                     binanceStatus = "Public market data enabled."
                                 }
-                                .buttonStyle(.borderedProminent)
-                                .tint(AppColors.accent)
                             } else {
-                                Button("Test connection") {
+                                AppButton("Test connection", icon: "network", style: .secondary, size: .compact) {
                                     testBinance()
                                 }
-                                .buttonStyle(.bordered)
                                 
-                                Button("Disable source") {
+                                AppButton("Disable source", icon: "xmark.circle", style: .destructive, size: .compact) {
                                     binanceEnabled = false
                                     dataStore.marketConnections.binanceEnabled = false
                                     dataStore.saveToDisk()
                                     binanceStatus = "Connection removed."
                                 }
-                                .buttonStyle(.bordered)
-                                .tint(AppColors.loss)
                             }
                         }
                         
@@ -838,41 +806,38 @@ public struct MarketDataSettingsView: View {
                             .pickerStyle(.segmented)
                         }
                         
-                        HStack(spacing: 8) {
-                            Button("Save credentials") {
+                        VStack(alignment: .leading, spacing: 8) {
+                            AppButton("Save credentials", icon: "checkmark", style: .primary, size: .compact) {
                                 dataStore.marketConnections.oandaApiKey = oandaToken
                                 dataStore.marketConnections.oandaAccountId = oandaAccountId
                                 dataStore.marketConnections.oandaEnvironment = oandaEnvironment
                                 dataStore.saveToDisk()
                                 oandaStatus = "Credentials saved. Test the connection to verify access."
                             }
-                            .buttonStyle(.borderedProminent)
-                            .tint(AppColors.accent)
                             
                             if !dataStore.marketConnections.oandaApiKey.isEmpty {
-                                Button("Test connection") {
-                                    oandaStatus = "Connecting to OANDA v20 servers..."
-                                    Task {
-                                        let res = await MarketDataService.shared.testOandaConnection(
-                                            apiKey: oandaToken,
-                                            accountId: oandaAccountId,
-                                            environment: oandaEnvironment
-                                        )
-                                        oandaStatus = res.message
+                                HStack(spacing: 8) {
+                                    AppButton("Test connection", icon: "network", style: .secondary, size: .compact) {
+                                        oandaStatus = "Connecting to OANDA v20 servers..."
+                                        Task {
+                                            let res = await MarketDataService.shared.testOandaConnection(
+                                                apiKey: oandaToken,
+                                                accountId: oandaAccountId,
+                                                environment: oandaEnvironment
+                                            )
+                                            oandaStatus = res.message
+                                        }
+                                    }
+                                    
+                                    AppButton("Remove credentials", icon: "trash", style: .destructive, size: .compact) {
+                                        oandaToken = ""
+                                        oandaAccountId = ""
+                                        dataStore.marketConnections.oandaApiKey = ""
+                                        dataStore.marketConnections.oandaAccountId = ""
+                                        dataStore.saveToDisk()
+                                        oandaStatus = "Connection removed."
                                     }
                                 }
-                                .buttonStyle(.bordered)
-                                
-                                Button("Remove credentials") {
-                                    oandaToken = ""
-                                    oandaAccountId = ""
-                                    dataStore.marketConnections.oandaApiKey = ""
-                                    dataStore.marketConnections.oandaAccountId = ""
-                                    dataStore.saveToDisk()
-                                    oandaStatus = "Connection removed."
-                                }
-                                .buttonStyle(.bordered)
-                                .tint(AppColors.loss)
                             }
                         }
                         
@@ -943,40 +908,20 @@ public struct ConnectionsSettingsView: View {
                     
                     // Main Action: OAuth Login vs Connected Actions
                     if !the5ers.isConnected {
-                        Button {
+                        AppButton("Log in with The5ers Hub (OAuth)", icon: "person.badge.key.fill", style: .primary, size: .regular, isLoading: isConnectingThe5ers) {
                             loginThe5ersOAuth()
-                        } label: {
-                            HStack {
-                                if isConnectingThe5ers {
-                                    ProgressView().scaleEffect(0.8)
-                                    Text("Connecting to The5ers Hub...")
-                                } else {
-                                    Image(systemName: "person.badge.key.fill")
-                                    Text("Log in with The5ers Hub (OAuth)")
-                                        .font(AppTypography.headline)
-                                }
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 8)
                         }
-                        .buttonStyle(.borderedProminent)
-                        .tint(AppColors.accent)
-                        .disabled(isConnectingThe5ers)
                     } else {
                         HStack(spacing: 8) {
-                            Button("Verify MCP Connection") {
+                            AppButton("Verify MCP", icon: "checkmark.shield", style: .primary, size: .compact) {
                                 pingMcp()
                             }
-                            .buttonStyle(.borderedProminent)
-                            .tint(AppColors.accent)
                             
-                            Button("Disconnect") {
+                            AppButton("Disconnect", icon: "xmark.circle", style: .destructive, size: .compact) {
                                 the5ers.disconnect()
                                 mcpToken = ""
                                 the5ersStatus = "Disconnected from The5ers MCP."
                             }
-                            .buttonStyle(.bordered)
-                            .tint(AppColors.loss)
                         }
                     }
                     
@@ -999,12 +944,10 @@ public struct ConnectionsSettingsView: View {
                                     .textInputAutocapitalization(.never)
                                     .autocorrectionDisabled(true)
                                 
-                                Button("Save token") {
+                                AppButton("Save token", icon: "checkmark", style: .primary, size: .compact) {
                                     the5ers.configure(token: mcpToken)
                                     the5ersStatus = "Saved The5ers MCP session token."
                                 }
-                                .buttonStyle(.borderedProminent)
-                                .tint(AppColors.accent)
                                 .disabled(mcpToken.trimmingCharacters(in: .whitespaces).isEmpty)
                             }
                         }
@@ -1069,19 +1012,14 @@ public struct ConnectionsSettingsView: View {
                     }
                     
                     HStack(spacing: 8) {
-                        Button("Test Connection") {
+                        AppButton("Test Connection", icon: "network", style: .primary, size: .compact) {
                             checkSupabaseConnection()
                         }
-                        .buttonStyle(.borderedProminent)
-                        .tint(AppColors.accent)
                         .disabled(supabaseUrl.trimmingCharacters(in: .whitespaces).isEmpty || supabaseAnonKey.trimmingCharacters(in: .whitespaces).isEmpty)
                         
-                        Button {
+                        AppButton("Copy Migration SQL", icon: "doc.on.doc", style: .secondary, size: .compact) {
                             copySqlScript()
-                        } label: {
-                            Label("Copy Migration DDL SQL", systemImage: "doc.on.doc")
                         }
-                        .buttonStyle(.bordered)
                     }
                     
                     // Email/Password Login Section for RLS
@@ -1108,19 +1046,16 @@ public struct ConnectionsSettingsView: View {
                                     .textFieldStyle(.roundedBorder)
                                 
                                 HStack(spacing: 8) {
-                                    Button("Sign in with Email") {
+                                    AppButton("Sign in with Email", icon: "envelope", style: .secondary, size: .compact) {
                                         loginSupabaseEmail()
                                     }
-                                    .buttonStyle(.bordered)
                                     .disabled(supabaseEmail.isEmpty || supabasePassword.isEmpty)
                                     
                                     if SupabaseService.shared.accessToken != nil {
-                                        Button("Sign out") {
+                                        AppButton("Sign out", icon: "arrow.right.square", style: .destructive, size: .compact) {
                                             SupabaseService.shared.logout()
                                             supabaseSyncStatus = "Signed out. Defaulting to Anon Key access."
                                         }
-                                        .buttonStyle(.bordered)
-                                        .tint(AppColors.loss)
                                     }
                                 }
                             }
@@ -1312,18 +1247,14 @@ public struct AiSettingsView: View {
                 }
                 
                 HStack(spacing: 12) {
-                    Button("Save AI settings") {
+                    AppButton("Save AI settings", icon: "checkmark", style: .primary, size: .compact) {
                         saveAiSettings()
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(AppColors.accent)
                     
                     if isKeyConfigured {
-                        Button("Remove key") {
+                        AppButton("Remove key", icon: "trash", style: .destructive, size: .compact) {
                             removeKey()
                         }
-                        .buttonStyle(.bordered)
-                        .tint(AppColors.loss)
                     }
                 }
                 
@@ -1401,25 +1332,13 @@ public struct YourDataSettingsView: View {
                         .foregroundColor(AppColors.secondaryText)
                     
                     HStack(spacing: 12) {
-                        Button {
+                        AppButton("Full backup (JSON)", icon: "square.and.arrow.up", style: .secondary, size: .compact) {
                             exportFullJsonBackup()
-                        } label: {
-                            HStack {
-                                Image(systemName: "square.and.arrow.up")
-                                Text("Full backup (JSON)")
-                            }
                         }
-                        .buttonStyle(.bordered)
                         
-                        Button {
+                        AppButton("Trades (CSV)", icon: "square.and.arrow.up", style: .secondary, size: .compact) {
                             exportTradesCsv()
-                        } label: {
-                            HStack {
-                                Image(systemName: "square.and.arrow.up")
-                                Text("Trades (CSV)")
-                            }
                         }
-                        .buttonStyle(.bordered)
                     }
                 }
             }

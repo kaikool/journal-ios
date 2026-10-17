@@ -87,10 +87,8 @@ public struct TradesListView: View {
                     selectedRange: $selectedRange,
                     showFilters: true
                 ) {
-                    HStack(spacing: 6) {
-                        AppButton("Add trade", icon: "plus", style: .primary) {
-                            showAddTradeSheet = true
-                        }
+                    AppActionPill("Add trade", icon: "plus") {
+                        showAddTradeSheet = true
                     }
                 }
                 

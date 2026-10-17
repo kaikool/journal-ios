@@ -20,6 +20,8 @@ public enum AppTypography {
     public static let captionMedium = Font.system(size: 11, weight: .medium)
     public static let captionBold = Font.system(size: 11, weight: .bold)
     public static let pill = Font.system(size: 11, weight: .medium)
+    public static let actionPill = Font.system(size: 12, weight: .bold)
+    public static let menuChip = Font.system(size: 12, weight: .semibold)
     public static let badge = Font.system(size: 10, weight: .semibold)
     public static let monoCaption = Font.system(size: 11, weight: .regular, design: .monospaced)
     

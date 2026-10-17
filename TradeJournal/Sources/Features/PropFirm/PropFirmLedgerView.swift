@@ -88,57 +88,54 @@ public struct PropFirmLedgerView: View {
                     title: "Prop firms",
                     showFilters: false
                 ) {
-                    HStack(spacing: 6) {
-                        AppButton("Track account", icon: "plus", style: .outline) {
+                    Menu {
+                        Button {
                             showNewAccountSheet = true
+                        } label: {
+                            Label("Track Account", systemImage: "briefcase.fill")
                         }
-                        AppButton("Add expense", icon: "arrow.up.right", style: .outline) {
+                        Button {
                             showNewEntrySheet = true
+                        } label: {
+                            Label("Add Expense", systemImage: "arrow.up.right")
                         }
-                        AppButton("Track payout", icon: "arrow.down.left", style: .primary) {
+                        Button {
                             showAddReceiptSheet = true
+                        } label: {
+                            Label("Track Payout", systemImage: "arrow.down.left")
                         }
+                    } label: {
+                        HStack(spacing: 5) {
+                            Image(systemName: "plus")
+                                .font(.system(size: 11, weight: .bold))
+                            Text("New")
+                                .font(AppTypography.actionPill)
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 9, weight: .semibold))
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .frame(minHeight: 32)
+                        .background(AppColors.brand)
+                        .foregroundColor(.white)
+                        .clipShape(Capsule())
+                        .shadow(color: AppColors.brand.opacity(0.25), radius: 4, x: 0, y: 2)
                     }
+                    .buttonStyle(ApplePressableButtonStyle())
                 }
                 
-            // Apple HIG Sliding Pill Section Bar
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 6) {
-                    ForEach(PropLedgerTab.allCases) { tab in
-                        let isSelected = selectedTab == tab
-                        Button {
-                            #if canImport(UIKit)
-                            UISelectionFeedbackGenerator().selectionChanged()
-                            #endif
-                            withAnimation(.spring(response: 0.28, dampingFraction: 0.75)) {
-                                selectedTab = tab
-                            }
-                        } label: {
-                            Text(tab.rawValue)
-                                .font(.system(size: 13, weight: isSelected ? .semibold : .medium))
-                                .foregroundColor(isSelected ? AppColors.primaryText : AppColors.secondaryText)
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 7)
-                                .background(
-                                    isSelected ? AppColors.cardBackground : Color.clear
-                                )
-                                .clipShape(Capsule())
-                                .overlay(
-                                    Capsule().stroke(isSelected ? AppColors.border.opacity(0.8) : Color.clear, lineWidth: 0.8)
-                                )
-                                .shadow(color: isSelected ? Color.black.opacity(0.06) : Color.clear, radius: 4, x: 0, y: 1)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 6)
-            }
-            .background(AppColors.secondaryBackground.opacity(0.4))
+            // Universal Apple HIG Sliding Segmented Bar
+            AppleSlidingSegmentedBar(
+                selection: $selectedTab,
+                items: PropLedgerTab.allCases,
+                titleFor: { $0.rawValue }
+            )
+            .padding(.horizontal, 14)
+            .padding(.vertical, 6)
             
             // Sub-Toolbar: Currency Pill & Archived Toggle
             HStack {
-                Menu {
+                AppleMenuChip(title: "Currency", selectionText: selectedCurrency, icon: "dollarsign.circle") {
                     ForEach(availableCurrencies, id: \.self) { c in
                         Button(c) {
                             #if canImport(UIKit)
@@ -147,23 +144,6 @@ public struct PropFirmLedgerView: View {
                             selectedCurrency = c
                         }
                     }
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "dollarsign.circle")
-                            .font(.system(size: 11))
-                            .foregroundColor(AppColors.brand)
-                        Text(selectedCurrency)
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundColor(AppColors.primaryText)
-                        Image(systemName: "chevron.down")
-                            .font(.system(size: 9, weight: .medium))
-                            .foregroundColor(AppColors.secondaryText)
-                    }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(AppColors.cardBackground)
-                    .clipShape(Capsule())
-                    .overlay(Capsule().stroke(AppColors.border.opacity(0.6), lineWidth: 0.5))
                 }
                 
                 Spacer()

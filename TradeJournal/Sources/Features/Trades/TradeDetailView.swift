@@ -77,7 +77,7 @@ public struct TradeDetailView: View {
                 title: "\(trade.symbol) · \(trade.direction.rawValue.uppercased())",
                 showFilters: false
             ) {
-                AppButton("Replay", icon: "play.fill", style: .primary) {
+                AppActionPill("Replay", icon: "play.fill") {
                     showReplayView = true
                 }
             }
@@ -106,25 +106,6 @@ public struct TradeDetailView: View {
                                 )
                                 
                                 Spacer()
-                                
-                                Button {
-                                    #if canImport(UIKit)
-                                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                                    #endif
-                                    showReplayView = true
-                                } label: {
-                                    HStack(spacing: 4) {
-                                        Image(systemName: "play.circle.fill")
-                                        Text("Replay")
-                                    }
-                                    .font(AppTypography.captionBold)
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 5)
-                                    .background(AppColors.brand.opacity(0.12))
-                                    .foregroundColor(AppColors.brand)
-                                    .clipShape(Capsule())
-                                }
-                                .buttonStyle(ApplePressableButtonStyle())
                             }
                             
                             Divider().background(AppColors.border.opacity(0.5))
@@ -167,7 +148,7 @@ public struct TradeDetailView: View {
                                     Text("Avg entry")
                                         .font(AppTypography.caption)
                                         .foregroundColor(AppColors.secondaryText)
-                                    Text("\(trade.avgEntry)")
+                                    Text(Formatters.price(trade.avgEntry))
                                         .font(AppTypography.subheadlineBold)
                                         .monospacedDigit()
                                         .foregroundColor(AppColors.primaryText)
@@ -177,7 +158,7 @@ public struct TradeDetailView: View {
                                     Text("Avg exit")
                                         .font(AppTypography.caption)
                                         .foregroundColor(AppColors.secondaryText)
-                                    Text(trade.avgExit != nil ? "\(trade.avgExit!)" : "Open")
+                                    Text(trade.avgExit != nil ? Formatters.price(trade.avgExit!) : "Open")
                                         .font(AppTypography.subheadlineBold)
                                         .monospacedDigit()
                                         .foregroundColor(AppColors.primaryText)
@@ -245,7 +226,7 @@ public struct TradeDetailView: View {
                                             .background((fill.side == .buy ? AppColors.brand : AppColors.warning).opacity(0.12))
                                             .clipShape(Capsule())
                                         
-                                        Text("\(fill.quantity) @ \(fill.price)")
+                                        Text("\(Formatters.formatNumber(fill.quantity)) @ \(Formatters.price(fill.price))")
                                             .font(AppTypography.captionBold)
                                             .monospacedDigit()
                                             .foregroundColor(AppColors.primaryText)
@@ -323,13 +304,18 @@ public struct TradeDetailView: View {
                                         #endif
                                         persistTradeUpdates()
                                     } label: {
-                                        Text("Save")
-                                            .font(AppTypography.captionBold)
-                                            .foregroundColor(.white)
-                                            .padding(.horizontal, 14)
-                                            .padding(.vertical, 8)
-                                            .background(AppColors.brand)
-                                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                        HStack(spacing: 4) {
+                                            Image(systemName: "checkmark")
+                                                .font(.system(size: 11, weight: .semibold))
+                                            Text("Save")
+                                                .font(AppTypography.captionBold)
+                                        }
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 6)
+                                        .background(AppColors.brand)
+                                        .foregroundColor(AppColors.brandTextOnDark)
+                                        .clipShape(Capsule())
+                                        .shadow(color: AppColors.brand.opacity(0.25), radius: 3, x: 0, y: 1.5)
                                     }
                                     .buttonStyle(ApplePressableButtonStyle())
                                 }
@@ -388,16 +374,22 @@ public struct TradeDetailView: View {
                                         .foregroundColor(AppColors.primaryText)
                                 }
                                 Spacer()
-                                Picker("Playbook", selection: $selectedPlaybookId) {
-                                    Text("None").tag("")
-                                    ForEach(dataStore.playbooks) { pb in
-                                        Text(pb.name).tag(pb.id)
+                                AppleMenuChip(
+                                    selectionText: activePlaybook?.name ?? "None",
+                                    icon: "book.pages"
+                                ) {
+                                    Button("None") {
+                                        selectedPlaybookId = ""
+                                        trade.playbookId = nil
+                                        persistTradeUpdates()
                                     }
-                                }
-                                .pickerStyle(.menu)
-                                .onChange(of: selectedPlaybookId) {
-                                    trade.playbookId = selectedPlaybookId.isEmpty ? nil : selectedPlaybookId
-                                    persistTradeUpdates()
+                                    ForEach(dataStore.playbooks) { pb in
+                                        Button(pb.name) {
+                                            selectedPlaybookId = pb.id
+                                            trade.playbookId = pb.id
+                                            persistTradeUpdates()
+                                        }
+                                    }
                                 }
                             }
                             

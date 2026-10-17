@@ -132,25 +132,9 @@ public struct ReportsView: View {
                 selectedRange: $selectedRange,
                 showFilters: true
             ) {
-                Button {
-                    #if canImport(UIKit)
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                    #endif
+                AppActionPill("Ask AI", icon: "sparkles") {
                     showAiReflectionSheet = true
-                } label: {
-                    HStack(spacing: 5) {
-                        Image(systemName: "sparkles")
-                        Text("Ask AI")
-                    }
-                    .font(AppTypography.captionBold)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(AppColors.brand)
-                    .foregroundColor(AppColors.brandTextOnDark)
-                    .clipShape(Capsule())
-                    .shadow(color: AppColors.brand.opacity(0.25), radius: 4, x: 0, y: 1.5)
                 }
-                .buttonStyle(ApplePressableButtonStyle())
             }
             
             ScrollView {
@@ -401,12 +385,16 @@ public struct ReportsView: View {
                                 .font(.system(size: 11))
                                 .foregroundColor(AppColors.secondaryText)
                             
-                            Picker("Primary", selection: $primaryDimension) {
+                            AppleMenuChip(
+                                selectionText: primaryDimension.label,
+                                icon: "square.grid.2x2"
+                            ) {
                                 ForEach(Dimension.allCases, id: \.self) { dim in
-                                    Text(dim.label).tag(dim)
+                                    Button(dim.label) {
+                                        primaryDimension = dim
+                                    }
                                 }
                             }
-                            .pickerStyle(.menu)
                         }
                         
                         if selectedMode == .cross {
@@ -418,12 +406,16 @@ public struct ReportsView: View {
                                     .font(.system(size: 11))
                                     .foregroundColor(AppColors.secondaryText)
                                 
-                                Picker("Secondary", selection: $secondaryDimension) {
+                                AppleMenuChip(
+                                    selectionText: secondaryDimension.label,
+                                    icon: "arrow.triangle.swap"
+                                ) {
                                     ForEach(Dimension.allCases, id: \.self) { dim in
-                                        Text(dim.label).tag(dim)
+                                        Button(dim.label) {
+                                            secondaryDimension = dim
+                                        }
                                     }
                                 }
-                                .pickerStyle(.menu)
                             }
                         }
                     }

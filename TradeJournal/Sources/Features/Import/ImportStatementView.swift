@@ -51,16 +51,19 @@ public struct ImportStatementView: View {
                                     .foregroundColor(AppColors.secondaryText)
                             }
                             
-                            Picker("Select account", selection: $dataStore.selectedAccountId) {
+                            let selectedAcc = dataStore.accounts.first(where: { $0.id == dataStore.selectedAccountId })
+                            let label = selectedAcc != nil ? "\(selectedAcc!.name) (\(selectedAcc!.currency))" : "Select account"
+                            
+                            AppleMenuChip(
+                                selectionText: label,
+                                icon: "creditcard"
+                            ) {
                                 ForEach(dataStore.accounts) { acc in
-                                    Text("\(acc.name) (\(acc.currency))").tag(acc.id)
+                                    Button("\(acc.name) (\(acc.currency))") {
+                                        dataStore.selectedAccountId = acc.id
+                                    }
                                 }
                             }
-                            .pickerStyle(.menu)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .background(AppColors.secondaryBackground)
-                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                         }
                     }
                     
@@ -259,7 +262,7 @@ public struct ImportStatementView: View {
                                                             .background((fill.side == .buy ? AppColors.brand : AppColors.warning).opacity(0.12))
                                                             .clipShape(Capsule())
                                                     }
-                                                    Text("Qty: \(fill.quantity) @ \(Formatters.price(fill.price))")
+                                                    Text("Qty: \(Formatters.formatNumber(fill.quantity)) @ \(Formatters.price(fill.price))")
                                                         .font(AppTypography.caption)
                                                         .monospacedDigit()
                                                         .foregroundColor(AppColors.secondaryText)

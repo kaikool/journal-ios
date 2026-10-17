@@ -93,7 +93,7 @@ public struct AccountsManagerView: View {
                 title: "Accounts",
                 showFilters: false
             ) {
-                AppButton("New account", icon: "plus", style: .primary) {
+                AppActionPill("New account", icon: "plus", style: .brand) {
                     showNewAccountSheet = true
                 }
             }
@@ -142,57 +142,20 @@ public struct AccountsManagerView: View {
     
     private var filterAndSearchHeader: some View {
         VStack(spacing: 10) {
-            // Apple HIG Sliding Filter Bar
-            HStack(spacing: 4) {
-                ForEach(AccountFilterTab.allCases) { tab in
-                    let isSelected = filterTab == tab
-                    let count: Int = {
-                        switch tab {
-                        case .default: return defaultCount
-                        case .active: return activeCount
-                        case .visible: return visibleCount
-                        case .all: return accounts.count
-                        }
-                    }()
-                    
-                    Button {
-                        #if canImport(UIKit)
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        #endif
-                        withAnimation(.spring(response: 0.28, dampingFraction: 0.76)) {
-                            filterTab = tab
-                        }
-                    } label: {
-                        HStack(spacing: 5) {
-                            Text(tab.rawValue)
-                                .font(AppTypography.captionBold)
-                            Text("\(count)")
-                                .font(.system(size: 10, weight: .bold))
-                                .monospacedDigit()
-                                .padding(.horizontal, 5)
-                                .padding(.vertical, 1)
-                                .background(isSelected ? AppColors.brand.opacity(0.15) : AppColors.secondaryText.opacity(0.12))
-                                .clipShape(Capsule())
-                        }
-                        .foregroundColor(isSelected ? AppColors.brand : AppColors.secondaryText)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 7)
-                        .frame(maxWidth: .infinity)
-                        .background {
-                            if isSelected {
-                                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                    .fill(AppColors.cardBackground)
-                                    .shadow(color: Color.black.opacity(0.08), radius: 4, x: 0, y: 1.5)
-                                    .matchedGeometryEffect(id: "AccountFilterPill", in: accountsFilterNamespace)
-                            }
-                        }
+            // Universal Apple HIG Sliding Filter Bar
+            AppleSlidingSegmentedBar(
+                selection: $filterTab,
+                items: AccountFilterTab.allCases,
+                titleFor: { $0.rawValue },
+                badgeCountFor: { tab in
+                    switch tab {
+                    case .default: return defaultCount
+                    case .active: return activeCount
+                    case .visible: return visibleCount
+                    case .all: return accounts.count
                     }
-                    .buttonStyle(ApplePressableButtonStyle())
                 }
-            }
-            .padding(4)
-            .background(AppColors.secondaryBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            )
             .padding(.horizontal, 16)
             
             // Search Input

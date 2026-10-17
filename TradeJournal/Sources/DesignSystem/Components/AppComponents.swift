@@ -165,10 +165,14 @@ public struct AppButton: View {
     public enum Style {
         case primary, secondary, outline, destructive
     }
+    public enum Size {
+        case regular, compact
+    }
     
     private let title: String
     private let iconName: String?
     private let style: Style
+    private let size: Size
     private let isLoading: Bool
     private let action: () -> Void
     
@@ -176,12 +180,14 @@ public struct AppButton: View {
         _ title: String,
         icon: String? = nil,
         style: Style = .primary,
+        size: Size = .regular,
         isLoading: Bool = false,
         action: @escaping () -> Void
     ) {
         self.title = title
         self.iconName = icon
         self.style = style
+        self.size = size
         self.isLoading = isLoading
         self.action = action
     }
@@ -193,25 +199,26 @@ public struct AppButton: View {
             #endif
             action()
         } label: {
-            HStack(spacing: 6) {
+            HStack(spacing: size == .compact ? 4 : 6) {
                 if isLoading {
                     ProgressView()
                         .progressViewStyle(CircularProgressViewStyle(tint: foregroundColor))
                 } else if let icon = iconName {
                     Image(systemName: icon)
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: size == .compact ? 11 : 13, weight: .semibold))
                 }
                 Text(title)
-                    .font(AppTypography.bodyBold)
+                    .font(size == .compact ? AppTypography.captionBold : AppTypography.bodyBold)
+                    .lineLimit(1)
             }
-            .padding(.vertical, 9)
-            .padding(.horizontal, 14)
-            .frame(minHeight: 38)
+            .padding(.vertical, size == .compact ? 5 : 9)
+            .padding(.horizontal, size == .compact ? 10 : 14)
+            .frame(minHeight: size == .compact ? 30 : 38)
             .background(backgroundColor)
             .foregroundColor(foregroundColor)
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: size == .compact ? 8 : 10, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                RoundedRectangle(cornerRadius: size == .compact ? 8 : 10, style: .continuous)
                     .stroke(AppColors.border.opacity(0.6), lineWidth: style == .outline ? 1 : 0)
             )
             .shadow(color: style == .primary ? AppColors.brand.opacity(0.25) : Color.clear, radius: 4, x: 0, y: 2)
@@ -391,5 +398,183 @@ public struct ErrorBannerView: View {
         .padding(10)
         .background(AppColors.loss.opacity(0.12))
         .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+    }
+}
+
+// MARK: - Apple HIG iOS 27 Harmonized Navigation & Control Components
+
+/// Standardized Apple HIG Action Pill for navigation and filter bars (e.g. Add Trade, View my day, Ask AI).
+public struct AppActionPill: View {
+    private let title: String
+    private let icon: String?
+    private let isPrimary: Bool
+    private let action: () -> Void
+    
+    public init(
+        _ title: String,
+        icon: String? = nil,
+        isPrimary: Bool = true,
+        action: @escaping () -> Void
+    ) {
+        self.title = title
+        self.icon = icon
+        self.isPrimary = isPrimary
+        self.action = action
+    }
+    
+    public var body: some View {
+        Button {
+            #if os(iOS)
+            UIImpactFeedbackGenerator(style: isPrimary ? .medium : .light).impactOccurred()
+            #endif
+            action()
+        } label: {
+            HStack(spacing: 5) {
+                if let icon = icon {
+                    Image(systemName: icon)
+                        .font(.system(size: 11, weight: .semibold))
+                }
+                Text(title)
+                    .font(AppTypography.actionPill)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(isPrimary ? AppColors.brand : AppColors.secondaryBackground)
+            .foregroundColor(isPrimary ? AppColors.brandTextOnDark : AppColors.primaryText)
+            .clipShape(Capsule())
+            .shadow(color: isPrimary ? AppColors.brand.opacity(0.25) : Color.clear, radius: 4, x: 0, y: 1.5)
+        }
+        .buttonStyle(ApplePressableButtonStyle())
+    }
+}
+
+/// Standardized Apple HIG Menu Picker Chip with chevron and subtle background.
+public struct AppleMenuChip<Content: View>: View {
+    private let title: String
+    private let selectionText: String
+    private let icon: String?
+    private let menuContent: Content
+    
+    public init(
+        title: String? = nil,
+        selectionText: String,
+        icon: String? = nil,
+        @ViewBuilder menuContent: () -> Content
+    ) {
+        self.title = title ?? ""
+        self.selectionText = selectionText
+        self.icon = icon
+        self.menuContent = menuContent()
+    }
+    
+    public var body: some View {
+        Menu {
+            menuContent
+        } label: {
+            HStack(spacing: 5) {
+                if let icon = icon {
+                    Image(systemName: icon)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(AppColors.secondaryText)
+                }
+                if !title.isEmpty {
+                    Text("\(title):")
+                        .font(.system(size: 11, weight: .regular))
+                        .foregroundColor(AppColors.secondaryText)
+                }
+                Text(selectionText)
+                    .font(AppTypography.menuChip)
+                    .foregroundColor(AppColors.primaryText)
+                
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundColor(AppColors.secondaryText.opacity(0.8))
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(AppColors.secondaryBackground.opacity(0.8))
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(AppColors.border.opacity(0.6), lineWidth: 0.5)
+            )
+        }
+        .buttonStyle(ApplePressableButtonStyle())
+    }
+}
+
+/// Universal Apple HIG Sliding Segmented Bar with matched geometry, spring physics, and haptics.
+public struct AppleSlidingSegmentedBar<T: Hashable & Identifiable>: View {
+    @Binding private var selection: T
+    private let items: [T]
+    private let titleFor: (T) -> String
+    private let iconFor: ((T) -> String?)?
+    private let badgeCountFor: ((T) -> Int?)?
+    @Namespace private var segmentNamespace
+    
+    public init(
+        selection: Binding<T>,
+        items: [T],
+        titleFor: @escaping (T) -> String,
+        iconFor: ((T) -> String?)? = nil,
+        badgeCountFor: ((T) -> Int?)? = nil
+    ) {
+        self._selection = selection
+        self.items = items
+        self.titleFor = titleFor
+        self.iconFor = iconFor
+        self.badgeCountFor = badgeCountFor
+    }
+    
+    public var body: some View {
+        HStack(spacing: 2) {
+            ForEach(items) { item in
+                let isSelected = selection == item
+                Button {
+                    #if os(iOS)
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    #endif
+                    withAnimation(.spring(response: 0.32, dampingFraction: 0.78)) {
+                        selection = item
+                    }
+                } label: {
+                    HStack(spacing: 5) {
+                        if let icon = iconFor?(item) {
+                            Image(systemName: icon)
+                                .font(.system(size: 11, weight: .semibold))
+                        }
+                        Text(titleFor(item))
+                            .font(.system(size: 12, weight: isSelected ? .bold : .medium))
+                        
+                        if let count = badgeCountFor?(item), count > 0 {
+                            Text("\(count)")
+                                .font(.system(size: 10, weight: .bold))
+                                .monospacedDigit()
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 1)
+                                .background(isSelected ? AppColors.brand : AppColors.cardBackground)
+                                .foregroundColor(isSelected ? .white : AppColors.secondaryText)
+                                .clipShape(Capsule())
+                        }
+                    }
+                    .foregroundColor(isSelected ? AppColors.primaryText : AppColors.secondaryText)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 7)
+                    .background {
+                        if isSelected {
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .fill(AppColors.cardBackground)
+                                .matchedGeometryEffect(id: "ACTIVE_SEGMENT", in: segmentNamespace)
+                                .shadow(color: Color.black.opacity(0.08), radius: 3, x: 0, y: 1.5)
+                        }
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(ApplePressableButtonStyle())
+            }
+        }
+        .padding(3)
+        .background(AppColors.secondaryBackground.opacity(0.7))
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }

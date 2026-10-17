@@ -247,7 +247,7 @@ public struct DashboardView: View {
                 selectedRange: $selectedRange,
                 showFilters: true
             ) {
-                AppButton("Add trade", icon: "plus", style: .primary) {
+                AppActionPill("Add trade", icon: "plus") {
                     showAddTradeSheet = true
                 }
             }

@@ -30,7 +30,7 @@ public struct MissedTradesView: View {
                 title: "Missed trades",
                 showFilters: false
             ) {
-                AppButton("Log opportunity", icon: "plus", style: .primary) {
+                AppActionPill("Log opportunity", icon: "plus", style: .brand) {
                     editingTrade = nil
                     showAddSheet = true
                 }
@@ -185,7 +185,7 @@ public struct MissedTradesView: View {
                 if let entry = trade.entry {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Entry").font(AppTypography.caption).foregroundColor(AppColors.secondaryText)
-                        Text("\(entry)")
+                        Text(Formatters.price(entry))
                             .font(AppTypography.captionBold)
                             .monospacedDigit()
                             .foregroundColor(AppColors.primaryText)
@@ -194,7 +194,7 @@ public struct MissedTradesView: View {
                 if let stop = trade.stop {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Stop").font(AppTypography.caption).foregroundColor(AppColors.secondaryText)
-                        Text("\(stop)")
+                        Text(Formatters.price(stop))
                             .font(AppTypography.captionBold)
                             .monospacedDigit()
                             .foregroundColor(AppColors.loss)
@@ -203,7 +203,7 @@ public struct MissedTradesView: View {
                 if let target = trade.target {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Target").font(AppTypography.caption).foregroundColor(AppColors.secondaryText)
-                        Text("\(target)")
+                        Text(Formatters.price(target))
                             .font(AppTypography.captionBold)
                             .monospacedDigit()
                             .foregroundColor(AppColors.profit)
