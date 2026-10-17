@@ -1,6 +1,15 @@
 import SwiftUI
 import Charts
 
+public enum DashboardChartTab: String, CaseIterable, Identifiable {
+    case equity = "Equity"
+    case drawdown = "Drawdown"
+    case session = "Sessions"
+    case weekday = "Weekdays"
+    
+    public var id: String { rawValue }
+}
+
 public struct DashboardView: View {
     @EnvironmentObject private var env: AppEnvironment
     @ObservedObject private var dataStore = TradeDataStore.shared
