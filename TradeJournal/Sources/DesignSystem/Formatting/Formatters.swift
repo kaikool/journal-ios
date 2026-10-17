@@ -110,6 +110,24 @@ public enum Formatters {
         return priceFormatter.string(from: value as NSDecimalNumber) ?? "\(value)"
     }
     
+    public static func formatNumber(_ value: Decimal) -> String {
+        return priceFormatter.string(from: value as NSDecimalNumber) ?? "\(value)"
+    }
+    
+    public static func formatNumber(_ value: Double) -> String {
+        return priceFormatter.string(from: NSNumber(value: value)) ?? "\(value)"
+    }
+    
+    public static func formatNumber(_ value: Decimal?) -> String {
+        guard let v = value else { return "-" }
+        return formatNumber(v)
+    }
+    
+    public static func formatNumber(_ value: Double?) -> String {
+        guard let v = value else { return "-" }
+        return formatNumber(v)
+    }
+    
     /// Định dạng thời gian theo múi giờ chỉ định
     public static func dateTime(_ date: Date, timeZone: TimeZone = .current) -> String {
         let f = DateFormatter()

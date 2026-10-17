@@ -446,7 +446,7 @@ public struct DashboardView: View {
                             }
                             
                             AppMonetaryText(
-                                Formatters.formatPnL(trade.netPnl, currency: trade.currency),
+                                Formatters.formatPnL(trade.netPnl, currency: env.currentCurrency),
                                 isPrivate: env.isPrivacyModeEnabled,
                                 font: AppTypography.financialNumber(size: 13, weight: .semibold),
                                 color: trade.netPnl >= 0 ? AppColors.profit : AppColors.loss
