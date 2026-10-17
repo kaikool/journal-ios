@@ -131,6 +131,9 @@ public struct DashboardCustomizerSheet: View {
                             Toggle("", isOn: Binding(
                                 get: { !hiddenCardIds.contains(card.id) },
                                 set: { isVisible in
+                                    #if os(iOS)
+                                    UISelectionFeedbackGenerator().selectionChanged()
+                                    #endif
                                     withAnimation {
                                         if isVisible {
                                             hiddenCardIds.remove(card.id)
@@ -153,9 +156,15 @@ public struct DashboardCustomizerSheet: View {
             .background(AppColors.background)
             .navigationTitle("Dashboard cards")
             .navigationBarTitleDisplayMode(.inline)
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+            .presentationCornerRadius(28)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Done") {
+                        #if os(iOS)
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        #endif
                         dismiss()
                     }
                     .font(AppTypography.bodyBold)

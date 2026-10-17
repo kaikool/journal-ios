@@ -85,7 +85,12 @@ public struct TradeDetailView: View {
                                 color: trade.status == .win ? AppColors.profit : (trade.status == .loss ? AppColors.loss : AppColors.breakeven)
                             )
                             Spacer()
-                            Button(action: { showReplayView = true }) {
+                            Button {
+                                #if os(iOS)
+                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                #endif
+                                showReplayView = true
+                            } label: {
                                 HStack(spacing: 4) {
                                     Image(systemName: "play.circle.fill")
                                     Text("Replay")
@@ -93,10 +98,11 @@ public struct TradeDetailView: View {
                                 .font(AppTypography.captionBold)
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 4)
-                                .background(AppColors.accent.opacity(0.15))
-                                .foregroundColor(AppColors.accent)
-                                .cornerRadius(12)
+                                .background(AppColors.brand.opacity(0.15))
+                                .foregroundColor(AppColors.brand)
+                                .clipShape(Capsule())
                             }
+                            .buttonStyle(ApplePressableButtonStyle())
                         }
                         
                         Divider().background(AppColors.border)
@@ -106,9 +112,12 @@ public struct TradeDetailView: View {
                                 Text("Net P&L")
                                     .font(AppTypography.caption)
                                     .foregroundColor(AppColors.secondaryText)
-                                Text(Formatters.formatPnL(trade.netPnl, currency: env.currentCurrency))
-                                    .font(AppTypography.financialNumber(size: 24, weight: .bold))
-                                    .foregroundColor(Formatters.pnlColor(trade.netPnl))
+                                AppMonetaryText(
+                                    Formatters.formatPnL(trade.netPnl, currency: env.currentCurrency),
+                                    isPrivate: env.isPrivacyModeEnabled,
+                                    font: AppTypography.financialNumber(size: 24, weight: .bold),
+                                    color: Formatters.pnlColor(trade.netPnl)
+                                )
                             }
                             Spacer()
                             VStack(alignment: .trailing, spacing: 2) {
@@ -117,6 +126,7 @@ public struct TradeDetailView: View {
                                     .foregroundColor(AppColors.secondaryText)
                                 Text("\(trade.quantity)")
                                     .font(AppTypography.financialNumber(size: 20, weight: .bold))
+                                    .monospacedDigit()
                                     .foregroundColor(AppColors.primaryText)
                             }
                         }

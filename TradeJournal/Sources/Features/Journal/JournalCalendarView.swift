@@ -211,9 +211,15 @@ public struct JournalCalendarView: View {
                         }
                     }
                 )
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(28)
             }
             .sheet(isPresented: $showAddTradeSheet) {
                 AddTradeSheet(initialDate: addTradeDate ?? Date())
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
+                    .presentationCornerRadius(28)
             }
         }
     }
@@ -221,6 +227,9 @@ public struct JournalCalendarView: View {
     // MARK: - Instant Day Selection Handler
     
     private func openDayDetail(for dateKey: String) {
+        #if os(iOS)
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        #endif
         let stats = dailyStatsMap[dateKey]
         let trades = tradesByDateMap[dateKey] ?? []
         let note = dataStore.calendarNotes[dateKey] ?? JournalNote(date: dateKey)
@@ -326,10 +335,12 @@ public struct JournalCalendarView: View {
             // 7 Days of the Week
             ForEach(0..<7, id: \.self) { dayIndex in
                 if dayIndex < week.days.count, let day = week.days[dayIndex] {
-                    dayCellView(day: day)
-                        .onTapGesture {
-                            openDayDetail(for: day.date)
-                        }
+                    Button {
+                        openDayDetail(for: day.date)
+                    } label: {
+                        dayCellView(day: day)
+                    }
+                    .buttonStyle(ApplePressableButtonStyle())
                 } else {
                     Color.clear
                         .frame(maxWidth: .infinity)
@@ -388,7 +399,7 @@ public struct JournalCalendarView: View {
         .frame(maxWidth: .infinity)
         .frame(height: 52)
         .background(
-            RoundedRectangle(cornerRadius: 6)
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .fill(
                     traded
                         ? (isProfit ? AppColors.profit.opacity(intensity) : AppColors.loss.opacity(intensity))
@@ -396,10 +407,10 @@ public struct JournalCalendarView: View {
                 )
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 6)
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .stroke(
                     isToday ? AppColors.brand : (traded ? AppColors.border.opacity(0.6) : Color.clear),
-                    lineWidth: isToday ? 1.5 : 0.5
+                    lineWidth: isToday ? 1.5 : 0.6
                 )
         )
     }

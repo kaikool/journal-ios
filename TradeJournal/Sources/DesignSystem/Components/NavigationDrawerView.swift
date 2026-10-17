@@ -229,7 +229,7 @@ public struct NavigationDrawerView: View {
                     .stroke(isActive ? AppColors.brand.opacity(0.25) : Color.clear, lineWidth: 1)
             )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ApplePressableButtonStyle())
     }
     
     // MARK: - Footer Control Dock

@@ -122,12 +122,14 @@ public struct DailyJournalListView: View {
                             Text("View my day")
                                 .font(AppTypography.captionBold)
                         }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 7)
                         .background(AppColors.brand)
-                        .foregroundColor(.white)
-                        .cornerRadius(6)
+                        .foregroundColor(AppColors.brandTextOnDark)
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .shadow(color: AppColors.brand.opacity(0.25), radius: 4, x: 0, y: 2)
                     }
+                    .buttonStyle(ApplePressableButtonStyle())
                 }
                 
                 ScrollView {
@@ -151,11 +153,11 @@ public struct DailyJournalListView: View {
                         .padding(.horizontal, 10)
                         .padding(.vertical, 7)
                         .background(AppColors.cardBackground)
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .stroke(AppColors.border, lineWidth: 1)
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
                         )
-                        .cornerRadius(6)
                         .padding(.horizontal, 14)
                         .padding(.top, 10)
                         
@@ -182,7 +184,7 @@ public struct DailyJournalListView: View {
                                     NavigationLink(destination: DailyJournalDetailView(date: day.date)) {
                                         dayRowCard(day)
                                     }
-                                    .buttonStyle(.plain)
+                                    .buttonStyle(ApplePressableButtonStyle())
                                 }
                             }
                             .padding(.horizontal, 14)

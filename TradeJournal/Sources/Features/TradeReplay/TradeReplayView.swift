@@ -226,63 +226,110 @@ public struct TradeReplayView: View {
                 // Playback controls row
                 HStack(spacing: 16) {
                     // Restart
-                    Button(action: { resetReplay() }) {
+                    Button {
+                        #if os(iOS)
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        #endif
+                        resetReplay()
+                    } label: {
                         Image(systemName: "backward.end.fill")
-                            .font(.system(size: 16))
+                            .font(.system(size: 15))
                             .foregroundColor(AppColors.primaryText)
-                            .frame(width: 32, height: 32)
-                            .background(AppColors.secondaryBackground)
-                            .cornerRadius(8)
+                            .frame(width: 36, height: 36)
+                            .background(AppColors.cardBackground.opacity(0.85))
+                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
+                            )
                     }
+                    .buttonStyle(ApplePressableButtonStyle())
                     .disabled(bars.isEmpty)
                     
                     // Step back
-                    Button(action: { step(by: -1) }) {
+                    Button {
+                        #if os(iOS)
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        #endif
+                        step(by: -1)
+                    } label: {
                         Image(systemName: "chevron.left")
                             .font(.system(size: 14, weight: .bold))
                             .foregroundColor(currentStep <= 1 ? AppColors.secondaryText.opacity(0.3) : AppColors.primaryText)
-                            .frame(width: 32, height: 32)
-                            .background(AppColors.secondaryBackground)
-                            .cornerRadius(8)
+                            .frame(width: 36, height: 36)
+                            .background(AppColors.cardBackground.opacity(0.85))
+                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
+                            )
                     }
+                    .buttonStyle(ApplePressableButtonStyle())
                     .disabled(currentStep <= 1 || bars.isEmpty)
                     
                     // Play / Pause
-                    Button(action: { togglePlay() }) {
+                    Button {
+                        #if os(iOS)
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        #endif
+                        togglePlay()
+                    } label: {
                         HStack(spacing: 6) {
                             Image(systemName: isPlaying ? "pause.fill" : "play.fill")
                                 .font(.system(size: 14))
                             Text(isPlaying ? "Pause" : "Play")
                                 .font(AppTypography.captionBold)
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .background(AppColors.accent)
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 9)
+                        .background(AppColors.brand)
                         .foregroundColor(.white)
-                        .cornerRadius(20)
+                        .clipShape(Capsule())
+                        .shadow(color: AppColors.brand.opacity(0.3), radius: 4, x: 0, y: 2)
                     }
+                    .buttonStyle(ApplePressableButtonStyle())
                     .disabled(bars.isEmpty)
                     
                     // Step forward
-                    Button(action: { step(by: 1) }) {
+                    Button {
+                        #if os(iOS)
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        #endif
+                        step(by: 1)
+                    } label: {
                         Image(systemName: "chevron.right")
                             .font(.system(size: 14, weight: .bold))
                             .foregroundColor(currentStep >= bars.count ? AppColors.secondaryText.opacity(0.3) : AppColors.primaryText)
-                            .frame(width: 32, height: 32)
-                            .background(AppColors.secondaryBackground)
-                            .cornerRadius(8)
+                            .frame(width: 36, height: 36)
+                            .background(AppColors.cardBackground.opacity(0.85))
+                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
+                            )
                     }
+                    .buttonStyle(ApplePressableButtonStyle())
                     .disabled(currentStep >= bars.count || bars.isEmpty)
                     
                     // Forward to end
-                    Button(action: { forwardToEnd() }) {
+                    Button {
+                        #if os(iOS)
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        #endif
+                        forwardToEnd()
+                    } label: {
                         Image(systemName: "forward.end.fill")
-                            .font(.system(size: 16))
+                            .font(.system(size: 15))
                             .foregroundColor(AppColors.primaryText)
-                            .frame(width: 32, height: 32)
-                            .background(AppColors.secondaryBackground)
-                            .cornerRadius(8)
+                            .frame(width: 36, height: 36)
+                            .background(AppColors.cardBackground.opacity(0.85))
+                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
+                            )
                     }
+                    .buttonStyle(ApplePressableButtonStyle())
                     .disabled(bars.isEmpty)
                     
                     Spacer()

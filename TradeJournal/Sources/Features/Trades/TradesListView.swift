@@ -227,7 +227,7 @@ public struct TradesListView: View {
                     NavigationLink(destination: TradeDetailView(trade: trade)) {
                         TradeTerminalRow(trade: trade)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ApplePressableButtonStyle())
                 }
             }
         }
@@ -283,6 +283,11 @@ private struct TradeTerminalRow: View {
                         .font(AppTypography.caption)
                         .foregroundColor(AppColors.secondaryText)
                 }
+                
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(AppColors.secondaryText.opacity(0.6))
+                    .padding(.leading, 2)
             }
         }
     }

@@ -108,6 +108,9 @@ public struct AccountsManagerView: View {
         }
         .sheet(isPresented: $showNewAccountSheet) {
             CreateAccountSheet()
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(28)
         }
         .alert("Delete Account", isPresented: $showDeleteAlert, presenting: accountToDelete) { acc in
             Button("Delete", role: .destructive) {
@@ -153,6 +156,10 @@ public struct AccountsManagerView: View {
             .padding(.vertical, 8)
             .background(AppColors.secondaryBackground)
             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
+            )
             .padding(.horizontal, 16)
         }
     }
@@ -160,17 +167,25 @@ public struct AccountsManagerView: View {
     @ViewBuilder
     private func filterButton(title: String, tab: AccountFilterTab) -> some View {
         Button {
-            filterTab = tab
+            if filterTab != tab {
+                #if os(iOS)
+                UISelectionFeedbackGenerator().selectionChanged()
+                #endif
+                withAnimation(.spring(response: 0.28, dampingFraction: 0.72)) {
+                    filterTab = tab
+                }
+            }
         } label: {
             Text(title)
-                .font(AppTypography.captionBold)
+                .font(.system(size: 12, weight: filterTab == tab ? .bold : .medium, design: .rounded))
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
                 .background(filterTab == tab ? AppColors.brand : AppColors.secondaryBackground)
                 .foregroundColor(filterTab == tab ? AppColors.brandTextOnDark : AppColors.primaryText)
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .clipShape(Capsule())
+                .shadow(color: filterTab == tab ? AppColors.brand.opacity(0.25) : Color.clear, radius: 4, x: 0, y: 2)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ApplePressableButtonStyle())
     }
     
     private var bulkVisibilityBar: some View {
@@ -180,34 +195,58 @@ public struct AccountsManagerView: View {
                 .foregroundColor(AppColors.secondaryText)
             
             Button("Active only") {
+                #if os(iOS)
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                #endif
                 dataStore.setBulkAccountVisibility(action: "select-active")
             }
             .font(.system(size: 11, weight: .medium))
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
+            .padding(.horizontal, 9)
+            .padding(.vertical, 5)
             .background(AppColors.cardBackground)
             .foregroundColor(AppColors.primaryText)
-            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
+            )
+            .buttonStyle(ApplePressableButtonStyle())
             
             Button("Show all") {
+                #if os(iOS)
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                #endif
                 dataStore.setBulkAccountVisibility(action: "select-all")
             }
             .font(.system(size: 11, weight: .medium))
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
+            .padding(.horizontal, 9)
+            .padding(.vertical, 5)
             .background(AppColors.cardBackground)
             .foregroundColor(AppColors.primaryText)
-            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
+            )
+            .buttonStyle(ApplePressableButtonStyle())
             
             Button("Hide all") {
+                #if os(iOS)
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                #endif
                 dataStore.setBulkAccountVisibility(action: "deselect-all")
             }
             .font(.system(size: 11, weight: .medium))
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
+            .padding(.horizontal, 9)
+            .padding(.vertical, 5)
             .background(AppColors.cardBackground)
             .foregroundColor(AppColors.secondaryText)
-            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
+            )
+            .buttonStyle(ApplePressableButtonStyle())
             
             Spacer()
         }
@@ -275,15 +314,21 @@ public struct AccountsManagerView: View {
                     
                     // Primary active view button
                     if !isSelected {
-                        Button("Select") {
+                        Button {
+                            #if os(iOS)
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            #endif
                             dataStore.selectAccount(id: acc.id)
+                        } label: {
+                            Text("Select")
+                                .font(.system(size: 11, weight: .semibold))
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 4)
+                                .background(AppColors.brand.opacity(0.12))
+                                .foregroundColor(AppColors.brand)
+                                .clipShape(Capsule())
                         }
-                        .font(.system(size: 11, weight: .semibold))
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
-                        .background(AppColors.brand.opacity(0.12))
-                        .foregroundColor(AppColors.brand)
-                        .clipShape(Capsule())
+                        .buttonStyle(ApplePressableButtonStyle())
                     } else {
                         Text("Viewing")
                             .font(.system(size: 11, weight: .semibold))

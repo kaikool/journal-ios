@@ -75,7 +75,17 @@ public struct AppRatioBar: View {
     }
 }
 
-/// Status badge matching Tailwind `badge.tsx`:
+public struct ApplePressableButtonStyle: ButtonStyle {
+    public init() {}
+    public func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.96 : 1.0)
+            .opacity(configuration.isPressed ? 0.92 : 1.0)
+            .animation(.spring(response: 0.28, dampingFraction: 0.72), value: configuration.isPressed)
+    }
+}
+
+/// Status badge matching Apple HIG and Tailwind `badge.tsx`:
 /// - profit: green with translucent background
 /// - loss: red with translucent background
 /// - secondary: dark gray secondary background
@@ -112,22 +122,22 @@ public struct AppBadge: View {
     
     public var body: some View {
         Text(text)
-            .font(AppTypography.badge)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2.5)
+            .font(.system(size: 10, weight: .bold, design: .rounded))
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3)
             .background(backgroundColor)
             .foregroundColor(foregroundColor)
-            .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+            .clipShape(Capsule())
             .overlay(
-                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                Capsule()
                     .stroke(borderColor, lineWidth: variant == .outline ? 1 : 0)
             )
     }
     
     private var backgroundColor: Color {
         switch variant {
-        case .profit: return AppColors.profit.opacity(0.15)
-        case .loss: return AppColors.loss.opacity(0.15)
+        case .profit: return AppColors.profit.opacity(0.14)
+        case .loss: return AppColors.loss.opacity(0.14)
         case .secondary: return AppColors.secondaryBackground
         case .outline: return Color.clear
         }
@@ -150,7 +160,7 @@ public struct AppBadge: View {
     }
 }
 
-/// Standardized Trading Terminal button
+/// Standardized Apple HIG Trading Terminal button with spring physics and haptics
 public struct AppButton: View {
     public enum Style {
         case primary, secondary, outline, destructive
@@ -177,28 +187,36 @@ public struct AppButton: View {
     }
     
     public var body: some View {
-        Button(action: action) {
+        Button {
+            #if os(iOS)
+            UIImpactFeedbackGenerator(style: style == .primary ? .medium : .light).impactOccurred()
+            #endif
+            action()
+        } label: {
             HStack(spacing: 6) {
                 if isLoading {
                     ProgressView()
                         .progressViewStyle(CircularProgressViewStyle(tint: foregroundColor))
                 } else if let icon = iconName {
                     Image(systemName: icon)
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.system(size: 13, weight: .semibold))
                 }
                 Text(title)
                     .font(AppTypography.bodyBold)
             }
-            .padding(.vertical, 8)
-            .padding(.horizontal, 12)
+            .padding(.vertical, 9)
+            .padding(.horizontal, 14)
+            .frame(minHeight: 38)
             .background(backgroundColor)
             .foregroundColor(foregroundColor)
-            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .stroke(AppColors.border, lineWidth: style == .outline ? 1 : 0)
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(AppColors.border.opacity(0.6), lineWidth: style == .outline ? 1 : 0)
             )
+            .shadow(color: style == .primary ? AppColors.brand.opacity(0.25) : Color.clear, radius: 4, x: 0, y: 2)
         }
+        .buttonStyle(ApplePressableButtonStyle())
         .disabled(isLoading)
     }
     
@@ -242,6 +260,7 @@ public struct AppMonetaryText: View {
     public var body: some View {
         Text(isPrivate ? "••••" : valueText)
             .font(font)
+            .monospacedDigit()
             .foregroundColor(color)
     }
 }

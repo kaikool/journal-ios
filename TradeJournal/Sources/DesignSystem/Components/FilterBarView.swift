@@ -59,6 +59,9 @@ public struct FilterBarView<Actions: View>: View {
                     // Account Selector Dropdown Pill (port 1:1 from account-selector.tsx)
                     Menu {
                         Button {
+                            #if os(iOS)
+                            UISelectionFeedbackGenerator().selectionChanged()
+                            #endif
                             dataStore.selectedAccountId = "all"
                         } label: {
                             HStack {
@@ -73,6 +76,9 @@ public struct FilterBarView<Actions: View>: View {
                         
                         ForEach(dataStore.visibleAccounts) { acc in
                             Button {
+                                #if os(iOS)
+                                UISelectionFeedbackGenerator().selectionChanged()
+                                #endif
                                 dataStore.selectedAccountId = acc.id
                             } label: {
                                 HStack {
@@ -90,7 +96,7 @@ public struct FilterBarView<Actions: View>: View {
                                 .foregroundColor(AppColors.secondaryText)
                             
                             Text(currentAccountName)
-                                .font(AppTypography.captionMedium)
+                                .font(.system(size: 12, weight: .medium))
                                 .foregroundColor(AppColors.primaryText)
                                 .lineLimit(1)
                             
@@ -98,13 +104,13 @@ public struct FilterBarView<Actions: View>: View {
                                 .font(.system(size: 8, weight: .bold))
                                 .foregroundColor(AppColors.secondaryText)
                         }
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 5)
-                        .background(AppColors.secondaryBackground)
-                        .cornerRadius(6)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(AppColors.cardBackground.opacity(0.9))
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 6)
-                                .stroke(AppColors.border, lineWidth: 1)
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
                         )
                     }
                     
@@ -112,47 +118,64 @@ public struct FilterBarView<Actions: View>: View {
                     HStack(spacing: 2) {
                         ForEach(JournalTimeRange.allCases) { range in
                             Button {
-                                selectedRange = range
+                                if selectedRange != range {
+                                    #if os(iOS)
+                                    UISelectionFeedbackGenerator().selectionChanged()
+                                    #endif
+                                    withAnimation(.spring(response: 0.28, dampingFraction: 0.72)) {
+                                        selectedRange = range
+                                    }
+                                }
                             } label: {
                                 Text(range.rawValue)
-                                    .font(AppTypography.captionMedium)
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 4)
-                                    .background(selectedRange == range ? AppColors.secondaryBackground : Color.clear)
+                                    .font(.system(size: 11, weight: selectedRange == range ? .bold : .medium, design: .rounded))
+                                    .padding(.horizontal, 7)
+                                    .padding(.vertical, 4.5)
+                                    .background(
+                                        selectedRange == range ?
+                                        AppColors.secondaryBackground : Color.clear
+                                    )
                                     .foregroundColor(selectedRange == range ? AppColors.primaryText : AppColors.secondaryText)
-                                    .cornerRadius(4)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                    .shadow(color: selectedRange == range ? Color.black.opacity(0.06) : Color.clear, radius: 2, x: 0, y: 1)
                             }
                         }
                     }
-                    .padding(2)
-                    .background(AppColors.cardBackground)
-                    .cornerRadius(6)
+                    .padding(2.5)
+                    .background(AppColors.cardBackground.opacity(0.9))
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 6)
-                            .stroke(AppColors.border, lineWidth: 1)
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
                     )
                     
                     Spacer()
                     
                     // Filter Dialog Button
                     if let onFilter = onOpenFilterDialog {
-                        Button(action: onFilter) {
+                        Button {
+                            #if os(iOS)
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            #endif
+                            onFilter()
+                        } label: {
                             HStack(spacing: 4) {
                                 Image(systemName: "slider.horizontal.3")
-                                    .font(.system(size: 10))
+                                    .font(.system(size: 11))
                                 Text(activeFilterCount > 0 ? "Filters · \(activeFilterCount)" : "Filters")
-                                    .font(AppTypography.captionMedium)
+                                    .font(.system(size: 12, weight: .medium))
                             }
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 5)
-                            .background(AppColors.cardBackground)
-                            .foregroundColor(AppColors.secondaryText)
-                            .cornerRadius(6)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(AppColors.cardBackground.opacity(0.9))
+                            .foregroundColor(activeFilterCount > 0 ? AppColors.brand : AppColors.secondaryText)
+                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                             .overlay(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .stroke(AppColors.border, lineWidth: 1)
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .stroke(activeFilterCount > 0 ? AppColors.brand.opacity(0.4) : AppColors.border.opacity(0.6), lineWidth: 0.8)
                             )
                         }
+                        .buttonStyle(ApplePressableButtonStyle())
                     }
                 }
             }

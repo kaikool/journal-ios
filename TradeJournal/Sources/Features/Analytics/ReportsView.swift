@@ -107,6 +107,9 @@ public struct ReportsView: View {
                 showFilters: true
             ) {
                 Button {
+                    #if os(iOS)
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    #endif
                     showAiReflectionSheet = true
                 } label: {
                     HStack(spacing: 4) {
@@ -114,12 +117,14 @@ public struct ReportsView: View {
                         Text("Ask AI")
                     }
                     .font(AppTypography.captionBold)
-                    .padding(.horizontal, 10)
+                    .padding(.horizontal, 11)
                     .padding(.vertical, 6)
                     .background(AppColors.brand)
                     .foregroundColor(AppColors.brandTextOnDark)
-                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .clipShape(Capsule())
+                    .shadow(color: AppColors.brand.opacity(0.3), radius: 4, x: 0, y: 2)
                 }
+                .buttonStyle(ApplePressableButtonStyle())
             }
             
             ScrollView {
@@ -129,21 +134,29 @@ public struct ReportsView: View {
                         HStack(spacing: 6) {
                             ForEach(ReportMode.allCases) { mode in
                                 Button {
-                                    selectedMode = mode
+                                    if selectedMode != mode {
+                                        #if os(iOS)
+                                        UISelectionFeedbackGenerator().selectionChanged()
+                                        #endif
+                                        withAnimation(.spring(response: 0.28, dampingFraction: 0.72)) {
+                                            selectedMode = mode
+                                        }
+                                    }
                                 } label: {
                                     Text(mode.rawValue)
-                                        .font(AppTypography.captionMedium)
-                                        .padding(.horizontal, 10)
+                                        .font(.system(size: 12, weight: selectedMode == mode ? .bold : .medium, design: .rounded))
+                                        .padding(.horizontal, 11)
                                         .padding(.vertical, 6)
                                         .background(selectedMode == mode ? AppColors.brand : AppColors.cardBackground)
                                         .foregroundColor(selectedMode == mode ? AppColors.brandTextOnDark : AppColors.primaryText)
-                                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                                        .clipShape(Capsule())
                                         .overlay(
-                                            RoundedRectangle(cornerRadius: 6)
-                                                .stroke(selectedMode == mode ? Color.clear : AppColors.border, lineWidth: 1)
+                                            Capsule()
+                                                .stroke(selectedMode == mode ? Color.clear : AppColors.border.opacity(0.6), lineWidth: 0.8)
                                         )
+                                        .shadow(color: selectedMode == mode ? AppColors.brand.opacity(0.25) : Color.clear, radius: 4, x: 0, y: 2)
                                 }
-                                .buttonStyle(.plain)
+                                .buttonStyle(ApplePressableButtonStyle())
                             }
                         }
                         .padding(.horizontal, 14)
@@ -170,9 +183,15 @@ public struct ReportsView: View {
         }
         .sheet(isPresented: $showAiReflectionSheet) {
             AIReflectionView()
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(28)
         }
         .sheet(isPresented: $showExportSheet) {
             ReviewExportModal(title: "Trade report", exportText: exportText)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(28)
         }
     }
     

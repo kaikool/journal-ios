@@ -16,21 +16,32 @@ public struct ShellHeaderView: View {
         HStack(spacing: 8) {
             // Hamburger button
             Button {
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                #if os(iOS)
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                #endif
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
                     env.isDrawerOpen.toggle()
                 }
             } label: {
                 Image(systemName: "line.3.horizontal")
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.system(size: 15, weight: .semibold))
                     .foregroundColor(AppColors.primaryText)
-                    .frame(width: 34, height: 34)
-                    .background(AppColors.secondaryBackground)
-                    .cornerRadius(8)
+                    .frame(width: 36, height: 36)
+                    .background(AppColors.cardBackground.opacity(0.85))
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
+                    )
             }
+            .buttonStyle(ApplePressableButtonStyle())
             .accessibilityLabel("Toggle navigation drawer")
             
             // Brand Logo & Title (matching web Link href="/")
             Button {
+                #if os(iOS)
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                #endif
                 env.selectedTab = .dashboard
             } label: {
                 HStack(spacing: 8) {
@@ -48,6 +59,9 @@ public struct ShellHeaderView: View {
             
             // Global Sync Button (icon-only in mobile header)
             Button {
+                #if os(iOS)
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                #endif
                 Task {
                     if The5ersService.shared.isConfigured {
                         _ = try? await dataStore.syncWithThe5ers()
@@ -61,55 +75,64 @@ public struct ShellHeaderView: View {
                     .foregroundColor(dataStore.isSyncing ? AppColors.brand : AppColors.secondaryText)
                     .rotationEffect(dataStore.isSyncing ? .degrees(360) : .zero)
                     .animation(dataStore.isSyncing ? Animation.linear(duration: 1).repeatForever(autoreverses: false) : .default, value: dataStore.isSyncing)
-                    .frame(width: 32, height: 32)
-                    .background(AppColors.cardBackground)
-                    .cornerRadius(8)
+                    .frame(width: 36, height: 36)
+                    .background(AppColors.cardBackground.opacity(0.85))
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(AppColors.border, lineWidth: 1)
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
                     )
             }
+            .buttonStyle(ApplePressableButtonStyle())
             .accessibilityLabel("Sync accounts")
             
             // Privacy Toggle Button
             Button {
+                #if os(iOS)
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                #endif
                 env.togglePrivacyMode()
             } label: {
                 Image(systemName: env.isPrivacyModeEnabled ? "eye.slash.fill" : "eye")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(env.isPrivacyModeEnabled ? AppColors.brand : AppColors.secondaryText)
-                    .frame(width: 32, height: 32)
-                    .background(AppColors.cardBackground)
-                    .cornerRadius(8)
+                    .frame(width: 36, height: 36)
+                    .background(AppColors.cardBackground.opacity(0.85))
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(AppColors.border, lineWidth: 1)
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
                     )
             }
+            .buttonStyle(ApplePressableButtonStyle())
             .accessibilityLabel("Toggle privacy mode")
             
             // Theme Toggle Button (Light / Dark mode)
             Button {
+                #if os(iOS)
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                #endif
                 env.toggleTheme()
             } label: {
-                Image(systemName: env.appTheme == .dark ? "sun.max" : "moon")
+                Image(systemName: env.appTheme == .dark ? "sun.max.fill" : "moon.fill")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(AppColors.secondaryText)
-                    .frame(width: 32, height: 32)
-                    .background(AppColors.cardBackground)
-                    .cornerRadius(8)
+                    .frame(width: 36, height: 36)
+                    .background(AppColors.cardBackground.opacity(0.85))
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(AppColors.border, lineWidth: 1)
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
                     )
             }
+            .buttonStyle(ApplePressableButtonStyle())
             .accessibilityLabel("Toggle theme")
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
-        .background(AppColors.background.opacity(0.95))
+        .background(.ultraThinMaterial)
         .overlay(
-            Divider().background(AppColors.border),
+            Divider().background(AppColors.border.opacity(0.4)),
             alignment: .bottom
         )
     }

@@ -50,6 +50,9 @@ public struct PlaybooksView: View {
             NewPlaybookSheet { newPb in
                 dataStore.savePlaybook(newPb)
             }
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+            .presentationCornerRadius(28)
         }
         .alert("Delete “\(playbookToDelete?.title ?? "")”?", isPresented: $showDeleteConfirmation) {
             Button("Cancel", role: .cancel) { playbookToDelete = nil }
@@ -79,6 +82,9 @@ public struct PlaybooksView: View {
                     .padding(.horizontal, 16)
                 
                 Button {
+                    #if os(iOS)
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    #endif
                     showNewPlaybookSheet = true
                 } label: {
                     Text("New playbook")
@@ -87,8 +93,10 @@ public struct PlaybooksView: View {
                         .padding(.horizontal, 16)
                         .padding(.vertical, 8)
                         .background(AppColors.brand)
-                        .cornerRadius(8)
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .shadow(color: AppColors.brand.opacity(0.3), radius: 4, x: 0, y: 2)
                 }
+                .buttonStyle(ApplePressableButtonStyle())
             }
             .padding(.vertical, 32)
             .frame(maxWidth: .infinity)
@@ -107,7 +115,7 @@ public struct PlaybooksView: View {
             )) {
                 playbookCard(summary: summary)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ApplePressableButtonStyle())
         }
     }
     

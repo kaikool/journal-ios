@@ -133,25 +133,32 @@ public struct SettingsView: View {
             HStack(spacing: 8) {
                 ForEach(SettingsSection.allCases) { section in
                     Button {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            activeSection = section
+                        if activeSection != section {
+                            #if os(iOS)
+                            UISelectionFeedbackGenerator().selectionChanged()
+                            #endif
+                            withAnimation(.spring(response: 0.28, dampingFraction: 0.72)) {
+                                activeSection = section
+                            }
                         }
                     } label: {
                         HStack(spacing: 6) {
                             Image(systemName: section.iconName)
                             Text(section.label)
                         }
-                        .font(.system(size: 13, weight: activeSection == section ? .semibold : .regular))
+                        .font(.system(size: 13, weight: activeSection == section ? .bold : .medium, design: .rounded))
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
-                        .background(activeSection == section ? AppColors.accent : AppColors.cardBackground)
-                        .foregroundColor(activeSection == section ? .white : AppColors.primaryText)
-                        .cornerRadius(20)
+                        .background(activeSection == section ? AppColors.brand : AppColors.cardBackground)
+                        .foregroundColor(activeSection == section ? AppColors.brandTextOnDark : AppColors.primaryText)
+                        .clipShape(Capsule())
                         .overlay(
-                            RoundedRectangle(cornerRadius: 20)
-                                .stroke(activeSection == section ? Color.clear : AppColors.border, lineWidth: 1)
+                            Capsule()
+                                .stroke(activeSection == section ? Color.clear : AppColors.border.opacity(0.6), lineWidth: 0.8)
                         )
+                        .shadow(color: activeSection == section ? AppColors.brand.opacity(0.25) : Color.clear, radius: 4, x: 0, y: 2)
                     }
+                    .buttonStyle(ApplePressableButtonStyle())
                 }
             }
             .padding(.horizontal)
@@ -1520,11 +1527,12 @@ public struct SettingsCard<Content: View>: View {
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(AppColors.cardBackground)
-        .cornerRadius(12)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(AppColors.border, lineWidth: 1)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
         )
+        .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 2)
     }
 }
 

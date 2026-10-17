@@ -163,52 +163,67 @@ public struct RootTabView: View {
     
     private var bottomNavigationBar: some View {
         HStack(spacing: 0) {
-            bottomBarItem(tab: .dashboard, label: "Dashboard", icon: "square.grid.2x2")
-            bottomBarItem(tab: .calendar, label: "Calendar", icon: "calendar")
-            bottomBarItem(tab: .journal, label: "Journal", icon: "book.closed")
-            bottomBarItem(tab: .trades, label: "Trades", icon: "list.number")
-            bottomBarItem(tab: .reports, label: "Reports", icon: "chart.bar.xaxis")
+            bottomBarItem(tab: .dashboard, label: "Dashboard", icon: "square.grid.2x2", selectedIcon: "square.grid.2x2.fill")
+            bottomBarItem(tab: .calendar, label: "Calendar", icon: "calendar", selectedIcon: "calendar.badge.clock")
+            bottomBarItem(tab: .journal, label: "Journal", icon: "book.closed", selectedIcon: "book.closed.fill")
+            bottomBarItem(tab: .trades, label: "Trades", icon: "list.bullet.rectangle", selectedIcon: "list.bullet.rectangle.fill")
+            bottomBarItem(tab: .reports, label: "Reports", icon: "chart.bar", selectedIcon: "chart.bar.xaxis")
             
             // Menu / More button
             Button {
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                #if os(iOS)
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                #endif
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
                     env.isDrawerOpen.toggle()
                 }
             } label: {
                 VStack(spacing: 3) {
                     Image(systemName: "line.3.horizontal")
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.system(size: 17, weight: .semibold))
                     Text("Menu")
-                        .font(AppTypography.badge)
+                        .font(.system(size: 10, weight: env.isDrawerOpen ? .bold : .medium))
                 }
                 .foregroundColor(env.isDrawerOpen ? AppColors.brand : AppColors.secondaryText)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 8)
+                .frame(height: 48)
             }
+            .buttonStyle(ApplePressableButtonStyle())
         }
         .padding(.horizontal, 4)
-        .background(AppColors.cardBackground)
+        .background(.ultraThinMaterial)
         .overlay(
-            Divider().background(AppColors.border),
+            Divider().background(AppColors.border.opacity(0.4)),
             alignment: .top
         )
     }
     
-    private func bottomBarItem(tab: AppTab, label: String, icon: String) -> some View {
+    private func bottomBarItem(tab: AppTab, label: String, icon: String, selectedIcon: String) -> some View {
         let isSelected = env.selectedTab == tab
         
         return Button {
-            env.selectedTab = tab
+            if !isSelected {
+                #if os(iOS)
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                #endif
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.72)) {
+                    env.selectedTab = tab
+                }
+            }
         } label: {
             VStack(spacing: 3) {
-                Image(systemName: icon)
-                    .font(.system(size: 16, weight: isSelected ? .bold : .regular))
+                Image(systemName: isSelected ? selectedIcon : icon)
+                    .font(.system(size: 17, weight: isSelected ? .semibold : .regular))
+                    .scaleEffect(isSelected ? 1.08 : 1.0)
+                    .animation(.spring(response: 0.28, dampingFraction: 0.65), value: isSelected)
+                
                 Text(label)
-                    .font(isSelected ? AppTypography.captionBold : AppTypography.badge)
+                    .font(.system(size: 10, weight: isSelected ? .bold : .medium))
             }
             .foregroundColor(isSelected ? AppColors.brand : AppColors.secondaryText)
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 8)
+            .frame(height: 48)
         }
+        .buttonStyle(ApplePressableButtonStyle())
     }
 }

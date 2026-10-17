@@ -87,9 +87,15 @@ public struct NotebookView: View {
                 initialFolderId: note.folderId,
                 activeFolders: activeFolders
             )
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+            .presentationCornerRadius(28)
         }
         .sheet(isPresented: $showNewFolderSheet) {
             newFolderSheet
+                .presentationDetents([.medium])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(28)
         }
         .alert("Delete “\(folderToDelete?.name ?? "")”?", isPresented: $showDeleteFolderAlert) {
             Button("Cancel", role: .cancel) { folderToDelete = nil }
@@ -143,10 +149,10 @@ public struct NotebookView: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 7)
         .background(AppColors.secondaryBackground)
-        .cornerRadius(8)
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(AppColors.border, lineWidth: 1)
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
         )
     }
     
@@ -162,13 +168,20 @@ public struct NotebookView: View {
                     }.count
                     
                     Button {
-                        selectedFolderId = folder.id
+                        if selectedFolderId != folder.id {
+                            #if os(iOS)
+                            UISelectionFeedbackGenerator().selectionChanged()
+                            #endif
+                            withAnimation(.spring(response: 0.28, dampingFraction: 0.72)) {
+                                selectedFolderId = folder.id
+                            }
+                        }
                     } label: {
                         HStack(spacing: 6) {
                             Image(systemName: folderIcon(for: folder))
                                 .font(.system(size: 12))
                             Text(folder.name)
-                                .font(.system(size: 12, weight: isSelected ? .semibold : .regular))
+                                .font(.system(size: 12, weight: isSelected ? .bold : .medium, design: .rounded))
                             Text("\(count)")
                                 .font(.system(size: 10, weight: .bold))
                                 .padding(.horizontal, 5)
@@ -193,13 +206,17 @@ public struct NotebookView: View {
                         .padding(.vertical, 6)
                         .background(isSelected ? AppColors.brand : AppColors.secondaryBackground)
                         .foregroundColor(isSelected ? AppColors.brandTextOnDark : AppColors.primaryText)
-                        .cornerRadius(16)
+                        .clipShape(Capsule())
+                        .shadow(color: isSelected ? AppColors.brand.opacity(0.25) : Color.clear, radius: 4, x: 0, y: 2)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ApplePressableButtonStyle())
                 }
                 
                 // Add new folder button
                 Button {
+                    #if os(iOS)
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    #endif
                     newFolderName = ""
                     folderError = nil
                     showNewFolderSheet = true
@@ -208,19 +225,19 @@ public struct NotebookView: View {
                         Image(systemName: "plus")
                             .font(.system(size: 11, weight: .bold))
                         Text("New folder")
-                            .font(.system(size: 12, weight: .medium))
+                            .font(.system(size: 12, weight: .medium, design: .rounded))
                     }
-                    .padding(.horizontal, 10)
+                    .padding(.horizontal, 11)
                     .padding(.vertical, 6)
                     .background(AppColors.secondaryBackground)
                     .foregroundColor(AppColors.brand)
-                    .cornerRadius(16)
+                    .clipShape(Capsule())
                     .overlay(
-                        RoundedRectangle(cornerRadius: 16)
-                            .stroke(AppColors.brand.opacity(0.4), lineWidth: 1)
+                        Capsule()
+                            .stroke(AppColors.brand.opacity(0.4), lineWidth: 0.8)
                     )
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ApplePressableButtonStyle())
             }
             .padding(.horizontal, 14)
         }
@@ -233,6 +250,9 @@ public struct NotebookView: View {
             LazyVStack(spacing: 10) {
                 ForEach(filteredNotes) { note in
                     Button {
+                        #if os(iOS)
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        #endif
                         editingNote = note
                     } label: {
                         AppCard {
@@ -250,7 +270,7 @@ public struct NotebookView: View {
                                             .padding(.vertical, 2)
                                             .background(AppColors.secondaryBackground)
                                             .foregroundColor(AppColors.secondaryText)
-                                            .cornerRadius(4)
+                                            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                                     }
                                 }
                                 
@@ -280,7 +300,7 @@ public struct NotebookView: View {
                             }
                         }
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ApplePressableButtonStyle())
                 }
             }
             .padding(14)
