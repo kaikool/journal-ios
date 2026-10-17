@@ -6,8 +6,9 @@ import UIKit
 /// Navigation drawer matching Apple iOS Design Guidelines & Web Shell Parity:
 /// - Native Apple `.ultraThinMaterial` frosted glass translucency
 /// - Dynamic continuous curvature edge (24pt trailing radius) with elevation shadow
-/// - Distinct section headers ("TRADING" & "WORKSPACE") with 44pt Apple touch targets
-/// - SF Symbol icon badges with active brand accents and subtle status chevrons
+/// - Clean, unboxed SF Symbol icons following Apple HIG standard
+/// - Crisp brand vector mark without double background wrappers
+/// - Professional active account subtitle (no unprofessional "online v1.0" tag)
 /// - Glass control dock at bottom: Cloud sync action, Theme mode toggle, and Privacy toggle
 public struct NavigationDrawerView: View {
     @EnvironmentObject private var env: AppEnvironment
@@ -21,6 +22,16 @@ public struct NavigationDrawerView: View {
     
     private var setupNavTabs: [AppTab] {
         AppTab.allCases.filter { $0.isSetupSection }
+    }
+    
+    private var activeAccountScope: String {
+        if dataStore.isSyncing {
+            return "Syncing..."
+        }
+        if dataStore.selectedAccountId == "all" {
+            return "All accounts"
+        }
+        return dataStore.accounts.first(where: { $0.id == dataStore.selectedAccountId })?.name ?? "Trading Terminal"
     }
     
     public var body: some View {
@@ -83,7 +94,7 @@ public struct NavigationDrawerView: View {
                 topTrailingRadius: 24,
                 style: .continuous
             )
-            .stroke(AppColors.border.opacity(0.7), lineWidth: 1)
+            .stroke(AppColors.border.opacity(0.5), lineWidth: 0.8)
         )
     }
     
@@ -93,35 +104,30 @@ public struct NavigationDrawerView: View {
     private var headerView: some View {
         VStack(spacing: 0) {
             HStack(spacing: 12) {
-                // App Logo Icon with subtle gradient glow
-                ZStack {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [AppColors.brand, AppColors.brand.opacity(0.8)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: 36, height: 36)
-                        .shadow(color: AppColors.brand.opacity(0.35), radius: 6, x: 0, y: 3)
-                    
-                    TradeJournalMarkView(size: 20, color: .white)
-                }
+                // Standalone Brand Vector Mark (Zero enclosing background box)
+                TradeJournalBrandMark(size: 28)
                 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Trade Journal")
-                        .font(.system(size: 17, weight: .bold, design: .rounded))
+                        .font(.system(size: 16, weight: .bold, design: .rounded))
                         .foregroundColor(AppColors.primaryText)
                     
-                    HStack(spacing: 5) {
-                        Circle()
-                            .fill(dataStore.isSyncing ? AppColors.brand : AppColors.profit)
-                            .frame(width: 6, height: 6)
-                        
-                        Text(dataStore.isSyncing ? "Syncing..." : "Online · v1.0")
+                    if dataStore.isSyncing {
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.triangle.2.circlepath")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundColor(AppColors.brand)
+                                .rotationEffect(dataStore.isSyncing ? .degrees(360) : .zero)
+                                .animation(Animation.linear(duration: 1).repeatForever(autoreverses: false), value: dataStore.isSyncing)
+                            Text("Syncing...")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundColor(AppColors.brand)
+                        }
+                    } else {
+                        Text(activeAccountScope)
                             .font(.system(size: 11, weight: .medium))
                             .foregroundColor(AppColors.secondaryText)
+                            .lineLimit(1)
                     }
                 }
                 
@@ -130,7 +136,7 @@ public struct NavigationDrawerView: View {
                 // Native Apple Circular Close Button
                 Button {
                     triggerHaptic()
-                    withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
+                    withAnimation(.spring(response: 0.34, dampingFraction: 0.84)) {
                         env.isDrawerOpen = false
                     }
                 } label: {
@@ -141,13 +147,14 @@ public struct NavigationDrawerView: View {
                         .background(AppColors.secondaryBackground.opacity(0.8))
                         .clipShape(Circle())
                 }
+                .buttonStyle(ApplePressableButtonStyle())
                 .accessibilityLabel("Close navigation drawer")
             }
             .padding(.horizontal, 16)
             .padding(.top, 54)
             .padding(.bottom, 14)
             
-            Divider().background(AppColors.border.opacity(0.6))
+            Divider().background(AppColors.border.opacity(0.4))
         }
     }
     
@@ -164,7 +171,7 @@ public struct NavigationDrawerView: View {
             .padding(.bottom, 2)
     }
     
-    // MARK: - Navigation Row (44pt Apple HIG Standard)
+    // MARK: - Navigation Row (44pt Apple HIG Standard, Clean Icon Without Boxes)
     
     @ViewBuilder
     private func navRow(for tab: AppTab) -> some View {
@@ -173,21 +180,16 @@ public struct NavigationDrawerView: View {
         Button {
             triggerHaptic()
             env.selectedTab = tab
-            withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
+            withAnimation(.spring(response: 0.34, dampingFraction: 0.84)) {
                 env.isDrawerOpen = false
             }
         } label: {
             HStack(spacing: 12) {
-                // SF Symbol Icon Badge
-                ZStack {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(isActive ? AppColors.brand : AppColors.secondaryBackground.opacity(0.7))
-                        .frame(width: 30, height: 30)
-                    
-                    Image(systemName: tab.iconName)
-                        .font(.system(size: 14, weight: isActive ? .semibold : .regular))
-                        .foregroundColor(isActive ? .white : AppColors.secondaryText)
-                }
+                // Clean SF Symbol Icon (no background box, Apple HIG standard)
+                Image(systemName: isActive ? tab.selectedIconName : tab.iconName)
+                    .font(.system(size: 16, weight: isActive ? .semibold : .regular))
+                    .foregroundColor(isActive ? AppColors.brand : AppColors.secondaryText)
+                    .frame(width: 24, height: 24, alignment: .center)
                 
                 Text(tab.rawValue)
                     .font(.system(size: 14, weight: isActive ? .semibold : .medium))
@@ -207,7 +209,7 @@ public struct NavigationDrawerView: View {
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
                         .background(AppColors.secondaryBackground.opacity(0.6))
-                        .cornerRadius(6)
+                        .clipShape(Capsule())
                 } else if tab == .accounts && !dataStore.accounts.isEmpty {
                     Text("\(dataStore.accounts.count)")
                         .font(.system(size: 11, weight: .medium, design: .monospaced))
@@ -215,7 +217,7 @@ public struct NavigationDrawerView: View {
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
                         .background(AppColors.secondaryBackground.opacity(0.6))
-                        .cornerRadius(6)
+                        .clipShape(Capsule())
                 }
             }
             .padding(.horizontal, 10)
@@ -237,7 +239,7 @@ public struct NavigationDrawerView: View {
     @ViewBuilder
     private var footerControlDock: some View {
         VStack(spacing: 8) {
-            Divider().background(AppColors.border.opacity(0.6))
+            Divider().background(AppColors.border.opacity(0.4))
             
             VStack(spacing: 8) {
                 // Global Cloud Sync Row
@@ -273,13 +275,13 @@ public struct NavigationDrawerView: View {
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
                     .background(AppColors.secondaryBackground.opacity(0.6))
-                    .cornerRadius(10)
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 10)
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
                             .stroke(AppColors.border.opacity(0.4), lineWidth: 0.5)
                     )
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ApplePressableButtonStyle())
                 
                 // Inline Side-by-Side Controls (Theme + Privacy)
                 HStack(spacing: 8) {
@@ -300,13 +302,13 @@ public struct NavigationDrawerView: View {
                         .frame(maxWidth: .infinity)
                         .frame(height: 36)
                         .background(AppColors.secondaryBackground.opacity(0.6))
-                        .cornerRadius(8)
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 8)
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
                                 .stroke(AppColors.border.opacity(0.4), lineWidth: 0.5)
                         )
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ApplePressableButtonStyle())
                     
                     // Privacy Mode Toggle
                     Button {
@@ -325,13 +327,13 @@ public struct NavigationDrawerView: View {
                         .frame(maxWidth: .infinity)
                         .frame(height: 36)
                         .background(AppColors.secondaryBackground.opacity(0.6))
-                        .cornerRadius(8)
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 8)
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
                                 .stroke(env.isPrivacyModeEnabled ? AppColors.brand.opacity(0.4) : AppColors.border.opacity(0.4), lineWidth: 0.5)
                         )
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ApplePressableButtonStyle())
                 }
             }
             .padding(.horizontal, 12)

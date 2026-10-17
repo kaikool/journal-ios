@@ -19,7 +19,7 @@ public struct ShellHeaderView: View {
                 #if os(iOS)
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 #endif
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
+                withAnimation(.spring(response: 0.34, dampingFraction: 0.84)) {
                     env.isDrawerOpen.toggle()
                 }
             } label: {

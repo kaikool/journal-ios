@@ -79,7 +79,7 @@ public enum AppTab: String, CaseIterable, Identifiable {
         case .dashboard: return "square.grid.2x2"
         case .calendar: return "calendar"
         case .journal: return "book.closed"
-        case .trades: return "list.number"
+        case .trades: return "list.bullet.rectangle"
         case .reports: return "chart.bar.xaxis"
         case .propFirms: return "building.columns"
         case .notebook: return "note.text"
@@ -89,6 +89,24 @@ public enum AppTab: String, CaseIterable, Identifiable {
         case .importTrades: return "square.and.arrow.down"
         case .accounts: return "creditcard"
         case .settings: return "gearshape"
+        }
+    }
+    
+    public var selectedIconName: String {
+        switch self {
+        case .dashboard: return "square.grid.2x2.fill"
+        case .calendar: return "calendar.badge.clock"
+        case .journal: return "book.closed.fill"
+        case .trades: return "list.bullet.rectangle.fill"
+        case .reports: return "chart.bar.xaxis"
+        case .propFirms: return "building.columns.fill"
+        case .notebook: return "note.text"
+        case .playbooks: return "book.fill"
+        case .progress: return "checklist.checked"
+        case .missed: return "bookmark.fill"
+        case .importTrades: return "square.and.arrow.down.fill"
+        case .accounts: return "creditcard.fill"
+        case .settings: return "gearshape.fill"
         }
     }
     

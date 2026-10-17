@@ -12,13 +12,33 @@ public struct RootTabView: View {
     
     public init() {}
     
+    private var drawerXOffset: CGFloat {
+        if isDragging {
+            if env.isDrawerOpen {
+                return min(0, max(-drawerWidth, dragOffset))
+            } else {
+                return min(0, -drawerWidth + max(0, dragOffset))
+            }
+        } else {
+            return env.isDrawerOpen ? 0 : -drawerWidth
+        }
+    }
+    
+    private var scrimOpacity: Double {
+        if isDragging {
+            if env.isDrawerOpen {
+                let ratio = (drawerWidth + dragOffset) / drawerWidth
+                return max(0, min(0.45, 0.45 * Double(ratio)))
+            } else {
+                let ratio = dragOffset / drawerWidth
+                return max(0, min(0.45, 0.45 * Double(ratio)))
+            }
+        } else {
+            return env.isDrawerOpen ? 0.45 : 0.0
+        }
+    }
+    
     public var body: some View {
-        let isDrawerActive = env.isDrawerOpen
-        let currentOffset: CGFloat = isDrawerActive 
-            ? max(-drawerWidth, min(0, dragOffset)) 
-            : min(0, -drawerWidth + max(0, dragOffset))
-        let progress: CGFloat = max(0, min(1, (drawerWidth + currentOffset) / drawerWidth))
-        
         ZStack(alignment: .leading) {
             // Main Application Content Canvas with Layered Parallax Scale
             VStack(spacing: 0) {
@@ -62,38 +82,40 @@ public struct RootTabView: View {
                 bottomNavigationBar
             }
             .background(AppColors.background.ignoresSafeArea())
-            .disabled(progress > 0.1)
+            .scaleEffect(env.isDrawerOpen ? 0.98 : 1.0)
+            .animation(.spring(response: 0.34, dampingFraction: 0.84), value: env.isDrawerOpen)
+            .disabled(env.isDrawerOpen)
             
-            // Native Apple Dimmed Frosted Backdrop
-            if progress > 0.001 {
-                ZStack {
-                    Rectangle()
-                        .fill(.ultraThinMaterial)
-                        .opacity(Double(progress))
-                    
-                    Color.black
-                        .opacity(0.4 * Double(progress))
-                }
+            // Native Apple Dimmed Scrim Backdrop (smooth GPU alpha fade)
+            Color.black
+                .opacity(scrimOpacity)
                 .ignoresSafeArea()
+                .animation(isDragging ? nil : .spring(response: 0.34, dampingFraction: 0.84), value: env.isDrawerOpen)
+                .allowsHitTesting(env.isDrawerOpen || isDragging)
                 .onTapGesture {
-                    withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
-                        env.isDrawerOpen = false
-                        dragOffset = 0
-                    }
                     #if canImport(UIKit)
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     #endif
+                    withAnimation(.spring(response: 0.34, dampingFraction: 0.84)) {
+                        env.isDrawerOpen = false
+                        dragOffset = 0
+                    }
                 }
-            }
             
-            // Elevated Apple HIG Translucent Drawer with Shadow
-            if progress > 0.001 {
-                NavigationDrawerView()
-                    .frame(width: drawerWidth)
-                    .offset(x: currentOffset)
-                    .shadow(color: Color.black.opacity(0.3 * Double(progress)), radius: 32, x: 10, y: 0)
-                    .ignoresSafeArea(.container, edges: .vertical)
-            }
+            // Elevated Apple HIG Translucent Drawer (Hardware-accelerated offset)
+            NavigationDrawerView()
+                .frame(width: drawerWidth)
+                .offset(x: drawerXOffset)
+                .animation(isDragging ? nil : .spring(response: 0.34, dampingFraction: 0.84), value: env.isDrawerOpen)
+                .animation(isDragging ? nil : .spring(response: 0.34, dampingFraction: 0.84), value: dragOffset)
+                .shadow(
+                    color: Color.black.opacity(env.isDrawerOpen || (isDragging && dragOffset > -drawerWidth) ? 0.32 : 0),
+                    radius: 28,
+                    x: 8,
+                    y: 0
+                )
+                .ignoresSafeArea(.container, edges: .vertical)
+                .allowsHitTesting(env.isDrawerOpen || isDragging)
         }
         .preferredColorScheme(env.colorScheme)
         .gesture(
@@ -105,7 +127,7 @@ public struct RootTabView: View {
                     
                     if !isDragging {
                         if !env.isDrawerOpen {
-                            if startX <= 45 && transX > 10 && abs(transX) > abs(transY) * 1.2 {
+                            if startX <= 38 && transX > 10 && abs(transX) > abs(transY) * 1.2 {
                                 isDragging = true
                             }
                         } else {
@@ -130,29 +152,29 @@ public struct RootTabView: View {
                     
                     if !env.isDrawerOpen {
                         if dragOffset > drawerWidth * 0.28 || velocity > 150 {
-                            withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
-                                env.isDrawerOpen = true
-                                dragOffset = 0
-                            }
                             #if canImport(UIKit)
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
                             #endif
+                            withAnimation(.spring(response: 0.34, dampingFraction: 0.84)) {
+                                env.isDrawerOpen = true
+                                dragOffset = 0
+                            }
                         } else {
-                            withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
+                            withAnimation(.spring(response: 0.34, dampingFraction: 0.84)) {
                                 dragOffset = 0
                             }
                         }
                     } else {
                         if dragOffset < -drawerWidth * 0.22 || velocity < -150 {
-                            withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
-                                env.isDrawerOpen = false
-                                dragOffset = 0
-                            }
                             #if canImport(UIKit)
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
                             #endif
+                            withAnimation(.spring(response: 0.34, dampingFraction: 0.84)) {
+                                env.isDrawerOpen = false
+                                dragOffset = 0
+                            }
                         } else {
-                            withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
+                            withAnimation(.spring(response: 0.34, dampingFraction: 0.84)) {
                                 dragOffset = 0
                             }
                         }
@@ -174,7 +196,7 @@ public struct RootTabView: View {
                 #if os(iOS)
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 #endif
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
+                withAnimation(.spring(response: 0.34, dampingFraction: 0.84)) {
                     env.isDrawerOpen.toggle()
                 }
             } label: {
