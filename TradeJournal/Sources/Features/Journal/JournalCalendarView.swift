@@ -121,70 +121,8 @@ public struct JournalCalendarView: View {
                 
                 ScrollView {
                     VStack(spacing: 12) {
-                        // Month Totals Card
-                        AppCard {
-                            HStack {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    AppCardHeader("Net P&L")
-                                    AppMonetaryText(
-                                        Formatters.formatPnL(monthNetPnl, currency: env.currentCurrency),
-                                        isPrivate: env.isPrivacyModeEnabled,
-                                        font: AppTypography.financialNumber(size: 20, weight: .semibold),
-                                        color: monthNetPnl >= 0 ? AppColors.profit : AppColors.loss
-                                    )
-                                }
-                                
-                                Spacer()
-                                
-                                let monthTrades = dailyStatsMap.filter { $0.key.hasPrefix(String(format: "%04d-%02d", year, month)) }
-                                    .reduce(0) { $0 + $1.value.trades }
-                                
-                                VStack(alignment: .trailing, spacing: 2) {
-                                    AppCardHeader("Trades")
-                                    Text("\(monthTrades)")
-                                        .font(AppTypography.financialNumber(size: 20, weight: .semibold))
-                                        .foregroundColor(AppColors.primaryText)
-                                }
-                            }
-                        }
-                        
-                        // Calendar Grid Card
-                        AppCard {
-                            VStack(spacing: 8) {
-                                // Weekday headers
-                                let headers = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
-                                HStack(spacing: 4) {
-                                    ForEach(headers, id: \.self) { header in
-                                        Text(header)
-                                            .font(AppTypography.cardTitle)
-                                            .foregroundColor(AppColors.secondaryText)
-                                            .frame(maxWidth: .infinity)
-                                    }
-                                }
-                                
-                                Divider().background(AppColors.border)
-                                
-                                // Day cells grid
-                                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 7), spacing: 4) {
-                                    ForEach(0..<daysInMonth.count, id: \.self) { index in
-                                        if let date = daysInMonth[index] {
-                                            let key = dateKey(for: date)
-                                            let stats = dailyStatsMap[key]
-                                            let hasNote = dataStore.calendarNotes[key] != nil
-                                            
-                                            dayCell(date: date, key: key, stats: stats, hasNote: hasNote)
-                                                .onTapGesture {
-                                                    selectedDateKey = key
-                                                    showDayDetailSheet = true
-                                                }
-                                        } else {
-                                            Color.clear
-                                                .frame(height: 52)
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                        monthTotalsCard
+                        calendarGridCard
                     }
                     .padding(14)
                 }
@@ -209,6 +147,78 @@ public struct JournalCalendarView: View {
             }
             .sheet(isPresented: $showAddTradeForDate) {
                 AddTradeSheet(initialDate: initialDateForSelectedKey())
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var monthTotalsCard: some View {
+        let isProfit = monthNetPnl >= 0
+        let pnlColor = isProfit ? AppColors.profit : AppColors.loss
+        let monthTrades = dailyStatsMap.filter { $0.key.hasPrefix(String(format: "%04d-%02d", year, month)) }
+            .reduce(0) { $0 + $1.value.trades }
+        
+        AppCard {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    AppCardHeader("Net P&L")
+                    AppMonetaryText(
+                        Formatters.formatPnL(monthNetPnl, currency: env.currentCurrency),
+                        isPrivate: env.isPrivacyModeEnabled,
+                        font: AppTypography.financialNumber(size: 20, weight: .semibold),
+                        color: pnlColor
+                    )
+                }
+                
+                Spacer()
+                
+                VStack(alignment: .trailing, spacing: 2) {
+                    AppCardHeader("Trades")
+                    Text("\(monthTrades)")
+                        .font(AppTypography.financialNumber(size: 20, weight: .semibold))
+                        .foregroundColor(AppColors.primaryText)
+                }
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var calendarGridCard: some View {
+        let headers = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+        
+        AppCard {
+            VStack(spacing: 8) {
+                // Weekday headers
+                HStack(spacing: 4) {
+                    ForEach(headers, id: \.self) { header in
+                        Text(header)
+                            .font(AppTypography.cardTitle)
+                            .foregroundColor(AppColors.secondaryText)
+                            .frame(maxWidth: .infinity)
+                    }
+                }
+                
+                Divider().background(AppColors.border)
+                
+                // Day cells grid
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 7), spacing: 4) {
+                    ForEach(0..<daysInMonth.count, id: \.self) { index in
+                        if let date = daysInMonth[index] {
+                            let key = dateKey(for: date)
+                            let stats = dailyStatsMap[key]
+                            let hasNote = dataStore.calendarNotes[key] != nil
+                            
+                            dayCell(date: date, key: key, stats: stats, hasNote: hasNote)
+                                .onTapGesture {
+                                    selectedDateKey = key
+                                    showDayDetailSheet = true
+                                }
+                        } else {
+                            Color.clear
+                                .frame(height: 52)
+                        }
+                    }
+                }
             }
         }
     }
@@ -318,128 +328,12 @@ public struct DayDetailSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 14) {
-                    // Summary Card
-                    AppCard {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                AppCardHeader("Net P&L")
-                                AppMonetaryText(
-                                    Formatters.formatPnL(stats?.netPnl ?? .zero, currency: env.currentCurrency),
-                                    isPrivate: env.isPrivacyModeEnabled,
-                                    font: AppTypography.financialNumber(size: 22, weight: .bold),
-                                    color: (stats?.netPnl ?? .zero) >= 0 ? AppColors.profit : AppColors.loss
-                                )
-                            }
-                            
-                            Spacer()
-                            
-                            VStack(alignment: .trailing, spacing: 2) {
-                                AppCardHeader("Trades")
-                                Text("\(stats?.trades ?? trades.count)")
-                                    .font(AppTypography.financialNumber(size: 22, weight: .bold))
-                                    .foregroundColor(AppColors.primaryText)
-                            }
-                        }
-                    }
-                    
-                    // Daily Note Card
-                    AppCard {
-                        VStack(alignment: .leading, spacing: 10) {
-                            HStack {
-                                AppCardHeader("Daily Note")
-                                Spacer()
-                                HStack(spacing: 4) {
-                                    ForEach(1...5, id: \.self) { star in
-                                        Image(systemName: star <= rating ? "star.fill" : "star")
-                                            .font(.system(size: 13))
-                                            .foregroundColor(star <= rating ? .yellow : AppColors.mutedText)
-                                            .onTapGesture {
-                                                rating = (rating == star) ? 0 : star
-                                                save()
-                                            }
-                                    }
-                                }
-                            }
-                            
-                            TextField("Write thoughts or notes for this day...", text: $noteContent, axis: .vertical)
-                                .lineLimit(3...6)
-                                .font(AppTypography.body)
-                                .foregroundColor(AppColors.primaryText)
-                                .padding(10)
-                                .background(AppColors.secondaryBackground)
-                                .cornerRadius(6)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 6)
-                                        .stroke(AppColors.border, lineWidth: 1)
-                                )
-                                .onChange(of: noteContent) { _ in
-                                    save()
-                                }
-                        }
-                    }
-                    
-                    // Day's Trades
+                    summaryCard
+                    noteCard
                     if !trades.isEmpty {
-                        AppCard {
-                            VStack(alignment: .leading, spacing: 10) {
-                                AppCardHeader("Trades (\(trades.count))")
-                                
-                                ForEach(trades) { trade in
-                                    HStack {
-                                        AppBadge(trade.status.rawValue.uppercased(), color: Formatters.statusColor(trade.status))
-                                        Text(trade.symbol)
-                                            .font(AppTypography.bodyBold)
-                                            .foregroundColor(AppColors.primaryText)
-                                        Spacer()
-                                        AppMonetaryText(
-                                            Formatters.formatPnL(trade.netPnl, currency: env.currentCurrency),
-                                            isPrivate: env.isPrivacyModeEnabled,
-                                            font: AppTypography.financialNumber(size: 13, weight: .semibold),
-                                            color: trade.netPnl >= 0 ? AppColors.profit : AppColors.loss
-                                        )
-                                    }
-                                    .padding(.vertical, 4)
-                                    
-                                    if trade.id != trades.last?.id {
-                                        Divider().background(AppColors.border)
-                                    }
-                                }
-                            }
-                        }
+                        tradesCard
                     }
-                    
-                    // Action Buttons
-                    HStack(spacing: 10) {
-                        Button(action: onAddTrade) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "plus")
-                                Text("Add Trade")
-                            }
-                            .font(AppTypography.captionBold)
-                            .foregroundColor(AppColors.brandTextOnDark)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 38)
-                            .background(AppColors.brand)
-                            .cornerRadius(6)
-                        }
-                        
-                        NavigationLink(destination: DailyJournalDetailView(date: dateKey)) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "doc.text")
-                                Text("Full Journal")
-                            }
-                            .font(AppTypography.captionBold)
-                            .foregroundColor(AppColors.primaryText)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 38)
-                            .background(AppColors.cardBackground)
-                            .cornerRadius(6)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .stroke(AppColors.border, lineWidth: 1)
-                            )
-                        }
-                    }
+                    actionButtons
                 }
                 .padding(14)
             }
@@ -454,6 +348,147 @@ public struct DayDetailSheet: View {
                     .font(AppTypography.captionBold)
                     .foregroundColor(AppColors.brand)
                 }
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var summaryCard: some View {
+        let netPnl = stats?.netPnl ?? .zero
+        let isProfit = netPnl >= 0
+        let pnlColor = isProfit ? AppColors.profit : AppColors.loss
+        let tradeCount = stats?.trades ?? trades.count
+        
+        AppCard {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    AppCardHeader("Net P&L")
+                    AppMonetaryText(
+                        Formatters.formatPnL(netPnl, currency: env.currentCurrency),
+                        isPrivate: env.isPrivacyModeEnabled,
+                        font: AppTypography.financialNumber(size: 22, weight: .bold),
+                        color: pnlColor
+                    )
+                }
+                
+                Spacer()
+                
+                VStack(alignment: .trailing, spacing: 2) {
+                    AppCardHeader("Trades")
+                    Text("\(tradeCount)")
+                        .font(AppTypography.financialNumber(size: 22, weight: .bold))
+                        .foregroundColor(AppColors.primaryText)
+                }
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var noteCard: some View {
+        AppCard {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    AppCardHeader("Daily Note")
+                    Spacer()
+                    HStack(spacing: 4) {
+                        ForEach(1...5, id: \.self) { star in
+                            Image(systemName: star <= rating ? "star.fill" : "star")
+                                .font(.system(size: 13))
+                                .foregroundColor(star <= rating ? .yellow : AppColors.mutedText)
+                                .onTapGesture {
+                                    rating = (rating == star) ? 0 : star
+                                    save()
+                                }
+                        }
+                    }
+                }
+                
+                TextField("Write thoughts or notes for this day...", text: $noteContent, axis: .vertical)
+                    .lineLimit(3...6)
+                    .font(AppTypography.body)
+                    .foregroundColor(AppColors.primaryText)
+                    .padding(10)
+                    .background(AppColors.secondaryBackground)
+                    .cornerRadius(6)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6)
+                            .stroke(AppColors.border, lineWidth: 1)
+                    )
+                    .onChange(of: noteContent) { _ in
+                        save()
+                    }
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var tradesCard: some View {
+        AppCard {
+            VStack(alignment: .leading, spacing: 10) {
+                AppCardHeader("Trades (\(trades.count))")
+                
+                ForEach(trades) { trade in
+                    tradeRow(trade)
+                    if trade.id != trades.last?.id {
+                        Divider().background(AppColors.border)
+                    }
+                }
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func tradeRow(_ trade: Trade) -> some View {
+        let isProfit = trade.netPnl >= 0
+        let pnlColor = isProfit ? AppColors.profit : AppColors.loss
+        
+        HStack {
+            AppBadge(trade.status.rawValue.uppercased(), color: Formatters.statusColor(trade.status))
+            Text(trade.symbol)
+                .font(AppTypography.bodyBold)
+                .foregroundColor(AppColors.primaryText)
+            Spacer()
+            AppMonetaryText(
+                Formatters.formatPnL(trade.netPnl, currency: env.currentCurrency),
+                isPrivate: env.isPrivacyModeEnabled,
+                font: AppTypography.financialNumber(size: 13, weight: .semibold),
+                color: pnlColor
+            )
+        }
+        .padding(.vertical, 4)
+    }
+    
+    @ViewBuilder
+    private var actionButtons: some View {
+        HStack(spacing: 10) {
+            Button(action: onAddTrade) {
+                HStack(spacing: 6) {
+                    Image(systemName: "plus")
+                    Text("Add Trade")
+                }
+                .font(AppTypography.captionBold)
+                .foregroundColor(AppColors.brandTextOnDark)
+                .frame(maxWidth: .infinity)
+                .frame(height: 38)
+                .background(AppColors.brand)
+                .cornerRadius(6)
+            }
+            
+            NavigationLink(destination: DailyJournalDetailView(date: dateKey)) {
+                HStack(spacing: 6) {
+                    Image(systemName: "doc.text")
+                    Text("Full Journal")
+                }
+                .font(AppTypography.captionBold)
+                .foregroundColor(AppColors.primaryText)
+                .frame(maxWidth: .infinity)
+                .frame(height: 38)
+                .background(AppColors.cardBackground)
+                .cornerRadius(6)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(AppColors.border, lineWidth: 1)
+                )
             }
         }
     }
