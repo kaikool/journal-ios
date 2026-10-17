@@ -31,7 +31,6 @@ public struct JournalCalendarView: View {
     @State private var showDayDetailSheet: Bool = false
     @State private var showAddTradeForDate: Bool = false
     @State private var showDailyTable: Bool = false
-    @State private var showFilterSheet: Bool = false
     
     public init() {}
     
@@ -92,11 +91,7 @@ public struct JournalCalendarView: View {
                 // Header FilterBar matching calendar/page.tsx
                 FilterBarView(
                     title: "Calendar",
-                    showFilters: true,
-                    activeFilterCount: dataStore.hasActiveFilters ? 1 : 0,
-                    onOpenFilterDialog: {
-                        showFilterSheet = true
-                    }
+                    showFilters: false
                 ) {
                     HStack(spacing: 6) {
                         Button(action: { changeMonth(by: -1) }) {
@@ -170,9 +165,6 @@ public struct JournalCalendarView: View {
             }
             .sheet(isPresented: $showAddTradeForDate) {
                 AddTradeSheet(initialDate: initialDateForSelectedKey())
-            }
-            .sheet(isPresented: $showFilterSheet) {
-                TradeFilterSheet()
             }
         }
     }
