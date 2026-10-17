@@ -31,38 +31,12 @@ public struct PlaybooksView: View {
             
             ScrollView {
                 VStack(spacing: 12) {
-                // Header card
-                AppCard {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Image(systemName: "book.pages.fill")
-                                .foregroundColor(AppColors.accent)
-                            Text("Playbooks & Kỷ Luật Tuân Thủ")
-                                .font(AppTypography.headline)
-                        }
-                        Text("Đo lường sự khác biệt về kết quả tài chính giữa việc tuân thủ 100% quy tắc và việc phá vỡ nguyên tắc.")
-                            .font(AppTypography.caption)
-                            .foregroundColor(AppColors.secondaryText)
-                    }
-                }
-                
-                if dataStore.playbooks.isEmpty {
-                    EmptyStateView(
-                        icon: "book.closed",
-                        title: "Chưa có Playbook",
-                        message: "Tạo chiến lược giao dịch đầu tiên để theo dõi tỷ lệ tuân thủ kỷ luật."
-                    )
-                    .padding(.top, 40)
-                } else {
-                    ForEach(adherenceSummaries) { summary in
-                        NavigationLink(destination: PlaybookDetailView(
-                            playbook: summary.playbook,
-                            summary: summary,
-                            trades: dataStore.filteredTrades.filter { $0.playbookId == summary.playbook.id }
-                        )) {
-                            playbookCard(summary: summary)
-                        }
-                        .buttonStyle(.plain)
+                    headerCard
+                    
+                    if dataStore.playbooks.isEmpty {
+                        emptyState
+                    } else {
+                        playbooksList
                     }
                 }
                 .padding(14)
@@ -75,6 +49,51 @@ public struct PlaybooksView: View {
             }
         }
     }
+    
+    @ViewBuilder
+    private var headerCard: some View {
+        AppCard {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Image(systemName: "book.pages.fill")
+                        .foregroundColor(AppColors.accent)
+                    Text("Playbooks & Kỷ Luật Tuân Thủ")
+                        .font(AppTypography.headline)
+                }
+                Text("Đo lường sự khác biệt về kết quả tài chính giữa việc tuân thủ 100% quy tắc và việc phá vỡ nguyên tắc.")
+                    .font(AppTypography.caption)
+                    .foregroundColor(AppColors.secondaryText)
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var emptyState: some View {
+        EmptyStateView(
+            icon: "book.closed",
+            title: "Chưa có Playbook",
+            message: "Tạo chiến lược giao dịch đầu tiên để theo dõi tỷ lệ tuân thủ kỷ luật."
+        )
+        .padding(.top, 40)
+    }
+    
+    @ViewBuilder
+    private var playbooksList: some View {
+        ForEach(adherenceSummaries) { summary in
+            let pbTrades = tradesForPlaybook(summary.playbook.id)
+            NavigationLink(destination: PlaybookDetailView(
+                playbook: summary.playbook,
+                summary: summary,
+                trades: pbTrades
+            )) {
+                playbookCard(summary: summary)
+            }
+            .buttonStyle(.plain)
+        }
+    }
+    
+    private func tradesForPlaybook(_ playbookId: String) -> [Trade] {
+        dataStore.filteredTrades.filter { $0.playbookId == playbookId }
     }
     
     private func playbookCard(summary: PlaybookAdherenceSummary) -> some View {
@@ -146,109 +165,10 @@ public struct PlaybookDetailView: View {
     public var body: some View {
         ScrollView {
             VStack(spacing: 16) {
-                // Info Card
-                AppCard {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Mô tả chiến lược")
-                            .font(AppTypography.caption)
-                            .foregroundColor(AppColors.secondaryText)
-                        Text(playbook.description)
-                            .font(AppTypography.subheadline)
-                            .foregroundColor(AppColors.primaryText)
-                    }
-                }
-                
-                // Rules Checklist Card
-                AppCard {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("Quy tắc bắt buộc (\(playbook.rules.count))")
-                            .font(AppTypography.headline)
-                        
-                        ForEach(Array(playbook.rules.enumerated()), id: \.offset) { index, rule in
-                            HStack(alignment: .top, spacing: 8) {
-                                Text("\(index + 1).")
-                                    .font(AppTypography.captionBold)
-                                    .foregroundColor(AppColors.accent)
-                                Text(rule)
-                                    .font(AppTypography.caption)
-                                    .foregroundColor(AppColors.primaryText)
-                                Spacer()
-                            }
-                            if index < playbook.rules.count - 1 {
-                                Divider().background(AppColors.border.opacity(0.4))
-                            }
-                        }
-                    }
-                }
-                
-                // Trades Under Playbook
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Lệnh thuộc Playbook này (\(trades.count))")
-                        .font(AppTypography.headline)
-                        .padding(.horizontal, 4)
-                    
-                    if trades.isEmpty {
-                        Text("Chưa có lệnh nào được gán vào playbook này.")
-                            .font(AppTypography.caption)
-                            .foregroundColor(AppColors.secondaryText)
-                            .padding(.horizontal, 4)
-                    } else {
-                        ForEach(trades) { trade in
-                            AppCard {
-                                VStack(alignment: .leading, spacing: 6) {
-                                    HStack {
-                                        Text(trade.symbol)
-                                            .font(AppTypography.subheadlineBold)
-                                        AppBadge(
-                                            text: trade.direction.rawValue.uppercased(),
-                                            color: trade.direction == .long ? AppColors.accent : AppColors.warning
-                                        )
-                                        Spacer()
-                                        Text(Formatters.formatPnL(trade.netPnl, currency: env.currentCurrency))
-                                            .font(AppTypography.subheadlineBold)
-                                            .foregroundColor(Formatters.pnlColor(trade.netPnl))
-                                    }
-                                    
-                                    // Rule checkboxes for this trade
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        ForEach(playbook.rules, id: \.self) { rule in
-                                            let followed = dataStore.playbookAssessments.first(where: {
-                                                $0.tradeKey == trade.key && $0.playbookId == playbook.id && $0.rule == rule
-                                            })?.followed ?? false
-                                            
-                                            HStack {
-                                                Image(systemName: followed ? "checkmark.square.fill" : "square")
-                                                    .foregroundColor(followed ? AppColors.profit : AppColors.secondaryText)
-                                                    .onTapGesture {
-                                                        dataStore.setRuleAssessment(tradeKey: trade.key, playbookId: playbook.id, rule: rule, followed: !followed)
-                                                    }
-                                                Text(rule)
-                                                    .font(AppTypography.caption)
-                                                    .foregroundColor(AppColors.primaryText)
-                                            }
-                                        }
-                                    }
-                                    .padding(.top, 4)
-                                }
-                            }
-                        }
-                    }
-                }
-                
-                // Delete Playbook Button
-                Button(role: .destructive, action: { showDeleteAlert = true }) {
-                    HStack {
-                        Image(systemName: "trash")
-                        Text("Xóa Playbook Này")
-                    }
-                    .font(AppTypography.captionBold)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(AppColors.loss.opacity(0.1))
-                    .foregroundColor(AppColors.loss)
-                    .cornerRadius(12)
-                }
-                .padding(.top, 8)
+                infoCard
+                rulesCard
+                tradesSection
+                deleteButton
             }
             .padding()
         }
@@ -263,6 +183,131 @@ public struct PlaybookDetailView: View {
         } message: {
             Text("Chiến lược này và các đánh giá quy tắc liên quan sẽ bị xóa.")
         }
+    }
+    
+    @ViewBuilder
+    private var infoCard: some View {
+        AppCard {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Mô tả chiến lược")
+                    .font(AppTypography.caption)
+                    .foregroundColor(AppColors.secondaryText)
+                Text(playbook.description)
+                    .font(AppTypography.subheadline)
+                    .foregroundColor(AppColors.primaryText)
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var rulesCard: some View {
+        AppCard {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Quy tắc bắt buộc (\(playbook.rules.count))")
+                    .font(AppTypography.headline)
+                
+                ForEach(Array(playbook.rules.enumerated()), id: \.offset) { index, rule in
+                    HStack(alignment: .top, spacing: 8) {
+                        Text("\(index + 1).")
+                            .font(AppTypography.captionBold)
+                            .foregroundColor(AppColors.accent)
+                        Text(rule)
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.primaryText)
+                        Spacer()
+                    }
+                    if index < playbook.rules.count - 1 {
+                        Divider().background(AppColors.border.opacity(0.4))
+                    }
+                }
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var tradesSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Lệnh thuộc Playbook này (\(trades.count))")
+                .font(AppTypography.headline)
+                .padding(.horizontal, 4)
+            
+            if trades.isEmpty {
+                Text("Chưa có lệnh nào được gán vào playbook này.")
+                    .font(AppTypography.caption)
+                    .foregroundColor(AppColors.secondaryText)
+                    .padding(.horizontal, 4)
+            } else {
+                ForEach(trades) { trade in
+                    tradeCard(trade)
+                }
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func tradeCard(_ trade: Trade) -> some View {
+        let isLong = trade.direction == .long
+        let dirColor = isLong ? AppColors.accent : AppColors.warning
+        
+        AppCard {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text(trade.symbol)
+                        .font(AppTypography.subheadlineBold)
+                    AppBadge(
+                        text: trade.direction.rawValue.uppercased(),
+                        color: dirColor
+                    )
+                    Spacer()
+                    Text(Formatters.formatPnL(trade.netPnl, currency: env.currentCurrency))
+                        .font(AppTypography.subheadlineBold)
+                        .foregroundColor(Formatters.pnlColor(trade.netPnl))
+                }
+                
+                // Rule checkboxes for this trade
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(playbook.rules, id: \.self) { rule in
+                        ruleCheckboxRow(trade: trade, rule: rule)
+                    }
+                }
+                .padding(.top, 4)
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func ruleCheckboxRow(trade: Trade, rule: String) -> some View {
+        let followed = dataStore.playbookAssessments.first(where: {
+            $0.tradeKey == trade.key && $0.playbookId == playbook.id && $0.rule == rule
+        })?.followed ?? false
+        
+        HStack {
+            Image(systemName: followed ? "checkmark.square.fill" : "square")
+                .foregroundColor(followed ? AppColors.profit : AppColors.secondaryText)
+                .onTapGesture {
+                    dataStore.setRuleAssessment(tradeKey: trade.key, playbookId: playbook.id, rule: rule, followed: !followed)
+                }
+            Text(rule)
+                .font(AppTypography.caption)
+                .foregroundColor(AppColors.primaryText)
+        }
+    }
+    
+    @ViewBuilder
+    private var deleteButton: some View {
+        Button(role: .destructive, action: { showDeleteAlert = true }) {
+            HStack {
+                Image(systemName: "trash")
+                Text("Xóa Playbook Này")
+            }
+            .font(AppTypography.captionBold)
+            .frame(maxWidth: .infinity)
+            .padding()
+            .background(AppColors.loss.opacity(0.1))
+            .foregroundColor(AppColors.loss)
+            .cornerRadius(12)
+        }
+        .padding(.top, 8)
     }
 }
 
