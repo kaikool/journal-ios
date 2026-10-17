@@ -100,9 +100,9 @@ jobs:
         run: |
           echo "==> Full build log:"
           cat build/xcodebuild.log || true
-          ERROR_SUMMARY=$(grep -E -i "(error:|fatal error:)" build/xcodebuild.log | head -n 3 | tr '\n' ' ' | cut -c 1-250)
+          ERROR_SUMMARY=$(grep -E -i "(error:|fatal error:)" build/xcodebuild.log | head -n 10 | tr '\n' ' ' | cut -c 1-2000)
           if [ -z "$ERROR_SUMMARY" ]; then
-            ERROR_SUMMARY=$(tail -n 10 build/xcodebuild.log | tr '\n' ' ' | cut -c 1-250)
+            ERROR_SUMMARY=$(tail -n 20 build/xcodebuild.log | tr '\n' ' ' | cut -c 1-2000)
           fi
           echo "::error title=XcodeBuildError::$ERROR_SUMMARY"
 
