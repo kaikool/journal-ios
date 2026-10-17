@@ -652,13 +652,17 @@ public final class The5ersService: ObservableObject {
             }
             
             // 3. Smart Target Selection: Lọc tài khoản cần quét vị thế
-            // Ưu tiên toàn bộ tài khoản active / available / passed + tối đa 5 tài khoản gần nhất
+            // Ưu tiên toàn bộ tài khoản active / available / passed / funded / evaluation / verification
+            // + bất kỳ tài khoản nào đã có lệnh trước đó
+            // + tối đa 5 tài khoản gần nhất
             var targetAccounts: [The5ersMcpAccount] = []
             var seenTargetIds = Set<String>()
             
             for acc in accountsList {
                 let s = acc.status.lowercased()
-                if (s == "active" || s == "available" || s == "passed") && !seenTargetIds.contains(acc.id) {
+                let isActiveLike = (s == "active" || s == "available" || s == "passed" || s == "funded" || s == "open" || s == "evaluation" || s == "verification" || s == "step1" || s == "step2")
+                let hasExistingTrades = dataStore.trades.contains(where: { $0.accountId == acc.id || $0.accountId == "the5ers_\(acc.id)" })
+                if (isActiveLike || hasExistingTrades) && !seenTargetIds.contains(acc.id) {
                     seenTargetIds.insert(acc.id)
                     targetAccounts.append(acc)
                 }
@@ -854,21 +858,21 @@ public final class The5ersService: ObservableObject {
         }()
         guard let dir = direction else { return nil }
         
-        guard let (openedAtIso, openedAtDate) = sourceInstant(row["opendate"] ?? row["openedat"] ?? row["opentime"] ?? row["open_date"] ?? row["opendatetime"]) else {
+        guard let (openedAtIso, openedAtDate) = sourceInstant(row["opendate"] ?? row["openedat"] ?? row["opentime"] ?? row["open_date"] ?? row["opendatetime"] ?? row["time"] ?? row["timestamp"] ?? row["datetime"]) else {
             return nil
         }
-        guard let quantity = sourceNumber(row["quantity"] ?? row["lots"] ?? row["volume"] ?? row["size"]), quantity > 0 else {
+        guard let quantity = sourceNumber(row["quantity"] ?? row["lots"] ?? row["volume"] ?? row["size"] ?? row["units"]), quantity > 0 else {
             return nil
         }
-        guard let entry = sourceNumber(row["entry"] ?? row["openprice"] ?? row["entryprice"] ?? row["open_price"]) else {
+        guard let entry = sourceNumber(row["entry"] ?? row["openprice"] ?? row["entryprice"] ?? row["open_price"] ?? row["price"]) else {
             return nil
         }
         
-        let isClosed = sourceBoolean(row["isclosed"]) ?? (row["closedate"] != nil || row["exit"] != nil || row["closetime"] != nil)
+        let isClosed = sourceBoolean(row["isclosed"] ?? row["closed"] ?? row["isclose"]) ?? (row["closedate"] != nil || row["exit"] != nil || row["closetime"] != nil || row["closeprice"] != nil)
         
-        let closedAtTuple = isClosed ? sourceInstant(row["closedate"] ?? row["closedat"] ?? row["closetime"] ?? row["close_date"] ?? row["closedatetime"]) : nil
-        let exit = isClosed ? sourceNumber(row["exit"] ?? row["closeprice"] ?? row["exitprice"] ?? row["close_price"]) : nil
-        let netPnl = isClosed ? (sourceNumber(row["profitandloss"] ?? row["profit"] ?? row["netpnl"] ?? row["pnl"] ?? row["net_pnl"]) ?? 0) : 0
+        let closedAtTuple = isClosed ? sourceInstant(row["closedate"] ?? row["closedat"] ?? row["closetime"] ?? row["close_date"] ?? row["closedatetime"] ?? row["exittime"] ?? row["exitdate"]) : nil
+        let exit = isClosed ? sourceNumber(row["exit"] ?? row["closeprice"] ?? row["exitprice"] ?? row["close_price"] ?? row["price"]) : nil
+        let netPnl = isClosed ? (sourceNumber(row["profitandloss"] ?? row["profit"] ?? row["netpnl"] ?? row["pnl"] ?? row["net_pnl"] ?? row["gross"]) ?? 0) : 0
         
         if isClosed && (closedAtTuple == nil || exit == nil) {
             return nil
@@ -885,8 +889,8 @@ public final class The5ersService: ObservableObject {
             return nil
         }()
         
-        let fee = sourceNumber(row["fee"] ?? row["commission"])
-        let swap = sourceNumber(row["swap"])
+        let fee = sourceNumber(row["fee"] ?? row["commission"] ?? row["fees"])
+        let swap = sourceNumber(row["swap"] ?? row["swaps"])
         let isValid = sourceBoolean(row["isvalid"])
         
         return SourcePosition(
@@ -966,12 +970,7 @@ public final class The5ersService: ObservableObject {
                 : .open
             
             // Công thức Gross P&L & Fees toán học port 1:1 từ `journal.ts` (lines 68-75):
-            // Broker The5ers báo netPnl đã tính cả fee và swap (mang dấu âm).
-            // Do đó costsReversed = -fee - swap (thành số dương).
-            // grossPnl = netPnl + costsReversed
-            // fees = costsReversed
-            // netPnl = netPnl
-            // Bất biến luôn thỏa mãn: grossPnl - fees == netPnl
+            // Provider net already includes signed swap and commission. Reverse costs for gross only.
             let fee = position.fee ?? 0
             let swap = position.swap ?? 0
             let hasCosts = (position.fee != nil && position.swap != nil)
@@ -1000,6 +999,7 @@ public final class The5ersService: ObservableObject {
                     existing.notes = "Vị thế được đồng bộ từ The5ers Hub (Ticket: \(position.providerId ?? ""))"
                 }
                 dataStore.trades[tIdx] = existing
+                count += 1
             } else {
                 let trade = Trade(
                     key: tradeKey,

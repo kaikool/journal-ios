@@ -56,31 +56,49 @@ public struct FilterBarView<Actions: View>: View {
             
             if showFilters {
                 HStack(spacing: 8) {
-                    // Account Selector Dropdown Pill
+                    // Account Selector Dropdown Pill (Port 1:1 từ source-repo account-selector.tsx)
                     Menu {
-                        Button("Tất cả tài khoản") {
+                        Button {
                             dataStore.selectedAccountId = "all"
+                        } label: {
+                            HStack {
+                                Text("All accounts")
+                                if dataStore.selectedAccountId == "all" {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
                         }
                         
                         Divider()
                         
-                        ForEach(dataStore.accounts) { acc in
-                            Button(acc.name.isEmpty ? acc.id : acc.name) {
+                        ForEach(dataStore.visibleAccounts) { acc in
+                            Button {
                                 dataStore.selectedAccountId = acc.id
+                            } label: {
+                                HStack {
+                                    Text(acc.name.isEmpty ? acc.id : acc.name + (acc.archivedAt != nil ? " (archived)" : ""))
+                                    if dataStore.selectedAccountId == acc.id {
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
                             }
                         }
                     } label: {
-                        HStack(spacing: 4) {
+                        HStack(spacing: 5) {
+                            Image(systemName: "creditcard")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundColor(AppColors.secondaryText)
+                            
                             Text(currentAccountName)
                                 .font(AppTypography.captionMedium)
                                 .foregroundColor(AppColors.primaryText)
                                 .lineLimit(1)
                             
                             Image(systemName: "chevron.down")
-                                .font(.system(size: 8, weight: .semibold))
+                                .font(.system(size: 8, weight: .bold))
                                 .foregroundColor(AppColors.secondaryText)
                         }
-                        .padding(.horizontal, 8)
+                        .padding(.horizontal, 9)
                         .padding(.vertical, 5)
                         .background(AppColors.secondaryBackground)
                         .cornerRadius(6)
@@ -152,6 +170,9 @@ public struct FilterBarView<Actions: View>: View {
         if dataStore.selectedAccountId == "all" {
             return "All accounts"
         }
-        return dataStore.selectedAccount?.name ?? "Account"
+        if let acc = dataStore.accounts.first(where: { $0.id == dataStore.selectedAccountId }) {
+            return acc.name.isEmpty ? acc.id : acc.name
+        }
+        return "All accounts"
     }
 }

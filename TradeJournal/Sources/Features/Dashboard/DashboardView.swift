@@ -48,7 +48,12 @@ public struct DashboardView: View {
     }
     
     private var overview: (metrics: TradeMetrics, curve: [EquityPoint], days: [DayStats]) {
-        let initialBalance = dataStore.selectedAccount?.initialBalance ?? 0
+        let initialBalance: Decimal = {
+            if dataStore.selectedAccountId == "all" {
+                return dataStore.visibleAccounts.reduce(Decimal.zero) { $0 + $1.initialBalance }
+            }
+            return dataStore.selectedAccount?.initialBalance ?? 0
+        }()
         return FinancialMetricsEngine.computeOverview(
             trades: scopedTrades,
             timeZone: env.currentTimeZone,

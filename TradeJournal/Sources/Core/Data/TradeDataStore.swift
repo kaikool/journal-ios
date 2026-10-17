@@ -47,26 +47,36 @@ public final class TradeDataStore: ObservableObject {
         loadFromDisk()
         if accounts.isEmpty {
             createInitialDefaultAccount()
+        } else if accounts.contains(where: { $0.id != "default-acc" }) {
+            accounts.removeAll(where: { $0.id == "default-acc" })
         }
         if folders.isEmpty {
             folders = NotebookEngine.defaultSystemFolders
         }
+        if selectedAccountId == "default-acc" || (!accounts.contains(where: { $0.id == selectedAccountId }) && selectedAccountId != "all") {
+            selectedAccountId = "all"
+        }
         rebuildAllAccounts()
     }
     
+    public var visibleAccounts: [Account] {
+        let unarchived = accounts.filter { $0.archivedAt == nil && ($0.visibleInJournal ?? true) }
+        return unarchived.isEmpty ? accounts : unarchived
+    }
+    
     public var selectedAccount: Account? {
-        accounts.first(where: { $0.id == selectedAccountId }) ?? accounts.first
+        if selectedAccountId == "all" {
+            return visibleAccounts.first ?? accounts.first
+        }
+        return accounts.first(where: { $0.id == selectedAccountId }) ?? visibleAccounts.first ?? accounts.first
     }
     
     public var filteredTrades: [Trade] {
         if selectedAccountId == "all" {
-            return trades
+            let visibleIds = Set(visibleAccounts.map { $0.id })
+            return trades.filter { visibleIds.contains($0.accountId) }
         }
-        guard let account = selectedAccount else { return trades }
-        let accountTrades = trades.filter { $0.accountId == account.id }
-        // Nếu tài khoản được chọn không có lệnh nào nhưng kho dữ liệu lại có lệnh từ tài khoản khác,
-        // hiển thị toàn bộ lệnh để người dùng không bị trống màn hình
-        return accountTrades.isEmpty ? trades : accountTrades
+        return trades.filter { $0.accountId == selectedAccountId }
     }
     
     public var existingHashesForSelectedAccount: Set<String> {
@@ -262,11 +272,9 @@ public final class TradeDataStore: ObservableObject {
                         accounts.append(rAcc)
                     }
                 }
-                // Nếu đang trỏ vào default-acc hoặc account không tồn tại, trỏ sang account thật từ Supabase
-                if selectedAccountId == "default-acc" || !accounts.contains(where: { $0.id == selectedAccountId }) {
-                    if let first = remoteAccounts.first {
-                        selectedAccountId = first.id
-                    }
+                // Nếu đang trỏ vào default-acc hoặc account không tồn tại, trỏ sang "all" hoặc account đầu tiên
+                if selectedAccountId == "default-acc" || (!accounts.contains(where: { $0.id == selectedAccountId }) && selectedAccountId != "all") {
+                    selectedAccountId = "all"
                 }
                 // Loại bỏ default-acc khi đã có tài khoản thực từ Supabase
                 accounts.removeAll(where: { $0.id == "default-acc" && accounts.count > 1 })
@@ -285,18 +293,23 @@ public final class TradeDataStore: ObservableObject {
             fetchedTradesCount = remoteTrades.count
             for rTrade in remoteTrades {
                 if let idx = trades.firstIndex(where: { $0.key == rTrade.key }) {
-                    trades[idx] = rTrade
+                    let local = trades[idx]
+                    // Nếu local đã có P&L thực tế (khác 0) mà remote lại là 0 (do cache build cũ), ưu tiên giữ local
+                    if (local.netPnl != 0 || local.grossPnl != 0) && (rTrade.netPnl == 0 && rTrade.grossPnl == 0) {
+                        // Giữ local
+                    } else {
+                        trades[idx] = rTrade
+                    }
                 } else {
                     trades.append(rTrade)
                 }
-                // Đảm bảo accountId của lệnh được đăng ký trong danh sách accounts
-                if !accounts.contains(where: { $0.id == rTrade.accountId }) {
+                // Đảm bảo accountId của lệnh được đăng ký trong danh sách accounts nếu có
+                if !rTrade.accountId.isEmpty && !accounts.contains(where: { $0.id == rTrade.accountId }) {
                     accounts.append(Account(id: rTrade.accountId, name: "Tài khoản \(rTrade.accountId)", kind: .sync))
                 }
             }
-            // Tự động chuyển selectedAccountId sang tài khoản có lệnh giao dịch nếu tài khoản hiện tại rỗng
-            if filteredTrades.isEmpty, let firstTrade = trades.first {
-                selectedAccountId = firstTrade.accountId
+            if selectedAccountId != "all" && !accounts.contains(where: { $0.id == selectedAccountId }) {
+                selectedAccountId = "all"
             }
             if !trades.isEmpty {
                 try? await SupabaseService.shared.upsertTrades(trades)

@@ -136,7 +136,7 @@ public final class SupabaseService {
     
     private var jsonDecoder: JSONDecoder {
         let decoder = JSONDecoder()
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        decoder.keyDecodingStrategy = .useDefaultKeys
         decoder.dateDecodingStrategy = .custom { decoder in
             let container = try decoder.singleValueContainer()
             if let dateStr = try? container.decode(String.self) {
@@ -158,7 +158,7 @@ public final class SupabaseService {
     
     private var jsonEncoder: JSONEncoder {
         let encoder = JSONEncoder()
-        encoder.keyEncodingStrategy = .convertToSnakeCase
+        encoder.keyEncodingStrategy = .useDefaultKeys
         encoder.dateEncodingStrategy = .iso8601
         return encoder
     }
@@ -918,6 +918,79 @@ public final class SupabaseService {
 
 // MARK: - PostgREST 1:1 Schema DTOs (Mapped to schema.pg.ts)
 
+public struct AnyCodingKey: CodingKey {
+    public var stringValue: String
+    public var intValue: Int?
+    public init?(stringValue: String) { self.stringValue = stringValue }
+    public init?(intValue: Int) { self.stringValue = "\(intValue)"; self.intValue = intValue }
+}
+
+extension KeyedDecodingContainer where K == AnyCodingKey {
+    func decodeString(forKeys keys: [String]) -> String? {
+        for key in keys {
+            if let k = AnyCodingKey(stringValue: key), let val = try? decode(String.self, forKey: k) {
+                let trimmed = val.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !trimmed.isEmpty { return trimmed }
+            }
+        }
+        return nil
+    }
+    
+    func decodeDouble(forKeys keys: [String]) -> Double? {
+        for key in keys {
+            guard let k = AnyCodingKey(stringValue: key) else { continue }
+            if let val = try? decode(Double.self, forKey: k) {
+                return val
+            }
+            if let str = try? decode(String.self, forKey: k), let val = Double(str.trimmingCharacters(in: .whitespaces)) {
+                return val
+            }
+        }
+        return nil
+    }
+    
+    func decodeInt(forKeys keys: [String]) -> Int? {
+        for key in keys {
+            guard let k = AnyCodingKey(stringValue: key) else { continue }
+            if let val = try? decode(Int.self, forKey: k) {
+                return val
+            }
+            if let str = try? decode(String.self, forKey: k), let val = Int(str.trimmingCharacters(in: .whitespaces)) {
+                return val
+            }
+        }
+        return nil
+    }
+    
+    func decodeInt64(forKeys keys: [String]) -> Int64? {
+        for key in keys {
+            guard let k = AnyCodingKey(stringValue: key) else { continue }
+            if let val = try? decode(Int64.self, forKey: k) {
+                return val
+            }
+            if let str = try? decode(String.self, forKey: k), let val = Int64(str.trimmingCharacters(in: .whitespaces)) {
+                return val
+            }
+        }
+        return nil
+    }
+    
+    func decodeBool(forKeys keys: [String]) -> Bool? {
+        for key in keys {
+            guard let k = AnyCodingKey(stringValue: key) else { continue }
+            if let val = try? decode(Bool.self, forKey: k) {
+                return val
+            }
+            if let str = try? decode(String.self, forKey: k) {
+                let s = str.trimmingCharacters(in: .whitespaces).lowercased()
+                if s == "true" || s == "1" || s == "yes" { return true }
+                if s == "false" || s == "0" || s == "no" { return false }
+            }
+        }
+        return nil
+    }
+}
+
 public struct SupabaseTradeRecord: Codable {
     public let key: String
     public let accountId: String
@@ -972,6 +1045,7 @@ public struct SupabaseTradeRecord: Codable {
     
     public init(trade: Trade) {
         let fmt = ISO8601DateFormatter()
+        fmt.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         self.key = trade.key
         self.accountId = trade.accountId
         self.symbol = trade.symbol
@@ -1004,66 +1078,74 @@ public struct SupabaseTradeRecord: Codable {
     }
     
     public init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        self.key = (try? c.decode(String.self, forKey: .key)) ?? UUID().uuidString
-        self.accountId = (try? c.decode(String.self, forKey: .accountId)) ?? ""
-        self.symbol = (try? c.decode(String.self, forKey: .symbol)) ?? "UNKNOWN"
-        self.assetClass = try? c.decode(String.self, forKey: .assetClass)
-        self.direction = (try? c.decode(String.self, forKey: .direction)) ?? "long"
-        self.status = (try? c.decode(String.self, forKey: .status)) ?? "open"
-        self.openedAt = (try? c.decode(String.self, forKey: .openedAt)) ?? JournalIds.nowIso()
-        self.closedAt = try? c.decode(String.self, forKey: .closedAt)
-        self.quantity = (try? c.decode(Double.self, forKey: .quantity)) ?? 0
-        self.openQuantity = (try? c.decode(Double.self, forKey: .openQuantity)) ?? 0
-        self.avgEntry = (try? c.decode(Double.self, forKey: .avgEntry)) ?? 0
-        self.avgExit = try? c.decode(Double.self, forKey: .avgExit)
-        self.grossPnl = (try? c.decode(Double.self, forKey: .grossPnl)) ?? 0
-        self.fees = (try? c.decode(Double.self, forKey: .fees)) ?? 0
-        self.netPnl = (try? c.decode(Double.self, forKey: .netPnl)) ?? 0
-        self.executionCount = (try? c.decode(Int.self, forKey: .executionCount)) ?? 0
+        let c = try decoder.container(keyedBy: AnyCodingKey.self)
+        self.key = c.decodeString(forKeys: ["key", "id"]) ?? UUID().uuidString
+        self.accountId = c.decodeString(forKeys: ["account_id", "accountId", "account"]) ?? ""
+        self.symbol = c.decodeString(forKeys: ["symbol"]) ?? "UNKNOWN"
+        self.assetClass = c.decodeString(forKeys: ["asset_class", "assetClass"])
+        self.direction = c.decodeString(forKeys: ["direction", "side"]) ?? "long"
+        self.status = c.decodeString(forKeys: ["status"]) ?? "open"
+        self.openedAt = c.decodeString(forKeys: ["opened_at", "openedAt", "open_date", "opendate", "open_time", "opentime"]) ?? JournalIds.nowIso()
+        self.closedAt = c.decodeString(forKeys: ["closed_at", "closedAt", "close_date", "closedate", "close_time", "closetime"])
+        self.quantity = c.decodeDouble(forKeys: ["quantity", "open_quantity", "size", "lots", "volume"]) ?? 0
+        self.openQuantity = c.decodeDouble(forKeys: ["open_quantity", "openQuantity"]) ?? 0
+        self.avgEntry = c.decodeDouble(forKeys: ["avg_entry", "avgEntry", "open_price", "entry_price", "entry"]) ?? 0
+        self.avgExit = c.decodeDouble(forKeys: ["avg_exit", "avgExit", "close_price", "exit_price", "exit"])
+        self.grossPnl = c.decodeDouble(forKeys: ["gross_pnl", "grossPnl", "gross"]) ?? 0
+        self.fees = c.decodeDouble(forKeys: ["fees", "fee", "commission"]) ?? 0
+        self.netPnl = c.decodeDouble(forKeys: ["net_pnl", "netPnl", "profit", "pnl"]) ?? 0
+        self.executionCount = c.decodeInt(forKeys: ["execution_count", "executionCount"]) ?? 0
         
         // Hỗ trợ cả string và array cho executionIdsJson
-        if let str = try? c.decode(String.self, forKey: .executionIdsJson) {
+        if let str = c.decodeString(forKeys: ["execution_ids_json", "executionIdsJson", "execution_ids"]) {
             self.executionIdsJson = str
-        } else if let arr = try? c.decode([String].self, forKey: .executionIdsJson) {
+        } else if let arr = (try? c.decode([String].self, forKey: AnyCodingKey(stringValue: "execution_ids_json")!)) ??
+                            (try? c.decode([String].self, forKey: AnyCodingKey(stringValue: "executionIdsJson")!)) ??
+                            (try? c.decode([String].self, forKey: AnyCodingKey(stringValue: "execution_ids")!)) {
             self.executionIdsJson = (try? String(data: JSONEncoder().encode(arr), encoding: .utf8)) ?? "[]"
         } else {
             self.executionIdsJson = "[]"
         }
         
         // Hỗ trợ cả string và array cho exitsJson
-        if let str = try? c.decode(String.self, forKey: .exitsJson) {
+        if let str = c.decodeString(forKeys: ["exits_json", "exitsJson", "exits"]) {
             self.exitsJson = str
-        } else if let arr = try? c.decode([ExitAttribution].self, forKey: .exitsJson) {
+        } else if let arr = (try? c.decode([ExitAttribution].self, forKey: AnyCodingKey(stringValue: "exits_json")!)) ??
+                            (try? c.decode([ExitAttribution].self, forKey: AnyCodingKey(stringValue: "exitsJson")!)) ??
+                            (try? c.decode([ExitAttribution].self, forKey: AnyCodingKey(stringValue: "exits")!)) {
             self.exitsJson = (try? String(data: JSONEncoder().encode(arr), encoding: .utf8)) ?? "[]"
         } else {
             self.exitsJson = "[]"
         }
         
-        self.durationMs = try? c.decode(Int64.self, forKey: .durationMs)
-        self.notes = try? c.decode(String.self, forKey: .notes)
+        self.durationMs = c.decodeInt64(forKeys: ["duration_ms", "durationMs"])
+        self.notes = c.decodeString(forKeys: ["notes", "note"])
         
-        if let str = try? c.decode(String.self, forKey: .tagsJson) {
+        if let str = c.decodeString(forKeys: ["tags_json", "tagsJson", "tags"]) {
             self.tagsJson = str
-        } else if let arr = try? c.decode([String].self, forKey: .tagsJson) {
+        } else if let arr = (try? c.decode([String].self, forKey: AnyCodingKey(stringValue: "tags_json")!)) ??
+                            (try? c.decode([String].self, forKey: AnyCodingKey(stringValue: "tagsJson")!)) ??
+                            (try? c.decode([String].self, forKey: AnyCodingKey(stringValue: "tags")!)) {
             self.tagsJson = (try? String(data: JSONEncoder().encode(arr), encoding: .utf8)) ?? "[]"
         } else {
             self.tagsJson = nil
         }
         
-        if let str = try? c.decode(String.self, forKey: .mistakesJson) {
+        if let str = c.decodeString(forKeys: ["mistakes_json", "mistakesJson", "mistakes"]) {
             self.mistakesJson = str
-        } else if let arr = try? c.decode([String].self, forKey: .mistakesJson) {
+        } else if let arr = (try? c.decode([String].self, forKey: AnyCodingKey(stringValue: "mistakes_json")!)) ??
+                            (try? c.decode([String].self, forKey: AnyCodingKey(stringValue: "mistakesJson")!)) ??
+                            (try? c.decode([String].self, forKey: AnyCodingKey(stringValue: "mistakes")!)) {
             self.mistakesJson = (try? String(data: JSONEncoder().encode(arr), encoding: .utf8)) ?? "[]"
         } else {
             self.mistakesJson = nil
         }
         
-        self.playbookId = try? c.decode(String.self, forKey: .playbookId)
-        self.rating = try? c.decode(Int.self, forKey: .rating)
-        self.stopLoss = try? c.decode(Double.self, forKey: .stopLoss)
-        self.profitTarget = try? c.decode(Double.self, forKey: .profitTarget)
-        self.reviewedAt = try? c.decode(String.self, forKey: .reviewedAt)
+        self.playbookId = c.decodeString(forKeys: ["playbook_id", "playbookId"])
+        self.rating = c.decodeInt(forKeys: ["rating"])
+        self.stopLoss = c.decodeDouble(forKeys: ["stop_loss", "stopLoss"])
+        self.profitTarget = c.decodeDouble(forKeys: ["profit_target", "profitTarget"])
+        self.reviewedAt = c.decodeString(forKeys: ["reviewed_at", "reviewedAt"])
     }
     
     public func toTrade() -> Trade {
@@ -1151,20 +1233,20 @@ public struct SupabaseExecutionRecord: Codable {
     }
     
     public init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        self.id = (try? c.decode(String.self, forKey: .id)) ?? UUID().uuidString
-        self.accountId = (try? c.decode(String.self, forKey: .accountId)) ?? ""
-        self.symbol = (try? c.decode(String.self, forKey: .symbol)) ?? "UNKNOWN"
-        self.side = (try? c.decode(String.self, forKey: .side)) ?? "buy"
-        self.quantity = (try? c.decode(Double.self, forKey: .quantity)) ?? 0
-        self.price = (try? c.decode(Double.self, forKey: .price)) ?? 0
-        self.fee = (try? c.decode(Double.self, forKey: .fee)) ?? 0
-        self.executedAt = (try? c.decode(String.self, forKey: .executedAt)) ?? JournalIds.nowIso()
-        self.assetClass = try? c.decode(String.self, forKey: .assetClass)
-        self.source = (try? c.decode(String.self, forKey: .source)) ?? "manual"
-        self.importMetadataJson = try? c.decode(String.self, forKey: .importMetadataJson)
-        self.contentHash = (try? c.decode(String.self, forKey: .contentHash)) ?? UUID().uuidString
-        self.createdAt = (try? c.decode(String.self, forKey: .createdAt)) ?? JournalIds.nowIso()
+        let c = try decoder.container(keyedBy: AnyCodingKey.self)
+        self.id = c.decodeString(forKeys: ["id"]) ?? UUID().uuidString
+        self.accountId = c.decodeString(forKeys: ["account_id", "accountId", "account"]) ?? ""
+        self.symbol = c.decodeString(forKeys: ["symbol"]) ?? "UNKNOWN"
+        self.side = c.decodeString(forKeys: ["side", "direction"]) ?? "buy"
+        self.quantity = c.decodeDouble(forKeys: ["quantity", "size", "lots", "volume"]) ?? 0
+        self.price = c.decodeDouble(forKeys: ["price", "entry"]) ?? 0
+        self.fee = c.decodeDouble(forKeys: ["fee", "commission", "fees"]) ?? 0
+        self.executedAt = c.decodeString(forKeys: ["executed_at", "executedAt", "timestamp", "date"]) ?? JournalIds.nowIso()
+        self.assetClass = c.decodeString(forKeys: ["asset_class", "assetClass"])
+        self.source = c.decodeString(forKeys: ["source"]) ?? "manual"
+        self.importMetadataJson = c.decodeString(forKeys: ["import_metadata_json", "importMetadataJson"])
+        self.contentHash = c.decodeString(forKeys: ["content_hash", "contentHash"]) ?? UUID().uuidString
+        self.createdAt = c.decodeString(forKeys: ["created_at", "createdAt"]) ?? JournalIds.nowIso()
     }
     
     public func toExecution() -> Execution {
@@ -1209,18 +1291,20 @@ public struct SupabasePlaybookRecord: Codable {
     }
     
     public init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        self.id = (try? c.decode(String.self, forKey: .id)) ?? UUID().uuidString
-        self.name = (try? c.decode(String.self, forKey: .name)) ?? "Playbook"
-        self.description = (try? c.decode(String.self, forKey: .description)) ?? ""
-        if let str = try? c.decode(String.self, forKey: .rulesJson) {
+        let c = try decoder.container(keyedBy: AnyCodingKey.self)
+        self.id = c.decodeString(forKeys: ["id"]) ?? UUID().uuidString
+        self.name = c.decodeString(forKeys: ["name"]) ?? "Playbook"
+        self.description = c.decodeString(forKeys: ["description"]) ?? ""
+        if let str = c.decodeString(forKeys: ["rules_json", "rulesJson", "rules"]) {
             self.rulesJson = str
-        } else if let arr = try? c.decode([String].self, forKey: .rulesJson) {
+        } else if let arr = (try? c.decode([String].self, forKey: AnyCodingKey(stringValue: "rules_json")!)) ??
+                            (try? c.decode([String].self, forKey: AnyCodingKey(stringValue: "rulesJson")!)) ??
+                            (try? c.decode([String].self, forKey: AnyCodingKey(stringValue: "rules")!)) {
             self.rulesJson = (try? String(data: JSONEncoder().encode(arr), encoding: .utf8)) ?? "[]"
         } else {
             self.rulesJson = "[]"
         }
-        self.createdAt = (try? c.decode(String.self, forKey: .createdAt)) ?? JournalIds.nowIso()
+        self.createdAt = c.decodeString(forKeys: ["created_at", "createdAt"]) ?? JournalIds.nowIso()
     }
     
     public func toPlaybook() -> Playbook {
@@ -1274,18 +1358,18 @@ public struct SupabaseAccountRecord: Codable {
     }
     
     public init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        self.id = (try? c.decode(String.self, forKey: .id)) ?? UUID().uuidString
-        self.name = (try? c.decode(String.self, forKey: .name)) ?? "Account"
-        self.broker = (try? c.decode(String.self, forKey: .broker)) ?? ""
-        self.kind = (try? c.decode(String.self, forKey: .kind)) ?? "trading"
-        self.currency = (try? c.decode(String.self, forKey: .currency)) ?? "USD"
-        self.initialBalance = (try? c.decode(Double.self, forKey: .initialBalance)) ?? 0
-        self.profitCalcMethod = (try? c.decode(String.self, forKey: .profitCalcMethod)) ?? "fifo"
-        self.autoSync = (try? c.decode(Bool.self, forKey: .autoSync)) ?? false
-        self.lastSyncAt = try? c.decode(String.self, forKey: .lastSyncAt)
-        self.archivedAt = try? c.decode(String.self, forKey: .archivedAt)
-        self.createdAt = (try? c.decode(String.self, forKey: .createdAt)) ?? JournalIds.nowIso()
+        let c = try decoder.container(keyedBy: AnyCodingKey.self)
+        self.id = c.decodeString(forKeys: ["id"]) ?? UUID().uuidString
+        self.name = c.decodeString(forKeys: ["name"]) ?? "Account"
+        self.broker = c.decodeString(forKeys: ["broker"]) ?? ""
+        self.kind = c.decodeString(forKeys: ["kind", "type"]) ?? "trading"
+        self.currency = c.decodeString(forKeys: ["currency"]) ?? "USD"
+        self.initialBalance = c.decodeDouble(forKeys: ["initial_balance", "initialBalance", "balance", "starting_balance", "startingBalance"]) ?? 0
+        self.profitCalcMethod = c.decodeString(forKeys: ["profit_calc_method", "profitCalcMethod"]) ?? "fifo"
+        self.autoSync = c.decodeBool(forKeys: ["auto_sync", "autoSync"]) ?? false
+        self.lastSyncAt = c.decodeString(forKeys: ["last_sync_at", "lastSyncAt"])
+        self.archivedAt = c.decodeString(forKeys: ["archived_at", "archivedAt"])
+        self.createdAt = c.decodeString(forKeys: ["created_at", "createdAt"]) ?? JournalIds.nowIso()
     }
     
     public func toAccount() -> Account {
@@ -1364,25 +1448,25 @@ public struct SupabasePropAccountRecord: Codable {
     }
     
     public init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        self.id = (try? c.decode(String.self, forKey: .id)) ?? UUID().uuidString
-        self.firm = (try? c.decode(String.self, forKey: .firm)) ?? "The5ers"
-        self.name = (try? c.decode(String.self, forKey: .name)) ?? "Prop Account"
-        self.program = (try? c.decode(String.self, forKey: .program)) ?? "evaluation"
-        self.status = (try? c.decode(String.self, forKey: .status)) ?? "active"
-        self.currency = (try? c.decode(String.self, forKey: .currency)) ?? "USD"
-        self.sizeMinor = try? c.decode(Int64.self, forKey: .sizeMinor)
-        self.parentId = try? c.decode(String.self, forKey: .parentId)
-        self.journalAccountId = try? c.decode(String.self, forKey: .journalAccountId)
-        self.openedOn = (try? c.decode(String.self, forKey: .openedOn)) ?? JournalIds.nowIso()
-        self.closedOn = try? c.decode(String.self, forKey: .closedOn)
-        self.renewalOn = try? c.decode(String.self, forKey: .renewalOn)
-        self.renewalMinor = try? c.decode(Int64.self, forKey: .renewalMinor)
-        self.notes = (try? c.decode(String.self, forKey: .notes)) ?? ""
-        self.archived = (try? c.decode(Bool.self, forKey: .archived)) ?? false
-        self.revision = (try? c.decode(Int.self, forKey: .revision)) ?? 1
-        self.createdAt = try? c.decode(String.self, forKey: .createdAt)
-        self.updatedAt = try? c.decode(String.self, forKey: .updatedAt)
+        let c = try decoder.container(keyedBy: AnyCodingKey.self)
+        self.id = c.decodeString(forKeys: ["id"]) ?? UUID().uuidString
+        self.firm = c.decodeString(forKeys: ["firm"]) ?? "The5ers"
+        self.name = c.decodeString(forKeys: ["name"]) ?? "Prop Account"
+        self.program = c.decodeString(forKeys: ["program"]) ?? "evaluation"
+        self.status = c.decodeString(forKeys: ["status"]) ?? "active"
+        self.currency = c.decodeString(forKeys: ["currency"]) ?? "USD"
+        self.sizeMinor = c.decodeInt64(forKeys: ["size_minor", "sizeMinor"])
+        self.parentId = c.decodeString(forKeys: ["parent_id", "parentId"])
+        self.journalAccountId = c.decodeString(forKeys: ["journal_account_id", "journalAccountId"])
+        self.openedOn = c.decodeString(forKeys: ["opened_on", "openedOn", "created_at", "createdAt"]) ?? JournalIds.nowIso()
+        self.closedOn = c.decodeString(forKeys: ["closed_on", "closedOn"])
+        self.renewalOn = c.decodeString(forKeys: ["renewal_on", "renewalOn"])
+        self.renewalMinor = c.decodeInt64(forKeys: ["renewal_minor", "renewalMinor"])
+        self.notes = c.decodeString(forKeys: ["notes", "note"]) ?? ""
+        self.archived = c.decodeBool(forKeys: ["archived"]) ?? false
+        self.revision = c.decodeInt(forKeys: ["revision"]) ?? 1
+        self.createdAt = c.decodeString(forKeys: ["created_at", "createdAt"])
+        self.updatedAt = c.decodeString(forKeys: ["updated_at", "updatedAt"])
     }
     
     public func toItem() -> PropAccountItem {
@@ -1468,27 +1552,27 @@ public struct SupabasePropEntryRecord: Codable {
     }
     
     public init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        self.id = (try? c.decode(String.self, forKey: .id)) ?? UUID().uuidString
-        self.accountId = try? c.decode(String.self, forKey: .accountId)
-        self.firm = (try? c.decode(String.self, forKey: .firm)) ?? "The5ers"
-        self.kind = (try? c.decode(String.self, forKey: .kind)) ?? "fee"
-        self.category = (try? c.decode(String.self, forKey: .category)) ?? "eval_fee"
-        self.currency = (try? c.decode(String.self, forKey: .currency)) ?? "USD"
-        self.amountMinor = (try? c.decode(Int64.self, forKey: .amountMinor)) ?? 0
-        self.splitBps = (try? c.decode(Int.self, forKey: .splitBps)) ?? 8000
-        self.feeMinor = (try? c.decode(Int64.self, forKey: .feeMinor)) ?? 0
-        let occ = (try? c.decode(String.self, forKey: .occurredOn)) ?? (try? c.decode(String.self, forKey: .incurredOn))
+        let c = try decoder.container(keyedBy: AnyCodingKey.self)
+        self.id = c.decodeString(forKeys: ["id"]) ?? UUID().uuidString
+        self.accountId = c.decodeString(forKeys: ["account_id", "accountId"])
+        self.firm = c.decodeString(forKeys: ["firm"]) ?? "The5ers"
+        self.kind = c.decodeString(forKeys: ["kind"]) ?? "fee"
+        self.category = c.decodeString(forKeys: ["category"]) ?? "eval_fee"
+        self.currency = c.decodeString(forKeys: ["currency"]) ?? "USD"
+        self.amountMinor = c.decodeInt64(forKeys: ["amount_minor", "amountMinor"]) ?? 0
+        self.splitBps = c.decodeInt(forKeys: ["split_bps", "splitBps"]) ?? 8000
+        self.feeMinor = c.decodeInt64(forKeys: ["fee_minor", "feeMinor"]) ?? 0
+        let occ = c.decodeString(forKeys: ["occurred_on", "occurredOn", "incurred_on", "incurredOn"])
         self.occurredOn = occ ?? JournalIds.nowIso()
-        self.dueOn = try? c.decode(String.self, forKey: .dueOn)
-        self.status = (try? c.decode(String.self, forKey: .status)) ?? "completed"
-        self.parentId = try? c.decode(String.self, forKey: .parentId)
-        self.reference = (try? c.decode(String.self, forKey: .reference)) ?? ""
-        self.notes = (try? c.decode(String.self, forKey: .notes)) ?? ""
-        self.voided = (try? c.decode(Bool.self, forKey: .voided)) ?? false
-        self.revision = (try? c.decode(Int.self, forKey: .revision)) ?? 1
-        self.createdAt = try? c.decode(String.self, forKey: .createdAt)
-        self.updatedAt = try? c.decode(String.self, forKey: .updatedAt)
+        self.dueOn = c.decodeString(forKeys: ["due_on", "dueOn"])
+        self.status = c.decodeString(forKeys: ["status"]) ?? "completed"
+        self.parentId = c.decodeString(forKeys: ["parent_id", "parentId"])
+        self.reference = c.decodeString(forKeys: ["reference"]) ?? ""
+        self.notes = c.decodeString(forKeys: ["notes", "note"]) ?? ""
+        self.voided = c.decodeBool(forKeys: ["voided"]) ?? false
+        self.revision = c.decodeInt(forKeys: ["revision"]) ?? 1
+        self.createdAt = c.decodeString(forKeys: ["created_at", "createdAt"])
+        self.updatedAt = c.decodeString(forKeys: ["updated_at", "updatedAt"])
     }
     
     public func encode(to encoder: Encoder) throws {
@@ -1574,17 +1658,17 @@ public struct SupabasePropReceiptRecord: Codable {
     }
     
     public init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        self.id = (try? c.decode(String.self, forKey: .id)) ?? UUID().uuidString
-        self.payoutId = (try? c.decode(String.self, forKey: .payoutId)) ?? (try? c.decode(String.self, forKey: .accountId)) ?? ""
-        self.kind = (try? c.decode(String.self, forKey: .kind)) ?? "payout"
-        self.amountMinor = (try? c.decode(Int64.self, forKey: .amountMinor)) ?? (try? c.decode(Int64.self, forKey: .netAmountMinor)) ?? 0
-        let occ = (try? c.decode(String.self, forKey: .occurredOn)) ?? (try? c.decode(String.self, forKey: .receivedOn))
+        let c = try decoder.container(keyedBy: AnyCodingKey.self)
+        self.id = c.decodeString(forKeys: ["id"]) ?? UUID().uuidString
+        self.payoutId = c.decodeString(forKeys: ["payout_id", "payoutId", "account_id", "accountId"]) ?? ""
+        self.kind = c.decodeString(forKeys: ["kind"]) ?? "payout"
+        self.amountMinor = c.decodeInt64(forKeys: ["amount_minor", "amountMinor", "net_amount_minor", "netAmountMinor"]) ?? 0
+        let occ = c.decodeString(forKeys: ["occurred_on", "occurredOn", "received_on", "receivedOn"])
         self.occurredOn = occ ?? JournalIds.nowIso()
-        self.reference = (try? c.decode(String.self, forKey: .reference)) ?? ""
-        self.notes = (try? c.decode(String.self, forKey: .notes)) ?? ""
-        self.voided = (try? c.decode(Bool.self, forKey: .voided)) ?? false
-        self.createdAt = try? c.decode(String.self, forKey: .createdAt)
+        self.reference = c.decodeString(forKeys: ["reference"]) ?? ""
+        self.notes = c.decodeString(forKeys: ["notes", "note"]) ?? ""
+        self.voided = c.decodeBool(forKeys: ["voided"]) ?? false
+        self.createdAt = c.decodeString(forKeys: ["created_at", "createdAt"])
     }
     
     public func encode(to encoder: Encoder) throws {
@@ -1644,14 +1728,14 @@ public struct SupabasePropAuditRecord: Codable {
     }
     
     public init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        self.id = (try? c.decode(String.self, forKey: .id)) ?? UUID().uuidString
-        self.entityType = (try? c.decode(String.self, forKey: .entityType)) ?? "entry"
-        self.entityId = (try? c.decode(String.self, forKey: .entityId)) ?? ""
-        self.beforeJson = try? c.decode(String.self, forKey: .beforeJson)
-        self.afterJson = (try? c.decode(String.self, forKey: .afterJson)) ?? "{}"
-        self.reason = (try? c.decode(String.self, forKey: .reason)) ?? "sync"
-        self.createdAt = try? c.decode(String.self, forKey: .createdAt)
+        let c = try decoder.container(keyedBy: AnyCodingKey.self)
+        self.id = c.decodeString(forKeys: ["id"]) ?? UUID().uuidString
+        self.entityType = c.decodeString(forKeys: ["entity_type", "entityType"]) ?? "entry"
+        self.entityId = c.decodeString(forKeys: ["entity_id", "entityId"]) ?? ""
+        self.beforeJson = c.decodeString(forKeys: ["before_json", "beforeJson"])
+        self.afterJson = c.decodeString(forKeys: ["after_json", "afterJson"]) ?? "{}"
+        self.reason = c.decodeString(forKeys: ["reason"]) ?? "sync"
+        self.createdAt = c.decodeString(forKeys: ["created_at", "createdAt"])
     }
     
     public func toItem() -> PropAuditItem {
@@ -1699,16 +1783,16 @@ public struct SupabaseAttachmentRecord: Codable {
     }
     
     public init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        self.id = (try? c.decode(String.self, forKey: .id)) ?? UUID().uuidString
-        self.ownerType = (try? c.decode(String.self, forKey: .ownerType)) ?? "trade"
-        self.ownerId = (try? c.decode(String.self, forKey: .ownerId)) ?? ""
-        self.name = (try? c.decode(String.self, forKey: .name)) ?? "Attachment"
-        self.mime = (try? c.decode(String.self, forKey: .mime)) ?? "image/png"
-        self.size = (try? c.decode(Int.self, forKey: .size)) ?? 0
-        self.storagePath = (try? c.decode(String.self, forKey: .storagePath)) ?? ""
-        self.status = (try? c.decode(String.self, forKey: .status)) ?? "ready"
-        self.createdAt = try? c.decode(String.self, forKey: .createdAt)
+        let c = try decoder.container(keyedBy: AnyCodingKey.self)
+        self.id = c.decodeString(forKeys: ["id"]) ?? UUID().uuidString
+        self.ownerType = c.decodeString(forKeys: ["owner_type", "ownerType"]) ?? "trade"
+        self.ownerId = c.decodeString(forKeys: ["owner_id", "ownerId"]) ?? ""
+        self.name = c.decodeString(forKeys: ["name"]) ?? "Attachment"
+        self.mime = c.decodeString(forKeys: ["mime"]) ?? "image/png"
+        self.size = c.decodeInt(forKeys: ["size"]) ?? 0
+        self.storagePath = c.decodeString(forKeys: ["storage_path", "storagePath"]) ?? ""
+        self.status = c.decodeString(forKeys: ["status"]) ?? "ready"
+        self.createdAt = c.decodeString(forKeys: ["created_at", "createdAt"])
     }
     
     public func toAttachment() -> Attachment {
