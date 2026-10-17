@@ -178,7 +178,7 @@ public final class MarketDataService: Sendable {
             ))
         }
         
-        return bars
+        return validateBars(bars)
     }
     
     // MARK: - 3. OANDA v20 Midpoint Candlesticks
@@ -252,7 +252,7 @@ public final class MarketDataService: Sendable {
             ))
         }
         
-        return bars
+        return validateBars(bars)
     }
     
     // MARK: - 3b. Diagnostic Connection Tests
@@ -313,7 +313,18 @@ public final class MarketDataService: Sendable {
         }
     }
     
-    // MARK: - 4. Unified Trade Candles Fetcher
+    // MARK: - 4. Validation & De-duplication
+    
+    /// Đảm bảo nến không bị trùng mốc thời gian và được sắp xếp tuần tự theo thời gian tăng dần
+    public func validateBars(_ bars: [MarketBar]) -> [MarketBar] {
+        var unique: [Int64: MarketBar] = [:]
+        for bar in bars {
+            unique[bar.timestamp] = bar
+        }
+        return unique.values.sorted { $0.timestamp < $1.timestamp }
+    }
+    
+    // MARK: - 5. Unified Trade Candles Fetcher
     
     /// Tự động phát hiện nhà cung cấp thích hợp và tải nến thật cho một Trade
     public func fetchBarsForTrade(
@@ -323,9 +334,12 @@ public final class MarketDataService: Sendable {
     ) async throws -> (provider: String, bars: [MarketBar]) {
         let provider = detectProviderForSymbol(symbol: trade.symbol)
         
-        // Khoảng thời gian: từ 2 giờ trước khi vào lệnh tới 2 giờ sau khi đóng lệnh
-        let openTime = trade.openedAt.addingTimeInterval(-7200)
-        let closeTime = (trade.closedAt ?? trade.openedAt).addingTimeInterval(7200)
+        let resMs = MarketResolution(rawValue: resolution)?.durationMs ?? 900_000
+        let beforePadding = Double(max(3_600_000, resMs * 4)) / 1000.0
+        let afterPadding = Double(max(1_800_000, resMs * 2)) / 1000.0
+        
+        let openTime = trade.openedAt.addingTimeInterval(-beforePadding)
+        let closeTime = (trade.closedAt ?? Date()).addingTimeInterval(afterPadding)
         
         if provider == "binance" {
             let startMs = Int64(openTime.timeIntervalSince1970 * 1000)
@@ -336,7 +350,7 @@ public final class MarketDataService: Sendable {
                 startTimeMs: startMs,
                 endTimeMs: endMs
             )
-            return ("Binance Spot (Public)", bars)
+            return ("Binance Spot (Public)", validateBars(bars))
         } else if !config.oandaApiKey.isEmpty && !config.oandaAccountId.isEmpty {
             let bars = try await fetchOandaBars(
                 symbol: trade.symbol,
@@ -347,7 +361,7 @@ public final class MarketDataService: Sendable {
                 to: closeTime,
                 resolution: resolution
             )
-            return ("OANDA v20", bars)
+            return ("OANDA v20", validateBars(bars))
         } else {
             // Trường hợp Forex nhưng chưa có key OANDA: thử tìm cặp tương đương trên Binance hoặc thông báo
             let binanceBars = try? await fetchBinanceBars(
@@ -357,7 +371,7 @@ public final class MarketDataService: Sendable {
                 endTimeMs: Int64(closeTime.timeIntervalSince1970 * 1000)
             )
             if let bb = binanceBars, !bb.isEmpty {
-                return ("Binance Spot (USDT)", bb)
+                return ("Binance Spot (USDT)", validateBars(bb))
             }
             
             throw NSError(
