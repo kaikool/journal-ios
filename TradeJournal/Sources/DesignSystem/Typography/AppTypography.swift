@@ -30,7 +30,9 @@ public enum AppTypography {
     public static let title3 = Font.system(size: 16, weight: .semibold)
     public static let headline = Font.system(size: 14, weight: .semibold)
     public static let subheadline = Font.system(size: 12, weight: .regular)
+    public static let subheading = subheadline
     public static let subheadlineBold = Font.system(size: 12, weight: .semibold)
+    public static let subheadingBold = subheadlineBold
     
     /// Specialized font for financial numbers and monetary amounts: monospaced digits
     /// to avoid column jitter during real-time value updates.

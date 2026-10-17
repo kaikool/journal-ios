@@ -352,7 +352,7 @@ public struct JournalCalendarView: View {
         VStack(alignment: .leading, spacing: 10) {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Performance insights")
-                    .font(AppTypography.subheading)
+                    .font(AppTypography.subheadline)
                     .foregroundColor(AppColors.primaryText)
                 
                 Text("Visible month × active filters · Closed trades, after fees")
