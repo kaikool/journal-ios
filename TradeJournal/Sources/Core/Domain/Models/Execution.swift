@@ -115,6 +115,9 @@ public struct Trade: Identifiable, Codable, Equatable {
     public var durationMs: Int64?
     public var contractMultiplier: Decimal?
     
+    public var side: String { direction.rawValue }
+    public var entryPrice: Decimal { avgEntry }
+    
 // User-annotated properties (User Annotations)
     public var notes: String?
     public var tags: [String]

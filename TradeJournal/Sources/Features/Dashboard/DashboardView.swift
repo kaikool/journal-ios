@@ -661,7 +661,7 @@ public struct DashboardView: View {
                             VStack(spacing: 6) {
                                 ForEach(openPos) { p in
                                     HStack {
-                                        AppBadge(p.side.uppercased(), color: p.side.lowercased() == "buy" || p.side.lowercased() == "long" ? AppColors.profit : AppColors.loss)
+                                        AppBadge(p.direction.rawValue.uppercased(), color: p.direction == .long ? AppColors.profit : AppColors.loss)
                                         
                                         Text(p.symbol)
                                             .font(AppTypography.bodyBold)
@@ -669,7 +669,7 @@ public struct DashboardView: View {
                                         
                                         Spacer()
                                         
-                                        Text("\(p.quantity) @ \(Formatters.formatCurrency(p.entryPrice, currency: env.currentCurrency))")
+                                        Text("\(p.quantity) @ \(Formatters.formatCurrency(p.avgEntry, currency: env.currentCurrency))")
                                             .font(AppTypography.caption)
                                             .foregroundColor(AppColors.secondaryText)
                                     }
