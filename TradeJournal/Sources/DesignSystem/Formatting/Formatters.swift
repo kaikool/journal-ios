@@ -128,6 +128,31 @@ public enum Formatters {
         return formatNumber(v)
     }
     
+    /// Định dạng thời gian nắm giữ lệnh từ milliseconds (e.g. 1d 4h, 2h 15m, 45m 10s)
+    public static func formatDuration(ms: Int64?) -> String {
+        guard let ms = ms, ms > 0 else { return "-" }
+        let totalSeconds = ms / 1000
+        let days = totalSeconds / 86400
+        let hours = (totalSeconds % 86400) / 3600
+        let minutes = (totalSeconds % 3600) / 60
+        let seconds = totalSeconds % 60
+        
+        if days > 0 {
+            return "\(days)d \(hours)h"
+        } else if hours > 0 {
+            return "\(hours)h \(minutes)m"
+        } else if minutes > 0 {
+            return "\(minutes)m"
+        } else {
+            return "\(seconds)s"
+        }
+    }
+    
+    public static func formatDuration(ms: Double?) -> String {
+        guard let ms = ms, ms > 0 else { return "-" }
+        return formatDuration(ms: Int64(ms))
+    }
+    
     /// Định dạng thời gian theo múi giờ chỉ định
     public static func dateTime(_ date: Date, timeZone: TimeZone = .current) -> String {
         let f = DateFormatter()

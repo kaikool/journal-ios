@@ -280,3 +280,189 @@ public struct JournalCalendarView: View {
         }
     }
 }
+
+/// Sheet chi tiết ngày giao dịch khi bấm vào một ô trong lịch
+public struct DayDetailSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var env: AppEnvironment
+    
+    public let dateKey: String
+    public let stats: DayStats?
+    public let trades: [Trade]
+    public let note: JournalNote
+    public let onSaveNote: (JournalNote) -> Void
+    public let onAddTrade: () -> Void
+    
+    @State private var noteContent: String = ""
+    @State private var rating: Int = 0
+    
+    public init(
+        dateKey: String,
+        stats: DayStats?,
+        trades: [Trade],
+        note: JournalNote,
+        onSaveNote: @escaping (JournalNote) -> Void,
+        onAddTrade: @escaping () -> Void
+    ) {
+        self.dateKey = dateKey
+        self.stats = stats
+        self.trades = trades
+        self.note = note
+        self.onSaveNote = onSaveNote
+        self.onAddTrade = onAddTrade
+        _noteContent = State(initialValue: note.content)
+        _rating = State(initialValue: note.rating ?? 0)
+    }
+    
+    public var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 14) {
+                    // Summary Card
+                    AppCard {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                AppCardHeader("Net P&L")
+                                AppMonetaryText(
+                                    Formatters.formatPnL(stats?.netPnl ?? .zero, currency: env.currentCurrency),
+                                    isPrivate: env.isPrivacyModeEnabled,
+                                    font: AppTypography.financialNumber(size: 22, weight: .bold),
+                                    color: (stats?.netPnl ?? .zero) >= 0 ? AppColors.profit : AppColors.loss
+                                )
+                            }
+                            
+                            Spacer()
+                            
+                            VStack(alignment: .trailing, spacing: 2) {
+                                AppCardHeader("Trades")
+                                Text("\(stats?.trades ?? trades.count)")
+                                    .font(AppTypography.financialNumber(size: 22, weight: .bold))
+                                    .foregroundColor(AppColors.primaryText)
+                            }
+                        }
+                    }
+                    
+                    // Daily Note Card
+                    AppCard {
+                        VStack(alignment: .leading, spacing: 10) {
+                            HStack {
+                                AppCardHeader("Daily Note")
+                                Spacer()
+                                HStack(spacing: 4) {
+                                    ForEach(1...5, id: \.self) { star in
+                                        Image(systemName: star <= rating ? "star.fill" : "star")
+                                            .font(.system(size: 13))
+                                            .foregroundColor(star <= rating ? .yellow : AppColors.mutedText)
+                                            .onTapGesture {
+                                                rating = (rating == star) ? 0 : star
+                                                save()
+                                            }
+                                    }
+                                }
+                            }
+                            
+                            TextField("Write thoughts or notes for this day...", text: $noteContent, axis: .vertical)
+                                .lineLimit(3...6)
+                                .font(AppTypography.body)
+                                .foregroundColor(AppColors.primaryText)
+                                .padding(10)
+                                .background(AppColors.secondaryBackground)
+                                .cornerRadius(6)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .stroke(AppColors.border, lineWidth: 1)
+                                )
+                                .onChange(of: noteContent) { _ in
+                                    save()
+                                }
+                        }
+                    }
+                    
+                    // Day's Trades
+                    if !trades.isEmpty {
+                        AppCard {
+                            VStack(alignment: .leading, spacing: 10) {
+                                AppCardHeader("Trades (\(trades.count))")
+                                
+                                ForEach(trades) { trade in
+                                    HStack {
+                                        AppBadge(trade.status.rawValue.uppercased(), color: Formatters.statusColor(trade.status))
+                                        Text(trade.symbol)
+                                            .font(AppTypography.bodyBold)
+                                            .foregroundColor(AppColors.primaryText)
+                                        Spacer()
+                                        AppMonetaryText(
+                                            Formatters.formatPnL(trade.netPnl, currency: env.currentCurrency),
+                                            isPrivate: env.isPrivacyModeEnabled,
+                                            font: AppTypography.financialNumber(size: 13, weight: .semibold),
+                                            color: trade.netPnl >= 0 ? AppColors.profit : AppColors.loss
+                                        )
+                                    }
+                                    .padding(.vertical, 4)
+                                    
+                                    if trade.id != trades.last?.id {
+                                        Divider().background(AppColors.border)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Action Buttons
+                    HStack(spacing: 10) {
+                        Button(action: onAddTrade) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "plus")
+                                Text("Add Trade")
+                            }
+                            .font(AppTypography.captionBold)
+                            .foregroundColor(AppColors.brandTextOnDark)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 38)
+                            .background(AppColors.brand)
+                            .cornerRadius(6)
+                        }
+                        
+                        NavigationLink(destination: DailyJournalDetailView(date: dateKey)) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "doc.text")
+                                Text("Full Journal")
+                            }
+                            .font(AppTypography.captionBold)
+                            .foregroundColor(AppColors.primaryText)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 38)
+                            .background(AppColors.cardBackground)
+                            .cornerRadius(6)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .stroke(AppColors.border, lineWidth: 1)
+                            )
+                        }
+                    }
+                }
+                .padding(14)
+            }
+            .background(AppColors.background)
+            .navigationTitle(dateKey)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                    .font(AppTypography.captionBold)
+                    .foregroundColor(AppColors.brand)
+                }
+            }
+        }
+    }
+    
+    private func save() {
+        var updated = note
+        updated.content = noteContent
+        updated.rating = rating > 0 ? rating : nil
+        updated.updatedAt = Date()
+        onSaveNote(updated)
+    }
+}
