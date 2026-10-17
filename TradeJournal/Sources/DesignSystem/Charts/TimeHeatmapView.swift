@@ -1,0 +1,199 @@
+import SwiftUI
+import Charts
+
+/// Apple HIG Hourly Trade Performance Chart ported from `components/charts/time-heatmap.tsx`.
+/// Two aligned panes:
+/// Upper: Net P&L per opening hour with gradient diverging bars and touch scrubber.
+/// Lower: Trade count volume with interactive synchronization.
+public struct TimeHeatmapView: View {
+    private let hours: [BucketStats]
+    private let currency: String
+    private let isPrivate: Bool
+    
+    @State private var selectedHourKey: String? = nil
+    @State private var lastHapticHour: String? = nil
+    
+    public init(hours: [BucketStats], currency: String = "USD", isPrivate: Bool = false) {
+        self.hours = hours
+        self.currency = currency
+        self.isPrivate = isPrivate
+    }
+    
+    private var activeBucket: BucketStats? {
+        guard let key = selectedHourKey else { return nil }
+        return hours.first { "\($0.key):00" == key }
+    }
+    
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Live Scrub Header
+            if let active = activeBucket {
+                HStack {
+                    Text("\(active.key):00")
+                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .foregroundColor(AppColors.primaryText)
+                    
+                    Spacer()
+                    
+                    Text("\(active.trades) trades")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(AppColors.secondaryText)
+                    
+                    Text("·")
+                        .foregroundColor(AppColors.secondaryText)
+                    
+                    Text(isPrivate ? "••••" : Formatters.formatPnL(active.netPnl, currency: currency))
+                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundColor(active.netPnl >= 0 ? AppColors.profit : AppColors.loss)
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(AppColors.cardBackground.opacity(0.8))
+                .clipShape(Capsule())
+                .transition(.opacity)
+            }
+            
+            // Upper Pane: Net P&L Diverging Bars
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text(isPrivate ? "Net P&L (hidden)" : "Net P&L (\(currency))")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(AppColors.secondaryText)
+                        .textCase(.uppercase)
+                        .tracking(0.5)
+                    Spacer()
+                }
+                
+                Chart {
+                    RuleMark(y: .value("Zero", 0))
+                        .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
+                        .foregroundStyle(AppColors.border.opacity(0.8))
+                    
+                    ForEach(hours) { h in
+                        let hourLabel = "\(h.key):00"
+                        let pnlVal = isPrivate ? 0 : (h.netPnl as NSDecimalNumber).doubleValue
+                        
+                        BarMark(
+                            x: .value("Hour", hourLabel),
+                            y: .value("Net P&L", pnlVal)
+                        )
+                        .foregroundStyle(
+                            h.netPnl >= 0 ?
+                            LinearGradient(
+                                colors: [AppColors.profit, AppColors.profit.opacity(0.75)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            ) :
+                            LinearGradient(
+                                colors: [AppColors.loss.opacity(0.75), AppColors.loss],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                        .cornerRadius(3.5)
+                        .opacity(selectedHourKey == nil || selectedHourKey == hourLabel ? 1.0 : 0.4)
+                    }
+                    
+                    if let activeKey = selectedHourKey {
+                        RuleMark(x: .value("Cursor", activeKey))
+                            .lineStyle(StrokeStyle(lineWidth: 1.2, dash: [3, 3]))
+                            .foregroundStyle(AppColors.primaryText.opacity(0.4))
+                    }
+                }
+                .chartXSelection(value: $selectedHourKey)
+                .chartYAxis {
+                    AxisMarks(position: .leading, values: .automatic(desiredCount: 3)) { value in
+                        AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
+                            .foregroundStyle(AppColors.border.opacity(0.3))
+                        AxisValueLabel {
+                            if let d = value.as(Double.self) {
+                                Text(isPrivate ? "••••" : Formatters.formatCurrency(Decimal(d), currency: currency))
+                                    .font(.system(size: 9, weight: .medium, design: .rounded))
+                                    .monospacedDigit()
+                                    .foregroundColor(AppColors.secondaryText)
+                            }
+                        }
+                    }
+                }
+                .chartXAxis(.hidden)
+                .frame(height: 120)
+            }
+            
+            // Lower Pane: Trade Volume
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text("Trades")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(AppColors.secondaryText)
+                        .textCase(.uppercase)
+                        .tracking(0.5)
+                    Spacer()
+                }
+                
+                Chart {
+                    ForEach(hours) { h in
+                        let hourLabel = "\(h.key):00"
+                        
+                        BarMark(
+                            x: .value("Hour", hourLabel),
+                            y: .value("Trades", h.trades)
+                        )
+                        .foregroundStyle(AppColors.secondaryText.opacity(0.35))
+                        .cornerRadius(2.5)
+                        
+                        PointMark(
+                            x: .value("Hour", hourLabel),
+                            y: .value("Trades", h.trades)
+                        )
+                        .foregroundStyle(AppColors.brand)
+                        .symbolSize(selectedHourKey == hourLabel ? 30 : 12)
+                    }
+                    
+                    if let activeKey = selectedHourKey {
+                        RuleMark(x: .value("Cursor", activeKey))
+                            .lineStyle(StrokeStyle(lineWidth: 1.2, dash: [3, 3]))
+                            .foregroundStyle(AppColors.primaryText.opacity(0.4))
+                    }
+                }
+                .chartXSelection(value: $selectedHourKey)
+                .chartYAxis {
+                    AxisMarks(position: .leading, values: .automatic(desiredCount: 2)) { value in
+                        AxisValueLabel {
+                            if let intVal = value.as(Int.self) {
+                                Text("\(intVal)")
+                                    .font(.system(size: 9, weight: .medium, design: .rounded))
+                                    .monospacedDigit()
+                                    .foregroundColor(AppColors.secondaryText)
+                            }
+                        }
+                    }
+                }
+                .chartXAxis {
+                    AxisMarks(position: .bottom) { _ in
+                        AxisValueLabel()
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundStyle(AppColors.secondaryText)
+                    }
+                }
+                .frame(height: 65)
+                .onChange(of: selectedHourKey) { newHour in
+                    if let h = newHour, h != lastHapticHour {
+                        lastHapticHour = h
+                        triggerHapticFeedback()
+                    } else if newHour == nil {
+                        lastHapticHour = nil
+                    }
+                }
+            }
+        }
+    }
+    
+    private func triggerHapticFeedback() {
+        #if os(iOS)
+        let generator = UISelectionFeedbackGenerator()
+        generator.prepare()
+        generator.selectionChanged()
+        #endif
+    }
+}

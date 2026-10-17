@@ -63,10 +63,10 @@ public struct CandleChartView: View {
             }
             .frame(height: 240)
             .background(AppColors.cardBackground)
-            .cornerRadius(8)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(AppColors.border, lineWidth: 1)
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(AppColors.border.opacity(0.6), lineWidth: 1)
             )
         }
     }
@@ -459,8 +459,11 @@ public struct CandleChartView: View {
         let slotCount = max(visibleBars.count, min(totalBarsCount, 50))
         let stepX = totalWidth / CGFloat(max(1, slotCount))
         let index = Int(x / stepX)
-        if index >= 0 && index < visibleBars.count {
+        if index >= 0 && index < visibleBars.count && self.hoveredBarIndex != index {
             self.hoveredBarIndex = index
+            #if os(iOS)
+            UISelectionFeedbackGenerator().selectionChanged()
+            #endif
         }
     }
     

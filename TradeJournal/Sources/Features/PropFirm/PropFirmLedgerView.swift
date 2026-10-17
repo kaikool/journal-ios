@@ -343,25 +343,58 @@ public struct PropFirmLedgerView: View {
                             .foregroundColor(AppColors.secondaryText)
                         
                         Chart {
+                            RuleMark(y: .value("Zero", 0))
+                                .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
+                                .foregroundStyle(AppColors.border.opacity(0.8))
+                            
                             ForEach(timelinePoints, id: \.date) { pt in
-                                LineMark(
-                                    x: .value("Date", pt.date),
-                                    y: .value("Net cash", Double(pt.netMinor) / 100.0)
-                                )
-                                .interpolationMethod(.monotone)
-                                .foregroundStyle(AppColors.accent)
+                                let val = Double(pt.netMinor) / 100.0
                                 
                                 AreaMark(
                                     x: .value("Date", pt.date),
-                                    y: .value("Net cash", Double(pt.netMinor) / 100.0)
+                                    y: .value("Net cash", val)
                                 )
+                                .interpolationMethod(.catmullRom)
                                 .foregroundStyle(
                                     LinearGradient(
-                                        colors: [AppColors.accent.opacity(0.3), Color.clear],
+                                        stops: [
+                                            .init(color: AppColors.brand.opacity(0.3), location: 0.0),
+                                            .init(color: AppColors.brand.opacity(0.06), location: 0.6),
+                                            .init(color: Color.clear, location: 1.0)
+                                        ],
                                         startPoint: .top,
                                         endPoint: .bottom
                                     )
                                 )
+                                
+                                LineMark(
+                                    x: .value("Date", pt.date),
+                                    y: .value("Net cash", val)
+                                )
+                                .interpolationMethod(.catmullRom)
+                                .foregroundStyle(AppColors.brand)
+                                .lineStyle(StrokeStyle(lineWidth: 2.2, lineCap: .round, lineJoin: .round))
+                            }
+                        }
+                        .chartYAxis {
+                            AxisMarks(position: .trailing, values: .automatic(desiredCount: 4)) { value in
+                                AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
+                                    .foregroundStyle(AppColors.border.opacity(0.3))
+                                AxisValueLabel {
+                                    if let d = value.as(Double.self) {
+                                        Text(Formatters.formatCurrency(Decimal(d), currency: "USD"))
+                                            .font(.system(size: 9, weight: .medium, design: .rounded))
+                                            .monospacedDigit()
+                                            .foregroundStyle(AppColors.secondaryText)
+                                    }
+                                }
+                            }
+                        }
+                        .chartXAxis {
+                            AxisMarks(values: .automatic(desiredCount: 5)) { _ in
+                                AxisValueLabel()
+                                    .font(.system(size: 9, weight: .medium))
+                                    .foregroundStyle(AppColors.secondaryText)
                             }
                         }
                         .frame(height: 180)

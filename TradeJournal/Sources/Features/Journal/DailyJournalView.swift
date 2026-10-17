@@ -285,6 +285,7 @@ public struct DailyJournalDetailView: View {
     @State private var aiErrorMessage: String? = nil
     @State private var showExportSheet: Bool = false
     @State private var exportText: String = ""
+    @State private var selectedTime: String? = nil
     
     public init(date: String) {
         self.date = date
@@ -454,41 +455,100 @@ public struct DailyJournalDetailView: View {
     }
     
     private var intradayChartCard: some View {
-        AppCard {
+        let activePoint = intradayPoints.first { $0.timeStr == selectedTime } ?? intradayPoints.last
+        let isPositive = (activePoint?.cumPnl ?? metrics.netPnl) >= 0
+        let chartColor = isPositive ? AppColors.profit : AppColors.loss
+        
+        return AppCard {
             VStack(alignment: .leading, spacing: 12) {
-                Text("Intraday cumulative net P&L")
-                    .font(AppTypography.headline)
-                    .foregroundColor(AppColors.primaryText)
+                HStack(alignment: .lastTextBaseline) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(selectedTime != nil ? "At \(selectedTime!)" : "Intraday Cumulative Net P&L")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(AppColors.secondaryText)
+                            .textCase(.uppercase)
+                            .tracking(0.5)
+                        
+                        Text(Formatters.formatPnL(activePoint?.cumPnl ?? metrics.netPnl, currency: env.currentCurrency))
+                            .font(.system(size: 22, weight: .bold, design: .rounded))
+                            .monospacedDigit()
+                            .foregroundColor(chartColor)
+                    }
+                    
+                    Spacer()
+                }
                 
                 Chart {
-                    ForEach(Array(intradayPoints.enumerated()), id: \.offset) { index, point in
+                    RuleMark(y: .value("Zero", 0))
+                        .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
+                        .foregroundStyle(AppColors.border.opacity(0.8))
+                    
+                    ForEach(Array(intradayPoints.enumerated()), id: \.offset) { _, point in
+                        let val = NSDecimalNumber(decimal: point.cumPnl).doubleValue
+                        
                         LineMark(
                             x: .value("Time", point.timeStr),
-                            y: .value("P&L", NSDecimalNumber(decimal: point.cumPnl).doubleValue)
+                            y: .value("P&L", val)
                         )
-                        .foregroundStyle(metrics.netPnl >= 0 ? AppColors.profit : AppColors.loss)
-                        .lineStyle(StrokeStyle(lineWidth: 2.5))
+                        .interpolationMethod(.catmullRom)
+                        .foregroundStyle(chartColor)
+                        .lineStyle(StrokeStyle(lineWidth: 2.2, lineCap: .round, lineJoin: .round))
                         
                         AreaMark(
                             x: .value("Time", point.timeStr),
-                            y: .value("P&L", NSDecimalNumber(decimal: point.cumPnl).doubleValue)
+                            y: .value("P&L", val)
                         )
+                        .interpolationMethod(.catmullRom)
                         .foregroundStyle(
                             LinearGradient(
-                                colors: [
-                                    (metrics.netPnl >= 0 ? AppColors.profit : AppColors.loss).opacity(0.3),
-                                    (metrics.netPnl >= 0 ? AppColors.profit : AppColors.loss).opacity(0.0)
+                                stops: [
+                                    .init(color: chartColor.opacity(0.3), location: 0.0),
+                                    .init(color: chartColor.opacity(0.0), location: 1.0)
                                 ],
                                 startPoint: .top,
                                 endPoint: .bottom
                             )
                         )
                     }
+                    
+                    if let time = selectedTime, let p = activePoint {
+                        let activeVal = NSDecimalNumber(decimal: p.cumPnl).doubleValue
+                        
+                        RuleMark(x: .value("Cursor", time))
+                            .lineStyle(StrokeStyle(lineWidth: 1.2, dash: [3, 3]))
+                            .foregroundStyle(AppColors.primaryText.opacity(0.4))
+                        
+                        PointMark(
+                            x: .value("Time", time),
+                            y: .value("P&L", activeVal)
+                        )
+                        .foregroundStyle(chartColor)
+                        .symbolSize(32)
+                    }
                 }
+                .chartXSelection(value: $selectedTime)
                 .chartYAxis {
-                    AxisMarks(position: .leading)
+                    AxisMarks(position: .leading, values: .automatic(desiredCount: 4)) { value in
+                        AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
+                            .foregroundStyle(AppColors.border.opacity(0.3))
+                        AxisValueLabel {
+                            if let d = value.as(Double.self) {
+                                Text(Formatters.formatCurrency(Decimal(d), currency: env.currentCurrency))
+                                    .font(.system(size: 9, weight: .medium, design: .rounded))
+                                    .monospacedDigit()
+                                    .foregroundColor(AppColors.secondaryText)
+                            }
+                        }
+                    }
                 }
-                .frame(height: 180)
+                .chartXAxis {
+                    AxisMarks(values: .automatic(desiredCount: 5)) { _ in
+                        AxisValueLabel()
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundStyle(AppColors.secondaryText)
+                    }
+                }
+                .frame(height: 160)
             }
         }
         .padding(.horizontal, 16)

@@ -1,8 +1,11 @@
 import SwiftUI
 
-/// Semicircle Gauge ported 1:1 from `components/charts/gauge.tsx`:
-/// Semicircle gauge measuring 0–1 ratios (Trade win %, Day win %).
-/// Always renders % value in center with visual arc.
+/// Apple HIG Semicircle Arc Gauge ported from `components/charts/gauge.tsx`.
+/// Features:
+/// - Apple Watch / Fitness complication grade curvature and rounded line caps
+/// - Luminous brand gradient stroke with soft ambient glow
+/// - Centered SF Pro Rounded typography with monospaced digits
+/// - Fluid spring animation on value updates
 public struct GaugeView: View {
     private let value: Double?
     private let label: String
@@ -20,37 +23,51 @@ public struct GaugeView: View {
     }
     
     public var body: some View {
+        let strokeWidth: CGFloat = 8
+        let radius = (size / 2) - strokeWidth
+        
         VStack(spacing: 0) {
             ZStack(alignment: .bottom) {
-                // Background track
+                // Background Track Arc
                 Circle()
                     .trim(from: 0.5, to: 1.0)
                     .stroke(
-                        AppColors.border,
-                        style: StrokeStyle(lineWidth: 7, lineCap: .round)
+                        AppColors.border.opacity(0.6),
+                        style: StrokeStyle(lineWidth: strokeWidth, lineCap: .round)
                     )
-                    .frame(width: size - 14, height: size - 14)
+                    .frame(width: radius * 2, height: radius * 2)
+                    .rotationEffect(.degrees(0))
                 
-                // Active Brand Progress
+                // Active Brand Arc
                 if ratio > 0 {
                     Circle()
-                        .trim(from: 0.5, to: 0.5 + (0.5 * CGFloat(ratio)))
+                        .trim(from: 0.5, to: 0.5 + CGFloat(ratio) * 0.5)
                         .stroke(
-                            AppColors.brand,
-                            style: StrokeStyle(lineWidth: 7, lineCap: .round)
+                            LinearGradient(
+                                colors: [
+                                    AppColors.brand.opacity(0.8),
+                                    AppColors.brand
+                                ],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            ),
+                            style: StrokeStyle(lineWidth: strokeWidth, lineCap: .round)
                         )
-                        .frame(width: size - 14, height: size - 14)
+                        .frame(width: radius * 2, height: radius * 2)
+                        .shadow(color: AppColors.brand.opacity(0.3), radius: 3, x: 0, y: 1)
+                        .animation(.spring(response: 0.55, dampingFraction: 0.8), value: ratio)
                 }
                 
-                // Percentage Text
+                // Centered Percentage Readout
                 VStack(spacing: 0) {
                     Text(value == nil ? "–" : String(format: "%.1f%%", ratio * 100))
-                        .font(AppTypography.financialNumber(size: 17, weight: .semibold))
+                        .font(.system(size: max(13, size * 0.19), weight: .bold, design: .rounded))
+                        .monospacedDigit()
                         .foregroundColor(AppColors.primaryText)
                 }
-                .offset(y: 4)
+                .offset(y: 2)
             }
-            .frame(width: size, height: size / 2 + 12)
+            .frame(width: size, height: size / 2 + 10)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(label): \(value == nil ? "no data" : String(format: "%.1f%%", ratio * 100))")

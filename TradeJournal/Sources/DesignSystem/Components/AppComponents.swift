@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Trading Terminal card container
+/// Trading Terminal card container matching Apple HIG
 public struct AppCard<Content: View>: View {
     private let content: Content
     
@@ -12,13 +12,14 @@ public struct AppCard<Content: View>: View {
         VStack(alignment: .leading, spacing: 10) {
             content
         }
-        .padding(14)
+        .padding(16)
         .background(AppColors.cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(AppColors.border, lineWidth: 1)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(AppColors.border.opacity(0.6), lineWidth: 1)
         )
+        .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 2)
     }
 }
 
@@ -50,7 +51,7 @@ public struct AppCardHeader: View {
     }
 }
 
-/// Win / Loss ratio bar visualization
+/// Win / Loss ratio bar visualization matching web journal-progress-visual
 public struct AppRatioBar: View {
     private let greenRatio: Double
     
@@ -61,16 +62,16 @@ public struct AppRatioBar: View {
     public var body: some View {
         GeometryReader { proxy in
             HStack(spacing: 2) {
-                RoundedRectangle(cornerRadius: 3)
+                Capsule()
                     .fill(AppColors.profit)
-                    .frame(width: max(4, proxy.size.width * CGFloat(greenRatio) - 1))
+                    .frame(width: max(6, proxy.size.width * CGFloat(greenRatio) - 1))
                 
-                RoundedRectangle(cornerRadius: 3)
+                Capsule()
                     .fill(AppColors.loss)
                     .frame(maxWidth: .infinity)
             }
         }
-        .frame(height: 5)
+        .frame(height: 6)
     }
 }
 

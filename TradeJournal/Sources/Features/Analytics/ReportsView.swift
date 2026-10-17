@@ -222,13 +222,16 @@ public struct ReportsView: View {
         VStack(spacing: 16) {
             // Cumulative Net Equity Curve
             let overview = FinancialMetricsEngine.computeOverview(trades: trades, timeZone: env.currentTimeZone)
+            var runningPeak: Decimal = 0
             let equityPoints = overview.curve.map { p in
-                EquityPointItem(
+                if p.cumNetPnl > runningPeak { runningPeak = p.cumNetPnl }
+                let dd = runningPeak > 0 ? (runningPeak - p.cumNetPnl) / runningPeak : Decimal.zero
+                return EquityPointItem(
                     date: p.timestamp,
                     dateKey: p.dateString,
                     netPnl: p.cumNetPnl,
                     cumulativePnl: p.cumNetPnl,
-                    drawdown: Decimal.zero
+                    drawdown: dd
                 )
             }
             
@@ -238,14 +241,18 @@ public struct ReportsView: View {
                         .font(AppTypography.headline)
                         .foregroundColor(AppColors.primaryText)
                     
-                    EquityCurveChart(points: equityPoints, currency: env.currentCurrency)
+                    EquityCurveChart(points: equityPoints, currency: env.currentCurrency, height: 200)
                 }
             }
             .padding(.horizontal, 16)
             
             // Drawdown Chart
-            DrawdownChart(points: equityPoints)
-                .padding(.horizontal, 16)
+            AppCard {
+                VStack(alignment: .leading, spacing: 10) {
+                    DrawdownChart(points: equityPoints, height: 120)
+                }
+            }
+            .padding(.horizontal, 16)
         }
     }
     

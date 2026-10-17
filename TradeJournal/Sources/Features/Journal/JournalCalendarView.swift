@@ -47,6 +47,7 @@ public struct JournalCalendarView: View {
     @State private var addTradeDate: Date? = nil
     @State private var showAddTradeSheet: Bool = false
     @State private var showDailyTable: Bool = false
+    @State private var selectedTrendDate: String? = nil
     
     public init() {}
     
@@ -660,18 +661,48 @@ public struct JournalCalendarView: View {
                 }
                 
                 if insights.tradingDays >= 2 {
+                    let activeTrend = insights.trend.first { dateLabel(for: $0.date) == selectedTrendDate }
+                    
+                    if let active = activeTrend {
+                        HStack {
+                            Text(dateLabel(for: active.date))
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundColor(AppColors.secondaryText)
+                            Spacer()
+                            Text(Formatters.formatPnL(active.netPnl, currency: env.currentCurrency))
+                                .font(.system(size: 12, weight: .bold, design: .rounded))
+                                .monospacedDigit()
+                                .foregroundColor(active.netPnl >= 0 ? AppColors.profit : AppColors.loss)
+                        }
+                        .padding(.horizontal, 2)
+                    }
+                    
                     Chart {
                         RuleMark(y: .value("Zero", 0))
                             .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
-                            .foregroundStyle(AppColors.border)
+                            .foregroundStyle(AppColors.border.opacity(0.8))
                         
                         ForEach(insights.trend) { pt in
+                            let label = dateLabel(for: pt.date)
                             BarMark(
-                                x: .value("Day", dateLabel(for: pt.date)),
+                                x: .value("Day", label),
                                 y: .value("Net P&L", (pt.netPnl as NSDecimalNumber).doubleValue)
                             )
-                            .foregroundStyle(pt.netPnl >= 0 ? AppColors.profit : AppColors.loss)
-                            .cornerRadius(3)
+                            .foregroundStyle(
+                                pt.netPnl >= 0 ?
+                                LinearGradient(
+                                    colors: [AppColors.profit, AppColors.profit.opacity(0.75)],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                ) :
+                                LinearGradient(
+                                    colors: [AppColors.loss.opacity(0.75), AppColors.loss],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                            .cornerRadius(3.5)
+                            .opacity(selectedTrendDate == nil || selectedTrendDate == label ? 1.0 : 0.45)
                         }
                         
                         if insights.tradingDays >= 8 {
@@ -680,13 +711,39 @@ public struct JournalCalendarView: View {
                                     x: .value("Day", dateLabel(for: pt.date)),
                                     y: .value("5-Day Avg", ((pt.average ?? .zero) as NSDecimalNumber).doubleValue)
                                 )
+                                .interpolationMethod(.catmullRom)
                                 .lineStyle(StrokeStyle(lineWidth: 2, dash: [4, 4]))
                                 .foregroundStyle(AppColors.brand)
                             }
                         }
+                        
+                        if let sel = selectedTrendDate {
+                            RuleMark(x: .value("Selected", sel))
+                                .lineStyle(StrokeStyle(lineWidth: 1.2, dash: [3, 3]))
+                                .foregroundStyle(AppColors.primaryText.opacity(0.4))
+                        }
                     }
+                    .chartXSelection(value: $selectedTrendDate)
                     .chartYAxis {
-                        AxisMarks(position: .leading)
+                        AxisMarks(position: .leading, values: .automatic(desiredCount: 4)) { value in
+                            AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
+                                .foregroundStyle(AppColors.border.opacity(0.3))
+                            AxisValueLabel {
+                                if let d = value.as(Double.self) {
+                                    Text(Formatters.formatCurrency(Decimal(d), currency: env.currentCurrency))
+                                        .font(.system(size: 9, weight: .medium, design: .rounded))
+                                        .monospacedDigit()
+                                        .foregroundColor(AppColors.secondaryText)
+                                }
+                            }
+                        }
+                    }
+                    .chartXAxis {
+                        AxisMarks { _ in
+                            AxisValueLabel()
+                                .font(.system(size: 9, weight: .medium))
+                                .foregroundStyle(AppColors.secondaryText)
+                        }
                     }
                     .frame(height: 160)
                 } else {
