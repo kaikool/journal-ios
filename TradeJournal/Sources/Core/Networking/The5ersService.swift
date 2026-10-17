@@ -843,14 +843,25 @@ public final class The5ersService: ObservableObject {
         return (fmt.string(from: date), date)
     }
     
+    private func firstValue(in dict: [String: Any], keys: [String]) -> Any? {
+        for k in keys {
+            if let val = dict[k] {
+                return val
+            }
+        }
+        return nil
+    }
+    
     /// Chuẩn hóa vị thế The5ers (Port 1:1 từ `the5ers-normalize.ts` `normalizePosition`)
     private func normalizePosition(from raw: [String: Any]) -> SourcePosition? {
         let row = sourceFields(raw)
         
-        let symbol = String(describing: row["symbol"] ?? "").trimmingCharacters(in: .whitespaces)
+        let rawSymbol = row["symbol"]
+        let symbol = String(describing: rawSymbol ?? "").trimmingCharacters(in: .whitespaces)
         guard !symbol.isEmpty && symbol.count <= 100 else { return nil }
         
-        let sideStr = String(describing: row["side"] ?? row["direction"] ?? "").lowercased()
+        let sideVal = row["side"] ?? row["direction"]
+        let sideStr = String(describing: sideVal ?? "").lowercased()
         let direction: TradeDirection? = {
             if sideStr.contains("buy") || sideStr == "long" { return .long }
             if sideStr.contains("sell") || sideStr == "short" { return .short }
@@ -858,21 +869,38 @@ public final class The5ersService: ObservableObject {
         }()
         guard let dir = direction else { return nil }
         
-        guard let (openedAtIso, openedAtDate) = sourceInstant(row["opendate"] ?? row["openedat"] ?? row["opentime"] ?? row["open_date"] ?? row["opendatetime"] ?? row["time"] ?? row["timestamp"] ?? row["datetime"]) else {
-            return nil
-        }
-        guard let quantity = sourceNumber(row["quantity"] ?? row["lots"] ?? row["volume"] ?? row["size"] ?? row["units"]), quantity > 0 else {
-            return nil
-        }
-        guard let entry = sourceNumber(row["entry"] ?? row["openprice"] ?? row["entryprice"] ?? row["open_price"] ?? row["price"]) else {
+        let openKeys = ["opendate", "openedat", "opentime", "open_date", "opendatetime", "time", "timestamp", "datetime"]
+        let openVal = firstValue(in: row, keys: openKeys)
+        guard let (openedAtIso, openedAtDate) = sourceInstant(openVal) else {
             return nil
         }
         
-        let isClosed = sourceBoolean(row["isclosed"] ?? row["closed"] ?? row["isclose"]) ?? (row["closedate"] != nil || row["exit"] != nil || row["closetime"] != nil || row["closeprice"] != nil)
+        let qtyKeys = ["quantity", "lots", "volume", "size", "units"]
+        let qtyVal = firstValue(in: row, keys: qtyKeys)
+        guard let quantity = sourceNumber(qtyVal), quantity > 0 else {
+            return nil
+        }
         
-        let closedAtTuple = isClosed ? sourceInstant(row["closedate"] ?? row["closedat"] ?? row["closetime"] ?? row["close_date"] ?? row["closedatetime"] ?? row["exittime"] ?? row["exitdate"]) : nil
-        let exit = isClosed ? sourceNumber(row["exit"] ?? row["closeprice"] ?? row["exitprice"] ?? row["close_price"] ?? row["price"]) : nil
-        let netPnl = isClosed ? (sourceNumber(row["profitandloss"] ?? row["profit"] ?? row["netpnl"] ?? row["pnl"] ?? row["net_pnl"] ?? row["gross"]) ?? 0) : 0
+        let entryKeys = ["entry", "openprice", "entryprice", "open_price", "price"]
+        let entryVal = firstValue(in: row, keys: entryKeys)
+        guard let entry = sourceNumber(entryVal) else {
+            return nil
+        }
+        
+        let closedFlag = firstValue(in: row, keys: ["isclosed", "closed", "isclose"])
+        let isClosed = sourceBoolean(closedFlag) ?? (row["closedate"] != nil || row["exit"] != nil || row["closetime"] != nil || row["closeprice"] != nil)
+        
+        let closeKeys = ["closedate", "closedat", "closetime", "close_date", "closedatetime", "exittime", "exitdate"]
+        let closeVal = firstValue(in: row, keys: closeKeys)
+        let closedAtTuple = isClosed ? sourceInstant(closeVal) : nil
+        
+        let exitKeys = ["exit", "closeprice", "exitprice", "close_price", "price"]
+        let exitVal = firstValue(in: row, keys: exitKeys)
+        let exit = isClosed ? sourceNumber(exitVal) : nil
+        
+        let pnlKeys = ["profitandloss", "profit", "netpnl", "pnl", "net_pnl", "gross"]
+        let pnlVal = firstValue(in: row, keys: pnlKeys)
+        let netPnl = isClosed ? (sourceNumber(pnlVal) ?? 0) : 0
         
         if isClosed && (closedAtTuple == nil || exit == nil) {
             return nil
@@ -881,16 +909,20 @@ public final class The5ersService: ObservableObject {
             return nil
         }
         
+        let provKeys = ["positionid", "ticket", "id", "dealid", "positionref"]
+        let provVal = firstValue(in: row, keys: provKeys)
         let providerId: String? = {
-            if let p = row["positionid"] ?? row["ticket"] ?? row["id"] ?? row["dealid"] ?? row["positionref"] {
+            if let p = provVal {
                 let s = String(describing: p).trimmingCharacters(in: .whitespaces)
                 return s.isEmpty ? nil : s
             }
             return nil
         }()
         
-        let fee = sourceNumber(row["fee"] ?? row["commission"] ?? row["fees"])
-        let swap = sourceNumber(row["swap"] ?? row["swaps"])
+        let feeVal = firstValue(in: row, keys: ["fee", "commission", "fees"])
+        let fee = sourceNumber(feeVal)
+        let swapVal = firstValue(in: row, keys: ["swap", "swaps"])
+        let swap = sourceNumber(swapVal)
         let isValid = sourceBoolean(row["isvalid"])
         
         return SourcePosition(
