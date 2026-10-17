@@ -4,10 +4,23 @@ public struct RootTabView: View {
     @EnvironmentObject private var env: AppEnvironment
     @ObservedObject private var dataStore = TradeDataStore.shared
     
+    // Interactive drawer state for ultra-smooth fluid navigation
+    @State private var dragOffset: CGFloat = 0
+    @State private var isDragging: Bool = false
+    
+    private let drawerWidth: CGFloat = 285
+    
     public init() {}
     
     public var body: some View {
+        let isDrawerActive = env.isDrawerOpen
+        let currentOffset: CGFloat = isDrawerActive 
+            ? max(-drawerWidth, min(0, dragOffset)) 
+            : min(0, -drawerWidth + max(0, dragOffset))
+        let progress: CGFloat = max(0, min(1, (drawerWidth + currentOffset) / drawerWidth))
+        
         ZStack(alignment: .leading) {
+            // Main Application Content Canvas with Layered Parallax Scale
             VStack(spacing: 0) {
                 // Shell Header Bar matching Shell.tsx mobile header
                 ShellHeaderView()
@@ -49,25 +62,92 @@ public struct RootTabView: View {
                 bottomNavigationBar
             }
             .background(AppColors.background.ignoresSafeArea())
+            .scaleEffect(1.0 - (0.04 * progress))
+            .offset(x: max(0, currentOffset + drawerWidth) * 0.1)
+            .clipShape(RoundedRectangle(cornerRadius: progress > 0.01 ? 16 : 0, style: .continuous))
+            .disabled(progress > 0.1)
             
-            // Navigation Drawer overlay with all 13 routes from Shell.tsx
-            NavigationDrawerView()
+            // Dimmed Interactive Backdrop
+            if progress > 0.001 {
+                Color.black
+                    .opacity(0.55 * Double(progress))
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
+                            env.isDrawerOpen = false
+                            dragOffset = 0
+                        }
+                    }
+            }
+            
+            // Modern Elevated Drawer with Shadow and Real-Time Interactive Translation
+            if progress > 0.001 {
+                NavigationDrawerView()
+                    .frame(width: drawerWidth)
+                    .offset(x: currentOffset)
+                    .shadow(color: Color.black.opacity(0.35 * Double(progress)), radius: 24, x: 8, y: 0)
+                    .ignoresSafeArea(.container, edges: .vertical)
+            }
         }
         .preferredColorScheme(env.colorScheme)
         .gesture(
-            DragGesture(minimumDistance: 15, coordinateSpace: .global)
-                .onEnded { value in
-                    let h = value.translation.width
-                    let v = value.translation.height
-                    // Ensure primarily horizontal swipe gesture
-                    if abs(h) > abs(v) * 1.3 {
-                        if !env.isDrawerOpen && value.startLocation.x <= 45 && h > 40 {
-                            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                                env.isDrawerOpen = true
+            DragGesture(minimumDistance: 10, coordinateSpace: .global)
+                .onChanged { value in
+                    let startX = value.startLocation.x
+                    let transX = value.translation.width
+                    let transY = value.translation.height
+                    
+                    if !isDragging {
+                        if !env.isDrawerOpen {
+                            if startX <= 45 && transX > 10 && abs(transX) > abs(transY) * 1.2 {
+                                isDragging = true
                             }
-                        } else if env.isDrawerOpen && h < -40 {
-                            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                        } else {
+                            if transX < -10 && abs(transX) > abs(transY) * 1.2 {
+                                isDragging = true
+                            }
+                        }
+                    }
+                    
+                    if isDragging {
+                        if !env.isDrawerOpen {
+                            dragOffset = max(0, min(drawerWidth, transX))
+                        } else {
+                            dragOffset = min(0, max(-drawerWidth, transX))
+                        }
+                    }
+                }
+                .onEnded { value in
+                    guard isDragging else { return }
+                    isDragging = false
+                    let velocity = value.predictedEndTranslation.width - value.translation.width
+                    
+                    if !env.isDrawerOpen {
+                        if dragOffset > drawerWidth * 0.28 || velocity > 150 {
+                            withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
+                                env.isDrawerOpen = true
+                                dragOffset = 0
+                            }
+                            #if canImport(UIKit)
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            #endif
+                        } else {
+                            withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
+                                dragOffset = 0
+                            }
+                        }
+                    } else {
+                        if dragOffset < -drawerWidth * 0.22 || velocity < -150 {
+                            withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
                                 env.isDrawerOpen = false
+                                dragOffset = 0
+                            }
+                            #if canImport(UIKit)
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            #endif
+                        } else {
+                            withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
+                                dragOffset = 0
                             }
                         }
                     }

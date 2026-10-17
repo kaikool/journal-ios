@@ -1,24 +1,15 @@
 import SwiftUI
 import Charts
 
-public enum DashboardChartTab: String, CaseIterable, Identifiable {
-    case equity = "Equity"
-    case drawdown = "Drawdown"
-    case session = "Sessions"
-    case weekday = "Weekdays"
-    
-    public var id: String { rawValue }
-}
-
 public struct DashboardView: View {
     @EnvironmentObject private var env: AppEnvironment
     @ObservedObject private var dataStore = TradeDataStore.shared
     
     @State private var selectedRange: JournalTimeRange = .all
-    @State private var selectedChartTab: DashboardChartTab = .equity
     @State private var showEdgeScoreBreakdown: Bool = false
     @State private var showAIReflection: Bool = false
     @State private var showAddTradeSheet: Bool = false
+    @State private var activityTab: String = "recent" // "recent" or "open"
     
     public init() {}
     
@@ -77,19 +68,11 @@ public struct DashboardView: View {
         }
     }
     
-    private var sessionStats: [BucketStats] {
-        AggregateEngine.bySession(trades: scopedTrades)
+    private var hourlyStats: [BucketStats] {
+        AggregateEngine.byHour(trades: scopedTrades, timeZone: env.currentTimeZone)
     }
     
-    private var weekdayStats: [BucketStats] {
-        AggregateEngine.byWeekday(trades: scopedTrades, timeZone: env.currentTimeZone)
-    }
-    
-    private var symbolStats: [BucketStats] {
-        AggregateEngine.bySymbol(trades: scopedTrades)
-    }
-    
-    // Momentum: net P&L of the last 7 days vs prior 7 days
+    // Momentum: net P&L of the last 7 calendar days vs prior 7 days
     private var weekDelta: Decimal? {
         let now = Date().timeIntervalSince1970 * 1000
         var last: Decimal = 0
@@ -124,6 +107,54 @@ public struct DashboardView: View {
         overview.days.min(by: { $0.netPnl < $1.netPnl })
     }
     
+    // Current month calendar helper
+    private var calendarMonthDays: [Date?] {
+        let cal = Calendar.current
+        let now = Date()
+        guard let range = cal.range(of: .day, in: .month, for: now),
+              let firstDay = cal.date(from: cal.dateComponents([.year, .month], from: now)) else {
+            return []
+        }
+        let firstWeekday = cal.component(.weekday, from: firstDay) // 1 = Sunday
+        var days: [Date?] = Array(repeating: nil, count: firstWeekday - 1)
+        for d in range {
+            if let date = cal.date(byAdding: .day, value: d - 1, to: firstDay) {
+                days.append(date)
+            }
+        }
+        while days.count % 7 != 0 {
+            days.append(nil)
+        }
+        return days
+    }
+    
+    private var monthName: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMMM yyyy"
+        formatter.locale = Locale(identifier: "en_US")
+        return formatter.string(from: Date())
+    }
+    
+    private var daysWithTradesMap: [String: DayStats] {
+        var map: [String: DayStats] = [:]
+        for d in overview.days {
+            map[d.date] = d
+        }
+        return map
+    }
+    
+    private var currentMonthStats: (tradingDays: Int, winningDays: Int, monthPnl: Decimal) {
+        let isoFormatter = DateFormatter()
+        isoFormatter.dateFormat = "yyyy-MM"
+        let prefix = isoFormatter.string(from: Date())
+        
+        let monthDays = overview.days.filter { $0.date.hasPrefix(prefix) }
+        let tradingDays = monthDays.count
+        let winningDays = monthDays.filter { $0.netPnl > 0 }.count
+        let pnl = monthDays.reduce(Decimal.zero) { $0 + $1.netPnl }
+        return (tradingDays, winningDays, pnl)
+    }
+    
     public var body: some View {
         let metrics = overview.metrics
         
@@ -142,12 +173,21 @@ public struct DashboardView: View {
             ScrollView {
                 VStack(spacing: 12) {
                     syncNotificationSection
-                    summaryWidgetsSection(metrics: metrics)
-                    edgeScoreCard
-                    chartVisualsCard
-                    activityCard
+                    
+                    // SECTION 1: Summary Group (Widgets 0-4) matching web DashboardLayout
+                    summaryGroupSection(metrics: metrics)
+                    
+                    // SECTION 2: Visuals Group (Widgets 5, 6, 7) matching web DashboardLayout
+                    visualsGroupSection(metrics: metrics)
+                    
+                    // SECTION 3: Detail Group (Widgets 8, 9) matching web DashboardLayout
+                    detailGroupSection
+                    
+                    // SECTION 4: Secondary Metrics Group (Widgets 10-14) matching web DashboardLayout
                     secondaryMetricsGrid(metrics: metrics)
-                    bestWorstDayCard
+                    
+                    // SECTION 5: Full Width Performance (Widget 15) matching web DashboardLayout
+                    tradeTimePerformanceCard
                 }
                 .padding(14)
             }
@@ -218,19 +258,20 @@ public struct DashboardView: View {
         }
     }
     
+    // MARK: - 1. Summary Group (Widgets 0, 1, 2, 3, 4)
     @ViewBuilder
-    private func summaryWidgetsSection(metrics: TradeMetrics) -> some View {
+    private func summaryGroupSection(metrics: TradeMetrics) -> some View {
         VStack(spacing: 10) {
-            // Widget 0: Net P&L
+            // Widget 0: Net P&L (full width on mobile)
             AppCard {
                 VStack(alignment: .leading, spacing: 6) {
-                    AppCardHeader("Net P&L", icon: "dollarsign.circle")
+                    statHeader("Net P&L", icon: "dollarsign.circle")
                     
                     HStack(alignment: .firstTextBaseline) {
                         AppMonetaryText(
                             Formatters.formatPnL(metrics.netPnl, currency: env.currentCurrency),
                             isPrivate: env.isPrivacyModeEnabled,
-                            font: AppTypography.financialNumber(size: 26, weight: .semibold),
+                            font: AppTypography.financialNumber(size: 28, weight: .semibold),
                             color: metrics.netPnl >= 0 ? AppColors.profit : AppColors.loss
                         )
                         
@@ -239,7 +280,7 @@ public struct DashboardView: View {
                         if let delta = weekDelta {
                             HStack(spacing: 3) {
                                 Text(delta >= 0 ? "▲" : "▼")
-                                    .font(.system(size: 9))
+                                    .font(.system(size: 9, weight: .bold))
                                 Text(Formatters.formatCurrency(abs(delta), currency: env.currentCurrency))
                                     .font(AppTypography.captionBold)
                                 Text("vs prior 7d")
@@ -264,7 +305,7 @@ public struct DashboardView: View {
                 // Widget 1: Trade win %
                 AppCard {
                     VStack(alignment: .leading, spacing: 6) {
-                        AppCardHeader("Trade win %", icon: "target")
+                        statHeader("Trade win %", icon: "target")
                         
                         HStack(alignment: .center, spacing: 8) {
                             GaugeView(value: metrics.winRate, label: "Trade win rate", size: 84)
@@ -289,7 +330,7 @@ public struct DashboardView: View {
                 // Widget 2: Profit factor
                 AppCard {
                     VStack(alignment: .leading, spacing: 6) {
-                        AppCardHeader("Profit factor", icon: "scalemass")
+                        statHeader("Profit factor", icon: "scalemass")
                         
                         Text(metrics.profitFactorIsInfinite ? "∞" : (metrics.profitFactor != nil ? String(format: "%.2f", metrics.profitFactor!) : "–"))
                             .font(AppTypography.financialNumber(size: 24, weight: .semibold))
@@ -304,7 +345,7 @@ public struct DashboardView: View {
                 // Widget 3: Day win %
                 AppCard {
                     VStack(alignment: .leading, spacing: 6) {
-                        AppCardHeader("Day win %", icon: "calendar.badge.clock")
+                        statHeader("Day win %", icon: "calendar.badge.clock")
                         
                         HStack(alignment: .center, spacing: 8) {
                             GaugeView(value: metrics.dayWinRate, label: "Day win rate", size: 84)
@@ -321,7 +362,7 @@ public struct DashboardView: View {
                 // Widget 4: Avg win / loss
                 AppCard {
                     VStack(alignment: .leading, spacing: 6) {
-                        AppCardHeader("Avg win / loss", icon: "arrow.up.arrow.down")
+                        statHeader("Avg win / loss", icon: "arrow.up.arrow.down")
                         
                         Text(metrics.avgWinLossRatio != nil ? String(format: "%.2f", metrics.avgWinLossRatio!) : "–")
                             .font(AppTypography.financialNumber(size: 24, weight: .semibold))
@@ -350,117 +391,295 @@ public struct DashboardView: View {
         }
     }
     
-    private var edgeScoreCard: some View {
-        AppCard {
-            VStack(spacing: 8) {
-                HStack {
-                    AppCardHeader("Edge Score", icon: "info.circle")
+    // MARK: - 2. Visuals Group (Widgets 5, 6, 7)
+    @ViewBuilder
+    private func visualsGroupSection(metrics: TradeMetrics) -> some View {
+        VStack(spacing: 10) {
+            // Widget 5: Edge Score
+            AppCard {
+                VStack(spacing: 8) {
+                    HStack {
+                        statHeader("Edge Score", icon: "info.circle")
+                        
+                        Spacer()
+                        
+                        HStack(spacing: 2) {
+                            Text(edgeResult.score != nil ? "\(Int(edgeResult.score!))" : "–")
+                                .font(AppTypography.financialNumber(size: 20, weight: .semibold))
+                                .foregroundColor(AppColors.brand)
+                            Text("/100")
+                                .font(AppTypography.caption)
+                                .foregroundColor(AppColors.secondaryText)
+                        }
+                    }
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        withAnimation {
+                            showEdgeScoreBreakdown.toggle()
+                        }
+                    }
                     
-                    Spacer()
-                    
-                    HStack(spacing: 2) {
-                        Text(edgeResult.score != nil ? "\(Int(edgeResult.score!))" : "–")
-                            .font(AppTypography.financialNumber(size: 20, weight: .semibold))
-                            .foregroundColor(AppColors.brand)
-                        Text("/100")
+                    if metrics.closedTrades < 5 {
+                        Text("Needs 5+ closed trades. A 0–100 score combining win rate, profit factor, average win/loss, drawdown, recovery, and consistency.")
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.top, 4)
+                    } else if showEdgeScoreBreakdown, let b = edgeResult.breakdown {
+                        Divider().background(AppColors.border)
+                        
+                        VStack(spacing: 5) {
+                            scorePillarRow("Win rate", value: b.winRate, max: 15)
+                            scorePillarRow("Profit factor", value: b.profitFactor, max: 25)
+                            scorePillarRow("Avg win / loss", value: b.avgWinLoss, max: 20)
+                            scorePillarRow("Drawdown", value: b.drawdown, max: 15)
+                            scorePillarRow("Recovery", value: b.recovery, max: 10)
+                            scorePillarRow("Consistency", value: b.consistency, max: 15)
+                        }
+                        .padding(.top, 4)
                     }
                 }
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    withAnimation {
-                        showEdgeScoreBreakdown.toggle()
+            }
+            
+            // Widget 6: Daily net cumulative P&L (Equity area + Drawdown bars)
+            AppCard {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Daily net cumulative P&L")
+                                .font(AppTypography.headline)
+                                .foregroundColor(AppColors.primaryText)
+                            Text("Running total of net profit and loss over the selected period.")
+                                .font(AppTypography.caption)
+                                .foregroundColor(AppColors.secondaryText)
+                        }
+                        Spacer()
                     }
-                }
-                
-                if showEdgeScoreBreakdown, let b = edgeResult.breakdown {
+                    
+                    EquityCurveChart(points: chartEquityPoints, currency: env.currentCurrency)
+                        .frame(height: 180)
+                    
                     Divider().background(AppColors.border)
                     
-                    VStack(spacing: 5) {
-                        scorePillarRow("Win rate", value: b.winRate, max: 15)
-                        scorePillarRow("Profit factor", value: b.profitFactor, max: 25)
-                        scorePillarRow("Avg win / loss", value: b.avgWinLoss, max: 20)
-                        scorePillarRow("Drawdown", value: b.drawdown, max: 15)
-                        scorePillarRow("Recovery", value: b.recovery, max: 10)
-                        scorePillarRow("Consistency", value: b.consistency, max: 15)
-                    }
-                    .padding(.top, 4)
-                }
-            }
-        }
-    }
-    
-    private var chartVisualsCard: some View {
-        AppCard {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    Text("PERFORMANCE CURVE")
-                        .font(AppTypography.cardTitle)
-                        .tracking(0.88)
-                        .foregroundColor(AppColors.secondaryText)
-                    Spacer()
-                }
-                
-                Picker("Chart tab", selection: $selectedChartTab) {
-                    ForEach(DashboardChartTab.allCases) { tab in
-                        Text(tab.rawValue).tag(tab)
-                    }
-                }
-                .pickerStyle(.segmented)
-                
-                switch selectedChartTab {
-                case .equity:
-                    EquityCurveChart(points: chartEquityPoints, currency: env.currentCurrency)
-                case .drawdown:
                     DrawdownChart(points: chartEquityPoints)
-                case .session:
-                    SessionBreakdownChart(sessions: sessionStats, currency: env.currentCurrency)
-                case .weekday:
-                    WeekdayChart(weekdays: weekdayStats, currency: env.currentCurrency)
+                        .frame(height: 70)
+                }
+            }
+            
+            // Widget 7: Net daily P&L (DailyBars)
+            AppCard {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Net daily P&L")
+                                .font(AppTypography.headline)
+                                .foregroundColor(AppColors.primaryText)
+                            Text("Net profit or loss for each trading day. Bars above zero are profitable; bars below zero are losses.")
+                                .font(AppTypography.caption)
+                                .foregroundColor(AppColors.secondaryText)
+                        }
+                        Spacer()
+                    }
+                    
+                    if overview.days.isEmpty {
+                        Text("No trading day data available.")
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.secondaryText)
+                            .padding(.vertical, 20)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                    } else {
+                        Chart {
+                            RuleMark(y: .value("Zero", 0))
+                                .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
+                                .foregroundStyle(AppColors.border)
+                            
+                            ForEach(overview.days) { d in
+                                BarMark(
+                                    x: .value("Date", String(d.date.suffix(5))),
+                                    y: .value("Net P&L", (d.netPnl as NSDecimalNumber).doubleValue)
+                                )
+                                .foregroundStyle(d.netPnl >= 0 ? AppColors.profit : AppColors.loss)
+                                .cornerRadius(3)
+                            }
+                        }
+                        .chartYAxis {
+                            AxisMarks(position: .leading)
+                        }
+                        .frame(height: 160)
+                    }
                 }
             }
         }
     }
     
-    private var activityCard: some View {
-        AppCard {
-            VStack(alignment: .leading, spacing: 10) {
-                AppCardHeader("Activity", icon: "clock.arrow.circlepath")
-                
-                if scopedTrades.isEmpty {
-                    Text("No trades recorded in this range.")
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.secondaryText)
-                        .padding(.vertical, 8)
-                } else {
-                    ForEach(scopedTrades.prefix(5)) { trade in
-                        HStack {
-                            AppBadge(trade.status.rawValue.uppercased(), color: Formatters.statusColor(trade.status))
-                            
-                            Text(trade.symbol)
-                                .font(AppTypography.bodyBold)
-                                .foregroundColor(AppColors.primaryText)
-                            
-                            Spacer()
-                            
-                            if let closed = trade.closedAt {
-                                Text(Formatters.formatDate(closed))
-                                    .font(AppTypography.caption)
-                                    .foregroundColor(AppColors.secondaryText)
-                            }
-                            
-                            AppMonetaryText(
-                                Formatters.formatPnL(trade.netPnl, currency: env.currentCurrency),
-                                isPrivate: env.isPrivacyModeEnabled,
-                                font: AppTypography.financialNumber(size: 13, weight: .semibold),
-                                color: trade.netPnl >= 0 ? AppColors.profit : AppColors.loss
-                            )
+    // MARK: - 3. Detail Group (Widgets 8, 9)
+    @ViewBuilder
+    private var detailGroupSection: some View {
+        VStack(spacing: 10) {
+            // Widget 8: Calendar Mini Widget
+            AppCard {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text(monthName)
+                            .font(AppTypography.headline)
+                            .foregroundColor(AppColors.primaryText)
+                        Spacer()
+                        Button {
+                            env.selectedTab = .calendar
+                        } label: {
+                            Text("Full calendar")
+                                .font(AppTypography.captionBold)
+                                .underline()
+                                .foregroundColor(AppColors.brand)
                         }
-                        .padding(.vertical, 2)
+                    }
+                    
+                    // Weekday headers
+                    let weekCols = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 2), count: 7), spacing: 4) {
+                        ForEach(weekCols, id: \.self) { w in
+                            Text(w)
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundColor(AppColors.secondaryText)
+                                .frame(maxWidth: .infinity)
+                        }
                         
-                        if trade.id != scopedTrades.prefix(5).last?.id {
-                            Divider().background(AppColors.border)
+                        let isoFormatter: DateFormatter = {
+                            let f = DateFormatter()
+                            f.dateFormat = "yyyy-MM-dd"
+                            return f
+                        }()
+                        
+                        ForEach(Array(calendarMonthDays.enumerated()), id: \.offset) { _, d in
+                            if let date = d {
+                                let key = isoFormatter.string(from: date)
+                                let stats = daysWithTradesMap[key]
+                                let dayNum = Calendar.current.component(.day, from: date)
+                                
+                                VStack(spacing: 1) {
+                                    Text("\(dayNum)")
+                                        .font(.system(size: 9))
+                                        .foregroundColor(stats != nil ? AppColors.primaryText : AppColors.secondaryText)
+                                    
+                                    if let s = stats {
+                                        Text(s.netPnl >= 0 ? "+" : "-")
+                                            .font(.system(size: 7, weight: .bold))
+                                            .foregroundColor(s.netPnl >= 0 ? AppColors.profit : AppColors.loss)
+                                    }
+                                }
+                                .frame(height: 26)
+                                .frame(maxWidth: .infinity)
+                                .background(stats != nil ? (stats!.netPnl >= 0 ? AppColors.profit.opacity(0.12) : AppColors.loss.opacity(0.12)) : Color.clear)
+                                .cornerRadius(4)
+                            } else {
+                                Color.clear
+                                    .frame(height: 26)
+                            }
+                        }
+                    }
+                    
+                    Divider().background(AppColors.border)
+                    
+                    HStack {
+                        Text("\(currentMonthStats.tradingDays) trading days · \(currentMonthStats.winningDays) green")
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.secondaryText)
+                        Spacer()
+                        Text("Month: \(Formatters.formatPnL(currentMonthStats.monthPnl, currency: env.currentCurrency))")
+                            .font(AppTypography.captionBold)
+                            .foregroundColor(currentMonthStats.monthPnl >= 0 ? AppColors.profit : AppColors.loss)
+                    }
+                }
+            }
+            
+            // Widget 9: Activity (Tabs: Recent trades & Open positions)
+            AppCard {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("Activity")
+                            .font(AppTypography.headline)
+                            .foregroundColor(AppColors.primaryText)
+                        Spacer()
+                    }
+                    
+                    Picker("Activity Tab", selection: $activityTab) {
+                        Text("Recent trades").tag("recent")
+                        Text("Open positions").tag("open")
+                    }
+                    .pickerStyle(.segmented)
+                    
+                    if activityTab == "recent" {
+                        let recent = scopedTrades.filter { $0.status != .open }.prefix(5)
+                        if recent.isEmpty {
+                            Text("No closed trades yet")
+                                .font(AppTypography.caption)
+                                .foregroundColor(AppColors.secondaryText)
+                                .frame(maxWidth: .infinity, alignment: .center)
+                                .padding(.vertical, 12)
+                        } else {
+                            VStack(spacing: 6) {
+                                ForEach(recent) { t in
+                                    HStack {
+                                        AppBadge(t.status.rawValue.uppercased(), color: Formatters.statusColor(t.status))
+                                        
+                                        Text(t.symbol)
+                                            .font(AppTypography.bodyBold)
+                                            .foregroundColor(AppColors.primaryText)
+                                        
+                                        Spacer()
+                                        
+                                        if let closed = t.closedAt {
+                                            Text(Formatters.formatDate(closed))
+                                                .font(AppTypography.caption)
+                                                .foregroundColor(AppColors.secondaryText)
+                                        }
+                                        
+                                        AppMonetaryText(
+                                            Formatters.formatPnL(t.netPnl, currency: env.currentCurrency),
+                                            isPrivate: env.isPrivacyModeEnabled,
+                                            font: AppTypography.financialNumber(size: 13, weight: .semibold),
+                                            color: t.netPnl >= 0 ? AppColors.profit : AppColors.loss
+                                        )
+                                    }
+                                    .padding(.vertical, 2)
+                                    
+                                    if t.id != recent.last?.id {
+                                        Divider().background(AppColors.border)
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        let openPos = dataStore.trades.filter { $0.status == .open }
+                        if openPos.isEmpty {
+                            Text("Flat — no open positions")
+                                .font(AppTypography.caption)
+                                .foregroundColor(AppColors.secondaryText)
+                                .frame(maxWidth: .infinity, alignment: .center)
+                                .padding(.vertical, 12)
+                        } else {
+                            VStack(spacing: 6) {
+                                ForEach(openPos) { p in
+                                    HStack {
+                                        AppBadge(p.side.uppercased(), color: p.side.lowercased() == "buy" || p.side.lowercased() == "long" ? AppColors.profit : AppColors.loss)
+                                        
+                                        Text(p.symbol)
+                                            .font(AppTypography.bodyBold)
+                                            .foregroundColor(AppColors.primaryText)
+                                        
+                                        Spacer()
+                                        
+                                        Text("\(p.quantity) @ \(Formatters.formatCurrency(p.entryPrice, currency: env.currentCurrency))")
+                                            .font(AppTypography.caption)
+                                            .foregroundColor(AppColors.secondaryText)
+                                    }
+                                    .padding(.vertical, 2)
+                                    
+                                    if p.id != openPos.last?.id {
+                                        Divider().background(AppColors.border)
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -468,13 +687,14 @@ public struct DashboardView: View {
         }
     }
     
+    // MARK: - 4. Secondary Metrics (Widgets 10, 11, 12, 13, 14)
     @ViewBuilder
     private func secondaryMetricsGrid(metrics: TradeMetrics) -> some View {
         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-            // Max drawdown
+            // Widget 10: Max drawdown
             AppCard {
                 VStack(alignment: .leading, spacing: 4) {
-                    AppCardHeader("Max drawdown", icon: "chart.line.downtrend.xyaxis")
+                    statHeader("Max drawdown", icon: "chart.line.downtrend.xyaxis")
                     
                     AppMonetaryText(
                         Formatters.formatCurrency(metrics.maxDrawdown, currency: env.currentCurrency),
@@ -489,10 +709,10 @@ public struct DashboardView: View {
                 }
             }
             
-            // Streaks
+            // Widget 11: Streaks
             AppCard {
                 VStack(alignment: .leading, spacing: 4) {
-                    AppCardHeader("Streaks", icon: "flame")
+                    statHeader("Streaks", icon: "flame")
                     
                     Text(metrics.currentStreak > 0 ? "\(metrics.currentStreak)W" : (metrics.currentStreak < 0 ? "\(-metrics.currentStreak)L" : "–"))
                         .font(AppTypography.financialNumber(size: 18, weight: .semibold))
@@ -504,10 +724,10 @@ public struct DashboardView: View {
                 }
             }
             
-            // Expectancy / trade
+            // Widget 12: Expectancy / trade
             AppCard {
                 VStack(alignment: .leading, spacing: 4) {
-                    AppCardHeader("Expectancy / trade", icon: "sum")
+                    statHeader("Expectancy / trade", icon: "sum")
                     
                     AppMonetaryText(
                         metrics.expectancy != nil ? Formatters.formatPnL(metrics.expectancy!, currency: env.currentCurrency) : "–",
@@ -523,10 +743,10 @@ public struct DashboardView: View {
                 }
             }
             
-            // Avg duration
+            // Widget 13: Avg duration
             AppCard {
                 VStack(alignment: .leading, spacing: 4) {
-                    AppCardHeader("Avg duration", icon: "timer")
+                    statHeader("Avg duration", icon: "timer")
                     
                     Text(Formatters.formatDuration(ms: metrics.avgDurationMs))
                         .font(AppTypography.financialNumber(size: 18, weight: .semibold))
@@ -537,55 +757,104 @@ public struct DashboardView: View {
                         .foregroundColor(AppColors.secondaryText)
                 }
             }
-        }
-    }
-    
-    @ViewBuilder
-    private var bestWorstDayCard: some View {
-        if let best = bestDay, let worst = worstDay {
+            
+            // Widget 14: Best / worst day
             AppCard {
-                VStack(alignment: .leading, spacing: 6) {
-                    AppCardHeader("Best / worst day", icon: "trophy")
+                VStack(alignment: .leading, spacing: 4) {
+                    statHeader("Best / worst day", icon: "trophy")
                     
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Best day")
-                                .font(AppTypography.caption)
-                                .foregroundColor(AppColors.secondaryText)
-                            HStack(spacing: 6) {
+                    if let best = bestDay, let worst = worstDay {
+                        VStack(alignment: .leading, spacing: 3) {
+                            HStack {
                                 AppMonetaryText(
                                     Formatters.formatPnL(best.netPnl, currency: env.currentCurrency),
                                     isPrivate: env.isPrivacyModeEnabled,
-                                    font: AppTypography.financialNumber(size: 14, weight: .semibold),
+                                    font: AppTypography.financialNumber(size: 13, weight: .semibold),
                                     color: AppColors.profit
                                 )
-                                Text(best.date)
+                                Spacer()
+                                Text(String(best.date.suffix(5)))
                                     .font(AppTypography.caption)
                                     .foregroundColor(AppColors.secondaryText)
                             }
-                        }
-                        
-                        Spacer()
-                        
-                        VStack(alignment: .trailing, spacing: 2) {
-                            Text("Worst day")
-                                .font(AppTypography.caption)
-                                .foregroundColor(AppColors.secondaryText)
-                            HStack(spacing: 6) {
+                            HStack {
                                 AppMonetaryText(
                                     Formatters.formatPnL(worst.netPnl, currency: env.currentCurrency),
                                     isPrivate: env.isPrivacyModeEnabled,
-                                    font: AppTypography.financialNumber(size: 14, weight: .semibold),
+                                    font: AppTypography.financialNumber(size: 13, weight: .semibold),
                                     color: AppColors.loss
                                 )
-                                Text(worst.date)
+                                Spacer()
+                                Text(String(worst.date.suffix(5)))
                                     .font(AppTypography.caption)
                                     .foregroundColor(AppColors.secondaryText)
                             }
                         }
+                    } else {
+                        Text("No closed trades yet")
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.secondaryText)
                     }
                 }
             }
+        }
+    }
+    
+    // MARK: - 5. Full Width Performance (Widget 15)
+    private var tradeTimePerformanceCard: some View {
+        AppCard {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Trade time performance")
+                            .font(AppTypography.headline)
+                            .foregroundColor(AppColors.primaryText)
+                        Text("Trades grouped by their opening hour. Bars show net P&L.")
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.secondaryText)
+                    }
+                    Spacer()
+                }
+                
+                if hourlyStats.isEmpty {
+                    Text("No hourly trade data available.")
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.secondaryText)
+                        .padding(.vertical, 20)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                } else {
+                    Chart {
+                        RuleMark(y: .value("Zero", 0))
+                            .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
+                            .foregroundStyle(AppColors.border)
+                        
+                        ForEach(hourlyStats) { h in
+                            BarMark(
+                                x: .value("Hour", "\(h.key):00"),
+                                y: .value("P&L", (h.netPnl as NSDecimalNumber).doubleValue)
+                            )
+                            .foregroundStyle(h.netPnl >= 0 ? AppColors.profit : AppColors.loss)
+                            .cornerRadius(3)
+                        }
+                    }
+                    .chartYAxis {
+                        AxisMarks(position: .leading)
+                    }
+                    .frame(height: 160)
+                }
+            }
+        }
+    }
+    
+    private func statHeader(_ title: String, icon: String) -> some View {
+        HStack {
+            Text(title)
+                .font(AppTypography.cardTitle)
+                .foregroundColor(AppColors.secondaryText)
+            Spacer()
+            Image(systemName: icon)
+                .font(.system(size: 13))
+                .foregroundColor(AppColors.secondaryText.opacity(0.8))
         }
     }
     

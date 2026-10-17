@@ -18,174 +18,147 @@ public struct NavigationDrawerView: View {
     }
     
     public var body: some View {
-        ZStack(alignment: .leading) {
-            // Blurred dark overlay
-            if env.isDrawerOpen {
-                Color.black.opacity(0.65)
-                    .ignoresSafeArea()
-                    .onTapGesture {
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                            env.isDrawerOpen = false
+        VStack(alignment: .leading, spacing: 0) {
+            // Drawer Header
+            HStack(spacing: 10) {
+                TradeJournalMarkView(size: 20, color: AppColors.brand)
+                
+                Text("Trade Journal")
+                    .font(AppTypography.pageTitle)
+                    .foregroundColor(AppColors.primaryText)
+                
+                Spacer()
+                
+                Button {
+                    withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
+                        env.isDrawerOpen = false
+                    }
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(AppColors.secondaryText)
+                        .frame(width: 30, height: 30)
+                        .background(AppColors.secondaryBackground)
+                        .clipShape(Circle())
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .overlay(
+                Divider().background(AppColors.border),
+                alignment: .bottom
+            )
+            
+            // Nav Items Scroll
+            ScrollView {
+                VStack(alignment: .leading, spacing: 2) {
+                    ForEach(mainNavTabs) { tab in
+                        navRow(for: tab)
+                    }
+                    
+                    Divider()
+                        .background(AppColors.border)
+                        .padding(.vertical, 8)
+                        .padding(.horizontal, 10)
+                    
+                    ForEach(setupNavTabs) { tab in
+                        navRow(for: tab)
+                    }
+                }
+                .padding(.vertical, 8)
+                .padding(.horizontal, 8)
+            }
+            
+            // Drawer Bottom Footer
+            VStack(spacing: 8) {
+                Divider().background(AppColors.border)
+                
+                // Global Sync Action Row
+                Button {
+                    Task {
+                        if The5ersService.shared.isConfigured {
+                            _ = try? await dataStore.syncWithThe5ers()
+                        } else if SupabaseService.shared.isConfigured {
+                            await dataStore.syncWithSupabase()
                         }
                     }
-                    .transition(.opacity)
-                
-                // Slide-out Drawer Panel
-                VStack(alignment: .leading, spacing: 0) {
-                    // Drawer Header
+                } label: {
                     HStack(spacing: 10) {
-                        TradeJournalMarkView(size: 20, color: AppColors.brand)
+                        Image(systemName: "arrow.triangle.2.circlepath")
+                            .font(.system(size: 14))
+                            .foregroundColor(dataStore.isSyncing ? AppColors.brand : AppColors.secondaryText)
+                            .rotationEffect(dataStore.isSyncing ? .degrees(360) : .zero)
+                            .animation(dataStore.isSyncing ? Animation.linear(duration: 1).repeatForever(autoreverses: false) : .default, value: dataStore.isSyncing)
                         
-                        Text("Trade Journal")
-                            .font(AppTypography.pageTitle)
+                        Text(dataStore.isSyncing ? "Syncing..." : "Sync all accounts")
+                            .font(AppTypography.bodyMedium)
+                            .foregroundColor(AppColors.primaryText)
+                        
+                        Spacer()
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(AppColors.secondaryBackground)
+                    .cornerRadius(8)
+                }
+                
+                // Theme Mode Action Row
+                Button {
+                    env.toggleTheme()
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: env.appTheme == .dark ? "sun.max" : "moon")
+                            .font(.system(size: 14))
+                            .foregroundColor(AppColors.secondaryText)
+                        
+                        Text(env.appTheme == .dark ? "Light mode" : "Dark mode")
+                            .font(AppTypography.bodyMedium)
+                            .foregroundColor(AppColors.primaryText)
+                        
+                        Spacer()
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(AppColors.secondaryBackground)
+                    .cornerRadius(8)
+                }
+                
+                // Privacy Mode Action Row
+                Button {
+                    env.togglePrivacyMode()
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: env.isPrivacyModeEnabled ? "eye.slash.fill" : "eye")
+                            .font(.system(size: 14))
+                            .foregroundColor(env.isPrivacyModeEnabled ? AppColors.brand : AppColors.secondaryText)
+                        
+                        Text("Privacy mode")
+                            .font(AppTypography.bodyMedium)
                             .foregroundColor(AppColors.primaryText)
                         
                         Spacer()
                         
-                        Button {
-                            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                                env.isDrawerOpen = false
-                            }
-                        } label: {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundColor(AppColors.secondaryText)
-                                .frame(width: 30, height: 30)
-                                .background(AppColors.secondaryBackground)
-                                .clipShape(Circle())
-                        }
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 14)
-                    .overlay(
-                        Divider().background(AppColors.border),
-                        alignment: .bottom
-                    )
-                    
-                    // Nav Items Scroll
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 2) {
-                            ForEach(mainNavTabs) { tab in
-                                navRow(for: tab)
-                            }
-                            
-                            Divider()
-                                .background(AppColors.border)
-                                .padding(.vertical, 8)
-                                .padding(.horizontal, 10)
-                            
-                            ForEach(setupNavTabs) { tab in
-                                navRow(for: tab)
-                            }
-                        }
-                        .padding(.vertical, 8)
-                        .padding(.horizontal, 8)
-                    }
-                    
-                    // Drawer Bottom Footer
-                    VStack(spacing: 8) {
-                        Divider().background(AppColors.border)
-                        
-                        // Global Sync Action Row
-                        Button {
-                            Task {
-                                if The5ersService.shared.isConfigured {
-                                    _ = try? await dataStore.syncWithThe5ers()
-                                } else if SupabaseService.shared.isConfigured {
-                                    await dataStore.syncWithSupabase()
-                                }
-                            }
-                        } label: {
-                            HStack(spacing: 10) {
-                                Image(systemName: "arrow.triangle.2.circlepath")
-                                    .font(.system(size: 14))
-                                    .foregroundColor(dataStore.isSyncing ? AppColors.brand : AppColors.secondaryText)
-                                    .rotationEffect(dataStore.isSyncing ? .degrees(360) : .zero)
-                                    .animation(dataStore.isSyncing ? Animation.linear(duration: 1).repeatForever(autoreverses: false) : .default, value: dataStore.isSyncing)
-                                
-                                Text(dataStore.isSyncing ? "Syncing..." : "Sync all accounts")
-                                    .font(AppTypography.bodyMedium)
-                                    .foregroundColor(AppColors.primaryText)
-                                
-                                Spacer()
-                            }
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(AppColors.secondaryBackground)
-                            .cornerRadius(8)
-                        }
-                        
-                        // Theme Mode Action Row
-                        Button {
-                            env.toggleTheme()
-                        } label: {
-                            HStack(spacing: 10) {
-                                Image(systemName: env.appTheme == .dark ? "sun.max" : "moon")
-                                    .font(.system(size: 14))
-                                    .foregroundColor(AppColors.secondaryText)
-                                
-                                Text(env.appTheme == .dark ? "Light mode" : "Dark mode")
-                                    .font(AppTypography.bodyMedium)
-                                    .foregroundColor(AppColors.primaryText)
-                                
-                                Spacer()
-                            }
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(AppColors.secondaryBackground)
-                            .cornerRadius(8)
-                        }
-                        
-                        // Privacy Mode Action Row
-                        Button {
-                            env.togglePrivacyMode()
-                        } label: {
-                            HStack(spacing: 10) {
-                                Image(systemName: env.isPrivacyModeEnabled ? "eye.slash.fill" : "eye")
-                                    .font(.system(size: 14))
-                                    .foregroundColor(env.isPrivacyModeEnabled ? AppColors.brand : AppColors.secondaryText)
-                                
-                                Text("Privacy mode")
-                                    .font(AppTypography.bodyMedium)
-                                    .foregroundColor(AppColors.primaryText)
-                                
-                                Spacer()
-                                
-                                Text(env.isPrivacyModeEnabled ? "ON" : "OFF")
-                                    .font(AppTypography.captionBold)
-                                    .foregroundColor(env.isPrivacyModeEnabled ? AppColors.brand : AppColors.secondaryText)
-                            }
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(AppColors.secondaryBackground)
-                            .cornerRadius(8)
-                        }
+                        Text(env.isPrivacyModeEnabled ? "ON" : "OFF")
+                            .font(AppTypography.captionBold)
+                            .foregroundColor(env.isPrivacyModeEnabled ? AppColors.brand : AppColors.secondaryText)
                     }
                     .padding(.horizontal, 12)
-                    .padding(.bottom, 16)
+                    .padding(.vertical, 8)
+                    .background(AppColors.secondaryBackground)
+                    .cornerRadius(8)
                 }
-                .frame(width: min(UIScreen.main.bounds.width - 50, 280))
-                .background(AppColors.cardBackground)
-                .overlay(
-                    Rectangle()
-                        .frame(width: 1)
-                        .foregroundColor(AppColors.border),
-                    alignment: .trailing
-                )
-                .gesture(
-                    DragGesture(minimumDistance: 15)
-                        .onEnded { value in
-                            if value.translation.width < -30 {
-                                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                                    env.isDrawerOpen = false
-                                }
-                            }
-                        }
-                )
-                .transition(.move(edge: .leading))
             }
+            .padding(.horizontal, 12)
+            .padding(.bottom, 16)
         }
-        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: env.isDrawerOpen)
+        .frame(width: 285)
+        .background(AppColors.cardBackground)
+        .overlay(
+            Rectangle()
+                .frame(width: 1)
+                .foregroundColor(AppColors.border),
+            alignment: .trailing
+        )
     }
     
     private func navRow(for tab: AppTab) -> some View {
