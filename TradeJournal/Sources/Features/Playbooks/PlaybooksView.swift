@@ -19,8 +19,18 @@ public struct PlaybooksView: View {
     }
     
     public var body: some View {
-        ScrollView {
-            VStack(spacing: 16) {
+        VStack(spacing: 0) {
+            FilterBarView(
+                title: "Playbooks",
+                showFilters: false
+            ) {
+                AppButton("New playbook", icon: "plus", style: .primary) {
+                    showNewPlaybookSheet = true
+                }
+            }
+            
+            ScrollView {
+                VStack(spacing: 12) {
                 // Header card
                 AppCard {
                     VStack(alignment: .leading, spacing: 8) {
@@ -55,25 +65,16 @@ public struct PlaybooksView: View {
                         .buttonStyle(.plain)
                     }
                 }
+                .padding(14)
             }
-            .padding()
-        }
-        .navigationTitle("Playbooks")
-        .background(AppColors.background)
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button(action: { showNewPlaybookSheet = true }) {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.title3)
-                        .foregroundColor(AppColors.accent)
-                }
-            }
+            .background(AppColors.background)
         }
         .sheet(isPresented: $showNewPlaybookSheet) {
             NewPlaybookSheet { newPb in
                 dataStore.savePlaybook(newPb)
             }
         }
+    }
     }
     
     private func playbookCard(summary: PlaybookAdherenceSummary) -> some View {

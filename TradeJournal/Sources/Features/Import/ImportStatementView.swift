@@ -15,9 +15,14 @@ public struct ImportStatementView: View {
     public init() {}
     
     public var body: some View {
-        NavigationStack {
+        VStack(spacing: 0) {
+            FilterBarView(
+                title: "Import trades",
+                showFilters: false
+            )
+            
             ScrollView {
-                VStack(spacing: 20) {
+                VStack(spacing: 14) {
                     // Account Selector
                     AppCard {
                         VStack(alignment: .leading, spacing: 8) {
@@ -201,9 +206,8 @@ public struct ImportStatementView: View {
                         }
                     }
                 }
-                .padding()
+                .padding(14)
             }
-            .navigationTitle("Nhập Sao Kê")
             .fileImporter(
                 isPresented: $isFileImporterPresented,
                 allowedContentTypes: [.commaSeparatedText, .plainText],
@@ -218,6 +222,7 @@ public struct ImportStatementView: View {
                 }
             }
         }
+        .background(AppColors.background)
     }
     
     private func loadFile(at url: URL) {

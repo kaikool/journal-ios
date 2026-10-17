@@ -109,43 +109,24 @@ public struct DailyJournalListView: View {
     }
     
     public var body: some View {
-        NavigationStack {
+        VStack(spacing: 0) {
+            FilterBarView(
+                title: "Daily journal",
+                showFilters: false
+            ) {
+                NavigationLink(destination: DailyJournalDetailView(date: todayKey)) {
+                    AppButton("View my day", icon: "sun.max", style: .primary) {}
+                }
+            }
+            
             ScrollView {
-                VStack(spacing: 12) {
-                    // Thanh công cụ đầu trang với nút "Hôm nay của tôi" (View my day)
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Nhật Ký Ngày")
-                                .font(AppTypography.title2)
-                                .foregroundColor(AppColors.primaryText)
-                            Text("Tổng hợp diễn biến, P&L và bài học theo từng ngày giao dịch")
-                                .font(AppTypography.caption)
-                                .foregroundColor(AppColors.secondaryText)
-                        }
-                        
-                        Spacer()
-                        
-                        NavigationLink(destination: DailyJournalDetailView(date: todayKey)) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "sun.max.fill")
-                                Text("Hôm nay của tôi")
-                            }
-                            .font(AppTypography.captionBold)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(AppColors.accent)
-                            .foregroundColor(.white)
-                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                        }
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 8)
-                    
-                    // Ô tìm kiếm ngày
+                VStack(spacing: 10) {
+                    // Search bar
                     HStack {
                         Image(systemName: "magnifyingglass")
                             .foregroundColor(AppColors.secondaryText)
-                        TextField("Tìm theo ngày (YYYY-MM-DD), thứ, ghi chú...", text: $searchText)
+                            .font(.system(size: 13))
+                        TextField("Search date (YYYY-MM-DD), note...", text: $searchText)
                             .font(AppTypography.body)
                         if !searchText.isEmpty {
                             Button {
@@ -156,20 +137,25 @@ public struct DailyJournalListView: View {
                             }
                         }
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(AppColors.secondaryBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 7)
+                    .background(AppColors.cardBackground)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .stroke(AppColors.border, lineWidth: 1)
+                    )
+                    .cornerRadius(6)
+                    .padding(.horizontal, 14)
+                    .padding(.top, 10)
                     
                     // Danh sách thẻ ngày
                     if daysList.isEmpty {
                         VStack(spacing: 12) {
                             Image(systemName: "calendar.badge.exclamationmark")
-                                .font(.system(size: 40))
+                                .font(.system(size: 36))
                                 .foregroundColor(AppColors.secondaryText.opacity(0.6))
                             Text("Chưa có ngày giao dịch nào")
-                                .font(AppTypography.headline)
+                                .font(AppTypography.cardTitle)
                                 .foregroundColor(AppColors.primaryText)
                             Text("Hãy nhập lệnh hoặc ghi chú đầu tiên để bắt đầu lưu lại nhật ký hành trình.")
                                 .font(AppTypography.caption)
@@ -188,13 +174,12 @@ public struct DailyJournalListView: View {
                                 .buttonStyle(.plain)
                             }
                         }
-                        .padding(.horizontal, 16)
+                        .padding(.horizontal, 14)
                     }
                 }
                 .padding(.bottom, 32)
             }
-            .background(AppColors.background.ignoresSafeArea())
-            .navigationBarTitleDisplayMode(.inline)
+            .background(AppColors.background)
         }
     }
     
@@ -324,48 +309,44 @@ public struct DailyJournalDetailView: View {
     }
     
     public var body: some View {
-        ScrollView {
-            VStack(spacing: 16) {
-                // Header & Action Bar
-                dayHeaderSection
-                
-                // Card 1: Day stats KPI grid (Port 1:1 từ Card Day stats)
-                dayStatsCard
-                
-                // Card 2: Biểu đồ Intraday cumulative net P&L
-                if !intradayPoints.isEmpty {
-                    intradayChartCard
-                }
-                
-                // Card 3: Danh sách các lệnh trong ngày (Trades list)
-                if !dayTrades.isEmpty {
-                    dayTradesCard
-                }
-                
-                // Card 4: Day note editor, Voice Note & AI Recap
-                dayNoteCard
-                
-                // Card 5: Tệp đính kèm & Ảnh biểu đồ của ngày
-                AttachmentsSectionView(ownerType: "day", ownerId: date, title: "Tệp đính kèm & Biểu đồ ngày \(date)")
-                    .padding(.horizontal, 16)
-            }
-            .padding(.vertical, 16)
-        }
-        .background(AppColors.background.ignoresSafeArea())
-        .navigationTitle("Nhật ký · \(date)")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button {
+        VStack(spacing: 0) {
+            FilterBarView(
+                title: "Journal · \(date)",
+                showFilters: false
+            ) {
+                AppButton("Export", icon: "square.and.arrow.up", style: .outline) {
                     prepareExport()
-                } label: {
-                    Image(systemName: "square.and.arrow.up")
-                        .foregroundColor(AppColors.accent)
                 }
             }
+            
+            ScrollView {
+                VStack(spacing: 12) {
+                    // Card 1: Day stats KPI grid (Port 1:1 từ Card Day stats)
+                    dayStatsCard
+                    
+                    // Card 2: Biểu đồ Intraday cumulative net P&L
+                    if !intradayPoints.isEmpty {
+                        intradayChartCard
+                    }
+                    
+                    // Card 3: Danh sách các lệnh trong ngày (Trades list)
+                    if !dayTrades.isEmpty {
+                        dayTradesCard
+                    }
+                    
+                    // Card 4: Day note editor, Voice Note & AI Recap
+                    dayNoteCard
+                    
+                    // Card 5: Tệp đính kèm & Ảnh biểu đồ của ngày
+                    AttachmentsSectionView(ownerType: "day", ownerId: date, title: "Attachments")
+                        .padding(.horizontal, 14)
+                }
+                .padding(.vertical, 12)
+            }
+            .background(AppColors.background)
         }
         .sheet(isPresented: $showExportSheet) {
-            ReviewExportModal(title: "Nhật ký ngày · \(date)", exportText: exportText)
+            ReviewExportModal(title: "Journal · \(date)", exportText: exportText)
         }
         .onAppear {
             loadNote()
@@ -756,3 +737,5 @@ public struct ReviewExportModal: View {
         }
     }
 }
+
+public typealias DailyJournalView = DailyJournalListView

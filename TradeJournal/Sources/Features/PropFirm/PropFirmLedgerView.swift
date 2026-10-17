@@ -82,14 +82,31 @@ public struct PropFirmLedgerView: View {
     }
     
     public var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
+        VStack(spacing: 0) {
+            // FilterBar chuẩn web
+                FilterBarView(
+                    title: "Prop firms",
+                    showFilters: false
+                ) {
+                    HStack(spacing: 6) {
+                        AppButton("Track account", icon: "plus", style: .outline) {
+                            showNewAccountSheet = true
+                        }
+                        AppButton("Add expense", icon: "arrow.up.right", style: .outline) {
+                            showNewEntrySheet = true
+                        }
+                        AppButton("Track payout", icon: "arrow.down.left", style: .primary) {
+                            showAddReceiptSheet = true
+                        }
+                    }
+                }
+                
                 // Currency Selector Bar
                 HStack {
-                    Text("Tiền tệ:")
+                    Text("Currency:")
                         .font(AppTypography.caption)
                         .foregroundColor(AppColors.secondaryText)
-                    Picker("Tiền tệ", selection: $selectedCurrency) {
+                    Picker("Currency", selection: $selectedCurrency) {
                         ForEach(availableCurrencies, id: \.self) { c in
                             Text(c).tag(c)
                         }
@@ -99,13 +116,13 @@ public struct PropFirmLedgerView: View {
                     Spacer()
                     
                     if selectedTab == .accounts {
-                        Toggle("Lưu trữ", isOn: $showArchivedAccounts)
+                        Toggle("Archived", isOn: $showArchivedAccounts)
                             .toggleStyle(.button)
                             .font(.system(size: 11, weight: .medium))
-                            .tint(AppColors.accent)
+                            .tint(AppColors.brand)
                     }
                 }
-                .padding(.horizontal)
+                .padding(.horizontal, 14)
                 .padding(.vertical, 8)
                 .background(AppColors.cardBackground.opacity(0.6))
                 
@@ -135,64 +152,11 @@ public struct PropFirmLedgerView: View {
                             activityAuditView
                         }
                     }
-                    .padding()
+                    .padding(14)
                 }
             }
-            .navigationTitle("Tích hợp Quỹ (Prop Firm)")
-            .navigationBarTitleDisplayMode(.inline)
             .background(AppColors.background)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    HStack(spacing: 12) {
-                        Button {
-                            Task {
-                                await dataStore.syncWithSupabase()
-                            }
-                        } label: {
-                            if dataStore.isSyncing {
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: AppColors.accent))
-                                    .scaleEffect(0.8)
-                            } else {
-                                Image(systemName: "arrow.triangle.2.circlepath")
-                                    .foregroundColor(AppColors.accent)
-                            }
-                        }
-                        .disabled(dataStore.isSyncing)
-                        
-                        Button {
-                            showAuditSheet = true
-                        } label: {
-                            Image(systemName: "clock.arrow.circlepath")
-                                .foregroundColor(AppColors.secondaryText)
-                        }
-                    }
-                }
-                
-                ToolbarItem(placement: .primaryAction) {
-                    Menu {
-                        Button {
-                            showNewAccountSheet = true
-                        } label: {
-                            Label("Thêm tài khoản quỹ", systemImage: "plus.circle")
-                        }
-                        Button {
-                            showNewEntrySheet = true
-                        } label: {
-                            Label("Thêm chi phí / Payout", systemImage: "dollarsign.circle")
-                        }
-                        Divider()
-                        Button {
-                            showCsvSheet = true
-                        } label: {
-                            Label("Import CSV Quỹ", systemImage: "square.and.arrow.down")
-                        }
-                    } label: {
-                        Image(systemName: "plus")
-                    }
-                }
-            }
-            .sheet(isPresented: $showNewAccountSheet) {
+        .sheet(isPresented: $showNewAccountSheet) {
                 NewPropAccountSheet(defaultCurrency: selectedCurrency) { newAcc in
                     dataStore.savePropAccount(item: newAcc, reason: "Tạo tài khoản mới")
                 }
@@ -249,7 +213,6 @@ public struct PropFirmLedgerView: View {
             } message: {
                 Text("Giao dịch sẽ được đánh dấu void và không tính vào dòng tiền, nhưng vẫn được lưu vết kiểm toán.")
             }
-        }
     }
     
     // MARK: - 1. Overview Tab

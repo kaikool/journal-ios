@@ -26,14 +26,67 @@ public struct MissedTradesView: View {
     
     public var body: some View {
         VStack(spacing: 0) {
-            // Filter Picker (Active vs Archived)
-            Picker("Trạng thái", selection: $showArchived) {
-                Text("Đang theo dõi").tag(false)
-                Text("Đã lưu trữ").tag(true)
+            FilterBarView(
+                title: "Missed trades",
+                showFilters: false
+            ) {
+                AppButton("Log opportunity", icon: "plus", style: .primary) {
+                    editingTrade = nil
+                    showAddSheet = true
+                }
             }
-            .pickerStyle(.segmented)
-            .padding(.horizontal)
-            .padding(.vertical, 8)
+            
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Record setups you watched but did not take. These observations never enter your trade count, P&L, or win rate.")
+                    .font(AppTypography.caption)
+                    .foregroundColor(AppColors.secondaryText)
+                
+                HStack(spacing: 12) {
+                    // Search bar
+                    HStack {
+                        Image(systemName: "magnifyingglass")
+                            .foregroundColor(AppColors.secondaryText)
+                            .font(.system(size: 13))
+                        TextField("Search symbol or notes…", text: $searchText)
+                            .font(AppTypography.body)
+                        if !searchText.isEmpty {
+                            Button {
+                                searchText = ""
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundColor(AppColors.secondaryText)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 7)
+                    .background(AppColors.cardBackground)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .stroke(AppColors.border, lineWidth: 1)
+                    )
+                    .cornerRadius(6)
+                    
+                    // Show archived toggle
+                    Button {
+                        showArchived.toggle()
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: showArchived ? "checkmark.square.fill" : "square")
+                                .foregroundColor(showArchived ? AppColors.brand : AppColors.secondaryText)
+                                .font(.system(size: 14))
+                            Text("Show archived")
+                                .font(AppTypography.caption)
+                                .foregroundColor(AppColors.primaryText)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(14)
+            
+            Divider()
+                .overlay(AppColors.border)
             
             if filteredTrades.isEmpty {
                 emptyStateView
@@ -41,7 +94,7 @@ public struct MissedTradesView: View {
                 List {
                     ForEach(filteredTrades) { trade in
                         missedTradeRow(trade)
-                            .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                            .listRowInsets(EdgeInsets(top: 6, leading: 14, bottom: 6, trailing: 14))
                             .listRowBackground(Color.clear)
                             .listRowSeparator(.hidden)
                     }
@@ -49,22 +102,7 @@ public struct MissedTradesView: View {
                 .listStyle(.plain)
             }
         }
-        .searchable(text: $searchText, prompt: "Tìm kèo lỡ theo mã hoặc ghi chú...")
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    editingTrade = nil
-                    showAddSheet = true
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "plus.circle.fill")
-                        Text("Thêm Kèo Lỡ")
-                    }
-                    .font(AppTypography.captionBold)
-                    .foregroundColor(AppColors.accent)
-                }
-            }
-        }
+        .background(AppColors.background)
         .sheet(isPresented: $showAddSheet) {
             AddMissedTradeSheet(tradeToEdit: editingTrade)
         }

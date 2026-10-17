@@ -59,8 +59,18 @@ public struct TradeDetailView: View {
     }
     
     public var body: some View {
-        ScrollView {
-            VStack(spacing: 16) {
+        VStack(spacing: 0) {
+            FilterBarView(
+                title: "\(trade.symbol) · \(trade.direction.rawValue.uppercased())",
+                showFilters: false
+            ) {
+                AppButton("Replay", icon: "play.fill", style: .primary) {
+                    showReplayView = true
+                }
+            }
+            
+            ScrollView {
+                VStack(spacing: 12) {
                 // Header PnL Card
                 AppCard {
                     VStack(alignment: .leading, spacing: 10) {
@@ -457,11 +467,12 @@ public struct TradeDetailView: View {
                 }
                 .padding(.top, 8)
             }
-            .padding()
+            .padding(14)
         }
-        .navigationTitle(trade.symbol)
         .background(AppColors.background)
-        .navigationDestination(isPresented: $showReplayView) {
+    }
+    .background(AppColors.background)
+    .navigationDestination(isPresented: $showReplayView) {
             TradeReplayView(trade: trade, executions: fills)
         }
         .alert("Xóa giao dịch \(trade.symbol)?", isPresented: $showDeleteAlert) {

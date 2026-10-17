@@ -1,30 +1,11 @@
 import SwiftUI
 import Charts
 
-public enum DashboardTimeRange: String, CaseIterable, Identifiable {
-    case all = "Tất cả"
-    case week = "7 ngày"
-    case month = "30 ngày"
-    case quarter = "90 ngày"
-    case ytd = "Năm nay"
-    
-    public var id: String { rawValue }
-}
-
-public enum DashboardChartTab: String, CaseIterable, Identifiable {
-    case equity = "Đường cong vốn"
-    case drawdown = "Drawdown"
-    case session = "Phiên GD"
-    case weekday = "Thứ trong tuần"
-    
-    public var id: String { rawValue }
-}
-
 public struct DashboardView: View {
     @EnvironmentObject private var env: AppEnvironment
     @ObservedObject private var dataStore = TradeDataStore.shared
     
-    @State private var selectedTimeRange: DashboardTimeRange = .all
+    @State private var selectedRange: JournalTimeRange = .all
     @State private var selectedChartTab: DashboardChartTab = .equity
     @State private var showEdgeScoreBreakdown: Bool = false
     @State private var showAIReflection: Bool = false
@@ -34,20 +15,20 @@ public struct DashboardView: View {
     
     private var scopedTrades: [Trade] {
         let baseTrades = dataStore.filteredTrades
-        guard selectedTimeRange != .all else { return baseTrades }
+        guard selectedRange != .all else { return baseTrades }
         
         let now = Date()
         let calendar = Calendar.current
         let cutoff: Date
         
-        switch selectedTimeRange {
+        switch selectedRange {
         case .all:
             return baseTrades
-        case .week:
+        case .d7:
             cutoff = calendar.date(byAdding: .day, value: -7, to: now) ?? now
-        case .month:
+        case .d30:
             cutoff = calendar.date(byAdding: .day, value: -30, to: now) ?? now
-        case .quarter:
+        case .d90:
             cutoff = calendar.date(byAdding: .day, value: -90, to: now) ?? now
         case .ytd:
             let comps = calendar.dateComponents([.year], from: now)
@@ -94,18 +75,66 @@ public struct DashboardView: View {
         AggregateEngine.bySymbol(trades: scopedTrades)
     }
     
+    // Momentum: net P&L của 7 ngày qua vs 7 ngày trước đó
+    private var weekDelta: Decimal? {
+        let now = Date().timeIntervalSince1970 * 1000
+        var last: Decimal = 0
+        var prior: Decimal = 0
+        var lastDays = 0
+        var priorDays = 0
+        
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        
+        for day in overview.days {
+            if let date = formatter.date(from: day.date) {
+                let ageDays = (now - (date.timeIntervalSince1970 * 1000)) / 86_400_000
+                if ageDays <= 7 {
+                    last += day.netPnl
+                    lastDays += 1
+                } else if ageDays <= 14 {
+                    prior += day.netPnl
+                    priorDays += 1
+                }
+            }
+        }
+        return (lastDays > 0 && priorDays > 0) ? (last - prior) : nil
+    }
+    
+    private var bestDay: DayStats? {
+        overview.days.max(by: { $0.netPnl < $1.netPnl })
+    }
+    
+    private var worstDay: DayStats? {
+        overview.days.min(by: { $0.netPnl < $1.netPnl })
+    }
+    
     public var body: some View {
         let metrics = overview.metrics
         
-        NavigationStack {
+        VStack(spacing: 0) {
+            // FilterBar chuẩn xác từ web
+            FilterBarView(
+                title: "Dashboard",
+                selectedRange: $selectedRange,
+                showFilters: true
+            ) {
+                AppButton("Add trade", icon: "plus", style: .primary) {
+                    showAddTradeSheet = true
+                }
+            }
+            
             ScrollView {
-                VStack(spacing: 16) {
+                VStack(spacing: 12) {
+                    // Sync Notification
                     if let summary = dataStore.lastSyncSummary {
-                        HStack {
+                        HStack(spacing: 8) {
                             Image(systemName: "checkmark.circle.fill")
                                 .foregroundColor(AppColors.profit)
                             Text(summary)
                                 .font(AppTypography.caption)
+                                .foregroundColor(AppColors.primaryText)
                             Spacer()
                             Button {
                                 dataStore.lastSyncSummary = nil
@@ -118,15 +147,16 @@ public struct DashboardView: View {
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)
                         .background(AppColors.profit.opacity(0.12))
-                        .cornerRadius(8)
+                        .cornerRadius(6)
                     }
                     
                     if let err = dataStore.lastSyncError {
-                        HStack {
+                        HStack(spacing: 8) {
                             Image(systemName: "exclamationmark.triangle.fill")
                                 .foregroundColor(AppColors.loss)
                             Text(err)
                                 .font(AppTypography.caption)
+                                .foregroundColor(AppColors.primaryText)
                                 .lineLimit(2)
                             Spacer()
                             Button {
@@ -140,138 +170,154 @@ public struct DashboardView: View {
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)
                         .background(AppColors.loss.opacity(0.12))
-                        .cornerRadius(8)
+                        .cornerRadius(6)
                     }
                     
-                    if dataStore.filteredTrades.isEmpty {
+                    // 5 Top Summary Cards (widget-0 to widget-4 chuẩn web)
+                    VStack(spacing: 10) {
+                        // Widget 0: Net P&L
                         AppCard {
-                            VStack(alignment: .leading, spacing: 12) {
-                                HStack {
-                                    Image(systemName: "icloud.and.arrow.down")
-                                        .foregroundColor(AppColors.accent)
-                                    Text("Chưa Có Dữ Liệu Giao Dịch")
-                                        .font(AppTypography.headline)
-                                    Spacer()
-                                }
-                                Text("Dữ liệu tự động đồng bộ từ The5ers Hub lên đám mây Supabase, hoặc nhập từ file sao kê CSV.")
-                                    .font(AppTypography.caption)
-                                    .foregroundColor(AppColors.secondaryText)
+                            VStack(alignment: .leading, spacing: 6) {
+                                AppCardHeader("Net P&L", icon: "dollarsign.circle")
                                 
-                                HStack(spacing: 10) {
-                                    AppButton("Ghi Lệnh Mới", icon: "plus.circle", style: .primary) {
-                                        showAddTradeSheet = true
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    
-                    // Time Range Selector
-                    Picker("Khoảng thời gian", selection: $selectedTimeRange) {
-                        ForEach(DashboardTimeRange.allCases) { range in
-                            Text(range.rawValue).tag(range)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    
-                    // Main Net P&L Card
-                    AppCard {
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack {
-                                Text("TỔNG LÃI/LỖ RÒNG")
-                                    .font(AppTypography.caption)
-                                    .foregroundColor(AppColors.secondaryText)
-                                Spacer()
-                                Button(action: { env.togglePrivacyMode() }) {
-                                    Image(systemName: env.isPrivacyModeEnabled ? "eye.slash.fill" : "eye.fill")
-                                        .foregroundColor(AppColors.secondaryText)
-                                }
-                            }
-                            
-                            HStack(alignment: .firstTextBaseline) {
-                                Text(Formatters.pnl(metrics.netPnl, currencyCode: env.currentCurrency, isPrivate: env.isPrivacyModeEnabled))
-                                    .font(AppTypography.financialNumber(size: 32, weight: .bold))
-                                    .foregroundColor(metrics.netPnl >= 0 ? AppColors.profit : AppColors.loss)
-                                
-                                Spacer()
-                                
-                                if let initial = dataStore.selectedAccount?.initialBalance, initial > 0 {
-                                    let pct = (metrics.netPnl as NSDecimalNumber).doubleValue / (initial as NSDecimalNumber).doubleValue
-                                    AppBadge(
-                                        text: String(format: "%+.1f%%", pct * 100),
+                                HStack(alignment: .firstTextBaseline) {
+                                    AppMonetaryText(
+                                        Formatters.formatPnL(metrics.netPnl, currency: env.currentCurrency),
+                                        isPrivate: env.isPrivacyModeEnabled,
+                                        font: AppTypography.financialNumber(size: 26, weight: .semibold),
                                         color: metrics.netPnl >= 0 ? AppColors.profit : AppColors.loss
                                     )
+                                    
+                                    Spacer()
+                                    
+                                    if let delta = weekDelta {
+                                        HStack(spacing: 3) {
+                                            Text(delta >= 0 ? "▲" : "▼")
+                                                .font(.system(size: 9))
+                                            Text(Formatters.formatCurrency(abs(delta), currency: env.currentCurrency))
+                                                .font(AppTypography.captionBold)
+                                            Text("vs prior 7d")
+                                                .font(AppTypography.caption)
+                                        }
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 3)
+                                        .background(delta >= 0 ? AppColors.profit.opacity(0.12) : AppColors.loss.opacity(0.12))
+                                        .foregroundColor(delta >= 0 ? AppColors.profit : AppColors.loss)
+                                        .clipShape(Capsule())
+                                    }
+                                }
+                                
+                                Text("\(metrics.closedTrades) closed trades · \(Formatters.formatCurrency(metrics.fees, currency: env.currentCurrency)) fees")
+                                    .font(AppTypography.caption)
+                                    .foregroundColor(AppColors.secondaryText)
+                            }
+                        }
+                        
+                        // 2x2 Grid for Widgets 1, 2, 3, 4
+                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                            // Widget 1: Trade win %
+                            AppCard {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    AppCardHeader("Trade win %", icon: "target")
+                                    
+                                    HStack(alignment: .center, spacing: 8) {
+                                        GaugeView(value: metrics.winRate, label: "Trade win rate", size: 84)
+                                        
+                                        Spacer()
+                                        
+                                        VStack(alignment: .trailing, spacing: 2) {
+                                            Text("\(metrics.wins) W")
+                                                .font(AppTypography.caption)
+                                                .foregroundColor(AppColors.secondaryText)
+                                            Text("\(metrics.breakevens) BE")
+                                                .font(AppTypography.caption)
+                                                .foregroundColor(AppColors.secondaryText)
+                                            Text("\(metrics.losses) L")
+                                                .font(AppTypography.caption)
+                                                .foregroundColor(AppColors.secondaryText)
+                                        }
+                                    }
                                 }
                             }
                             
-                            Divider().background(AppColors.border)
+                            // Widget 2: Profit factor
+                            AppCard {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    AppCardHeader("Profit factor", icon: "scalemass")
+                                    
+                                    Text(metrics.profitFactorIsInfinite ? "∞" : (metrics.profitFactor != nil ? String(format: "%.2f", metrics.profitFactor!) : "–"))
+                                        .font(AppTypography.financialNumber(size: 24, weight: .semibold))
+                                        .foregroundColor(AppColors.primaryText)
+                                    
+                                    Text("gross profit ÷ gross loss")
+                                        .font(AppTypography.caption)
+                                        .foregroundColor(AppColors.secondaryText)
+                                }
+                            }
                             
-                            HStack {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("Lãi gộp")
-                                        .font(AppTypography.caption)
-                                        .foregroundColor(AppColors.secondaryText)
-                                    Text(Formatters.formatCurrency(metrics.profit, currency: env.currentCurrency))
-                                        .font(AppTypography.captionBold)
-                                        .foregroundColor(AppColors.profit)
+                            // Widget 3: Day win %
+                            AppCard {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    AppCardHeader("Day win %", icon: "calendar.badge.clock")
+                                    
+                                    HStack(alignment: .center, spacing: 8) {
+                                        GaugeView(value: metrics.dayWinRate, label: "Day win rate", size: 84)
+                                        
+                                        Spacer()
+                                        
+                                        Text("\(metrics.tradingDays) days")
+                                            .font(AppTypography.caption)
+                                            .foregroundColor(AppColors.secondaryText)
+                                    }
                                 }
-                                Spacer()
-                                VStack(alignment: .center, spacing: 2) {
-                                    Text("Lỗ gộp")
-                                        .font(AppTypography.caption)
-                                        .foregroundColor(AppColors.secondaryText)
-                                    Text(Formatters.formatCurrency(metrics.loss, currency: env.currentCurrency))
-                                        .font(AppTypography.captionBold)
-                                        .foregroundColor(AppColors.loss)
-                                }
-                                Spacer()
-                                VStack(alignment: .trailing, spacing: 2) {
-                                    Text("Phí giao dịch")
-                                        .font(AppTypography.caption)
-                                        .foregroundColor(AppColors.secondaryText)
-                                    Text(Formatters.formatCurrency(metrics.fees, currency: env.currentCurrency))
-                                        .font(AppTypography.captionBold)
-                                        .foregroundColor(AppColors.secondaryText)
+                            }
+                            
+                            // Widget 4: Avg win / loss
+                            AppCard {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    AppCardHeader("Avg win / loss", icon: "arrow.up.arrow.down")
+                                    
+                                    Text(metrics.avgWinLossRatio != nil ? String(format: "%.2f", metrics.avgWinLossRatio!) : "–")
+                                        .font(AppTypography.financialNumber(size: 24, weight: .semibold))
+                                        .foregroundColor(AppColors.primaryText)
+                                    
+                                    if let w = metrics.avgWin, let l = metrics.avgLoss, (w + l) > 0 {
+                                        let ratio = (w as NSDecimalNumber).doubleValue / ((w + l) as NSDecimalNumber).doubleValue
+                                        AppRatioBar(greenRatio: ratio)
+                                            .padding(.vertical, 2)
+                                    }
+                                    
+                                    HStack(spacing: 2) {
+                                        Text(Formatters.formatCurrency(metrics.avgWin, currency: env.currentCurrency))
+                                            .foregroundColor(AppColors.profit)
+                                        Text(" win · ")
+                                        Text(Formatters.formatCurrency(metrics.avgLoss, currency: env.currentCurrency))
+                                            .foregroundColor(AppColors.loss)
+                                        Text(" loss")
+                                    }
+                                    .font(AppTypography.caption)
+                                    .foregroundColor(AppColors.secondaryText)
+                                    .lineLimit(1)
                                 }
                             }
                         }
                     }
                     
-                    // Edge Score Card
+                    // Widget 5: Edge Score v2
                     AppCard {
-                        VStack(spacing: 12) {
-                            HStack(spacing: 16) {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    HStack {
-                                        Text("Edge Score v2")
-                                            .font(AppTypography.headline)
-                                        Image(systemName: "info.circle")
-                                            .font(.caption)
-                                            .foregroundColor(AppColors.secondaryText)
-                                    }
-                                    Text("Chấm điểm 6 trụ cột kỹ thuật")
-                                        .font(AppTypography.caption)
-                                        .foregroundColor(AppColors.secondaryText)
-                                }
+                        VStack(spacing: 8) {
+                            HStack {
+                                AppCardHeader("Edge Score", icon: "info.circle")
                                 
                                 Spacer()
                                 
-                                ZStack {
-                                    Circle()
-                                        .stroke(AppColors.secondaryBackground, lineWidth: 6)
-                                        .frame(width: 52, height: 52)
-                                    
-                                    Circle()
-                                        .trim(from: 0, to: CGFloat((edgeResult.score ?? 50.0) / 100.0))
-                                        .stroke(
-                                            (edgeResult.score ?? 0) >= 60 ? AppColors.profit : ((edgeResult.score ?? 0) >= 40 ? AppColors.accent : AppColors.loss),
-                                            style: StrokeStyle(lineWidth: 6, lineCap: .round)
-                                        )
-                                        .rotationEffect(.degrees(-90))
-                                        .frame(width: 52, height: 52)
-                                    
-                                    Text(edgeResult.score != nil ? "\(Int(edgeResult.score!))" : "N/A")
-                                        .font(AppTypography.headline.bold())
+                                HStack(spacing: 2) {
+                                    Text(edgeResult.score != nil ? "\(Int(edgeResult.score!))" : "–")
+                                        .font(AppTypography.financialNumber(size: 20, weight: .semibold))
+                                        .foregroundColor(AppColors.brand)
+                                    Text("/100")
+                                        .font(AppTypography.caption)
+                                        .foregroundColor(AppColors.secondaryText)
                                 }
                             }
                             .contentShape(Rectangle())
@@ -281,73 +327,30 @@ public struct DashboardView: View {
                                 }
                             }
                             
-                            if showEdgeScoreBreakdown, let breakdown = edgeResult.breakdown {
+                            if showEdgeScoreBreakdown, let b = edgeResult.breakdown {
                                 Divider().background(AppColors.border)
                                 
-                                VStack(spacing: 6) {
-                                    scoreRow(title: "Win Rate (15đ)", value: breakdown.winRate, max: 15)
-                                    scoreRow(title: "Profit Factor (25đ)", value: breakdown.profitFactor, max: 25)
-                                    scoreRow(title: "Avg Win / Loss (20đ)", value: breakdown.avgWinLoss, max: 20)
-                                    scoreRow(title: "Drawdown (15đ)", value: breakdown.drawdown, max: 15)
-                                    scoreRow(title: "Recovery (10đ)", value: breakdown.recovery, max: 10)
-                                    scoreRow(title: "Tính nhất quán (15đ)", value: breakdown.consistency, max: 15)
+                                VStack(spacing: 5) {
+                                    scorePillarRow("Win rate", value: b.winRate, max: 15)
+                                    scorePillarRow("Profit factor", value: b.profitFactor, max: 25)
+                                    scorePillarRow("Avg win / loss", value: b.avgWinLoss, max: 20)
+                                    scorePillarRow("Drawdown", value: b.drawdown, max: 15)
+                                    scorePillarRow("Recovery", value: b.recovery, max: 10)
+                                    scorePillarRow("Consistency", value: b.consistency, max: 15)
                                 }
                                 .padding(.top, 4)
                             }
                         }
                     }
                     
-                    // Quick Stats 2x2 Grid
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                        statTile(
-                            title: "Win Rate",
-                            value: Formatters.percentage(metrics.winRate),
-                            color: AppColors.profit,
-                            subtitle: "\(metrics.winningTrades)W / \(metrics.losingTrades)L / \(metrics.breakevenTrades)BE"
-                        )
-                        
-                        statTile(
-                            title: "Profit Factor",
-                            value: metrics.profitFactorIsInfinite ? "∞" : (metrics.profitFactor != nil ? String(format: "%.2f", metrics.profitFactor!) : "N/A"),
-                            color: AppColors.accent,
-                            subtitle: metrics.loss > 0 ? "Lãi/Lỗ: \(metrics.profitFactor ?? 0)" : "Không lỗ"
-                        )
-                        
-                        statTile(
-                            title: "Tổng Lệnh",
-                            value: "\(metrics.totalTrades)",
-                            color: AppColors.primaryText,
-                            subtitle: "Khối lượng: \(metrics.totalVolume)"
-                        )
-                        
-                        statTile(
-                            title: "Max Drawdown",
-                            value: metrics.maxDrawdownPct != nil ? String(format: "-%.1f%%", metrics.maxDrawdownPct! * 100) : "0.0%",
-                            color: AppColors.loss,
-                            subtitle: Formatters.formatCurrency(metrics.maxDrawdown, currency: env.currentCurrency)
-                        )
-                        
-                        statTile(
-                            title: "Expectancy",
-                            value: metrics.expectancy != nil ? Formatters.formatPnL(metrics.expectancy!, currency: env.currentCurrency) : "-",
-                            color: (metrics.expectancy ?? 0) >= 0 ? AppColors.profit : AppColors.loss,
-                            subtitle: "Kỳ vọng/lệnh"
-                        )
-                        
-                        statTile(
-                            title: "Streak Lãi / Lỗ",
-                            value: "\(metrics.maxConsecutiveWins)W / \(metrics.maxConsecutiveLosses)L",
-                            color: AppColors.secondaryText,
-                            subtitle: "Chuỗi liên tiếp max"
-                        )
-                    }
-                    
-                    // Interactive Charts Section
+                    // Chart Visuals (Equity curve, Drawdown, Session, Weekday)
                     AppCard {
-                        VStack(alignment: .leading, spacing: 14) {
+                        VStack(alignment: .leading, spacing: 10) {
                             HStack {
-                                Text("Phân tích biểu đồ")
-                                    .font(AppTypography.headline)
+                                Text("BIỂU ĐỒ HIỆU SUẤT")
+                                    .font(AppTypography.cardTitle)
+                                    .tracking(0.88)
+                                    .foregroundColor(AppColors.secondaryText)
                                 Spacer()
                             }
                             
@@ -371,44 +374,168 @@ public struct DashboardView: View {
                         }
                     }
                     
-                    // Symbols Breakdown Card
-                    if !symbolStats.isEmpty {
-                        AppCard {
-                            VStack(alignment: .leading, spacing: 10) {
-                                Text("Mã giao dịch hàng đầu")
-                                    .font(AppTypography.headline)
-                                
-                                ForEach(symbolStats.prefix(5)) { sym in
+                    // Activity Tabs: Recent Trades / Open Positions
+                    AppCard {
+                        VStack(alignment: .leading, spacing: 10) {
+                            AppCardHeader("Activity", icon: "clock.arrow.circlepath")
+                            
+                            if scopedTrades.isEmpty {
+                                Text("Chưa có lệnh giao dịch nào trong khoảng thời gian này.")
+                                    .font(AppTypography.caption)
+                                    .foregroundColor(AppColors.secondaryText)
+                                    .padding(.vertical, 8)
+                            } else {
+                                ForEach(scopedTrades.prefix(5)) { trade in
                                     HStack {
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text(sym.key)
-                                                .font(AppTypography.subheadlineBold)
-                                            Text("\(sym.trades) lệnh • KL: \(sym.volume)")
+                                        AppBadge(trade.status.rawValue.uppercased(), color: Formatters.statusColor(trade.status))
+                                        
+                                        Text(trade.symbol)
+                                            .font(AppTypography.bodyBold)
+                                            .foregroundColor(AppColors.primaryText)
+                                        
+                                        Spacer()
+                                        
+                                        if let closed = trade.closedAt {
+                                            Text(Formatters.formatDate(closed))
                                                 .font(AppTypography.caption)
                                                 .foregroundColor(AppColors.secondaryText)
                                         }
                                         
-                                        Spacer()
-                                        
-                                        VStack(alignment: .trailing, spacing: 2) {
-                                            Text(Formatters.formatPnL(sym.netPnl, currency: env.currentCurrency))
-                                                .font(AppTypography.subheadlineBold)
-                                                .foregroundColor(Formatters.pnlColor(sym.netPnl))
-                                            
-                                            if let wr = sym.winRate {
-                                                Text("WR \(Formatters.formatPercent(wr))")
-                                                    .font(AppTypography.caption)
-                                                    .foregroundColor(AppColors.secondaryText)
-                                            }
+                                        AppMonetaryText(
+                                            Formatters.formatPnL(trade.netPnl, currency: trade.currency),
+                                            isPrivate: env.isPrivacyModeEnabled,
+                                            font: AppTypography.financialNumber(size: 13, weight: .semibold),
+                                            color: trade.netPnl >= 0 ? AppColors.profit : AppColors.loss
+                                        )
+                                    }
+                                    .padding(.vertical, 2)
+                                    
+                                    if trade.id != scopedTrades.prefix(5).last?.id {
+                                        Divider().background(AppColors.border)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Secondary Metrics Grid (Max drawdown, Streaks, Expectancy, Avg duration, Best/Worst day)
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                        // Max drawdown
+                        AppCard {
+                            VStack(alignment: .leading, spacing: 4) {
+                                AppCardHeader("Max drawdown", icon: "chart.line.downtrend.xyaxis")
+                                
+                                AppMonetaryText(
+                                    Formatters.formatCurrency(metrics.maxDrawdown, currency: env.currentCurrency),
+                                    isPrivate: env.isPrivacyModeEnabled,
+                                    font: AppTypography.financialNumber(size: 18, weight: .semibold),
+                                    color: AppColors.loss
+                                )
+                                
+                                Text(metrics.maxDrawdownPct != nil ? String(format: "-%.1f%%", metrics.maxDrawdownPct! * 100) : "–")
+                                    .font(AppTypography.caption)
+                                    .foregroundColor(AppColors.secondaryText)
+                            }
+                        }
+                        
+                        // Streaks
+                        AppCard {
+                            VStack(alignment: .leading, spacing: 4) {
+                                AppCardHeader("Streaks", icon: "flame")
+                                
+                                Text(metrics.currentStreak > 0 ? "\(metrics.currentStreak)W" : (metrics.currentStreak < 0 ? "\(-metrics.currentStreak)L" : "–"))
+                                    .font(AppTypography.financialNumber(size: 18, weight: .semibold))
+                                    .foregroundColor(metrics.currentStreak > 0 ? AppColors.profit : (metrics.currentStreak < 0 ? AppColors.loss : AppColors.primaryText))
+                                
+                                Text("best \(metrics.maxWinStreak)W · worst \(metrics.maxLossStreak)L")
+                                    .font(AppTypography.caption)
+                                    .foregroundColor(AppColors.secondaryText)
+                            }
+                        }
+                        
+                        // Expectancy / trade
+                        AppCard {
+                            VStack(alignment: .leading, spacing: 4) {
+                                AppCardHeader("Expectancy / trade", icon: "sum")
+                                
+                                AppMonetaryText(
+                                    metrics.expectancy != nil ? Formatters.formatPnL(metrics.expectancy!, currency: env.currentCurrency) : "–",
+                                    isPrivate: env.isPrivacyModeEnabled,
+                                    font: AppTypography.financialNumber(size: 18, weight: .semibold),
+                                    color: (metrics.expectancy ?? 0) >= 0 ? AppColors.profit : AppColors.loss
+                                )
+                                
+                                Text(metrics.avgRealizedR != nil ? String(format: "avg %.2fR over %d trades", metrics.avgRealizedR!, metrics.tradesWithRisk) : "Kỳ vọng/lệnh")
+                                    .font(AppTypography.caption)
+                                    .foregroundColor(AppColors.secondaryText)
+                                    .lineLimit(1)
+                            }
+                        }
+                        
+                        // Avg duration
+                        AppCard {
+                            VStack(alignment: .leading, spacing: 4) {
+                                AppCardHeader("Avg duration", icon: "timer")
+                                
+                                Text(Formatters.formatDuration(ms: metrics.avgDurationMs))
+                                    .font(AppTypography.financialNumber(size: 18, weight: .semibold))
+                                    .foregroundColor(AppColors.primaryText)
+                                
+                                Text("Thời lượng nắm giữ TB")
+                                    .font(AppTypography.caption)
+                                    .foregroundColor(AppColors.secondaryText)
+                            }
+                        }
+                    }
+                    
+                    // Best / Worst Day
+                    if let best = bestDay, let worst = worstDay {
+                        AppCard {
+                            VStack(alignment: .leading, spacing: 6) {
+                                AppCardHeader("Best / worst day", icon: "trophy")
+                                
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("Ngày thắng lớn nhất")
+                                            .font(AppTypography.caption)
+                                            .foregroundColor(AppColors.secondaryText)
+                                        HStack(spacing: 6) {
+                                            AppMonetaryText(
+                                                Formatters.formatPnL(best.netPnl, currency: env.currentCurrency),
+                                                isPrivate: env.isPrivacyModeEnabled,
+                                                font: AppTypography.financialNumber(size: 14, weight: .semibold),
+                                                color: AppColors.profit
+                                            )
+                                            Text(best.date)
+                                                .font(AppTypography.caption)
+                                                .foregroundColor(AppColors.secondaryText)
                                         }
                                     }
-                                    Divider().background(AppColors.border.opacity(0.4))
+                                    
+                                    Spacer()
+                                    
+                                    VStack(alignment: .trailing, spacing: 2) {
+                                        Text("Ngày lỗ lớn nhất")
+                                            .font(AppTypography.caption)
+                                            .foregroundColor(AppColors.secondaryText)
+                                        HStack(spacing: 6) {
+                                            AppMonetaryText(
+                                                Formatters.formatPnL(worst.netPnl, currency: env.currentCurrency),
+                                                isPrivate: env.isPrivacyModeEnabled,
+                                                font: AppTypography.financialNumber(size: 14, weight: .semibold),
+                                                color: AppColors.loss
+                                            )
+                                            Text(worst.date)
+                                                .font(AppTypography.caption)
+                                                .foregroundColor(AppColors.secondaryText)
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
                 }
-                .padding()
+                .padding(14)
             }
             .refreshable {
                 if The5ersService.shared.isConfigured {
@@ -417,97 +544,17 @@ public struct DashboardView: View {
                     await dataStore.syncWithSupabase()
                 }
             }
-            .navigationTitle("Dashboard")
             .background(AppColors.background)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    HStack(spacing: 8) {
-                        Menu {
-                            Button("Tất cả tài khoản") {
-                                dataStore.selectedAccountId = "all"
-                            }
-                            ForEach(dataStore.accounts) { acc in
-                                Button(acc.name.isEmpty ? acc.id : acc.name) {
-                                    dataStore.selectedAccountId = acc.id
-                                }
-                            }
-                        } label: {
-                            HStack(spacing: 4) {
-                                Image(systemName: "person.crop.circle")
-                                Text(dataStore.selectedAccountId == "all" ? "Tất cả" : (dataStore.selectedAccount?.name ?? "Tài khoản"))
-                                    .font(AppTypography.caption)
-                                Image(systemName: "chevron.down")
-                                    .font(.system(size: 10))
-                            }
-                            .foregroundColor(AppColors.primaryText)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(AppColors.secondaryBackground)
-                            .cornerRadius(6)
-                        }
-                        
-                        Button(action: { showAIReflection = true }) {
-                            Image(systemName: "sparkles")
-                                .foregroundColor(AppColors.accent)
-                        }
-                    }
-                }
-                ToolbarItem(placement: .primaryAction) {
-                    HStack(spacing: 12) {
-                        Button {
-                            Task {
-                                if The5ersService.shared.isConfigured {
-                                    _ = try? await dataStore.syncWithThe5ers()
-                                } else if SupabaseService.shared.isConfigured {
-                                    await dataStore.syncWithSupabase()
-                                }
-                            }
-                        } label: {
-                            Image(systemName: dataStore.isSyncing ? "arrow.triangle.2.circlepath.circle.fill" : "arrow.triangle.2.circlepath")
-                        }
-                        
-                        Button(action: { showAddTradeSheet = true }) {
-                            Image(systemName: "plus.circle.fill")
-                                .font(.title3)
-                                .foregroundColor(AppColors.accent)
-                        }
-                    }
-                }
-            }
-            .sheet(isPresented: $showAIReflection) {
-                AIReflectionView()
-            }
-            .sheet(isPresented: $showAddTradeSheet) {
-                AddTradeSheet()
-            }
+        }
+        .sheet(isPresented: $showAIReflection) {
+            AIReflectionView()
+        }
+        .sheet(isPresented: $showAddTradeSheet) {
+            AddTradeSheet()
         }
     }
     
-    // MARK: - Subcomponents
-    
-    private func statTile(title: String, value: String, color: Color, subtitle: String) -> some View {
-        AppCard {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(AppTypography.caption)
-                    .foregroundColor(AppColors.secondaryText)
-                
-                Text(value)
-                    .font(AppTypography.financialNumber(size: 20, weight: .bold))
-                    .foregroundColor(color)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-                
-                Text(subtitle)
-                    .font(AppTypography.caption)
-                    .foregroundColor(AppColors.secondaryText)
-                    .lineLimit(1)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-    
-    private func scoreRow(title: String, value: Double, max: Double) -> some View {
+    private func scorePillarRow(_ title: String, value: Double, max: Double) -> some View {
         HStack {
             Text(title)
                 .font(AppTypography.caption)

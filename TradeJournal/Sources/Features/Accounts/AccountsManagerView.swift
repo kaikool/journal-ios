@@ -69,40 +69,19 @@ public struct AccountsManagerView: View {
     }
     
     public var body: some View {
-        NavigationStack {
+        VStack(spacing: 0) {
+            // FilterBar chuẩn web
+            FilterBarView(
+                title: "Accounts",
+                showFilters: false
+            ) {
+                AppButton("New account", icon: "plus", style: .primary) {
+                    showNewAccountSheet = true
+                }
+            }
+            
             ScrollView {
-                VStack(spacing: 16) {
-                    // Header Bar
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Tài Khoản")
-                                .font(AppTypography.title2)
-                                .foregroundColor(AppColors.primaryText)
-                            Text("Quản lý các tài khoản giao dịch cá nhân và tài khoản quỹ")
-                                .font(AppTypography.caption)
-                                .foregroundColor(AppColors.secondaryText)
-                        }
-                        
-                        Spacer()
-                        
-                        Button {
-                            showNewAccountSheet = true
-                        } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: "plus")
-                                Text("Tạo tài khoản")
-                            }
-                            .font(AppTypography.captionBold)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(AppColors.accent)
-                            .foregroundColor(.white)
-                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                        }
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 8)
-                    
+                VStack(spacing: 12) {
                     // Filter & Search Controls (Port 1:1 từ thanh lọc Accounts)
                     filterAndSearchHeader
                     
@@ -118,16 +97,15 @@ public struct AccountsManagerView: View {
                                 accountCard(acc)
                             }
                         }
-                        .padding(.horizontal, 16)
+                        .padding(.horizontal, 14)
                     }
                 }
-                .padding(.bottom, 32)
             }
-            .background(AppColors.background.ignoresSafeArea())
-            .navigationBarTitleDisplayMode(.inline)
-            .sheet(isPresented: $showNewAccountSheet) {
-                CreateAccountSheet()
-            }
+            .background(AppColors.background)
+        }
+        .sheet(isPresented: $showNewAccountSheet) {
+            CreateAccountSheet()
+        }
             .alert("Xác nhận xoá tài khoản", isPresented: $showDeleteAlert, presenting: accountToDelete) { acc in
                 Button("Xoá tài khoản", role: .destructive) {
                     dataStore.deleteAccount(id: acc.id)
@@ -136,7 +114,6 @@ public struct AccountsManagerView: View {
             } message: { acc in
                 Text("Hành động này sẽ xoá tài khoản “\(acc.name)” và các lệnh liên quan khỏi máy của bạn.")
             }
-        }
     }
     
     // MARK: - Subviews

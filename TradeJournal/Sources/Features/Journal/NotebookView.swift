@@ -39,15 +39,22 @@ public struct NotebookView: View {
     
     public var body: some View {
         VStack(spacing: 0) {
+            FilterBarView(
+                title: "Notebook",
+                showFilters: false
+            ) {
+                AppButton("New note", icon: "plus", style: .primary) {
+                    createNewNote()
+                }
+            }
+            
             // MARK: - Folder Selector Bar
             folderChipsBar
                 .padding(.vertical, 8)
-                .background(AppColors.cardBackground.opacity(0.5))
+                .background(AppColors.cardBackground)
             
-            // MARK: - Search & Action Bar
-            searchAndActionBar
-                .padding(.horizontal)
-                .padding(.vertical, 8)
+            Divider()
+                .overlay(AppColors.border)
             
             // MARK: - Notes Content List
             if filteredNotes.isEmpty {

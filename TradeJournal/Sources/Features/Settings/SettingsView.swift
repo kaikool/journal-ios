@@ -68,59 +68,64 @@ public struct SettingsView: View {
     public init() {}
     
     public var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                // Section Selector Tabs (Pills)
-                sectionSelectorBar
-                    .padding(.vertical, 8)
-                    .background(AppColors.secondaryBackground)
-                
-                Divider()
-                
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 20) {
-                        // Section Header
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack {
-                                Image(systemName: activeSection.iconName)
-                                    .foregroundColor(AppColors.accent)
-                                Text(activeSection.label)
-                                    .font(AppTypography.title)
-                            }
-                            Text(activeSection.description)
-                                .font(AppTypography.caption)
-                                .foregroundColor(AppColors.secondaryText)
+        VStack(spacing: 0) {
+            FilterBarView(
+                title: "Settings",
+                showFilters: false
+            )
+            
+            // Section Selector Tabs (Pills)
+            sectionSelectorBar
+                .padding(.vertical, 8)
+                .background(AppColors.cardBackground)
+            
+            Divider()
+                .overlay(AppColors.border)
+            
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    // Section Header
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 6) {
+                            Image(systemName: activeSection.iconName)
+                                .foregroundColor(AppColors.brand)
+                                .font(.system(size: 14))
+                            Text(activeSection.label)
+                                .font(AppTypography.pageTitle)
+                                .foregroundColor(AppColors.primaryText)
                         }
-                        .padding(.horizontal)
-                        .padding(.top, 12)
-                        
-                        // Active Section Content (Preserving State)
-                        Group {
-                            switch activeSection {
-                            case .general:
-                                GeneralSettingsView()
-                            case .trading:
-                                TradingSettingsView()
-                            case .currencyConversion:
-                                CurrencyConversionSettingsView()
-                            case .marketData:
-                                MarketDataSettingsView()
-                            case .connections:
-                                ConnectionsSettingsView()
-                            case .aiSettings:
-                                AiSettingsView()
-                            case .yourData:
-                                YourDataSettingsView()
-                            }
-                        }
-                        .padding(.horizontal)
-                        .padding(.bottom, 32)
+                        Text(activeSection.description)
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.secondaryText)
                     }
+                    .padding(.horizontal, 14)
+                    .padding(.top, 10)
+                    
+                    // Active Section Content (Preserving State)
+                    Group {
+                        switch activeSection {
+                        case .general:
+                            GeneralSettingsView()
+                        case .trading:
+                            TradingSettingsView()
+                        case .currencyConversion:
+                            CurrencyConversionSettingsView()
+                        case .marketData:
+                            MarketDataSettingsView()
+                        case .connections:
+                            ConnectionsSettingsView()
+                        case .aiSettings:
+                            AiSettingsView()
+                        case .yourData:
+                            YourDataSettingsView()
+                        }
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 32)
                 }
             }
-            .navigationTitle("Settings")
-            .navigationBarTitleDisplayMode(.inline)
         }
+        .background(AppColors.background)
     }
     
     private var sectionSelectorBar: some View {

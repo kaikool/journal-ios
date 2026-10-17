@@ -1,26 +1,43 @@
 import SwiftUI
 
-public enum TradeStatusFilter: String, CaseIterable, Identifiable {
-    case all = "Tất cả"
-    case win = "Lãi"
-    case loss = "Lỗ"
-    case open = "Đang mở"
-    
-    public var id: String { rawValue }
-}
-
 public struct TradesListView: View {
     @EnvironmentObject private var env: AppEnvironment
     @ObservedObject private var dataStore = TradeDataStore.shared
     
+    @State private var selectedRange: JournalTimeRange = .all
     @State private var showAddTradeSheet: Bool = false
     @State private var searchText: String = ""
     @State private var statusFilter: TradeStatusFilter = .all
     
     public init() {}
     
+    private var scopedTrades: [Trade] {
+        let baseTrades = dataStore.filteredTrades
+        guard selectedRange != .all else { return baseTrades }
+        
+        let now = Date()
+        let calendar = Calendar.current
+        let cutoff: Date
+        
+        switch selectedRange {
+        case .all:
+            return baseTrades
+        case .d7:
+            cutoff = calendar.date(byAdding: .day, value: -7, to: now) ?? now
+        case .d30:
+            cutoff = calendar.date(byAdding: .day, value: -30, to: now) ?? now
+        case .d90:
+            cutoff = calendar.date(byAdding: .day, value: -90, to: now) ?? now
+        case .ytd:
+            let comps = calendar.dateComponents([.year], from: now)
+            cutoff = calendar.date(from: comps) ?? now
+        }
+        
+        return baseTrades.filter { $0.openedAt >= cutoff }
+    }
+    
     private var filteredTrades: [Trade] {
-        var list = dataStore.filteredTrades
+        var list = scopedTrades
         
         switch statusFilter {
         case .all:
@@ -45,259 +62,208 @@ public struct TradesListView: View {
         return list.sorted { $0.openedAt > $1.openedAt }
     }
     
+    private var overviewMetrics: TradeMetrics {
+        FinancialMetricsEngine.computeMetrics(
+            trades: scopedTrades,
+            timeZone: env.currentTimeZone
+        )
+    }
+    
     public var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                filterPicker
-                
-                if let summary = dataStore.lastSyncSummary {
-                    HStack {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(AppColors.profit)
-                        Text(summary)
-                            .font(AppTypography.caption)
-                        Spacer()
-                        Button {
-                            dataStore.lastSyncSummary = nil
-                        } label: {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 10))
-                                .foregroundColor(AppColors.secondaryText)
+                // FilterBar chuẩn web
+                FilterBarView(
+                    title: "Trades",
+                    selectedRange: $selectedRange,
+                    showFilters: true
+                ) {
+                    HStack(spacing: 6) {
+                        AppButton("Add trade", icon: "plus", style: .primary) {
+                            showAddTradeSheet = true
                         }
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(AppColors.profit.opacity(0.12))
-                    .cornerRadius(6)
-                    .padding(.horizontal)
-                    .padding(.bottom, 6)
                 }
                 
-                if let err = dataStore.lastSyncError {
-                    HStack {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundColor(AppColors.loss)
-                        Text(err)
-                            .font(AppTypography.caption)
-                            .lineLimit(2)
-                        Spacer()
-                        Button {
-                            dataStore.lastSyncError = nil
-                        } label: {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 10))
-                                .foregroundColor(AppColors.secondaryText)
-                        }
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(AppColors.loss.opacity(0.12))
-                    .cornerRadius(6)
-                    .padding(.horizontal)
-                    .padding(.bottom, 6)
-                }
-                
-                if filteredTrades.isEmpty {
-                    emptyState
-                } else {
-                    tradesList
-                }
-            }
-            .refreshable {
-                if The5ersService.shared.isConfigured {
-                    _ = try? await dataStore.syncWithThe5ers()
-                } else if SupabaseService.shared.isConfigured {
-                    await dataStore.syncWithSupabase()
-                }
-            }
-            .navigationTitle("Giao Dịch")
-            .searchable(text: $searchText, prompt: "Tìm theo mã (symbol), tag hoặc ghi chú...")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Menu {
-                        Button("Tất cả tài khoản") {
-                            dataStore.selectedAccountId = "all"
-                        }
-                        ForEach(dataStore.accounts) { acc in
-                            Button(acc.name.isEmpty ? acc.id : acc.name) {
-                                dataStore.selectedAccountId = acc.id
-                            }
-                        }
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "person.crop.circle")
-                            Text(dataStore.selectedAccountId == "all" ? "Tất cả" : (dataStore.selectedAccount?.name ?? "Tài khoản"))
-                                .font(AppTypography.caption)
-                            Image(systemName: "chevron.down")
-                                .font(.system(size: 10))
-                        }
-                        .foregroundColor(AppColors.primaryText)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(AppColors.secondaryBackground)
-                        .cornerRadius(6)
-                    }
-                }
-                
-                ToolbarItem(placement: .primaryAction) {
-                    HStack(spacing: 12) {
-                        Button {
-                            Task {
-                                if The5ersService.shared.isConfigured {
-                                    _ = try? await dataStore.syncWithThe5ers()
-                                } else if SupabaseService.shared.isConfigured {
-                                    await dataStore.syncWithSupabase()
+                ScrollView {
+                    VStack(spacing: 12) {
+                        // 4 KPI Summary Cards matching trades/page.tsx lines 330-372
+                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                            AppCard {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    AppCardHeader("Net cumulative P&L")
+                                    AppMonetaryText(
+                                        Formatters.formatPnL(overviewMetrics.netPnl, currency: env.currentCurrency),
+                                        isPrivate: env.isPrivacyModeEnabled,
+                                        font: AppTypography.financialNumber(size: 20, weight: .semibold),
+                                        color: overviewMetrics.netPnl >= 0 ? AppColors.profit : AppColors.loss
+                                    )
+                                    Text("\(overviewMetrics.closedTrades) trades")
+                                        .font(AppTypography.caption)
+                                        .foregroundColor(AppColors.secondaryText)
                                 }
                             }
-                        } label: {
-                            Image(systemName: dataStore.isSyncing ? "arrow.triangle.2.circlepath.circle.fill" : "arrow.triangle.2.circlepath")
+                            
+                            AppCard {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    AppCardHeader("Profit factor")
+                                    Text(overviewMetrics.profitFactorIsInfinite ? "∞" : (overviewMetrics.profitFactor != nil ? String(format: "%.2f", overviewMetrics.profitFactor!) : "–"))
+                                        .font(AppTypography.financialNumber(size: 20, weight: .semibold))
+                                        .foregroundColor(AppColors.primaryText)
+                                    Text("gross profit ÷ gross loss")
+                                        .font(AppTypography.caption)
+                                        .foregroundColor(AppColors.secondaryText)
+                                }
+                            }
+                            
+                            AppCard {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    AppCardHeader("Trade win %")
+                                    Text(overviewMetrics.winRate != nil ? String(format: "%.1f%%", overviewMetrics.winRate! * 100) : "–")
+                                        .font(AppTypography.financialNumber(size: 20, weight: .semibold))
+                                        .foregroundColor(AppColors.primaryText)
+                                    Text("\(overviewMetrics.wins)W · \(overviewMetrics.losses)L")
+                                        .font(AppTypography.caption)
+                                        .foregroundColor(AppColors.secondaryText)
+                                }
+                            }
+                            
+                            AppCard {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    AppCardHeader("Avg win / loss")
+                                    Text(overviewMetrics.avgWinLossRatio != nil ? String(format: "%.2f", overviewMetrics.avgWinLossRatio!) : "–")
+                                        .font(AppTypography.financialNumber(size: 20, weight: .semibold))
+                                        .foregroundColor(AppColors.primaryText)
+                                    Text("tỉ lệ trung bình")
+                                        .font(AppTypography.caption)
+                                        .foregroundColor(AppColors.secondaryText)
+                                }
+                            }
                         }
                         
-                        Button(action: { showAddTradeSheet = true }) {
-                            Image(systemName: "plus.circle.fill")
-                                .font(.system(size: 20))
-                                .foregroundColor(AppColors.accent)
+                        // Search & Status filters
+                        HStack(spacing: 8) {
+                            HStack {
+                                Image(systemName: "magnifyingglass")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(AppColors.secondaryText)
+                                TextField("Search symbol, tag...", text: $searchText)
+                                    .font(AppTypography.caption)
+                                    .foregroundColor(AppColors.primaryText)
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 7)
+                            .background(AppColors.cardBackground)
+                            .cornerRadius(6)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .stroke(AppColors.border, lineWidth: 1)
+                            )
+                            
+                            Picker("Status", selection: $statusFilter) {
+                                ForEach(TradeStatusFilter.allCases) { f in
+                                    Text(f.rawValue).tag(f)
+                                }
+                            }
+                            .pickerStyle(.menu)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 5)
+                            .background(AppColors.cardBackground)
+                            .cornerRadius(6)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .stroke(AppColors.border, lineWidth: 1)
+                            )
+                        }
+                        
+                        // Trades List Rows
+                        if filteredTrades.isEmpty {
+                            AppCard {
+                                VStack(spacing: 12) {
+                                    Text("No trades match these filters.")
+                                        .font(AppTypography.body)
+                                        .foregroundColor(AppColors.secondaryText)
+                                        .frame(maxWidth: .infinity, alignment: .center)
+                                        .padding(.vertical, 24)
+                                }
+                            }
+                        } else {
+                            VStack(spacing: 8) {
+                                ForEach(filteredTrades) { trade in
+                                    NavigationLink(destination: TradeDetailView(trade: trade)) {
+                                        TradeTerminalRow(trade: trade)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
                         }
                     }
+                    .padding(14)
                 }
+                .refreshable {
+                    if The5ersService.shared.isConfigured {
+                        _ = try? await dataStore.syncWithThe5ers()
+                    } else if SupabaseService.shared.isConfigured {
+                        await dataStore.syncWithSupabase()
+                    }
+                }
+                .background(AppColors.background)
             }
             .sheet(isPresented: $showAddTradeSheet) {
                 AddTradeSheet()
             }
         }
     }
-    
-    private var filterPicker: some View {
-        Picker("Lọc trạng thái", selection: $statusFilter) {
-            ForEach(TradeStatusFilter.allCases) { f in
-                Text(f.rawValue).tag(f)
-            }
-        }
-        .pickerStyle(.segmented)
-        .padding(.horizontal)
-        .padding(.vertical, 8)
-    }
-    
-    private var tradesList: some View {
-        List {
-            ForEach(filteredTrades) { trade in
-                NavigationLink(destination: TradeDetailView(trade: trade)) {
-                    TradeRowCard(trade: trade)
-                }
-                .buttonStyle(.plain)
-                .listRowSeparator(.hidden)
-                .listRowBackground(Color.clear)
-                .swipeActions(edge: .trailing) {
-                    Button(role: .destructive) {
-                        dataStore.deleteTrade(key: trade.key)
-                    } label: {
-                        Label("Xóa", systemImage: "trash")
-                    }
-                }
-            }
-        }
-        .listStyle(.plain)
-    }
-    
-    private var emptyState: some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                Spacer().frame(height: 30)
-                
-                Image(systemName: "chart.line.uptrend.xyaxis.circle")
-                    .font(.system(size: 56))
-                    .foregroundColor(AppColors.accent)
-                
-                VStack(spacing: 8) {
-                    Text("Chưa Có Giao Dịch Nào")
-                        .font(AppTypography.title)
-                    Text("Dữ liệu tự động đồng bộ từ The5ers Hub lên Supabase, hoặc nhập từ file sao kê CSV.")
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.secondaryText)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 32)
-                }
-                
-                VStack(spacing: 12) {
-                    AppButton("Ghi Nhận Giao Dịch Mới", icon: "plus.circle", style: .primary) {
-                        showAddTradeSheet = true
-                    }
-                    
-                    AppButton("Nhập File CSV Sao Kê", icon: "doc.text", style: .secondary) {
-                        env.selectedTab = .settings
-                    }
-                }
-                .padding(.horizontal, 40)
-                
-                Spacer()
-            }
-            .frame(maxWidth: .infinity)
-        }
-    }
 }
 
-private struct TradeRowCard: View {
+private struct TradeTerminalRow: View {
     @EnvironmentObject private var env: AppEnvironment
     let trade: Trade
     
     var body: some View {
         AppCard {
-            HStack(alignment: .center) {
-                tradeInfoColumn
-                Spacer()
-                tradeFinancialColumn
-            }
-        }
-    }
-    
-    private var tradeInfoColumn: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 8) {
-                Text(trade.symbol)
-                    .font(AppTypography.headline)
-                AppBadge(
-                    trade.direction == .long ? "LONG" : "SHORT",
-                    color: trade.direction == .long ? AppColors.accent : AppColors.warning
-                )
+            HStack(alignment: .center, spacing: 10) {
+                // Status badge
                 AppBadge(
                     trade.status.rawValue.uppercased(),
-                    color: trade.status == .win ? AppColors.profit : (trade.status == .loss ? AppColors.loss : AppColors.breakeven)
+                    color: Formatters.statusColor(trade.status)
                 )
-            }
-            
-            Text("Vào: \(Formatters.price(trade.avgEntry)) • KL: \(trade.quantity)")
-                .font(AppTypography.caption)
-                .foregroundColor(.secondary)
-            
-            if !trade.tags.isEmpty {
-                HStack(spacing: 4) {
-                    ForEach(trade.tags.prefix(3), id: \.self) { tag in
-                        Text("#\(tag)")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundColor(AppColors.accent)
+                
+                // Position badge
+                AppBadge(
+                    trade.direction == .long ? "Long" : "Short",
+                    variant: .secondary
+                )
+                
+                // Symbol & Entry Info
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(trade.symbol)
+                        .font(AppTypography.bodyBold)
+                        .foregroundColor(AppColors.primaryText)
+                    
+                    HStack(spacing: 4) {
+                        Text(trade.closedAt != nil ? Formatters.dateOnly(trade.closedAt!, timeZone: env.currentTimeZone) : "open")
+                        Text("·")
+                        Text("Vol: \(Formatters.formatNumber(trade.quantity))")
                     }
+                    .font(AppTypography.caption)
+                    .foregroundColor(AppColors.secondaryText)
                 }
-            }
-        }
-    }
-    
-    private var tradeFinancialColumn: some View {
-        VStack(alignment: .trailing, spacing: 4) {
-            Text(Formatters.pnl(trade.netPnl, currencyCode: env.currentCurrency, isPrivate: env.isPrivacyModeEnabled))
-                .font(AppTypography.financialNumber(size: 16, weight: .bold))
-                .foregroundColor(trade.netPnl >= 0 ? AppColors.profit : AppColors.loss)
-            
-            Text(Formatters.dateOnly(trade.openedAt, timeZone: env.currentTimeZone))
-                .font(AppTypography.caption)
-                .foregroundColor(.secondary)
-            
-            if let r = trade.rating, r > 0 {
-                HStack(spacing: 2) {
-                    ForEach(1...r, id: \.self) { _ in
-                        Image(systemName: "star.fill")
-                            .font(.system(size: 8))
-                            .foregroundColor(.yellow)
-                    }
+                
+                Spacer()
+                
+                // Financials P&L and prices
+                VStack(alignment: .trailing, spacing: 2) {
+                    AppMonetaryText(
+                        Formatters.formatPnL(trade.netPnl, currency: trade.currency),
+                        isPrivate: env.isPrivacyModeEnabled,
+                        font: AppTypography.financialNumber(size: 14, weight: .semibold),
+                        color: trade.netPnl >= 0 ? AppColors.profit : AppColors.loss
+                    )
+                    
+                    Text("Entry \(Formatters.price(trade.avgEntry))")
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.secondaryText)
                 }
             }
         }

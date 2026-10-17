@@ -20,9 +20,14 @@ public struct AIReflectionView: View {
     }
     
     public var body: some View {
-        NavigationStack {
+        VStack(spacing: 0) {
+            FilterBarView(
+                title: "AI Trader Reflection",
+                showFilters: false
+            )
+            
             ScrollView {
-                VStack(spacing: 16) {
+                VStack(spacing: 12) {
                     // Header Card
                     AppCard {
                         VStack(alignment: .leading, spacing: 8) {
@@ -97,14 +102,14 @@ public struct AIReflectionView: View {
                         }
                     }
                 }
-                .padding()
+                .padding(14)
             }
-            .navigationTitle("AI Reflection")
             .background(AppColors.background)
-            .onAppear {
-                if reflectionResult.isEmpty {
-                    executeReflection()
-                }
+        }
+        .background(AppColors.background)
+        .onAppear {
+            if reflectionResult.isEmpty {
+                executeReflection()
             }
         }
     }

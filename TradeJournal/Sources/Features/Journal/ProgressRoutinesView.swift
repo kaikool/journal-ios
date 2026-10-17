@@ -48,39 +48,24 @@ public struct ProgressRoutinesView: View {
     }
     
     public var body: some View {
-        NavigationStack {
+        VStack(spacing: 0) {
+            FilterBarView(
+                title: "Progress",
+                showFilters: false
+            ) {
+                AppButton("Add routine", icon: "plus", style: .primary) {
+                    showAddRoutineSheet = true
+                }
+            }
+            
             ScrollView {
-                VStack(spacing: 16) {
-                    // Header Bar
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Thói Quen Kỷ Luật")
-                                .font(AppTypography.title2)
-                                .foregroundColor(AppColors.primaryText)
-                            Text("Xây dựng quy trình giao dịch có tính lặp lại và đo lường kỷ luật")
-                                .font(AppTypography.caption)
-                                .foregroundColor(AppColors.secondaryText)
-                        }
-                        
-                        Spacer()
-                        
-                        Button {
-                            showAddRoutineSheet = true
-                        } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: "plus")
-                                Text("Thêm thói quen")
-                            }
-                            .font(AppTypography.captionBold)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(AppColors.accent)
-                            .foregroundColor(.white)
-                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                        }
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 8)
+                VStack(spacing: 12) {
+                    Text("Build a repeatable trading day. Routines are tracked independently of trade filters and profit.")
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.secondaryText)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 14)
+                        .padding(.top, 10)
                     
                     // Card 1: Tổng kết hoàn thành ngày (Daily completion & Date selector)
                     completionScoreCard
@@ -93,9 +78,9 @@ public struct ProgressRoutinesView: View {
                 }
                 .padding(.bottom, 32)
             }
-            .background(AppColors.background.ignoresSafeArea())
-            .navigationBarTitleDisplayMode(.inline)
-            .sheet(isPresented: $showAddRoutineSheet) {
+            .background(AppColors.background)
+        }
+        .sheet(isPresented: $showAddRoutineSheet) {
                 AddProgressRoutineSheet()
             }
             .alert("Lưu trữ thói quen", isPresented: $showArchiveAlert, presenting: ruleToArchive) { rule in
@@ -106,7 +91,6 @@ public struct ProgressRoutinesView: View {
             } message: { rule in
                 Text("Bạn có chắc chắn muốn ngừng theo dõi thói quen “\(rule.title)”? Dữ liệu ngày trước vẫn được lưu giữ.")
             }
-        }
     }
     
     // MARK: - Subviews

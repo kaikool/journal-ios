@@ -2,12 +2,12 @@ import SwiftUI
 import Charts
 
 public enum ReportMode: String, CaseIterable, Identifiable {
-    case overview = "Tổng quan"
-    case trends = "Xu hướng"
-    case explorer = "Khám phá"
-    case breakdown = "Phân rã"
-    case cross = "Phân tích chéo"
-    case compare = "So sánh"
+    case overview = "Overview"
+    case trends = "Performance trends"
+    case explorer = "Trade explorer"
+    case breakdown = "Breakdowns"
+    case cross = "Cross-analysis"
+    case compare = "Compare groups"
     
     public var id: String { rawValue }
 }
@@ -18,6 +18,7 @@ public struct ReportsView: View {
     @ObservedObject private var dataStore = TradeDataStore.shared
     @EnvironmentObject private var env: AppEnvironment
     
+    @State private var selectedRange: JournalTimeRange = .all
     @State private var selectedMode: ReportMode = .overview
     @State private var primaryDimension: Dimension = .symbol
     @State private var secondaryDimension: Dimension = .weekday
@@ -28,7 +29,28 @@ public struct ReportsView: View {
     public init() {}
     
     private var trades: [Trade] {
-        dataStore.filteredTrades
+        let baseTrades = dataStore.filteredTrades
+        guard selectedRange != .all else { return baseTrades }
+        
+        let now = Date()
+        let calendar = Calendar.current
+        let cutoff: Date
+        
+        switch selectedRange {
+        case .all:
+            return baseTrades
+        case .d7:
+            cutoff = calendar.date(byAdding: .day, value: -7, to: now) ?? now
+        case .d30:
+            cutoff = calendar.date(byAdding: .day, value: -30, to: now) ?? now
+        case .d90:
+            cutoff = calendar.date(byAdding: .day, value: -90, to: now) ?? now
+        case .ytd:
+            let comps = calendar.dateComponents([.year], from: now)
+            cutoff = calendar.date(from: comps) ?? now
+        }
+        
+        return baseTrades.filter { $0.openedAt >= cutoff }
     }
     
     private var metrics: TradeMetrics {
@@ -58,75 +80,67 @@ public struct ReportsView: View {
         let avgPlanRStr = avgPlannedR != nil ? String(format: "%.2f R", avgPlannedR!) : "–"
         
         return [
-            ("Lệnh đã đóng", "\(s.closedTrades)", false),
-            ("Lợi nhuận ròng (Net P&L)", netStr, true),
-            ("Tỷ lệ thắng (Win rate)", wrStr, false),
-            ("Hệ số lợi nhuận (PF)", pfStr, false),
-            ("Khối lượng vào lệnh", volStr, false),
-            ("Kỳ vọng mỗi lệnh (Exp)", s.expectancy != nil ? Formatters.currency(s.expectancy!) : "–", false),
-            ("Tỷ lệ R dự kiến (Plan R)", avgPlanRStr, false),
-            ("Tỷ lệ R thực hiện (Real R)", avgRStr, false)
+            ("Closed trades", "\(s.closedTrades)", false),
+            ("Net P&L", netStr, true),
+            ("Win rate", wrStr, false),
+            ("Profit factor", pfStr, false),
+            ("Entry volume", volStr, false),
+            ("Avg duration", s.avgDurationMs != nil ? Formatters.formatDuration(ms: s.avgDurationMs) : "–", false),
+            ("Avg planned R", avgPlanRStr, false),
+            ("Avg realized R", avgRStr, false)
         ]
     }
     
     public var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 16) {
-                    // Header & Ask AI Action Bar
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Báo Cáo & Phân Tích")
-                                .font(AppTypography.title2)
-                                .foregroundColor(AppColors.primaryText)
-                            Text("Phân rã đa chiều và trích xuất lợi thế giao dịch (Edge)")
-                                .font(AppTypography.caption)
-                                .foregroundColor(AppColors.secondaryText)
-                        }
-                        
-                        Spacer()
-                        
-                        Button {
-                            showAiReflectionSheet = true
-                        } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: "sparkles")
-                                Text("Hỏi AI")
-                            }
-                            .font(AppTypography.captionBold)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(AppColors.accent)
-                            .foregroundColor(.white)
-                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                        }
+        VStack(spacing: 0) {
+            // FilterBar chuẩn xác từ web
+            FilterBarView(
+                title: "Reports",
+                selectedRange: $selectedRange,
+                showFilters: true
+            ) {
+                Button {
+                    showAiReflectionSheet = true
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "sparkles")
+                        Text("Ask AI")
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 8)
-                    
-                    // Mode Selector (Port 1:1 từ thanh nút chọn mode của Reports)
+                    .font(AppTypography.captionBold)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(AppColors.brand)
+                    .foregroundColor(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                }
+            }
+            
+            ScrollView {
+                VStack(spacing: 12) {
+                    // Mode Selector (6 chế độ chuẩn web)
                     ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
+                        HStack(spacing: 6) {
                             ForEach(ReportMode.allCases) { mode in
                                 Button {
                                     selectedMode = mode
                                 } label: {
                                     Text(mode.rawValue)
-                                        .font(AppTypography.captionBold)
-                                        .padding(.horizontal, 14)
-                                        .padding(.vertical, 8)
-                                        .background(selectedMode == mode ? AppColors.accent : AppColors.cardBackground)
+                                        .font(AppTypography.captionMedium)
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 6)
+                                        .background(selectedMode == mode ? AppColors.brand : AppColors.cardBackground)
                                         .foregroundColor(selectedMode == mode ? .white : AppColors.primaryText)
-                                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                                         .overlay(
-                                            RoundedRectangle(cornerRadius: 8)
+                                            RoundedRectangle(cornerRadius: 6)
                                                 .stroke(selectedMode == mode ? Color.clear : AppColors.border, lineWidth: 1)
                                         )
                                 }
                                 .buttonStyle(.plain)
                             }
                         }
-                        .padding(.horizontal, 16)
+                        .padding(.horizontal, 14)
+                        .padding(.top, 10)
                     }
                     
                     // Nội dung theo từng chế độ
@@ -145,14 +159,13 @@ public struct ReportsView: View {
                 }
                 .padding(.bottom, 32)
             }
-            .background(AppColors.background.ignoresSafeArea())
-            .navigationBarTitleDisplayMode(.inline)
-            .sheet(isPresented: $showAiReflectionSheet) {
-                AIReflectionView()
-            }
-            .sheet(isPresented: $showExportSheet) {
-                ReviewExportModal(title: "Báo cáo giao dịch", exportText: exportText)
-            }
+            .background(AppColors.background)
+        }
+        .sheet(isPresented: $showAiReflectionSheet) {
+            AIReflectionView()
+        }
+        .sheet(isPresented: $showExportSheet) {
+            ReviewExportModal(title: "Báo cáo giao dịch", exportText: exportText)
         }
     }
     

@@ -1,37 +1,58 @@
 import SwiftUI
 
-#if canImport(UIKit)
-import UIKit
-#elseif canImport(AppKit)
-import AppKit
-#endif
+extension Color {
+    public init(hex: String) {
+        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var int: UInt64 = 0
+        Scanner(string: hex).scanHexInt64(&int)
+        let a, r, g, b: UInt64
+        switch hex.count {
+        case 3: // RGB (12-bit)
+            (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
+        case 6: // RGB (24-bit)
+            (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
+        case 8: // ARGB (32-bit)
+            (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
+        default:
+            (a, r, g, b) = (255, 0, 0, 0)
+        }
+        self.init(
+            .sRGB,
+            red: Double(r) / 255,
+            green: Double(g) / 255,
+            blue: Double(b) / 255,
+            opacity: Double(a) / 255
+        )
+    }
+}
 
+/// Hệ màu Trading Terminal dark-first chuẩn xác 100% từ `source-repo/apps/web/src/app/globals.css`
 public enum AppColors {
-    // Semantic Financial Colors
-    public static let profit = Color(red: 34/255, green: 197/255, blue: 94/255)   // Emerald green (#22c55e)
-    public static let loss = Color(red: 239/255, green: 68/255, blue: 68/255)     // Crimson red (#ef4444)
-    public static let breakeven = Color(red: 148/255, green: 163/255, blue: 184/255) // Slate gray (#94a3b8)
+    // Canvas & Surfaces
+    public static let background = Color(hex: "#08080a")
+    public static let cardBackground = Color(hex: "#101013")
+    public static let popoverBackground = Color(hex: "#131317")
+    public static let secondaryBackground = Color(hex: "#17171b")
+    public static let surface = Color(hex: "#101013")
+    public static let input = Color(hex: "#26262c")
+    public static let border = Color(hex: "#222228")
     
-    // Brand & Accents
-    public static let accent = Color(red: 59/255, green: 130/255, blue: 246/255)   // Blue (#3b82f6)
-    public static let warning = Color(red: 245/255, green: 158/255, blue: 11/255)  // Amber (#f59e0b)
+    // Brand & Interactive Accents (LuxAlgo cyan blue)
+    public static let brand = Color(hex: "#1197e2")
+    public static let accent = Color(hex: "#1197e2")
+    public static let ring = Color(hex: "#1197e2")
     
-    // Text
-    public static let primaryText = Color.primary
-    public static let secondaryText = Color.secondary
+    // Financial P&L convention (Traders Emerald / Crimson)
+    public static let profit = Color(hex: "#0ca30c")
+    public static let profitFill = Color(hex: "#0ca30c").opacity(0.15)
+    public static let loss = Color(hex: "#d03b3b")
+    public static let lossFill = Color(hex: "#d03b3b").opacity(0.15)
+    public static let breakeven = Color(hex: "#8b8b95")
+    public static let warning = Color(hex: "#eda100")
     
-    // Backgrounds & Surfaces
-    #if canImport(UIKit)
-    public static let background = Color(UIColor.systemBackground)
-    public static let secondaryBackground = Color(UIColor.secondarySystemBackground)
-    public static let surface = Color(UIColor.secondarySystemBackground)
-    public static let cardBackground = Color(UIColor.tertiarySystemBackground)
-    public static let border = Color(UIColor.separator)
-    #else
-    public static let background = Color(NSColor.windowBackgroundColor)
-    public static let secondaryBackground = Color(NSColor.underPageBackgroundColor)
-    public static let surface = Color(NSColor.underPageBackgroundColor)
-    public static let cardBackground = Color(NSColor.controlBackgroundColor)
-    public static let border = Color(NSColor.separatorColor)
-    #endif
+    // Typography
+    public static let primaryText = Color(hex: "#f4f4f4")
+    public static let secondaryText = Color(hex: "#9c9ca6")
+    public static let muted = Color(hex: "#17171b")
+    public static let mutedForeground = Color(hex: "#9c9ca6")
 }
