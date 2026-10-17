@@ -50,9 +50,11 @@ public enum AppColors {
     public static let breakeven = Color(hex: "#8b8b95")
     public static let warning = Color(hex: "#eda100")
     
-    // Typography
+    // Typography & Accents
     public static let primaryText = Color(hex: "#f4f4f4")
     public static let secondaryText = Color(hex: "#9c9ca6")
     public static let muted = Color(hex: "#17171b")
     public static let mutedForeground = Color(hex: "#9c9ca6")
+    public static let mutedText = Color(hex: "#9c9ca6")
+    public static let brandTextOnDark = Color(hex: "#ffffff")
 }
