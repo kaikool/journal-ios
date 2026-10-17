@@ -40,7 +40,7 @@ public struct RootTabView: View {
                     case .accounts:
                         AccountsManagerView()
                     case .settings:
-                        SettingsHubView()
+                        SettingsView()
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -54,6 +54,25 @@ public struct RootTabView: View {
             NavigationDrawerView()
         }
         .preferredColorScheme(env.colorScheme)
+        .gesture(
+            DragGesture(minimumDistance: 15, coordinateSpace: .global)
+                .onEnded { value in
+                    let h = value.translation.width
+                    let v = value.translation.height
+                    // Ensure primarily horizontal swipe gesture
+                    if abs(h) > abs(v) * 1.3 {
+                        if !env.isDrawerOpen && value.startLocation.x <= 45 && h > 40 {
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                                env.isDrawerOpen = true
+                            }
+                        } else if env.isDrawerOpen && h < -40 {
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                                env.isDrawerOpen = false
+                            }
+                        }
+                    }
+                }
+        )
     }
     
     private var bottomNavigationBar: some View {

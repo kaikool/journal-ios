@@ -29,15 +29,20 @@ public struct ShellHeaderView: View {
             }
             .accessibilityLabel("Toggle navigation drawer")
             
-            // Brand Logo & Title
-            HStack(spacing: 8) {
-                TradeJournalMarkView(size: 18, color: AppColors.brand)
-                
-                Text("Trade Journal")
-                    .font(AppTypography.pageTitle)
-                    .tracking(-0.3)
-                    .foregroundColor(AppColors.primaryText)
+            // Brand Logo & Title (matching web Link href="/")
+            Button {
+                env.selectedTab = .dashboard
+            } label: {
+                HStack(spacing: 8) {
+                    TradeJournalMarkView(size: 20, color: AppColors.brand)
+                    
+                    Text("Trade Journal")
+                        .font(AppTypography.pageTitle)
+                        .tracking(-0.3)
+                        .foregroundColor(AppColors.primaryText)
+                }
             }
+            .buttonStyle(.plain)
             
             Spacer()
             

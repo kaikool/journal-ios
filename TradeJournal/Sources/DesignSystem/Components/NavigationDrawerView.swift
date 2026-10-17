@@ -172,6 +172,16 @@ public struct NavigationDrawerView: View {
                         .foregroundColor(AppColors.border),
                     alignment: .trailing
                 )
+                .gesture(
+                    DragGesture(minimumDistance: 15)
+                        .onEnded { value in
+                            if value.translation.width < -30 {
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                                    env.isDrawerOpen = false
+                                }
+                            }
+                        }
+                )
                 .transition(.move(edge: .leading))
             }
         }

@@ -109,77 +109,91 @@ public struct DailyJournalListView: View {
     }
     
     public var body: some View {
-        VStack(spacing: 0) {
-            FilterBarView(
-                title: "Daily journal",
-                showFilters: false
-            ) {
-                NavigationLink(destination: DailyJournalDetailView(date: todayKey)) {
-                    AppButton("View my day", icon: "sun.max", style: .primary) {}
-                }
-            }
-            
-            ScrollView {
-                VStack(spacing: 10) {
-                    // Search bar
-                    HStack {
-                        Image(systemName: "magnifyingglass")
-                            .foregroundColor(AppColors.secondaryText)
-                            .font(.system(size: 13))
-                        TextField("Search date (YYYY-MM-DD), note...", text: $searchText)
-                            .font(AppTypography.body)
-                        if !searchText.isEmpty {
-                            Button {
-                                searchText = ""
-                            } label: {
-                                Image(systemName: "xmark.circle.fill")
-                                    .foregroundColor(AppColors.secondaryText)
-                            }
+        NavigationStack {
+            VStack(spacing: 0) {
+                FilterBarView(
+                    title: "Daily journal",
+                    showFilters: false
+                ) {
+                    NavigationLink(destination: DailyJournalDetailView(date: todayKey)) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "sun.max")
+                                .font(.system(size: 13, weight: .semibold))
+                            Text("View my day")
+                                .font(AppTypography.captionBold)
                         }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(AppColors.brand)
+                        .foregroundColor(.white)
+                        .cornerRadius(6)
                     }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 7)
-                    .background(AppColors.cardBackground)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .stroke(AppColors.border, lineWidth: 1)
-                    )
-                    .cornerRadius(6)
-                    .padding(.horizontal, 14)
-                    .padding(.top, 10)
-                    
-                    // Day cards list
-                    if daysList.isEmpty {
-                        VStack(spacing: 12) {
-                            Image(systemName: "calendar.badge.exclamationmark")
-                                .font(.system(size: 36))
-                                .foregroundColor(AppColors.secondaryText.opacity(0.6))
-                            Text("No trading days yet")
-                                .font(AppTypography.cardTitle)
-                                .foregroundColor(AppColors.primaryText)
-                            Text("No trading days yet — import trades or write your first day note.")
-                                .font(AppTypography.caption)
+                }
+                
+                ScrollView {
+                    VStack(spacing: 10) {
+                        // Search bar
+                        HStack {
+                            Image(systemName: "magnifyingglass")
                                 .foregroundColor(AppColors.secondaryText)
-                                .multilineTextAlignment(.center)
-                                .padding(.horizontal, 32)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 60)
-                    } else {
-                        LazyVStack(spacing: 8) {
-                            ForEach(daysList) { day in
-                                NavigationLink(destination: DailyJournalDetailView(date: day.date)) {
-                                    dayRowCard(day)
+                                .font(.system(size: 13))
+                            TextField("Search date (YYYY-MM-DD), note...", text: $searchText)
+                                .font(AppTypography.body)
+                            if !searchText.isEmpty {
+                                Button {
+                                    searchText = ""
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .foregroundColor(AppColors.secondaryText)
                                 }
-                                .buttonStyle(.plain)
                             }
                         }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 7)
+                        .background(AppColors.cardBackground)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                .stroke(AppColors.border, lineWidth: 1)
+                        )
+                        .cornerRadius(6)
                         .padding(.horizontal, 14)
+                        .padding(.top, 10)
+                        
+                        // Day cards list
+                        if daysList.isEmpty {
+                            VStack(spacing: 12) {
+                                Image(systemName: "calendar.badge.exclamationmark")
+                                    .font(.system(size: 36))
+                                    .foregroundColor(AppColors.secondaryText.opacity(0.6))
+                                Text("No trading days yet")
+                                    .font(AppTypography.cardTitle)
+                                    .foregroundColor(AppColors.primaryText)
+                                Text("No trading days yet — import trades or write your first day note.")
+                                    .font(AppTypography.caption)
+                                    .foregroundColor(AppColors.secondaryText)
+                                    .multilineTextAlignment(.center)
+                                    .padding(.horizontal, 32)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 60)
+                        } else {
+                            LazyVStack(spacing: 8) {
+                                ForEach(daysList) { day in
+                                    NavigationLink(destination: DailyJournalDetailView(date: day.date)) {
+                                        dayRowCard(day)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                            .padding(.horizontal, 14)
+                        }
                     }
+                    .padding(.bottom, 32)
                 }
-                .padding(.bottom, 32)
+                .background(AppColors.background)
             }
-            .background(AppColors.background)
+            .navigationTitle("Daily journal")
+            .navigationBarHidden(true)
         }
     }
     
