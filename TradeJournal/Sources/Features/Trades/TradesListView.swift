@@ -1,5 +1,14 @@
 import SwiftUI
 
+public enum TradeStatusFilter: String, CaseIterable, Identifiable {
+    case all = "All Status"
+    case win = "Win"
+    case loss = "Loss"
+    case open = "Open"
+    
+    public var id: String { rawValue }
+}
+
 public struct TradesListView: View {
     @EnvironmentObject private var env: AppEnvironment
     @ObservedObject private var dataStore = TradeDataStore.shared
@@ -87,116 +96,9 @@ public struct TradesListView: View {
                 
                 ScrollView {
                     VStack(spacing: 12) {
-                        // 4 KPI Summary Cards matching trades/page.tsx lines 330-372
-                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                            AppCard {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    AppCardHeader("Net cumulative P&L")
-                                    AppMonetaryText(
-                                        Formatters.formatPnL(overviewMetrics.netPnl, currency: env.currentCurrency),
-                                        isPrivate: env.isPrivacyModeEnabled,
-                                        font: AppTypography.financialNumber(size: 20, weight: .semibold),
-                                        color: overviewMetrics.netPnl >= 0 ? AppColors.profit : AppColors.loss
-                                    )
-                                    Text("\(overviewMetrics.closedTrades) trades")
-                                        .font(AppTypography.caption)
-                                        .foregroundColor(AppColors.secondaryText)
-                                }
-                            }
-                            
-                            AppCard {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    AppCardHeader("Profit factor")
-                                    Text(overviewMetrics.profitFactorIsInfinite ? "∞" : (overviewMetrics.profitFactor != nil ? String(format: "%.2f", overviewMetrics.profitFactor!) : "–"))
-                                        .font(AppTypography.financialNumber(size: 20, weight: .semibold))
-                                        .foregroundColor(AppColors.primaryText)
-                                    Text("gross profit ÷ gross loss")
-                                        .font(AppTypography.caption)
-                                        .foregroundColor(AppColors.secondaryText)
-                                }
-                            }
-                            
-                            AppCard {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    AppCardHeader("Trade win %")
-                                    Text(overviewMetrics.winRate != nil ? String(format: "%.1f%%", overviewMetrics.winRate! * 100) : "–")
-                                        .font(AppTypography.financialNumber(size: 20, weight: .semibold))
-                                        .foregroundColor(AppColors.primaryText)
-                                    Text("\(overviewMetrics.wins)W · \(overviewMetrics.losses)L")
-                                        .font(AppTypography.caption)
-                                        .foregroundColor(AppColors.secondaryText)
-                                }
-                            }
-                            
-                            AppCard {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    AppCardHeader("Avg win / loss")
-                                    Text(overviewMetrics.avgWinLossRatio != nil ? String(format: "%.2f", overviewMetrics.avgWinLossRatio!) : "–")
-                                        .font(AppTypography.financialNumber(size: 20, weight: .semibold))
-                                        .foregroundColor(AppColors.primaryText)
-                                    Text("tỉ lệ trung bình")
-                                        .font(AppTypography.caption)
-                                        .foregroundColor(AppColors.secondaryText)
-                                }
-                            }
-                        }
-                        
-                        // Search & Status filters
-                        HStack(spacing: 8) {
-                            HStack {
-                                Image(systemName: "magnifyingglass")
-                                    .font(.system(size: 12))
-                                    .foregroundColor(AppColors.secondaryText)
-                                TextField("Search symbol, tag...", text: $searchText)
-                                    .font(AppTypography.caption)
-                                    .foregroundColor(AppColors.primaryText)
-                            }
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 7)
-                            .background(AppColors.cardBackground)
-                            .cornerRadius(6)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .stroke(AppColors.border, lineWidth: 1)
-                            )
-                            
-                            Picker("Status", selection: $statusFilter) {
-                                ForEach(TradeStatusFilter.allCases) { f in
-                                    Text(f.rawValue).tag(f)
-                                }
-                            }
-                            .pickerStyle(.menu)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 5)
-                            .background(AppColors.cardBackground)
-                            .cornerRadius(6)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .stroke(AppColors.border, lineWidth: 1)
-                            )
-                        }
-                        
-                        // Trades List Rows
-                        if filteredTrades.isEmpty {
-                            AppCard {
-                                VStack(spacing: 12) {
-                                    Text("No trades match these filters.")
-                                        .font(AppTypography.body)
-                                        .foregroundColor(AppColors.secondaryText)
-                                        .frame(maxWidth: .infinity, alignment: .center)
-                                        .padding(.vertical, 24)
-                                }
-                            }
-                        } else {
-                            VStack(spacing: 8) {
-                                ForEach(filteredTrades) { trade in
-                                    NavigationLink(destination: TradeDetailView(trade: trade)) {
-                                        TradeTerminalRow(trade: trade)
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                            }
-                        }
+                        summaryCardsGrid
+                        searchAndStatusFilter
+                        tradesListContent
                     }
                     .padding(14)
                 }
@@ -211,6 +113,129 @@ public struct TradesListView: View {
             }
             .sheet(isPresented: $showAddTradeSheet) {
                 AddTradeSheet()
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var summaryCardsGrid: some View {
+        let isProfit = overviewMetrics.netPnl >= 0
+        let pnlColor = isProfit ? AppColors.profit : AppColors.loss
+        let pfStr = overviewMetrics.profitFactorIsInfinite ? "∞" : (overviewMetrics.profitFactor != nil ? String(format: "%.2f", overviewMetrics.profitFactor!) : "–")
+        let winRateStr = overviewMetrics.winRate != nil ? String(format: "%.1f%%", overviewMetrics.winRate! * 100) : "–"
+        let avgWlStr = overviewMetrics.avgWinLossRatio != nil ? String(format: "%.2f", overviewMetrics.avgWinLossRatio!) : "–"
+        
+        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+            AppCard {
+                VStack(alignment: .leading, spacing: 4) {
+                    AppCardHeader("Net cumulative P&L")
+                    AppMonetaryText(
+                        Formatters.formatPnL(overviewMetrics.netPnl, currency: env.currentCurrency),
+                        isPrivate: env.isPrivacyModeEnabled,
+                        font: AppTypography.financialNumber(size: 20, weight: .semibold),
+                        color: pnlColor
+                    )
+                    Text("\(overviewMetrics.closedTrades) trades")
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.secondaryText)
+                }
+            }
+            
+            AppCard {
+                VStack(alignment: .leading, spacing: 4) {
+                    AppCardHeader("Profit factor")
+                    Text(pfStr)
+                        .font(AppTypography.financialNumber(size: 20, weight: .semibold))
+                        .foregroundColor(AppColors.primaryText)
+                    Text("gross profit ÷ gross loss")
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.secondaryText)
+                }
+            }
+            
+            AppCard {
+                VStack(alignment: .leading, spacing: 4) {
+                    AppCardHeader("Trade win %")
+                    Text(winRateStr)
+                        .font(AppTypography.financialNumber(size: 20, weight: .semibold))
+                        .foregroundColor(AppColors.primaryText)
+                    Text("\(overviewMetrics.wins)W · \(overviewMetrics.losses)L")
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.secondaryText)
+                }
+            }
+            
+            AppCard {
+                VStack(alignment: .leading, spacing: 4) {
+                    AppCardHeader("Avg win / loss")
+                    Text(avgWlStr)
+                        .font(AppTypography.financialNumber(size: 20, weight: .semibold))
+                        .foregroundColor(AppColors.primaryText)
+                    Text("tỉ lệ trung bình")
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.secondaryText)
+                }
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var searchAndStatusFilter: some View {
+        HStack(spacing: 8) {
+            HStack {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 12))
+                    .foregroundColor(AppColors.secondaryText)
+                TextField("Search symbol, tag...", text: $searchText)
+                    .font(AppTypography.caption)
+                    .foregroundColor(AppColors.primaryText)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(AppColors.cardBackground)
+            .cornerRadius(6)
+            .overlay(
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(AppColors.border, lineWidth: 1)
+            )
+            
+            Picker("Status", selection: $statusFilter) {
+                ForEach(TradeStatusFilter.allCases) { f in
+                    Text(f.rawValue).tag(f)
+                }
+            }
+            .pickerStyle(.menu)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background(AppColors.cardBackground)
+            .cornerRadius(6)
+            .overlay(
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(AppColors.border, lineWidth: 1)
+            )
+        }
+    }
+    
+    @ViewBuilder
+    private var tradesListContent: some View {
+        if filteredTrades.isEmpty {
+            AppCard {
+                VStack(spacing: 12) {
+                    Text("No trades match these filters.")
+                        .font(AppTypography.body)
+                        .foregroundColor(AppColors.secondaryText)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.vertical, 24)
+                }
+            }
+        } else {
+            VStack(spacing: 8) {
+                ForEach(filteredTrades) { trade in
+                    NavigationLink(destination: TradeDetailView(trade: trade)) {
+                        TradeTerminalRow(trade: trade)
+                    }
+                    .buttonStyle(.plain)
+                }
             }
         }
     }
