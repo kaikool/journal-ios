@@ -59,6 +59,12 @@ public final class TradeDataStore: ObservableObject {
         rebuildAllAccounts()
     }
     
+    public var availableCurrencies: [String] {
+        let list = accounts.map { $0.currency.uppercased() }
+        let unique = Array(Set(list)).sorted()
+        return unique.isEmpty ? ["USD"] : unique
+    }
+    
     public func isAccountActive(_ account: Account) -> Bool {
         if account.archivedAt != nil { return false }
         if let prop = propAccounts.first(where: {

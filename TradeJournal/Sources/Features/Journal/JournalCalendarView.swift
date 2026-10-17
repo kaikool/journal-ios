@@ -85,6 +85,10 @@ public struct JournalCalendarView: View {
         return max(1.0, peak)
     }
     
+    private var availableCurrencies: [String] {
+        dataStore.availableCurrencies
+    }
+    
     public var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
@@ -132,7 +136,7 @@ public struct JournalCalendarView: View {
                 ScrollView {
                     VStack(spacing: 14) {
                         // Multi-currency notice matching calendar/page.tsx line 74
-                        if dataStore.availableCurrencies.count > 1 {
+                        if availableCurrencies.count > 1 {
                             currencyNoticeBanner
                         }
                         
@@ -178,7 +182,7 @@ public struct JournalCalendarView: View {
                 .foregroundColor(AppColors.brand)
                 .font(.system(size: 14))
             
-            Text("These trades use multiple currencies (\(dataStore.availableCurrencies.joined(separator: ", "))). Select accounts with one currency to compare monetary performance; no exchange-rate conversion is applied.")
+            Text("These trades use multiple currencies (\(availableCurrencies.joined(separator: ", "))). Select accounts with one currency to compare monetary performance; no exchange-rate conversion is applied.")
                 .font(AppTypography.caption)
                 .foregroundColor(AppColors.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
