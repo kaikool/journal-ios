@@ -1,6 +1,22 @@
 import SwiftUI
 import Charts
 
+/// Model representing pre-computed day details passed directly to DayDetailSheet
+public struct DayDetailContext: Identifiable {
+    public var id: String { dateKey }
+    public let dateKey: String
+    public let stats: DayStats?
+    public let trades: [Trade]
+    public let note: JournalNote
+    
+    public init(dateKey: String, stats: DayStats?, trades: [Trade], note: JournalNote) {
+        self.dateKey = dateKey
+        self.stats = stats
+        self.trades = trades
+        self.note = note
+    }
+}
+
 /// Monthly P&L Calendar view matching 100% of web parity:
 /// - `source-repo/apps/web/src/app/calendar/page.tsx`
 /// - `source-repo/apps/web/src/components/calendar-pnl.tsx`
@@ -26,10 +42,10 @@ public struct JournalCalendarView: View {
     @ObservedObject private var dataStore = TradeDataStore.shared
     
     @State private var currentMonth: Date = Date()
-    @State private var selectedDateKey: String? = nil
+    @State private var selectedDayContext: DayDetailContext? = nil
     @State private var selectedWeekdayIndex: Int? = nil
-    @State private var showDayDetailSheet: Bool = false
-    @State private var showAddTradeForDate: Bool = false
+    @State private var addTradeDate: Date? = nil
+    @State private var showAddTradeSheet: Bool = false
     @State private var showDailyTable: Bool = false
     
     public init() {}
@@ -57,6 +73,31 @@ public struct JournalCalendarView: View {
             trades: dataStore.filteredTrades,
             timeZone: env.currentTimeZone
         )
+    }
+    
+    private var dateKeyFormatter: DateFormatter {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        f.timeZone = env.currentTimeZone
+        return f
+    }
+    
+    private var dailyStatsMap: [String: DayStats] {
+        var map: [String: DayStats] = [:]
+        for d in overview.days {
+            map[d.date] = d
+        }
+        return map
+    }
+    
+    private var tradesByDateMap: [String: [Trade]] {
+        let f = dateKeyFormatter
+        var map: [String: [Trade]] = [:]
+        for trade in dataStore.filteredTrades {
+            let key = f.string(from: trade.closedAt ?? trade.openedAt)
+            map[key, default: []].append(trade)
+        }
+        return map
     }
     
     private var calendarMonth: CalendarMonth {
@@ -150,27 +191,44 @@ public struct JournalCalendarView: View {
                 }
                 .background(AppColors.background)
             }
-            .sheet(isPresented: $showDayDetailSheet) {
-                if let key = selectedDateKey {
-                    DayDetailSheet(
-                        dateKey: key,
-                        stats: statsForDay(key),
-                        trades: tradesForDay(key),
-                        note: dataStore.calendarNotes[key] ?? JournalNote(date: key),
-                        onSaveNote: { updatedNote in
-                            dataStore.saveCalendarNote(updatedNote)
-                        },
-                        onAddTrade: {
-                            showDayDetailSheet = false
-                            showAddTradeForDate = true
+            // Dedicated item-based presentation eliminates white screens and guarantees instant loading
+            .sheet(item: $selectedDayContext) { ctx in
+                DayDetailSheet(
+                    dateKey: ctx.dateKey,
+                    stats: ctx.stats,
+                    trades: ctx.trades,
+                    note: ctx.note,
+                    onSaveNote: { updatedNote in
+                        dataStore.saveCalendarNote(updatedNote)
+                    },
+                    onAddTrade: {
+                        let targetDate = parseDate(from: ctx.dateKey)
+                        selectedDayContext = nil
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                            addTradeDate = targetDate
+                            showAddTradeSheet = true
                         }
-                    )
-                }
+                    }
+                )
             }
-            .sheet(isPresented: $showAddTradeForDate) {
-                AddTradeSheet(initialDate: initialDateForSelectedKey())
+            .sheet(isPresented: $showAddTradeSheet) {
+                AddTradeSheet(initialDate: addTradeDate ?? Date())
             }
         }
+    }
+    
+    // MARK: - Instant Day Selection Handler
+    
+    private func openDayDetail(for dateKey: String) {
+        let stats = dailyStatsMap[dateKey]
+        let trades = tradesByDateMap[dateKey] ?? []
+        let note = dataStore.calendarNotes[dateKey] ?? JournalNote(date: dateKey)
+        selectedDayContext = DayDetailContext(
+            dateKey: dateKey,
+            stats: stats,
+            trades: trades,
+            note: note
+        )
     }
     
     // MARK: - Currency Notice Banner
@@ -269,8 +327,7 @@ public struct JournalCalendarView: View {
                 if dayIndex < week.days.count, let day = week.days[dayIndex] {
                     dayCellView(day: day)
                         .onTapGesture {
-                            selectedDateKey = day.date
-                            showDayDetailSheet = true
+                            openDayDetail(for: day.date)
                         }
                 } else {
                     Color.clear
@@ -671,8 +728,7 @@ public struct JournalCalendarView: View {
                             
                             ForEach(insights.days) { day in
                                 Button(action: {
-                                    selectedDateKey = day.date
-                                    showDayDetailSheet = true
+                                    openDayDetail(for: day.date)
                                 }) {
                                     HStack {
                                         Text(dateLabel(for: day.date))
@@ -775,8 +831,7 @@ public struct JournalCalendarView: View {
                             HStack(spacing: 6) {
                                 ForEach(selected.days) { day in
                                     Button(action: {
-                                        selectedDateKey = day.date
-                                        showDayDetailSheet = true
+                                        openDayDetail(for: day.date)
                                     }) {
                                         HStack(spacing: 4) {
                                             Text(dateLabel(for: day.date))
@@ -955,12 +1010,11 @@ public struct JournalCalendarView: View {
         return outFormatter.string(from: d)
     }
     
-    private func initialDateForSelectedKey() -> Date {
-        guard let key = selectedDateKey else { return Date() }
+    private func parseDate(from dateKey: String) -> Date {
         let fmt = DateFormatter()
         fmt.dateFormat = "yyyy-MM-dd"
         fmt.timeZone = env.currentTimeZone
-        return fmt.date(from: key) ?? Date()
+        return fmt.date(from: dateKey) ?? Date()
     }
     
     private func changeMonth(by value: Int) {
@@ -975,19 +1029,6 @@ public struct JournalCalendarView: View {
         formatter.dateFormat = "MMMM yyyy"
         formatter.timeZone = env.currentTimeZone
         return formatter.string(from: date)
-    }
-    
-    private func statsForDay(_ dateKey: String) -> DayStats? {
-        overview.days.first(where: { $0.date == dateKey })
-    }
-    
-    private func tradesForDay(_ dateKey: String) -> [Trade] {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd"
-        f.timeZone = env.currentTimeZone
-        return dataStore.filteredTrades.filter {
-            f.string(from: $0.openedAt) == dateKey
-        }
     }
 }
 
@@ -1025,21 +1066,31 @@ public struct DayDetailSheet: View {
         _rating = State(initialValue: note.rating ?? 0)
     }
     
+    private func formattedDateTitle(_ key: String) -> String {
+        let inFormatter = DateFormatter()
+        inFormatter.dateFormat = "yyyy-MM-dd"
+        inFormatter.timeZone = TimeZone(identifier: "UTC")
+        guard let d = inFormatter.date(from: key) else { return key }
+        let outFormatter = DateFormatter()
+        outFormatter.locale = Locale(identifier: "en_US")
+        outFormatter.dateFormat = "EEEE, MMM d, yyyy"
+        outFormatter.timeZone = TimeZone(identifier: "UTC")
+        return outFormatter.string(from: d)
+    }
+    
     public var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 14) {
                     summaryCard
                     noteCard
-                    if !trades.isEmpty {
-                        tradesCard
-                    }
+                    tradesCard
                     actionButtons
                 }
                 .padding(14)
             }
-            .background(AppColors.background)
-            .navigationTitle(dateKey)
+            .background(AppColors.background.ignoresSafeArea())
+            .navigationTitle(formattedDateTitle(dateKey))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -1128,10 +1179,23 @@ public struct DayDetailSheet: View {
             VStack(alignment: .leading, spacing: 10) {
                 AppCardHeader("Trades (\(trades.count))")
                 
-                ForEach(trades) { trade in
-                    tradeRow(trade)
-                    if trade.id != trades.last?.id {
-                        Divider().background(AppColors.border)
+                if trades.isEmpty {
+                    VStack(spacing: 6) {
+                        Image(systemName: "tray")
+                            .font(.system(size: 20))
+                            .foregroundColor(AppColors.secondaryText)
+                        Text("No closed trades on this day")
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.secondaryText)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                } else {
+                    ForEach(trades) { trade in
+                        tradeRow(trade)
+                        if trade.id != trades.last?.id {
+                            Divider().background(AppColors.border)
+                        }
                     }
                 }
             }

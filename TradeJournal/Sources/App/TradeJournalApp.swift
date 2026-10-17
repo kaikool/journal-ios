@@ -8,7 +8,7 @@ public struct RootTabView: View {
     @State private var dragOffset: CGFloat = 0
     @State private var isDragging: Bool = false
     
-    private let drawerWidth: CGFloat = 285
+    private let drawerWidth: CGFloat = 300
     
     public init() {}
     
@@ -62,30 +62,36 @@ public struct RootTabView: View {
                 bottomNavigationBar
             }
             .background(AppColors.background.ignoresSafeArea())
-            .scaleEffect(1.0 - (0.04 * progress))
-            .offset(x: max(0, currentOffset + drawerWidth) * 0.1)
-            .clipShape(RoundedRectangle(cornerRadius: progress > 0.01 ? 16 : 0, style: .continuous))
             .disabled(progress > 0.1)
             
-            // Dimmed Interactive Backdrop
+            // Native Apple Dimmed Frosted Backdrop
             if progress > 0.001 {
-                Color.black
-                    .opacity(0.55 * Double(progress))
-                    .ignoresSafeArea()
-                    .onTapGesture {
-                        withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
-                            env.isDrawerOpen = false
-                            dragOffset = 0
-                        }
+                ZStack {
+                    Rectangle()
+                        .fill(.ultraThinMaterial)
+                        .opacity(Double(progress))
+                    
+                    Color.black
+                        .opacity(0.4 * Double(progress))
+                }
+                .ignoresSafeArea()
+                .onTapGesture {
+                    withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
+                        env.isDrawerOpen = false
+                        dragOffset = 0
                     }
+                    #if canImport(UIKit)
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    #endif
+                }
             }
             
-            // Modern Elevated Drawer with Shadow and Real-Time Interactive Translation
+            // Elevated Apple HIG Translucent Drawer with Shadow
             if progress > 0.001 {
                 NavigationDrawerView()
                     .frame(width: drawerWidth)
                     .offset(x: currentOffset)
-                    .shadow(color: Color.black.opacity(0.35 * Double(progress)), radius: 24, x: 8, y: 0)
+                    .shadow(color: Color.black.opacity(0.3 * Double(progress)), radius: 32, x: 10, y: 0)
                     .ignoresSafeArea(.container, edges: .vertical)
             }
         }
