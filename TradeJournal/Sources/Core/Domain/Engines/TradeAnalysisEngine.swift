@@ -66,7 +66,7 @@ public struct GroupAnalysisResult: Equatable, Sendable {
     public let summary: GroupSummary
 }
 
-/// Port 1:1 từ `packages/core/src/analysis.ts`.
+/// Ported 1:1 from `packages/core/src/analysis.ts`.
 public enum TradeAnalysisEngine {
     
     public static func tradeRisk(trade: Trade) -> Decimal? {

@@ -37,7 +37,7 @@ public struct CalendarInsights: Equatable {
     public let trend: [DayTrendPoint]
 }
 
-/// Port 1:1 từ `apps/web/src/lib/calendar-insights.ts`.
+/// Ported 1:1 from `apps/web/src/lib/calendar-insights.ts`.
 public enum CalendarInsightsEngine {
     
     public static func closingWeekday(_ dateString: String) -> Int {

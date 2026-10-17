@@ -5,7 +5,7 @@ import AuthenticationServices
 import UIKit
 #endif
 
-/// Trình quản lý luồng đăng nhập Web OAuth an toàn qua ASWebAuthenticationSession trên iOS
+/// Domain specification matching core web repository
 @MainActor
 public final class WebAuthHelper: NSObject, ASWebAuthenticationPresentationContextProviding {
     public static let shared = WebAuthHelper()

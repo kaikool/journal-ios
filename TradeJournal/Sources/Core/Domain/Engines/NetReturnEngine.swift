@@ -26,7 +26,7 @@ public struct ReturnInputs {
 }
 
 /// Net return on absolute entry notional, as a ratio (not return on margin).
-/// Port 1:1 từ `packages/core/src/returns.ts`.
+/// Ported 1:1 from `packages/core/src/returns.ts`.
 public enum NetReturnEngine {
     
     public static func netReturnOnEntry(trade: ReturnInputs) -> Double? {

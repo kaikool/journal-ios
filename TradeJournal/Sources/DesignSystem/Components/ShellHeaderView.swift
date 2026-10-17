@@ -1,10 +1,11 @@
 import SwiftUI
 
-/// Header thanh điều hướng di động chuẩn xác 100% từ `source-repo/apps/web/src/components/shell.tsx`:
-/// - Nút Hamburger Drawer mở toàn bộ 13 phân hệ
-/// - Logo Trade Journal vector + Nhãn "Trade Journal"
-/// - Nút GlobalSyncButton (xoay tròn liên tục khi đang đồng bộ)
-/// - Nút PrivacyToggle (Ẩn/Hiện số tiền)
+/// Mobile navigation header matching 100% of `source-repo/apps/web/src/components/shell.tsx`:
+/// - Drawer hamburger button opening all 13 application routes
+/// - Trade Journal vector mark + "Trade Journal" title
+/// - GlobalSyncButton (continuous rotation spinner during synchronization)
+/// - PrivacyToggle (hide / unhide financial balances)
+/// - ThemeToggle (toggle between dark and light appearance)
 public struct ShellHeaderView: View {
     @EnvironmentObject private var env: AppEnvironment
     @ObservedObject private var dataStore = TradeDataStore.shared
@@ -12,7 +13,7 @@ public struct ShellHeaderView: View {
     public init() {}
     
     public var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
             // Hamburger button
             Button {
                 withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
@@ -26,7 +27,7 @@ public struct ShellHeaderView: View {
                     .background(AppColors.secondaryBackground)
                     .cornerRadius(8)
             }
-            .accessibilityLabel("Mở danh mục điều hướng")
+            .accessibilityLabel("Toggle navigation drawer")
             
             // Brand Logo & Title
             HStack(spacing: 8) {
@@ -63,7 +64,7 @@ public struct ShellHeaderView: View {
                             .stroke(AppColors.border, lineWidth: 1)
                     )
             }
-            .accessibilityLabel("Đồng bộ dữ liệu")
+            .accessibilityLabel("Sync accounts")
             
             // Privacy Toggle Button
             Button {
@@ -80,7 +81,24 @@ public struct ShellHeaderView: View {
                             .stroke(AppColors.border, lineWidth: 1)
                     )
             }
-            .accessibilityLabel("Chế độ ẩn số dư")
+            .accessibilityLabel("Toggle privacy mode")
+            
+            // Theme Toggle Button (Light / Dark mode)
+            Button {
+                env.toggleTheme()
+            } label: {
+                Image(systemName: env.appTheme == .dark ? "sun.max" : "moon")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(AppColors.secondaryText)
+                    .frame(width: 32, height: 32)
+                    .background(AppColors.cardBackground)
+                    .cornerRadius(8)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(AppColors.border, lineWidth: 1)
+                    )
+            }
+            .accessibilityLabel("Toggle theme")
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
@@ -91,3 +109,4 @@ public struct ShellHeaderView: View {
         )
     }
 }
+

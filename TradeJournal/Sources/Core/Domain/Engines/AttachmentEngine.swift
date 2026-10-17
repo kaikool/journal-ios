@@ -1,19 +1,19 @@
 import Foundation
 
-/// Engine xử lý và xác thực tệp đính kèm & ảnh chụp màn hình biểu đồ
-/// Port 1:1 từ `source-repo/apps/web/src/lib/attachment-validation.ts` và `chart-screenshot-upload.ts`
+/// Internal domain documentation
+/// Domain specification matching core web repository
 public enum AttachmentEngine {
     
-    /// Giới hạn kích thước tối đa: 8 MB
+    /// Internal domain documentation
     public static let maxAttachmentSize: Int = 8 * 1024 * 1024
     
-    /// Các loại đối tượng sở hữu tệp đính kèm hợp lệ
+    /// Internal domain documentation
     public static let validOwnerTypes: Set<String> = [
         "trade", "day", "note", "missed", "prop-account", "prop-entry"
     ]
     
-    /// Xác định MIME type từ magic bytes thực tế của file, không tin tưởng extension hay header do client gửi
-    /// Port 1:1 từ `attachmentMime` trong `attachment-validation.ts`
+    /// Internal domain documentation
+/// Ported 1:1 from `attachmentMime` trong `attachment-validation.ts`
     public static func attachmentMime(data: Data) -> String? {
         let bytes = [UInt8](data.prefix(32))
         guard !bytes.isEmpty else { return nil }
@@ -49,8 +49,8 @@ public enum AttachmentEngine {
         return nil
     }
     
-    /// Chuẩn hóa tên tệp an toàn (Safe Name)
-    /// Port 1:1 từ `safeName` trong `route.ts`
+    /// Internal domain documentation
+/// Ported 1:1 from `safeName` trong `route.ts`
     public static func safeName(_ name: String) -> String {
         let trimmed = String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(200))
         let basename = (trimmed as NSString).lastPathComponent
@@ -62,8 +62,8 @@ public enum AttachmentEngine {
         return result.isEmpty ? "attachment" : result
     }
     
-    /// Đường dẫn lưu trữ (Storage Path)
-    /// Port 1:1 từ `storagePath` trong `route.ts`:
+    /// Internal domain documentation
+/// Ported 1:1 from `storagePath` trong `route.ts`:
     /// `attachments/<ownerType>/<ownerId>/<id>/<name>`
     public static func storagePath(ownerType: String, ownerId: String, id: String, name: String) -> String {
         let encOwnerId = ownerId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? ownerId
@@ -71,8 +71,8 @@ public enum AttachmentEngine {
         return "attachments/\(ownerType)/\(encOwnerId)/\(id)/\(encName)"
     }
     
-    /// Kiểm tra tính hợp lệ và trích xuất dữ liệu ảnh chụp màn hình biểu đồ (Data URL Base64)
-    /// Port 1:1 từ `uploadChartScreenshot` trong `chart-screenshot-upload.ts`
+    /// Internal domain documentation
+/// Ported 1:1 from `uploadChartScreenshot` trong `chart-screenshot-upload.ts`
     public static func validateChartScreenshotPng(dataUrl: String) throws -> Data {
         let prefix = "data:image/png;base64,"
         guard dataUrl.hasPrefix(prefix) else {
@@ -84,7 +84,7 @@ public enum AttachmentEngine {
             throw AttachmentError.invalidData
         }
         
-        // Kiểm tra chữ ký magic bytes của PNG
+        // Internal implementation note
         let signature: [UInt8] = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]
         guard data.count >= signature.count else {
             throw AttachmentError.invalidData
@@ -97,7 +97,7 @@ public enum AttachmentEngine {
         return data
     }
     
-    /// Kiểm tra toàn bộ dữ liệu tệp đính kèm trước khi lưu trữ
+    /// Internal domain documentation
     public static func validateAttachment(
         data: Data,
         declaredName: String
@@ -134,13 +134,13 @@ public enum AttachmentError: LocalizedError, Equatable {
         case .invalidData:
             return "Chart screenshot data is invalid."
         case .emptyFile:
-            return "Tệp đính kèm không có nội dung."
+            return "Attachment contains no data."
         case .fileTooLarge(let size, let max):
-            return "Tệp vượt quá kích thước tối đa cho phép (\(size / 1024 / 1024) MB > \(max / 1024 / 1024) MB)."
+            return "File exceeds maximum allowed size (\(size / 1024 / 1024) MB > \(max / 1024 / 1024) MB)."
         case .unsupportedType:
-            return "Chỉ hỗ trợ tệp hình ảnh (PNG, JPEG, WebP) hoặc tài liệu PDF."
+            return "Only image files (PNG, JPEG, WebP) or PDF documents are supported."
         case .ownerNotFound(let msg):
-            return "Không tìm thấy đối tượng gắn tệp đính kèm: \(msg)"
+            return "Attachment parent entity not found: \(msg)"
         }
     }
 }

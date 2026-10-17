@@ -1,9 +1,9 @@
 import SwiftUI
 
 public enum AnalyticsSubTab: String, CaseIterable, Identifiable {
-    case reports = "Báo Cáo"
-    case playbooks = "Chiến Lược"
-    case propFirms = "Quỹ Prop"
+    case reports = "Reports"
+    case playbooks = "Playbooks"
+    case propFirms = "Prop firms"
     
     public var id: String { rawValue }
     
@@ -16,8 +16,10 @@ public enum AnalyticsSubTab: String, CaseIterable, Identifiable {
     }
 }
 
-/// Trung tâm điều phối tính năng Phân tích & Quản lý chiến lược
-/// Kết hợp 3 màn hình: Báo cáo phân tích chuyên sâu, Sách chiến lược (Playbooks), Quỹ Prop Firms
+/// Analytics Hub coordinating:
+/// - Reports & deep performance metrics
+/// - Trading Playbooks & strategy adherence
+/// - Prop Firm accounts, challenges & payout ledger
 public struct AnalyticsHubView: View {
     @State private var selectedSubTab: AnalyticsSubTab = .reports
     
@@ -25,8 +27,8 @@ public struct AnalyticsHubView: View {
     
     public var body: some View {
         VStack(spacing: 0) {
-            // Segmented Navigation Header theo chuẩn Apple HIG
-            Picker("Phần phân tích", selection: $selectedSubTab) {
+            // Segmented Navigation Header adhering to Apple HIG
+            Picker("Analytics Section", selection: $selectedSubTab) {
                 ForEach(AnalyticsSubTab.allCases) { tab in
                     Text(tab.rawValue).tag(tab)
                 }
@@ -38,7 +40,7 @@ public struct AnalyticsHubView: View {
             
             Divider()
             
-            // Nội dung tab con tương ứng
+            // Sub-view presentation
             switch selectedSubTab {
             case .reports:
                 ReportsView()

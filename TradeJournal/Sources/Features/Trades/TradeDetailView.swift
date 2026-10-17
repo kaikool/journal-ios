@@ -1,7 +1,6 @@
 import SwiftUI
 
-/// Màn hình chi tiết giao dịch (Trade Detail)
-/// Port 1:1 từ `source-repo/apps/web/src/app/trades/[key]/page.tsx`
+/// Trade detail view matching 100% of `source-repo/apps/web/src/app/trades/[key]/page.tsx`
 public struct TradeDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var env: AppEnvironment
@@ -104,7 +103,7 @@ public struct TradeDetailView: View {
                         
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("Lãi/Lỗ Ròng")
+                                Text("Net P&L")
                                     .font(AppTypography.caption)
                                     .foregroundColor(AppColors.secondaryText)
                                 Text(Formatters.formatPnL(trade.netPnl, currency: env.currentCurrency))
@@ -113,7 +112,7 @@ public struct TradeDetailView: View {
                             }
                             Spacer()
                             VStack(alignment: .trailing, spacing: 2) {
-                                Text("Khối lượng")
+                                Text("Volume")
                                     .font(AppTypography.caption)
                                     .foregroundColor(AppColors.secondaryText)
                                 Text("\(trade.quantity)")
@@ -127,12 +126,12 @@ public struct TradeDetailView: View {
                 // Pricing & Execution Details
                 AppCard {
                     VStack(alignment: .leading, spacing: 10) {
-                        Text("Thông số vào / ra lệnh")
+                        Text("Execution details")
                             .font(AppTypography.headline)
                         
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("Giá vào TB")
+                                Text("Avg entry")
                                     .font(AppTypography.caption)
                                     .foregroundColor(AppColors.secondaryText)
                                 Text("\(trade.avgEntry)")
@@ -140,15 +139,15 @@ public struct TradeDetailView: View {
                             }
                             Spacer()
                             VStack(alignment: .center, spacing: 2) {
-                                Text("Giá ra TB")
+                                Text("Avg exit")
                                     .font(AppTypography.caption)
                                     .foregroundColor(AppColors.secondaryText)
-                                Text(trade.avgExit != nil ? "\(trade.avgExit!)" : "Đang mở")
+                                Text(trade.avgExit != nil ? "\(trade.avgExit!)" : "Open")
                                     .font(AppTypography.subheadlineBold)
                             }
                             Spacer()
                             VStack(alignment: .trailing, spacing: 2) {
-                                Text("Phí GD")
+                                Text("Fees")
                                     .font(AppTypography.caption)
                                     .foregroundColor(AppColors.secondaryText)
                                 Text(Formatters.formatCurrency(trade.fees, currency: env.currentCurrency))
@@ -159,7 +158,7 @@ public struct TradeDetailView: View {
                         Divider().background(AppColors.border.opacity(0.5))
                         
                         HStack {
-                            Text("Thời gian mở:")
+                            Text("Opened at:")
                                 .font(AppTypography.caption)
                                 .foregroundColor(AppColors.secondaryText)
                             Spacer()
@@ -169,9 +168,9 @@ public struct TradeDetailView: View {
                         
                         if let closedAt = trade.closedAt {
                             HStack {
-                                Text("Thời gian đóng:")
-                                    .font(AppTypography.caption)
-                                    .foregroundColor(AppColors.secondaryText)
+                                Text("Closed at:")
+                                .font(AppTypography.caption)
+                                .foregroundColor(AppColors.secondaryText)
                                 Spacer()
                                 Text(Formatters.formatDateTime(closedAt, timeZone: env.currentTimeZone))
                                     .font(AppTypography.caption)
@@ -184,7 +183,7 @@ public struct TradeDetailView: View {
                 if !fills.isEmpty {
                     AppCard {
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("Lịch sử khớp lệnh (\(fills.count) lần khớp)")
+                            Text("Executions (\(fills.count) legs)")
                                 .font(AppTypography.headline)
                             
                             ForEach(fills) { fill in
@@ -217,7 +216,7 @@ public struct TradeDetailView: View {
                 // Risk & Reward Section
                 AppCard {
                     VStack(alignment: .leading, spacing: 10) {
-                        Text("Quản trị rủi ro (R:R)")
+                        Text("Risk & Reward (R:R)")
                             .font(AppTypography.headline)
                         
                         HStack(spacing: 12) {
@@ -225,16 +224,16 @@ public struct TradeDetailView: View {
                                 Text("Stop Loss")
                                     .font(AppTypography.caption)
                                     .foregroundColor(AppColors.secondaryText)
-                                TextField("Chưa đặt", text: $stopLossText)
+                                TextField("Not set", text: $stopLossText)
                                     .textFieldStyle(.roundedBorder)
                                     .keyboardType(.decimalPad)
                             }
                             
                             VStack(alignment: .leading, spacing: 4) {
-                                Text("Take Profit")
+                                Text("Profit Target")
                                     .font(AppTypography.caption)
                                     .foregroundColor(AppColors.secondaryText)
-                                TextField("Chưa đặt", text: $profitTargetText)
+                                TextField("Not set", text: $profitTargetText)
                                     .textFieldStyle(.roundedBorder)
                                     .keyboardType(.decimalPad)
                             }
@@ -242,7 +241,7 @@ public struct TradeDetailView: View {
                             VStack {
                                 Text(" ")
                                     .font(AppTypography.caption)
-                                Button("Lưu") {
+                                Button("Save") {
                                     persistTradeUpdates()
                                 }
                                 .buttonStyle(.borderedProminent)
@@ -253,7 +252,7 @@ public struct TradeDetailView: View {
                         HStack(spacing: 16) {
                             if let risk = riskAmount {
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text("Rủi ro (1R):")
+                                    Text("Risk (1R):")
                                         .font(AppTypography.caption)
                                         .foregroundColor(AppColors.secondaryText)
                                     Text(Formatters.formatCurrency(risk, currency: env.currentCurrency))
@@ -289,11 +288,11 @@ public struct TradeDetailView: View {
                 AppCard {
                     VStack(alignment: .leading, spacing: 10) {
                         HStack {
-                            Text("Chiến lược (Playbook)")
+                            Text("Playbook")
                                 .font(AppTypography.headline)
                             Spacer()
                             Picker("Playbook", selection: $selectedPlaybookId) {
-                                Text("Không chọn").tag("")
+                                Text("None").tag("")
                                 ForEach(dataStore.playbooks) { pb in
                                     Text(pb.name).tag(pb.id)
                                 }
@@ -306,7 +305,7 @@ public struct TradeDetailView: View {
                         
                         if let pb = activePlaybook {
                             VStack(alignment: .leading, spacing: 6) {
-                                Text("Quy tắc tuân thủ:")
+                                Text("Rule checklist:")
                                     .font(AppTypography.caption)
                                     .foregroundColor(AppColors.secondaryText)
                                 
@@ -339,12 +338,12 @@ public struct TradeDetailView: View {
                 // Annotations: Mistakes, Tags & Rating
                 AppCard {
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("Đánh giá kỷ luật & Sai lầm")
+                        Text("Discipline & Mistakes")
                             .font(AppTypography.headline)
                         
                         // Rating
                         HStack {
-                            Text("Đánh giá:")
+                            Text("Rating:")
                                 .font(AppTypography.caption)
                                 .foregroundColor(AppColors.secondaryText)
                             ForEach(1...5, id: \.self) { star in
@@ -376,9 +375,9 @@ public struct TradeDetailView: View {
                             }
                             
                             HStack {
-                                TextField("Thêm tag...", text: $newTag)
+                                TextField("Add tag...", text: $newTag)
                                     .textFieldStyle(.roundedBorder)
-                                Button("Thêm") {
+                                Button("Add") {
                                     let clean = newTag.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: "#", with: "")
                                     if !clean.isEmpty && !trade.tags.contains(clean) {
                                         trade.tags.append(clean)
@@ -391,7 +390,7 @@ public struct TradeDetailView: View {
                         
                         // Mistakes
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("Sai lầm vi phạm:")
+                            Text("Mistakes:")
                                 .font(AppTypography.caption)
                                 .foregroundColor(AppColors.secondaryText)
                             
@@ -408,9 +407,9 @@ public struct TradeDetailView: View {
                             }
                             
                             HStack {
-                                TextField("VD: FOMO, Dời SL...", text: $newMistake)
+                                TextField("e.g. FOMO, Moved SL...", text: $newMistake)
                                     .textFieldStyle(.roundedBorder)
-                                Button("Thêm") {
+                                Button("Add") {
                                     let clean = newMistake.trimmingCharacters(in: .whitespaces)
                                     if !clean.isEmpty && !trade.mistakes.contains(clean) {
                                         trade.mistakes.append(clean)
@@ -427,10 +426,10 @@ public struct TradeDetailView: View {
                 AppCard {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
-                            Text("Ghi chú phân tích & Nhật ký lệnh")
+                            Text("Trade notes & analysis")
                                 .font(AppTypography.headline)
                             Spacer()
-                            Button("Lưu ghi chú") {
+                            Button("Save notes") {
                                 persistTradeUpdates()
                             }
                             .font(AppTypography.captionBold)
@@ -448,7 +447,7 @@ public struct TradeDetailView: View {
                     AttachmentsSectionView(
                         ownerType: "trade",
                         ownerId: trade.key,
-                        title: "Ảnh biểu đồ & Bằng chứng vào lệnh"
+                        title: "Attachments & Screenshots"
                     )
                 }
                 
@@ -456,7 +455,7 @@ public struct TradeDetailView: View {
                 Button(role: .destructive, action: { showDeleteAlert = true }) {
                     HStack {
                         Image(systemName: "trash")
-                        Text("Xóa Giao Dịch Này")
+                        Text("Delete trade")
                     }
                     .font(AppTypography.captionBold)
                     .frame(maxWidth: .infinity)
@@ -475,14 +474,14 @@ public struct TradeDetailView: View {
     .navigationDestination(isPresented: $showReplayView) {
             TradeReplayView(trade: trade, executions: fills)
         }
-        .alert("Xóa giao dịch \(trade.symbol)?", isPresented: $showDeleteAlert) {
-            Button("Hủy", role: .cancel) {}
-            Button("Xóa vĩnh viễn", role: .destructive) {
+        .alert("Delete trade \(trade.symbol)?", isPresented: $showDeleteAlert) {
+            Button("Cancel", role: .cancel) {}
+            Button("Delete permanently", role: .destructive) {
                 dataStore.deleteTrade(key: trade.key)
                 dismiss()
             }
         } message: {
-            Text("Lệnh này và các khớp lệnh liên quan sẽ bị xóa khỏi tài khoản.")
+            Text("This trade and its associated executions will be permanently removed.")
         }
     }
     

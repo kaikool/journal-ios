@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// Màn hình Trade Replay xem lại từng thanh nến lịch sử và diễn biến lệnh theo thời gian thực.
-/// Port 1:1 từ `trade-market-data.tsx`, `trade-replay.ts`, và `excursions.ts` trong source web gốc.
-/// Áp dụng tiêu chuẩn Apple HIG với typography sắc nét và điều khiển tương tác mượt mà.
+/// Trade Replay screen to review historical candlesticks and execution progression step-by-step.
+/// Ported 1:1 from `trade-market-data.tsx`, `trade-replay.ts`, and `excursions.ts`.
+/// Adheres strictly to Apple HIG with crisp typography and smooth playback controls.
 public struct TradeReplayView: View {
     @EnvironmentObject private var env: AppEnvironment
     let trade: Trade
@@ -22,6 +22,16 @@ public struct TradeReplayView: View {
     public init(trade: Trade, executions: [Execution]) {
         self.trade = trade
         self.executions = executions
+        let durationMs = trade.durationMs ?? (trade.closedAt != nil ? Int64(trade.closedAt!.timeIntervalSince(trade.openedAt) * 1000) : 3_600_000)
+        let minutes = Double(max(60_000, durationMs)) / 60_000.0
+        let res: MarketResolution = {
+            if minutes <= 90 { return .m1 }
+            if minutes <= 60 * 8 { return .m5 }
+            if minutes <= 60 * 48 { return .m15 }
+            if minutes <= 60 * 24 * 10 { return .h1 }
+            return .d1
+        }()
+        self._selectedResolution = State(initialValue: res)
     }
     
     private var frame: ReplayFrame {
@@ -37,22 +47,22 @@ public struct TradeReplayView: View {
     public var body: some View {
         ScrollView {
             VStack(spacing: 12) {
-                // Header: Thông tin lệnh và P&L thời gian thực tại cây nến đang replay
+                // Header: Trade info and dynamic replay P&L
                 headerCard
                 
-                // Thanh chọn khung thời gian (Timeframe Resolution: 1m, 5m, 15m, 1h, 1d)
+                // Timeframe Selector: 1m, 5m, 15m, 1h, 1d
                 resolutionSelectorBar
                 
-                // Khung biểu đồ nến chuyên nghiệp
+                // Professional Candlestick Chart
                 chartCard
                 
-                // Bảng điều khiển tua/phát nến (Replay Controls)
+                // Replay Playback Controls (Play/Pause, Step, Speed)
                 playbackControlsCard
                 
-                // Thống kê MAE (Bất lợi tối đa) & MFE (Thuận lợi tối đa)
+                // MAE & MFE Excursion Statistics
                 excursionMetricsCard
                 
-                // Ghi chú giới hạn dữ liệu nến sàn
+                // Broker Data Notes
                 dataCoverageNote
             }
             .padding(.horizontal, 14)
@@ -92,7 +102,7 @@ public struct TradeReplayView: View {
                     Spacer()
                     
                     VStack(alignment: .trailing, spacing: 2) {
-                        Text("P&L TẠM TÍNH")
+                        Text("UNREALIZED P&L")
                             .font(AppTypography.cardTitle)
                             .foregroundColor(AppColors.secondaryText)
                         
@@ -105,14 +115,14 @@ public struct TradeReplayView: View {
                 Divider().background(AppColors.border.opacity(0.5))
                 
                 HStack {
-                    Text("Vào: \(Formatters.price(trade.avgEntry)) • KL: \(Formatters.formatNumber(trade.quantity))")
+                    Text("Entry: \(Formatters.price(trade.avgEntry)) • Qty: \(Formatters.formatNumber(trade.quantity))")
                         .font(AppTypography.caption)
                         .foregroundColor(AppColors.secondaryText)
                     
                     Spacer()
                     
                     if let curBar = frame.currentBar {
-                        Text("Giá nến: \(Formatters.price(curBar.close))")
+                        Text("Bar Close: \(Formatters.price(curBar.close))")
                             .font(AppTypography.captionBold)
                             .foregroundColor(curBar.isUp ? AppColors.profit : AppColors.loss)
                     }
@@ -125,7 +135,7 @@ public struct TradeReplayView: View {
     
     private var resolutionSelectorBar: some View {
         HStack(spacing: 8) {
-            Text("Khung nến:")
+            Text("Resolution:")
                 .font(AppTypography.caption)
                 .foregroundColor(AppColors.secondaryText)
             
@@ -151,7 +161,7 @@ public struct TradeReplayView: View {
             if isLoadingCandles {
                 ProgressView()
                     .scaleEffect(0.7)
-                Text("Đang tải...")
+                Text("Loading…")
                     .font(AppTypography.caption)
                     .foregroundColor(AppColors.secondaryText)
             }
@@ -195,7 +205,7 @@ public struct TradeReplayView: View {
     private var playbackControlsCard: some View {
         AppCard {
             VStack(spacing: 12) {
-                // Thanh trượt tua nến (Scrubber Slider)
+                // Scrubber Slider
                 if bars.count > 1 {
                     VStack(spacing: 4) {
                         Slider(
@@ -213,9 +223,9 @@ public struct TradeReplayView: View {
                     }
                 }
                 
-                // Các nút điều khiển tua/phát
+                // Playback controls row
                 HStack(spacing: 16) {
-                    // Nút về đầu
+                    // Restart
                     Button(action: { resetReplay() }) {
                         Image(systemName: "backward.end.fill")
                             .font(.system(size: 16))
@@ -226,7 +236,7 @@ public struct TradeReplayView: View {
                     }
                     .disabled(bars.isEmpty)
                     
-                    // Nút lùi 1 nến
+                    // Step back
                     Button(action: { step(by: -1) }) {
                         Image(systemName: "chevron.left")
                             .font(.system(size: 14, weight: .bold))
@@ -237,12 +247,12 @@ public struct TradeReplayView: View {
                     }
                     .disabled(currentStep <= 1 || bars.isEmpty)
                     
-                    // Nút Play / Pause chính
+                    // Play / Pause
                     Button(action: { togglePlay() }) {
                         HStack(spacing: 6) {
                             Image(systemName: isPlaying ? "pause.fill" : "play.fill")
                                 .font(.system(size: 14))
-                            Text(isPlaying ? "Tạm dừng" : "Phát")
+                            Text(isPlaying ? "Pause" : "Play")
                                 .font(AppTypography.captionBold)
                         }
                         .padding(.horizontal, 16)
@@ -253,7 +263,7 @@ public struct TradeReplayView: View {
                     }
                     .disabled(bars.isEmpty)
                     
-                    // Nút tiến 1 nến
+                    // Step forward
                     Button(action: { step(by: 1) }) {
                         Image(systemName: "chevron.right")
                             .font(.system(size: 14, weight: .bold))
@@ -264,7 +274,7 @@ public struct TradeReplayView: View {
                     }
                     .disabled(currentStep >= bars.count || bars.isEmpty)
                     
-                    // Nút tới nến cuối cùng
+                    // Forward to end
                     Button(action: { forwardToEnd() }) {
                         Image(systemName: "forward.end.fill")
                             .font(.system(size: 16))
@@ -277,7 +287,7 @@ public struct TradeReplayView: View {
                     
                     Spacer()
                     
-                    // Menu chọn tốc độ tua (1x, 2x, 4x)
+                    // Replay Speed menu
                     Menu {
                         Button("1×") { replaySpeed = 1.0; restartTimerIfPlaying() }
                         Button("2×") { replaySpeed = 2.0; restartTimerIfPlaying() }
@@ -297,11 +307,11 @@ public struct TradeReplayView: View {
                     }
                 }
                 
-                // Dòng chú thích thời gian chi tiết
+                // Timestamp and count caption
                 if let curBar = frame.currentBar {
                     let formattedTime = Formatters.formatDateTime(curBar.date, timeZone: env.currentTimeZone)
                     HStack {
-                        Text("\(currentStep) / \(bars.count) nến • Mốc thời gian: \(formattedTime)")
+                        Text("\(currentStep) / \(bars.count) candles • Through: \(formattedTime)")
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText)
                         Spacer()
@@ -316,14 +326,14 @@ public struct TradeReplayView: View {
     private var excursionMetricsCard: some View {
         AppCard {
             VStack(alignment: .leading, spacing: 8) {
-                Text("Chỉ số MAE & MFE (Biên độ biến động lệnh)")
+                Text("EXCURSION ESTIMATES (MAE & MFE)")
                     .font(AppTypography.cardTitle)
                     .foregroundColor(AppColors.secondaryText)
                 
                 HStack(spacing: 12) {
-                    // MAE: Maximum Adverse Excursion (Mức lỗ tạm thời lớn nhất khi giữ lệnh)
+                    // MAE
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("MAE (Bất lợi tối đa)")
+                        Text("Estimated MAE · adverse")
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText)
                         
@@ -332,7 +342,7 @@ public struct TradeReplayView: View {
                                 .font(AppTypography.financialNumber(size: 16, weight: .bold))
                                 .foregroundColor(AppColors.loss)
                         } else {
-                            Text("Chưa xác định")
+                            Text("Unavailable")
                                 .font(AppTypography.captionBold)
                                 .foregroundColor(AppColors.secondaryText)
                         }
@@ -341,9 +351,9 @@ public struct TradeReplayView: View {
                     
                     Divider().frame(height: 36)
                     
-                    // MFE: Maximum Favorable Excursion (Mức lãi tạm thời cao nhất khi giữ lệnh)
+                    // MFE
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("MFE (Thuận lợi tối đa)")
+                        Text("Estimated MFE · favorable")
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText)
                         
@@ -352,7 +362,7 @@ public struct TradeReplayView: View {
                                 .font(AppTypography.financialNumber(size: 16, weight: .bold))
                                 .foregroundColor(AppColors.profit)
                         } else {
-                            Text("Chưa xác định")
+                            Text("Unavailable")
                                 .font(AppTypography.captionBold)
                                 .foregroundColor(AppColors.secondaryText)
                         }
@@ -367,11 +377,11 @@ public struct TradeReplayView: View {
     
     private var dataCoverageNote: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Lưu ý kỹ thuật:")
+            Text("Data coverage & estimate limits:")
                 .font(AppTypography.captionBold)
                 .foregroundColor(AppColors.secondaryText)
             
-            Text("Nến được hiển thị tại thời điểm đóng nến (Bar Close) từ sàn giao dịch, không phải mô phỏng từng tick. MAE/MFE tính toán trên giá High/Low của các nến trong phiên giữ lệnh.")
+            Text("Candles are revealed at bar close; this is not a tick-by-tick simulation. Excursion estimates use observed candles only.")
                 .font(AppTypography.caption)
                 .foregroundColor(AppColors.secondaryText.opacity(0.8))
         }
@@ -403,10 +413,36 @@ public struct TradeReplayView: View {
                     resolution: selectedResolution
                 )
             } else {
-                candleErrorMessage = "Sàn giao dịch (\(provider)) không có dữ liệu nến cho khung \(selectedResolution.rawValue) trong khoảng thời gian này."
+                let simulated = TradeReplayEngine.generateBarsFromTrade(
+                    trade: trade,
+                    fills: executions,
+                    resolution: selectedResolution
+                )
+                self.bars = simulated
+                self.dataSourceName = "Price Path Replay"
+                self.currentStep = min(6, simulated.count)
+                self.excursionEstimate = TradeReplayEngine.estimateExcursions(
+                    trade: trade,
+                    fills: executions,
+                    bars: simulated,
+                    resolution: selectedResolution
+                )
             }
         } catch {
-            candleErrorMessage = error.localizedDescription
+            let simulated = TradeReplayEngine.generateBarsFromTrade(
+                trade: trade,
+                fills: executions,
+                resolution: selectedResolution
+            )
+            self.bars = simulated
+            self.dataSourceName = "Execution Path"
+            self.currentStep = min(6, simulated.count)
+            self.excursionEstimate = TradeReplayEngine.estimateExcursions(
+                trade: trade,
+                fills: executions,
+                bars: simulated,
+                resolution: selectedResolution
+            )
         }
         isLoadingCandles = false
     }
@@ -474,7 +510,7 @@ public struct TradeReplayView: View {
     }
 }
 
-/// View bao bọc màn hình Replay biểu đồ, cho phép chọn bất kỳ lệnh nào trong tài khoản để Replay
+/// Wrapper view for Trade Replay allowing selection of any filtered trade in the account
 public struct TradeReplayHubView: View {
     @ObservedObject private var dataStore = TradeDataStore.shared
     @State private var selectedTradeId: String = ""
@@ -504,10 +540,10 @@ public struct TradeReplayHubView: View {
                     Image(systemName: "play.rectangle.on.rectangle")
                         .font(.system(size: 40))
                         .foregroundColor(AppColors.secondaryText.opacity(0.6))
-                    Text("Chưa có lệnh để Replay")
+                    Text("No Trades to Replay")
                         .font(AppTypography.headline)
                         .foregroundColor(AppColors.primaryText)
-                    Text("Hãy nhập lệnh hoặc đồng bộ tài khoản để sử dụng tính năng xem lại từng thanh nến.")
+                    Text("Import trades or sync your account to view candle replays.")
                         .font(AppTypography.caption)
                         .foregroundColor(AppColors.secondaryText)
                         .multilineTextAlignment(.center)
@@ -516,14 +552,14 @@ public struct TradeReplayHubView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .padding(.vertical, 60)
             } else {
-                // Thanh chọn lệnh để Replay
+                // Select Trade Card
                 AppCard {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("CHỌN LỆNH CẦN REPLAY")
+                        Text("SELECT TRADE TO REPLAY")
                             .font(AppTypography.cardTitle)
                             .foregroundColor(AppColors.secondaryText)
                         
-                        Picker("Lệnh", selection: Binding(
+                        Picker("Trade", selection: Binding(
                             get: { activeTrade?.id ?? "" },
                             set: { selectedTradeId = $0 }
                         )) {

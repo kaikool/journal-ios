@@ -11,7 +11,7 @@ public struct EdgeScoreComponents: Equatable {
 
 public struct EdgeScore: Equatable {
     public let version: Int
-    /// Điểm tổng hợp từ 0 đến 100; trả về nil nếu có ít hơn 5 trades đã đóng.
+    /// Internal domain documentation
     public let score: Double?
     public let components: EdgeScoreComponents
     public let closedTrades: Int
@@ -25,8 +25,8 @@ extension EdgeScore {
     }
 }
 
-/// Engine tính toán điểm Edge Score v2.
-/// Port 1:1 từ `packages/core/src/edge-score.ts`.
+/// Internal domain documentation
+/// Ported 1:1 from `packages/core/src/edge-score.ts`.
 public enum EdgeScoreEngine {
     public static let version = 2
     

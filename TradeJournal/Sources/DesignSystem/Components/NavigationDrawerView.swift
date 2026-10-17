@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// Drawer thanh điều hướng chuẩn xác 100% từ `source-repo/apps/web/src/components/shell.tsx`:
-/// Hỗ trợ đầy đủ 13 phân hệ, phân cách rõ ràng giữa NAV chính và NAV_SETUP,
-/// kèm nút điều khiển Global Sync và Chế độ bảo mật Privacy ở chân Drawer.
+/// Navigation drawer matching 100% of `source-repo/apps/web/src/components/shell.tsx`:
+/// Supports all 13 application routes divided into primary NAV and NAV_SETUP sections,
+/// with Global Sync, Theme switch, and Privacy controls in the drawer footer.
 public struct NavigationDrawerView: View {
     @EnvironmentObject private var env: AppEnvironment
     @ObservedObject private var dataStore = TradeDataStore.shared
@@ -103,7 +103,28 @@ public struct NavigationDrawerView: View {
                                     .rotationEffect(dataStore.isSyncing ? .degrees(360) : .zero)
                                     .animation(dataStore.isSyncing ? Animation.linear(duration: 1).repeatForever(autoreverses: false) : .default, value: dataStore.isSyncing)
                                 
-                                Text(dataStore.isSyncing ? "Đang đồng bộ..." : "Đồng bộ tất cả tài khoản")
+                                Text(dataStore.isSyncing ? "Syncing..." : "Sync all accounts")
+                                    .font(AppTypography.bodyMedium)
+                                    .foregroundColor(AppColors.primaryText)
+                                
+                                Spacer()
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(AppColors.secondaryBackground)
+                            .cornerRadius(8)
+                        }
+                        
+                        // Theme Mode Action Row
+                        Button {
+                            env.toggleTheme()
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: env.appTheme == .dark ? "sun.max" : "moon")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(AppColors.secondaryText)
+                                
+                                Text(env.appTheme == .dark ? "Light mode" : "Dark mode")
                                     .font(AppTypography.bodyMedium)
                                     .foregroundColor(AppColors.primaryText)
                                 
@@ -124,13 +145,13 @@ public struct NavigationDrawerView: View {
                                     .font(.system(size: 14))
                                     .foregroundColor(env.isPrivacyModeEnabled ? AppColors.brand : AppColors.secondaryText)
                                 
-                                Text("Chế độ bảo mật")
+                                Text("Privacy mode")
                                     .font(AppTypography.bodyMedium)
                                     .foregroundColor(AppColors.primaryText)
                                 
                                 Spacer()
                                 
-                                Text(env.isPrivacyModeEnabled ? "BẬT" : "TẮT")
+                                Text(env.isPrivacyModeEnabled ? "ON" : "OFF")
                                     .font(AppTypography.captionBold)
                                     .foregroundColor(env.isPrivacyModeEnabled ? AppColors.brand : AppColors.secondaryText)
                             }

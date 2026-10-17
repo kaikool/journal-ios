@@ -89,7 +89,7 @@ public struct DashboardView: View {
         AggregateEngine.bySymbol(trades: scopedTrades)
     }
     
-    // Momentum: net P&L của 7 ngày qua vs 7 ngày trước đó
+    // Momentum: net P&L of the last 7 days vs prior 7 days
     private var weekDelta: Decimal? {
         let now = Date().timeIntervalSince1970 * 1000
         var last: Decimal = 0
@@ -128,7 +128,7 @@ public struct DashboardView: View {
         let metrics = overview.metrics
         
         VStack(spacing: 0) {
-            // FilterBar chuẩn xác từ web
+            // FilterBar matching web filter-bar.tsx
             FilterBarView(
                 title: "Dashboard",
                 selectedRange: $selectedRange,
@@ -395,14 +395,14 @@ public struct DashboardView: View {
         AppCard {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
-                    Text("BIỂU ĐỒ HIỆU SUẤT")
+                    Text("PERFORMANCE CURVE")
                         .font(AppTypography.cardTitle)
                         .tracking(0.88)
                         .foregroundColor(AppColors.secondaryText)
                     Spacer()
                 }
                 
-                Picker("Tab biểu đồ", selection: $selectedChartTab) {
+                Picker("Chart tab", selection: $selectedChartTab) {
                     ForEach(DashboardChartTab.allCases) { tab in
                         Text(tab.rawValue).tag(tab)
                     }
@@ -429,7 +429,7 @@ public struct DashboardView: View {
                 AppCardHeader("Activity", icon: "clock.arrow.circlepath")
                 
                 if scopedTrades.isEmpty {
-                    Text("Chưa có lệnh giao dịch nào trong khoảng thời gian này.")
+                    Text("No trades recorded in this range.")
                         .font(AppTypography.caption)
                         .foregroundColor(AppColors.secondaryText)
                         .padding(.vertical, 8)
@@ -516,7 +516,7 @@ public struct DashboardView: View {
                         color: (metrics.expectancy ?? 0) >= 0 ? AppColors.profit : AppColors.loss
                     )
                     
-                    Text(metrics.avgRealizedR != nil ? String(format: "avg %.2fR over %d trades", metrics.avgRealizedR!, metrics.tradesWithRisk) : "Kỳ vọng/lệnh")
+                    Text(metrics.avgRealizedR != nil ? String(format: "avg %.2fR over %d trades", metrics.avgRealizedR!, metrics.tradesWithRisk) : "net P&L ÷ closed trades")
                         .font(AppTypography.caption)
                         .foregroundColor(AppColors.secondaryText)
                         .lineLimit(1)
@@ -532,7 +532,7 @@ public struct DashboardView: View {
                         .font(AppTypography.financialNumber(size: 18, weight: .semibold))
                         .foregroundColor(AppColors.primaryText)
                     
-                    Text("Thời lượng nắm giữ TB")
+                    Text("average holding time")
                         .font(AppTypography.caption)
                         .foregroundColor(AppColors.secondaryText)
                 }
@@ -549,7 +549,7 @@ public struct DashboardView: View {
                     
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Ngày thắng lớn nhất")
+                            Text("Best day")
                                 .font(AppTypography.caption)
                                 .foregroundColor(AppColors.secondaryText)
                             HStack(spacing: 6) {
@@ -568,7 +568,7 @@ public struct DashboardView: View {
                         Spacer()
                         
                         VStack(alignment: .trailing, spacing: 2) {
-                            Text("Ngày lỗ lớn nhất")
+                            Text("Worst day")
                                 .font(AppTypography.caption)
                                 .foregroundColor(AppColors.secondaryText)
                             HStack(spacing: 6) {

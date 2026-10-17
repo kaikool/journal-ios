@@ -1,7 +1,7 @@
 import Foundation
 
-/// Engine tái dựng các chu kỳ giao dịch (Round Trips - Flat to Flat) từ các lần khớp lệnh nguyên tử (Executions).
-/// Port 1:1 từ thuật toán TypeScript tại `packages/core/src/round-trips.ts`.
+/// Domain specification matching core web repository
+/// Internal domain documentation
 public enum TradeReconstructionEngine {
     
     public static let flatEpsilon: Decimal = Decimal(string: "0.000000001")! // 1e-9
@@ -55,8 +55,8 @@ public enum TradeReconstructionEngine {
         }
     }
     
-    /// Tiêu thụ khối lượng từ các lot đang mở theo phương pháp tính (FIFO, LIFO, WAVG)
-    /// và trả về giá trị khớp vào (matched entry notional = entry price * matched qty).
+/// Domain specification matching core web repository
+/// Returns matched entry notional (entry price * matched qty) (matched entry notional = entry price * matched qty).
     private static func consumeLots(cycle: OpenCycle, quantity: Decimal, method: ProfitCalcMethod) -> Decimal {
         var remaining = quantity
         var matchedNotional: Decimal = 0
@@ -162,7 +162,7 @@ public enum TradeReconstructionEngine {
         )
     }
     
-    /// Hàm chính: Tái dựng toàn bộ danh sách Trades từ các Executions nguyên tử
+/// Domain specification matching core web repository
     public static func buildRoundTrips(
         executions: [Execution],
         options: Options = Options()
@@ -170,18 +170,18 @@ public enum TradeReconstructionEngine {
         var trips: [Trade] = []
         var keyCollisions: [String: Int] = [:]
         
-        // 1. Nhóm theo accountId + symbol + importGroup
+// 1. Group by accountId + symbol + importGroup + symbol + importGroup
         var groups: [String: [Execution]] = [:]
         for execution in executions {
-            // Giả lập đọc group từ metadata JSON nếu có
+// Core implementation detail
             let groupKey = "\(execution.accountId)\u{0000}\(execution.symbol)"
             groups[groupKey, default: []].append(execution)
         }
         
-        // 2. Xử lý từng nhóm
+// 2. Process each group sequentially
         for (_, groupExecutions) in groups {
             var group = groupExecutions
-            // Sắp xếp thứ tự toàn phần (Total Order): executedAt -> id
+            // Internal implementation note
             group.sort {
                 if $0.executedAt != $1.executedAt {
                     return $0.executedAt < $1.executedAt
@@ -282,7 +282,7 @@ public enum TradeReconstructionEngine {
                                 )
                             )
                             cycle = nil
-                            // signedQty còn dư sẽ tiếp tục vòng lặp để mở chu kỳ đảo chiều!
+                            // Internal implementation note
                         }
                     }
                 }
@@ -292,7 +292,7 @@ public enum TradeReconstructionEngine {
                 }
             }
             
-            // Nếu vẫn còn chu kỳ mở (chưa đóng về flat)
+            // Internal implementation note
             if let activeCycle = cycle {
                 trips.append(
                     finalizeCycle(
@@ -309,7 +309,7 @@ public enum TradeReconstructionEngine {
             }
         }
         
-        // Sắp xếp kết quả cuối cùng theo openedAt -> key
+        // Internal implementation note
         trips.sort {
             if $0.openedAt != $1.openedAt {
                 return $0.openedAt < $1.openedAt

@@ -3,8 +3,8 @@ import SwiftUI
 import UIKit
 #endif
 
-/// Thành phần giao diện quản lý tệp đính kèm và ảnh chụp màn hình biểu đồ
-/// Port 1:1 từ `source-repo/apps/web/src/components/attachments.tsx`
+/// Attachments and chart screenshot management component
+/// Port 1:1 from `source-repo/apps/web/src/components/attachments.tsx`
 public struct AttachmentsSectionView: View {
     @ObservedObject private var dataStore = TradeDataStore.shared
     
@@ -19,7 +19,7 @@ public struct AttachmentsSectionView: View {
     @State private var errorMessage: String? = nil
     @State private var isProcessing: Bool = false
     
-    public init(ownerType: String, ownerId: String, title: String = "Tệp đính kèm & Ảnh biểu đồ") {
+    public init(ownerType: String, ownerId: String, title: String = "Attachments & Screenshots") {
         self.ownerType = ownerType
         self.ownerId = ownerId
         self.title = title
@@ -38,20 +38,20 @@ public struct AttachmentsSectionView: View {
                 
                 Spacer()
                 
-                Text("\(attachments.count) tệp (Tối đa 8MB)")
+                Text("\(attachments.count) files · Up to 8 MB each")
                     .font(.system(size: 11))
                     .foregroundColor(AppColors.secondaryText)
             }
             
-            // Thanh công cụ thêm tệp
+            // Add attachment actions toolbar
             HStack(spacing: 12) {
-                // 1. Thư viện ảnh / Ảnh chụp màn hình biểu đồ
+                // 1. Photo library / Chart screenshot picker
                 Button {
                     showPhotoPicker = true
                 } label: {
                     HStack(spacing: 6) {
                         Image(systemName: "photo.badge.plus")
-                        Text("Thêm ảnh / Screenshot")
+                        Text("Add screenshot")
                     }
                     .font(.system(size: 12, weight: .medium))
                     .padding(.horizontal, 10)
@@ -65,13 +65,13 @@ public struct AttachmentsSectionView: View {
                     )
                 }
                 
-                // 2. Chọn file tài liệu / PDF từ Tệp
+                // 2. Document file / PDF importer
                 Button {
                     showFileImporter = true
                 } label: {
                     HStack(spacing: 6) {
                         Image(systemName: "doc.badge.plus")
-                        Text("Tệp / PDF")
+                        Text("File / PDF")
                     }
                     .font(.system(size: 12, weight: .medium))
                     .padding(.horizontal, 10)
@@ -97,7 +97,7 @@ public struct AttachmentsSectionView: View {
                     .foregroundColor(AppColors.loss)
             }
             
-            // Danh sách tệp đính kèm dạng Grid
+            // Attachments Grid List
             if !attachments.isEmpty {
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                     ForEach(attachments) { att in
@@ -136,22 +136,21 @@ public struct AttachmentsSectionView: View {
         .sheet(item: $previewAttachment) { att in
             AttachmentPreviewSheet(attachment: att)
         }
-        .alert("Xóa tệp đính kèm?", isPresented: Binding(
+        .alert("Delete attachment?", isPresented: Binding(
             get: { itemToDelete != nil },
             set: { if !$0 { itemToDelete = nil } }
         )) {
-            Button("Hủy", role: .cancel) { itemToDelete = nil }
-            Button("Xóa", role: .destructive) {
+            Button("Cancel", role: .cancel) { itemToDelete = nil }
+            Button("Delete", role: .destructive) {
                 if let att = itemToDelete {
                     try? dataStore.deleteAttachment(id: att.id)
                     itemToDelete = nil
                 }
             }
         } message: {
-            Text("Tệp sẽ bị xóa khỏi nhật ký và bộ nhớ máy.")
+            Text("This file will be permanently removed.")
         }
     }
-
     
     private func handleImportedFile(_ result: Result<[URL], Error>) {
         isProcessing = true
@@ -160,7 +159,7 @@ public struct AttachmentsSectionView: View {
             let urls = try result.get()
             if let url = urls.first {
                 guard url.startAccessingSecurityScopedResource() else {
-                    errorMessage = "Không có quyền truy cập tệp đã chọn."
+                    errorMessage = "Cannot access selected file."
                     isProcessing = false
                     return
                 }
@@ -214,7 +213,7 @@ public struct AttachmentCardView: View {
                             Image(systemName: isImage ? "photo" : "doc.text.fill")
                                 .font(.system(size: 28))
                                 .foregroundColor(AppColors.accent)
-                            Text(isImage ? "Ảnh biểu đồ" : "Tài liệu PDF")
+                            Text(isImage ? "Chart screenshot" : "PDF document")
                                 .font(.system(size: 10))
                                 .foregroundColor(AppColors.secondaryText)
                         }
@@ -282,7 +281,7 @@ public struct AttachmentPreviewSheet: View {
                         Text(attachment.name)
                             .font(AppTypography.headline)
                             .foregroundColor(AppColors.primaryText)
-                        Text("Kích thước: \(attachment.size / 1024) KB • MIME: \(attachment.mime)")
+                        Text("Size: \(attachment.size / 1024) KB • MIME: \(attachment.mime)")
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText)
                     }
@@ -293,7 +292,7 @@ public struct AttachmentPreviewSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Đóng") { dismiss() }
+                    Button("Done") { dismiss() }
                 }
             }
         }

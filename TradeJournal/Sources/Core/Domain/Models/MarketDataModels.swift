@@ -1,6 +1,6 @@
 import Foundation
 
-/// 1:1 port từ bảng `market_csv_datasets` trong `schema.pg.ts`
+/// 1:1 port from table `market_csv_datasets` in `schema.pg.ts`
 public struct MarketCsvDataset: Identifiable, Codable, Sendable, Equatable {
     public let id: String
     public var name: String
@@ -47,7 +47,7 @@ public struct MarketCsvDataset: Identifiable, Codable, Sendable, Equatable {
     }
 }
 
-/// 1:1 port từ bảng `trade_excursions` trong `schema.pg.ts`
+/// 1:1 port from table `trade_excursions` in `schema.pg.ts`
 public struct TradeExcursion: Codable, Sendable, Equatable {
     public let tradeKey: String
     public let fingerprint: String

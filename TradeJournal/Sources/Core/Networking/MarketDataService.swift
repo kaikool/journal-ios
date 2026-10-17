@@ -1,7 +1,7 @@
 import Foundation
 
-/// Dịch vụ cung cấp dữ liệu nến thị trường (Market Data) cho tính năng Trade Replay và MAE/MFE.
-/// Port 1:1 từ `market-normalize.ts`, `public-crypto.ts`, và `oanda.ts` trong mã nguồn web gốc.
+/// Market data service providing historical candlestick data for Trade Replay and MAE/MFE excursions.
+/// Domain specification matching core web repository
 public final class MarketDataService: Sendable {
     public static let shared = MarketDataService()
     
@@ -10,13 +10,13 @@ public final class MarketDataService: Sendable {
     
     private init() {}
     
-    // MARK: - 1. Symbol Normalization (Port 1:1 từ `market-normalize.ts`)
+    // MARK: - 1. Symbol Normalization (Ported 1:1 from `market-normalize.ts`)
     
     public func normalizeMarketSymbol(symbol: String, provider: String) -> String {
         guard !symbol.isEmpty else { return "" }
         var clean = symbol.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
         
-        // Loại bỏ tiền tố và hậu tố thường gặp từ MT4/MT5/cTrader
+        // Strip common MT4/MT5/cTrader prefixes and suffixes
         // VD: XAUUSD.m, XAUUSDpro, XAUUSDraw, EURUSD+, #EURUSD, EURUSD_i, EURUSD_sb
         clean = clean.replacingOccurrences(of: "^#", with: "", options: .regularExpression)
         clean = clean.replacingOccurrences(
@@ -26,7 +26,7 @@ public final class MarketDataService: Sendable {
         )
         
         if provider == "oanda" {
-            // Nếu đã theo chuẩn BASE_QUOTE (như XAU_USD, EUR_USD, US30_USD), giữ nguyên
+            // Preserve standard BASE_QUOTE format (e.g. XAU_USD, EUR_USD, US30_USD)
             if clean.contains("_") { return clean }
             
             let aliases: [String: String] = [
@@ -54,7 +54,7 @@ public final class MarketDataService: Sendable {
             
             clean = clean.replacingOccurrences(of: "[/\\-\\.]", with: "", options: .regularExpression)
             
-            // Cặp 6 ký tự Forex/Kim loại: XAUUSD -> XAU_USD, EURUSD -> EUR_USD
+            // 6-character Forex/Metal pairs: XAUUSD -> XAU_USD, EURUSD -> EUR_USD
             if clean.count == 6 {
                 let base = String(clean.prefix(3))
                 let quote = String(clean.suffix(3))
@@ -97,9 +97,9 @@ public final class MarketDataService: Sendable {
         return "oanda"
     }
     
-    // MARK: - 2. Binance Public Spot Candlesticks (Không Cần API Key)
+    // MARK: - 2. Binance Public Spot Candlesticks (No API Key Required)
     
-    /// Tải nến lịch sử từ API công khai của Binance
+    /// Fetches historical candlesticks from Binance Public API
     public func fetchBinanceBars(
         symbol: String,
         interval: String = "15m",
@@ -265,13 +265,13 @@ public final class MarketDataService: Sendable {
         let cleanKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
         let cleanAcc = accountId.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !cleanKey.isEmpty, !cleanAcc.isEmpty else {
-            return (false, "Vui lòng nhập đầy đủ OANDA Access Token và v20 Account ID.")
+            return (false, "Please enter both OANDA Access Token and v20 Account ID.")
         }
         
         let base = environment.lowercased() == "live" ? "https://api-fxtrade.oanda.com" : "https://api-fxpractice.oanda.com"
         let urlStr = "\(base)/v3/accounts/\(cleanAcc)/instruments/EUR_USD/candles?count=1&granularity=M1&price=M"
         guard let url = URL(string: urlStr) else {
-            return (false, "URL OANDA không hợp lệ.")
+            return (false, "Invalid OANDA URL.")
         }
         
         var request = URLRequest(url: url)
@@ -282,21 +282,21 @@ public final class MarketDataService: Sendable {
         do {
             let (data, response) = try await session.data(for: request)
             guard let http = response as? HTTPURLResponse else {
-                return (false, "Không nhận được phản hồi từ máy chủ OANDA.")
+                return (false, "No response received from OANDA server.")
             }
             if (200...299).contains(http.statusCode) {
-                return (true, "Kết nối OANDA v20 thành công! Tài khoản \(cleanAcc) (\(environment)) đã sẵn sàng tải nến.")
+                return (true, "OANDA v20 connection successful! Account \(cleanAcc) (\(environment)) is ready for candle data.")
             } else if http.statusCode == 401 {
-                return (false, "Lỗi 401: Access Token OANDA không hợp lệ hoặc đã hết hạn.")
+                return (false, "Error 401: Invalid or expired OANDA Access Token.")
             } else if http.statusCode == 404 {
-                return (false, "Lỗi 404: Không tìm thấy v20 Account ID '\(cleanAcc)' trên môi trường \(environment).")
+                return (false, "Error 404: Account ID '\(cleanAcc)' not found in \(environment). environment.")
             } else {
                 let errJson = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
                 let errMsg = errJson?["errorMessage"] as? String ?? (String(data: data, encoding: .utf8) ?? "HTTP \(http.statusCode)")
-                return (false, "OANDA phản hồi lỗi: \(errMsg)")
+                return (false, "OANDA returned error: \(errMsg)")
             }
         } catch {
-            return (false, "Lỗi kết nối OANDA: \(error.localizedDescription)")
+            return (false, "OANDA connection error: \(error.localizedDescription)")
         }
     }
     
@@ -304,18 +304,18 @@ public final class MarketDataService: Sendable {
         do {
             let bars = try await fetchBinanceBars(symbol: "BTCUSDT", interval: "1m", limit: 1)
             if !bars.isEmpty {
-                return (true, "Kết nối Binance Public Spot API thành công! Tải nến Crypto sẵn sàng.")
+                return (true, "Binance Public Spot API connected. Crypto candles ready.")
             } else {
-                return (false, "Binance không trả về dữ liệu nến.")
+                return (false, "Binance returned no candle data.")
             }
         } catch {
-            return (false, "Lỗi kết nối Binance: \(error.localizedDescription)")
+            return (false, "Binance connection error: \(error.localizedDescription)")
         }
     }
     
     // MARK: - 4. Validation & De-duplication
     
-    /// Đảm bảo nến không bị trùng mốc thời gian và được sắp xếp tuần tự theo thời gian tăng dần
+    /// Internal domain documentation
     public func validateBars(_ bars: [MarketBar]) -> [MarketBar] {
         var unique: [Int64: MarketBar] = [:]
         for bar in bars {
@@ -326,7 +326,7 @@ public final class MarketDataService: Sendable {
     
     // MARK: - 5. Unified Trade Candles Fetcher
     
-    /// Tự động phát hiện nhà cung cấp thích hợp và tải nến thật cho một Trade
+    /// Internal domain documentation
     public func fetchBarsForTrade(
         trade: Trade,
         config: MarketConnectionConfig,
@@ -363,7 +363,7 @@ public final class MarketDataService: Sendable {
             )
             return ("OANDA v20", validateBars(bars))
         } else {
-            // Trường hợp Forex nhưng chưa có key OANDA: thử tìm cặp tương đương trên Binance hoặc thông báo
+            // Internal implementation note
             let binanceBars = try? await fetchBinanceBars(
                 symbol: "\(trade.symbol)USDT",
                 interval: resolution,
@@ -377,7 +377,7 @@ public final class MarketDataService: Sendable {
             throw NSError(
                 domain: "MarketDataService",
                 code: 404,
-                userInfo: [NSLocalizedDescriptionKey: "Cặp \(trade.symbol) thuộc nhóm Forex/CFD. Cần cấu hình OANDA Access Token trong Cài Đặt → Market Data để tải nến thật."]
+                userInfo: [NSLocalizedDescriptionKey: "Instrument \(trade.symbol) is a Forex/CFD symbol. Please configure your OANDA Access Token in Settings → Market Data to stream historical candles."]
             )
         }
     }

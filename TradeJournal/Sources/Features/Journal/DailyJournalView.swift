@@ -1,8 +1,8 @@
 import SwiftUI
 import Charts
 
-/// Model đại diện cho một ngày giao dịch trong danh sách nhật ký ngày
-/// Port 1:1 từ `JournalDay` trong `source-repo/apps/web/src/app/journal/page.tsx`
+/// Model representing a single day in the daily journal list
+/// Port 1:1 from `JournalDay` in `source-repo/apps/web/src/app/journal/page.tsx`
 public struct JournalDaySummary: Identifiable {
     public var id: String { date }
     public let date: String
@@ -16,8 +16,8 @@ public struct JournalDaySummary: Identifiable {
     public let notePreview: String
 }
 
-/// Màn hình danh sách nhật ký giao dịch hàng ngày
-/// Port 1:1 từ `source-repo/apps/web/src/app/journal/page.tsx`
+/// Daily journal list screen
+/// Port 1:1 from `source-repo/apps/web/src/app/journal/page.tsx`
 public struct DailyJournalListView: View {
     @ObservedObject private var dataStore = TradeDataStore.shared
     @EnvironmentObject private var env: AppEnvironment
@@ -43,16 +43,16 @@ public struct DailyJournalListView: View {
         
         let weekdayFormatter = DateFormatter()
         weekdayFormatter.dateFormat = "EEEE"
-        weekdayFormatter.locale = Locale(identifier: "vi_VN")
+        weekdayFormatter.locale = Locale(identifier: "en_US")
         
-        // Thu thập toàn bộ ngày có lệnh hoặc có ghi chú
+        // Collect all dates with trades or notes
         var dateMap: [String: [Trade]] = [:]
         for t in trades {
             let key = t.closedAt != nil ? isoFormatter.string(from: t.closedAt!) : isoFormatter.string(from: t.openedAt)
             dateMap[key, default: []].append(t)
         }
         
-        // Thêm các ngày có ghi chú
+        // Add dates with notes
         for dateKey in dataStore.journalDays.keys {
             if dateMap[dateKey] == nil {
                 dateMap[dateKey] = []
@@ -66,7 +66,7 @@ public struct DailyJournalListView: View {
             }
         }
         
-        // Đảm bảo có ngày hôm nay trong danh sách
+        // Ensure today is present in the list
         if dateMap[todayKey] == nil {
             dateMap[todayKey] = []
         }
@@ -148,16 +148,16 @@ public struct DailyJournalListView: View {
                     .padding(.horizontal, 14)
                     .padding(.top, 10)
                     
-                    // Danh sách thẻ ngày
+                    // Day cards list
                     if daysList.isEmpty {
                         VStack(spacing: 12) {
                             Image(systemName: "calendar.badge.exclamationmark")
                                 .font(.system(size: 36))
                                 .foregroundColor(AppColors.secondaryText.opacity(0.6))
-                            Text("Chưa có ngày giao dịch nào")
+                            Text("No trading days yet")
                                 .font(AppTypography.cardTitle)
                                 .foregroundColor(AppColors.primaryText)
-                            Text("Hãy nhập lệnh hoặc ghi chú đầu tiên để bắt đầu lưu lại nhật ký hành trình.")
+                            Text("No trading days yet — import trades or write your first day note.")
                                 .font(AppTypography.caption)
                                 .foregroundColor(AppColors.secondaryText)
                                 .multilineTextAlignment(.center)
@@ -187,7 +187,7 @@ public struct DailyJournalListView: View {
     private func dayRowCard(_ day: JournalDaySummary) -> some View {
         AppCard {
             HStack(alignment: .center, spacing: 12) {
-                // Cột ngày & thứ
+                // Date & Weekday column
                 VStack(alignment: .leading, spacing: 2) {
                     Text(day.date)
                         .font(AppTypography.bodyBold)
@@ -201,7 +201,7 @@ public struct DailyJournalListView: View {
                 Divider()
                     .frame(height: 36)
                 
-                // Cột PnL & chỉ số
+                // PnL & stats column
                 if day.tradesCount > 0 {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack(spacing: 8) {
@@ -209,7 +209,7 @@ public struct DailyJournalListView: View {
                                 .font(AppTypography.bodyBold)
                                 .foregroundColor(day.netPnl >= 0 ? AppColors.profit : AppColors.loss)
                             
-                            Text("(\(day.tradesCount) lệnh)")
+                            Text("(\(day.tradesCount) trade\(day.tradesCount == 1 ? "" : "s"))")
                                 .font(AppTypography.caption)
                                 .foregroundColor(AppColors.secondaryText)
                         }
@@ -226,19 +226,19 @@ public struct DailyJournalListView: View {
                         }
                     }
                 } else {
-                    Text("Không có lệnh giao dịch")
+                    Text("No trades")
                         .font(AppTypography.caption)
                         .foregroundColor(AppColors.secondaryText)
                 }
                 
                 Spacer()
                 
-                // Huy hiệu có ghi chú
+                // Note badge indicator
                 if day.hasNote {
                     HStack(spacing: 4) {
                         Image(systemName: "note.text")
                             .font(.system(size: 11))
-                        Text("Ghi chú")
+                        Text("note")
                             .font(AppTypography.caption)
                     }
                     .padding(.horizontal, 8)
@@ -256,8 +256,8 @@ public struct DailyJournalListView: View {
     }
 }
 
-/// Màn hình chi tiết một ngày giao dịch
-/// Port 1:1 từ `source-repo/apps/web/src/app/journal/[date]/page.tsx`
+/// Day detail view
+/// Port 1:1 from `source-repo/apps/web/src/app/journal/[date]/page.tsx`
 public struct DailyJournalDetailView: View {
     public let date: String
     
@@ -321,23 +321,23 @@ public struct DailyJournalDetailView: View {
             
             ScrollView {
                 VStack(spacing: 12) {
-                    // Card 1: Day stats KPI grid (Port 1:1 từ Card Day stats)
+                    // Card 1: Day stats KPI grid (port 1:1 from web Day stats)
                     dayStatsCard
                     
-                    // Card 2: Biểu đồ Intraday cumulative net P&L
+                    // Card 2: Intraday cumulative net P&L chart
                     if !intradayPoints.isEmpty {
                         intradayChartCard
                     }
                     
-                    // Card 3: Danh sách các lệnh trong ngày (Trades list)
+                    // Card 3: Closed and open trades list
                     if !dayTrades.isEmpty {
                         dayTradesCard
                     }
                     
-                    // Card 4: Day note editor, Voice Note & AI Recap
+                    // Card 4: Day note editor & AI Recap
                     dayNoteCard
                     
-                    // Card 5: Tệp đính kèm & Ảnh biểu đồ của ngày
+                    // Card 5: Attachments & chart screenshots
                     AttachmentsSectionView(ownerType: "day", ownerId: date, title: "Attachments")
                         .padding(.horizontal, 14)
                 }
@@ -368,12 +368,12 @@ public struct DailyJournalDetailView: View {
             
             Spacer()
             
-            // Huy hiệu tổng kết P&L nhanh
+            // Quick P&L summary badge
             VStack(alignment: .trailing, spacing: 2) {
                 Text(metrics.netPnl >= 0 ? "+\(Formatters.currency(metrics.netPnl))" : Formatters.currency(metrics.netPnl))
                     .font(AppTypography.title3)
                     .foregroundColor(metrics.netPnl >= 0 ? AppColors.profit : AppColors.loss)
-                Text("\(metrics.closedTrades) lệnh đã đóng")
+                Text("\(metrics.closedTrades) closed trade\(metrics.closedTrades == 1 ? "" : "s")")
                     .font(AppTypography.caption)
                     .foregroundColor(AppColors.secondaryText)
             }
@@ -388,35 +388,35 @@ public struct DailyJournalDetailView: View {
         guard let d = formatter.date(from: date) else { return "" }
         let wf = DateFormatter()
         wf.dateFormat = "EEEE, dd MMMM yyyy"
-        wf.locale = Locale(identifier: "vi_VN")
+        wf.locale = Locale(identifier: "en_US")
         return wf.string(from: d)
     }
     
     private var dayStatsCard: some View {
         AppCard {
             VStack(alignment: .leading, spacing: 14) {
-                Text("Chỉ số ngày (Day stats)")
+                Text("Day stats")
                     .font(AppTypography.headline)
                     .foregroundColor(AppColors.primaryText)
                 
                 if metrics.closedTrades > 0 {
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 14) {
                         statItem(label: "Net P&L", value: metrics.netPnl >= 0 ? "+\(Formatters.currency(metrics.netPnl))" : Formatters.currency(metrics.netPnl), color: metrics.netPnl >= 0 ? AppColors.profit : AppColors.loss)
-                        statItem(label: "Tổng lệnh", value: "\(metrics.closedTrades)")
-                        statItem(label: "Tỷ lệ thắng", value: Formatters.percent(metrics.winRate))
+                        statItem(label: "Trades", value: "\(metrics.closedTrades)")
+                        statItem(label: "Winrate", value: Formatters.percent(metrics.winRate))
                         
-                        statItem(label: "Lệnh thắng", value: "\(metrics.wins)", color: AppColors.profit)
-                        statItem(label: "Lệnh thua", value: "\(metrics.losses)", color: AppColors.loss)
-                        statItem(label: "Lãi gộp", value: Formatters.currency(metrics.grossPnl ?? 0))
+                        statItem(label: "Winners", value: "\(metrics.wins)", color: AppColors.profit)
+                        statItem(label: "Losers", value: "\(metrics.losses)", color: AppColors.loss)
+                        statItem(label: "Gross", value: Formatters.currency(metrics.grossPnl ?? 0))
                         
-                        statItem(label: "Phí & Phí sàn", value: Formatters.currency(metrics.fees ?? 0))
-                        statItem(label: "Khối lượng", value: "\(metrics.totalVolume.formatted())")
+                        statItem(label: "Fees", value: Formatters.currency(metrics.fees ?? 0))
+                        statItem(label: "Volume", value: "\(metrics.totalVolume.formatted())")
                         statItem(label: "Profit Factor", value: metrics.profitFactorIsInfinite ? "∞" : (metrics.profitFactor != nil ? String(format: "%.2f", metrics.profitFactor!) : "–"))
                         
-                        statItem(label: "Kỳ vọng (Exp)", value: metrics.expectancy != nil ? Formatters.currency(metrics.expectancy!) : "–")
+                        statItem(label: "Expectancy", value: metrics.expectancy != nil ? Formatters.currency(metrics.expectancy!) : "–")
                     }
                 } else {
-                    Text("Chưa có lệnh giao dịch nào được đóng trong ngày này.")
+                    Text("No closed trades this day.")
                         .font(AppTypography.caption)
                         .foregroundColor(AppColors.secondaryText)
                         .frame(maxWidth: .infinity, alignment: .center)
@@ -442,21 +442,21 @@ public struct DailyJournalDetailView: View {
     private var intradayChartCard: some View {
         AppCard {
             VStack(alignment: .leading, spacing: 12) {
-                Text("Lợi nhuận tích luỹ trong ngày (Intraday Net P&L)")
+                Text("Intraday cumulative net P&L")
                     .font(AppTypography.headline)
                     .foregroundColor(AppColors.primaryText)
                 
                 Chart {
                     ForEach(Array(intradayPoints.enumerated()), id: \.offset) { index, point in
                         LineMark(
-                            x: .value("Thời gian", point.timeStr),
+                            x: .value("Time", point.timeStr),
                             y: .value("P&L", NSDecimalNumber(decimal: point.cumPnl).doubleValue)
                         )
                         .foregroundStyle(metrics.netPnl >= 0 ? AppColors.profit : AppColors.loss)
                         .lineStyle(StrokeStyle(lineWidth: 2.5))
                         
                         AreaMark(
-                            x: .value("Thời gian", point.timeStr),
+                            x: .value("Time", point.timeStr),
                             y: .value("P&L", NSDecimalNumber(decimal: point.cumPnl).doubleValue)
                         )
                         .foregroundStyle(
@@ -484,7 +484,7 @@ public struct DailyJournalDetailView: View {
         AppCard {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
-                    Text("Lệnh giao dịch (\(dayTrades.count))")
+                    Text("Trades (\(dayTrades.count))")
                         .font(AppTypography.headline)
                         .foregroundColor(AppColors.primaryText)
                     Spacer()
@@ -494,7 +494,7 @@ public struct DailyJournalDetailView: View {
                     ForEach(dayTrades) { trade in
                         NavigationLink(destination: TradeDetailView(trade: trade)) {
                             HStack(spacing: 8) {
-                                // Badge trạng thái WIN / LOSS / BE
+                                // Status badge WIN / LOSS / BE
                                 Text(trade.status.rawValue.uppercased())
                                     .font(.system(size: 10, weight: .bold))
                                     .padding(.horizontal, 6)
@@ -551,13 +551,13 @@ public struct DailyJournalDetailView: View {
         AppCard {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
-                    Text("Ghi chú ngày (Day note)")
+                    Text("Day note")
                         .font(AppTypography.headline)
                         .foregroundColor(AppColors.primaryText)
                     
                     Spacer()
                     
-                    // Nút AI Recap
+                    // AI Recap button
                     Button {
                         generateAiRecap()
                     } label: {
@@ -580,14 +580,14 @@ public struct DailyJournalDetailView: View {
                     .disabled(isGeneratingAiRecap || dayTrades.isEmpty)
                 }
                 
-                Text("Ghi chú này được lưu trữ cục bộ và đồng bộ khi kết nối. Bạn có thể tự do viết cảm xúc, kịch bản thị trường hoặc để AI tạo tổng kết tự động.")
+                Text("Notes are saved locally and synced automatically. Write your reflections, market observations, or generate an AI recap.")
                     .font(AppTypography.caption)
                     .foregroundColor(AppColors.secondaryText)
                 
-                // Trình soạn thảo ghi chú
+                // Note text editor
                 ZStack(alignment: .topLeading) {
                     if noteText.isEmpty {
-                        Text("Nhập nhật ký cảm xúc, nhận định thị trường ngày \(date)...")
+                        Text("Write your review for \(date)...")
                             .font(AppTypography.body)
                             .foregroundColor(AppColors.secondaryText.opacity(0.6))
                             .padding(.horizontal, 8)
@@ -614,7 +614,7 @@ public struct DailyJournalDetailView: View {
                     
                     Spacer()
                     
-                    Button("Lưu ngay") {
+                    Button("Save now") {
                         saveNoteImmediately()
                     }
                     .font(AppTypography.captionBold)
@@ -637,14 +637,14 @@ public struct DailyJournalDetailView: View {
     }
     
     private func scheduleSaveNote(_ text: String) {
-        saveStatusMessage = "Đang lưu..."
+        saveStatusMessage = "Saving..."
         dataStore.saveJournalDayNote(date: date, note: text)
         var calNote = dataStore.calendarNotes[date] ?? JournalNote(date: date, content: text)
         calNote.content = text
         calNote.updatedAt = Date()
         dataStore.saveCalendarNote(calNote)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-            self.saveStatusMessage = "Đã lưu tự động"
+            self.saveStatusMessage = "Auto-saved"
         }
     }
     
@@ -654,7 +654,7 @@ public struct DailyJournalDetailView: View {
         calNote.content = noteText
         calNote.updatedAt = Date()
         dataStore.saveCalendarNote(calNote)
-        saveStatusMessage = "Đã lưu"
+        saveStatusMessage = "Saved"
     }
     
     private func generateAiRecap() {
@@ -663,8 +663,8 @@ public struct DailyJournalDetailView: View {
         aiErrorMessage = nil
         
         Task {
-            let prompt = "Hãy tổng kết ngày giao dịch \(date) gồm \(metrics.closedTrades) lệnh, Net P&L: \(metrics.netPnl), Tỷ lệ thắng: \(metrics.winRate?.description ?? "0"). Chỉ ra 2 điểm tốt và 1 điểm cần cải thiện trong kỷ luật."
-            let recap = (try? await AIReflectionService.shared.requestReflection(action: .recap, prompt: prompt, metrics: metrics)) ?? "Đã ghi nhận tổng kết ngày \(date)."
+            let prompt = "Please summarize the trading day \(date) with \(metrics.closedTrades) trades, Net P&L: \(metrics.netPnl), Win rate: \(metrics.winRate?.description ?? "0"). Highlight 2 strengths and 1 area for discipline improvement."
+            let recap = (try? await AIReflectionService.shared.requestReflection(action: .recap, prompt: prompt, metrics: metrics)) ?? "Daily recap recorded for \(date)."
             
             await MainActor.run {
                 self.isGeneratingAiRecap = false
@@ -676,15 +676,15 @@ public struct DailyJournalDetailView: View {
     }
     
     private func prepareExport() {
-        let header = "Nhật ký giao dịch · \(date)\n"
-        let stats = "Tổng lệnh: \(metrics.closedTrades) | Net P&L: \(Formatters.currency(metrics.netPnl)) | Tỷ lệ thắng: \(Formatters.percent(metrics.winRate))\n\n"
-        let note = "Ghi chú:\n\(noteText)"
+        let header = "Trade Journal · \(date)\n"
+        let stats = "Trades: \(metrics.closedTrades) | Net P&L: \(Formatters.currency(metrics.netPnl)) | Win rate: \(Formatters.percent(metrics.winRate))\n\n"
+        let note = "Notes:\n\(noteText)"
         exportText = header + stats + note
         showExportSheet = true
     }
 }
 
-/// Modal xuất và chia sẻ tài liệu đánh giá ngày
+/// Modal for exporting and sharing daily review
 public struct ReviewExportModal: View {
     public let title: String
     public let exportText: String
@@ -713,7 +713,7 @@ public struct ReviewExportModal: View {
                 } label: {
                     HStack {
                         Image(systemName: "doc.on.doc")
-                        Text("Sao chép vào Clipboard")
+                        Text("Copy to Clipboard")
                     }
                     .font(AppTypography.headline)
                     .frame(maxWidth: .infinity)
@@ -729,7 +729,7 @@ public struct ReviewExportModal: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Đóng") {
+                    Button("Done") {
                         dismiss()
                     }
                 }

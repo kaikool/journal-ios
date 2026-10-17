@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Màn hình nhập giao dịch thủ công (Manual Trade Entry)
-/// Port 1:1 từ `source-repo/apps/web/src/components/manual-trade-entry.tsx` & `add-trade-dialog.tsx`
+/// Manual trade entry sheet
+/// Port 1:1 from `source-repo/apps/web/src/components/manual-trade-entry.tsx` & `add-trade-dialog.tsx`
 public struct AddTradeSheet: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var env: AppEnvironment
@@ -29,7 +29,7 @@ public struct AddTradeSheet: View {
     @State private var errorMessage: String? = nil
     
     private let commonSymbols = ["NQ", "ES", "EURUSD", "GBPUSD", "BTCUSDT", "ETHUSDT", "AAPL", "NVDA", "XAUUSD"]
-    private let commonMistakes = ["FOMO", "Dời SL", "Gồng lỗ", "Đánh ngược trend", "Khối lượng quá lớn", "Vào lệnh sớm"]
+    private let commonMistakes = ["FOMO", "Moved SL", "Held loser", "Counter-trend", "Oversized", "Early entry"]
     
     public init(initialDate: Date = Date()) {
         _openedAt = State(initialValue: initialDate)
@@ -73,15 +73,15 @@ public struct AddTradeSheet: View {
         NavigationStack {
             Form {
                 // Section 1: Account & Symbol
-                Section("Tài khoản & Mã giao dịch") {
-                    Picker("Tài khoản", selection: $accountId) {
+                Section("Account & Instrument") {
+                    Picker("Account", selection: $accountId) {
                         ForEach(dataStore.accounts) { acc in
                             Text("\(acc.name) (\(acc.currency))").tag(acc.id)
                         }
                     }
                     
                     VStack(alignment: .leading, spacing: 6) {
-                        TextField("Mã (VD: NQ, EURUSD, AAPL...)", text: $symbol)
+                        TextField("Symbol (e.g. NQ, EURUSD, AAPL...)", text: $symbol)
                             .textInputAutocapitalization(.characters)
                             .font(AppTypography.subheadlineBold)
                         
@@ -104,18 +104,18 @@ public struct AddTradeSheet: View {
                     }
                 }
                 
-                // Section 2: Vị thế & Giá
-                Section("Thông số lệnh") {
-                    Picker("Hướng lệnh", selection: $direction) {
-                        Text("MUA / LONG").tag(TradeDirection.long)
-                        Text("BÁN / SHORT").tag(TradeDirection.short)
+                // Section 2: Position & Pricing
+                Section("Position & Pricing") {
+                    Picker("Direction", selection: $direction) {
+                        Text("BUY / LONG").tag(TradeDirection.long)
+                        Text("SELL / SHORT").tag(TradeDirection.short)
                     }
                     .pickerStyle(.segmented)
                     
-                    Toggle("Đã đóng lệnh (Closed)", isOn: $isClosed)
+                    Toggle("Closed position", isOn: $isClosed)
                     
                     HStack {
-                        Text("Khối lượng:")
+                        Text("Quantity:")
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText)
                         Spacer()
@@ -125,29 +125,29 @@ public struct AddTradeSheet: View {
                     }
                     
                     HStack {
-                        Text("Giá vào (Entry):")
+                        Text("Entry price:")
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText)
                         Spacer()
-                        TextField("Giá khớp", text: $entryPriceText)
+                        TextField("Entry price", text: $entryPriceText)
                             .keyboardType(.decimalPad)
                             .multilineTextAlignment(.trailing)
                     }
                     
                     if isClosed {
                         HStack {
-                            Text("Giá ra (Exit):")
+                            Text("Exit price:")
                                 .font(AppTypography.caption)
                                 .foregroundColor(AppColors.secondaryText)
                             Spacer()
-                            TextField("Giá chốt", text: $exitPriceText)
+                            TextField("Exit price", text: $exitPriceText)
                                 .keyboardType(.decimalPad)
                                 .multilineTextAlignment(.trailing)
                         }
                     }
                     
                     HStack {
-                        Text("Phí giao dịch:")
+                        Text("Fees:")
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText)
                         Spacer()
@@ -158,7 +158,7 @@ public struct AddTradeSheet: View {
                     
                     if let pnl = estimatedPnl {
                         HStack {
-                            Text("Lãi/Lỗ tạm tính:")
+                            Text("Estimated P&L:")
                                 .font(AppTypography.captionBold)
                             Spacer()
                             Text(Formatters.formatPnL(pnl, currency: env.currentCurrency))
@@ -168,48 +168,48 @@ public struct AddTradeSheet: View {
                     }
                 }
                 
-                // Section 3: Thời gian
-                Section("Thời gian khớp lệnh") {
-                    DatePicker("Thời gian vào:", selection: $openedAt, displayedComponents: [.date, .hourAndMinute])
+                // Section 3: Execution Timestamps
+                Section("Execution Timestamps") {
+                    DatePicker("Opened at:", selection: $openedAt, displayedComponents: [.date, .hourAndMinute])
                     if isClosed {
-                        DatePicker("Thời gian đóng:", selection: $closedAt, displayedComponents: [.date, .hourAndMinute])
+                        DatePicker("Closed at:", selection: $closedAt, displayedComponents: [.date, .hourAndMinute])
                     }
                 }
                 
-                // Section 4: Quản trị rủi ro & Playbook
-                Section("Quản trị rủi ro & Chiến lược") {
+                // Section 4: Risk Management & Strategy
+                Section("Risk & Strategy") {
                     HStack {
                         Text("Stop Loss:")
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText)
                         Spacer()
-                        TextField("Không bắt buộc", text: $stopLossText)
+                        TextField("Optional", text: $stopLossText)
                             .keyboardType(.decimalPad)
                             .multilineTextAlignment(.trailing)
                     }
                     
                     HStack {
-                        Text("Take Profit:")
+                        Text("Profit Target:")
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText)
                         Spacer()
-                        TextField("Không bắt buộc", text: $profitTargetText)
+                        TextField("Optional", text: $profitTargetText)
                             .keyboardType(.decimalPad)
                             .multilineTextAlignment(.trailing)
                     }
                     
-                    Picker("Chiến lược (Playbook)", selection: $selectedPlaybookId) {
-                        Text("Không áp dụng").tag("")
+                    Picker("Playbook", selection: $selectedPlaybookId) {
+                        Text("None").tag("")
                         ForEach(dataStore.playbooks) { pb in
                             Text(pb.name).tag(pb.id)
                         }
                     }
                 }
                 
-                // Section 5: Đánh giá & Ghi chú
-                Section("Đánh giá kỷ luật & Nhật ký") {
+                // Section 5: Discipline & Journal
+                Section("Discipline & Journal") {
                     HStack {
-                        Text("Đánh giá lệnh:")
+                        Text("Rating:")
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText)
                         Spacer()
@@ -240,9 +240,9 @@ public struct AddTradeSheet: View {
                         }
                         
                         HStack {
-                            TextField("Thêm tag (VD: fvg, scalping...)", text: $tagInput)
+                            TextField("Add tag (e.g. fvg, scalp...)", text: $tagInput)
                                 .textFieldStyle(.roundedBorder)
-                            Button("Thêm") {
+                            Button("Add") {
                                 let clean = tagInput.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: "#", with: "")
                                 if !clean.isEmpty && !tags.contains(clean) {
                                     tags.append(clean)
@@ -255,7 +255,7 @@ public struct AddTradeSheet: View {
                     
                     // Mistakes
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("Sai lầm vi phạm:")
+                        Text("Mistakes:")
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText)
                         
@@ -290,9 +290,9 @@ public struct AddTradeSheet: View {
                         }
                         
                         HStack {
-                            TextField("Sai lầm khác...", text: $mistakeInput)
+                            TextField("Other mistake...", text: $mistakeInput)
                                 .textFieldStyle(.roundedBorder)
-                            Button("Thêm") {
+                            Button("Add") {
                                 let clean = mistakeInput.trimmingCharacters(in: .whitespaces)
                                 if !clean.isEmpty && !mistakes.contains(clean) {
                                     mistakes.append(clean)
@@ -305,7 +305,7 @@ public struct AddTradeSheet: View {
                     
                     // Notes Text Editor
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Ghi chú lý do vào lệnh & tâm lý:")
+                        Text("Notes on thesis & psychology:")
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText)
                         TextEditor(text: $notes)
@@ -322,14 +322,14 @@ public struct AddTradeSheet: View {
                     }
                 }
             }
-            .navigationTitle("Ghi Nhận Giao Dịch")
+            .navigationTitle("Add Trade")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Hủy") { dismiss() }
+                    Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Lưu Giao Dịch") {
+                    Button("Save Trade") {
                         saveTrade()
                     }
                     .font(AppTypography.headline)
@@ -353,7 +353,7 @@ public struct AddTradeSheet: View {
     
     private func saveTrade() {
         guard isValid else {
-            errorMessage = "Vui lòng nhập đầy đủ mã, khối lượng và giá hợp lệ."
+            errorMessage = "Please enter valid symbol, quantity, and price."
             return
         }
         

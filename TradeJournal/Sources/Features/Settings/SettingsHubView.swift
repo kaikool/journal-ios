@@ -1,9 +1,9 @@
 import SwiftUI
 
 public enum SettingsSubTab: String, CaseIterable, Identifiable {
-    case accounts = "Tài Khoản"
-    case importFile = "Nhập File"
-    case settings = "Cài Đặt"
+    case accounts = "Accounts"
+    case importFile = "Import"
+    case settings = "Settings"
     
     public var id: String { rawValue }
     
@@ -16,8 +16,7 @@ public enum SettingsSubTab: String, CaseIterable, Identifiable {
     }
 }
 
-/// Trung tâm điều phối Cài đặt & Quản lý hệ thống
-/// Kết hợp 3 màn hình: Quản lý tài khoản, Nhập file statement/lệnh, Cài đặt hệ thống
+/// Settings Hub coordinating Accounts Management, Statement Import, and Application Settings
 public struct SettingsHubView: View {
     @State private var selectedSubTab: SettingsSubTab = .accounts
     
@@ -25,8 +24,8 @@ public struct SettingsHubView: View {
     
     public var body: some View {
         VStack(spacing: 0) {
-            // Segmented Navigation Header theo chuẩn Apple HIG
-            Picker("Phần cài đặt", selection: $selectedSubTab) {
+            // Segmented Navigation Header adhering to Apple HIG
+            Picker("Settings Section", selection: $selectedSubTab) {
                 ForEach(SettingsSubTab.allCases) { tab in
                     Text(tab.rawValue).tag(tab)
                 }
@@ -38,7 +37,7 @@ public struct SettingsHubView: View {
             
             Divider()
             
-            // Nội dung tab con tương ứng
+            // Sub-view presentation
             switch selectedSubTab {
             case .accounts:
                 AccountsManagerView()

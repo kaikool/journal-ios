@@ -1,11 +1,11 @@
 import SwiftUI
 
-/// Hệ typography chuẩn xác 100% đối chiếu với hệ thống Tailwind trong `source-repo/apps/web`:
-/// - Tiêu đề thẻ (CardTitle): 11px, weight: .medium, uppercase, tracking +0.88
-/// - Chỉ số chính (Hero Metric): 26px, weight: .semibold, số monospaced
-/// - Tiêu đề trang (PageTitle): 16px, weight: .semibold
-/// - Văn bản thông thường (Body): 13px
-/// - Nhãn phụ (Caption/Subtitle): 11px
+/// Typography system matching 100% of Tailwind scales in `source-repo/apps/web`:
+/// - Card title (CardTitle): 11px, weight: .medium, uppercase, tracking +0.88
+/// - Hero metric (Hero Metric): 26px, weight: .semibold, monospaced digits
+/// - Page title (PageTitle): 16px, weight: .semibold
+/// - Body text (Body): 13px
+/// - Caption / subtitle: 11px
 public enum AppTypography {
     // Web Tailwind Parity Scales
     public static let pageTitle = Font.system(size: 16, weight: .semibold)
@@ -32,8 +32,8 @@ public enum AppTypography {
     public static let subheadline = Font.system(size: 12, weight: .regular)
     public static let subheadlineBold = Font.system(size: 12, weight: .semibold)
     
-    /// Font chuyên biệt cho số tiền và giá tài chính: cố định bề ngang chữ số (monospaced digits)
-    /// để các cột số không bị rung lắc khi cập nhật.
+    /// Specialized font for financial numbers and monetary amounts: monospaced digits
+    /// to avoid column jitter during real-time value updates.
     public static func financialNumber(size: CGFloat = 24, weight: Font.Weight = .semibold) -> Font {
         Font.system(size: size, weight: weight, design: .monospaced)
     }

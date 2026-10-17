@@ -3,7 +3,7 @@ import Foundation
 public typealias AssetClass = String // "equity" | "option" | "futures" | "forex" | "crypto" | "cfd" | "other"
 public typealias ExecutionSource = String // "sync" | "import" | "manual"
 
-/// Lần khớp lệnh nguyên tử (Execution Fill)
+/// Atomic execution fill model (Execution Fill)
 public struct Execution: Identifiable, Codable, Equatable, Hashable, Sendable {
     public let id: String
     public let accountId: String
@@ -78,7 +78,7 @@ public enum TradeStatus: String, Codable, Equatable {
     case breakeven = "breakeven"
 }
 
-/// Ghi nhận P&L cho từng lần đóng một phần của vị thế
+/// Domain specification matching core web repository
 public struct ExitAttribution: Codable, Equatable, Hashable {
     public let executionId: String
     public let grossPnl: Decimal
@@ -91,7 +91,7 @@ public struct ExitAttribution: Codable, Equatable, Hashable {
     }
 }
 
-/// Chu kỳ vị thế giao dịch Flat-to-Flat (RoundTrip / Trade)
+/// Flat-to-Flat round-trip trade cycle (RoundTrip / Trade)
 public struct Trade: Identifiable, Codable, Equatable {
     public var id: String { key }
     public let key: String
@@ -115,7 +115,7 @@ public struct Trade: Identifiable, Codable, Equatable {
     public var durationMs: Int64?
     public var contractMultiplier: Decimal?
     
-    // Thuộc tính do người dùng ghi chú (User Annotations)
+// User-annotated properties (User Annotations)
     public var notes: String?
     public var tags: [String]
     public var mistakes: [String]

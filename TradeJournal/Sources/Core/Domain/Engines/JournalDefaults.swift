@@ -50,7 +50,7 @@ public struct JournalDefaults: Codable, Equatable {
     }
 }
 
-/// Port 1:1 từ `apps/web/src/lib/journal-defaults.ts`.
+/// Ported 1:1 from `apps/web/src/lib/journal-defaults.ts`.
 public enum JournalDefaultsEngine {
     
     public static func matchesRule(ruleAccountId: String, ruleSymbol: String, accountId: String, symbol: String) -> Bool {

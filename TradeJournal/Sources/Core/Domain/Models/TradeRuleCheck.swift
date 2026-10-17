@@ -1,6 +1,6 @@
 import Foundation
 
-/// 1:1 port từ bảng `trade_rule_checks` trong `schema.pg.ts`
+/// 1:1 port from table `trade_rule_checks` in `schema.pg.ts`
 public struct TradeRuleCheck: Identifiable, Codable, Sendable, Equatable {
     public let id: String
     public let tradeKey: String

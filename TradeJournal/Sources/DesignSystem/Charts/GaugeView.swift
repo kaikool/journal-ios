@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// Semicircle Gauge đối chiếu 1:1 với `source-repo/apps/web/src/components/charts/gauge.tsx`:
-/// Biểu đồ hình bán nguyệt đo tỉ lệ 0–1 (Trade win %, Day win %).
-/// Luôn in giá trị % ở chính giữa, cung tròn chỉ mang tính trực quan hóa bổ trợ.
+/// Semicircle Gauge ported 1:1 from `components/charts/gauge.tsx`:
+/// Semicircle gauge measuring 0–1 ratios (Trade win %, Day win %).
+/// Always renders % value in center with visual arc.
 public struct GaugeView: View {
     private let value: Double?
     private let label: String
@@ -53,6 +53,6 @@ public struct GaugeView: View {
             .frame(width: size, height: size / 2 + 12)
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(label): \(value == nil ? "không có dữ liệu" : String(format: "%.1f%%", ratio * 100))")
+        .accessibilityLabel("\(label): \(value == nil ? "no data" : String(format: "%.1f%%", ratio * 100))")
     }
 }

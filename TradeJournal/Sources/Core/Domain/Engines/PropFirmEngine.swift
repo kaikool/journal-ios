@@ -12,11 +12,11 @@ public enum PropProgram: String, CaseIterable, Codable, Sendable {
     
     public var label: String {
         switch self {
-        case .evaluation: return "Đánh giá (Vòng 1)"
-        case .verification: return "Xác minh (Vòng 2)"
-        case .funded: return "Cấp vốn (Funded)"
-        case .instantFunded: return "Cấp vốn tức thì"
-        case .live: return "Tài khoản Live"
+        case .evaluation: return "Evaluation"
+        case .verification: return "Verification"
+        case .funded: return "Funded"
+        case .instantFunded: return "Instant funded"
+        case .live: return "Live account"
         }
     }
 }
@@ -30,11 +30,11 @@ public enum PropStatus: String, CaseIterable, Codable, Sendable {
     
     public var label: String {
         switch self {
-        case .active: return "Đang hoạt động"
-        case .inactive: return "Tạm dừng"
-        case .passed: return "Đã đỗ"
-        case .breached: return "Phạm quy (Vi phạm)"
-        case .closed: return "Đã đóng"
+        case .active: return "Active"
+        case .inactive: return "Inactive"
+        case .passed: return "Passed"
+        case .breached: return "Breached"
+        case .closed: return "Closed"
         }
     }
 }
@@ -48,11 +48,11 @@ public enum PayoutStatus: String, CaseIterable, Codable, Sendable {
     
     public var label: String {
         switch self {
-        case .requested: return "Đã yêu cầu"
-        case .approved: return "Đã duyệt"
-        case .completed: return "Hoàn tất"
-        case .rejected: return "Từ chối"
-        case .cancelled: return "Đã hủy"
+        case .requested: return "Requested"
+        case .approved: return "Approved"
+        case .completed: return "Completed"
+        case .rejected: return "Rejected"
+        case .cancelled: return "Cancelled"
         }
     }
 }
@@ -69,14 +69,14 @@ public enum PropExpenseCategory: String, CaseIterable, Codable, Sendable {
     
     public var label: String {
         switch self {
-        case .evaluation: return "Phí thi"
-        case .reset: return "Phí reset"
-        case .activation: return "Phí kích hoạt"
-        case .subscription: return "Đăng ký định kỳ"
-        case .platform: return "Nền tảng"
-        case .marketData: return "Dữ liệu thị trường"
-        case .transfer: return "Phí chuyển tiền"
-        case .other: return "Chi phí khác"
+        case .evaluation: return "Evaluation fee"
+        case .reset: return "Reset fee"
+        case .activation: return "Activation fee"
+        case .subscription: return "Subscription"
+        case .platform: return "Platform"
+        case .marketData: return "Market data"
+        case .transfer: return "Transfer fee"
+        case .other: return "Other expense"
         }
     }
 }
@@ -386,7 +386,7 @@ public enum PropFirmEngine {
         "BHD", "IQD", "JOD", "KWD", "LYD", "OMR", "TND"
     ]
     
-    /// Trả về số chữ số thập phân chuẩn ISO 4217 cho mã tiền tệ
+    /// Internal domain documentation
     public static func currencyDigits(_ currency: String) throws -> Int {
         let code = currency.trimmingCharacters(in: .whitespaces).uppercased()
         guard code.count == 3, code.range(of: "^[A-Z]{3}$", options: .regularExpression) != nil else {
@@ -397,8 +397,8 @@ public enum PropFirmEngine {
         return 2
     }
     
-    /// Chuyển đổi chính xác chuỗi thập phân sang đơn vị tiền tệ nhỏ nhất (Minor unit cents/pence),
-    /// cấm làm tròn âm thầm (silent rounding), cấm số âm hoặc format lỗi.
+    /// Internal domain documentation
+    /// Internal domain documentation
     public static func toMinor(value: Any?, currency: String) throws -> Int64 {
         let digits = try currencyDigits(currency)
         guard let str = value as? String else {
@@ -433,7 +433,7 @@ public enum PropFirmEngine {
         return result
     }
     
-    /// Định dạng số nguyên minor units về chuỗi thập phân
+    /// Internal domain documentation
     public static func fromMinor(_ value: Int64, currency: String) throws -> String {
         let digits = try currencyDigits(currency)
         let factor = pow(10.0, Double(digits))
@@ -441,7 +441,7 @@ public enum PropFirmEngine {
         return String(format: "%.\(digits)f", doubleVal)
     }
     
-    /// Tính toán kỳ vọng lợi nhuận ròng Payout của Trader theo tỷ lệ basis points:
+    /// Internal domain documentation
     /// `((amountMinor * splitBps + 5000) / 10000) - feeMinor`
     public static func expectedPayout(entry: PropEntryItem) -> Int64 {
         let amount = entry.amountMinor
@@ -450,7 +450,7 @@ public enum PropFirmEngine {
         return calc - entry.feeMinor
     }
     
-    /// Tổng số tiền thực nhận từ các biên lai thanh toán (trừ các khoản đảo/reversal)
+    /// Internal domain documentation
     public static func receivedPayout(id: String, receipts: [PropReceiptItem]) -> Int64 {
         receipts.reduce(0) { sum, row in
             guard !row.voided && row.payoutId == id else { return sum }
@@ -466,7 +466,7 @@ public enum PropFirmEngine {
         return receipt.occurredOn
     }
     
-    /// Hợp nhất tất cả các chuyển dịch tiền tệ (Chi phí, Hoàn tiền, Biên lai nhận tiền, Đảo tiền)
+    /// Internal domain documentation
     public static func cashMovements(entries: [PropEntryItem], receipts: [PropReceiptItem]) -> [CashMovementItem] {
         let activeEntries = entries.filter { !$0.voided }
         let entryMap = Dictionary(uniqueKeysWithValues: activeEntries.map { ($0.id, $0) })
@@ -514,8 +514,8 @@ public enum PropFirmEngine {
         }
     }
     
-    /// Tổng hợp số liệu tiền mặt (Spent, Refunds, Net Spend, Received, Net, ROI).
-    /// Bắt buộc chọn đúng 1 loại tiền tệ, từ chối việc cộng dồn tiền tệ khác nhau mà không có tỷ giá chứng từ.
+    /// Internal domain documentation
+    /// Internal domain documentation
     public static func cashSummary(rows: [CashMovementItem]) throws -> CashSummaryResult {
         let currencies = Set(rows.map { $0.currency })
         if currencies.count > 1 {
@@ -549,9 +549,9 @@ public enum PropFirmEngine {
         )
     }
     
-    /// Tính đường cong tích lũy dòng tiền ròng theo ngày (Cash Timeline)
+    /// Internal domain documentation
     public static func cashTimeline(rows: [CashMovementItem]) throws -> [CashTimelinePoint] {
-        _ = try cashSummary(rows: rows) // Kiểm tra tiền tệ đồng nhất
+        _ = try cashSummary(rows: rows) // Core implementation detail
         var daysMap: [String: Int64] = [:]
         for row in rows where row.date != nil {
             let mult: Int64 = (row.kind == "expense" || row.kind == "reversal") ? -1 : 1
@@ -567,7 +567,7 @@ public enum PropFirmEngine {
         return points
     }
     
-    /// Tiến độ xử lý của từng khoản Payout (Actual, Expected, Remaining, Variance, Overdue, Partial)
+    /// Internal domain documentation
     public static func payoutProgress(
         entries: [PropEntryItem],
         receipts: [PropReceiptItem],
@@ -602,7 +602,7 @@ public enum PropFirmEngine {
             }
     }
     
-    /// Tính tỷ lệ đỗ các vòng đánh giá: passed / (passed + breached)
+    /// Internal domain documentation
     public static func resolvedPhasePassRate(accounts: [PropAccountItem]) -> Double? {
         let relevant = accounts.filter {
             ($0.program == .evaluation || $0.program == .verification) &&
@@ -615,7 +615,7 @@ public enum PropFirmEngine {
     
     // MARK: - Generic Prop CSV Import
     
-    /// Import file CSV tiền mặt Quỹ theo mẫu chuẩn `/prop-cash-template.csv`:
+    /// Internal domain documentation
     /// `id,kind,firm,account_id,currency,date,amount,category,expense_id,reference,notes`
     public static func importPropCsv(
         csvText: String,
@@ -791,7 +791,7 @@ public enum PropFirmEngine {
         let importResult = PropCsvImportResult(imported: importedCount, skipped: skippedCount, sample: sample)
         
         if preview {
-            // Rollback — không lưu thay đổi vào data
+            // Internal implementation note
             return (importResult, existingEntries, existingReceipts, existingAudits)
         }
         

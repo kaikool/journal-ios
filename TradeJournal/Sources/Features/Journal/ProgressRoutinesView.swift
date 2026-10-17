@@ -1,7 +1,12 @@
 import SwiftUI
 
-/// Màn hình quản lý và theo dõi thói quen kỷ luật giao dịch hàng ngày
-/// Port 1:1 từ `source-repo/apps/web/src/app/progress/page.tsx`
+/// Screen managing daily disciplined trading routines.
+/// Ported 1:1 from `source-repo/apps/web/src/app/progress/page.tsx`:
+/// - FilterBar with title "Progress" and "Add routine" button
+/// - Subtitle: "Build a repeatable trading day. Routines are tracked independently of trade filters and profit."
+/// - Daily completion score card with date picker & progress bar
+/// - 3 stage checklist cards: "Before trading", "During trading", "After trading"
+/// - 13-week streak heatmap (last 91 days)
 public struct ProgressRoutinesView: View {
     @ObservedObject private var dataStore = TradeDataStore.shared
     @EnvironmentObject private var env: AppEnvironment
@@ -11,7 +16,7 @@ public struct ProgressRoutinesView: View {
     @State private var ruleToArchive: ProgressRule? = nil
     @State private var showArchiveAlert: Bool = false
     
-    public static let stages = ["Trước khi giao dịch", "Trong khi giao dịch", "Sau khi giao dịch"]
+    public static let stages = ["Before trading", "During trading", "After trading"]
     
     public init() {}
     
@@ -30,7 +35,7 @@ public struct ProgressRoutinesView: View {
         dataStore.progressScore(for: activeDate)
     }
     
-    /// 91 ngày gần nhất (13 tuần) phục vụ streak heatmap
+    /// Last 91 days (13 weeks) for the routine heatmap
     private var past91Days: [(date: String, percent: Double, completed: Int, total: Int)] {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
@@ -67,13 +72,13 @@ public struct ProgressRoutinesView: View {
                         .padding(.horizontal, 14)
                         .padding(.top, 10)
                     
-                    // Card 1: Tổng kết hoàn thành ngày (Daily completion & Date selector)
+                    // Card 1: Daily completion & Date selector
                     completionScoreCard
                     
-                    // Card 2: 3 Stages checklist (Trước, Trong, Sau khi giao dịch)
+                    // Card 2: 3 Stages checklist (Before, During, After trading)
                     stagesSection
                     
-                    // Card 3: 13-week heatmap streak (Ma trận kỷ luật 90 ngày)
+                    // Card 3: 13-week heatmap streak (Last 91 days)
                     heatmapCard
                 }
                 .padding(.bottom, 32)
@@ -81,16 +86,16 @@ public struct ProgressRoutinesView: View {
             .background(AppColors.background)
         }
         .sheet(isPresented: $showAddRoutineSheet) {
-                AddProgressRoutineSheet()
+            AddProgressRoutineSheet()
+        }
+        .alert("Archive routine", isPresented: $showArchiveAlert, presenting: ruleToArchive) { rule in
+            Button("Archive", role: .destructive) {
+                dataStore.deleteProgressRule(id: rule.id)
             }
-            .alert("Lưu trữ thói quen", isPresented: $showArchiveAlert, presenting: ruleToArchive) { rule in
-                Button("Lưu trữ (Xoá)", role: .destructive) {
-                    dataStore.deleteProgressRule(id: rule.id)
-                }
-                Button("Huỷ", role: .cancel) {}
-            } message: { rule in
-                Text("Bạn có chắc chắn muốn ngừng theo dõi thói quen “\(rule.title)”? Dữ liệu ngày trước vẫn được lưu giữ.")
-            }
+            Button("Cancel", role: .cancel) {}
+        } message: { rule in
+            Text("Archive “\(rule.title)”? Previous days are preserved.")
+        }
     }
     
     // MARK: - Subviews
@@ -100,31 +105,31 @@ public struct ProgressRoutinesView: View {
             VStack(spacing: 14) {
                 HStack(alignment: .center) {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Mức độ hoàn thành")
+                        Text("Daily completion")
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText)
                         
                         Text("\(Int(score.percent * 100))%")
                             .font(.system(size: 36, weight: .bold, design: .rounded))
-                            .foregroundColor(score.percent >= 0.8 ? AppColors.profit : (score.percent >= 0.5 ? AppColors.accent : AppColors.secondaryText))
+                            .foregroundColor(score.percent >= 0.8 ? AppColors.profit : (score.percent >= 0.5 ? AppColors.brand : AppColors.secondaryText))
                         
-                        Text("Đã làm \(score.completed)/\(score.total) thói quen trong ngày")
+                        Text("\(score.completed) of \(score.total) scheduled routines")
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText)
                     }
                     
                     Spacer()
                     
-                    // Bộ chọn ngày đánh giá
+                    // Review date selector
                     VStack(alignment: .trailing, spacing: 4) {
-                        Text("Ngày xem xét")
+                        Text("Review date")
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText)
                         
                         HStack(spacing: 6) {
                             Image(systemName: "calendar")
-                                .foregroundColor(AppColors.accent)
-                            Text(activeDate == todayKey ? "Hôm nay (\(activeDate))" : activeDate)
+                                .foregroundColor(AppColors.brand)
+                            Text(activeDate == todayKey ? "Today (\(activeDate))" : activeDate)
                                 .font(AppTypography.bodyBold)
                                 .foregroundColor(AppColors.primaryText)
                         }
@@ -143,7 +148,7 @@ public struct ProgressRoutinesView: View {
                             .frame(height: 8)
                         
                         RoundedRectangle(cornerRadius: 4)
-                            .fill(score.percent >= 0.8 ? AppColors.profit : AppColors.accent)
+                            .fill(score.percent >= 0.8 ? AppColors.profit : AppColors.brand)
                             .frame(width: max(0, min(geo.size.width * CGFloat(score.percent), geo.size.width)), height: 8)
                     }
                 }
@@ -165,14 +170,19 @@ public struct ProgressRoutinesView: View {
     @ViewBuilder
     private func stageCard(_ stage: String) -> some View {
         let rulesForStage = dataStore.progressRules.filter { r in
-            r.archivedAt == nil && (r.stage == stage || (stage == "Trước khi giao dịch" && r.stage == "Before trading") || (stage == "Trong khi giao dịch" && r.stage == "During trading") || (stage == "Sau khi giao dịch" && r.stage == "After trading"))
+            guard r.archivedAt == nil else { return false }
+            if r.stage == stage { return true }
+            if stage == "Before trading" && (r.stage.localizedCaseInsensitiveContains("before") || r.stage.localizedCaseInsensitiveContains("truoc")) { return true }
+            if stage == "During trading" && (r.stage.localizedCaseInsensitiveContains("during") || r.stage.localizedCaseInsensitiveContains("trong")) { return true }
+            if stage == "After trading" && (r.stage.localizedCaseInsensitiveContains("after") || r.stage.localizedCaseInsensitiveContains("sau")) { return true }
+            return false
         }
         
         AppCard {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     Image(systemName: stageIcon(stage))
-                        .foregroundColor(AppColors.accent)
+                        .foregroundColor(AppColors.brand)
                     Text(stage)
                         .font(AppTypography.headline)
                         .foregroundColor(AppColors.primaryText)
@@ -185,7 +195,7 @@ public struct ProgressRoutinesView: View {
                 Divider()
                 
                 if rulesForStage.isEmpty {
-                    Text("Chưa có thói quen nào trong giai đoạn này.")
+                    Text("No routines scheduled.")
                         .font(AppTypography.caption)
                         .foregroundColor(AppColors.secondaryText)
                         .padding(.vertical, 4)
@@ -198,7 +208,7 @@ public struct ProgressRoutinesView: View {
                                 } label: {
                                     Image(systemName: isRuleChecked(rule.id) ? "checkmark.square.fill" : "square")
                                         .font(.system(size: 20))
-                                        .foregroundColor(isRuleChecked(rule.id) ? AppColors.accent : AppColors.secondaryText)
+                                        .foregroundColor(isRuleChecked(rule.id) ? AppColors.brand : AppColors.secondaryText)
                                 }
                                 .buttonStyle(.plain)
                                 
@@ -236,9 +246,9 @@ public struct ProgressRoutinesView: View {
     
     private func stageIcon(_ stage: String) -> String {
         switch stage {
-        case "Trước khi giao dịch": return "sunrise.fill"
-        case "Trong khi giao dịch": return "waveform.path.ecg"
-        case "Sau khi giao dịch": return "moon.stars.fill"
+        case "Before trading": return "sunrise.fill"
+        case "During trading": return "waveform.path.ecg"
+        case "After trading": return "moon.stars.fill"
         default: return "checklist"
         }
     }
@@ -247,17 +257,17 @@ public struct ProgressRoutinesView: View {
         AppCard {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
-                    Text("Kỷ luật 13 tuần qua (91 ngày)")
+                    Text("Last 13 weeks")
                         .font(AppTypography.headline)
                         .foregroundColor(AppColors.primaryText)
                     Spacer()
                 }
                 
-                Text("Màu càng sáng thể hiện tỷ lệ hoàn thành thói quen càng cao. Chạm vào ô bất kỳ để xem và kiểm tra lại ngày đó.")
+                Text("Brighter squares mean a higher completion rate. Click a day to review it.")
                     .font(AppTypography.caption)
                     .foregroundColor(AppColors.secondaryText)
                 
-                // Lưới 91 ô chia theo tuần (13 cột x 7 hàng)
+                // 91-cell grid (13 columns x 7 rows)
                 ScrollView(.horizontal, showsIndicators: false) {
                     let columns = Array(repeating: GridItem(.fixed(18), spacing: 4), count: 13)
                     LazyVGrid(columns: columns, spacing: 4) {
@@ -290,27 +300,27 @@ public struct ProgressRoutinesView: View {
         if percent == 0 {
             return AppColors.secondaryBackground.opacity(0.8)
         }
-        return AppColors.accent.opacity(0.2 + (percent * 0.8))
+        return AppColors.brand.opacity(0.2 + (percent * 0.8))
     }
 }
 
-/// Sheet thêm thói quen mới
+/// Sheet to add a new daily disciplined routine
 public struct AddProgressRoutineSheet: View {
     @ObservedObject private var dataStore = TradeDataStore.shared
     @Environment(\.dismiss) private var dismiss
     
     @State private var title: String = ""
     @State private var stage: String = ProgressRoutinesView.stages[0]
-    @State private var selectedDays: Set<Int> = [1, 2, 3, 4, 5] // Thứ 2 - Thứ 6 mặc định
+    @State private var selectedDays: Set<Int> = [1, 2, 3, 4, 5] // Monday - Friday default
     
     private let weekdayNames = [
-        (0, "CN"),
-        (1, "T2"),
-        (2, "T3"),
-        (3, "T4"),
-        (4, "T5"),
-        (5, "T6"),
-        (6, "T7")
+        (0, "Sun"),
+        (1, "Mon"),
+        (2, "Tue"),
+        (3, "Wed"),
+        (4, "Thu"),
+        (5, "Fri"),
+        (6, "Sat")
     ]
     
     public init() {}
@@ -318,13 +328,13 @@ public struct AddProgressRoutineSheet: View {
     public var body: some View {
         NavigationStack {
             Form {
-                Section(header: Text("Tên thói quen")) {
-                    TextField("VD: Đọc tin vĩ mô, Kiểm tra Forex Factory...", text: $title)
+                Section(header: Text("Routine")) {
+                    TextField("e.g. Review the economic calendar", text: $title)
                         .font(AppTypography.body)
                 }
                 
-                Section(header: Text("Giai đoạn áp dụng")) {
-                    Picker("Giai đoạn", selection: $stage) {
+                Section(header: Text("When")) {
+                    Picker("Stage", selection: $stage) {
                         ForEach(ProgressRoutinesView.stages, id: \.self) { st in
                             Text(st).tag(st)
                         }
@@ -332,7 +342,7 @@ public struct AddProgressRoutineSheet: View {
                     .pickerStyle(.menu)
                 }
                 
-                Section(header: Text("Các ngày áp dụng trong tuần")) {
+                Section(header: Text("Scheduled days")) {
                     HStack {
                         ForEach(weekdayNames, id: \.0) { day in
                             let isSelected = selectedDays.contains(day.0)
@@ -347,8 +357,8 @@ public struct AddProgressRoutineSheet: View {
                                     .font(AppTypography.captionBold)
                                     .frame(maxWidth: .infinity)
                                     .padding(.vertical, 8)
-                                    .background(isSelected ? AppColors.accent : AppColors.secondaryBackground)
-                                    .foregroundColor(isSelected ? .white : AppColors.primaryText)
+                                    .background(isSelected ? AppColors.brand : AppColors.secondaryBackground)
+                                    .foregroundColor(isSelected ? AppColors.brandTextOnDark : AppColors.primaryText)
                                     .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                             }
                             .buttonStyle(.plain)
@@ -357,16 +367,16 @@ public struct AddProgressRoutineSheet: View {
                     .padding(.vertical, 4)
                 }
             }
-            .navigationTitle("Thêm thói quen mới")
+            .navigationTitle("Add a daily routine")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Huỷ") {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
                         dismiss()
                     }
                 }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Lưu") {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Add routine") {
                         saveRoutine()
                     }
                     .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || selectedDays.isEmpty)

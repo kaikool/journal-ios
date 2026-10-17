@@ -1,6 +1,6 @@
 import Foundation
 
-/// 1:1 port từ bảng `note_templates` trong `schema.pg.ts`
+/// 1:1 port from table `note_templates` in `schema.pg.ts`
 public struct NoteTemplate: Identifiable, Codable, Sendable, Equatable {
     public let id: String
     public var name: String

@@ -1,6 +1,6 @@
 import Foundation
 
-/// Lỗi chi tiết từ Supabase PostgREST API giúp người dùng chẩn đoán chính xác nguyên nhân
+/// Detailed error from Supabase PostgREST API for precise diagnostics
 public enum SupabaseError: LocalizedError {
     case notConfigured
     case invalidUrl
@@ -14,30 +14,30 @@ public enum SupabaseError: LocalizedError {
     public var errorDescription: String? {
         switch self {
         case .notConfigured:
-            return "Chưa cấu hình Supabase Project URL và Anon Key."
+            return "Supabase Project URL and Anon Key are not configured."
         case .invalidUrl:
-            return "Supabase Project URL không đúng định dạng."
+            return "Invalid Supabase Project URL format."
         case .tableNotFound(let table, let msg):
-            return "Bảng '\(table)' chưa tồn tại trên Supabase PostgreSQL (\(msg)). Hãy bấm 'Sao Chép SQL Khởi Tạo' và chạy trên Supabase SQL Editor để tạo bảng."
+            return "Table '\(table)' does not exist on Supabase PostgreSQL (\(msg)). Run the migration DDL SQL in the Supabase SQL Editor."
         case .unauthorized(let msg):
-            return "Lỗi xác thực (HTTP 401): \(msg). Vui lòng kiểm tra lại Anon Key hoặc JWT Access Token."
+            return "Authentication error (HTTP 401): \(msg). Please verify your Anon Key or JWT Access Token."
         case .rlsBlocked(let table, let msg):
-            return "Bị chặn bởi Row Level Security (RLS) trên bảng '\(table)' (HTTP 403: \(msg)). Cần thêm Policy cho phép quyền thao tác hoặc dùng Service Role Key."
+            return "Blocked by Row Level Security (RLS) on table '\(table)' (HTTP 403: \(msg)). Add an RLS policy or use the Service Role Key."
         case .postgrestError(let code, let pgCode, let msg, let hint):
-            var res = "Supabase lỗi HTTP \(code)"
-            if let p = pgCode, !p.isEmpty { res += " (Mã: \(p))" }
+            var res = "Supabase HTTP error \(code)"
+            if let p = pgCode, !p.isEmpty { res += " (Code: \(p))" }
             res += ": \(msg)"
-            if let h = hint, !h.isEmpty { res += " • Gợi ý: \(h)" }
+            if let h = hint, !h.isEmpty { res += " • Hint: \(h)" }
             return res
         case .networkError(let msg):
-            return "Lỗi kết nối mạng: \(msg)"
+            return "Network connection error: \(msg)"
         case .decodingError(let msg):
-            return "Lỗi phân tích dữ liệu từ Supabase: \(msg)"
+            return "Data decoding error from Supabase: \(msg)"
         }
     }
 }
 
-/// Cấu trúc phản hồi lỗi chuẩn từ Supabase PostgREST
+/// Standard error response payload from Supabase PostgREST
 private struct PostgrestErrorPayload: Decodable {
     let code: String?
     let details: String?
@@ -45,8 +45,8 @@ private struct PostgrestErrorPayload: Decodable {
     let message: String?
 }
 
-/// Dịch vụ kết nối trực tiếp với Supabase PostgreSQL qua chuẩn PostgREST API.
-/// Hỗ trợ Auth, Multi-tenancy RLS, và đồng bộ dữ liệu hai chiều.
+/// Service connecting directly to Supabase PostgreSQL via PostgREST API.
+/// Supports Auth, Multi-tenancy RLS, and bi-directional synchronization.
 public final class SupabaseService {
     public static let shared = SupabaseService()
     
@@ -107,10 +107,10 @@ public final class SupabaseService {
         return request
     }
     
-    /// Kiểm tra phản hồi HTTP và ném lỗi có mô tả cụ thể thay vì lỗi -1011
+    /// Internal domain documentation
     private func validateResponse(_ response: URLResponse, data: Data, endpoint: String) throws {
         guard let http = response as? HTTPURLResponse else {
-            throw SupabaseError.networkError("Không nhận được phản hồi HTTP từ Supabase.")
+            throw SupabaseError.networkError("No HTTP response received from Supabase.")
         }
         
         if (200...299).contains(http.statusCode) {
@@ -163,8 +163,8 @@ public final class SupabaseService {
         return encoder
     }
     
-    /// Giải mã mảng dữ liệu PostgREST với khả năng phục hồi lỗi tối đa (Permissive Decoder)
-    /// Đảm bảo không bao giờ ném DecodingError.keyNotFound hoặc valueNotFound làm sập luồng đồng bộ.
+    /// Internal domain documentation
+    /// Internal domain documentation
     public func decodeArray<T: Decodable>(_ type: T.Type, from data: Data) -> [T] {
         if data.isEmpty { return [] }
         if let str = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -172,17 +172,17 @@ public final class SupabaseService {
             return []
         }
         
-        // Fast path: Thử parse toàn bộ mảng
+        // Internal implementation note
         if let decoded = try? jsonDecoder.decode([T].self, from: data) {
             return decoded
         }
         
-        // Nếu PostgREST trả về 1 object đơn lẻ thay vì mảng
+        // Internal implementation note
         if let singleItem = try? jsonDecoder.decode(T.self, from: data) {
             return [singleItem]
         }
         
-        // Lossy path: Parse từng bản ghi độc lập để 1 dòng lỗi không vứt bỏ toàn bộ hàng trăm bản ghi khác
+        // Internal implementation note
         guard let jsonArray = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
             return []
         }
@@ -194,22 +194,22 @@ public final class SupabaseService {
                 let item = try jsonDecoder.decode(T.self, from: itemData)
                 results.append(item)
             } catch {
-                AppLogger.warning("SupabaseService: Bỏ qua 1 dòng không hợp lệ của \(T.self): \(error.localizedDescription)")
+                AppLogger.warning("SupabaseService: Skipped 1 invalid row of \(T.self): \(error.localizedDescription)")
             }
         }
         return results
     }
     
-    // MARK: - Chẩn Đoán Kết Nối Chính Xác (Accurate Connection Diagnostics)
+    // Internal implementation note
     
     public func pingConnection() async throws -> (success: Bool, message: String) {
         guard isConfigured else {
-            return (false, "Vui lòng nhập đầy đủ Supabase Project URL và Anon Key.")
+            return (false, "Please provide both Supabase Project URL and Anon Key.")
         }
         
-        // 1. Kiểm tra URL Auth Settings để xác thực Anon Key (Endpoint chuẩn của Supabase)
+        // Internal implementation note
         guard let authSettingsUrl = URL(string: "\(supabaseUrl)/auth/v1/settings") else {
-            return (false, "Project URL không đúng định dạng: \(supabaseUrl)")
+            return (false, "Invalid Project URL format: \(supabaseUrl)")
         }
         
         var authReq = URLRequest(url: authSettingsUrl)
@@ -219,24 +219,24 @@ public final class SupabaseService {
         do {
             let (authData, authResp) = try await session.data(for: authReq)
             guard let authHttp = authResp as? HTTPURLResponse else {
-                return (false, "Không nhận được phản hồi mạng từ Supabase.")
+                return (false, "No network response received from Supabase.")
             }
             
             if authHttp.statusCode == 401 {
-                return (false, "Lỗi 401: Anon Key không khớp với Project URL này. Vui lòng vào Supabase Dashboard -> Project Settings -> API và copy đúng 'anon public' key.")
+                return (false, "Error 401: Invalid Anon Key for this Project URL. Check Supabase Dashboard -> Project Settings -> API.")
             }
             
             if !(200...299).contains(authHttp.statusCode) {
                 let errStr = String(data: authData, encoding: .utf8) ?? ""
-                return (false, "Supabase phản hồi mã HTTP \(authHttp.statusCode): \(errStr)")
+                return (false, "Supabase HTTP error \(authHttp.statusCode): \(errStr)")
             }
         } catch {
-            return (false, "Không thể kết nối tới Project URL: \(error.localizedDescription). Vui lòng kiểm tra lại kết nối mạng hoặc URL.")
+            return (false, "Cannot connect to Project URL: \(error.localizedDescription). Please check your network connection or URL.")
         }
         
-        // 2. Xác thực PostgREST Database Tables
+        // Internal implementation note
         guard let restUrl = URL(string: "\(supabaseUrl)/rest/v1/accounts?select=id&limit=1") else {
-            return (false, "URL PostgREST không đúng định dạng.")
+            return (false, "PostgREST URL is not properly formatted.")
         }
         
         var restReq = URLRequest(url: restUrl)
@@ -247,29 +247,29 @@ public final class SupabaseService {
         do {
             let (restData, restResp) = try await session.data(for: restReq)
             guard let restHttp = restResp as? HTTPURLResponse else {
-                return (false, "Không có phản hồi từ máy chủ PostgREST.")
+                return (false, "No response received from PostgREST server.")
             }
             
             if (200...299).contains(restHttp.statusCode) {
-                return (true, "Kết nối Supabase thành công 100%! Bảng 'accounts' và dữ liệu đã sẵn sàng đồng bộ.")
+                return (true, "Supabase connection verified successfully! 'accounts' table and schema are ready to sync.")
             } else if restHttp.statusCode == 404 {
                 let err = try? JSONDecoder().decode(PostgrestErrorPayload.self, from: restData)
                 if err?.code == "42P01" || (err?.message?.contains("does not exist") ?? true) {
-                    return (true, "Xác thực URL và Anon Key thành công! Tuy nhiên database chưa có bảng 'accounts' (Mã 42P01). Hãy bấm 'Sao Chép SQL Khởi Tạo' và chạy trong Supabase SQL Editor.")
+                    return (true, "URL and Anon Key authenticated successfully! Database is missing 'accounts' table (Code 42P01). Click 'Copy Schema SQL' and execute in Supabase SQL Editor.")
                 }
-                return (false, "Bảng accounts không tìm thấy: \(err?.message ?? "HTTP 404")")
+                return (false, "'accounts' table not found: \(err?.message ?? "HTTP 404")")
             } else if restHttp.statusCode == 403 {
-                return (true, "Xác thực URL và Anon Key thành công! Tuy nhiên bảng đang bật Row Level Security (RLS). Hãy tạo policy cho phép thao tác.")
+                return (true, "URL and Anon Key authenticated successfully! Row Level Security (RLS) is active. Please add RLS policies to allow access.")
             } else {
                 let bodyStr = String(data: restData, encoding: .utf8) ?? ""
-                return (false, "PostgREST phản hồi HTTP \(restHttp.statusCode): \(bodyStr)")
+                return (false, "PostgREST returned HTTP \(restHttp.statusCode): \(bodyStr)")
             }
         } catch {
-            return (false, "Lỗi kiểm tra PostgREST: \(error.localizedDescription)")
+            return (false, "PostgREST check error: \(error.localizedDescription)")
         }
     }
     
-    /// Kiểm tra trạng thái tồn tại của các bảng cốt lõi
+    /// Internal domain documentation
     public func checkDatabaseTables() async -> (allExist: Bool, missing: [String]) {
         let tables = ["accounts", "trades", "executions", "playbooks", "prop_accounts"]
         var missing: [String] = []
@@ -294,7 +294,7 @@ public final class SupabaseService {
         return (missing.isEmpty, missing)
     }
     
-    // MARK: - Email & Password Authentication (Native Không Cần Trình Duyệt Web)
+    // Internal implementation note
     
     public func loginWithEmail(email: String, password: String) async throws -> String {
         guard isConfigured else { throw SupabaseError.notConfigured }
@@ -311,18 +311,18 @@ public final class SupabaseService {
         
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse else {
-            throw SupabaseError.networkError("Không nhận được phản hồi từ Supabase.")
+            throw SupabaseError.networkError("No response received from Supabase.")
         }
         
         guard (200...299).contains(http.statusCode) else {
             let errJson = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-            let errMsg = errJson?["error_description"] as? String ?? errJson?["msg"] as? String ?? "Đăng nhập thất bại (HTTP \(http.statusCode))"
+            let errMsg = errJson?["error_description"] as? String ?? errJson?["msg"] as? String ?? "Login failed (HTTP \(http.statusCode))"
             throw SupabaseError.unauthorized(message: errMsg)
         }
         
         guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
               let token = json["access_token"] as? String else {
-            throw SupabaseError.unauthorized(message: "Không tìm thấy access token trong phản hồi.")
+            throw SupabaseError.unauthorized(message: "Access token not found in response.")
         }
         
         self.accessToken = token
@@ -337,7 +337,7 @@ public final class SupabaseService {
     
     // MARK: - Web OAuth Login Helper
     
-    /// Đăng nhập qua trình duyệt web an toàn (Google, GitHub, Apple) để lấy Session Token
+    /// Internal domain documentation
     @MainActor
     public func startWebOAuthLogin(provider: String = "google") async throws -> String {
         guard !supabaseUrl.isEmpty else { throw SupabaseError.notConfigured }
@@ -347,9 +347,9 @@ public final class SupabaseService {
         
         let callbackUrl = try await WebAuthHelper.shared.startSession(url: authUrl, callbackScheme: callbackScheme)
         
-        // Trích xuất access_token từ URL hash (VD: tradejournal://auth-callback#access_token=...&refresh_token=...)
+        // Internal implementation note
         guard let fragment = callbackUrl.fragment, !fragment.isEmpty else {
-            throw SupabaseError.unauthorized(message: "Không tìm thấy token trong phản hồi xác thực.")
+            throw SupabaseError.unauthorized(message: "Token not found in authentication response.")
         }
         
         var params: [String: String] = [:]
@@ -361,7 +361,7 @@ public final class SupabaseService {
         }
         
         guard let token = params["access_token"], !token.isEmpty else {
-            throw SupabaseError.unauthorized(message: "Access token không có trong callback URL.")
+            throw SupabaseError.unauthorized(message: "Access token not present in callback URL.")
         }
         
         self.accessToken = token
@@ -371,13 +371,13 @@ public final class SupabaseService {
     
     // MARK: - SQL Migration Script Generator
     
-    /// Tạo mã SQL hoàn chỉnh 1:1 từ `schema.pg.ts` và `0000_ancient_starjammers.sql`
-    /// để người dùng có thể dán trực tiếp vào Supabase SQL Editor và chạy khởi tạo
+    /// Internal domain documentation
+    /// Internal domain documentation
     public func generateDatabaseInitSql() -> String {
         return """
         -- ========================================================
         -- Trade Journal: Supabase PostgreSQL DDL Initialization
-        -- Port 1:1 từ schema.pg.ts và drizzle migrations
+        -- 1:1 Parity with schema.pg.ts and drizzle migrations
         -- ========================================================
 
         CREATE TABLE IF NOT EXISTS "accounts" (
@@ -559,7 +559,7 @@ public final class SupabaseService {
             "updated_at" text NOT NULL
         );
 
-        -- Tự động vá bổ sung các cột nếu bảng đã được tạo trước đó
+        -- Automatically patch columns if tables were created previously
         DO $$
         BEGIN
             -- accounts
@@ -612,7 +612,7 @@ public final class SupabaseService {
             ALTER TABLE IF EXISTS prop_receipts ADD COLUMN IF NOT EXISTS voided boolean DEFAULT false NOT NULL;
         END $$;
 
-        -- Gỡ bỏ các chính sách RLS hạn chế cũ nếu có (từ schema user_id)
+        -- Remove legacy restrictive RLS policies if present (from user_id schema)
         DROP POLICY IF EXISTS "Users can only manage own accounts" ON accounts;
         DROP POLICY IF EXISTS "Users can only manage own executions" ON executions;
         DROP POLICY IF EXISTS "Users can only manage own trades" ON trades;
@@ -622,7 +622,7 @@ public final class SupabaseService {
         DROP POLICY IF EXISTS "Users can only manage own prop_accounts" ON prop_accounts;
         DROP POLICY IF EXISTS "Users can only manage own journal days" ON journal_days;
 
-        -- Bật RLS và cấp quyền cho anon, authenticated và service_role
+        -- Enable RLS and grant access for anon, authenticated, and service_role
         ALTER TABLE accounts ENABLE ROW LEVEL SECURITY;
         ALTER TABLE executions ENABLE ROW LEVEL SECURITY;
         ALTER TABLE trades ENABLE ROW LEVEL SECURITY;
@@ -664,7 +664,7 @@ public final class SupabaseService {
         DROP POLICY IF EXISTS "Allow All For Anon" ON journal_days;
         CREATE POLICY "Allow All For Anon" ON journal_days FOR ALL USING (true) WITH CHECK (true);
 
-        -- Cấp toàn quyền truy cập bảng cho anon và authenticated
+        -- Grant full table permissions to anon, authenticated, and service_role
         GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
         """
     }
@@ -1096,7 +1096,7 @@ public struct SupabaseTradeRecord: Codable {
         self.netPnl = c.decodeDouble(forKeys: ["net_pnl", "netPnl", "profit", "pnl"]) ?? 0
         self.executionCount = c.decodeInt(forKeys: ["execution_count", "executionCount"]) ?? 0
         
-        // Hỗ trợ cả string và array cho executionIdsJson
+        // Internal implementation note
         if let str = c.decodeString(forKeys: ["execution_ids_json", "executionIdsJson", "execution_ids"]) {
             self.executionIdsJson = str
         } else if let arr = (try? c.decode([String].self, forKey: AnyCodingKey(stringValue: "execution_ids_json")!)) ??
@@ -1107,7 +1107,7 @@ public struct SupabaseTradeRecord: Codable {
             self.executionIdsJson = "[]"
         }
         
-        // Hỗ trợ cả string và array cho exitsJson
+        // Internal implementation note
         if let str = c.decodeString(forKeys: ["exits_json", "exitsJson", "exits"]) {
             self.exitsJson = str
         } else if let arr = (try? c.decode([ExitAttribution].self, forKey: AnyCodingKey(stringValue: "exits_json")!)) ??

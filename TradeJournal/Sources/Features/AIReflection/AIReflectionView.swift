@@ -33,11 +33,11 @@ public struct AIReflectionView: View {
                         VStack(alignment: .leading, spacing: 8) {
                             HStack {
                                 Image(systemName: "sparkles")
-                                    .foregroundColor(AppColors.accent)
+                                    .foregroundColor(AppColors.brand)
                                 Text("AI Trader Reflection")
                                     .font(AppTypography.headline)
                             }
-                            Text("Phân tích khách quan dựa trên 100% dữ liệu nhật ký giao dịch thực tế của bạn. Không suy đoán, không sáo rỗng.")
+                            Text("Objective feedback grounded 100% in your actual trading journal data. No speculation, no generic advice.")
                                 .font(AppTypography.caption)
                                 .foregroundColor(AppColors.secondaryText)
                         }
@@ -45,24 +45,24 @@ public struct AIReflectionView: View {
                     
                     // Quick Action Buttons
                     HStack(spacing: 8) {
-                        actionButton(title: "Tổng kết Recap", icon: "doc.text.magnifyingglass", action: .recap)
-                        actionButton(title: "Nhận xét Critique", icon: "brain.head.profile", action: .critique)
-                        actionButton(title: "Hỏi đáp Ask", icon: "questionmark.bubble", action: .ask)
+                        actionButton(title: "Recap", icon: "doc.text.magnifyingglass", action: .recap)
+                        actionButton(title: "Critique", icon: "brain.head.profile", action: .critique)
+                        actionButton(title: "Ask Journal", icon: "questionmark.bubble", action: .ask)
                     }
                     
                     // Input if Ask is selected
                     if selectedAction == .ask {
                         AppCard {
                             VStack(alignment: .leading, spacing: 8) {
-                                Text("Đặt câu hỏi cho AI")
+                                Text("Ask your journal")
                                     .font(AppTypography.caption)
                                     .foregroundColor(AppColors.secondaryText)
                                 
                                 HStack {
-                                    TextField("VD: Lỗi nào khiến tôi thua lỗ nhiều nhất?", text: $userPrompt)
+                                    TextField("e.g. Which mistake costs me the most money?", text: $userPrompt)
                                         .textFieldStyle(.roundedBorder)
                                     
-                                    Button("Gửi") {
+                                    Button("Send") {
                                         executeReflection()
                                     }
                                     .disabled(userPrompt.trimmingCharacters(in: .whitespaces).isEmpty || isLoading)
@@ -76,7 +76,7 @@ public struct AIReflectionView: View {
                         AppCard {
                             VStack(spacing: 12) {
                                 ProgressView()
-                                Text("Đang phân tích dữ liệu hiệu suất...")
+                                Text("Analyzing trading performance data...")
                                     .font(AppTypography.caption)
                                     .foregroundColor(AppColors.secondaryText)
                             }
@@ -88,8 +88,8 @@ public struct AIReflectionView: View {
                             VStack(alignment: .leading, spacing: 10) {
                                 HStack {
                                     Image(systemName: "quote.opening")
-                                        .foregroundColor(AppColors.accent)
-                                    Text("Phản hồi từ Huấn luyện viên")
+                                        .foregroundColor(AppColors.brand)
+                                    Text("Coach Feedback")
                                         .font(AppTypography.headline)
                                     Spacer()
                                 }
@@ -128,8 +128,8 @@ public struct AIReflectionView: View {
             .font(AppTypography.captionBold)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 10)
-            .background(selectedAction == action ? AppColors.accent : AppColors.secondaryBackground)
-            .foregroundColor(selectedAction == action ? .white : AppColors.primaryText)
+            .background(selectedAction == action ? AppColors.brand : AppColors.secondaryBackground)
+            .foregroundColor(selectedAction == action ? AppColors.brandTextOnDark : AppColors.primaryText)
             .cornerRadius(8)
         }
     }
@@ -150,7 +150,7 @@ public struct AIReflectionView: View {
                 }
             } catch {
                 await MainActor.run {
-                    self.reflectionResult = "Lỗi khi tạo phản hồi AI: \(error.localizedDescription)"
+                    self.reflectionResult = "AI reflection error: \(error.localizedDescription)"
                     self.isLoading = false
                 }
             }

@@ -1,7 +1,15 @@
 import SwiftUI
 import Combine
 
-/// Quản lý trạng thái môi trường và cấu hình toàn ứng dụng.
+/// Manages application-wide environment state and theme configuration.
+public enum AppTheme: String, CaseIterable, Identifiable {
+    case dark = "Dark"
+    case light = "Light"
+    case system = "System"
+    
+    public var id: String { rawValue }
+}
+
 public final class AppEnvironment: ObservableObject {
     public static let shared = AppEnvironment()
     
@@ -10,24 +18,44 @@ public final class AppEnvironment: ObservableObject {
     @Published public var isDrawerOpen: Bool = false
     @Published public var currentCurrency: String = "USD"
     @Published public var currentTimeZone: TimeZone = .current
+    @Published public var appTheme: AppTheme {
+        didSet {
+            UserDefaults.standard.set(appTheme.rawValue, forKey: "journal_theme_preference")
+        }
+    }
     
-    // Bỏ qua đăng nhập theo yêu cầu người dùng
+    // Bypass authentication per local developer requirements
     @Published public var isAuthenticated: Bool = true
     @Published public var currentUserId: String = "local-developer-user"
     
+    public var colorScheme: ColorScheme? {
+        switch appTheme {
+        case .system: return nil
+        case .dark: return .dark
+        case .light: return .light
+        }
+    }
+    
     public init() {
-        AppLogger.info("AppEnvironment initialized. PrivacyMode: \(isPrivacyModeEnabled), Currency: \(currentCurrency)")
+        let savedTheme = UserDefaults.standard.string(forKey: "journal_theme_preference")
+        self.appTheme = savedTheme.flatMap(AppTheme.init(rawValue:)) ?? .dark
+        AppLogger.info("AppEnvironment initialized. PrivacyMode: \(isPrivacyModeEnabled), Currency: \(currentCurrency), Theme: \(appTheme.rawValue)")
     }
     
     public func togglePrivacyMode() {
         isPrivacyModeEnabled.toggle()
         AppLogger.debug("Privacy mode toggled to: \(isPrivacyModeEnabled)")
     }
+    
+    public func toggleTheme() {
+        appTheme = (appTheme == .dark) ? .light : .dark
+        AppLogger.debug("Theme toggled to: \(appTheme.rawValue)")
+    }
 }
 
-/// 13 phân hệ điều hướng chuẩn xác 1:1 từ `source-repo/apps/web/src/components/shell.tsx`
+/// 13 navigation sections mapped 1:1 from `source-repo/apps/web/src/components/shell.tsx`
 public enum AppTab: String, CaseIterable, Identifiable {
-    // Nhóm tính năng giao dịch (NAV)
+    // Primary trading navigation group (NAV)
     case dashboard = "Dashboard"
     case calendar = "Calendar"
     case journal = "Daily journal"
@@ -39,7 +67,7 @@ public enum AppTab: String, CaseIterable, Identifiable {
     case progress = "Progress"
     case missed = "Missed trades"
     
-    // Nhóm cấu hình (NAV_SETUP)
+    // Configuration & setup group (NAV_SETUP)
     case importTrades = "Import"
     case accounts = "Accounts"
     case settings = "Settings"
@@ -71,6 +99,7 @@ public enum AppTab: String, CaseIterable, Identifiable {
         }
     }
     
-    // Alias tương thích ngược
+    // Backward compatibility alias
     public static var analytics: AppTab { .reports }
 }
+

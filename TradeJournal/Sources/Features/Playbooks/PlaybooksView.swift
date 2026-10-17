@@ -1,12 +1,17 @@
 import SwiftUI
 
-/// Màn hình quản lý chiến lược giao dịch & đo lường kỷ luật tuân thủ quy tắc
-/// Port 1:1 từ `source-repo/apps/web/src/app/playbooks` & `adherence.ts`
+/// Playbooks screen matching 1:1 with `source-repo/apps/web/src/app/playbooks/page.tsx`:
+/// - FilterBar with title "Playbooks" and "New playbook" button
+/// - Empty state: "A playbook is a setup you trade on purpose — name it, write its rules, then tag trades with it and let Reports tell you if it actually pays."
+/// - Playbook cards with title, trade count, trash icon, description, numbered rules, and adherence breakdown
+/// - New playbook sheet with title, description, and rules
 public struct PlaybooksView: View {
     @EnvironmentObject private var env: AppEnvironment
     @ObservedObject private var dataStore = TradeDataStore.shared
     
     @State private var showNewPlaybookSheet: Bool = false
+    @State private var playbookToDelete: Playbook? = nil
+    @State private var showDeleteConfirmation: Bool = false
     
     public init() {}
     
@@ -31,8 +36,6 @@ public struct PlaybooksView: View {
             
             ScrollView {
                 VStack(spacing: 12) {
-                    headerCard
-                    
                     if dataStore.playbooks.isEmpty {
                         emptyState
                     } else {
@@ -48,33 +51,49 @@ public struct PlaybooksView: View {
                 dataStore.savePlaybook(newPb)
             }
         }
-    }
-    
-    @ViewBuilder
-    private var headerCard: some View {
-        AppCard {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Image(systemName: "book.pages.fill")
-                        .foregroundColor(AppColors.accent)
-                    Text("Playbooks & Kỷ Luật Tuân Thủ")
-                        .font(AppTypography.headline)
+        .alert("Delete “\(playbookToDelete?.title ?? "")”?", isPresented: $showDeleteConfirmation) {
+            Button("Cancel", role: .cancel) { playbookToDelete = nil }
+            Button("Delete", role: .destructive) {
+                if let pb = playbookToDelete {
+                    dataStore.deletePlaybook(id: pb.id)
+                    playbookToDelete = nil
                 }
-                Text("Đo lường sự khác biệt về kết quả tài chính giữa việc tuân thủ 100% quy tắc và việc phá vỡ nguyên tắc.")
-                    .font(AppTypography.caption)
-                    .foregroundColor(AppColors.secondaryText)
             }
+        } message: {
+            Text("Trades keep their data, just lose the link.")
         }
     }
     
     @ViewBuilder
     private var emptyState: some View {
-        EmptyStateView(
-            icon: "book.closed",
-            title: "Chưa có Playbook",
-            message: "Tạo chiến lược giao dịch đầu tiên để theo dõi tỷ lệ tuân thủ kỷ luật."
-        )
-        .padding(.top, 40)
+        AppCard {
+            VStack(spacing: 12) {
+                Image(systemName: "book.closed")
+                    .font(.system(size: 36))
+                    .foregroundColor(AppColors.secondaryText.opacity(0.6))
+                
+                Text("A playbook is a setup you trade on purpose — name it, write its rules, then tag trades with it and let Reports tell you if it actually pays.")
+                    .font(AppTypography.caption)
+                    .foregroundColor(AppColors.secondaryText)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 16)
+                
+                Button {
+                    showNewPlaybookSheet = true
+                } label: {
+                    Text("New playbook")
+                        .font(AppTypography.captionBold)
+                        .foregroundColor(AppColors.brandTextOnDark)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(AppColors.brand)
+                        .cornerRadius(8)
+                }
+            }
+            .padding(.vertical, 32)
+            .frame(maxWidth: .infinity)
+        }
+        .padding(.top, 20)
     }
     
     @ViewBuilder
@@ -99,33 +118,58 @@ public struct PlaybooksView: View {
     private func playbookCard(summary: PlaybookAdherenceSummary) -> some View {
         AppCard {
             VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(summary.playbook.title)
-                            .font(AppTypography.subheadlineBold)
-                            .foregroundColor(AppColors.primaryText)
-                        Text("\(summary.playbook.rules.count) quy tắc • \(summary.totalTrades) lệnh")
-                            .font(AppTypography.caption)
-                            .foregroundColor(AppColors.secondaryText)
-                    }
+                // Header matching playbooks/page.tsx line 73-97
+                HStack(alignment: .center) {
+                    Text(summary.playbook.title)
+                        .font(AppTypography.bodyBold)
+                        .foregroundColor(AppColors.primaryText)
                     
                     Spacer()
                     
-                    if let rate = summary.overallAdherenceRate {
-                        AppBadge(
-                            text: "\(Int(rate * 100))% Tuân thủ",
-                            color: rate >= 0.8 ? AppColors.profit : (rate >= 0.5 ? AppColors.accent : AppColors.loss)
-                        )
-                    } else {
-                        AppBadge(text: "Chưa đánh giá", color: AppColors.secondaryText)
+                    Text("\(summary.totalTrades) trades")
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.secondaryText)
+                    
+                    Button {
+                        playbookToDelete = summary.playbook
+                        showDeleteConfirmation = true
+                    } label: {
+                        Image(systemName: "trash")
+                            .font(.system(size: 13))
+                            .foregroundColor(AppColors.secondaryText.opacity(0.6))
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.leading, 4)
+                }
+                
+                if !summary.playbook.description.isEmpty {
+                    Text(summary.playbook.description)
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.secondaryText)
+                }
+                
+                if !summary.playbook.rules.isEmpty {
+                    VStack(alignment: .leading, spacing: 3) {
+                        ForEach(Array(summary.playbook.rules.prefix(4).enumerated()), id: \.offset) { index, rule in
+                            HStack(alignment: .top, spacing: 6) {
+                                Text("\(index + 1).")
+                                    .font(AppTypography.caption)
+                                    .foregroundColor(AppColors.secondaryText)
+                                Text(rule)
+                                    .font(AppTypography.caption)
+                                    .foregroundColor(AppColors.primaryText)
+                                    .lineLimit(1)
+                            }
+                        }
                     }
                 }
                 
                 Divider().background(AppColors.border.opacity(0.5))
                 
+                // Adherence summary row
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Khi tuân thủ quy tắc")
+                        Text("When followed")
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText)
                         Text(Formatters.formatPnL(summary.netPnlWhenFollowed, currency: env.currentCurrency))
@@ -136,7 +180,7 @@ public struct PlaybooksView: View {
                     Spacer()
                     
                     VStack(alignment: .trailing, spacing: 2) {
-                        Text("Khi phá vỡ quy tắc")
+                        Text("When broken")
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText)
                         Text(Formatters.formatPnL(summary.netPnlWhenBroken, currency: env.currentCurrency))
@@ -174,14 +218,14 @@ public struct PlaybookDetailView: View {
         }
         .navigationTitle(playbook.title)
         .background(AppColors.background)
-        .alert("Xóa playbook “\(playbook.title)”? ", isPresented: $showDeleteAlert) {
-            Button("Hủy", role: .cancel) {}
-            Button("Xóa", role: .destructive) {
+        .alert("Delete “\(playbook.title)”? ", isPresented: $showDeleteAlert) {
+            Button("Cancel", role: .cancel) {}
+            Button("Delete", role: .destructive) {
                 dataStore.deletePlaybook(id: playbook.id)
                 dismiss()
             }
         } message: {
-            Text("Chiến lược này và các đánh giá quy tắc liên quan sẽ bị xóa.")
+            Text("Trades keep their data, just lose the link.")
         }
     }
     
@@ -189,11 +233,11 @@ public struct PlaybookDetailView: View {
     private var infoCard: some View {
         AppCard {
             VStack(alignment: .leading, spacing: 8) {
-                Text("Mô tả chiến lược")
+                Text("Strategy Description")
                     .font(AppTypography.caption)
                     .foregroundColor(AppColors.secondaryText)
-                Text(playbook.description)
-                    .font(AppTypography.subheadline)
+                Text(playbook.description.isEmpty ? "No description provided." : playbook.description)
+                    .font(AppTypography.body)
                     .foregroundColor(AppColors.primaryText)
             }
         }
@@ -203,14 +247,14 @@ public struct PlaybookDetailView: View {
     private var rulesCard: some View {
         AppCard {
             VStack(alignment: .leading, spacing: 10) {
-                Text("Quy tắc bắt buộc (\(playbook.rules.count))")
+                Text("Checklist Rules (\(playbook.rules.count))")
                     .font(AppTypography.headline)
                 
                 ForEach(Array(playbook.rules.enumerated()), id: \.offset) { index, rule in
                     HStack(alignment: .top, spacing: 8) {
                         Text("\(index + 1).")
                             .font(AppTypography.captionBold)
-                            .foregroundColor(AppColors.accent)
+                            .foregroundColor(AppColors.brand)
                         Text(rule)
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.primaryText)
@@ -227,12 +271,12 @@ public struct PlaybookDetailView: View {
     @ViewBuilder
     private var tradesSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Lệnh thuộc Playbook này (\(trades.count))")
+            Text("Assigned Trades (\(trades.count))")
                 .font(AppTypography.headline)
                 .padding(.horizontal, 4)
             
             if trades.isEmpty {
-                Text("Chưa có lệnh nào được gán vào playbook này.")
+                Text("No trades currently assigned to this playbook.")
                     .font(AppTypography.caption)
                     .foregroundColor(AppColors.secondaryText)
                     .padding(.horizontal, 4)
@@ -247,7 +291,7 @@ public struct PlaybookDetailView: View {
     @ViewBuilder
     private func tradeCard(_ trade: Trade) -> some View {
         let isLong = trade.direction == .long
-        let dirColor = isLong ? AppColors.accent : AppColors.warning
+        let dirColor = isLong ? AppColors.brand : AppColors.warning
         
         AppCard {
             VStack(alignment: .leading, spacing: 6) {
@@ -255,7 +299,7 @@ public struct PlaybookDetailView: View {
                     Text(trade.symbol)
                         .font(AppTypography.subheadlineBold)
                     AppBadge(
-                        text: trade.direction.rawValue.uppercased(),
+                        trade.direction.rawValue.uppercased(),
                         color: dirColor
                     )
                     Spacer()
@@ -298,7 +342,7 @@ public struct PlaybookDetailView: View {
         Button(role: .destructive, action: { showDeleteAlert = true }) {
             HStack {
                 Image(systemName: "trash")
-                Text("Xóa Playbook Này")
+                Text("Delete Playbook")
             }
             .font(AppTypography.captionBold)
             .frame(maxWidth: .infinity)
@@ -318,57 +362,44 @@ public struct NewPlaybookSheet: View {
     
     @State private var title: String = ""
     @State private var description: String = ""
-    @State private var rules: [String] = []
-    @State private var currentRuleInput: String = ""
+    @State private var rulesText: String = ""
     
     var onSave: (Playbook) -> Void
     
     public var body: some View {
         NavigationStack {
             Form {
-                Section("Tên & Mô tả") {
-                    TextField("Tên Playbook (VD: London Breakout)", text: $title)
-                    TextField("Mô tả chiến lược...", text: $description)
+                Section("Playbook Details") {
+                    TextField("Name (e.g. Opening range breakout)", text: $title)
+                    TextField("One-line description", text: $description)
                 }
                 
-                Section("Quy tắc bắt buộc") {
-                    ForEach(Array(rules.enumerated()), id: \.offset) { index, rule in
-                        HStack {
-                            Text("\(index + 1). \(rule)")
-                                .font(AppTypography.caption)
-                            Spacer()
-                            Button(action: { rules.remove(at: index) }) {
-                                Image(systemName: "minus.circle.fill")
-                                    .foregroundColor(AppColors.loss)
-                            }
-                        }
-                    }
-                    
-                    HStack {
-                        TextField("Thêm quy tắc mới...", text: $currentRuleInput)
-                        Button("Thêm") {
-                            let clean = currentRuleInput.trimmingCharacters(in: .whitespaces)
-                            if !clean.isEmpty {
-                                rules.append(clean)
-                                currentRuleInput = ""
-                            }
-                        }
-                        .disabled(currentRuleInput.trimmingCharacters(in: .whitespaces).isEmpty)
-                    }
+                Section {
+                    TextEditor(text: $rulesText)
+                        .frame(minHeight: 120)
+                } header: {
+                    Text("Checklist Rules")
+                } footer: {
+                    Text("One rule per line:\nOnly A+ setups\nRisk max 1R\nNo entries after 11:30")
                 }
             }
-            .navigationTitle("Tạo Playbook Mới")
+            .navigationTitle("New playbook")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Hủy") { dismiss() }
+                    Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Lưu") {
+                    Button("Create") {
+                        let parsedRules = rulesText
+                            .components(separatedBy: .newlines)
+                            .map { $0.trimmingCharacters(in: .whitespaces) }
+                            .filter { !$0.isEmpty }
+                        
                         let pb = Playbook(
                             title: title.isEmpty ? "New Playbook" : title,
                             description: description,
-                            rules: rules
+                            rules: parsedRules
                         )
                         onSave(pb)
                         dismiss()

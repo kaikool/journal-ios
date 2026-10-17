@@ -88,8 +88,8 @@ public struct IntradayPoint: Equatable {
     }
 }
 
-/// Engine tính toán các chỉ số hiệu suất giao dịch và đường cong vốn.
-/// Port 1:1 từ `packages/core/src/metrics.ts` và `equity.ts`.
+/// Internal domain documentation
+/// Domain specification matching core web repository
 public enum FinancialMetricsEngine {
     
     public static func computeOverview(trades: [Trade], timeZone: TimeZone = .current, initialBalance: Decimal = 0) -> (metrics: TradeMetrics, curve: [EquityPoint], days: [DayStats]) {
@@ -99,7 +99,7 @@ public enum FinancialMetricsEngine {
         return (metrics, curve, days)
     }
     
-    /// Đường cong vốn (Equity Curve) tích lũy Net P&L theo từng trade đóng
+    /// Internal domain documentation
     public static func equityCurve(trades: [Trade]) -> [EquityPoint] {
         let closedTrades = trades
             .filter { $0.status != .open && $0.closedAt != nil }
@@ -122,7 +122,7 @@ public enum FinancialMetricsEngine {
         }
     }
     
-    /// Thống kê kết quả theo từng ngày giao dịch (YYYY-MM-DD theo múi giờ)
+    /// Internal domain documentation
     public static func dailyStats(trades: [Trade], timeZone: TimeZone = .current) -> [DayStats] {
         let closedTrades = trades
             .filter { $0.status != .open && $0.closedAt != nil }
@@ -230,7 +230,7 @@ public enum FinancialMetricsEngine {
         }
     }
     
-    /// Tính toán độ sụt giảm tối đa (Drawdown)
+    /// Internal domain documentation
     public static func drawdown(curve: [EquityPoint], initialBalance: Decimal) -> DrawdownStats {
         var peak: Decimal = 0
         var maxDrawdown: Decimal = 0
@@ -253,7 +253,7 @@ public enum FinancialMetricsEngine {
         return DrawdownStats(maxDrawdown: maxDrawdown, maxDrawdownPct: maxDrawdownPct, peak: peak)
     }
     
-    /// Tính toán bộ chỉ số hiệu suất tổng thể (TradeMetrics)
+    /// Internal domain documentation
     public static func computeMetrics(
         trades: [Trade],
         curve: [EquityPoint]? = nil,
@@ -279,7 +279,7 @@ public enum FinancialMetricsEngine {
         let winningDays = dayStatsList.filter { $0.netPnl > 0 }.count
         let dayWinRate: Double? = !dayStatsList.isEmpty ? (Double(winningDays) / Double(dayStatsList.count)) : nil
         
-        // Tính Streaks
+        // Internal implementation note
         let ordered = closed.compactMap { $0.closedAt != nil ? $0 : nil }.sorted { $0.closedAt! < $1.closedAt! }
         var maxWinStreak = 0
         var maxLossStreak = 0
@@ -375,7 +375,7 @@ public enum FinancialMetricsEngine {
     }
     
     /// Point-in-time relative drawdown for an underwater chart.
-    /// Port 1:1 từ `packages/core/src/equity.ts` `relativeDrawdownCurve`.
+/// Ported 1:1 from `packages/core/src/equity.ts` `relativeDrawdownCurve`.
     public static func relativeDrawdownCurve(curve: [EquityPoint], initialBalance: Decimal = 0) -> [(timestamp: Date, dateString: String, drawdownPct: Double?)] {
         var peak: Decimal = 0
         return curve.map { point in

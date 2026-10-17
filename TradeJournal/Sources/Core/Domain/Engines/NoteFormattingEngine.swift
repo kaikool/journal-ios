@@ -12,22 +12,22 @@ public struct FormattedSelection: Equatable, Sendable {
     }
 }
 
-/// 1:1 port từ `source-repo/apps/web/src/lib/note-formatting.ts`
+/// Internal domain documentation
 public enum NoteFormattingEngine {
     
-    /// Giữ khoảng trắng bên ngoài dấu nhấn mạnh Markdown (* hoặc **) để đảm bảo tính hợp lệ của Markdown.
+    /// Internal domain documentation
     public static func formatInlineSelection(
         value: String,
         start: Int,
         end: Int,
-        marker: String // "*" hoặc "**"
+        marker: String // Core implementation detail
     ) -> FormattedSelection {
         let nsString = value as NSString
         let safeStart = max(0, min(start, nsString.length))
         let safeEnd = max(safeStart, min(end, nsString.length))
         let selected = nsString.substring(with: NSRange(location: safeStart, length: safeEnd - safeStart))
         
-        // Trích xuất leading whitespace
+        // Internal implementation note
         var leading = ""
         for char in selected {
             if char.isWhitespace { leading.append(char) }
@@ -43,7 +43,7 @@ public enum NoteFormattingEngine {
             trailing = ""
         } else {
             content = trimmed
-            // Trích xuất trailing whitespace
+            // Internal implementation note
             var trail = ""
             for char in selected.reversed() {
                 if char.isWhitespace { trail.append(char) }

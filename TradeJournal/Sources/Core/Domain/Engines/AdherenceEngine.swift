@@ -31,7 +31,7 @@ public struct PlaybookAdherenceSummary: Identifiable, Sendable, Equatable {
     public var netPnlWhenBroken: Decimal { broken.netPnl }
 }
 
-/// Port 1:1 từ `packages/core/src/adherence.ts`.
+/// Ported 1:1 from `packages/core/src/adherence.ts`.
 public enum AdherenceEngine {
     
     public static func analyzeAdherence(

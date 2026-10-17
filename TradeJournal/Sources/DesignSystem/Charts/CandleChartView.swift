@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// View biểu đồ nến chuyên nghiệp và đường khớp lệnh (Execution Path) cho Trade Replay.
-/// Port 1:1 từ `@luxalgo/vela` và `trade-market-data.tsx` / `trade-chart.tsx`.
-/// Đảm bảo mỗi thanh nến có cột toạ độ riêng biệt, không bao giờ bị dồn/chồng cùng mốc thời gian.
+/// Professional candlestick chart and execution path view for Trade Replay.
+/// Ported 1:1 from `@luxalgo/vela` and `trade-market-data.tsx` / `trade-chart.tsx`.
+/// Ensures distinct horizontal coordinates for each bar without timestamp crowding.
 public struct CandleChartView: View {
     let visibleBars: [MarketBar]
     let totalBarsCount: Int
@@ -41,10 +41,10 @@ public struct CandleChartView: View {
     
     public var body: some View {
         VStack(spacing: 6) {
-            // HUD Information Bar: hiển thị chi tiết nến được chọn/chạm
+            // HUD Information Bar: shows detailed OHLC values for selected candle
             hudHeaderView
             
-            // Khung biểu đồ nến Canvas
+            // Candlestick Canvas drawing
             GeometryReader { geo in
                 if visibleBars.isEmpty {
                     executionPathFallbackView(size: geo.size)
@@ -112,7 +112,7 @@ public struct CandleChartView: View {
                 }
                 .font(.system(size: 10, weight: .medium, design: .monospaced))
             } else {
-                Text("Chưa có dữ liệu nến")
+                Text("No candle data available")
                     .font(AppTypography.caption)
                     .foregroundColor(AppColors.secondaryText)
                 Spacer()
@@ -135,25 +135,25 @@ public struct CandleChartView: View {
         let maxP = bounds.maxPrice
         let priceSpan = max(0.00001, maxP - minP)
         
-        // Số slot hiển thị trên màn hình: tối thiểu 15 slot để nến không bị quá to
+        // Number of visible slots: minimum 15 to prevent oversized candles
         let slotCount = max(visibleBars.count, min(totalBarsCount, 50))
         let stepX = plotWidth / CGFloat(max(1, slotCount))
         let candleWidth = max(2.5, min(12.0, stepX * 0.7))
         
         return ZStack(alignment: .topLeading) {
-            // Lưới toạ độ (Grid) và Trục Giá (Right Axis)
+            // Grid lines and right price axis
             gridAndPriceAxis(width: plotWidth, height: plotHeight, minP: minP, maxP: maxP, fullWidth: size.width)
             
-            // Trục Thời Gian (Bottom Axis)
+            // Time axis (bottom)
             timeAxis(width: plotWidth, height: plotHeight, stepX: stepX, fullHeight: size.height)
             
-            // Vẽ khối lượng giao dịch (Volume bars ở đáy)
+// Core implementation detail
             volumeHistogram(plotWidth: plotWidth, plotHeight: plotHeight, stepX: stepX, candleWidth: candleWidth)
             
-            // Đường Entry & Exit tham chiếu
+// Reference Entry & Exit lines
             referencePriceLines(plotWidth: plotWidth, plotHeight: plotHeight, minP: minP, span: priceSpan)
             
-            // Vẽ từng thanh nến (Wick + Body)
+// Render candlesticks (wick + body) (Wick + Body)
             Canvas { context, _ in
                 for (i, bar) in visibleBars.enumerated() {
                     let centerX = CGFloat(i) * stepX + (stepX / 2.0)
@@ -170,13 +170,13 @@ public struct CandleChartView: View {
                     
                     let color = bar.isUp ? AppColors.profit : AppColors.loss
                     
-                    // Vẽ bóng nến (Wick)
+// Draw candle wicks (Wick)
                     var wickPath = Path()
                     wickPath.move(to: CGPoint(x: centerX, y: yHigh))
                     wickPath.addLine(to: CGPoint(x: centerX, y: yLow))
                     context.stroke(wickPath, with: .color(color), lineWidth: 1.5)
                     
-                    // Vẽ thân nến (Body)
+// Draw candle bodies (Body)
                     let bodyTop = min(yOpen, yClose)
                     let bodyHeight = max(2.0, abs(yClose - yOpen))
                     let bodyRect = CGRect(
@@ -190,10 +190,10 @@ public struct CandleChartView: View {
             }
             .frame(width: plotWidth, height: plotHeight)
             
-            // Khớp lệnh (Fills / Executions) hiển thị trên nến tương ứng
+// Core implementation detail
             fillsOverlay(plotWidth: plotWidth, plotHeight: plotHeight, stepX: stepX, minP: minP, span: priceSpan)
             
-            // Đường chỉ báo Crosshair khi người dùng chạm vào biểu đồ
+// Core implementation detail
             if let hIdx = hoveredBarIndex, hIdx < visibleBars.count {
                 let hX = CGFloat(hIdx) * stepX + (stepX / 2.0)
                 Rectangle()
@@ -288,7 +288,7 @@ public struct CandleChartView: View {
                 .cornerRadius(4)
                 .position(x: 45, y: max(10, yEntry - 10))
             
-            // Exit Line (khi lệnh đã đóng)
+// Core implementation detail
             if let avgExit = trade.avgExit {
                 let exitD = (avgExit as NSDecimalNumber).doubleValue
                 let yExit = plotHeight - CGFloat((exitD - minP) / span) * plotHeight
@@ -312,12 +312,12 @@ public struct CandleChartView: View {
         }
     }
     
-    // MARK: - 6. Fills Overlay (Buy / Sell badges trên nến)
+    // Internal implementation note
     
     private func fillsOverlay(plotWidth: CGFloat, plotHeight: CGFloat, stepX: CGFloat, minP: Double, span: Double) -> some View {
         ForEach(activeFills) { fill in
             let fillMs = Int64(fill.executedAt.timeIntervalSince1970 * 1000)
-            // Tìm thanh nến gần nhất với thời gian khớp lệnh
+            // Internal implementation note
             let barIndex = visibleBars.firstIndex { $0.timestamp >= fillMs } ?? (visibleBars.count - 1)
             let x = CGFloat(barIndex) * stepX + (stepX / 2.0)
             let fillPriceD = (fill.price as NSDecimalNumber).doubleValue
@@ -341,7 +341,7 @@ public struct CandleChartView: View {
         }
     }
     
-    // MARK: - 7. Fallback: Execution Path Chart (Port 1:1 từ TradeChart)
+    // Internal implementation note
     
     private func executionPathFallbackView(size: CGSize) -> some View {
         let entryD = (trade.avgEntry as NSDecimalNumber).doubleValue
@@ -371,7 +371,7 @@ public struct CandleChartView: View {
                 HStack(spacing: 2) {
                     Image(systemName: trade.direction == .long ? "triangle.fill" : "arrowtriangle.down.fill")
                         .font(.system(size: 8))
-                    Text("VÀO LỆNH: \(Formatters.price(trade.avgEntry))")
+                    Text("ENTRY: \(Formatters.price(trade.avgEntry))")
                         .font(.system(size: 9, weight: .bold))
                 }
                 .padding(.horizontal, 6)
@@ -386,13 +386,13 @@ public struct CandleChartView: View {
             }
             .position(x: 65, y: max(25, yEntry - 20))
             
-            // Exit Marker (nếu có)
+            // Exit Marker (if closed)
             if let closedAt = trade.closedAt, let avgExit = trade.avgExit {
                 VStack(spacing: 2) {
                     HStack(spacing: 2) {
                         Image(systemName: trade.direction == .long ? "arrowtriangle.down.fill" : "triangle.fill")
                             .font(.system(size: 8))
-                        Text("ĐÓNG: \(Formatters.price(avgExit))")
+                        Text("EXIT: \(Formatters.price(avgExit))")
                             .font(.system(size: 9, weight: .bold))
                     }
                     .padding(.horizontal, 6)
@@ -421,7 +421,7 @@ public struct CandleChartView: View {
             // Footer notice
             VStack {
                 Spacer()
-                Text("Đang hiển thị đường giá khớp lệnh (Execution Path). Chưa có dữ liệu nến từ sàn.")
+                Text("Showing execution price path. Connect market data in Settings to load candles.")
                     .font(.system(size: 10))
                     .foregroundColor(AppColors.secondaryText)
                     .padding(.bottom, 6)
@@ -468,7 +468,14 @@ public struct CandleChartView: View {
         let date = Date(timeIntervalSince1970: Double(timestamp) / 1000.0)
         let f = DateFormatter()
         f.timeZone = timeZone
-        f.dateFormat = "HH:mm"
+        let spanMs = (visibleBars.last?.timestamp ?? timestamp) - (visibleBars.first?.timestamp ?? timestamp)
+        if spanMs > 86_400_000 * 2 {
+            f.dateFormat = "MM/dd"
+        } else if spanMs > 86_400_000 {
+            f.dateFormat = "MM/dd HH:mm"
+        } else {
+            f.dateFormat = "HH:mm"
+        }
         return f.string(from: date)
     }
 }

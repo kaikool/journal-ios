@@ -1,7 +1,7 @@
 import Foundation
 
-/// Bộ phân tích cú pháp CSV tuân thủ chuẩn RFC 4180
-/// Hỗ trợ dấu ngoặc kép, dấu phẩy bên trong chuỗi, xuống dòng bên trong trường, và khoảng trắng.
+/// Internal domain documentation
+/// Internal domain documentation
 public enum CSVParser {
     
     public static func parse(_ text: String, delimiter: Character = ",") -> [[String]] {
@@ -19,7 +19,7 @@ public enum CSVParser {
             
             if char == "\"" {
                 if insideQuotes && i + 1 < count && chars[i + 1] == "\"" {
-                    // Thoát dấu ngoặc kép đôi ""
+                    // Internal implementation note
                     currentField.append("\"")
                     i += 1
                 } else {
@@ -29,14 +29,14 @@ public enum CSVParser {
                 currentRow.append(currentField.trimmingCharacters(in: .whitespaces))
                 currentField = ""
             } else if (char == "\r" || char == "\n") && !insideQuotes {
-                // Xuống dòng
+                // Internal implementation note
                 if char == "\r" && i + 1 < count && chars[i + 1] == "\n" {
                     i += 1
                 }
                 currentRow.append(currentField.trimmingCharacters(in: .whitespaces))
                 currentField = ""
                 
-                // Chỉ thêm dòng nếu có ít nhất 1 trường không rỗng
+                // Internal implementation note
                 if !currentRow.allSatisfy({ $0.isEmpty }) {
                     rows.append(currentRow)
                 }

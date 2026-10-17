@@ -72,7 +72,7 @@ public actor AIReflectionService {
         prompt: String?
     ) -> String {
         guard let m = metrics else {
-            return "Chưa có đủ dữ liệu giao dịch để phân tích. Hãy thực hiện hoặc import ít nhất một chu kỳ giao dịch."
+            return "Insufficient trade data for analysis. Please record or import trades to analyze performance."
         }
         
         let wr = (m.winRate ?? 0.0) * 100
@@ -82,38 +82,38 @@ public actor AIReflectionService {
         switch action {
         case .ask:
             return """
-            [Phân tích nội bộ]
-            Câu hỏi của bạn: "\(prompt ?? "")"
+            [Internal Performance Analysis]
+            Your question: "\(prompt ?? "")"
             
-            Dữ liệu thực tế:
-            - Tổng số lệnh: \(m.totalTrades) lệnh
-            - Tỷ lệ thắng (Win Rate): \(String(format: "%.1f%%", wr)) (\(m.wins)W / \(m.losses)L / \(m.breakevens)BE)
+            Actual trading data:
+            - Total closed trades: \(m.totalTrades)
+            - Win Rate: \(String(format: "%.1f%%", wr)) (\(m.wins)W / \(m.losses)L / \(m.breakevens)BE)
             - Profit Factor: \(pf)
-            - Điểm Edge Score v2: \(score)/100
+            - Edge Score v2: \(score)/100
             
-            Nhận định:
-            \(wr >= 50.0 ? "Hệ thống đang có tỷ lệ thắng ổn định." : "Tỷ lệ thắng dưới 50%, cần tối ưu lại điểm vào lệnh và quản lý tỷ lệ R:R.")
-            \(m.losses > 0 ? "Lệnh lỗ lớn nhất ghi nhận là \(m.largestLoss). Cắt lỗ nghiêm ngặt là yếu tố then chốt." : "Chưa có lệnh lỗ nào được ghi nhận.")
+            Summary:
+            \(wr >= 50.0 ? "The trading system maintains a solid win rate." : "Win rate is below 50%; optimize trade entries and focus on favorable R:R ratios.")
+            \(m.losses > 0 ? "Largest loss recorded is \(m.largestLoss). Strict stop loss adherence is essential." : "No losing trades recorded in this period.")
             """
             
         case .critique:
             return """
-            [Góc nhìn Huấn luyện viên]
-            Nhìn vào bức tranh tổng thể:
-            1. Chuỗi lệnh: Chuỗi thắng dài nhất là \(m.maxWinStreak) lệnh, chuỗi thua dài nhất là \(m.maxLossStreak) lệnh.
-            2. Điểm Edge Score đạt \(score)/100.
-            3. Khuyến nghị: Giữ kỷ luật kích thước vị thế (position sizing), không tăng khối lượng sau chuỗi thua để tránh hiện tượng Revenge Trading.
+            [Coach Perspective]
+            Reviewing the overall performance:
+            1. Streaks: Longest win streak is \(m.maxWinStreak) trades, longest loss streak is \(m.maxLossStreak) trades.
+            2. Edge Score reached \(score)/100.
+            3. Recommendation: Maintain disciplined position sizing. Never revenge trade or scale up sizing after drawdowns.
             """
             
         case .recap:
             return """
-            [Tổng kết hiệu suất]
-            - Tổng lợi nhuận ròng: \(m.netPnl >= 0 ? "+" : "")\(m.netPnl)
-            - Lệnh thắng lớn nhất: \(m.largestWin) | Lệnh thua lớn nhất: \(m.largestLoss)
-            - Phí giao dịch đã trả: \(m.fees != nil ? "\(m.fees!)" : "0")
-            - Khối lượng giao dịch: \(m.totalVolume)
+            [Performance Summary]
+            - Net Cumulative P&L: \(m.netPnl >= 0 ? "+" : "")\(m.netPnl)
+            - Largest win: \(m.largestWin) | Largest loss: \(m.largestLoss)
+            - Total fees paid: \(m.fees != nil ? "\(m.fees!)" : "0")
+            - Total trade volume: \(m.totalVolume)
             
-            Đánh giá: \(m.netPnl >= 0 ? "Kỳ giao dịch sinh lời dương. Tiếp tục duy trì quy tắc của Playbook." : "Kỳ giao dịch đang âm ròng. Đề xuất rà soát lại các lệnh vi phạm quy tắc.")
+            Assessment: \(m.netPnl >= 0 ? "Profitable period. Maintain playbook execution rules." : "Net negative period. Review rule-violating trades and tighten risk parameters.")
             """
         }
     }

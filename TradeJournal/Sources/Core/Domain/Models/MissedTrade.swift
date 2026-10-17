@@ -1,6 +1,6 @@
 import Foundation
 
-/// 1:1 port từ bảng `missed_trades` trong `schema.pg.ts`
+/// 1:1 port from table `missed_trades` in `schema.pg.ts`
 public struct MissedTrade: Identifiable, Codable, Sendable, Equatable {
     public let id: String
     public var symbol: String

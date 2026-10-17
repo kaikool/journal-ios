@@ -12,8 +12,15 @@ public enum ReportMode: String, CaseIterable, Identifiable {
     public var id: String { rawValue }
 }
 
-/// Màn hình Báo cáo và Phân tích chuyên sâu
-/// Port 1:1 từ `source-repo/apps/web/src/app/reports/page.tsx`
+/// Comprehensive Performance Reports and Deep Analytics view.
+/// Ported 1:1 from `source-repo/apps/web/src/app/reports/page.tsx`:
+/// - FilterBar with title "Reports", time-range filters, and "Ask AI" action button
+/// - Mode Selector: Overview, Performance trends, Trade explorer, Breakdowns, Cross-analysis, Compare groups
+/// - Overview: 8-KPI summary grid, Weekday breakdown chart, Session breakdown chart
+/// - Performance trends: Cumulative Equity Curve and Drawdown chart
+/// - Trade explorer: List of filtered trades with badges, status, and P&L
+/// - Breakdowns & Cross-analysis: Multi-dimensional grouping table
+/// - Compare groups: Strategy and playbook comparison
 public struct ReportsView: View {
     @ObservedObject private var dataStore = TradeDataStore.shared
     @EnvironmentObject private var env: AppEnvironment
@@ -93,7 +100,7 @@ public struct ReportsView: View {
     
     public var body: some View {
         VStack(spacing: 0) {
-            // FilterBar chuẩn xác từ web
+            // FilterBar matching reports/page.tsx
             FilterBarView(
                 title: "Reports",
                 selectedRange: $selectedRange,
@@ -110,14 +117,14 @@ public struct ReportsView: View {
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
                     .background(AppColors.brand)
-                    .foregroundColor(.white)
+                    .foregroundColor(AppColors.brandTextOnDark)
                     .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                 }
             }
             
             ScrollView {
                 VStack(spacing: 12) {
-                    // Mode Selector (6 chế độ chuẩn web)
+                    // Mode Selector (6 modes matching reports/page.tsx line 285-304)
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 6) {
                             ForEach(ReportMode.allCases) { mode in
@@ -129,7 +136,7 @@ public struct ReportsView: View {
                                         .padding(.horizontal, 10)
                                         .padding(.vertical, 6)
                                         .background(selectedMode == mode ? AppColors.brand : AppColors.cardBackground)
-                                        .foregroundColor(selectedMode == mode ? .white : AppColors.primaryText)
+                                        .foregroundColor(selectedMode == mode ? AppColors.brandTextOnDark : AppColors.primaryText)
                                         .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                                         .overlay(
                                             RoundedRectangle(cornerRadius: 6)
@@ -143,7 +150,7 @@ public struct ReportsView: View {
                         .padding(.top, 10)
                     }
                     
-                    // Nội dung theo từng chế độ
+                    // Selected Mode Content
                     switch selectedMode {
                     case .overview:
                         overviewSection
@@ -165,7 +172,7 @@ public struct ReportsView: View {
             AIReflectionView()
         }
         .sheet(isPresented: $showExportSheet) {
-            ReviewExportModal(title: "Báo cáo giao dịch", exportText: exportText)
+            ReviewExportModal(title: "Trade report", exportText: exportText)
         }
     }
     
@@ -173,11 +180,11 @@ public struct ReportsView: View {
     
     private var overviewSection: some View {
         VStack(spacing: 16) {
-            // 8 KPI Summary Grid
+            // 8 KPI Summary Grid matching report-overview.tsx & reports/page.tsx line 61-85
             AppCard {
                 VStack(alignment: .leading, spacing: 14) {
                     HStack {
-                        Text("Chỉ số tổng hợp (Performance Summary)")
+                        Text("Performance Summary")
                             .font(AppTypography.headline)
                             .foregroundColor(AppColors.primaryText)
                         Spacer()
@@ -199,12 +206,12 @@ public struct ReportsView: View {
             }
             .padding(.horizontal, 16)
             
-            // Biểu đồ ngày trong tuần
+            // Weekday breakdown chart
             let weekdayStats = AggregateEngine.byWeekday(trades: trades, timeZone: env.currentTimeZone)
             WeekdayChart(weekdays: weekdayStats, currency: env.currentCurrency)
                 .padding(.horizontal, 16)
             
-            // Biểu đồ phiên giao dịch
+            // Trading session breakdown chart
             let sessionStats = AggregateEngine.bySession(trades: trades)
             SessionBreakdownChart(sessions: sessionStats, currency: env.currentCurrency)
                 .padding(.horizontal, 16)
@@ -213,7 +220,7 @@ public struct ReportsView: View {
     
     private var trendsSection: some View {
         VStack(spacing: 16) {
-            // Đường cong lợi nhuận tích luỹ (Equity Curve)
+            // Cumulative Net Equity Curve
             let overview = FinancialMetricsEngine.computeOverview(trades: trades, timeZone: env.currentTimeZone)
             let equityPoints = overview.curve.map { p in
                 EquityPointItem(
@@ -227,7 +234,7 @@ public struct ReportsView: View {
             
             AppCard {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Đường cong vốn (Equity Curve)")
+                    Text("Equity Curve")
                         .font(AppTypography.headline)
                         .foregroundColor(AppColors.primaryText)
                     
@@ -236,7 +243,7 @@ public struct ReportsView: View {
             }
             .padding(.horizontal, 16)
             
-            // Biểu đồ sụt giảm vốn (Drawdown)
+            // Drawdown Chart
             DrawdownChart(points: equityPoints)
                 .padding(.horizontal, 16)
         }
@@ -247,14 +254,14 @@ public struct ReportsView: View {
             AppCard {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
-                        Text("Khám phá lệnh (\(trades.count))")
+                        Text("Trade explorer (\(trades.count))")
                             .font(AppTypography.headline)
                             .foregroundColor(AppColors.primaryText)
                         Spacer()
                     }
                     
                     if trades.isEmpty {
-                        Text("Không có lệnh giao dịch nào khớp với bộ lọc.")
+                        Text("No closed trades match these filters.")
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText)
                     } else {
@@ -295,20 +302,20 @@ public struct ReportsView: View {
     
     private var breakdownAndCrossSection: some View {
         VStack(spacing: 16) {
-            // Dimension Pickers
+            // Dimension Pickers matching reports/page.tsx line 320-328
             AppCard {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Thiết lập chiều phân tích")
+                    Text("Analysis Dimensions")
                         .font(AppTypography.headline)
                         .foregroundColor(AppColors.primaryText)
                     
                     HStack(spacing: 12) {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("Nhóm theo (Cột 1)")
+                            Text("Group by")
                                 .font(.system(size: 11))
                                 .foregroundColor(AppColors.secondaryText)
                             
-                            Picker("Chiều 1", selection: $primaryDimension) {
+                            Picker("Primary", selection: $primaryDimension) {
                                 ForEach(Dimension.allCases, id: \.self) { dim in
                                     Text(dim.label).tag(dim)
                                 }
@@ -321,11 +328,11 @@ public struct ReportsView: View {
                                 .frame(height: 36)
                             
                             VStack(alignment: .leading, spacing: 4) {
-                                Text("Tiếp tục theo (Cột 2)")
+                                Text("Then by")
                                     .font(.system(size: 11))
                                     .foregroundColor(AppColors.secondaryText)
                                 
-                                Picker("Chiều 2", selection: $secondaryDimension) {
+                                Picker("Secondary", selection: $secondaryDimension) {
                                     ForEach(Dimension.allCases, id: \.self) { dim in
                                         Text(dim.label).tag(dim)
                                     }
@@ -338,18 +345,18 @@ public struct ReportsView: View {
             }
             .padding(.horizontal, 16)
             
-            // Bảng kết quả phân rã chi tiết
+            // Detailed breakdown results table matching reports/page.tsx line 200-250
             AppCard {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
-                        Text(selectedMode == .cross ? "\(primaryDimension.label) × \(secondaryDimension.label)" : "Hiệu suất theo \(primaryDimension.label)")
+                        Text(selectedMode == .cross ? "\(primaryDimension.label) × \(secondaryDimension.label)" : "\(primaryDimension.label) performance")
                             .font(AppTypography.headline)
                             .foregroundColor(AppColors.primaryText)
                         Spacer()
                     }
                     
                     if groupResults.isEmpty {
-                        Text("Không có dữ liệu lệnh phù hợp để phân rã.")
+                        Text("No closed trades match these filters.")
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText)
                             .padding(.vertical, 8)
@@ -363,7 +370,7 @@ public struct ReportsView: View {
                                             .foregroundColor(AppColors.primaryText)
                                         
                                         HStack(spacing: 6) {
-                                            Text("\(g.summary.trades) lệnh")
+                                            Text("\(g.summary.trades) trades")
                                                 .font(.system(size: 11))
                                                 .foregroundColor(AppColors.secondaryText)
                                             
@@ -404,19 +411,19 @@ public struct ReportsView: View {
         VStack(spacing: 16) {
             AppCard {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("So sánh theo Chiến lược (Playbooks)")
+                    Text("Playbooks Comparison")
                         .font(AppTypography.headline)
                         .foregroundColor(AppColors.primaryText)
                     
                     let pResults = TradeAnalysisEngine.analyzeGroups(trades: trades, primary: .playbook)
                     if pResults.isEmpty {
-                        Text("Chưa có chiến lược nào được gán cho lệnh.")
+                        Text("No playbooks assigned to closed trades.")
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText)
                     } else {
                         ForEach(pResults, id: \.row) { item in
                             HStack {
-                                Text(item.row.isEmpty ? "Không có chiến lược" : item.row)
+                                Text(item.row.isEmpty ? "No playbook" : item.row)
                                     .font(AppTypography.bodyBold)
                                     .foregroundColor(AppColors.primaryText)
                                 Spacer()

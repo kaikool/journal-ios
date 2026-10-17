@@ -81,7 +81,7 @@ public struct TradesListView: View {
     public var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                // FilterBar chuẩn web
+                // FilterBar matching web filter-bar.tsx
                 FilterBarView(
                     title: "Trades",
                     selectedRange: $selectedRange,
@@ -129,15 +129,17 @@ public struct TradesListView: View {
             AppCard {
                 VStack(alignment: .leading, spacing: 4) {
                     AppCardHeader("Net cumulative P&L")
-                    AppMonetaryText(
-                        Formatters.formatPnL(overviewMetrics.netPnl, currency: env.currentCurrency),
-                        isPrivate: env.isPrivacyModeEnabled,
-                        font: AppTypography.financialNumber(size: 20, weight: .semibold),
-                        color: pnlColor
-                    )
-                    Text("\(overviewMetrics.closedTrades) trades")
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.secondaryText)
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        AppMonetaryText(
+                            Formatters.formatPnL(overviewMetrics.netPnl, currency: env.currentCurrency),
+                            isPrivate: env.isPrivacyModeEnabled,
+                            font: AppTypography.financialNumber(size: 20, weight: .semibold),
+                            color: pnlColor
+                        )
+                        Text("\(overviewMetrics.closedTrades) trades")
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.secondaryText)
+                    }
                 }
             }
             
@@ -147,9 +149,6 @@ public struct TradesListView: View {
                     Text(pfStr)
                         .font(AppTypography.financialNumber(size: 20, weight: .semibold))
                         .foregroundColor(AppColors.primaryText)
-                    Text("gross profit ÷ gross loss")
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.secondaryText)
                 }
             }
             
@@ -159,9 +158,6 @@ public struct TradesListView: View {
                     Text(winRateStr)
                         .font(AppTypography.financialNumber(size: 20, weight: .semibold))
                         .foregroundColor(AppColors.primaryText)
-                    Text("\(overviewMetrics.wins)W · \(overviewMetrics.losses)L")
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.secondaryText)
                 }
             }
             
@@ -171,9 +167,6 @@ public struct TradesListView: View {
                     Text(avgWlStr)
                         .font(AppTypography.financialNumber(size: 20, weight: .semibold))
                         .foregroundColor(AppColors.primaryText)
-                    Text("tỉ lệ trung bình")
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.secondaryText)
                 }
             }
         }

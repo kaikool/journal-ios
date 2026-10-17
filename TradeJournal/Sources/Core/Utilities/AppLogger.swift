@@ -1,7 +1,7 @@
 import Foundation
 import os.log
 
-/// Hệ thống logging chuẩn hóa, tuân thủ nguyên tắc R005 không làm lộ secrets hoặc thông tin nhạy cảm.
+/// Standard logging system adhering to security guidelines without leaking secrets.
 public enum AppLogger {
     private static let subsystem = Bundle.main.bundleIdentifier ?? "com.kaikool.tradejournal"
     private static let logger = Logger(subsystem: subsystem, category: "TradeJournal")
@@ -32,19 +32,19 @@ public enum AppLogger {
         }
     }
     
-    /// Loại bỏ các chuỗi nhạy cảm có khả năng là API keys, bearer tokens hoặc passwords
+    /// Masks sensitive strings such as API keys, bearer tokens, or credentials
     private static func sanitize(_ text: String) -> String {
         var result = text
-        // Mặt nạ hóa Bearer tokens
+        // Mask Bearer tokens
         result = result.replacingOccurrences(of: "Bearer\\s+[A-Za-z0-9._-]+", with: "Bearer [REDACTED]", options: .regularExpression)
-        // Mặt nạ hóa key có định dạng sk-... hoặc sb_...
+        // Mask keys with sk-... or sb_... prefix
         result = result.replacingOccurrences(of: "(sk-[A-Za-z0-9]{20,})", with: "[SECRET_KEY_REDACTED]", options: .regularExpression)
         result = result.replacingOccurrences(of: "(sbp_[A-Za-z0-9]{20,})", with: "[SUPABASE_KEY_REDACTED]", options: .regularExpression)
         return result
     }
 }
 
-/// Mô hình lỗi chuẩn hóa toàn ứng dụng
+/// Standard application error model
 public enum AppError: LocalizedError, Equatable {
     case networkUnavailable
     case unauthorized
@@ -57,19 +57,19 @@ public enum AppError: LocalizedError, Equatable {
     public var errorDescription: String? {
         switch self {
         case .networkUnavailable:
-            return "Không có kết nối mạng. Ứng dụng đang hoạt động ở chế độ ngoại tuyến."
+            return "No network connection. The application is operating in offline mode."
         case .unauthorized:
-            return "Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại."
+            return "Session expired. Please sign in again."
         case .serverError(let code, let msg):
-            return "Lỗi máy chủ (\(code)): \(msg)"
+            return "Server error (\(code)): \(msg)"
         case .invalidData(let desc):
-            return "Dữ liệu không hợp lệ: \(desc)"
+            return "Invalid data: \(desc)"
         case .importFailed(let reason):
-            return "Không thể nạp dữ liệu: \(reason)"
+            return "Could not load data: \(reason)"
         case .syncConflict(let id):
-            return "Xảy ra xung đột đồng bộ cho bản ghi \(id)."
+            return "Sync conflict occurred for record \(id)."
         case .unknown(let desc):
-            return "Lỗi không xác định: \(desc)"
+            return "Unknown error: \(desc)"
         }
     }
 }

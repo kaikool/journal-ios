@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Màn hình quản lý Kèo Bị Lỡ (Missed Trades)
-/// Port 1:1 từ `source-repo/apps/web/src/app/missed/page.tsx`
+/// Missed trades management view
+/// Port 1:1 from `source-repo/apps/web/src/app/missed/page.tsx`
 public struct MissedTradesView: View {
     @EnvironmentObject private var env: AppEnvironment
     @ObservedObject private var dataStore = TradeDataStore.shared
@@ -115,11 +115,11 @@ public struct MissedTradesView: View {
                 .font(.system(size: 48))
                 .foregroundColor(AppColors.secondaryText)
             
-            Text(showArchived ? "Không có kèo lỡ nào trong kho lưu trữ" : "Chưa có kèo giao dịch bị lỡ nào")
+            Text(showArchived ? "No archived opportunities here yet" : "No opportunities recorded yet")
                 .font(AppTypography.headline)
                 .foregroundColor(AppColors.primaryText)
             
-            Text("Ghi lại các cơ hội bạn đã thấy đúng tín hiệu nhưng bỏ lỡ hoặc ngần ngại không vào, để rút kinh nghiệm tâm lý.")
+            Text("Record setups you watched but did not take, to review execution discipline and identify hesitation patterns.")
                 .font(AppTypography.caption)
                 .foregroundColor(AppColors.secondaryText)
                 .multilineTextAlignment(.center)
@@ -132,7 +132,7 @@ public struct MissedTradesView: View {
                 } label: {
                     HStack {
                         Image(systemName: "plus.circle")
-                        Text("Ghi Lại Kèo Bị Lỡ")
+                        Text("Log Missed Opportunity")
                     }
                     .font(AppTypography.subheadlineBold)
                     .padding(.horizontal, 20)
@@ -173,19 +173,19 @@ public struct MissedTradesView: View {
                 HStack(spacing: 16) {
                     if let entry = trade.entry {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Giá vào").font(AppTypography.caption).foregroundColor(AppColors.secondaryText)
+                            Text("Entry").font(AppTypography.caption).foregroundColor(AppColors.secondaryText)
                             Text("\(entry)").font(AppTypography.captionBold)
                         }
                     }
                     if let stop = trade.stop {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Stop Loss").font(AppTypography.caption).foregroundColor(AppColors.secondaryText)
+                            Text("Stop").font(AppTypography.caption).foregroundColor(AppColors.secondaryText)
                             Text("\(stop)").font(AppTypography.captionBold).foregroundColor(AppColors.loss)
                         }
                     }
                     if let target = trade.target {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Take Profit").font(AppTypography.caption).foregroundColor(AppColors.secondaryText)
+                            Text("Target").font(AppTypography.caption).foregroundColor(AppColors.secondaryText)
                             Text("\(target)").font(AppTypography.captionBold).foregroundColor(AppColors.profit)
                         }
                     }
@@ -217,19 +217,19 @@ public struct MissedTradesView: View {
                 editingTrade = trade
                 showAddSheet = true
             } label: {
-                Label("Chỉnh sửa", systemImage: "pencil")
+                Label("Edit", systemImage: "pencil")
             }
             
             Button {
                 dataStore.toggleArchiveMissedTrade(id: trade.id)
             } label: {
-                Label(trade.archivedAt == nil ? "Lưu trữ" : "Bỏ lưu trữ", systemImage: trade.archivedAt == nil ? "archivebox" : "arrow.up.bin")
+                Label(trade.archivedAt == nil ? "Archive" : "Restore", systemImage: trade.archivedAt == nil ? "archivebox" : "arrow.up.bin")
             }
             
             Button(role: .destructive) {
                 dataStore.deleteMissedTrade(id: trade.id)
             } label: {
-                Label("Xóa", systemImage: "trash")
+                Label("Delete", systemImage: "trash")
             }
         }
     }
@@ -244,7 +244,7 @@ public struct MissedTradesView: View {
     }
 }
 
-/// Sheet thêm / sửa Kèo Bị Lỡ
+/// Sheet for logging or editing missed trade opportunities
 public struct AddMissedTradeSheet: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var dataStore = TradeDataStore.shared
@@ -278,38 +278,38 @@ public struct AddMissedTradeSheet: View {
     public var body: some View {
         NavigationStack {
             Form {
-                Section("Thông Tin Kèo") {
-                    TextField("Mã cặp tiền / tài sản (VD: EURUSD, XAUUSD)", text: $symbol)
+                Section("Opportunity Details") {
+                    TextField("Symbol (e.g. EURUSD, XAUUSD, NQ)", text: $symbol)
                         .autocapitalization(.allCharacters)
                     
-                    Picker("Chiều giao dịch", selection: $direction) {
-                        Text("Mua (Long)").tag("long")
-                        Text("Bán (Short)").tag("short")
+                    Picker("Direction", selection: $direction) {
+                        Text("BUY / LONG").tag("long")
+                        Text("SELL / SHORT").tag("short")
                     }
                     .pickerStyle(.segmented)
                     
-                    DatePicker("Thời điểm phát hiện", selection: $observedDate)
+                    DatePicker("Observed at", selection: $observedDate)
                 }
                 
-                Section("Kế Hoạch Giá") {
-                    TextField("Giá vào dự kiến (Entry)", text: $entryText)
+                Section("Planned Prices") {
+                    TextField("Planned entry", text: $entryText)
                         .keyboardType(.decimalPad)
-                    TextField("Stop Loss dự kiến", text: $stopText)
+                    TextField("Planned stop loss", text: $stopText)
                         .keyboardType(.decimalPad)
-                    TextField("Take Profit dự kiến", text: $targetText)
+                    TextField("Planned take profit", text: $targetText)
                         .keyboardType(.decimalPad)
                 }
                 
-                Section("Chiến Lược (Playbook)") {
-                    Picker("Playbook liên kết", selection: $selectedPlaybookId) {
-                        Text("Không liên kết").tag("")
+                Section("Playbook") {
+                    Picker("Associated playbook", selection: $selectedPlaybookId) {
+                        Text("None").tag("")
                         ForEach(dataStore.playbooks) { pb in
                             Text(pb.name).tag(pb.id)
                         }
                     }
                 }
                 
-                Section("Lý Do Bỏ Lỡ & Ghi Chú") {
+                Section("Review & Notes") {
                     TextEditor(text: $notes)
                         .frame(minHeight: 100)
                 }
@@ -320,14 +320,14 @@ public struct AddMissedTradeSheet: View {
                     }
                 }
             }
-            .navigationTitle(tradeToEdit == nil ? "Ghi Kèo Bị Lỡ" : "Sửa Kèo Lỡ")
+            .navigationTitle(tradeToEdit == nil ? "Log Missed Opportunity" : "Edit Opportunity")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Hủy") { dismiss() }
+                    Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Lưu") { save() }
+                    Button("Save") { save() }
                         .font(AppTypography.captionBold)
                         .foregroundColor(AppColors.accent)
                 }
@@ -338,7 +338,7 @@ public struct AddMissedTradeSheet: View {
     private func save() {
         let cleanSymbol = symbol.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
         guard !cleanSymbol.isEmpty else {
-            errorMessage = "Vui lòng nhập mã giao dịch (Symbol)."
+            errorMessage = "Please enter an instrument symbol."
             return
         }
         

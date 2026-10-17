@@ -60,7 +60,7 @@ public enum NotebookError: LocalizedError, Equatable {
     }
 }
 
-/// 1:1 port từ các handler:
+/// Internal domain documentation
 /// - `source-repo/apps/web/src/app/api/folders/route.ts`
 /// - `source-repo/apps/web/src/app/api/folders/[id]/route.ts`
 /// - `source-repo/apps/web/src/app/api/notes/route.ts`
@@ -73,7 +73,7 @@ public enum NotebookEngine {
     public static let systemFolderTradeNotes = "trade-notes"
     public static let systemFolderMyNotes = "my-notes"
     
-    /// 3 thư mục hệ thống mặc định được khởi tạo theo `notebook-postgres.test.ts` & `notebook-folder-delete.test.ts`
+    /// Internal domain documentation
     public static var defaultSystemFolders: [NotebookFolder] {
         [
             NotebookFolder(id: systemFolderAll, name: "All notes", kind: "system", createdAt: "2026-01-01T00:00:00.000Z"),
@@ -82,7 +82,7 @@ public enum NotebookEngine {
         ]
     }
     
-    /// Tạo thư mục mới (`POST /api/folders`)
+    /// Internal domain documentation
     public static func createFolder(
         name: String,
         existingFolders: [NotebookFolder]
@@ -107,9 +107,9 @@ public enum NotebookEngine {
         return (newFolder, updated)
     }
     
-    /// Xóa thư mục (`DELETE /api/folders/[id]`):
-    /// BẢO TOÀN DỮ LIỆU: Toàn bộ ghi chú trong thư mục bị xoá sẽ được chuyển về "my-notes".
-    /// Không cho phép xoá thư mục "all" hoặc "my-notes".
+    /// Internal domain documentation
+    /// Internal domain documentation
+    /// Internal domain documentation
     public static func deleteFolder(
         id: String,
         folders: [NotebookFolder],
@@ -128,7 +128,7 @@ public enum NotebookEngine {
         targetFolder.deletedAt = JournalIds.nowIso()
         updatedFolders[index] = targetFolder
         
-        // Di chuyển toàn bộ ghi chú của thư mục này sang "my-notes"
+        // Internal implementation note
         let updatedNotes = notes.map { note -> NotebookNote in
             if note.folderId == id {
                 var modified = note
@@ -142,7 +142,7 @@ public enum NotebookEngine {
         return (updatedFolders, updatedNotes)
     }
     
-    /// Tạo ghi chú mới (`POST /api/notes`)
+    /// Internal domain documentation
     public static func createNote(
         folderId: String? = nil,
         title: String = "",
@@ -188,7 +188,7 @@ public enum NotebookEngine {
         return (newNote, updated)
     }
     
-    /// Cập nhật ghi chú (`PATCH /api/notes/[id]`)
+    /// Internal domain documentation
     public static func patchNote(
         id: String,
         title: String? = nil,
@@ -228,7 +228,7 @@ public enum NotebookEngine {
         return (target, updated)
     }
     
-    /// Xóa ghi chú (`DELETE /api/notes/[id]`)
+    /// Internal domain documentation
     public static func deleteNote(
         id: String,
         notes: [NotebookNote]
@@ -236,7 +236,7 @@ public enum NotebookEngine {
         notes.filter { $0.id != id }
     }
     
-    /// Lọc và tìm kiếm danh sách ghi chú (`GET /api/notes`)
+    /// Internal domain documentation
     public static func filterNotes(
         notes: [NotebookNote],
         folders: [NotebookFolder],
@@ -248,7 +248,7 @@ public enum NotebookEngine {
         let activeFolders = folders.filter { $0.deletedAt == nil }
         let activeFolderIds = Set(activeFolders.map { $0.id })
         
-        // Chỉ lấy ghi chú thuộc các thư mục đang hoạt động
+        // Internal implementation note
         var result = notes.filter { activeFolderIds.contains($0.folderId) }
         
         if let targetFolder = folderId, targetFolder != systemFolderAll {
@@ -272,7 +272,7 @@ public enum NotebookEngine {
             }
         }
         
-        // Sắp xếp
+        // Internal implementation note
         result.sort { a, b in
             switch sort {
             case .created:
@@ -288,8 +288,8 @@ public enum NotebookEngine {
         return (result, sortedFolders)
     }
     
-    /// Lấy dòng thời gian lịch sử nhật ký (`GET /api/journal`)
-    /// Trả về tất cả các ngày có giao dịch HOẶC có ghi chú ngày, xếp mới nhất lên đầu.
+    /// Internal domain documentation
+    /// Internal domain documentation
     public static func journalChronology(
         trades: [Trade],
         journalDays: [String: String], // date -> note
@@ -330,7 +330,7 @@ public enum NotebookEngine {
         }
     }
     
-    /// Chi tiết một ngày nhật ký (`GET /api/journal/[date]`)
+    /// Internal domain documentation
     public static func journalDayDetail(
         date: String,
         trades: [Trade],
@@ -340,7 +340,7 @@ public enum NotebookEngine {
     ) -> JournalDayDetail {
         let tz = TimeZone(identifier: timeZone) ?? TimeZone(identifier: "UTC") ?? .current
         
-        // Lọc các trade đóng trong ngày này
+        // Internal implementation note
         let dayTrades = trades.filter { trade in
             guard let closed = trade.closedAt else { return false }
             return AggregateEngine.dayKeyOf(date: closed, timeZone: tz) == date

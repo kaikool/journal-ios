@@ -1,6 +1,6 @@
 import Foundation
 
-/// 1:1 port từ bảng `attachments` trong `schema.pg.ts`
+/// 1:1 port from table `attachments` in `schema.pg.ts`
 public struct Attachment: Identifiable, Codable, Sendable, Equatable {
     public let id: String
     public let ownerType: String

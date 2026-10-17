@@ -1,6 +1,6 @@
 import Foundation
 
-/// 1:1 port từ bảng `progress_rules` trong `schema.pg.ts`
+/// 1:1 port from table `progress_rules` in `schema.pg.ts`
 public struct ProgressRule: Identifiable, Codable, Sendable, Equatable {
     public let id: String
     public var title: String
@@ -26,7 +26,7 @@ public struct ProgressRule: Identifiable, Codable, Sendable, Equatable {
     }
 }
 
-/// 1:1 port từ bảng `progress_checks` trong `schema.pg.ts`
+/// 1:1 port from table `progress_checks` in `schema.pg.ts`
 public struct ProgressCheck: Identifiable, Codable, Sendable, Equatable {
     public let id: String
     public let ruleId: String

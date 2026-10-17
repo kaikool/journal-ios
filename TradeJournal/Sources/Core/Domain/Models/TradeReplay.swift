@@ -136,8 +136,8 @@ public enum TradeReplayEngine {
         )
     }
     
-    /// Tính toán MAE (Maximum Adverse Excursion) và MFE (Maximum Favorable Excursion)
-    /// Port 1:1 từ `excursions.ts` trong source-repo
+    /// Computes MAE (Maximum Adverse Excursion) and MFE (Maximum Favorable Excursion)
+    /// Ported 1:1 from `excursions.ts` in source-repo
     public static func estimateExcursions(
         trade: Trade,
         fills: [Execution],
@@ -145,22 +145,22 @@ public enum TradeReplayEngine {
         resolution: MarketResolution = .m15
     ) -> ExcursionEstimate {
         guard !bars.isEmpty else {
-            return ExcursionEstimate(warnings: ["Không có dữ liệu nến để tính MAE/MFE."])
+            return ExcursionEstimate(warnings: ["No candle data available to calculate MAE/MFE."])
         }
         
         let qty = trade.quantity
         guard qty > 0, trade.avgEntry > 0 else {
-            return ExcursionEstimate(warnings: ["Thiếu khối lượng hoặc giá vào lệnh hợp lệ."])
+            return ExcursionEstimate(warnings: ["Missing valid quantity or entry price."])
         }
         
         let openMs = Int64(trade.openedAt.timeIntervalSince1970 * 1000)
         let closeMs = Int64((trade.closedAt ?? Date()).timeIntervalSince1970 * 1000)
         let step = resolution.durationMs
         
-        // Lọc các nến nằm trong khoảng thời gian giữ lệnh
+        // Filter candles within trade holding window
         let tradeBars = bars.filter { $0.timestamp + step >= openMs && $0.timestamp <= closeMs }
         guard !tradeBars.isEmpty else {
-            return ExcursionEstimate(warnings: ["Khoảng nến không bao phủ thời gian giữ lệnh."])
+            return ExcursionEstimate(warnings: ["Candle range does not cover trade holding duration."])
         }
         
         var minAdverse: Decimal = 0
@@ -186,9 +186,65 @@ public enum TradeReplayEngine {
             sampledBars: tradeBars.count,
             excludedBars: max(0, bars.count - tradeBars.count),
             warnings: [
-                "Ước tính MAE/MFE dựa trên giá High/Low của các nến hoàn tất trong thời gian giữ lệnh.",
-                "Chưa tính phí hoa hồng và qua đêm (swap)."
+                "MAE/MFE estimates based on completed candle High/Low during trade holding period.",
+                "Excludes commissions, fees, and overnight swap."
             ]
         )
+    }
+    
+    /// Generates distinct, time-stepped candlesticks representing trade progress when external candle feeds are offline
+    public static func generateBarsFromTrade(
+        trade: Trade,
+        fills: [Execution],
+        resolution: MarketResolution = .m15
+    ) -> [MarketBar] {
+        let openMs = Int64(trade.openedAt.timeIntervalSince1970 * 1000)
+        let closeMs: Int64 = {
+            if let c = trade.closedAt {
+                return max(openMs + resolution.durationMs * 3, Int64(c.timeIntervalSince1970 * 1000))
+            } else if let dur = trade.durationMs, dur > 0 {
+                return openMs + dur
+            } else {
+                return openMs + resolution.durationMs * 12
+            }
+        }()
+        
+        let step = resolution.durationMs
+        let preBars = 4
+        let postBars = 2
+        let startTimestamp = openMs - Int64(preBars) * step
+        let endTimestamp = closeMs + Int64(postBars) * step
+        
+        let totalSteps = max(8, min(120, Int((endTimestamp - startTimestamp) / step)))
+        var bars: [MarketBar] = []
+        
+        let entryPrice = (trade.avgEntry as NSDecimalNumber).doubleValue
+        let exitPrice = trade.avgExit != nil ? (trade.avgExit! as NSDecimalNumber).doubleValue : (entryPrice + (trade.netPnl > 0 ? 0.005 : -0.005) * entryPrice)
+        let priceSpan = exitPrice - entryPrice
+        
+        for i in 0..<totalSteps {
+            let t = startTimestamp + Int64(i) * step
+            let progress = min(1.0, max(0.0, Double(t - openMs) / Double(max(1, closeMs - openMs))))
+            
+            let basePrice = entryPrice + progress * priceSpan
+            let variance = abs(entryPrice) * 0.0015 * sin(Double(i) * 0.8)
+            let currentClose = basePrice + variance
+            let previousClose = i > 0 ? (bars[i - 1].close as NSDecimalNumber).doubleValue : (basePrice - variance)
+            
+            let high = max(previousClose, currentClose) + abs(entryPrice) * 0.0012
+            let low = min(previousClose, currentClose) - abs(entryPrice) * 0.0012
+            let vol = (trade.quantity as NSDecimalNumber).doubleValue * (0.8 + 0.4 * abs(sin(Double(i))))
+            
+            bars.append(MarketBar(
+                timestamp: t,
+                open: Decimal(previousClose),
+                high: Decimal(high),
+                low: Decimal(low),
+                close: Decimal(currentClose),
+                volume: Decimal(vol)
+            ))
+        }
+        
+        return bars
     }
 }

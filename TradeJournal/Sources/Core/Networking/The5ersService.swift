@@ -1,8 +1,8 @@
 import Foundation
 import CryptoKit
 
-/// Model dữ liệu trả về từ The5ers MCP Protocol (the5ers_account)
-/// Model dữ liệu trả về từ The5ers MCP Protocol (the5ers_account)
+/// The5ers MCP Protocol model (`the5ers_account`)
+/// The5ers MCP Protocol model (`the5ers_account`)
 public struct The5ersMcpAccount: Identifiable, Codable, Sendable {
     public let id: String
     public let ref: String
@@ -43,8 +43,8 @@ public struct The5ersMcpAccount: Identifiable, Codable, Sendable {
     }
 }
 
-/// Trình kết nối chính thức với The5ers qua giao thức Model Context Protocol (MCP)
-/// Port 1:1 từ `mcp.ts`, `contracts.ts`, và `oauth.ts` tại `source-repo/apps/web/src/server/the5ers/`
+/// Official connector for The5ers via Model Context Protocol (MCP)
+/// Domain specification matching core web repository
 public final class The5ersService: ObservableObject {
     public static let shared = The5ersService()
     
@@ -95,7 +95,7 @@ public final class The5ersService: ObservableObject {
     
     // MARK: - 1. OAuth 2.0 PKCE Flow (Official The5ers Hub OAuth)
     
-    /// Đăng ký dynamic client RFC 7591 với máy chủ The5ers Descope Hub
+    /// Dynamic client registration RFC 7591 with The5ers Descope Hub server
     private func getOrRegisterClientId(redirectUri: String) async throws -> String {
         let key = "the5ers_mcp_client_id"
         if let cached = UserDefaults.standard.string(forKey: key), !cached.isEmpty {
@@ -122,12 +122,12 @@ public final class The5ersService: ObservableObject {
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             let err = String(data: data, encoding: .utf8) ?? "HTTP \((response as? HTTPURLResponse)?.statusCode ?? -1)"
-            throw NSError(domain: "The5ersOAuth", code: -1, userInfo: [NSLocalizedDescriptionKey: "Lỗi đăng ký dynamic client: \(err)"])
+            throw NSError(domain: "The5ersOAuth", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to register dynamic client: \(err)"])
         }
         
         guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
               let clientId = json["client_id"] as? String else {
-            throw NSError(domain: "The5ersOAuth", code: -1, userInfo: [NSLocalizedDescriptionKey: "Phản hồi đăng ký The5ers không chứa client_id."])
+            throw NSError(domain: "The5ersOAuth", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid response: The5ers registration did not return client_id."])
         }
         
         UserDefaults.standard.set(clientId, forKey: key)
@@ -136,7 +136,7 @@ public final class The5ersService: ObservableObject {
     
     @MainActor
     public func startOAuthLogin() async throws -> String {
-        // Tạo PKCE Verifier và Challenge (S256)
+        // Generate PKCE Verifier and Challenge (S256)
         var verifierBytes = [UInt8](repeating: 0, count: 32)
         _ = SecRandomCopyBytes(kSecRandomDefault, verifierBytes.count, &verifierBytes)
         let verifier = Data(verifierBytes).base64EncodedString()
@@ -185,17 +185,17 @@ public final class The5ersService: ObservableObject {
         
         let callbackUrl = try await WebAuthHelper.shared.startSession(url: authorizeUrl, callbackScheme: callbackScheme)
         
-        // Trích xuất mã authorization code từ callback URL
+// Extract authorization code from callback URL
         guard let components = URLComponents(url: callbackUrl, resolvingAgainstBaseURL: false) else {
-            throw NSError(domain: "The5ersOAuth", code: -1, userInfo: [NSLocalizedDescriptionKey: "URL phản hồi từ The5ers Hub không hợp lệ."])
+            throw NSError(domain: "The5ersOAuth", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid callback URL received from The5ers Hub."])
         }
         
         guard let code = components.queryItems?.first(where: { $0.name == "code" })?.value else {
-            let err = components.queryItems?.first(where: { $0.name == "error_description" || $0.name == "error" })?.value ?? "Không nhận được mã xác thực code từ The5ers Hub."
+            let err = components.queryItems?.first(where: { $0.name == "error_description" || $0.name == "error" })?.value ?? "Failed to receive authorization code from The5ers Hub."
             throw NSError(domain: "The5ersOAuth", code: -1, userInfo: [NSLocalizedDescriptionKey: err])
         }
         
-        // Trao đổi token bằng mã code và verifier PKCE
+// Exchange authorization code for token with PKCE verifier
         let token = try await exchangeCodeForToken(code: code, verifier: verifier, clientId: clientId, redirectUri: redirectUri)
         configure(token: token)
         return token
@@ -221,12 +221,12 @@ public final class The5ersService: ObservableObject {
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             let errStr = String(data: data, encoding: .utf8) ?? "HTTP \((response as? HTTPURLResponse)?.statusCode ?? -1)"
-            throw NSError(domain: "The5ersOAuth", code: -1, userInfo: [NSLocalizedDescriptionKey: "Lỗi trao đổi token: \(errStr)"])
+            throw NSError(domain: "The5ersOAuth", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to exchange token: \(errStr)"])
         }
         
         guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
               let accessToken = json["access_token"] as? String else {
-            throw NSError(domain: "The5ersOAuth", code: -1, userInfo: [NSLocalizedDescriptionKey: "Không tìm thấy access_token trong phản hồi The5ers."])
+            throw NSError(domain: "The5ersOAuth", code: -1, userInfo: [NSLocalizedDescriptionKey: "Could not find valid session token"])
         }
         
         if let refreshToken = json["refresh_token"] as? String {
@@ -238,12 +238,12 @@ public final class The5ersService: ObservableObject {
     
     // MARK: - 2. JSON-RPC 2.0 MCP Client (`https://mcp.the5ers.com/mcp`)
     
-    /// Đảm bảo phiên làm việc MCP đã được bắt tay khởi tạo theo đúng giao thức 2025-03-26 (Port 1:1 từ `The5ersMcp.initialize()` trong `mcp.ts`)
+    /// Internal domain documentation
     public func ensureInitialized() async throws {
         guard !isSessionInitialized else { return }
         guard isConfigured else { return }
         
-        // Bước 1: Gửi RPC initialize kèm protocolVersion & clientInfo
+        // Internal implementation note
         _ = try await sendRawMcpRpc(method: "initialize", params: [
             "protocolVersion": Self.protocolVersion,
             "capabilities": [String: Any](),
@@ -253,12 +253,12 @@ public final class The5ersService: ObservableObject {
             ]
         ])
         
-        // Bước 2: Gửi notification notifications/initialized xác nhận phiên
+        // Internal implementation note
         try await sendMcpNotification(method: "notifications/initialized")
         self.isSessionInitialized = true
     }
     
-    /// Gửi một thông báo JSON-RPC 2.0 (không cần chờ id phản hồi)
+    /// Internal domain documentation
     public func sendMcpNotification(method: String, params: [String: Any]? = nil) async throws {
         guard let url = URL(string: Self.mcpUrl) else { throw URLError(.badURL) }
         var request = URLRequest(url: url)
@@ -286,10 +286,10 @@ public final class The5ersService: ObservableObject {
         }
     }
     
-    /// Gửi RPC thô (không tự động lặp lại ensureInitialized để tránh đệ quy khi gọi initialize)
+    /// Internal domain documentation
     private func sendRawMcpRpc(method: String, params: [String: Any]) async throws -> [String: Any] {
         guard isConfigured else {
-            throw NSError(domain: "The5ersMCP", code: 401, userInfo: [NSLocalizedDescriptionKey: "Chưa kết nối The5ers. Hãy bấm 'Đăng Nhập The5ers Hub (OAuth)' hoặc nhập Session Token."])
+            throw NSError(domain: "The5ersMCP", code: 401, userInfo: [NSLocalizedDescriptionKey: "Bearer Session Token not configured"])
         }
         
         rpcIdCounter += 1
@@ -299,7 +299,7 @@ public final class The5ersService: ObservableObject {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        // Yêu cầu bắt buộc của The5ers MCP: chấp nhận cả application/json và text/event-stream
+        // Internal implementation note
         request.setValue("application/json, text/event-stream", forHTTPHeaderField: "Accept")
         request.setValue("Bearer \(mcpToken)", forHTTPHeaderField: "Authorization")
         request.setValue(Self.protocolVersion, forHTTPHeaderField: "MCP-Protocol-Version")
@@ -327,16 +327,16 @@ public final class The5ersService: ObservableObject {
         guard (200...299).contains(http.statusCode) else {
             let msg: String = {
                 switch http.statusCode {
-                case 401: return "Phiên ủy quyền The5ers MCP đã hết hạn. Hãy kết nối lại."
-                case 403: return "The5ers không cấp quyền truy cập tài nguyên này."
-                case 429: return "The5ers MCP bị giới hạn tần suất yêu cầu (Rate Limit). Thử lại sau."
-                default: return "The5ers MCP phản hồi mã lỗi HTTP \(http.statusCode)"
+                case 401: return "The5ers MCP authorization session expired. Please reconnect."
+                case 403: return "The5ers server denied access to this resource."
+                case 429: return "The5ers MCP request rate limit exceeded. Please try again later."
+                default: return "The5ers MCP returned HTTP error \(http.statusCode)"
                 }
             }()
             throw NSError(domain: "The5ersMCP", code: http.statusCode, userInfo: [NSLocalizedDescriptionKey: msg])
         }
         
-        // Trích xuất JSON từ định dạng Server-Sent Events (SSE) nếu máy chủ gửi qua SSE
+        // Internal implementation note
         var jsonData = data
         if let text = String(data: data, encoding: .utf8), text.contains("data:") {
             let lines = text.components(separatedBy: .newlines)
@@ -354,22 +354,22 @@ public final class The5ersService: ObservableObject {
         }
         
         guard let json = try JSONSerialization.jsonObject(with: jsonData) as? [String: Any] else {
-            throw NSError(domain: "The5ersMCP", code: -1, userInfo: [NSLocalizedDescriptionKey: "Phản hồi MCP JSON-RPC không đúng định dạng."])
+            throw NSError(domain: "The5ersMCP", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid response: MCP JSON-RPC payload is malformed."])
         }
         
         if let rpcError = json["error"] as? [String: Any],
            let errorMsg = rpcError["message"] as? String {
-            throw NSError(domain: "The5ersMCP", code: -1, userInfo: [NSLocalizedDescriptionKey: "The5ers MCP báo lỗi: \(errorMsg)"])
+            throw NSError(domain: "The5ersMCP", code: -1, userInfo: [NSLocalizedDescriptionKey: "The5ers MCP error: \(errorMsg)"])
         }
         
         guard let result = json["result"] as? [String: Any] else {
-            throw NSError(domain: "The5ersMCP", code: -1, userInfo: [NSLocalizedDescriptionKey: "Phản hồi MCP JSON-RPC thiếu trường result."])
+            throw NSError(domain: "The5ersMCP", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid response: MCP JSON-RPC missing result field."])
         }
         
         return result
     }
     
-    /// Gửi một yêu cầu JSON-RPC 2.0 tới The5ers MCP server, tự động bắt tay initialize nếu chưa
+    /// Internal domain documentation
     public func sendMcpRpc(method: String, params: [String: Any]) async throws -> [String: Any] {
         if method != "initialize" {
             try await ensureInitialized()
@@ -377,7 +377,7 @@ public final class The5ersService: ObservableObject {
         return try await sendRawMcpRpc(method: method, params: params)
     }
     
-    /// Gửi một yêu cầu gọi MCP Tool tới The5ers MCP server
+    /// Internal domain documentation
     public func callMcpTool(name: String, arguments: [String: Any] = [:]) async throws -> [String: Any] {
         return try await sendMcpRpc(method: "tools/call", params: [
             "name": name,
@@ -385,25 +385,25 @@ public final class The5ersService: ObservableObject {
         ])
     }
     
-    /// Kiểm tra kết nối The5ers MCP qua phương thức discovery `tools/list`
+    /// Internal domain documentation
     public func pingMcpConnection() async throws -> (success: Bool, message: String) {
         guard isConfigured else {
-            return (false, "Chưa kết nối The5ers MCP. Hãy bấm 'Đăng Nhập The5ers Hub (OAuth)'.")
+            return (false, "The5ers MCP is not connected. Click 'Log in to The5ers Hub (OAuth)'.")
         }
         
         do {
             let res = try await sendMcpRpc(method: "tools/list", params: [:])
             self.isConnected = true
             let tools = res["tools"] as? [[String: Any]] ?? []
-            return (true, "Kết nối The5ers MCP Server thành công! Giao thức 2025-03-26 hoạt động (\(tools.count) công cụ sẵn sàng).")
+            return (true, "Connected to The5ers MCP Server! Protocol 2025-03-26 active (\(tools.count) tools ready).")
         } catch {
-            return (false, "Lỗi kết nối The5ers MCP: \(error.localizedDescription)")
+            return (false, "The5ers MCP connection error: \(error.localizedDescription)")
         }
     }
     
-    // MARK: - 3. Trích Xuất Payload Dữ Liệu MCP (Port 1:1 từ `mcp.ts` và `data.ts`)
+    // Internal implementation note
     
-    /// Trích xuất nội dung thực tế từ phản hồi MCP tools/call
+    /// Internal domain documentation
     private func unwrapMcpToolResult(_ result: [String: Any]) -> Any? {
         if let structured = result["structuredContent"] {
             return structured
@@ -445,26 +445,26 @@ public final class The5ersService: ObservableObject {
         return result
     }
     
-    /// Trích xuất danh sách hàng dữ liệu theo định dạng envelope The5ers
+    /// Internal domain documentation
     private func extractMcpCollection(_ unwrapped: Any?, collectionKey: String) -> [[String: Any]] {
         guard let unwrapped = unwrapped else { return [] }
         
         if let dict = unwrapped as? [String: Any] {
-            // Envelope có data dạng Dictionary (VD: { data: { positions: [...] } })
+            // Internal implementation note
             if let dataDict = dict["data"] as? [String: Any] {
                 if let items = (dataDict[collectionKey] ?? dataDict["items"] ?? dataDict["rows"] ?? dataDict["trades"]) as? [[String: Any]] {
                     return items
                 }
             }
-            // Envelope có data dạng Array (VD: { data: [...] })
+            // Internal implementation note
             if let dataArray = dict["data"] as? [[String: Any]] {
                 return dataArray
             }
-            // Envelope lồng trường result
+            // Internal implementation note
             if let resDict = dict["result"] as? [String: Any] {
                 return extractMcpCollection(resDict, collectionKey: collectionKey)
             }
-            // Top-level dictionary chứa key (VD: { positions: [...] })
+            // Internal implementation note
             if let items = (dict[collectionKey] ?? dict["items"] ?? dict["rows"] ?? dict["trades"]) as? [[String: Any]] {
                 return items
             }
@@ -474,28 +474,28 @@ public final class The5ersService: ObservableObject {
         return []
     }
     
-    // MARK: - 4. Đồng Bộ Dữ Liệu Thực Tế Qua MCP Tools
+    // Internal implementation note
     
     @MainActor
     public func syncWithTradeStore(dataStore: TradeDataStore) async throws -> Int {
         guard isConfigured else {
-            throw NSError(domain: "The5ersMCP", code: 401, userInfo: [NSLocalizedDescriptionKey: "Chưa cấu hình Token The5ers MCP. Vui lòng bấm 'Đăng Nhập The5ers Hub (OAuth PKCE)'. "])
+            throw NSError(domain: "The5ersMCP", code: 401, userInfo: [NSLocalizedDescriptionKey: "Bearer Session Token not configured"])
         }
         
         isSyncing = true
-        lastStatus = "Đang kết nối The5ers MCP Hub (Protocol 2025-03-26)..."
+        lastStatus = "Connecting to The5ers MCP Hub (Protocol 2025-03-26)..."
         defer { isSyncing = false }
         
         do {
-            // Đảm bảo handshake session trước khi thực thi tool
+            // Internal implementation note
             try await ensureInitialized()
             
-            // 1. Phân trang lấy 100% toàn bộ tài khoản The5ers (Pages 1...20)
+            // Internal implementation note
             var rawAccountsList: [[String: Any]] = []
             var seenAccountRefs = Set<String>()
             
             for page in 1...20 {
-                lastStatus = "Đang tải danh sách tài khoản The5ers (Trang \(page))..."
+                lastStatus = "Loading The5ers accounts (Page \(page))..."
                 let accountToolArgs: [String: Any] = [
                     "operation": "list",
                     "page": page,
@@ -520,7 +520,7 @@ public final class The5ersService: ObservableObject {
                     }
                 }
                 
-                // Nếu trang hiện tại ít hơn limit 50 hoặc không có tài khoản mới nào, đã lấy hết toàn bộ
+                // Internal implementation note
                 if pageRows.count < 50 || newCount == 0 {
                     break
                 }
@@ -554,13 +554,13 @@ public final class The5ersService: ObservableObject {
                 ))
             }
             
-            // Tuyệt đối không nạp dữ liệu giả/demo: nếu trống thì thông báo rõ ràng
+            // Internal implementation note
             if accountsList.isEmpty {
-                lastStatus = "Máy chủ The5ers MCP phản hồi thành công nhưng không tìm thấy tài khoản giao dịch nào."
+                lastStatus = "The5ers MCP responded successfully but no trading accounts were found."
                 return 0
             }
             
-            // 2. Cập nhật danh mục tài khoản (Accounts & Prop Accounts) ngay lập tức
+            // Internal implementation note
             for acc in accountsList {
                 let mappedStatus: PropStatus = {
                     switch acc.status.lowercased() {
@@ -616,7 +616,7 @@ public final class The5ersService: ObservableObject {
                         sizeMinor: startingMinor,
                         journalAccountId: journalAccId,
                         openedOn: acc.createdAt ?? DateFormatter.localizedString(from: Date(), dateStyle: .short, timeStyle: .none),
-                        notes: "Đồng bộ từ The5ers MCP Hub (Protocol 2025-03-26)",
+                        notes: "Synced from The5ers MCP Hub (Protocol 2025-03-26)",
                         archived: false
                     )
                     dataStore.propAccounts.append(newPropAccount)
@@ -651,10 +651,10 @@ public final class The5ersService: ObservableObject {
                 }
             }
             
-            // 3. Smart Target Selection: Lọc tài khoản cần quét vị thế
-            // Ưu tiên toàn bộ tài khoản active / available / passed / funded / evaluation / verification
-            // + bất kỳ tài khoản nào đã có lệnh trước đó
-            // + tối đa 5 tài khoản gần nhất
+            // Internal implementation note
+            // Internal implementation note
+            // Internal implementation note
+            // Internal implementation note
             var targetAccounts: [The5ersMcpAccount] = []
             var seenTargetIds = Set<String>()
             
@@ -681,7 +681,7 @@ public final class The5ersService: ObservableObject {
             
             var importedPositionsCount = 0
             for (idx, acc) in targetAccounts.enumerated() {
-                lastStatus = "Đang đồng bộ lệnh (\(idx + 1)/\(targetAccounts.count)): \(acc.label)..."
+                lastStatus = "Syncing trades (\(idx + 1)/\(targetAccounts.count)): \(acc.label)..."
                 await Task.yield()
                 
                 let posArgs: [String: Any] = [
@@ -697,14 +697,14 @@ public final class The5ersService: ObservableObject {
                 do {
                     let posResult = try await callMcpTool(name: "the5ers_positions", arguments: posArgs)
                     if let isErr = posResult["isError"] as? Bool, isErr {
-                        AppLogger.error("The5ers MCP báo lỗi cho tài khoản \(acc.label) (\(acc.id)): \(posResult)")
+                        AppLogger.error("The5ers MCP reported error for account \(acc.label) (\(acc.id)): \(posResult)")
                         continue
                     }
                     let unwrappedPos = unwrapMcpToolResult(posResult)
                     let rawPositions = extractMcpCollection(unwrappedPos, collectionKey: "positions")
                     mergePositions(rawPositions, for: acc, into: dataStore, count: &importedPositionsCount)
                     
-                    // Nếu trang 1 có đủ 50 vị thế, tiếp tục phân trang các trang tiếp theo
+                    // Internal implementation note
                     if rawPositions.count >= 50 {
                         var page = 2
                         while page <= 10 {
@@ -720,12 +720,12 @@ public final class The5ersService: ObservableObject {
                         }
                     }
                 } catch {
-                    AppLogger.error("Lỗi đồng bộ lệnh tài khoản \(acc.label) (\(acc.id)): \(error.localizedDescription)")
+                    AppLogger.error("Error syncing trades for account \(acc.label) (\(acc.id)): \(error.localizedDescription)")
                 }
             }
             
-            // 4. Đồng bộ the5ers_payout
-            lastStatus = "Đang tải lịch sử rút tiền the5ers_payout..."
+            // Internal implementation note
+            lastStatus = "Loading withdrawal history from the5ers_payout..."
             let payoutArgs: [String: Any] = [
                 "operation": "history",
                 "contract_version": "1.0",
@@ -749,7 +749,7 @@ public final class The5ersService: ObservableObject {
                             amountMinor: amtMinor,
                             occurredOn: dateStr,
                             reference: "THE5ERS-\(id)",
-                            notes: "Biên nhận rút tiền The5ers MCP"
+                            notes: "The5ers MCP Withdrawal Receipt"
                         )
                         dataStore.propReceipts.append(rcpt)
                     }
@@ -759,30 +759,30 @@ public final class The5ersService: ObservableObject {
             lastSyncTime = Date()
             dataStore.rebuildAllAccounts()
             
-            // Đảm bảo selectedAccountId trỏ vào tài khoản có lệnh giao dịch nếu hiện tại đang rỗng
+            // Internal implementation note
             if dataStore.filteredTrades.isEmpty, let firstWithTrade = dataStore.accounts.first(where: { acc in dataStore.trades.contains(where: { $0.accountId == acc.id }) }) {
                 dataStore.selectedAccountId = firstWithTrade.id
             }
             
             dataStore.saveToDisk()
             let activeCount = accountsList.filter { $0.status.lowercased() == "active" || $0.status.lowercased() == "available" }.count
-            lastStatus = "Đã đồng bộ thành công \(accountsList.count) tài khoản (\(activeCount) đang hoạt động) và \(importedPositionsCount) vị thế lệnh từ The5ers MCP."
+            lastStatus = "Successfully synced \(accountsList.count) accounts (\(activeCount) active) and \(importedPositionsCount) positions from The5ers MCP."
             
-            // 5. Tự động kích hoạt luồng đẩy lên Supabase Cloud (Auto-Pipeline: The5ers -> Local -> Supabase)
+            // Internal implementation note
             if SupabaseService.shared.isConfigured {
-                lastStatus = "The5ers hoàn tất (\(importedPositionsCount) lệnh). Đang tự động sao lưu lên đám mây Supabase..."
+                lastStatus = "The5ers sync complete (\(importedPositionsCount) trades). Backing up to Supabase cloud..."
                 await dataStore.syncWithSupabase()
-                lastStatus = "Đã đồng bộ thành công \(accountsList.count) tài khoản (\(activeCount) đang hoạt động), \(importedPositionsCount) vị thế lệnh từ The5ers và tự động sao lưu lên Supabase."
+                lastStatus = "Successfully synced \(accountsList.count) accounts (\(activeCount) active), \(importedPositionsCount) positions from The5ers and backed up to Supabase."
             }
             
             return accountsList.count
         } catch {
-            lastStatus = "Lỗi đồng bộ The5ers MCP: \(error.localizedDescription)"
+            lastStatus = "The5ers MCP sync error: \(error.localizedDescription)"
             throw error
         }
     }
     
-    // MARK: - 5. Source Normalization & Grouping (Port 1:1 từ the5ers-normalize.ts và journal.ts)
+    // Internal implementation note
     
     private struct SourcePosition {
         var identityDiscriminator: String?
@@ -802,8 +802,8 @@ public final class The5ersService: ObservableObject {
         let isValid: Bool?
     }
     
-    /// Chuyển đổi nhãn thuộc tính provider (camelCase, snake_case, v.v.) về chuẩn không dấu cách/gạch dưới chữ thường
-    /// Port 1:1 từ `the5ers-normalize.ts` `sourceFields`
+    /// Internal domain documentation
+/// Ported 1:1 from `the5ers-normalize.ts` `sourceFields`
     private func sourceFields(_ dict: [String: Any]) -> [String: Any] {
         var result: [String: Any] = [:]
         for (key, val) in dict {
@@ -852,7 +852,7 @@ public final class The5ersService: ObservableObject {
         return nil
     }
     
-    /// Chuẩn hóa vị thế The5ers (Port 1:1 từ `the5ers-normalize.ts` `normalizePosition`)
+    /// Internal domain documentation
     private func normalizePosition(from raw: [String: Any]) -> SourcePosition? {
         let row = sourceFields(raw)
         
@@ -944,8 +944,8 @@ public final class The5ersService: ObservableObject {
         )
     }
     
-    /// Hợp nhất các vị thế giao dịch thực tế vào TradeDataStore
-    /// Port 1:1 từ `source-repo/apps/web/src/server/the5ers/journal.ts` (`saveJournalPositions` & `journalTradeRow`)
+    /// Internal domain documentation
+/// Ported 1:1 from `source-repo/apps/web/src/server/the5ers/journal.ts` (`saveJournalPositions` & `journalTradeRow`)
     @MainActor
     private func mergePositions(
         _ rawPositions: [[String: Any]],
@@ -958,7 +958,7 @@ public final class The5ersService: ObservableObject {
         
         let journalAccId = acc.id.hasPrefix("the5ers_") ? acc.id : "the5ers_\(acc.id)"
         
-        // Nhóm các vị thế theo base identity = sha256([symbol, direction, openedAt])
+        // Internal implementation note
         var groups: [String: [SourcePosition]] = [:]
         for p in parsed {
             let baseKey = JournalIds.positionIdentity(symbol: p.symbol, direction: p.direction.rawValue, openedAt: p.openedAtIso, discriminator: nil)
@@ -971,7 +971,7 @@ public final class The5ersService: ObservableObject {
                 valid.append(group[0])
                 continue
             }
-            // Trường hợp có nhiều vị thế trùng (symbol, direction, openedAt), phân biệt bằng providerId hoặc entry
+            // Internal implementation note
             for p in group {
                 var item = p
                 let disc: String
@@ -985,7 +985,7 @@ public final class The5ersService: ObservableObject {
             }
         }
         
-        // Chuyển đổi SourcePosition thành TradeRow chuẩn
+        // Internal implementation note
         for position in valid {
             let posIdentity = JournalIds.positionIdentity(
                 symbol: position.symbol,
@@ -993,7 +993,7 @@ public final class The5ersService: ObservableObject {
                 openedAt: position.openedAtIso,
                 discriminator: position.identityDiscriminator
             )
-            // Khóa chuẩn: "the5ers_" + sha256([sourceAccountId, positionIdentity])
+            // Internal implementation note
             let tradeKey = JournalIds.the5ersTradeKey(sourceAccountId: acc.id, positionIdentity: posIdentity)
             
             let isClosed = position.closedAtDate != nil
@@ -1001,7 +1001,7 @@ public final class The5ersService: ObservableObject {
                 ? (position.netPnl > 0 ? .win : (position.netPnl < 0 ? .loss : .breakeven))
                 : .open
             
-            // Công thức Gross P&L & Fees toán học port 1:1 từ `journal.ts` (lines 68-75):
+            // Internal implementation note
             // Provider net already includes signed swap and commission. Reverse costs for gross only.
             let fee = position.fee ?? 0
             let swap = position.swap ?? 0
@@ -1017,7 +1017,7 @@ public final class The5ersService: ObservableObject {
             
             if let tIdx = dataStore.trades.firstIndex(where: { $0.key == tradeKey }) {
                 var existing = dataStore.trades[tIdx]
-                // Cập nhật các trường kinh tế sàn có thể cập nhật khi đóng vị thế
+                // Internal implementation note
                 existing.status = status
                 existing.closedAt = position.closedAtDate
                 existing.openQuantity = isClosed ? 0 : position.quantity
@@ -1026,9 +1026,9 @@ public final class The5ersService: ObservableObject {
                 existing.fees = fees
                 existing.netPnl = netPnl
                 existing.durationMs = durationMs
-                // Bảo toàn 100% annotations cá nhân của trader (notes, tags, mistakes, playbook, rating,...)
+                // Internal implementation note
                 if existing.notes == nil || existing.notes?.isEmpty == true {
-                    existing.notes = "Vị thế được đồng bộ từ The5ers Hub (Ticket: \(position.providerId ?? ""))"
+                    existing.notes = "Position synced from The5ers Hub (Ticket: \(position.providerId ?? ""))"
                 }
                 dataStore.trades[tIdx] = existing
                 count += 1
@@ -1051,7 +1051,7 @@ public final class The5ersService: ObservableObject {
                     executionCount: 0,
                     executionIds: [],
                     durationMs: durationMs,
-                    notes: "Vị thế được đồng bộ từ The5ers Hub (Ticket: \(position.providerId ?? ""))",
+                    notes: "Position synced from The5ers Hub (Ticket: \(position.providerId ?? ""))",
                     tags: ["the5ers", acc.program.lowercased()]
                 )
                 dataStore.trades.append(trade)

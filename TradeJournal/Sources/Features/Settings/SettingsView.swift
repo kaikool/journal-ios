@@ -160,7 +160,7 @@ public struct SettingsView: View {
 }
 
 // MARK: - 1. General Settings View
-// Port 1:1 từ `TimeZoneSettings` trong `journal-settings.tsx`
+// Ported 1:1 from `TimeZoneSettings` in `journal-settings.tsx`
 public struct GeneralSettingsView: View {
     @EnvironmentObject private var env: AppEnvironment
     @ObservedObject private var dataStore = TradeDataStore.shared
@@ -281,7 +281,7 @@ public struct GeneralSettingsView: View {
 }
 
 // MARK: - 2. Trading Settings View
-// Port 1:1 từ `ContractMultiplierSettings` và `JournalDefaultSettings`
+// Ported 1:1 from `ContractMultiplierSettings` and `JournalDefaultSettings`
 public struct TradingSettingsView: View {
     @ObservedObject private var dataStore = TradeDataStore.shared
     
@@ -579,7 +579,7 @@ public struct TradingSettingsView: View {
 }
 
 // MARK: - 3. Currency Conversion Settings View
-// Port 1:1 từ `CurrencySettings` trong `currency-settings.tsx`
+// Ported 1:1 from `CurrencySettings` in `currency-settings.tsx`
 public struct CurrencyConversionSettingsView: View {
     @ObservedObject private var dataStore = TradeDataStore.shared
     
@@ -717,7 +717,7 @@ public struct CurrencyConversionSettingsView: View {
 }
 
 // MARK: - 4. Market Data Settings View
-// Port 1:1 từ `MarketDataSettings` trong `market-data-settings.tsx`
+// Ported 1:1 from `MarketDataSettings` in `market-data-settings.tsx`
 public struct MarketDataSettingsView: View {
     @ObservedObject private var dataStore = TradeDataStore.shared
     
@@ -838,7 +838,7 @@ public struct MarketDataSettingsView: View {
                             
                             if !dataStore.marketConnections.oandaApiKey.isEmpty {
                                 Button("Test connection") {
-                                    oandaStatus = "Đang gửi yêu cầu kiểm tra tới máy chủ OANDA v20..."
+                                    oandaStatus = "Connecting to OANDA v20 servers..."
                                     Task {
                                         let res = await MarketDataService.shared.testOandaConnection(
                                             apiKey: oandaToken,
@@ -884,7 +884,7 @@ public struct MarketDataSettingsView: View {
     }
     
     private func testBinance() {
-        binanceStatus = "Đang kiểm tra kết nối Binance Public Klines..."
+        binanceStatus = "Verifying connection to Binance Public Klines API..."
         Task {
             let res = await MarketDataService.shared.testBinanceConnection()
             binanceStatus = res.message
@@ -893,7 +893,7 @@ public struct MarketDataSettingsView: View {
 }
 
 // MARK: - 5. Connections Settings View
-// Port 1:1 từ `The5ersConnection` (Model Context Protocol JSON-RPC) & Supabase Cloud
+// Ported 1:1 from `The5ersConnection` (Model Context Protocol JSON-RPC) & Supabase Cloud
 public struct ConnectionsSettingsView: View {
     @ObservedObject private var dataStore = TradeDataStore.shared
     @ObservedObject private var the5ers = The5ersService.shared
@@ -924,7 +924,7 @@ public struct ConnectionsSettingsView: View {
                             .foregroundColor(the5ers.isConnected ? AppColors.profit : AppColors.secondaryText)
                     }
                     
-                    Text("Official The5ers MCP Service tại `https://mcp.the5ers.com/mcp` (Giao thức 2025-03-26). Xác thực qua cổng OAuth 2.0 PKCE của The5ers Hub để đồng bộ tài khoản, vị thế lệnh và lịch sử rút tiền.")
+                    Text("Official The5ers MCP Service at `https://mcp.the5ers.com/mcp` (2025-03-26 Protocol). Authenticates via The5ers Hub OAuth 2.0 PKCE to sync prop accounts, positions, and payout history.")
                         .font(AppTypography.caption)
                         .foregroundColor(AppColors.secondaryText)
                     
@@ -936,10 +936,10 @@ public struct ConnectionsSettingsView: View {
                             HStack {
                                 if isConnectingThe5ers {
                                     ProgressView().scaleEffect(0.8)
-                                    Text("Đang kết nối The5ers Hub...")
+                                    Text("Connecting to The5ers Hub...")
                                 } else {
                                     Image(systemName: "person.badge.key.fill")
-                                    Text("Đăng Nhập The5ers Hub (OAuth)")
+                                    Text("Log in with The5ers Hub (OAuth)")
                                         .font(AppTypography.headline)
                                 }
                             }
@@ -951,16 +951,16 @@ public struct ConnectionsSettingsView: View {
                         .disabled(isConnectingThe5ers)
                     } else {
                         HStack(spacing: 8) {
-                            Button("Kiểm Tra MCP") {
+                            Button("Verify MCP Connection") {
                                 pingMcp()
                             }
                             .buttonStyle(.borderedProminent)
                             .tint(AppColors.accent)
                             
-                            Button("Ngắt kết nối") {
+                            Button("Disconnect") {
                                 the5ers.disconnect()
                                 mcpToken = ""
-                                the5ersStatus = "Đã ngắt kết nối The5ers MCP."
+                                the5ersStatus = "Disconnected from The5ers MCP."
                             }
                             .buttonStyle(.bordered)
                             .tint(AppColors.loss)
@@ -970,25 +970,25 @@ public struct ConnectionsSettingsView: View {
                     if !the5ersStatus.isEmpty {
                         Text(the5ersStatus)
                             .font(AppTypography.caption)
-                            .foregroundColor(the5ersStatus.contains("Lỗi") ? AppColors.loss : AppColors.profit)
+                            .foregroundColor(the5ersStatus.contains("Error") ? AppColors.loss : AppColors.profit)
                     }
                     
                     // Collapsible Advanced: Session Token Manual Override
-                    DisclosureGroup("Cài đặt token thủ công (Nâng cao)", isExpanded: $showManualThe5ersToken) {
+                    DisclosureGroup("Manual Token Settings (Advanced)", isExpanded: $showManualThe5ersToken) {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("The5ers MCP Bearer Token:")
                                 .font(AppTypography.captionBold)
                                 .foregroundColor(AppColors.secondaryText)
                             
                             HStack {
-                                SecureField("Dán The5ers MCP Bearer token...", text: $mcpToken)
+                                SecureField("Paste The5ers MCP Bearer token...", text: $mcpToken)
                                     .textFieldStyle(.roundedBorder)
                                     .textInputAutocapitalization(.never)
                                     .autocorrectionDisabled(true)
                                 
-                                Button("Lưu token") {
+                                Button("Save token") {
                                     the5ers.configure(token: mcpToken)
-                                    the5ersStatus = "Đã lưu Session Token The5ers MCP."
+                                    the5ersStatus = "Saved The5ers MCP session token."
                                 }
                                 .buttonStyle(.borderedProminent)
                                 .tint(AppColors.accent)
@@ -1003,11 +1003,11 @@ public struct ConnectionsSettingsView: View {
                     // Sync Info Box
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
-                            Text("Tài khoản The5ers: \(dataStore.propAccounts.filter { $0.firm.contains("The5ers") }.count)")
+                            Text("The5ers accounts: \(dataStore.propAccounts.filter { $0.firm.contains("The5ers") }.count)")
                                 .font(AppTypography.caption)
                                 .foregroundColor(AppColors.secondaryText)
                             Spacer()
-                            Text("Lệnh đồng bộ: \(dataStore.trades.filter { $0.tags.contains("the5ers") }.count)")
+                            Text("Synced trades: \(dataStore.trades.filter { $0.tags.contains("the5ers") }.count)")
                                 .font(AppTypography.caption)
                                 .foregroundColor(AppColors.secondaryText)
                         }
@@ -1021,7 +1021,7 @@ public struct ConnectionsSettingsView: View {
             // Card 2: Supabase Cloud Database Sync
             SettingsCard(title: "Supabase Cloud Database (PostgreSQL + RLS)") {
                 VStack(alignment: .leading, spacing: 14) {
-                    Text("Đồng bộ dữ liệu 2 chiều với Supabase PostgreSQL qua chuẩn PostgREST API.")
+                    Text("Bi-directional database sync with Supabase PostgreSQL via PostgREST API.")
                         .font(AppTypography.caption)
                         .foregroundColor(AppColors.secondaryText)
                     
@@ -1041,22 +1041,22 @@ public struct ConnectionsSettingsView: View {
                                 .font(AppTypography.captionBold)
                                 .foregroundColor(AppColors.secondaryText)
                             Spacer()
-                            Text("Khuyến nghị: service_role key")
+                            Text("Recommended: service_role key")
                                 .font(.system(size: 11, weight: .semibold))
                                 .foregroundColor(AppColors.accent)
                         }
-                        SecureField("Dán anon key hoặc service_role key...", text: $supabaseAnonKey)
+                        SecureField("Paste anon key or service_role key...", text: $supabaseAnonKey)
                             .textFieldStyle(.roundedBorder)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled(true)
                         
-                        Text("💡 Mẹo: Dùng `service_role` (Secret key từ Project Settings → API) để đồng bộ mọi bảng dữ liệu không bị RLS chặn. Nếu dùng `anon` key, hãy bấm nút dưới để sao chép SQL mở quyền RLS.")
+                        Text("💡 Tip: Use `service_role` (Secret key from Project Settings → API) for full bypass of RLS constraints. If using `anon` key, copy the migration SQL below to enable RLS policies.")
                             .font(.system(size: 11))
                             .foregroundColor(AppColors.secondaryText)
                     }
                     
                     HStack(spacing: 8) {
-                        Button("Kiểm Tra Kết Nối") {
+                        Button("Test Connection") {
                             checkSupabaseConnection()
                         }
                         .buttonStyle(.borderedProminent)
@@ -1066,7 +1066,7 @@ public struct ConnectionsSettingsView: View {
                         Button {
                             copySqlScript()
                         } label: {
-                            Label("Sao chép SQL Khởi Tạo", systemImage: "doc.on.doc")
+                            Label("Copy Migration DDL SQL", systemImage: "doc.on.doc")
                         }
                         .buttonStyle(.bordered)
                     }
@@ -1078,7 +1078,7 @@ public struct ConnectionsSettingsView: View {
                         } label: {
                             HStack {
                                 Image(systemName: showEmailAuthSection ? "chevron.down" : "chevron.right")
-                                Text("Đăng nhập tài khoản người dùng Supabase (Tùy chọn)")
+                                Text("Supabase User Authentication (Optional)")
                                     .font(AppTypography.captionBold)
                             }
                             .foregroundColor(AppColors.secondaryText)
@@ -1086,25 +1086,25 @@ public struct ConnectionsSettingsView: View {
                         
                         if showEmailAuthSection {
                             VStack(alignment: .leading, spacing: 8) {
-                                TextField("Email tài khoản...", text: $supabaseEmail)
+                                TextField("Account email...", text: $supabaseEmail)
                                     .textFieldStyle(.roundedBorder)
                                     .textInputAutocapitalization(.never)
                                     .autocorrectionDisabled(true)
                                 
-                                SecureField("Mật khẩu...", text: $supabasePassword)
+                                SecureField("Password...", text: $supabasePassword)
                                     .textFieldStyle(.roundedBorder)
                                 
                                 HStack(spacing: 8) {
-                                    Button("Đăng Nhập Email") {
+                                    Button("Sign in with Email") {
                                         loginSupabaseEmail()
                                     }
                                     .buttonStyle(.bordered)
                                     .disabled(supabaseEmail.isEmpty || supabasePassword.isEmpty)
                                     
                                     if SupabaseService.shared.accessToken != nil {
-                                        Button("Đăng Xuất Token") {
+                                        Button("Sign out") {
                                             SupabaseService.shared.logout()
-                                            supabaseSyncStatus = "Đã đăng xuất tài khoản. Sử dụng quyền Anon Key mặc định."
+                                            supabaseSyncStatus = "Signed out. Defaulting to Anon Key access."
                                         }
                                         .buttonStyle(.bordered)
                                         .tint(AppColors.loss)
@@ -1120,7 +1120,7 @@ public struct ConnectionsSettingsView: View {
                     if let status = supabaseSyncStatus {
                         Text(status)
                             .font(AppTypography.caption)
-                            .foregroundColor(status.contains("Lỗi") || status.contains("thiếu") ? AppColors.loss : AppColors.profit)
+                            .foregroundColor(status.contains("Error") || status.contains("missing") ? AppColors.loss : AppColors.profit)
                     }
                 }
             }
@@ -1145,19 +1145,19 @@ public struct ConnectionsSettingsView: View {
     
     private func loginThe5ersOAuth() {
         isConnectingThe5ers = true
-        the5ersStatus = "Đang mở trang đăng nhập ủy quyền The5ers Hub..."
+        the5ersStatus = "Opening The5ers Hub authorization page..."
         Task {
             do {
                 let token = try await the5ers.startOAuthLogin()
                 await MainActor.run {
                     self.mcpToken = token
                     self.isConnectingThe5ers = false
-                    self.the5ersStatus = "Đăng nhập The5ers Hub thành công! Đã kết nối MCP Server."
+                    self.the5ersStatus = "The5ers Hub authorization successful! Connected to MCP Server."
                 }
             } catch {
                 await MainActor.run {
                     self.isConnectingThe5ers = false
-                    self.the5ersStatus = "Lỗi xác thực OAuth: \(error.localizedDescription)"
+                    self.the5ersStatus = "OAuth error: \(error.localizedDescription)"
                 }
             }
         }
@@ -1165,13 +1165,13 @@ public struct ConnectionsSettingsView: View {
     
     private func pingMcp() {
         the5ers.configure(token: mcpToken)
-        the5ersStatus = "Đang gửi yêu cầu 'tools/list' tới The5ers MCP Server..."
+        the5ersStatus = "Sending tools/list request to The5ers MCP Server..."
         Task {
             do {
                 let res = try await the5ers.pingMcpConnection()
                 the5ersStatus = res.message
             } catch {
-                the5ersStatus = "Lỗi kết nối MCP: \(error.localizedDescription)"
+                the5ersStatus = "MCP connection error: \(error.localizedDescription)"
             }
         }
     }
@@ -1182,12 +1182,12 @@ public struct ConnectionsSettingsView: View {
             do {
                 let count = try await the5ers.syncWithTradeStore(dataStore: dataStore)
                 if count > 0 {
-                    the5ersStatus = "Đã đồng bộ thành công \(count) tài khoản The5ers qua MCP!"
+                    the5ersStatus = "Successfully synchronized \(count) The5ers accounts via MCP!"
                 } else {
                     the5ersStatus = the5ers.lastStatus
                 }
             } catch {
-                the5ersStatus = "Lỗi đồng bộ: \(error.localizedDescription)"
+                the5ersStatus = "Sync error: \(error.localizedDescription)"
             }
         }
     }
@@ -1195,7 +1195,7 @@ public struct ConnectionsSettingsView: View {
     private func checkSupabaseConnection() {
         SupabaseService.shared.configure(url: supabaseUrl, anonKey: supabaseAnonKey)
         Task {
-            supabaseSyncStatus = "Đang kiểm tra tính hợp lệ của Project URL và Anon Key..."
+            supabaseSyncStatus = "Validating Project URL and Anon Key..."
             do {
                 let res = try await SupabaseService.shared.pingConnection()
                 supabaseSyncStatus = res.message
@@ -1208,12 +1208,12 @@ public struct ConnectionsSettingsView: View {
     private func loginSupabaseEmail() {
         SupabaseService.shared.configure(url: supabaseUrl, anonKey: supabaseAnonKey)
         Task {
-            supabaseSyncStatus = "Đang gửi yêu cầu đăng nhập email tới Supabase Auth..."
+            supabaseSyncStatus = "Authenticating with Supabase Auth..."
             do {
                 _ = try await SupabaseService.shared.loginWithEmail(email: supabaseEmail, password: supabasePassword)
-                supabaseSyncStatus = "Đăng nhập thành công! Phiên làm việc JWT đã được lưu vào Keychain."
+                supabaseSyncStatus = "Signed in successfully! Session JWT saved to Keychain."
             } catch {
-                supabaseSyncStatus = "Lỗi đăng nhập: \(error.localizedDescription)"
+                supabaseSyncStatus = "Sign-in error: \(error.localizedDescription)"
             }
         }
     }
@@ -1221,28 +1221,28 @@ public struct ConnectionsSettingsView: View {
     private func copySqlScript() {
         #if canImport(UIKit)
         UIPasteboard.general.string = SupabaseService.shared.generateDatabaseInitSql()
-        supabaseSyncStatus = "Đã sao chép SQL DDL khởi tạo (23 bảng + RLS) vào Clipboard! Hãy dán vào Supabase SQL Editor và bấm Run."
+        supabaseSyncStatus = "Copied migration DDL SQL (23 tables + RLS) to Clipboard! Paste into Supabase SQL Editor and run."
         #endif
     }
     
     private func syncSupabase() {
         SupabaseService.shared.configure(url: supabaseUrl, anonKey: supabaseAnonKey)
         Task {
-            supabaseSyncStatus = "Đang đồng bộ 2 chiều với Supabase..."
+            supabaseSyncStatus = "Performing bi-directional sync with Supabase..."
             await dataStore.syncWithSupabase()
             if let err = dataStore.lastSyncError {
-                supabaseSyncStatus = "Lỗi đồng bộ: \(err)"
+                supabaseSyncStatus = "Sync error: \(err)"
             } else if let summary = dataStore.lastSyncSummary {
                 supabaseSyncStatus = summary
             } else {
-                supabaseSyncStatus = "Đã hoàn tất đồng bộ 2 chiều với Supabase!"
+                supabaseSyncStatus = "Bi-directional sync completed successfully!"
             }
         }
     }
 }
 
 // MARK: - 6. AI Settings View
-// Port 1:1 từ `AiSettings` trong `ai-settings.tsx` & `ai-settings.ts`
+// Ported 1:1 from `AiSettings` in `ai-settings.tsx` & `ai-settings.ts`
 public struct AiSettingsView: View {
     @ObservedObject private var dataStore = TradeDataStore.shared
     
@@ -1369,7 +1369,7 @@ public struct AiSettingsView: View {
 }
 
 // MARK: - 7. Your Data & Backups Settings View
-// Port 1:1 từ `your-data` trong `settings/page.tsx` & `api/export/route.ts`
+// Ported 1:1 from `your-data` in `settings/page.tsx` & `api/export/route.ts`
 public struct YourDataSettingsView: View {
     @ObservedObject private var dataStore = TradeDataStore.shared
     
@@ -1412,16 +1412,16 @@ public struct YourDataSettingsView: View {
             }
             
             // Card 2: Reset Database
-            SettingsCard(title: "Quản lý dữ liệu máy") {
+            SettingsCard(title: "Local Database Management") {
                 VStack(alignment: .leading, spacing: 14) {
-                    Text("Quản lý lưu trữ cục bộ trên thiết bị hoặc xóa sạch toàn bộ cơ sở dữ liệu.")
+                    Text("Manage on-device storage or reset your local database.")
                         .font(AppTypography.caption)
                         .foregroundColor(AppColors.secondaryText)
                     
                     Button(role: .destructive) {
                         showResetConfirmation = true
                     } label: {
-                        Label("Xóa sạch toàn bộ dữ liệu trên máy", systemImage: "trash")
+                        Label("Reset and delete all local data", systemImage: "trash")
                             .foregroundColor(AppColors.loss)
                     }
                 }
@@ -1432,13 +1432,13 @@ public struct YourDataSettingsView: View {
                 ShareFileSheet(fileUrl: fileUrl)
             }
         }
-        .alert("Xác nhận xóa toàn bộ dữ liệu?", isPresented: $showResetConfirmation) {
-            Button("Xóa toàn bộ", role: .destructive) {
+        .alert("Reset all local data?", isPresented: $showResetConfirmation) {
+            Button("Delete all data", role: .destructive) {
                 dataStore.resetAllData()
             }
-            Button("Hủy", role: .cancel) {}
+            Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Toàn bộ các giao dịch và ghi chú hiện tại sẽ bị xóa sạch khỏi bộ nhớ và ổ đĩa.")
+            Text("All trades, journal logs, and notes will be permanently erased from this device.")
         }
     }
     

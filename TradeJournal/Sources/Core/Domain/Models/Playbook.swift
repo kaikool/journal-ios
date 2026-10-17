@@ -52,7 +52,7 @@ public struct PlaybookRuleAssessment: Identifiable, Codable, Equatable, Sendable
     }
 }
 
-/// Tương đương `{ id: string; rules: string[] }` trong `packages/core/src/adherence.ts`
+/// Equivalent to `{ id: string; rules: string[] }` in `packages/core/src/adherence.ts` `{ id: string; rules: string[] }` trong `packages/core/src/adherence.ts`
 public struct PlaybookRuleSet: Identifiable, Sendable, Equatable {
     public let id: String
     public let rules: [String]

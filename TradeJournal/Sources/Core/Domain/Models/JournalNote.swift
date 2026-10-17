@@ -29,7 +29,7 @@ public struct JournalNote: Identifiable, Codable, Equatable, Sendable {
     }
 }
 
-/// 1:1 port từ bảng `folders` trong `schema.pg.ts`
+/// 1:1 port from table `folders` in `schema.pg.ts`
 public struct NotebookFolder: Identifiable, Codable, Equatable, Sendable {
     public let id: String
     public var name: String
@@ -52,7 +52,7 @@ public struct NotebookFolder: Identifiable, Codable, Equatable, Sendable {
     }
 }
 
-/// 1:1 port từ bảng `notes` trong `schema.pg.ts`
+/// 1:1 port from table `notes` in `schema.pg.ts`
 public struct NotebookNote: Identifiable, Codable, Equatable, Sendable {
     public let id: String
     public var folderId: String

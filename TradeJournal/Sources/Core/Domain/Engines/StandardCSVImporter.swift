@@ -18,8 +18,8 @@ public struct ImportPreview: Equatable {
     }
 }
 
-/// Trình nhập khẩu dữ liệu giao dịch từ CSV tiêu chuẩn
-/// Nhận diện linh hoạt các cột header phổ biến và chuẩn hóa dữ liệu sang `Execution`.
+/// Internal domain documentation
+/// Internal domain documentation
 public enum StandardCSVImporter {
     
     private static let isoFormatter: ISO8601DateFormatter = {
@@ -41,7 +41,7 @@ public enum StandardCSVImporter {
         "yyyy-MM-dd"
     ]
     
-    /// Parse chuỗi ngày tháng từ nhiều format thông dụng
+    /// Internal domain documentation
     private static func parseDateTime(_ string: String, timeZone: TimeZone = .current) -> Date? {
         let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
         if let d = isoFormatter.date(from: trimmed) { return d }
@@ -59,7 +59,7 @@ public enum StandardCSVImporter {
         return nil
     }
     
-    /// Làm sạch chuỗi số tiền/khối lượng (loại bỏ ký tự $, dấu phẩy ngăn cách hàng nghìn)
+    /// Internal domain documentation
     private static func parseDecimal(_ string: String) -> Decimal? {
         var clean = string.trimmingCharacters(in: .whitespacesAndNewlines)
         clean = clean.replacingOccurrences(of: "$", with: "")
@@ -67,7 +67,7 @@ public enum StandardCSVImporter {
         clean = clean.replacingOccurrences(of: "£", with: "")
         clean = clean.replacingOccurrences(of: ",", with: "")
         
-        // Hỗ trợ số âm trong ngoặc đơn: (10.50) -> -10.50
+        // Internal implementation note
         if clean.hasPrefix("(") && clean.hasSuffix(")") {
             clean = "-" + clean.dropFirst().dropLast()
         }
@@ -75,7 +75,7 @@ public enum StandardCSVImporter {
         return Decimal(string: clean)
     }
     
-    /// Phân tích nội dung CSV và sinh bản xem trước (Preview)
+    /// Internal domain documentation
     public static func preview(
         csvText: String,
         accountId: String,
@@ -85,13 +85,13 @@ public enum StandardCSVImporter {
         let rows = CSVParser.parse(csvText)
         guard rows.count > 1 else {
             return ImportPreview(totalRows: 0, usableExecutions: [], problems: [
-                ImportRowProblem(lineNumber: 1, symbol: "-", reason: "Tệp CSV rỗng hoặc chỉ có dòng tiêu đề.")
+                ImportRowProblem(lineNumber: 1, symbol: "-", reason: "CSV file is empty or contains only the header row.")
             ], duplicateCount: 0)
         }
         
         let headers = rows[0].map { $0.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) }
         
-        // Tìm vị trí các cột
+// Find column header indices
         var symbolIdx: Int?
         var sideIdx: Int?
         var qtyIdx: Int?
@@ -115,7 +115,7 @@ public enum StandardCSVImporter {
                 totalRows: rows.count - 1,
                 usableExecutions: [],
                 problems: [
-                    ImportRowProblem(lineNumber: 1, symbol: "-", reason: "Không tìm thấy các cột bắt buộc: Symbol, Side (Buy/Sell), Quantity, Price.")
+                    ImportRowProblem(lineNumber: 1, symbol: "-", reason: "Required columns not found: Symbol, Side (Buy/Sell), Quantity, Price.")
                 ],
                 duplicateCount: 0
             )
@@ -132,7 +132,7 @@ public enum StandardCSVImporter {
             
             let symbol = sIdx < row.count ? row[sIdx].trimmingCharacters(in: .whitespacesAndNewlines).uppercased() : ""
             if symbol.isEmpty {
-                problems.append(ImportRowProblem(lineNumber: lineNum, symbol: "N/A", reason: "Mã tài sản (Symbol) bị trống."))
+                problems.append(ImportRowProblem(lineNumber: lineNum, symbol: "N/A", reason: "Asset symbol is missing."))
                 continue
             }
             
@@ -143,19 +143,19 @@ public enum StandardCSVImporter {
             } else if ["sell", "s", "sld", "short"].contains(rawSide) {
                 side = .sell
             } else {
-                problems.append(ImportRowProblem(lineNumber: lineNum, symbol: symbol, reason: "Cột Side phải là Buy hoặc Sell (nhận diện được: '\(rawSide)')."))
+                problems.append(ImportRowProblem(lineNumber: lineNum, symbol: symbol, reason: "Side must be Buy or Sell (parsed: '\(rawSide)')."))
                 continue
             }
             
             let rawQty = qIdx < row.count ? row[qIdx] : ""
             guard let quantity = parseDecimal(rawQty), quantity > 0 else {
-                problems.append(ImportRowProblem(lineNumber: lineNum, symbol: symbol, reason: "Khối lượng phải là số dương hợp lệ."))
+                problems.append(ImportRowProblem(lineNumber: lineNum, symbol: symbol, reason: "Quantity must be a valid positive number."))
                 continue
             }
             
             let rawPrice = pIdx < row.count ? row[pIdx] : ""
             guard let price = parseDecimal(rawPrice), price >= 0 else {
-                problems.append(ImportRowProblem(lineNumber: lineNum, symbol: symbol, reason: "Giá phải là số dương hợp lệ."))
+                problems.append(ImportRowProblem(lineNumber: lineNum, symbol: symbol, reason: "Price must be a valid non-negative number."))
                 continue
             }
             
@@ -174,11 +174,11 @@ public enum StandardCSVImporter {
             }
             
             guard let validDate = executedAt else {
-                problems.append(ImportRowProblem(lineNumber: lineNum, symbol: symbol, reason: "Thời gian khớp lệnh không hợp lệ hoặc thiếu."))
+                problems.append(ImportRowProblem(lineNumber: lineNum, symbol: symbol, reason: "Execution timestamp is invalid or missing."))
                 continue
             }
             
-            // Tính toán Content Hash
+            // Internal implementation note
             let isoTime = ISO8601DateFormatter().string(from: validDate)
             let hash = "\(accountId)|\(symbol)|\(side.rawValue)|\(quantity)|\(price)|\(isoTime)"
             

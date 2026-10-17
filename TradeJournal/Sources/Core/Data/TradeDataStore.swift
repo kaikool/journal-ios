@@ -1,9 +1,9 @@
 import SwiftUI
 import Combine
 
-/// Quản lý dữ liệu thực tế của ứng dụng, hỗ trợ lưu trữ cục bộ (Offline persistence)
-/// và đồng bộ hai chiều với Supabase PostgreSQL.
-/// Thuật toán tái dựng và băm dedup tuân thủ 100% `rebuild.ts` và `ids.ts`.
+/// Internal domain documentation
+/// Internal domain documentation
+/// Internal domain documentation
 @MainActor
 public final class TradeDataStore: ObservableObject {
     public static let shared = TradeDataStore()
@@ -59,24 +59,79 @@ public final class TradeDataStore: ObservableObject {
         rebuildAllAccounts()
     }
     
-    public var visibleAccounts: [Account] {
-        let unarchived = accounts.filter { $0.archivedAt == nil && ($0.visibleInJournal ?? true) }
-        return unarchived.isEmpty ? accounts : unarchived
+    public func isAccountActive(_ account: Account) -> Bool {
+        if account.archivedAt != nil { return false }
+        if let prop = propAccounts.first(where: {
+            $0.journalAccountId == account.id ||
+            $0.id == account.id ||
+            $0.journalAccountId == "the5ers_\(account.id)" ||
+            account.id == "the5ers_\($0.id)"
+        }) {
+            let s = prop.status.rawValue.lowercased()
+            return s == "active" || s == "funded" || s == "open"
+        }
+        return true
     }
-    
+
+    public func isAccountVisible(_ account: Account) -> Bool {
+        if let v = account.visibleInJournal {
+            return v
+        }
+        return isAccountActive(account)
+    }
+
+    public var visibleAccounts: [Account] {
+        let matching = accounts.filter { isAccountVisible($0) }
+        return matching.isEmpty ? accounts : matching
+    }
+
+    public var activeAccounts: [Account] {
+        accounts.filter { isAccountActive($0) }
+    }
+
+    public var mostRecentActiveAccount: Account? {
+        let active = activeAccounts
+        let withTrades = active.filter { acc in
+            trades.contains(where: {
+                $0.accountId == acc.id ||
+                $0.accountId == "the5ers_\(acc.id)" ||
+                (acc.id.hasPrefix("the5ers_") && $0.accountId == String(acc.id.dropFirst(8)))
+            })
+        }
+        if let best = withTrades.max(by: { a, b in
+            let aDate = trades.filter { $0.accountId == a.id || $0.accountId == "the5ers_\(a.id)" || (a.id.hasPrefix("the5ers_") && $0.accountId == String(a.id.dropFirst(8))) }.map { $0.openedAt }.max()
+            let bDate = trades.filter { $0.accountId == b.id || $0.accountId == "the5ers_\(b.id)" || (b.id.hasPrefix("the5ers_") && $0.accountId == String(b.id.dropFirst(8))) }.map { $0.openedAt }.max()
+            guard let ad = aDate else { return true }
+            guard let bd = bDate else { return false }
+            return ad < bd
+        }) {
+            return best
+        }
+        return active.first ?? accounts.first
+    }
+
     public var selectedAccount: Account? {
         if selectedAccountId == "all" {
-            return visibleAccounts.first ?? accounts.first
+            return mostRecentActiveAccount ?? visibleAccounts.first ?? accounts.first
         }
-        return accounts.first(where: { $0.id == selectedAccountId }) ?? visibleAccounts.first ?? accounts.first
+        let selId = selectedAccountId
+        let altId = selId.hasPrefix("the5ers_") ? String(selId.dropFirst(8)) : "the5ers_\(selId)"
+        return accounts.first(where: { $0.id == selId || $0.id == altId }) ?? mostRecentActiveAccount ?? accounts.first
     }
-    
+
     public var filteredTrades: [Trade] {
         if selectedAccountId == "all" {
             let visibleIds = Set(visibleAccounts.map { $0.id })
-            return trades.filter { visibleIds.contains($0.accountId) }
+            return trades.filter { trade in
+                if visibleIds.contains(trade.accountId) { return true }
+                if visibleIds.contains("the5ers_\(trade.accountId)") { return true }
+                if trade.accountId.hasPrefix("the5ers_") && visibleIds.contains(String(trade.accountId.dropFirst(8))) { return true }
+                return false
+            }
         }
-        return trades.filter { $0.accountId == selectedAccountId }
+        let selId = selectedAccountId
+        let altId = selId.hasPrefix("the5ers_") ? String(selId.dropFirst(8)) : "the5ers_\(selId)"
+        return trades.filter { $0.accountId == selId || $0.accountId == altId }
     }
     
     public var existingHashesForSelectedAccount: Set<String> {
@@ -141,8 +196,8 @@ public final class TradeDataStore: ObservableObject {
         saveToDisk()
     }
     
-    /// Nạp danh sách executions mới từ Import hoặc Sync
-    /// Chống ghi trùng tuyệt đối theo `executionHash` chuẩn SHA-256 từ `ids.ts`
+    /// Internal domain documentation
+    /// Internal domain documentation
     public func importExecutions(accountId: String, newExecutions: [Execution]) {
         let uniqueNew = newExecutions.filter { !executionHashes.contains($0.contentHash) }
         guard !uniqueNew.isEmpty else {
@@ -160,8 +215,8 @@ public final class TradeDataStore: ObservableObject {
         AppLogger.info("Imported \(uniqueNew.count) executions for account \(accountId). Rebuilt \(trades.count) trades.")
     }
     
-    /// Tái dựng toàn bộ các Trades cho một account từ executions nguyên tử
-    /// Port 1:1 từ `source-repo/apps/web/src/server/rebuild.ts`
+    /// Internal domain documentation
+/// Ported 1:1 from `source-repo/apps/web/src/server/rebuild.ts`
     public func rebuildAccount(accountId: String) {
         guard let account = accounts.first(where: { $0.id == accountId }) else { return }
         
@@ -171,7 +226,7 @@ public final class TradeDataStore: ObservableObject {
             options: .init(method: account.profitCalcMethod, multipliers: multipliers)
         )
         
-        // Lưu lại các annotation người dùng đã ghi chú để bảo toàn khi rebuild
+        // Internal implementation note
         var existingAnnotations: [String: (notes: String?, tags: [String], mistakes: [String], rating: Int?, stopLoss: Decimal?, profitTarget: Decimal?, reviewedAt: Date?, playbookId: String?)] = [:]
         for t in trades where t.accountId == accountId {
             existingAnnotations[t.key] = (t.notes, t.tags, t.mistakes, t.rating, t.stopLoss, t.profitTarget, t.reviewedAt, t.playbookId)
@@ -189,7 +244,7 @@ public final class TradeDataStore: ObservableObject {
                 t.reviewedAt = ann.reviewedAt
                 t.playbookId = ann.playbookId
             } else {
-                // Áp dụng defaultRisk nếu chưa có annotation
+                // Internal implementation note
                 let defaultRisk = JournalDefaultsEngine.defaultRisk(
                     entry: t.avgEntry,
                     direction: t.direction,
@@ -203,9 +258,9 @@ public final class TradeDataStore: ObservableObject {
             return t
         }
         
-        // Port 1:1 từ `source-repo/apps/web/src/server/rebuild.ts` (lines 44-48):
-        // Các vị thế có key bắt đầu bằng "the5ers_" (hoặc vị thế được báo cáo không qua atomic fills)
-        // tuyệt đối KHÔNG bị đánh dấu obsolete hay xóa mất khi tái dựng round-trips từ executions.
+// Ported 1:1 from `source-repo/apps/web/src/server/rebuild.ts` (lines 44-48):
+        // Internal implementation note
+        // Internal implementation note
         let preservedThe5ers = trades.filter { $0.accountId == accountId && $0.key.hasPrefix("the5ers_") }
         let otherTrades = trades.filter { $0.accountId != accountId }
         trades = otherTrades + preservedThe5ers + mergedTrades
@@ -260,7 +315,7 @@ public final class TradeDataStore: ObservableObject {
         var fetchedPropCount = 0
         var syncWarnings: [String] = []
 
-        // 1. Đồng bộ Accounts (Tải về và đẩy lên)
+        // Internal implementation note
         do {
             let remoteAccounts = try await SupabaseService.shared.fetchAccounts()
             fetchedAccountsCount = remoteAccounts.count
@@ -272,11 +327,11 @@ public final class TradeDataStore: ObservableObject {
                         accounts.append(rAcc)
                     }
                 }
-                // Nếu đang trỏ vào default-acc hoặc account không tồn tại, trỏ sang "all" hoặc account đầu tiên
+                // Internal implementation note
                 if selectedAccountId == "default-acc" || (!accounts.contains(where: { $0.id == selectedAccountId }) && selectedAccountId != "all") {
                     selectedAccountId = "all"
                 }
-                // Loại bỏ default-acc khi đã có tài khoản thực từ Supabase
+                // Internal implementation note
                 accounts.removeAll(where: { $0.id == "default-acc" && accounts.count > 1 })
             }
             if !accounts.isEmpty {
@@ -284,28 +339,28 @@ public final class TradeDataStore: ObservableObject {
             }
         } catch {
             AppLogger.error("Supabase accounts sync warning: \(error.localizedDescription)")
-            syncWarnings.append("Tài khoản: \(error.localizedDescription)")
+            syncWarnings.append("Accounts: \(error.localizedDescription)")
         }
 
-        // 2. Tải TOÀN BỘ lệnh giao dịch từ Supabase
+        // Internal implementation note
         do {
             let remoteTrades = try await SupabaseService.shared.fetchTrades(accountId: nil)
             fetchedTradesCount = remoteTrades.count
             for rTrade in remoteTrades {
                 if let idx = trades.firstIndex(where: { $0.key == rTrade.key }) {
                     let local = trades[idx]
-                    // Nếu local đã có P&L thực tế (khác 0) mà remote lại là 0 (do cache build cũ), ưu tiên giữ local
+                    // Internal implementation note
                     if (local.netPnl != 0 || local.grossPnl != 0) && (rTrade.netPnl == 0 && rTrade.grossPnl == 0) {
-                        // Giữ local
+                        // Internal implementation note
                     } else {
                         trades[idx] = rTrade
                     }
                 } else {
                     trades.append(rTrade)
                 }
-                // Đảm bảo accountId của lệnh được đăng ký trong danh sách accounts nếu có
+                // Internal implementation note
                 if !rTrade.accountId.isEmpty && !accounts.contains(where: { $0.id == rTrade.accountId }) {
-                    accounts.append(Account(id: rTrade.accountId, name: "Tài khoản \(rTrade.accountId)", kind: .sync))
+                    accounts.append(Account(id: rTrade.accountId, name: "Account \(rTrade.accountId)", kind: .sync))
                 }
             }
             if selectedAccountId != "all" && !accounts.contains(where: { $0.id == selectedAccountId }) {
@@ -316,10 +371,10 @@ public final class TradeDataStore: ObservableObject {
             }
         } catch {
             AppLogger.error("Supabase trades sync warning: \(error.localizedDescription)")
-            syncWarnings.append("Lệnh giao dịch: \(error.localizedDescription)")
+            syncWarnings.append("Trades: \(error.localizedDescription)")
         }
 
-        // 2b. Tải TOÀN BỘ executions từ Supabase
+        // Internal implementation note
         do {
             let remoteExecutions = try await SupabaseService.shared.fetchExecutions(accountId: nil)
             fetchedExecutionsCount = remoteExecutions.count
@@ -335,10 +390,10 @@ public final class TradeDataStore: ObservableObject {
             }
         } catch {
             AppLogger.error("Supabase executions sync warning: \(error.localizedDescription)")
-            syncWarnings.append("Khớp lệnh (Executions): \(error.localizedDescription)")
+            syncWarnings.append("Executions: \(error.localizedDescription)")
         }
 
-        // 3. Đồng bộ Playbooks
+        // Internal implementation note
         do {
             let remotePlaybooks = try await SupabaseService.shared.fetchPlaybooks()
             for rPb in remotePlaybooks {
@@ -358,7 +413,7 @@ public final class TradeDataStore: ObservableObject {
             AppLogger.warning("Supabase playbooks sync warning: \(error.localizedDescription)")
         }
 
-        // 4. Đồng bộ Quỹ (Prop Firm Subsystem)
+        // Internal implementation note
         do {
             let remotePropAccounts = try await SupabaseService.shared.fetchPropAccounts()
             fetchedPropCount = remotePropAccounts.count
@@ -426,7 +481,7 @@ public final class TradeDataStore: ObservableObject {
             AppLogger.warning("Supabase prop audits warning: \(error.localizedDescription)")
         }
 
-        // 5. Đồng bộ Tệp đính kèm (Attachments Sync)
+        // Internal implementation note
         do {
             let remoteAttachments = try await SupabaseService.shared.fetchAttachments()
             for rAtt in remoteAttachments {
@@ -443,16 +498,16 @@ public final class TradeDataStore: ObservableObject {
         let totalRecords = fetchedAccountsCount + fetchedTradesCount + fetchedExecutionsCount + fetchedPropCount
         await MainActor.run {
             if totalRecords > 0 {
-                var summary = "Đồng bộ Supabase thành công: Tải về \(fetchedAccountsCount) tài khoản, \(fetchedTradesCount) lệnh, \(fetchedExecutionsCount) executions, \(fetchedPropCount) quỹ."
+                var summary = "Supabase sync successful: Downloaded \(fetchedAccountsCount) accounts, \(fetchedTradesCount) trades, \(fetchedExecutionsCount) executions, \(fetchedPropCount) prop accounts."
                 if !syncWarnings.isEmpty {
-                    summary += " (Cảnh báo: \(syncWarnings.joined(separator: "; ")))"
+                    summary += " (Warnings: \(syncWarnings.joined(separator: "; ")))"
                 }
                 self.lastSyncSummary = summary
                 self.lastSyncError = nil
             } else if !syncWarnings.isEmpty {
                 self.lastSyncError = syncWarnings.joined(separator: "\n")
             } else {
-                self.lastSyncSummary = "Kết nối Supabase thành công. Dữ liệu local và đám mây đã đồng bộ (0 bản ghi mới)."
+                self.lastSyncSummary = "Supabase connection successful. Local and cloud data are synchronized (0 new records)."
                 self.lastSyncError = nil
             }
             self.isSyncing = false
@@ -473,7 +528,7 @@ public final class TradeDataStore: ObservableObject {
         let count = try await The5ersService.shared.syncWithTradeStore(dataStore: self)
         await MainActor.run {
             if count > 0 {
-                self.lastSyncSummary = "Đã đồng bộ The5ers MCP thành công: \(count) tài khoản, \(self.trades.filter { $0.tags.contains("the5ers") }.count) lệnh."
+                self.lastSyncSummary = "The5ers MCP synchronized successfully: \(count) accounts, \(self.trades.filter { $0.tags.contains("the5ers") }.count) trades."
             } else {
                 self.lastSyncSummary = The5ersService.shared.lastStatus
             }
@@ -481,7 +536,7 @@ public final class TradeDataStore: ObservableObject {
         return count
     }
     
-    // MARK: - Notebook & Journal Operations (1:1 port từ source-repo)
+    // Internal implementation note
     
     public func createFolder(name: String) throws -> NotebookFolder {
         let (folder, updated) = try NotebookEngine.createFolder(name: name, existingFolders: folders)
@@ -693,7 +748,7 @@ public final class TradeDataStore: ObservableObject {
         
         propReceipts.append(item)
         
-        // Cập nhật trạng thái Payout nếu đủ số tiền hoặc cần chuyển sang approved/completed
+        // Internal implementation note
         let allReceiptsForPayout = propReceipts.filter { $0.payoutId == item.payoutId && !$0.voided }
         let totalNetReceived = allReceiptsForPayout.reduce(0) { sum, r in
             sum + (r.kind == "reversal" ? -r.amountMinor : r.amountMinor)
@@ -726,7 +781,7 @@ public final class TradeDataStore: ObservableObject {
         updated.voided = voided
         propReceipts[rIdx] = updated
         
-        // Kiểm tra sau khi void, số dư không bao giờ âm
+        // Internal implementation note
         let receiptsForPayout = propReceipts.filter { $0.payoutId == payoutId && !$0.voided }
         let totalNet = receiptsForPayout.reduce(0) { $0 + ($1.kind == "reversal" ? -$1.amountMinor : $1.amountMinor) }
         if totalNet < 0 {
@@ -773,7 +828,7 @@ public final class TradeDataStore: ObservableObject {
         return res
     }
 
-    // MARK: - Attachments & Screenshots (1:1 port từ source-repo)
+    // Internal implementation note
     
     private var attachmentsBaseUrl: URL {
         let paths = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
@@ -979,12 +1034,12 @@ public final class TradeDataStore: ObservableObject {
     
     public static var defaultProgressRules: [ProgressRule] {
         [
-            ProgressRule(title: "Kiểm tra tin tức kinh tế hôm nay", stage: "Trước khi GD", weekdaysJson: "[1,2,3,4,5]"),
-            ProgressRule(title: "Xác định vùng FVG / Liquidity Sweep khung H1-H4", stage: "Trước khi GD", weekdaysJson: "[1,2,3,4,5]"),
-            ProgressRule(title: "Luôn đặt Stop Loss trước khi khớp lệnh", stage: "Trong khi GD", weekdaysJson: "[1,2,3,4,5]"),
-            ProgressRule(title: "Không dời SL hoặc gồng lỗ vượt kế hoạch R:R", stage: "Trong khi GD", weekdaysJson: "[1,2,3,4,5]"),
-            ProgressRule(title: "Ghi nhật ký cảm xúc & đánh giá sau lệnh", stage: "Sau khi GD", weekdaysJson: "[1,2,3,4,5]"),
-            ProgressRule(title: "Lưu ảnh chụp màn hình và chấm điểm Playbook", stage: "Sau khi GD", weekdaysJson: "[1,2,3,4,5]")
+            ProgressRule(title: "Check high-impact economic news", stage: "Before trading", weekdaysJson: "[1,2,3,4,5]"),
+            ProgressRule(title: "Identify H1-H4 Key Levels & Liquidity", stage: "Before trading", weekdaysJson: "[1,2,3,4,5]"),
+            ProgressRule(title: "Always set Stop Loss before order fill", stage: "During trading", weekdaysJson: "[1,2,3,4,5]"),
+            ProgressRule(title: "Do not move SL or hold beyond planned R:R", stage: "During trading", weekdaysJson: "[1,2,3,4,5]"),
+            ProgressRule(title: "Log emotional notes & post-trade review", stage: "After trading", weekdaysJson: "[1,2,3,4,5]"),
+            ProgressRule(title: "Save chart screenshots and score Playbook", stage: "After trading", weekdaysJson: "[1,2,3,4,5]")
         ]
     }
     
@@ -1050,7 +1105,7 @@ public final class TradeDataStore: ObservableObject {
     private func createInitialDefaultAccount() {
         let defaultAcc = Account(
             id: "default-acc",
-            name: "Tài Khoản Giao Dịch",
+            name: "Trading Account",
             broker: "",
             currency: "USD",
             initialBalance: 0
@@ -1211,7 +1266,7 @@ public final class TradeDataStore: ObservableObject {
         AppLogger.info("Reset all trading data to 100% clean blank state.")
     }
     
-    /// Xuất danh sách giao dịch sang định dạng CSV 1:1 theo `api/export/route.ts`
+    /// Internal domain documentation
     public func exportTradesCsv() -> String {
         let header = "key,account_id,symbol,direction,status,opened_at,closed_at,quantity,avg_entry,avg_exit,gross_pnl,fees,net_pnl,tags,notes"
         let iso = ISO8601DateFormatter()

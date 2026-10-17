@@ -1,5 +1,11 @@
 import SwiftUI
 
+/// Notebook view adhering 1:1 with `source-repo/apps/web/src/app/notebook/page.tsx`:
+/// - FilterBar with title "Notebook" and "New note" button
+/// - Folder selector bar (All notes, folders, New folder)
+/// - Search notes input
+/// - Notes list with title, preview, and update date
+/// - Full-featured Note Editor with edit/preview toggle, format actions, autosave, delete, and attachments
 public struct NotebookView: View {
     @ObservedObject private var dataStore = TradeDataStore.shared
     @ObservedObject private var env = AppEnvironment.shared
@@ -34,7 +40,7 @@ public struct NotebookView: View {
     }
     
     private var currentFolderName: String {
-        activeFolders.first(where: { $0.id == selectedFolderId })?.name ?? "Ghi chú"
+        activeFolders.first(where: { $0.id == selectedFolderId })?.name ?? "Notes"
     }
     
     public var body: some View {
@@ -48,7 +54,7 @@ public struct NotebookView: View {
                 }
             }
             
-            // MARK: - Folder Selector Bar
+            // Folder selector bar
             folderChipsBar
                 .padding(.vertical, 8)
                 .background(AppColors.cardBackground)
@@ -56,7 +62,16 @@ public struct NotebookView: View {
             Divider()
                 .overlay(AppColors.border)
             
-            // MARK: - Notes Content List
+            // Search field matching notebook/page.tsx line 301
+            searchBar
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(AppColors.background)
+            
+            Divider()
+                .overlay(AppColors.border)
+            
+            // Notes Content List
             if filteredNotes.isEmpty {
                 emptyNotesState
             } else {
@@ -76,9 +91,9 @@ public struct NotebookView: View {
         .sheet(isPresented: $showNewFolderSheet) {
             newFolderSheet
         }
-        .alert("Xóa thư mục “\(folderToDelete?.name ?? "")”?", isPresented: $showDeleteFolderAlert) {
-            Button("Hủy", role: .cancel) { folderToDelete = nil }
-            Button("Xóa thư mục", role: .destructive) {
+        .alert("Delete “\(folderToDelete?.name ?? "")”?", isPresented: $showDeleteFolderAlert) {
+            Button("Cancel", role: .cancel) { folderToDelete = nil }
+            Button("Delete folder", role: .destructive) {
                 if let folder = folderToDelete {
                     try? dataStore.deleteFolder(id: folder.id)
                     if selectedFolderId == folder.id {
@@ -88,19 +103,51 @@ public struct NotebookView: View {
                 }
             }
         } message: {
-            Text("Thư mục sẽ bị xóa. Toàn bộ ghi chú bên trong sẽ được giữ lại an toàn trong “My notes”.")
+            Text("The folder will be removed. Its notes will be kept in My notes.")
         }
-        .alert("Xóa ghi chú?", isPresented: $showDeleteNoteAlert) {
-            Button("Hủy", role: .cancel) { noteToDelete = nil }
-            Button("Xóa", role: .destructive) {
+        .alert("Delete this note?", isPresented: $showDeleteNoteAlert) {
+            Button("Cancel", role: .cancel) { noteToDelete = nil }
+            Button("Delete", role: .destructive) {
                 if let note = noteToDelete {
                     dataStore.deleteNote(id: note.id)
                     noteToDelete = nil
                 }
             }
         } message: {
-            Text("Ghi chú này sẽ bị xóa khỏi sổ tay.")
+            Text("This note will be permanently removed.")
         }
+    }
+    
+    // MARK: - Search Bar
+    
+    private var searchBar: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundColor(AppColors.secondaryText)
+                .font(.system(size: 13))
+            
+            TextField("Search notes", text: $searchQuery)
+                .font(AppTypography.caption)
+                .foregroundColor(AppColors.primaryText)
+            
+            if !searchQuery.isEmpty {
+                Button {
+                    searchQuery = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(AppColors.secondaryText)
+                        .font(.system(size: 13))
+                }
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .background(AppColors.secondaryBackground)
+        .cornerRadius(8)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(AppColors.border, lineWidth: 1)
+        )
     }
     
     // MARK: - Folder Chips Horizontal Bar
@@ -119,39 +166,39 @@ public struct NotebookView: View {
                     } label: {
                         HStack(spacing: 6) {
                             Image(systemName: folderIcon(for: folder))
-                                .font(.system(size: 13))
+                                .font(.system(size: 12))
                             Text(folder.name)
-                                .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
+                                .font(.system(size: 12, weight: isSelected ? .semibold : .regular))
                             Text("\(count)")
-                                .font(.system(size: 11, weight: .bold))
+                                .font(.system(size: 10, weight: .bold))
                                 .padding(.horizontal, 5)
                                 .padding(.vertical, 1)
                                 .background(isSelected ? Color.white.opacity(0.25) : AppColors.cardBackground)
                                 .clipShape(Capsule())
                             
-                            // Nút xóa thư mục user
+                            // Delete folder button for custom user folders
                             if folder.id != NotebookEngine.systemFolderAll && folder.id != NotebookEngine.systemFolderMyNotes && isSelected {
                                 Button {
                                     folderToDelete = folder
                                     showDeleteFolderAlert = true
                                 } label: {
                                     Image(systemName: "trash")
-                                        .font(.system(size: 11))
+                                        .font(.system(size: 10))
                                         .foregroundColor(Color.red.opacity(0.9))
                                 }
                                 .padding(.leading, 2)
                             }
                         }
                         .padding(.horizontal, 12)
-                        .padding(.vertical, 7)
-                        .background(isSelected ? AppColors.accent : AppColors.surface)
-                        .foregroundColor(isSelected ? .white : AppColors.primaryText)
-                        .cornerRadius(20)
+                        .padding(.vertical, 6)
+                        .background(isSelected ? AppColors.brand : AppColors.secondaryBackground)
+                        .foregroundColor(isSelected ? AppColors.brandTextOnDark : AppColors.primaryText)
+                        .cornerRadius(16)
                     }
                     .buttonStyle(.plain)
                 }
                 
-                // Nút thêm thư mục mới
+                // Add new folder button
                 Button {
                     newFolderName = ""
                     folderError = nil
@@ -159,69 +206,23 @@ public struct NotebookView: View {
                 } label: {
                     HStack(spacing: 4) {
                         Image(systemName: "plus")
-                            .font(.system(size: 12, weight: .bold))
-                        Text("Thư mục")
-                            .font(.system(size: 13, weight: .medium))
+                            .font(.system(size: 11, weight: .bold))
+                        Text("New folder")
+                            .font(.system(size: 12, weight: .medium))
                     }
                     .padding(.horizontal, 10)
-                    .padding(.vertical, 7)
-                    .background(AppColors.surface)
-                    .foregroundColor(AppColors.accent)
-                    .cornerRadius(20)
+                    .padding(.vertical, 6)
+                    .background(AppColors.secondaryBackground)
+                    .foregroundColor(AppColors.brand)
+                    .cornerRadius(16)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 20)
-                            .stroke(AppColors.accent.opacity(0.4), lineWidth: 1)
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(AppColors.brand.opacity(0.4), lineWidth: 1)
                     )
                 }
                 .buttonStyle(.plain)
             }
-            .padding(.horizontal)
-        }
-    }
-    
-    // MARK: - Search & Action Bar
-    
-    private var searchAndActionBar: some View {
-        HStack(spacing: 10) {
-            HStack(spacing: 6) {
-                Image(systemName: "magnifyingglass")
-                    .foregroundColor(AppColors.secondaryText)
-                    .font(.system(size: 14))
-                TextField("Tìm kiếm ghi chú...", text: $searchQuery)
-                    .font(AppTypography.caption)
-                    .foregroundColor(AppColors.primaryText)
-                if !searchQuery.isEmpty {
-                    Button {
-                        searchQuery = ""
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(AppColors.secondaryText)
-                            .font(.system(size: 14))
-                    }
-                }
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
-            .background(AppColors.surface)
-            .cornerRadius(10)
-            
-            // Nút Tạo Ghi Chú Mới
-            Button {
-                createNewNote()
-            } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: "square.and.pencil")
-                        .font(.system(size: 14, weight: .bold))
-                    Text("Viết")
-                        .font(.system(size: 13, weight: .semibold))
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(AppColors.accent)
-                .foregroundColor(.white)
-                .cornerRadius(10)
-            }
-            .buttonStyle(.plain)
+            .padding(.horizontal, 14)
         }
     }
     
@@ -237,8 +238,8 @@ public struct NotebookView: View {
                         AppCard {
                             VStack(alignment: .leading, spacing: 6) {
                                 HStack(alignment: .top) {
-                                    Text(note.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Ghi chú không tên" : note.title)
-                                        .font(AppTypography.subheadlineBold)
+                                    Text(note.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Untitled" : note.title)
+                                        .font(AppTypography.bodyBold)
                                         .foregroundColor(AppColors.primaryText)
                                         .lineLimit(1)
                                     Spacer()
@@ -247,7 +248,7 @@ public struct NotebookView: View {
                                             .font(.system(size: 10, weight: .semibold))
                                             .padding(.horizontal, 6)
                                             .padding(.vertical, 2)
-                                            .background(AppColors.surface)
+                                            .background(AppColors.secondaryBackground)
                                             .foregroundColor(AppColors.secondaryText)
                                             .cornerRadius(4)
                                     }
@@ -282,9 +283,7 @@ public struct NotebookView: View {
                     .buttonStyle(.plain)
                 }
             }
-            .padding(.horizontal)
-            .padding(.top, 4)
-            .padding(.bottom, 24)
+            .padding(14)
         }
     }
     
@@ -294,20 +293,23 @@ public struct NotebookView: View {
         VStack(spacing: 12) {
             Spacer()
             Image(systemName: "note.text")
-                .font(.system(size: 44))
-                .foregroundColor(AppColors.secondaryText.opacity(0.6))
-            Text("Chưa có ghi chú nào trong mục này")
-                .font(AppTypography.subheadline)
+                .font(.system(size: 40))
+                .foregroundColor(AppColors.secondaryText.opacity(0.5))
+            Text("No notes here yet.")
+                .font(AppTypography.bodyBold)
+                .foregroundColor(AppColors.primaryText)
+            Text("Create your first note in this folder to begin.")
+                .font(AppTypography.caption)
                 .foregroundColor(AppColors.secondaryText)
             Button {
                 createNewNote()
             } label: {
-                Text("Tạo ghi chú mới ngay")
+                Text("New note")
                     .font(AppTypography.captionBold)
-                    .foregroundColor(AppColors.accent)
+                    .foregroundColor(AppColors.brandTextOnDark)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 8)
-                    .background(AppColors.surface)
+                    .background(AppColors.brand)
                     .cornerRadius(8)
             }
             Spacer()
@@ -337,26 +339,26 @@ public struct NotebookView: View {
         NavigationStack {
             Form {
                 Section {
-                    TextField("Tên thư mục", text: $newFolderName)
+                    TextField("Folder name", text: $newFolderName)
                     if let err = folderError {
                         Text(err)
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.loss)
                     }
                 } header: {
-                    Text("Thông tin thư mục")
+                    Text("Folder details")
                 } footer: {
-                    Text("Tối đa 100 ký tự. Các khoảng trắng thừa sẽ tự động được cắt bỏ.")
+                    Text("Organize your notes in a named folder. Up to 100 characters.")
                 }
             }
-            .navigationTitle("Tạo thư mục mới")
+            .navigationTitle("New folder")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Hủy") { showNewFolderSheet = false }
+                    Button("Cancel") { showNewFolderSheet = false }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Tạo") {
+                    Button("Create folder") {
                         do {
                             let folder = try dataStore.createFolder(name: newFolderName)
                             selectedFolderId = folder.id
@@ -372,7 +374,7 @@ public struct NotebookView: View {
     }
 }
 
-// MARK: - Notebook Note Editor Sheet (Crash-proof & Native)
+// MARK: - Notebook Note Editor Sheet
 
 public struct NotebookEditorSheet: View {
     @Environment(\.dismiss) private var dismiss
@@ -406,7 +408,7 @@ public struct NotebookEditorSheet: View {
             VStack(spacing: 0) {
                 // Header inputs
                 VStack(spacing: 12) {
-                    TextField("Tiêu đề ghi chú...", text: $title)
+                    TextField("Title", text: $title)
                         .font(AppTypography.headline)
                         .foregroundColor(AppColors.primaryText)
                         .padding(.horizontal)
@@ -414,22 +416,22 @@ public struct NotebookEditorSheet: View {
                         .onChange(of: title) { _ in autoSave() }
                     
                     HStack {
-                        // Thư mục selector
-                        Picker("Thư mục", selection: $selectedFolderId) {
+                        // Folder selector
+                        Picker("Folder", selection: $selectedFolderId) {
                             ForEach(activeFolders.filter { $0.id != NotebookEngine.systemFolderAll }) { folder in
                                 Text(folder.name).tag(folder.id)
                             }
                         }
                         .pickerStyle(.menu)
-                        .tint(AppColors.accent)
+                        .tint(AppColors.brand)
                         .onChange(of: selectedFolderId) { _ in autoSave() }
                         
                         Spacer()
                         
-                        // Mode toggle: Soạn thảo / Xem trước
-                        Picker("Chế độ", selection: $isPreviewMode) {
-                            Text("Soạn thảo").tag(false)
-                            Text("Xem trước").tag(true)
+                        // Mode toggle: Edit / Preview
+                        Picker("Mode", selection: $isPreviewMode) {
+                            Text("Edit").tag(false)
+                            Text("Preview").tag(true)
                         }
                         .pickerStyle(.segmented)
                         .frame(width: 170)
@@ -438,7 +440,7 @@ public struct NotebookEditorSheet: View {
                     
                     Divider().background(AppColors.border)
                     
-                    // Formatting Toolbar (Bold, Italic, Bullet, Quote)
+                    // Formatting Toolbar (Bold, Italic, Bullet)
                     if !isPreviewMode {
                         HStack(spacing: 12) {
                             Button {
@@ -447,7 +449,7 @@ public struct NotebookEditorSheet: View {
                                 Text("B")
                                     .font(.system(size: 15, weight: .black))
                                     .frame(width: 32, height: 28)
-                                    .background(AppColors.surface)
+                                    .background(AppColors.secondaryBackground)
                                     .foregroundColor(AppColors.primaryText)
                                     .cornerRadius(6)
                             }
@@ -459,7 +461,7 @@ public struct NotebookEditorSheet: View {
                                     .font(.system(size: 15, weight: .semibold, design: .serif))
                                     .italic()
                                     .frame(width: 32, height: 28)
-                                    .background(AppColors.surface)
+                                    .background(AppColors.secondaryBackground)
                                     .foregroundColor(AppColors.primaryText)
                                     .cornerRadius(6)
                             }
@@ -470,7 +472,7 @@ public struct NotebookEditorSheet: View {
                                 Image(systemName: "list.bullet")
                                     .font(.system(size: 13, weight: .semibold))
                                     .frame(width: 32, height: 28)
-                                    .background(AppColors.surface)
+                                    .background(AppColors.secondaryBackground)
                                     .foregroundColor(AppColors.primaryText)
                                     .cornerRadius(6)
                             }
@@ -489,7 +491,7 @@ public struct NotebookEditorSheet: View {
                         if isPreviewMode {
                             VStack(alignment: .leading, spacing: 8) {
                                 if title.isEmpty && content.isEmpty {
-                                    Text("*(Ghi chú trống)*")
+                                    Text("*(Empty note)*")
                                         .foregroundColor(AppColors.secondaryText)
                                         .font(AppTypography.body)
                                 } else {
@@ -519,14 +521,14 @@ public struct NotebookEditorSheet: View {
                         AttachmentsSectionView(
                             ownerType: "note",
                             ownerId: noteId,
-                            title: "Hình ảnh & Tệp đính kèm ghi chú"
+                            title: "Attachments & Screenshots"
                         )
                     }
                     .padding()
                 }
                 .background(AppColors.background)
             }
-            .navigationTitle("Ghi chú")
+            .navigationTitle("Note")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -538,22 +540,22 @@ public struct NotebookEditorSheet: View {
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Xong") {
+                    Button("Done") {
                         autoSave()
                         dismiss()
                     }
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundColor(AppColors.accent)
+                    .font(AppTypography.captionBold)
+                    .foregroundColor(AppColors.brand)
                 }
             }
-            .alert("Xóa ghi chú này?", isPresented: $showDeleteConfirmation) {
-                Button("Hủy", role: .cancel) {}
-                Button("Xóa", role: .destructive) {
+            .alert("Delete this note?", isPresented: $showDeleteConfirmation) {
+                Button("Cancel", role: .cancel) {}
+                Button("Delete", role: .destructive) {
                     dataStore.deleteNote(id: noteId)
                     dismiss()
                 }
             } message: {
-                Text("Ghi chú này sẽ bị xóa hoàn toàn khỏi sổ tay.")
+                Text("This note will be permanently removed.")
             }
         }
     }

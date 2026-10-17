@@ -27,7 +27,7 @@ public enum Formatters {
         return f
     }()
     
-    /// Định dạng số tiền (có hỗ trợ Privacy Mode làm mờ số dư)
+    /// Formats currency with optional Privacy Mode masking
     public static func currency(_ amount: Decimal, currencyCode: String = "USD", isPrivate: Bool = false) -> String {
         if isPrivate { return "••••••" }
         currencyFormatter.currencyCode = currencyCode
@@ -43,7 +43,7 @@ public enum Formatters {
         return Formatters.currency(a, currencyCode: currency, isPrivate: isPrivate)
     }
     
-    /// Định dạng P&L có dấu cộng/trừ rõ ràng
+    /// Formats P&L with explicit +/- prefix
     public static func pnl(_ amount: Decimal, currencyCode: String = "USD", isPrivate: Bool = false) -> String {
         if isPrivate { return "••••••" }
         let sign = amount > 0 ? "+" : ""
@@ -59,7 +59,7 @@ public enum Formatters {
         return Formatters.pnl(a, currencyCode: currency, isPrivate: isPrivate)
     }
     
-    /// Định dạng tỷ lệ phần trăm (ví dụ: 0.542 -> "54.2%")
+    /// Formats percentage value (e.g. 0.542 -> "54.2%")
     public static func percentage(_ value: Double?) -> String {
         guard let value = value, value.isFinite else { return "n/a" }
         return percentFormatter.string(from: NSNumber(value: value)) ?? "\(value * 100)%"
@@ -105,7 +105,7 @@ public enum Formatters {
         }
     }
     
-    /// Định dạng giá thực hiện lệnh (linh hoạt từ 2 tới 5 số lẻ cho Forex/Crypto)
+    /// Formats execution price (2 to 5 decimal places for Forex/Crypto)
     public static func price(_ value: Decimal) -> String {
         return priceFormatter.string(from: value as NSDecimalNumber) ?? "\(value)"
     }
@@ -128,7 +128,7 @@ public enum Formatters {
         return formatNumber(v)
     }
     
-    /// Định dạng thời gian nắm giữ lệnh từ milliseconds (e.g. 1d 4h, 2h 15m, 45m 10s)
+    /// Formats holding duration from milliseconds (e.g. 1d 4h, 2h 15m, 45m 10s)
     public static func formatDuration(ms: Int64?) -> String {
         guard let ms = ms, ms > 0 else { return "-" }
         let totalSeconds = ms / 1000
@@ -153,7 +153,7 @@ public enum Formatters {
         return formatDuration(ms: Int64(ms))
     }
     
-    /// Định dạng thời gian theo múi giờ chỉ định
+    /// Formats date and time according to designated timezone
     public static func dateTime(_ date: Date, timeZone: TimeZone = .current) -> String {
         let f = DateFormatter()
         f.dateStyle = .medium

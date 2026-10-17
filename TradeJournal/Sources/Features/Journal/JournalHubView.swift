@@ -1,10 +1,10 @@
 import SwiftUI
 
 public enum JournalSubTab: String, CaseIterable, Identifiable {
-    case daily = "Nhật Ký Ngày"
-    case calendar = "Lịch P&L"
-    case notebook = "Sổ Tay"
-    case routines = "Thói Quen"
+    case daily = "Daily"
+    case calendar = "Calendar"
+    case notebook = "Notebook"
+    case routines = "Routines"
     
     public var id: String { rawValue }
     
@@ -18,8 +18,11 @@ public enum JournalSubTab: String, CaseIterable, Identifiable {
     }
 }
 
-/// Trung tâm điều phối tính năng Nhật ký giao dịch
-/// Kết hợp 4 màn hình: Nhật ký ngày, Lịch P&L tháng, Sổ tay ghi chép, Thói quen kỷ luật
+/// Journal hub navigation view providing access to:
+/// - Daily journal logs
+/// - Monthly P&L calendar
+/// - Trading notebook & folders
+/// - Discipline routines & progress checklist
 public struct JournalHubView: View {
     @State private var selectedSubTab: JournalSubTab = .daily
     
@@ -27,8 +30,8 @@ public struct JournalHubView: View {
     
     public var body: some View {
         VStack(spacing: 0) {
-            // Segmented Navigation Header theo chuẩn Apple HIG
-            Picker("Phần nhật ký", selection: $selectedSubTab) {
+            // Segmented Navigation Header adhering to Apple HIG
+            Picker("Journal Section", selection: $selectedSubTab) {
                 ForEach(JournalSubTab.allCases) { tab in
                     Text(tab.rawValue).tag(tab)
                 }
@@ -40,7 +43,7 @@ public struct JournalHubView: View {
             
             Divider()
             
-            // Nội dung tab con tương ứng
+            // Sub-view presentation
             switch selectedSubTab {
             case .daily:
                 DailyJournalListView()

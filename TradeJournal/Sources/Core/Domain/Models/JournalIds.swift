@@ -1,7 +1,7 @@
 import Foundation
 import CryptoKit
 
-/// Port 1:1 từ `apps/web/src/server/ids.ts`.
+/// Ported 1:1 from `apps/web/src/server/ids.ts`.
 public enum JournalIds {
     
     public static func newId() -> String {
@@ -38,7 +38,7 @@ public enum JournalIds {
     }
     
     /// Content hash for execution dedup: identical fills insert once per account.
-    /// Port 1:1 từ `apps/web/src/server/ids.ts` `executionHash`.
+/// Ported 1:1 from `apps/web/src/server/ids.ts` `executionHash`.
     public static func executionHash(
         symbol: String,
         side: String,
@@ -69,7 +69,7 @@ public enum JournalIds {
         return digest.map { String(format: "%02x", $0) }.joined()
     }
     
-    /// Băm mảng JSON chuẩn SHA-256 (port 1:1 từ `journal.ts` `const hash = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex")`)
+/// Domain specification matching core web repository
     public static func sha256Hex(_ jsonArray: [Any]) -> String {
         if let data = try? JSONSerialization.data(withJSONObject: jsonArray, options: []) {
             let digest = SHA256.hash(data: data)
@@ -92,8 +92,8 @@ public enum JournalIds {
         return digest.map { String(format: "%02x", $0) }.joined()
     }
     
-    /// Định danh vị thế: SHA256 của [symbol, direction, openedAt, discriminator?]
-    /// Port 1:1 từ `source-repo/apps/web/src/server/the5ers/journal.ts` `positionIdentity`
+/// Domain specification matching core web repository
+/// Ported 1:1 from `source-repo/apps/web/src/server/the5ers/journal.ts` `positionIdentity`
     public static func positionIdentity(symbol: String, direction: String, openedAt: String, discriminator: String? = nil) -> String {
         if let disc = discriminator, !disc.isEmpty {
             return sha256Hex([symbol, direction, openedAt, disc])
@@ -102,8 +102,8 @@ public enum JournalIds {
         }
     }
     
-    /// Tạo khóa Trade chuẩn: "the5ers_" + sha256([sourceAccountId, positionIdentity])
-    /// Port 1:1 từ `source-repo/apps/web/src/server/the5ers/journal.ts` `journalTradeRow`
+/// Standard Trade key: "the5ers_" + sha256([sourceAccountId, positionIdentity]): "the5ers_" + sha256([sourceAccountId, positionIdentity])
+/// Ported 1:1 from `source-repo/apps/web/src/server/the5ers/journal.ts` `journalTradeRow`
     public static func the5ersTradeKey(sourceAccountId: String, positionIdentity: String) -> String {
         return "the5ers_" + sha256Hex([sourceAccountId, positionIdentity])
     }

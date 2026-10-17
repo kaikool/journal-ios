@@ -10,12 +10,12 @@ public enum JournalTimeRange: String, CaseIterable, Identifiable {
     public var id: String { rawValue }
 }
 
-/// Thanh FilterBar chuẩn xác 100% đối chiếu từ `source-repo/apps/web/src/components/filter-bar.tsx`:
-/// - Tiêu đề trang (16px font-semibold)
-/// - AccountSelector pill (chọn tài khoản hoặc "Tất cả tài khoản")
-/// - Dải nút phạm vi thời gian (7D, 30D, 90D, YTD, ALL)
-/// - Nút Filters kèm đếm bộ lọc đang kích hoạt
-/// - Slot chứa Action Buttons bên phải
+/// FilterBar component matching 100% of `source-repo/apps/web/src/components/filter-bar.tsx`:
+/// - Page title (16px font-semibold)
+/// - AccountSelector pill (select account or "All accounts")
+/// - Time range pill strip (7D, 30D, 90D, YTD, ALL)
+/// - Filters trigger button with active filter badge count
+/// - Right-aligned action buttons slot
 public struct FilterBarView<Actions: View>: View {
     @ObservedObject private var dataStore = TradeDataStore.shared
     @Binding private var selectedRange: JournalTimeRange
@@ -56,7 +56,7 @@ public struct FilterBarView<Actions: View>: View {
             
             if showFilters {
                 HStack(spacing: 8) {
-                    // Account Selector Dropdown Pill (Port 1:1 từ source-repo account-selector.tsx)
+                    // Account Selector Dropdown Pill (port 1:1 from account-selector.tsx)
                     Menu {
                         Button {
                             dataStore.selectedAccountId = "all"

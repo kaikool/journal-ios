@@ -1,9 +1,12 @@
 import SwiftUI
 
-/// Màn hình Lịch P&L tháng chuẩn xác 100% đối chiếu từ `source-repo/apps/web/src/app/calendar/page.tsx`:
-/// - FilterBar với tiêu đề "Calendar" và bộ chuyển tháng `<` Tháng Năm `>`
-/// - Khung lịch tháng 7 cột với các ô ngày hiển thị P&L và số lượng lệnh giao dịch
-/// - Tóm tắt hiệu suất tháng (P&L tháng này, tổng số lệnh)
+/// Monthly P&L Calendar view matching `source-repo/apps/web/src/app/calendar/page.tsx`,
+/// `components/calendar-pnl.tsx`, and `components/calendar-insights.tsx`:
+/// - FilterBar with Month navigator (< Month Year >)
+/// - 7-column calendar grid with daily net P&L and trade counts
+/// - Trading day summary footer
+/// - Full Performance Insights breakdown: Net P&L, Avg Daily P&L, Win Rate, Closed Trades,
+///   Best/Worst Day, Avg Green/Red Day, Day Consistency
 public struct JournalCalendarView: View {
     @EnvironmentObject private var env: AppEnvironment
     @ObservedObject private var dataStore = TradeDataStore.shared
@@ -27,6 +30,10 @@ public struct JournalCalendarView: View {
     
     private var month: Int {
         calendar.component(.month, from: currentMonth)
+    }
+    
+    private var monthPrefix: String {
+        String(format: "%04d-%02d", year, month)
     }
     
     private var daysInMonth: [Date?] {
@@ -71,16 +78,87 @@ public struct JournalCalendarView: View {
         return formatter.string(from: date)
     }
     
+    private var monthDaysList: [DayStats] {
+        dailyStatsMap
+            .filter { $0.key.hasPrefix(monthPrefix) && $0.value.trades > 0 }
+            .map { $0.value }
+            .sorted { $0.date < $1.date }
+    }
+    
+    private var monthTradingDays: Int {
+        monthDaysList.count
+    }
+    
+    private var monthWinningDays: Int {
+        monthDaysList.filter { $0.netPnl > 0 }.count
+    }
+    
+    private var monthLosingDays: Int {
+        monthDaysList.filter { $0.netPnl < 0 }.count
+    }
+    
+    private var monthFlatDays: Int {
+        monthDaysList.filter { $0.netPnl == 0 }.count
+    }
+    
     private var monthNetPnl: Decimal {
-        let prefix = String(format: "%04d-%02d", year, month)
-        return dailyStatsMap.filter { $0.key.hasPrefix(prefix) }
-            .reduce(Decimal.zero) { $0 + $1.value.netPnl }
+        monthDaysList.reduce(Decimal.zero) { $0 + $1.netPnl }
+    }
+    
+    private var monthTradesCount: Int {
+        monthDaysList.reduce(0) { $0 + $1.trades }
+    }
+    
+    private var monthWinsCount: Int {
+        monthDaysList.reduce(0) { $0 + $1.wins }
+    }
+    
+    private var monthLossesCount: Int {
+        monthDaysList.reduce(0) { $0 + $1.losses }
+    }
+    
+    private var monthBreakevensCount: Int {
+        monthDaysList.reduce(0) { $0 + $1.breakevens }
+    }
+    
+    private var avgDailyPnl: Decimal {
+        monthTradingDays > 0 ? (monthNetPnl / Decimal(monthTradingDays)) : .zero
+    }
+    
+    private var monthWinRate: Double {
+        monthTradesCount > 0 ? (Double(monthWinsCount) / Double(monthTradesCount)) * 100 : 0
+    }
+    
+    private var profitableDayRate: Double {
+        monthTradingDays > 0 ? (Double(monthWinningDays) / Double(monthTradingDays)) * 100 : 0
+    }
+    
+    private var bestDay: DayStats? {
+        monthDaysList.max(by: { $0.netPnl < $1.netPnl })
+    }
+    
+    private var worstDay: DayStats? {
+        monthDaysList.min(by: { $0.netPnl < $1.netPnl })
+    }
+    
+    private var avgGreenDay: Decimal {
+        let greenDays = monthDaysList.filter { $0.netPnl > 0 }
+        guard !greenDays.isEmpty else { return .zero }
+        let total = greenDays.reduce(Decimal.zero) { $0 + $1.netPnl }
+        return total / Decimal(greenDays.count)
+    }
+    
+    private var avgRedDay: Decimal {
+        let redDays = monthDaysList.filter { $0.netPnl < 0 }
+        guard !redDays.isEmpty else { return .zero }
+        let total = redDays.reduce(Decimal.zero) { $0 + $1.netPnl }
+        return total / Decimal(redDays.count)
     }
     
     public var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                // FilterBar với nút điều hướng tháng < Month Year >
+                // FilterBar with Month navigator matching calendar/page.tsx
                 FilterBarView(
                     title: "Calendar",
                     showFilters: false
@@ -102,7 +180,7 @@ public struct JournalCalendarView: View {
                         Text(monthTitle(for: currentMonth))
                             .font(AppTypography.captionBold)
                             .foregroundColor(AppColors.primaryText)
-                            .frame(minWidth: 100, alignment: .center)
+                            .frame(minWidth: 120, alignment: .center)
                         
                         Button(action: { changeMonth(by: 1) }) {
                             Image(systemName: "chevron.right")
@@ -120,9 +198,12 @@ public struct JournalCalendarView: View {
                 }
                 
                 ScrollView {
-                    VStack(spacing: 12) {
-                        monthTotalsCard
+                    VStack(spacing: 14) {
+                        // Monthly Calendar Card
                         calendarGridCard
+                        
+                        // Performance Insights Section matching calendar-insights.tsx
+                        performanceInsightsSection
                     }
                     .padding(14)
                 }
@@ -152,42 +233,11 @@ public struct JournalCalendarView: View {
     }
     
     @ViewBuilder
-    private var monthTotalsCard: some View {
-        let isProfit = monthNetPnl >= 0
-        let pnlColor = isProfit ? AppColors.profit : AppColors.loss
-        let monthTrades = dailyStatsMap.filter { $0.key.hasPrefix(String(format: "%04d-%02d", year, month)) }
-            .reduce(0) { $0 + $1.value.trades }
-        
-        AppCard {
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    AppCardHeader("Net P&L")
-                    AppMonetaryText(
-                        Formatters.formatPnL(monthNetPnl, currency: env.currentCurrency),
-                        isPrivate: env.isPrivacyModeEnabled,
-                        font: AppTypography.financialNumber(size: 20, weight: .semibold),
-                        color: pnlColor
-                    )
-                }
-                
-                Spacer()
-                
-                VStack(alignment: .trailing, spacing: 2) {
-                    AppCardHeader("Trades")
-                    Text("\(monthTrades)")
-                        .font(AppTypography.financialNumber(size: 20, weight: .semibold))
-                        .foregroundColor(AppColors.primaryText)
-                }
-            }
-        }
-    }
-    
-    @ViewBuilder
     private var calendarGridCard: some View {
         let headers = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
         
         AppCard {
-            VStack(spacing: 8) {
+            VStack(spacing: 10) {
                 // Weekday headers
                 HStack(spacing: 4) {
                     ForEach(headers, id: \.self) { header in
@@ -219,20 +269,41 @@ public struct JournalCalendarView: View {
                         }
                     }
                 }
+                
+                Divider().background(AppColors.border)
+                
+                // Calendar bottom summary matching calendar-pnl.tsx line 71-83
+                HStack {
+                    Text("\(monthTradingDays) trading days · \(monthWinningDays) green")
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.secondaryText)
+                    
+                    Spacer()
+                    
+                    HStack(spacing: 4) {
+                        Text("Month:")
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.secondaryText)
+                        
+                        AppMonetaryText(
+                            Formatters.formatPnL(monthNetPnl, currency: env.currentCurrency),
+                            isPrivate: env.isPrivacyModeEnabled,
+                            font: AppTypography.captionBold,
+                            color: monthNetPnl >= 0 ? AppColors.profit : AppColors.loss
+                        )
+                    }
+                }
+                .padding(.top, 2)
             }
         }
-    }
-    
-    private func initialDateForSelectedKey() -> Date {
-        guard let key = selectedDateKey else { return Date() }
-        let fmt = DateFormatter()
-        fmt.dateFormat = "yyyy-MM-dd"
-        return fmt.date(from: key) ?? Date()
     }
     
     private func dayCell(date: Date, key: String, stats: DayStats?, hasNote: Bool) -> some View {
         let dayNum = calendar.component(.day, from: date)
         let isToday = calendar.isDateInToday(date)
+        let traded = (stats?.trades ?? 0) > 0
+        let pnl = stats?.netPnl ?? .zero
+        let isProfit = pnl >= 0
         
         return VStack(spacing: 2) {
             HStack(spacing: 2) {
@@ -247,29 +318,240 @@ public struct JournalCalendarView: View {
                 }
             }
             
-            if let stats = stats, stats.trades > 0 {
+            if traded {
                 AppMonetaryText(
-                    Formatters.formatPnL(stats.netPnl, currency: env.currentCurrency),
+                    Formatters.formatPnL(pnl, currency: env.currentCurrency),
                     isPrivate: env.isPrivacyModeEnabled,
                     font: .system(size: 9, weight: .bold, design: .monospaced),
-                    color: stats.netPnl >= 0 ? AppColors.profit : AppColors.loss
+                    color: isProfit ? AppColors.profit : AppColors.loss
                 )
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
+                
+                Text("\(stats!.trades) trade\(stats!.trades == 1 ? "" : "s")")
+                    .font(.system(size: 7, weight: .regular))
+                    .foregroundColor(AppColors.secondaryText)
             } else {
-                Spacer().frame(height: 12)
+                Spacer().frame(height: 14)
             }
         }
         .frame(maxWidth: .infinity)
         .frame(height: 52)
         .background(
             RoundedRectangle(cornerRadius: 6)
-                .fill(stats != nil && stats!.trades > 0 ? (stats!.netPnl >= 0 ? AppColors.profit.opacity(0.12) : AppColors.loss.opacity(0.12)) : AppColors.secondaryBackground.opacity(0.3))
+                .fill(traded ? (isProfit ? AppColors.profit.opacity(0.12) : AppColors.loss.opacity(0.12)) : AppColors.secondaryBackground.opacity(0.3))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 6)
                 .stroke(isToday ? AppColors.brand : AppColors.border, lineWidth: isToday ? 1.5 : 0.5)
         )
+    }
+    
+    @ViewBuilder
+    private var performanceInsightsSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Performance insights")
+                    .font(AppTypography.subheading)
+                    .foregroundColor(AppColors.primaryText)
+                
+                Text("Visible month × active filters · Closed trades, after fees")
+                    .font(AppTypography.caption)
+                    .foregroundColor(AppColors.secondaryText)
+            }
+            .padding(.horizontal, 2)
+            
+            if monthTradingDays == 0 {
+                AppCard {
+                    VStack(spacing: 6) {
+                        Image(systemName: "calendar")
+                            .font(.system(size: 24))
+                            .foregroundColor(AppColors.secondaryText)
+                        
+                        Text("No closed trades in this view")
+                            .font(AppTypography.bodyBold)
+                            .foregroundColor(AppColors.primaryText)
+                        
+                        Text("Choose another month or adjust your account and filters. Open positions and days without trades aren't included.")
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.secondaryText)
+                            .multilineTextAlignment(.center)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 20)
+                }
+            } else {
+                // 4-card metric grid matching calendar-insights.tsx line 136-168
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                    metricCard(
+                        title: "Net P&L",
+                        value: Formatters.formatPnL(monthNetPnl, currency: env.currentCurrency),
+                        detail: "\(monthTradingDays) trading day\(monthTradingDays == 1 ? "" : "s")",
+                        valueColor: monthNetPnl >= 0 ? AppColors.profit : AppColors.loss
+                    )
+                    
+                    metricCard(
+                        title: "Average daily P&L",
+                        value: Formatters.formatPnL(avgDailyPnl, currency: env.currentCurrency),
+                        detail: "Per active trading day",
+                        valueColor: avgDailyPnl >= 0 ? AppColors.profit : AppColors.loss
+                    )
+                    
+                    metricCard(
+                        title: "Trade win rate",
+                        value: String(format: "%.1f%%", monthWinRate),
+                        detail: "\(monthWinsCount)W · \(monthLossesCount)L · \(monthBreakevensCount)BE",
+                        valueColor: AppColors.primaryText
+                    )
+                    
+                    metricCard(
+                        title: "Total closed trades",
+                        value: "\(monthTradesCount)",
+                        detail: "Round-trip trades",
+                        valueColor: AppColors.primaryText
+                    )
+                }
+                
+                // Extrema & Averages matching calendar-insights.tsx line 171-218
+                VStack(spacing: 10) {
+                    AppCard {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Best & worst day")
+                                .font(AppTypography.captionBold)
+                                .foregroundColor(AppColors.primaryText)
+                            
+                            HStack {
+                                Text("Best day")
+                                    .font(AppTypography.caption)
+                                    .foregroundColor(AppColors.secondaryText)
+                                Spacer()
+                                if let best = bestDay {
+                                    HStack(spacing: 6) {
+                                        AppMonetaryText(
+                                            Formatters.formatPnL(best.netPnl, currency: env.currentCurrency),
+                                            isPrivate: env.isPrivacyModeEnabled,
+                                            font: AppTypography.captionBold,
+                                            color: AppColors.profit
+                                        )
+                                        Text(best.date)
+                                            .font(AppTypography.caption)
+                                            .foregroundColor(AppColors.secondaryText)
+                                    }
+                                } else {
+                                    Text("—").font(AppTypography.caption).foregroundColor(AppColors.secondaryText)
+                                }
+                            }
+                            
+                            HStack {
+                                Text("Worst day")
+                                    .font(AppTypography.caption)
+                                    .foregroundColor(AppColors.secondaryText)
+                                Spacer()
+                                if let worst = worstDay {
+                                    HStack(spacing: 6) {
+                                        AppMonetaryText(
+                                            Formatters.formatPnL(worst.netPnl, currency: env.currentCurrency),
+                                            isPrivate: env.isPrivacyModeEnabled,
+                                            font: AppTypography.captionBold,
+                                            color: AppColors.loss
+                                        )
+                                        Text(worst.date)
+                                            .font(AppTypography.caption)
+                                            .foregroundColor(AppColors.secondaryText)
+                                    }
+                                } else {
+                                    Text("—").font(AppTypography.caption).foregroundColor(AppColors.secondaryText)
+                                }
+                            }
+                        }
+                    }
+                    
+                    AppCard {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Average green & red day")
+                                .font(AppTypography.captionBold)
+                                .foregroundColor(AppColors.primaryText)
+                            
+                            HStack {
+                                Text("\(monthWinningDays) profitable days")
+                                    .font(AppTypography.caption)
+                                    .foregroundColor(AppColors.secondaryText)
+                                Spacer()
+                                AppMonetaryText(
+                                    Formatters.formatPnL(avgGreenDay, currency: env.currentCurrency),
+                                    isPrivate: env.isPrivacyModeEnabled,
+                                    font: AppTypography.captionBold,
+                                    color: AppColors.profit
+                                )
+                            }
+                            
+                            HStack {
+                                Text("\(monthLosingDays) losing days")
+                                    .font(AppTypography.caption)
+                                    .foregroundColor(AppColors.secondaryText)
+                                Spacer()
+                                AppMonetaryText(
+                                    Formatters.formatPnL(avgRedDay, currency: env.currentCurrency),
+                                    isPrivate: env.isPrivacyModeEnabled,
+                                    font: AppTypography.captionBold,
+                                    color: AppColors.loss
+                                )
+                            }
+                        }
+                    }
+                    
+                    AppCard {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Day consistency")
+                                    .font(AppTypography.captionBold)
+                                    .foregroundColor(AppColors.primaryText)
+                                Text("\(monthWinningDays) positive · \(monthLosingDays) negative · \(monthFlatDays) flat")
+                                    .font(AppTypography.caption)
+                                    .foregroundColor(AppColors.secondaryText)
+                            }
+                            
+                            Spacer()
+                            
+                            Text(String(format: "%.1f%%", profitableDayRate))
+                                .font(AppTypography.financialNumber(size: 18, weight: .semibold))
+                                .foregroundColor(profitableDayRate >= 50 ? AppColors.profit : AppColors.secondaryText)
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    private func metricCard(title: String, value: String, detail: String, valueColor: Color) -> some View {
+        AppCard {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(AppTypography.cardTitle)
+                    .foregroundColor(AppColors.secondaryText)
+                
+                AppMonetaryText(
+                    value,
+                    isPrivate: env.isPrivacyModeEnabled,
+                    font: AppTypography.financialNumber(size: 17, weight: .semibold),
+                    color: valueColor
+                )
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                
+                Text(detail)
+                    .font(AppTypography.caption)
+                    .foregroundColor(AppColors.mutedText)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+    
+    private func initialDateForSelectedKey() -> Date {
+        guard let key = selectedDateKey else { return Date() }
+        let fmt = DateFormatter()
+        fmt.dateFormat = "yyyy-MM-dd"
+        return fmt.date(from: key) ?? Date()
     }
     
     private func changeMonth(by value: Int) {
@@ -280,6 +562,7 @@ public struct JournalCalendarView: View {
     
     private func monthTitle(for date: Date) -> String {
         let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US")
         formatter.dateFormat = "MMMM yyyy"
         return formatter.string(from: date)
     }
@@ -291,7 +574,7 @@ public struct JournalCalendarView: View {
     }
 }
 
-/// Sheet chi tiết ngày giao dịch khi bấm vào một ô trong lịch
+/// Sheet presenting trade details, day note, and quick actions for a selected calendar date
 public struct DayDetailSheet: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var env: AppEnvironment

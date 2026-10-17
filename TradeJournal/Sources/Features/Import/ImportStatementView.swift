@@ -1,6 +1,8 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
+/// Trade statement import view supporting CSV file uploads, reconciliation, and preview.
+/// Ported 1:1 from `source-repo/apps/web/src/app/import/page.tsx`
 public struct ImportStatementView: View {
     @EnvironmentObject private var env: AppEnvironment
     @ObservedObject private var dataStore = TradeDataStore.shared
@@ -23,14 +25,14 @@ public struct ImportStatementView: View {
             
             ScrollView {
                 VStack(spacing: 14) {
-                    // Account Selector
+                    // Target Account Selector
                     AppCard {
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("Tài khoản đích")
+                            Text("Target account")
                                 .font(AppTypography.caption)
-                                .foregroundColor(.secondary)
+                                .foregroundColor(AppColors.secondaryText)
                             
-                            Picker("Chọn tài khoản", selection: $dataStore.selectedAccountId) {
+                            Picker("Select account", selection: $dataStore.selectedAccountId) {
                                 ForEach(dataStore.accounts) { acc in
                                     Text("\(acc.name) (\(acc.currency))").tag(acc.id)
                                 }
@@ -44,23 +46,23 @@ public struct ImportStatementView: View {
                         VStack(spacing: 16) {
                             Image(systemName: "doc.badge.plus")
                                 .font(.system(size: 40))
-                                .foregroundColor(AppColors.accent)
+                                .foregroundColor(AppColors.brand)
                             
                             if let fileName = importedFileName {
-                                Text("Tệp đã chọn: \(fileName)")
+                                Text("Selected file: \(fileName)")
                                     .font(AppTypography.headline)
-                                    .foregroundColor(.primary)
+                                    .foregroundColor(AppColors.primaryText)
                             } else {
-                                Text("Chọn tệp sao kê giao dịch (.csv)")
+                                Text("Choose trade statement file (.csv)")
                                     .font(AppTypography.headline)
-                                Text("Hỗ trợ các cột chuẩn: Symbol, Side (Buy/Sell), Quantity, Price, Fee, Date")
+                                Text("Supports standard columns: Symbol, Side (Buy/Sell), Quantity, Price, Fee, Executed Date")
                                     .font(AppTypography.caption)
-                                    .foregroundColor(.secondary)
+                                    .foregroundColor(AppColors.secondaryText)
                                     .multilineTextAlignment(.center)
                             }
                             
                             HStack(spacing: 12) {
-                                AppButton("Chọn File CSV", icon: "folder", style: .primary) {
+                                AppButton("Choose CSV file", icon: "folder", style: .primary) {
                                     isFileImporterPresented = true
                                 }
                             }
@@ -78,11 +80,11 @@ public struct ImportStatementView: View {
                                     .foregroundColor(AppColors.profit)
                                 
                                 VStack(alignment: .leading, spacing: 4) {
-                                    Text("Nạp sao kê thành công!")
+                                    Text("Import completed successfully!")
                                         .font(AppTypography.headline)
-                                    Text("Đã thêm \(successCount) lần khớp lệnh và cập nhật danh sách trades.")
+                                    Text("Added \(successCount) executions and updated trades.")
                                         .font(AppTypography.caption)
-                                        .foregroundColor(.secondary)
+                                        .foregroundColor(AppColors.secondaryText)
                                 }
                                 Spacer()
                             }
@@ -95,36 +97,36 @@ public struct ImportStatementView: View {
                             // Summary Grid
                             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
                                 AppCard {
-                                    Text("Lệnh hợp lệ")
+                                    Text("Usable fills")
                                         .font(AppTypography.caption)
-                                        .foregroundColor(.secondary)
+                                        .foregroundColor(AppColors.secondaryText)
                                     Text("\(preview.usableExecutions.count)")
                                         .font(AppTypography.financialNumber(size: 24, weight: .bold))
                                         .foregroundColor(AppColors.profit)
                                 }
                                 
                                 AppCard {
-                                    Text("Lệnh bị trùng")
+                                    Text("Duplicate fills")
                                         .font(AppTypography.caption)
-                                        .foregroundColor(.secondary)
+                                        .foregroundColor(AppColors.secondaryText)
                                     Text("\(preview.duplicateCount)")
                                         .font(AppTypography.financialNumber(size: 24, weight: .bold))
                                         .foregroundColor(AppColors.warning)
                                 }
                                 
                                 AppCard {
-                                    Text("Dòng bị lỗi")
+                                    Text("Problem rows")
                                         .font(AppTypography.caption)
-                                        .foregroundColor(.secondary)
+                                        .foregroundColor(AppColors.secondaryText)
                                     Text("\(preview.problems.count)")
                                         .font(AppTypography.financialNumber(size: 24, weight: .bold))
-                                        .foregroundColor(preview.problems.isEmpty ? .secondary : AppColors.loss)
+                                        .foregroundColor(preview.problems.isEmpty ? AppColors.secondaryText : AppColors.loss)
                                 }
                                 
                                 AppCard {
-                                    Text("Tổng dòng trong file")
+                                    Text("Total file rows")
                                         .font(AppTypography.caption)
-                                        .foregroundColor(.secondary)
+                                        .foregroundColor(AppColors.secondaryText)
                                     Text("\(preview.totalRows)")
                                         .font(AppTypography.financialNumber(size: 24, weight: .bold))
                                 }
@@ -134,25 +136,25 @@ public struct ImportStatementView: View {
                             if !preview.problems.isEmpty {
                                 AppCard {
                                     VStack(alignment: .leading, spacing: 8) {
-                                        Label("Cảnh báo & Lỗi dòng (\(preview.problems.count))", systemImage: "exclamationmark.triangle.fill")
+                                        Label("Warnings & Problems (\(preview.problems.count))", systemImage: "exclamationmark.triangle.fill")
                                             .font(AppTypography.headline)
                                             .foregroundColor(AppColors.loss)
                                         
                                         ForEach(preview.problems.prefix(5)) { p in
                                             HStack(alignment: .top, spacing: 6) {
-                                                Text("Dòng \(p.lineNumber):")
+                                                Text("Line \(p.lineNumber):")
                                                     .font(AppTypography.caption.bold())
-                                                    .foregroundColor(.secondary)
+                                                    .foregroundColor(AppColors.secondaryText)
                                                 Text(p.reason)
                                                     .font(AppTypography.caption)
-                                                    .foregroundColor(.primary)
+                                                    .foregroundColor(AppColors.primaryText)
                                             }
                                         }
                                         
                                         if preview.problems.count > 5 {
-                                            Text("+ còn \(preview.problems.count - 5) lỗi khác...")
+                                            Text("+ \(preview.problems.count - 5) more issues...")
                                                 .font(AppTypography.caption)
-                                                .foregroundColor(.secondary)
+                                                .foregroundColor(AppColors.secondaryText)
                                         }
                                     }
                                 }
@@ -162,7 +164,7 @@ public struct ImportStatementView: View {
                             if !preview.usableExecutions.isEmpty {
                                 AppCard {
                                     VStack(alignment: .leading, spacing: 10) {
-                                        Text("Xem trước dữ liệu (\(min(3, preview.usableExecutions.count))/\(preview.usableExecutions.count))")
+                                        Text("Execution Preview (\(min(3, preview.usableExecutions.count))/\(preview.usableExecutions.count))")
                                             .font(AppTypography.headline)
                                         
                                         ForEach(preview.usableExecutions.prefix(3)) { fill in
@@ -172,21 +174,21 @@ public struct ImportStatementView: View {
                                                         Text(fill.symbol).font(AppTypography.headline)
                                                         AppBadge(
                                                             fill.side.rawValue.uppercased(),
-                                                            color: fill.side == .buy ? AppColors.accent : AppColors.warning
+                                                            color: fill.side == .buy ? AppColors.brand : AppColors.warning
                                                         )
                                                     }
-                                                    Text("KL: \(fill.quantity) @ \(Formatters.price(fill.price))")
+                                                    Text("Qty: \(fill.quantity) @ \(Formatters.price(fill.price))")
                                                         .font(AppTypography.caption)
-                                                        .foregroundColor(.secondary)
+                                                        .foregroundColor(AppColors.secondaryText)
                                                 }
                                                 Spacer()
                                                 VStack(alignment: .trailing, spacing: 2) {
-                                                    Text("Phí: \(Formatters.currency(fill.fee, isPrivate: false))")
+                                                    Text("Fee: \(Formatters.currency(fill.fee, isPrivate: false))")
                                                         .font(AppTypography.caption)
-                                                        .foregroundColor(.secondary)
+                                                        .foregroundColor(AppColors.secondaryText)
                                                     Text(Formatters.dateOnly(fill.executedAt, timeZone: env.currentTimeZone))
                                                         .font(AppTypography.caption)
-                                                        .foregroundColor(.secondary)
+                                                        .foregroundColor(AppColors.secondaryText)
                                                 }
                                             }
                                             Divider()
@@ -196,7 +198,7 @@ public struct ImportStatementView: View {
                                 
                                 // Confirm Button
                                 AppButton(
-                                    "Xác Nhận Nạp \(preview.usableExecutions.count) Lệnh",
+                                    "Confirm Import \(preview.usableExecutions.count) Fills",
                                     icon: "arrow.up.circle.fill",
                                     style: .primary
                                 ) {
@@ -238,7 +240,6 @@ public struct ImportStatementView: View {
             AppLogger.error("Failed to read file", error: error)
         }
     }
-    
     
     private func generatePreview(_ content: String) {
         isImportSuccess = false

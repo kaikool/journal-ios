@@ -1,6 +1,6 @@
 import Foundation
 
-/// 1:1 port từ bảng `settings` trong `schema.pg.ts`
+/// 1:1 port from table `settings` in `schema.pg.ts`
 public struct JournalSettingRecord: Identifiable, Codable, Equatable, Sendable {
     public var id: String { key }
     public let key: String
@@ -23,7 +23,7 @@ public struct JournalSettingRecord: Identifiable, Codable, Equatable, Sendable {
 }
 
 // MARK: - 1. General Settings (TimeZones)
-// Port 1:1 từ `TimeZoneSettings` trong `journal-settings.tsx`
+// Ported 1:1 from `TimeZoneSettings` trong `journal-settings.tsx`
 public struct GeneralSettingsConfig: Codable, Equatable, Sendable {
     public var displayTimeZone: String
     public var defaultImportTimeZone: String
@@ -40,7 +40,7 @@ public struct GeneralSettingsConfig: Codable, Equatable, Sendable {
 }
 
 // MARK: - 3. Currency Conversion Settings
-// Port 1:1 từ `currency-settings.tsx` và `currencies.ts`
+// Core implementation detail
 public struct CurrencyConversion: Codable, Equatable, Sendable {
     public var enabled: Bool
     public var reportingCurrency: String
@@ -73,7 +73,7 @@ public struct CurrencyConversion: Codable, Equatable, Sendable {
 }
 
 // MARK: - 4. Market Data Connections
-// Port 1:1 từ `market-data-settings.tsx` và `market-providers.ts`
+// Core implementation detail
 public struct MarketConnectionConfig: Codable, Equatable, Sendable {
     public var binanceEnabled: Bool
     public var oandaApiKey: String
@@ -101,7 +101,7 @@ public struct MarketConnectionConfig: Codable, Equatable, Sendable {
 }
 
 // MARK: - 6. AI Provider Settings
-// Port 1:1 từ `ai-settings.tsx` và `ai-settings.ts`
+// Core implementation detail
 public struct AiSettingsConfig: Codable, Equatable, Sendable {
     public var provider: String // "anthropic" | "openai"
     public var model: String

@@ -2,11 +2,11 @@ import SwiftUI
 import Charts
 
 public enum PropLedgerTab: String, CaseIterable, Identifiable {
-    case overview = "Tổng quan"
-    case accounts = "Tài khoản"
+    case overview = "Overview"
+    case accounts = "Accounts"
     case payouts = "Payouts"
-    case transactions = "Sổ cái"
-    case activity = "Hoạt động"
+    case transactions = "Transactions"
+    case activity = "Activity"
     
     public var id: String { rawValue }
 }
@@ -83,7 +83,7 @@ public struct PropFirmLedgerView: View {
     
     public var body: some View {
         VStack(spacing: 0) {
-            // FilterBar chuẩn web
+            // FilterBar matching web
                 FilterBarView(
                     title: "Prop firms",
                     showFilters: false
@@ -127,7 +127,7 @@ public struct PropFirmLedgerView: View {
                 .background(AppColors.cardBackground.opacity(0.6))
                 
                 // Segmented Tab Picker
-                Picker("Mục quỹ", selection: $selectedTab) {
+                Picker("Section", selection: $selectedTab) {
                     ForEach(PropLedgerTab.allCases) { tab in
                         Text(tab.rawValue).tag(tab)
                     }
@@ -158,7 +158,7 @@ public struct PropFirmLedgerView: View {
             .background(AppColors.background)
         .sheet(isPresented: $showNewAccountSheet) {
                 NewPropAccountSheet(defaultCurrency: selectedCurrency) { newAcc in
-                    dataStore.savePropAccount(item: newAcc, reason: "Tạo tài khoản mới")
+                    dataStore.savePropAccount(item: newAcc, reason: "Create new account")
                 }
             }
             .sheet(item: $selectedAccountForNextPhase) { parentAcc in
@@ -169,12 +169,12 @@ public struct PropFirmLedgerView: View {
                     initialSizeText: "\(parentAcc.sizeMinor.map { $0 / 100 } ?? 50000)",
                     parentId: parentAcc.id
                 ) { nextAcc in
-                    dataStore.savePropAccount(item: nextAcc, reason: "Tạo vòng thi / giai đoạn kế tiếp")
+                    dataStore.savePropAccount(item: nextAcc, reason: "Next stage / phase")
                 }
             }
             .sheet(item: $selectedAccountForEdit) { acc in
                 EditPropAccountSheet(account: acc) { updatedAcc in
-                    dataStore.savePropAccount(item: updatedAcc, reason: "Cập nhật thông tin tài khoản")
+                    dataStore.savePropAccount(item: updatedAcc, reason: "Update account details")
                 }
             }
             .sheet(isPresented: $showAuditSheet) {
@@ -182,36 +182,36 @@ public struct PropFirmLedgerView: View {
             }
             .sheet(isPresented: $showNewEntrySheet) {
                 NewPropEntrySheet(accounts: filteredAccounts, defaultCurrency: selectedCurrency) { newEntry in
-                    dataStore.savePropEntry(item: newEntry, reason: "Ghi nhận giao dịch")
+                    dataStore.savePropEntry(item: newEntry, reason: "Record transaction")
                 }
             }
             .sheet(item: $selectedPayoutForReceipt) { payout in
                 AddReceiptSheet(payout: payout) { receipt in
-                    try? dataStore.addPropReceipt(item: receipt, reason: "Thanh toán tiền về")
+                    try? dataStore.addPropReceipt(item: receipt, reason: "Payout receipt settlement")
                 }
             }
             .sheet(item: $selectedExpenseForRefund) { expense in
                 AddRefundSheet(expense: expense) { refundEntry in
-                    dataStore.savePropEntry(item: refundEntry, reason: "Hoàn tiền phí thi")
+                    dataStore.savePropEntry(item: refundEntry, reason: "Evaluation fee refund")
                 }
             }
             .sheet(isPresented: $showCsvSheet) {
                 PropCsvImportSheet()
             }
-            .alert("Hủy giao dịch (Void)", isPresented: $showVoidAlert) {
-                TextField("Lý do hủy (bắt buộc)...", text: $voidReason)
-                Button("Hủy", role: .cancel) { itemToVoid = nil; voidReason = "" }
-                Button("Xác nhận hủy", role: .destructive) {
+            .alert("Void transaction", isPresented: $showVoidAlert) {
+                TextField("Void reason (required)...", text: $voidReason)
+                Button("Cancel", role: .cancel) { itemToVoid = nil; voidReason = "" }
+                Button("Confirm void", role: .destructive) {
                     if let target = itemToVoid {
                         if target.isEntry {
-                            try? dataStore.voidPropEntry(id: target.id, voided: true, reason: voidReason.isEmpty ? "Hủy giao dịch" : voidReason)
+                            try? dataStore.voidPropEntry(id: target.id, voided: true, reason: voidReason.isEmpty ? "Void transaction" : voidReason)
                         }
                         itemToVoid = nil
                         voidReason = ""
                     }
                 }
             } message: {
-                Text("Giao dịch sẽ được đánh dấu void và không tính vào dòng tiền, nhưng vẫn được lưu vết kiểm toán.")
+                Text("The transaction will be voided and excluded from cash flow totals, but preserved for audit history.")
             }
     }
     
@@ -232,10 +232,10 @@ public struct PropFirmLedgerView: View {
                                     .foregroundColor(AppColors.accent)
                                     .font(.title3)
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text("Gia hạn sắp tới: \(rAcc.firm)")
+                                    Text("Upcoming renewal: \(rAcc.firm)")
                                         .font(AppTypography.captionBold)
                                         .foregroundColor(AppColors.primaryText)
-                                    Text("\(rAcc.name) • Đến hạn: \(rAcc.renewalOn ?? "") • Phí: \(Formatters.formatCurrency(Decimal(rAcc.renewalMinor ?? 0) / 100, currency: rAcc.currency))")
+                                    Text("\(rAcc.name) • Due: \(rAcc.renewalOn ?? "") • Fee: \(Formatters.formatCurrency(Decimal(rAcc.renewalMinor ?? 0) / 100, currency: rAcc.currency))")
                                         .font(.system(size: 11))
                                         .foregroundColor(AppColors.secondaryText)
                                 }
@@ -250,7 +250,7 @@ public struct PropFirmLedgerView: View {
             AppCard {
                 VStack(spacing: 12) {
                     HStack {
-                        Text("LỢI NHUẬN RÒNG QUỸ (\(selectedCurrency))")
+                        Text("NET PROP CASH (\(selectedCurrency))")
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText)
                         Spacer()
@@ -272,11 +272,11 @@ public struct PropFirmLedgerView: View {
                     
                     Divider().background(AppColors.border)
                     
-                    // Chi phí vs Nhận về
+                    // Spending vs Received
                     Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 8) {
                         GridRow {
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("Tổng chi")
+                                Text("Gross spent")
                                     .font(AppTypography.caption)
                                     .foregroundColor(AppColors.secondaryText)
                                 Text(Formatters.formatCurrency(Decimal(summary.spentMinor) / 100, currency: selectedCurrency))
@@ -284,7 +284,7 @@ public struct PropFirmLedgerView: View {
                                     .foregroundColor(AppColors.loss)
                             }
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("Được hoàn lại")
+                                Text("Refunded")
                                     .font(AppTypography.caption)
                                     .foregroundColor(AppColors.secondaryText)
                                 Text(Formatters.formatCurrency(Decimal(summary.refundsMinor) / 100, currency: selectedCurrency))
@@ -294,7 +294,7 @@ public struct PropFirmLedgerView: View {
                         }
                         GridRow {
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("Chi thực tế (Net Spend)")
+                                Text("Net spend")
                                     .font(AppTypography.caption)
                                     .foregroundColor(AppColors.secondaryText)
                                 Text(Formatters.formatCurrency(Decimal(summary.netSpendMinor) / 100, currency: selectedCurrency))
@@ -302,7 +302,7 @@ public struct PropFirmLedgerView: View {
                                     .foregroundColor(AppColors.primaryText)
                             }
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("Tiền Payout đã nhận")
+                                Text("Payouts received")
                                     .font(AppTypography.caption)
                                     .foregroundColor(AppColors.secondaryText)
                                 Text(Formatters.formatCurrency(Decimal(summary.receivedMinor) / 100, currency: selectedCurrency))
@@ -319,7 +319,7 @@ public struct PropFirmLedgerView: View {
                 AppCard {
                     HStack {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("Tỷ lệ đỗ thi Quỹ (Pass Rate)")
+                            Text("Phase pass rate")
                                 .font(AppTypography.caption)
                                 .foregroundColor(AppColors.secondaryText)
                             Text(String(format: "%.1f%%", pr * 100))
@@ -338,22 +338,22 @@ public struct PropFirmLedgerView: View {
             if !timelinePoints.isEmpty {
                 AppCard {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("ĐƯỜNG CONG TÍCH LŨY DÒNG TIỀN")
+                        Text("CUMULATIVE CASH TIMELINE")
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText)
                         
                         Chart {
                             ForEach(timelinePoints, id: \.date) { pt in
                                 LineMark(
-                                    x: .value("Ngày", pt.date),
-                                    y: .value("Lợi nhuận ròng", Double(pt.netMinor) / 100.0)
+                                    x: .value("Date", pt.date),
+                                    y: .value("Net cash", Double(pt.netMinor) / 100.0)
                                 )
                                 .interpolationMethod(.monotone)
                                 .foregroundStyle(AppColors.accent)
                                 
                                 AreaMark(
-                                    x: .value("Ngày", pt.date),
-                                    y: .value("Lợi nhuận ròng", Double(pt.netMinor) / 100.0)
+                                    x: .value("Date", pt.date),
+                                    y: .value("Net cash", Double(pt.netMinor) / 100.0)
                                 )
                                 .foregroundStyle(
                                     LinearGradient(
@@ -378,8 +378,8 @@ public struct PropFirmLedgerView: View {
             if filteredAccounts.isEmpty {
                 EmptyStateView(
                     icon: "building.columns",
-                    title: "Chưa có tài khoản quỹ \(selectedCurrency)",
-                    message: "Nhấn nút '+' ở trên để thêm tài khoản Topstep, FTMO, The5ers..."
+                    title: "No prop accounts in \(selectedCurrency)",
+                    message: "Tap 'Track account' above to add your Topstep, FTMO, The5ers accounts."
                 )
             } else {
                 ForEach(filteredAccounts) { acc in
@@ -390,7 +390,7 @@ public struct PropFirmLedgerView: View {
                                     .font(AppTypography.captionBold)
                                     .foregroundColor(AppColors.accent)
                                 if acc.archived {
-                                    Text("[Đã lưu trữ]")
+                                    Text("[Archived]")
                                         .font(.system(size: 10))
                                         .foregroundColor(AppColors.secondaryText)
                                 }
@@ -410,7 +410,7 @@ public struct PropFirmLedgerView: View {
                                     Image(systemName: "arrow.turn.down.right")
                                         .font(.system(size: 10))
                                         .foregroundColor(AppColors.accent)
-                                    Text("Giai đoạn kế tiếp của: \(parentAcc.name)")
+                                    Text("Next phase of: \(parentAcc.name)")
                                         .font(.system(size: 10, weight: .medium))
                                         .foregroundColor(AppColors.accent)
                                 }
@@ -418,7 +418,7 @@ public struct PropFirmLedgerView: View {
                             
                             HStack {
                                 if let size = acc.sizeMinor {
-                                    Text("Vốn: \(Formatters.formatCurrency(Decimal(size) / 100, currency: acc.currency))")
+                                    Text("Size: \(Formatters.formatCurrency(Decimal(size) / 100, currency: acc.currency))")
                                         .font(AppTypography.caption)
                                         .foregroundColor(AppColors.secondaryText)
                                 }
@@ -431,11 +431,11 @@ public struct PropFirmLedgerView: View {
                             Divider().background(AppColors.border)
                             
                             HStack(spacing: 12) {
-                                Text("Mở: \(acc.openedOn)")
+                                Text("Opened: \(acc.openedOn)")
                                     .font(.system(size: 11))
                                     .foregroundColor(AppColors.secondaryText)
                                 if let closed = acc.closedOn {
-                                    Text("• Đóng: \(closed)")
+                                    Text("• Closed: \(closed)")
                                         .font(.system(size: 11))
                                         .foregroundColor(AppColors.secondaryText)
                                 }
@@ -445,7 +445,7 @@ public struct PropFirmLedgerView: View {
                                     Button {
                                         selectedAccountForNextPhase = acc
                                     } label: {
-                                        Text("Vòng kế tiếp")
+                                        Text("Next phase")
                                             .font(.system(size: 11, weight: .semibold))
                                             .foregroundColor(AppColors.accent)
                                     }
@@ -454,7 +454,7 @@ public struct PropFirmLedgerView: View {
                                 Button {
                                     selectedAccountForEdit = acc
                                 } label: {
-                                    Text("Sửa")
+                                    Text("Edit")
                                         .font(.system(size: 11, weight: .semibold))
                                         .foregroundColor(AppColors.accent)
                                 }
@@ -462,7 +462,7 @@ public struct PropFirmLedgerView: View {
                                 Button {
                                     dataStore.archivePropAccount(id: acc.id, archived: !acc.archived, reason: "User toggle archive")
                                 } label: {
-                                    Text(acc.archived ? "Khôi phục" : "Lưu trữ")
+                                    Text(acc.archived ? "Restore" : "Archive")
                                         .font(.system(size: 11, weight: .semibold))
                                         .foregroundColor(AppColors.secondaryText)
                                 }
@@ -481,8 +481,8 @@ public struct PropFirmLedgerView: View {
             if payoutItems.isEmpty {
                 EmptyStateView(
                     icon: "banknote",
-                    title: "Chưa có yêu cầu Payout",
-                    message: "Theo dõi trạng thái duyệt, giải ngân và chênh lệch phí chuyển tiền của từng đợt rút quỹ."
+                    title: "No payout requests",
+                    message: "Track approval status, receipts and transfer fee variance for each prop firm payout."
                 )
             } else {
                 ForEach(payoutItems) { p in
@@ -493,9 +493,9 @@ public struct PropFirmLedgerView: View {
                                     .font(AppTypography.subheadlineBold)
                                 Spacer()
                                 if p.isOverdue {
-                                    AppBadge(text: "Quá hạn", color: AppColors.loss)
+                                    AppBadge(text: "Overdue", color: AppColors.loss)
                                 } else if p.isPartial {
-                                    AppBadge(text: "Đã nhận 1 phần", color: AppColors.accent)
+                                    AppBadge(text: "Partially received", color: AppColors.brand)
                                 }
                                 AppBadge(
                                     text: p.entry.status.label,
@@ -505,7 +505,7 @@ public struct PropFirmLedgerView: View {
                             
                             HStack {
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text("Dự kiến nhận (sau chia split):")
+                                    Text("Expected payout (after split):")
                                         .font(AppTypography.caption)
                                         .foregroundColor(AppColors.secondaryText)
                                     Text(Formatters.formatCurrency(Decimal(p.expectedMinor) / 100, currency: p.entry.currency))
@@ -513,7 +513,7 @@ public struct PropFirmLedgerView: View {
                                 }
                                 Spacer()
                                 VStack(alignment: .trailing, spacing: 2) {
-                                    Text("Thực tế đã nhận:")
+                                    Text("Actually received:")
                                         .font(AppTypography.caption)
                                         .foregroundColor(AppColors.secondaryText)
                                     Text(Formatters.formatCurrency(Decimal(p.actualMinor) / 100, currency: p.entry.currency))
@@ -524,7 +524,7 @@ public struct PropFirmLedgerView: View {
                             
                             if p.remainingMinor > 0 {
                                 HStack {
-                                    Text("Còn chờ giải ngân:")
+                                    Text("Remaining payout:")
                                         .font(AppTypography.caption)
                                         .foregroundColor(AppColors.secondaryText)
                                     Spacer()
@@ -536,7 +536,7 @@ public struct PropFirmLedgerView: View {
                             
                             if p.varianceMinor != 0 && p.entry.status == .completed {
                                 HStack {
-                                    Text("Chênh lệch thanh toán (Variance):")
+                                    Text("Settlement variance:")
                                         .font(AppTypography.caption)
                                         .foregroundColor(AppColors.secondaryText)
                                     Spacer()
@@ -549,7 +549,7 @@ public struct PropFirmLedgerView: View {
                             Divider().background(AppColors.border)
                             
                             HStack {
-                                Text("Yêu cầu ngày: \(p.entry.occurredOn)")
+                                Text("Requested: \(p.entry.occurredOn)")
                                     .font(.system(size: 11))
                                     .foregroundColor(AppColors.secondaryText)
                                 Spacer()
@@ -558,7 +558,7 @@ public struct PropFirmLedgerView: View {
                                 } label: {
                                     HStack(spacing: 4) {
                                         Image(systemName: "plus.circle")
-                                        Text("Ghi nhận tiền về")
+                                        Text("Record receipt")
                                     }
                                     .font(.system(size: 12, weight: .semibold))
                                     .foregroundColor(AppColors.accent)
@@ -578,8 +578,8 @@ public struct PropFirmLedgerView: View {
             if movements.isEmpty {
                 EmptyStateView(
                     icon: "arrow.left.arrow.right",
-                    title: "Chưa có dòng tiền",
-                    message: "Các khoản phí thi, hoàn tiền và tiền payout nhận về sẽ hiển thị tại đây."
+                    title: "No cash movements",
+                    message: "Evaluation fees, refunds, and payout receipts will appear here."
                 )
             } else {
                 ForEach(movements) { m in
@@ -594,7 +594,7 @@ public struct PropFirmLedgerView: View {
                                         color: m.kind == "payout" || m.kind == "receipt" ? AppColors.profit : AppColors.secondaryText
                                     )
                                 }
-                                Text(m.date ?? "Chưa giải ngân")
+                                Text(m.date ?? "Pending settlement")
                                     .font(AppTypography.caption)
                                     .foregroundColor(AppColors.secondaryText)
                                 if !m.reference.isEmpty {
@@ -620,7 +620,7 @@ public struct PropFirmLedgerView: View {
                                                 selectedExpenseForRefund = entry
                                             }
                                         } label: {
-                                            Text("Hoàn tiền")
+                                            Text("Refund")
                                                 .font(.system(size: 10, weight: .semibold))
                                                 .foregroundColor(AppColors.accent)
                                         }
@@ -643,16 +643,16 @@ public struct PropFirmLedgerView: View {
         }
     }
     
-    // MARK: - Activity / Audit Trail View (Port 1:1 từ tab activity trong web prop-firm-tracker)
+    // MARK: - Activity / Audit Trail View
     private var activityAuditView: some View {
         AppCard {
             VStack(alignment: .leading, spacing: 14) {
                 HStack {
-                    Text("Nhật ký hoạt động & Kiểm toán (Activity)")
+                    Text("Activity & Audit Trail")
                         .font(AppTypography.headline)
                         .foregroundColor(AppColors.primaryText)
                     Spacer()
-                    Text("\(dataStore.propAudits.count) bản ghi")
+                    Text("\(dataStore.propAudits.count) events")
                         .font(AppTypography.caption)
                         .foregroundColor(AppColors.secondaryText)
                 }
@@ -660,7 +660,7 @@ public struct PropFirmLedgerView: View {
                 Divider()
                 
                 if dataStore.propAudits.isEmpty {
-                    Text("Chưa có sự kiện kiểm toán hoặc thay đổi nào được ghi nhận.")
+                    Text("No audit events recorded yet.")
                         .font(AppTypography.caption)
                         .foregroundColor(AppColors.secondaryText)
                         .padding(.vertical, 8)
@@ -746,41 +746,41 @@ public struct NewPropAccountSheet: View {
         NavigationStack {
             Form {
                 if let pId = parentId {
-                    Section("Liên kết Lineage") {
+                    Section("Lineage Link") {
                         HStack {
                             Image(systemName: "link")
                                 .foregroundColor(AppColors.accent)
-                            Text("Giai đoạn tiếp theo (Parent: \(pId))")
+                            Text("Next phase (Parent: \(pId))")
                                 .font(AppTypography.captionBold)
                                 .foregroundColor(AppColors.accent)
                         }
                     }
                 }
                 
-                Section("Quỹ & Tên tài khoản") {
-                    TextField("Tên Quỹ (Topstep, FTMO, Apex...)", text: $firm)
-                    TextField("Tên tài khoản gợi nhớ", text: $name)
+                Section("Firm & Account Name") {
+                    TextField("Firm name (Topstep, FTMO, Apex...)", text: $firm)
+                    TextField("Account name", text: $name)
                 }
                 
-                Section("Loại chương trình & Quy mô") {
-                    Picker("Giai đoạn", selection: $program) {
+                Section("Program Type & Size") {
+                    Picker("Stage", selection: $program) {
                         ForEach(PropProgram.allCases, id: \.self) { prog in
                             Text(prog.label).tag(prog)
                         }
                     }
-                    TextField("Quy mô tài khoản (\(defaultCurrency))", text: $sizeText)
+                    TextField("Account size (\(defaultCurrency))", text: $sizeText)
                         .keyboardType(.numberPad)
                 }
                 
-                Section("Ghi chú") {
-                    TextField("Quy tắc drawdown, mục tiêu lãi...", text: $notes)
+                Section("Notes") {
+                    TextField("Drawdown rules, profit targets...", text: $notes)
                 }
             }
-            .navigationTitle(parentId == nil ? "Thêm tài khoản quỹ" : "Vòng thi / Giai đoạn mới")
+            .navigationTitle(parentId == nil ? "Track account" : "Next stage / Phase")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Lưu") {
+                    Button("Save") {
                         let formatter = DateFormatter()
                         formatter.dateFormat = "yyyy-MM-dd"
                         let today = formatter.string(from: Date())
@@ -802,7 +802,7 @@ public struct NewPropAccountSheet: View {
                     }
                 }
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Hủy") { dismiss() }
+                    Button("Cancel") { dismiss() }
                 }
             }
         }
@@ -837,38 +837,38 @@ public struct EditPropAccountSheet: View {
     public var body: some View {
         NavigationStack {
             Form {
-                Section("Tên tài khoản & Quỹ") {
-                    Text("Quỹ: \(account.firm)")
+                Section("Firm & Account Name") {
+                    Text("Firm: \(account.firm)")
                         .foregroundColor(AppColors.secondaryText)
-                    TextField("Tên tài khoản", text: $name)
+                    TextField("Account name", text: $name)
                 }
                 
-                Section("Trạng thái") {
-                    Picker("Trạng thái", selection: $status) {
+                Section("Status") {
+                    Picker("Status", selection: $status) {
                         ForEach(PropStatus.allCases, id: \.self) { st in
                             Text(st.label).tag(st)
                         }
                     }
                     if status == .passed || status == .breached || status == .closed {
-                        TextField("Ngày kết thúc (YYYY-MM-DD)", text: $closedDateText)
+                        TextField("Closed date (YYYY-MM-DD)", text: $closedDateText)
                     }
                 }
                 
-                Section("Nhắc nhở gia hạn định kỳ (Renewal)") {
-                    TextField("Ngày gia hạn tiếp theo (YYYY-MM-DD)", text: $renewalDateText)
-                    TextField("Phí gia hạn (\(account.currency))", text: $renewalAmountText)
+                Section("Renewal Reminder") {
+                    TextField("Next renewal date (YYYY-MM-DD)", text: $renewalDateText)
+                    TextField("Renewal fee (\(account.currency))", text: $renewalAmountText)
                         .keyboardType(.numberPad)
                 }
                 
-                Section("Ghi chú") {
-                    TextField("Ghi chú tài khoản...", text: $notes)
+                Section("Notes") {
+                    TextField("Account notes...", text: $notes)
                 }
             }
-            .navigationTitle("Sửa tài khoản")
+            .navigationTitle("Edit account")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Lưu") {
+                    Button("Save") {
                         var updated = account
                         let cleanName = name.trimmingCharacters(in: .whitespaces)
                         updated.name = cleanName.isEmpty ? account.name : cleanName
@@ -890,7 +890,7 @@ public struct EditPropAccountSheet: View {
                     }
                 }
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Hủy") { dismiss() }
+                    Button("Cancel") { dismiss() }
                 }
             }
         }
@@ -907,7 +907,7 @@ public struct PropAuditTrailSheet: View {
         NavigationStack {
             List {
                 if audits.isEmpty {
-                    Text("Chưa có lịch sử thay đổi kiểm toán.")
+                    Text("No audit history recorded.")
                         .foregroundColor(AppColors.secondaryText)
                 } else {
                     ForEach(audits.reversed()) { a in
@@ -932,11 +932,11 @@ public struct PropAuditTrailSheet: View {
                     }
                 }
             }
-            .navigationTitle("Lịch sử kiểm toán Quỹ")
+            .navigationTitle("Prop Audit Trail")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Đóng") { dismiss() }
+                    Button("Close") { dismiss() }
                 }
             }
         }
@@ -964,23 +964,23 @@ public struct NewPropEntrySheet: View {
     public var body: some View {
         NavigationStack {
             Form {
-                Section("Tài khoản liên kết") {
-                    Picker("Tài khoản quỹ", selection: $selectedAccountId) {
-                        Text("Chi phí chung toàn quỹ").tag("")
+                Section("Linked Account") {
+                    Picker("Account", selection: $selectedAccountId) {
+                        Text("Shared firm cost").tag("")
                         ForEach(accounts) { acc in
                             Text("\(acc.firm) - \(acc.name)").tag(acc.id)
                         }
                     }
                 }
                 
-                Section("Phân loại") {
-                    Picker("Loại giao dịch", selection: $kind) {
-                        Text("Chi phí (Phí thi, reset...)").tag("expense")
-                        Text("Yêu cầu Payout").tag("payout")
+                Section("Classification") {
+                    Picker("Transaction type", selection: $kind) {
+                        Text("Expense (Fee, reset...)").tag("expense")
+                        Text("Payout request").tag("payout")
                     }
                     
                     if kind == "expense" {
-                        Picker("Hạng mục chi phí", selection: $category) {
+                        Picker("Expense category", selection: $category) {
                             ForEach(PropExpenseCategory.allCases, id: \.self) { cat in
                                 Text(cat.label).tag(cat)
                             }
@@ -988,27 +988,27 @@ public struct NewPropEntrySheet: View {
                     }
                 }
                 
-                Section("Số tiền") {
-                    TextField("Số tiền (\(defaultCurrency))", text: $amountText)
+                Section("Amount") {
+                    TextField("Amount (\(defaultCurrency))", text: $amountText)
                         .keyboardType(.decimalPad)
                     
                     if kind == "payout" {
-                        TextField("Tỷ lệ Trader nhận (%) (VD: 90)", text: $splitText)
+                        TextField("Trader split (%) (e.g. 90)", text: $splitText)
                             .keyboardType(.numberPad)
-                        TextField("Phí khấu trừ chuyển khoản (\(defaultCurrency))", text: $feeText)
+                        TextField("Transfer fee (\(defaultCurrency))", text: $feeText)
                             .keyboardType(.decimalPad)
                     }
                 }
                 
-                Section("Ghi chú") {
-                    TextField("Số hóa đơn, context...", text: $notes)
+                Section("Notes") {
+                    TextField("Invoice number, context...", text: $notes)
                 }
             }
-            .navigationTitle("Ghi nhận chi phí / Payout")
+            .navigationTitle("Record expense / Payout")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Lưu") {
+                    Button("Save") {
                         let formatter = DateFormatter()
                         formatter.dateFormat = "yyyy-MM-dd"
                         let today = formatter.string(from: Date())
@@ -1038,7 +1038,7 @@ public struct NewPropEntrySheet: View {
                     .disabled(amountText.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Hủy") { dismiss() }
+                    Button("Cancel") { dismiss() }
                 }
             }
         }
@@ -1061,27 +1061,27 @@ public struct AddReceiptSheet: View {
     public var body: some View {
         NavigationStack {
             Form {
-                Section("Thông tin Payout") {
-                    Text("Quỹ: \(payout.firm)")
-                    Text("Số tiền dự kiến: \(Formatters.formatCurrency(Decimal(PropFirmEngine.expectedPayout(entry: payout)) / 100, currency: payout.currency))")
+                Section("Payout Details") {
+                    Text("Firm: \(payout.firm)")
+                    Text("Expected payout: \(Formatters.formatCurrency(Decimal(PropFirmEngine.expectedPayout(entry: payout)) / 100, currency: payout.currency))")
                 }
                 
-                Section("Thanh toán tiền mặt") {
-                    Toggle("Là khoản đảo tiền / trả lại (Reversal)?", isOn: $isReversal)
-                    TextField("Số tiền thực tế nhận (\(payout.currency))", text: $amountText)
+                Section("Cash Settlement") {
+                    Toggle("Reversal / Return?", isOn: $isReversal)
+                    TextField("Actual amount received (\(payout.currency))", text: $amountText)
                         .keyboardType(.decimalPad)
-                    TextField("Mã tham chiếu ngân hàng (Deel, Wise...)", text: $reference)
+                    TextField("Bank reference (Deel, Wise...)", text: $reference)
                 }
                 
-                Section("Ghi chú") {
-                    TextField("Ghi chú bổ sung...", text: $notes)
+                Section("Notes") {
+                    TextField("Additional notes...", text: $notes)
                 }
             }
-            .navigationTitle("Ghi nhận biên lai Payout")
+            .navigationTitle("Record payout receipt")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Xác nhận") {
+                    Button("Confirm") {
                         let formatter = DateFormatter()
                         formatter.dateFormat = "yyyy-MM-dd"
                         let today = formatter.string(from: Date())
@@ -1101,7 +1101,7 @@ public struct AddReceiptSheet: View {
                     .disabled(amountText.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Hủy") { dismiss() }
+                    Button("Cancel") { dismiss() }
                 }
             }
         }
@@ -1115,29 +1115,29 @@ public struct AddRefundSheet: View {
     let expense: PropEntryItem
     
     @State private var amountText: String = ""
-    @State private var notes: String = "Hoàn lại phí thi sau khi đỗ"
+    @State private var notes: String = "Evaluation fee refund after passing"
     
     var onRefund: (PropEntryItem) -> Void
     
     public var body: some View {
         NavigationStack {
             Form {
-                Section("Khoản chi phí gốc") {
-                    Text("Quỹ: \(expense.firm)")
-                    Text("Số tiền đã chi: \(Formatters.formatCurrency(Decimal(expense.amountMinor) / 100, currency: expense.currency))")
+                Section("Original Expense") {
+                    Text("Firm: \(expense.firm)")
+                    Text("Amount spent: \(Formatters.formatCurrency(Decimal(expense.amountMinor) / 100, currency: expense.currency))")
                 }
                 
-                Section("Số tiền hoàn trả (Refund)") {
-                    TextField("Số tiền được hoàn (\(expense.currency))", text: $amountText)
+                Section("Refund Amount") {
+                    TextField("Refunded amount (\(expense.currency))", text: $amountText)
                         .keyboardType(.decimalPad)
-                    TextField("Ghi chú...", text: $notes)
+                    TextField("Notes...", text: $notes)
                 }
             }
-            .navigationTitle("Ghi nhận hoàn tiền (Refund)")
+            .navigationTitle("Record refund")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Lưu") {
+                    Button("Save") {
                         let formatter = DateFormatter()
                         formatter.dateFormat = "yyyy-MM-dd"
                         let today = formatter.string(from: Date())
@@ -1161,7 +1161,7 @@ public struct AddRefundSheet: View {
                     .disabled(amountText.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Hủy") { dismiss() }
+                    Button("Cancel") { dismiss() }
                 }
             }
         }
@@ -1182,13 +1182,13 @@ public struct PropCsvImportSheet: View {
     public var body: some View {
         NavigationStack {
             Form {
-                Section("Mẫu CSV chuẩn (/prop-cash-template.csv)") {
+                Section("Standard CSV Template (/prop-cash-template.csv)") {
                     Text("id,kind,firm,account_id,currency,date,amount,category,expense_id,reference,notes")
                         .font(.system(size: 11, design: .monospaced))
                         .foregroundColor(AppColors.secondaryText)
                 }
                 
-                Section("Nội dung CSV") {
+                Section("CSV Content") {
                     TextEditor(text: $csvContent)
                         .frame(minHeight: 160)
                         .font(.system(size: 12, design: .monospaced))
@@ -1201,23 +1201,23 @@ public struct PropCsvImportSheet: View {
                 }
                 
                 if let res = importResult {
-                    Section("Kết quả kiểm tra (Preview)") {
-                        Text("Số dòng hợp lệ sẽ nạp: \(res.imported)")
+                    Section("Import Preview") {
+                        Text("Valid rows to import: \(res.imported)")
                             .foregroundColor(AppColors.profit)
-                        Text("Số dòng trùng lặp bỏ qua: \(res.skipped)")
+                        Text("Duplicate rows skipped: \(res.skipped)")
                             .foregroundColor(AppColors.secondaryText)
                     }
                 }
             }
-            .navigationTitle("Import CSV Quỹ")
+            .navigationTitle("Import Prop CSV")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Đóng") { dismiss() }
+                    Button("Close") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     if importResult == nil {
-                        Button("Kiểm tra (Preview)") {
+                        Button("Preview") {
                             do {
                                 errorMessage = nil
                                 let res = try dataStore.importPropCsvData(csvText: csvContent, preview: true)
@@ -1228,7 +1228,7 @@ public struct PropCsvImportSheet: View {
                         }
                         .disabled(csvContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     } else {
-                        Button("Tiến hành nạp") {
+                        Button("Import now") {
                             do {
                                 errorMessage = nil
                                 _ = try dataStore.importPropCsvData(csvText: csvContent, preview: false)

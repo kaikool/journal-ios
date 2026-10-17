@@ -1,15 +1,15 @@
 import SwiftUI
 
 public enum TradesTabSection: String, CaseIterable, Identifiable {
-    case trades = "Lệnh Thực Tế"
-    case missed = "Kèo Bị Lỡ"
-    case replay = "Replay Biểu Đồ"
+    case trades = "Trades"
+    case missed = "Missed trades"
+    case replay = "Trade replay"
     
     public var id: String { rawValue }
 }
 
-/// Màn hình điều phối toàn bộ nghiệp vụ Giao Dịch
-/// Bao gồm Lệnh Thực Tế (/trades), Kèo Bị Lỡ (/missed), và Replay Biểu Đồ
+/// Navigation coordinator for trades modules:
+/// Trades (/trades), Missed trades (/missed), and Trade replay
 public struct TradesHubView: View {
     @State private var selectedSection: TradesTabSection = .trades
     
@@ -17,7 +17,7 @@ public struct TradesHubView: View {
     
     public var body: some View {
         VStack(spacing: 0) {
-            Picker("Phân mục giao dịch", selection: $selectedSection) {
+            Picker("Trades section", selection: $selectedSection) {
                 ForEach(TradesTabSection.allCases) { section in
                     Text(section.rawValue).tag(section)
                 }

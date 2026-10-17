@@ -53,7 +53,7 @@ public struct RootTabView: View {
             // Navigation Drawer overlay with all 13 routes from Shell.tsx
             NavigationDrawerView()
         }
-        .preferredColorScheme(.dark)
+        .preferredColorScheme(env.colorScheme)
     }
     
     private var bottomNavigationBar: some View {

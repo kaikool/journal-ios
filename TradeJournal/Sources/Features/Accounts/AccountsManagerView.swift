@@ -1,16 +1,20 @@
 import SwiftUI
 
 public enum AccountFilterTab: String, CaseIterable, Identifiable {
-    case `default` = "Mặc định"
-    case active = "Hoạt động"
-    case visible = "Hiển thị"
-    case all = "Tất cả"
+    case `default` = "Default"
+    case active = "Active"
+    case visible = "Displayed"
+    case all = "All"
     
     public var id: String { rawValue }
 }
 
-/// Màn hình quản lý các tài khoản giao dịch
-/// Port 1:1 từ `source-repo/apps/web/src/app/accounts/page.tsx`
+/// Accounts Manager screen matching `source-repo/apps/web/src/app/accounts/page.tsx`:
+/// - FilterBar with title "Accounts" and "New account" button
+/// - Tab filters: Default, Active, Displayed, All with live counts
+/// - Search input
+/// - Bulk visibility actions: Active only, Show all, Hide all
+/// - Account card with visibility checkbox, broker/status badges, initial balance, trade count, sync toggle, archive/restore and delete
 public struct AccountsManagerView: View {
     @ObservedObject private var dataStore = TradeDataStore.shared
     @EnvironmentObject private var env: AppEnvironment
@@ -29,21 +33,21 @@ public struct AccountsManagerView: View {
     }
     
     private var defaultCount: Int {
-        accounts.filter { $0.archivedAt == nil || ($0.visibleInJournal ?? true) }.count
+        accounts.filter { dataStore.isAccountActive($0) || dataStore.isAccountVisible($0) }.count
     }
     
     private var activeCount: Int {
-        accounts.filter { $0.archivedAt == nil }.count
+        accounts.filter { dataStore.isAccountActive($0) }.count
     }
     
     private var visibleCount: Int {
-        accounts.filter { $0.visibleInJournal ?? true }.count
+        accounts.filter { dataStore.isAccountVisible($0) }.count
     }
     
     private var filteredAccounts: [Account] {
         accounts.filter { acc in
-            let isActive = acc.archivedAt == nil
-            let isVisible = acc.visibleInJournal ?? true
+            let isActive = dataStore.isAccountActive(acc)
+            let isVisible = dataStore.isAccountVisible(acc)
             
             switch filterTab {
             case .default:
@@ -70,7 +74,6 @@ public struct AccountsManagerView: View {
     
     public var body: some View {
         VStack(spacing: 0) {
-            // FilterBar chuẩn web
             FilterBarView(
                 title: "Accounts",
                 showFilters: false
@@ -82,13 +85,13 @@ public struct AccountsManagerView: View {
             
             ScrollView {
                 VStack(spacing: 12) {
-                    // Filter & Search Controls (Port 1:1 từ thanh lọc Accounts)
+                    // Filter & Search Controls matching accounts/page.tsx line 182-228
                     filterAndSearchHeader
                     
-                    // Bulk Visibility Actions
+                    // Bulk Visibility Actions matching accounts/page.tsx line 229-250
                     bulkVisibilityBar
                     
-                    // Danh sách thẻ tài khoản
+                    // Account Cards List
                     if filteredAccounts.isEmpty {
                         emptyStateView
                     } else {
@@ -106,14 +109,14 @@ public struct AccountsManagerView: View {
         .sheet(isPresented: $showNewAccountSheet) {
             CreateAccountSheet()
         }
-            .alert("Xác nhận xoá tài khoản", isPresented: $showDeleteAlert, presenting: accountToDelete) { acc in
-                Button("Xoá tài khoản", role: .destructive) {
-                    dataStore.deleteAccount(id: acc.id)
-                }
-                Button("Huỷ", role: .cancel) {}
-            } message: { acc in
-                Text("Hành động này sẽ xoá tài khoản “\(acc.name)” và các lệnh liên quan khỏi máy của bạn.")
+        .alert("Delete Account", isPresented: $showDeleteAlert, presenting: accountToDelete) { acc in
+            Button("Delete", role: .destructive) {
+                dataStore.deleteAccount(id: acc.id)
             }
+            Button("Cancel", role: .cancel) {}
+        } message: { acc in
+            Text("This will remove “\(acc.name)” and unlink its associated trades from your device.")
+        }
     }
     
     // MARK: - Subviews
@@ -123,10 +126,10 @@ public struct AccountsManagerView: View {
             // Filter Pills
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
-                    filterButton(title: "Mặc định (\(defaultCount))", tab: .default)
-                    filterButton(title: "Hoạt động (\(activeCount))", tab: .active)
-                    filterButton(title: "Hiển thị (\(visibleCount))", tab: .visible)
-                    filterButton(title: "Tất cả (\(accounts.count))", tab: .all)
+                    filterButton(title: "Default (\(defaultCount))", tab: .default)
+                    filterButton(title: "Active (\(activeCount))", tab: .active)
+                    filterButton(title: "Displayed (\(visibleCount))", tab: .visible)
+                    filterButton(title: "All (\(accounts.count))", tab: .all)
                 }
                 .padding(.horizontal, 16)
             }
@@ -135,7 +138,7 @@ public struct AccountsManagerView: View {
             HStack {
                 Image(systemName: "magnifyingglass")
                     .foregroundColor(AppColors.secondaryText)
-                TextField("Tìm theo tên, sàn, ID...", text: $searchText)
+                TextField("Search by name, broker, ID...", text: $searchText)
                     .font(AppTypography.body)
                 if !searchText.isEmpty {
                     Button {
@@ -163,8 +166,8 @@ public struct AccountsManagerView: View {
                 .font(AppTypography.captionBold)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
-                .background(filterTab == tab ? AppColors.accent : AppColors.secondaryBackground)
-                .foregroundColor(filterTab == tab ? .white : AppColors.primaryText)
+                .background(filterTab == tab ? AppColors.brand : AppColors.secondaryBackground)
+                .foregroundColor(filterTab == tab ? AppColors.brandTextOnDark : AppColors.primaryText)
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         }
         .buttonStyle(.plain)
@@ -172,11 +175,11 @@ public struct AccountsManagerView: View {
     
     private var bulkVisibilityBar: some View {
         HStack(spacing: 8) {
-            Text("Hiển thị nhanh:")
+            Text("Quick display:")
                 .font(.system(size: 11))
                 .foregroundColor(AppColors.secondaryText)
             
-            Button("Chỉ hiện Active") {
+            Button("Active only") {
                 dataStore.setBulkAccountVisibility(action: "select-active")
             }
             .font(.system(size: 11, weight: .medium))
@@ -186,7 +189,7 @@ public struct AccountsManagerView: View {
             .foregroundColor(AppColors.primaryText)
             .clipShape(RoundedRectangle(cornerRadius: 6))
             
-            Button("Hiện tất cả") {
+            Button("Show all") {
                 dataStore.setBulkAccountVisibility(action: "select-all")
             }
             .font(.system(size: 11, weight: .medium))
@@ -196,7 +199,7 @@ public struct AccountsManagerView: View {
             .foregroundColor(AppColors.primaryText)
             .clipShape(RoundedRectangle(cornerRadius: 6))
             
-            Button("Ẩn tất cả") {
+            Button("Hide all") {
                 dataStore.setBulkAccountVisibility(action: "deselect-all")
             }
             .font(.system(size: 11, weight: .medium))
@@ -216,10 +219,10 @@ public struct AccountsManagerView: View {
             Image(systemName: "creditcard.and.123")
                 .font(.system(size: 40))
                 .foregroundColor(AppColors.secondaryText.opacity(0.6))
-            Text("Không tìm thấy tài khoản nào")
+            Text("No accounts found")
                 .font(AppTypography.headline)
                 .foregroundColor(AppColors.primaryText)
-            Text("Hãy tạo tài khoản mới hoặc kết nối The5ers trong phần Cài đặt.")
+            Text("Create a new account or connect your broker sync credentials in Settings.")
                 .font(AppTypography.caption)
                 .foregroundColor(AppColors.secondaryText)
                 .multilineTextAlignment(.center)
@@ -234,10 +237,22 @@ public struct AccountsManagerView: View {
         let isSelected = dataStore.selectedAccountId == acc.id
         let isArchived = acc.archivedAt != nil
         let tradeCount = dataStore.trades.filter { $0.accountId == acc.id }.count
+        let isVisible = acc.visibleInJournal ?? true
         
         AppCard {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(alignment: .top) {
+                    // Journal visibility toggle button
+                    Button {
+                        dataStore.toggleAccountVisibility(id: acc.id)
+                    } label: {
+                        Image(systemName: isVisible ? "checkmark.square.fill" : "square")
+                            .font(.system(size: 18))
+                            .foregroundColor(isVisible ? AppColors.brand : AppColors.secondaryText)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, 2)
+                    
                     VStack(alignment: .leading, spacing: 4) {
                         HStack(spacing: 6) {
                             Text(acc.name)
@@ -258,19 +273,19 @@ public struct AccountsManagerView: View {
                     
                     Spacer()
                     
-                    // Nút chọn làm tài khoản chính
+                    // Primary active view button
                     if !isSelected {
-                        Button("Chọn xem") {
+                        Button("Select") {
                             dataStore.selectAccount(id: acc.id)
                         }
                         .font(.system(size: 11, weight: .semibold))
                         .padding(.horizontal, 10)
                         .padding(.vertical, 4)
-                        .background(AppColors.accent.opacity(0.12))
-                        .foregroundColor(AppColors.accent)
+                        .background(AppColors.brand.opacity(0.12))
+                        .foregroundColor(AppColors.brand)
                         .clipShape(Capsule())
                     } else {
-                        Text("Đang xem")
+                        Text("Viewing")
                             .font(.system(size: 11, weight: .semibold))
                             .padding(.horizontal, 10)
                             .padding(.vertical, 4)
@@ -280,16 +295,16 @@ public struct AccountsManagerView: View {
                     }
                 }
                 
-                // Huy hiệu trạng thái & sàn
+                // Badges
                 HStack(spacing: 6) {
                     if isArchived {
-                        badgeView("Đã lưu trữ", color: AppColors.secondaryText)
+                        badgeView("Archived", color: AppColors.secondaryText)
                     } else {
                         badgeView("Active", color: AppColors.profit)
                     }
                     
                     if !acc.broker.isEmpty {
-                        badgeView(acc.broker, color: AppColors.accent)
+                        badgeView(acc.broker, color: AppColors.brand)
                     }
                     
                     badgeView(acc.kind.rawValue.uppercased(), color: AppColors.secondaryText)
@@ -302,10 +317,10 @@ public struct AccountsManagerView: View {
                 
                 Divider()
                 
-                // Thông tin số dư và lệnh
+                // Balance and Trades Info
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Số dư khởi đầu")
+                        Text("Initial balance")
                             .font(.system(size: 10))
                             .foregroundColor(AppColors.secondaryText)
                         Text(Formatters.formatCurrency(acc.initialBalance, currency: acc.currency))
@@ -316,10 +331,10 @@ public struct AccountsManagerView: View {
                     Spacer()
                     
                     VStack(alignment: .trailing, spacing: 2) {
-                        Text("Tổng lệnh")
+                        Text("Total trades")
                             .font(.system(size: 10))
                             .foregroundColor(AppColors.secondaryText)
-                        Text("\(tradeCount) lệnh")
+                        Text("\(tradeCount) trades")
                             .font(AppTypography.bodyBold)
                             .foregroundColor(AppColors.primaryText)
                     }
@@ -327,19 +342,19 @@ public struct AccountsManagerView: View {
                 
                 Divider()
                 
-                // Thanh tác vụ bên dưới thẻ
+                // Action row
                 HStack(spacing: 12) {
                     // Auto sync toggle
-                    Toggle("Tự động đồng bộ", isOn: Binding(
+                    Toggle("Auto-sync", isOn: Binding(
                         get: { acc.autoSync },
                         set: { _ in dataStore.toggleAccountAutoSync(id: acc.id) }
                     ))
                     .font(.system(size: 11))
-                    .tint(AppColors.accent)
+                    .tint(AppColors.brand)
                     
                     Spacer()
                     
-                    // Nút Lưu trữ / Khôi phục
+                    // Archive / Restore
                     Button {
                         dataStore.archiveAccount(id: acc.id, archived: !isArchived)
                     } label: {
@@ -348,7 +363,7 @@ public struct AccountsManagerView: View {
                             .foregroundColor(AppColors.secondaryText)
                     }
                     
-                    // Nút Xoá
+                    // Delete
                     Button {
                         accountToDelete = acc
                         showDeleteAlert = true
@@ -375,7 +390,7 @@ public struct AccountsManagerView: View {
     }
 }
 
-/// Sheet tạo tài khoản mới
+/// Sheet to create a new trading account
 public struct CreateAccountSheet: View {
     @ObservedObject private var dataStore = TradeDataStore.shared
     @Environment(\.dismiss) private var dismiss
@@ -386,51 +401,51 @@ public struct CreateAccountSheet: View {
     @State private var initialBalanceText: String = "10000"
     @State private var calcMethod: ProfitCalcMethod = .fifo
     
-    private let commonBrokers = ["The5ers", "FTMO", "Topstep", "Oanda", "MetaTrader 5", "Binance", "Thủ công"]
-    private let commonCurrencies = ["USD", "EUR", "GBP", "JPY", "VND"]
+    private let commonBrokers = ["The5ers", "FTMO", "Topstep", "Oanda", "MetaTrader 5", "Binance", "Manual"]
+    private let commonCurrencies = ["USD", "EUR", "GBP", "JPY", "CAD", "AUD"]
     
     public init() {}
     
     public var body: some View {
         NavigationStack {
             Form {
-                Section(header: Text("Tên và sàn")) {
-                    TextField("Tên tài khoản (VD: Quỹ 100K 5ers)", text: $name)
+                Section(header: Text("Account & Broker")) {
+                    TextField("Account name (e.g. The5ers 100K Bootcamp)", text: $name)
                     
-                    Picker("Sàn giao dịch", selection: $broker) {
+                    Picker("Broker", selection: $broker) {
                         ForEach(commonBrokers, id: \.self) { b in
                             Text(b).tag(b)
                         }
                     }
                 }
                 
-                Section(header: Text("Tài chính & Thuật toán tính lãi")) {
-                    Picker("Đồng tiền", selection: $currency) {
+                Section(header: Text("Financials & Calculation Method")) {
+                    Picker("Currency", selection: $currency) {
                         ForEach(commonCurrencies, id: \.self) { c in
                             Text(c).tag(c)
                         }
                     }
                     
-                    TextField("Số dư ban đầu", text: $initialBalanceText)
+                    TextField("Initial balance", text: $initialBalanceText)
                         .keyboardType(.decimalPad)
                     
-                    Picker("Phương pháp tính P&L", selection: $calcMethod) {
+                    Picker("P&L Method", selection: $calcMethod) {
                         Text("FIFO (First In First Out)").tag(ProfitCalcMethod.fifo)
                         Text("LIFO (Last In First Out)").tag(ProfitCalcMethod.lifo)
-                        Text("Weighted Average (Bình quân gia quyền)").tag(ProfitCalcMethod.wavg)
+                        Text("Weighted Average").tag(ProfitCalcMethod.wavg)
                     }
                 }
             }
-            .navigationTitle("Tạo tài khoản mới")
+            .navigationTitle("New account")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Huỷ") {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
                         dismiss()
                     }
                 }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Lưu") {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
                         let bal = Decimal(string: initialBalanceText) ?? 0
                         dataStore.addAccount(
                             name: name.trimmingCharacters(in: .whitespacesAndNewlines),

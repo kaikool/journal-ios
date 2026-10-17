@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Thẻ chứa nội dung Trading Terminal: viền `#222228`, nền `#101013`, bo góc 12px
+/// Trading Terminal card container
 public struct AppCard<Content: View>: View {
     private let content: Content
     
@@ -22,7 +22,7 @@ public struct AppCard<Content: View>: View {
     }
 }
 
-/// Header của mỗi thẻ thống kê: chữ in hoa 11px, màu nhạt `#9c9ca6`, kèm icon gợi ý
+/// Stat card header component
 public struct AppCardHeader: View {
     private let title: String
     private let icon: String?
@@ -50,7 +50,7 @@ public struct AppCardHeader: View {
     }
 }
 
-/// Thanh tỉ lệ trực quan giữa Lãi Trung Bình và Lỗ Trung Bình
+/// Win / Loss ratio bar visualization
 public struct AppRatioBar: View {
     private let greenRatio: Double
     
@@ -74,10 +74,10 @@ public struct AppRatioBar: View {
     }
 }
 
-/// Badge trạng thái giao dịch chuẩn xác từ Tailwind `badge.tsx`:
-/// - profit: chữ xanh `#0ca30c` trên nền xanh mờ 15%
-/// - loss: chữ đỏ `#d03b3b` trên nền đỏ mờ 15%
-/// - secondary: xám sẫm nền phụ
+/// Status badge matching Tailwind `badge.tsx`:
+/// - profit: green with translucent background
+/// - loss: red with translucent background
+/// - secondary: dark gray secondary background
 public struct AppBadge: View {
     public enum Variant {
         case profit
@@ -149,7 +149,7 @@ public struct AppBadge: View {
     }
 }
 
-/// Nút bấm chuẩn hóa Trading Terminal
+/// Standardized Trading Terminal button
 public struct AppButton: View {
     public enum Style {
         case primary, secondary, outline, destructive
@@ -219,7 +219,7 @@ public struct AppButton: View {
     }
 }
 
-/// Hiển thị giá trị P&L hoặc tiền tệ với hỗ trợ Privacy Mode
+/// Domain specification matching core web repository
 public struct AppMonetaryText: View {
     private let valueText: String
     private let isPrivate: Bool
@@ -245,7 +245,7 @@ public struct AppMonetaryText: View {
     }
 }
 
-/// Màn hình rỗng (Empty State) gọn gàng
+/// Domain specification matching core web repository
 public struct EmptyStateView: View {
     private let title: String
     private let description: String
@@ -317,11 +317,11 @@ public struct EmptyStateView: View {
     }
 }
 
-/// Màn hình Loading
+/// Standardized loading spinner view
 public struct LoadingView: View {
     private let message: String
     
-    public init(_ message: String = "Đang tải dữ liệu...") {
+    public init(_ message: String = "Loading...") {
         self.message = message
     }
     
@@ -337,7 +337,7 @@ public struct LoadingView: View {
     }
 }
 
-/// Banner thông báo lỗi kèm nút Retry
+/// Domain specification matching core web repository
 public struct ErrorBannerView: View {
     private let message: String
     private let onRetry: (() -> Void)?
@@ -362,7 +362,7 @@ public struct ErrorBannerView: View {
             
             if let onRetry = onRetry {
                 Button(action: onRetry) {
-                    Text("Thử lại")
+                    Text("Retry")
                         .font(AppTypography.captionBold)
                         .foregroundColor(AppColors.brand)
                 }
