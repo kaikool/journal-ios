@@ -1,6 +1,7 @@
 import Foundation
 
-public struct WeekdayPerformance: Equatable {
+public struct WeekdayPerformance: Equatable, Identifiable {
+    public var id: Int { index }
     public let index: Int
     public let label: String
     public let days: [DayStats]
@@ -8,7 +9,8 @@ public struct WeekdayPerformance: Equatable {
     public let netPnl: Decimal
 }
 
-public struct DayTrendPoint: Equatable {
+public struct DayTrendPoint: Equatable, Identifiable {
+    public var id: String { date }
     public let date: String
     public let netPnl: Decimal
     public let average: Decimal?

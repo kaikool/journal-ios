@@ -493,7 +493,7 @@ public struct DashboardView: View {
                                 .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
                                 .foregroundStyle(AppColors.border)
                             
-                            ForEach(overview.days) { d in
+                            ForEach(overview.days, id: \.date) { d in
                                 BarMark(
                                     x: .value("Date", String(d.date.suffix(5))),
                                     y: .value("Net P&L", (d.netPnl as NSDecimalNumber).doubleValue)

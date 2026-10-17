@@ -60,7 +60,8 @@ public struct EquityPoint: Equatable {
     }
 }
 
-public struct DayStats: Equatable {
+public struct DayStats: Equatable, Identifiable {
+    public var id: String { date }
     public let date: String
     public var netPnl: Decimal
     public var grossPnl: Decimal?
