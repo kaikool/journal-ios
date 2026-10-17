@@ -71,7 +71,7 @@ public struct DrawdownChart: View {
                         let ddVal = -(point.drawdown as NSDecimalNumber).doubleValue * 100.0
                         
                         BarMark(
-                            x: .value("Date", point.date),
+                            x: .value("Date", point.date, unit: .day),
                             y: .value("Drawdown", ddVal)
                         )
                         .foregroundStyle(

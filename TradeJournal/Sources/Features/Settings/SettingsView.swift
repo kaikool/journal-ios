@@ -356,6 +356,7 @@ public struct TradingSettingsView: View {
                         
                         HStack {
                             TextField("0", text: $breakevenText)
+                                .font(AppTypography.inputText)
                                 .keyboardType(.decimalPad)
                                 .textFieldStyle(.roundedBorder)
                                 .frame(maxWidth: 140)
@@ -407,12 +408,14 @@ public struct TradingSettingsView: View {
                                     .pickerStyle(.menu)
                                     
                                     TextField("Symbol (e.g. ES)", text: $feeRules[index].symbol)
+                                        .font(AppTypography.inputText)
                                         .textFieldStyle(.roundedBorder)
                                         .textInputAutocapitalization(.characters)
                                 }
                                 
                                 HStack {
                                     TextField("Amount", value: $feeRules[index].amount, format: .number)
+                                        .font(AppTypography.inputText)
                                         .keyboardType(.decimalPad)
                                         .textFieldStyle(.roundedBorder)
                                         .frame(maxWidth: 100)
@@ -469,6 +472,7 @@ public struct TradingSettingsView: View {
                                     .pickerStyle(.menu)
                                     
                                     TextField("Symbol (e.g. NQ)", text: $riskRules[index].symbol)
+                                        .font(AppTypography.inputText)
                                         .textFieldStyle(.roundedBorder)
                                         .textInputAutocapitalization(.characters)
                                 }
@@ -477,12 +481,14 @@ public struct TradingSettingsView: View {
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text("Stop").font(AppTypography.caption)
                                         TextField("Stop", value: $riskRules[index].stop, format: .number)
+                                            .font(AppTypography.inputText)
                                             .keyboardType(.decimalPad)
                                             .textFieldStyle(.roundedBorder)
                                     }
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text("Target").font(AppTypography.caption)
                                         TextField("Target", value: $riskRules[index].target, format: .number)
+                                            .font(AppTypography.inputText)
                                             .keyboardType(.decimalPad)
                                             .textFieldStyle(.roundedBorder)
                                     }
@@ -640,7 +646,7 @@ public struct CurrencyConversionSettingsView: View {
                     .foregroundColor(AppColors.secondaryText)
                 
                 HStack(spacing: 12) {
-                    AppButton("Save conversion settings", icon: "checkmark", style: .primary, size: .compact) {
+                    AppButton("Save rates", icon: "checkmark", style: .primary, size: .compact) {
                         saveConversion()
                     }
                     
@@ -740,18 +746,18 @@ public struct MarketDataSettingsView: View {
                         
                         HStack(spacing: 8) {
                             if !binanceEnabled {
-                                AppButton("Enable source", icon: "checkmark.circle", style: .primary, size: .compact) {
+                                AppButton("Enable", icon: "checkmark.circle", style: .primary, size: .compact) {
                                     binanceEnabled = true
                                     dataStore.marketConnections.binanceEnabled = true
                                     dataStore.saveToDisk()
                                     binanceStatus = "Public market data enabled."
                                 }
                             } else {
-                                AppButton("Test connection", icon: "network", style: .secondary, size: .compact) {
+                                AppButton("Test", icon: "network", style: .secondary, size: .compact) {
                                     testBinance()
                                 }
                                 
-                                AppButton("Disable source", icon: "xmark.circle", style: .destructive, size: .compact) {
+                                AppButton("Disable", icon: "xmark.circle", style: .destructive, size: .compact) {
                                     binanceEnabled = false
                                     dataStore.marketConnections.binanceEnabled = false
                                     dataStore.saveToDisk()
@@ -792,10 +798,12 @@ public struct MarketDataSettingsView: View {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Access token").font(AppTypography.captionBold)
                             SecureField("Enter access token", text: $oandaToken)
+                                .font(AppTypography.inputText)
                                 .textFieldStyle(.roundedBorder)
                             
                             Text("v20 account ID").font(AppTypography.captionBold)
                             TextField("Enter v20 account ID", text: $oandaAccountId)
+                                .font(AppTypography.inputText)
                                 .textFieldStyle(.roundedBorder)
                             
                             Text("Environment").font(AppTypography.captionBold)
@@ -817,7 +825,7 @@ public struct MarketDataSettingsView: View {
                             
                             if !dataStore.marketConnections.oandaApiKey.isEmpty {
                                 HStack(spacing: 8) {
-                                    AppButton("Test connection", icon: "network", style: .secondary, size: .compact) {
+                                    AppButton("Test", icon: "network", style: .secondary, size: .compact) {
                                         oandaStatus = "Connecting to OANDA v20 servers..."
                                         Task {
                                             let res = await MarketDataService.shared.testOandaConnection(
@@ -829,7 +837,7 @@ public struct MarketDataSettingsView: View {
                                         }
                                     }
                                     
-                                    AppButton("Remove credentials", icon: "trash", style: .destructive, size: .compact) {
+                                    AppButton("Remove", icon: "trash", style: .destructive, size: .compact) {
                                         oandaToken = ""
                                         oandaAccountId = ""
                                         dataStore.marketConnections.oandaApiKey = ""
@@ -908,7 +916,7 @@ public struct ConnectionsSettingsView: View {
                     
                     // Main Action: OAuth Login vs Connected Actions
                     if !the5ers.isConnected {
-                        AppButton("Log in with The5ers Hub (OAuth)", icon: "person.badge.key.fill", style: .primary, size: .regular, isLoading: isConnectingThe5ers) {
+                        AppButton("Log in with The5ers", icon: "person.badge.key.fill", style: .primary, size: .compact, isLoading: isConnectingThe5ers) {
                             loginThe5ersOAuth()
                         }
                     } else {
@@ -1017,7 +1025,7 @@ public struct ConnectionsSettingsView: View {
                         }
                         .disabled(supabaseUrl.trimmingCharacters(in: .whitespaces).isEmpty || supabaseAnonKey.trimmingCharacters(in: .whitespaces).isEmpty)
                         
-                        AppButton("Copy Migration SQL", icon: "doc.on.doc", style: .secondary, size: .compact) {
+                        AppButton("Copy SQL", icon: "doc.on.doc", style: .secondary, size: .compact) {
                             copySqlScript()
                         }
                     }
@@ -1247,7 +1255,7 @@ public struct AiSettingsView: View {
                 }
                 
                 HStack(spacing: 12) {
-                    AppButton("Save AI settings", icon: "checkmark", style: .primary, size: .compact) {
+                    AppButton("Save AI", icon: "checkmark", style: .primary, size: .compact) {
                         saveAiSettings()
                     }
                     
@@ -1332,11 +1340,11 @@ public struct YourDataSettingsView: View {
                         .foregroundColor(AppColors.secondaryText)
                     
                     HStack(spacing: 12) {
-                        AppButton("Full backup (JSON)", icon: "square.and.arrow.up", style: .secondary, size: .compact) {
+                        AppButton("Export JSON", icon: "square.and.arrow.up", style: .secondary, size: .compact) {
                             exportFullJsonBackup()
                         }
                         
-                        AppButton("Trades (CSV)", icon: "square.and.arrow.up", style: .secondary, size: .compact) {
+                        AppButton("Export CSV", icon: "square.and.arrow.up", style: .secondary, size: .compact) {
                             exportTradesCsv()
                         }
                     }

@@ -448,11 +448,14 @@ public struct NewPlaybookSheet: View {
             Form {
                 Section("Playbook Details") {
                     TextField("Name (e.g. Opening range breakout)", text: $title)
+                        .font(AppTypography.inputText)
                     TextField("One-line description", text: $description)
+                        .font(AppTypography.inputText)
                 }
                 
                 Section {
                     TextEditor(text: $rulesText)
+                        .font(AppTypography.inputText)
                         .frame(minHeight: 120)
                 } header: {
                     Text("Checklist Rules")

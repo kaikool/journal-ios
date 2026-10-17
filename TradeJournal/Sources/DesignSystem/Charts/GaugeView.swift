@@ -25,9 +25,10 @@ public struct GaugeView: View {
     public var body: some View {
         let strokeWidth: CGFloat = 8
         let radius = (size / 2) - strokeWidth
+        let arcHeight = radius + (strokeWidth / 2) + 4
         
         VStack(spacing: 0) {
-            ZStack(alignment: .bottom) {
+            ZStack(alignment: .top) {
                 // Background Track Arc
                 Circle()
                     .trim(from: 0.5, to: 1.0)
@@ -36,7 +37,6 @@ public struct GaugeView: View {
                         style: StrokeStyle(lineWidth: strokeWidth, lineCap: .round)
                     )
                     .frame(width: radius * 2, height: radius * 2)
-                    .rotationEffect(.degrees(0))
                 
                 // Active Brand Arc
                 if ratio > 0 {
@@ -59,15 +59,14 @@ public struct GaugeView: View {
                 }
                 
                 // Centered Percentage Readout
-                VStack(spacing: 0) {
-                    Text(value == nil ? "–" : String(format: "%.1f%%", ratio * 100))
-                        .font(.system(size: max(13, size * 0.19), weight: .bold, design: .rounded))
-                        .monospacedDigit()
-                        .foregroundColor(AppColors.primaryText)
-                }
-                .offset(y: 2)
+                Text(value == nil ? "–" : String(format: "%.1f%%", ratio * 100))
+                    .font(.system(size: max(12, size * 0.18), weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundColor(AppColors.primaryText)
+                    .offset(y: radius - 10)
             }
-            .frame(width: size, height: size / 2 + 10)
+            .frame(width: size, height: arcHeight)
+            .clipped()
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(label): \(value == nil ? "no data" : String(format: "%.1f%%", ratio * 100))")

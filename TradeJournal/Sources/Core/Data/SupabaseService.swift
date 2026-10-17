@@ -760,6 +760,14 @@ public final class SupabaseService {
         let (data, response) = try await session.data(for: request)
         try validateResponse(response, data: data, endpoint: endpoint)
     }
+
+    public func deletePlaybook(id: String) async throws {
+        guard isConfigured else { return }
+        let endpoint = "playbooks?id=eq.\(id)"
+        let request = try makeRequest(endpoint: endpoint, method: "DELETE")
+        let (data, response) = try await session.data(for: request)
+        try validateResponse(response, data: data, endpoint: endpoint)
+    }
     
     public func fetchSettings() async throws -> [JournalSettingRecord] {
         guard isConfigured else { return [] }

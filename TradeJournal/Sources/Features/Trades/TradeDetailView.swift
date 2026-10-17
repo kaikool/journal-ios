@@ -622,6 +622,7 @@ public struct TradeDetailView: View {
                             }
                             
                             TextEditor(text: $noteContent)
+                                .font(AppTypography.inputText)
                                 .frame(minHeight: 100)
                                 .padding(8)
                                 .background(AppColors.secondaryBackground)

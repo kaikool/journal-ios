@@ -1279,7 +1279,7 @@ public struct DayDetailSheet: View {
                 
                 TextField("Write thoughts or notes for this day...", text: $noteContent, axis: .vertical)
                     .lineLimit(3...6)
-                    .font(AppTypography.body)
+                    .font(AppTypography.inputText)
                     .foregroundColor(AppColors.primaryText)
                     .padding(10)
                     .background(AppColors.secondaryBackground)

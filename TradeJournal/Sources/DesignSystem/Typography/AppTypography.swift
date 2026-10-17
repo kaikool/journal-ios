@@ -36,9 +36,27 @@ public enum AppTypography {
     public static let subheadlineBold = Font.system(size: 12, weight: .semibold)
     public static let subheadingBold = subheadlineBold
     
+    /// Standard Apple HIG input and editor typography
+    public static let inputText = Font.system(size: 13, weight: .regular)
+    public static let inputTextMedium = Font.system(size: 13, weight: .medium)
+    public static let inputTextBold = Font.system(size: 13, weight: .semibold)
+    
     /// Specialized font for financial numbers and monetary amounts: monospaced digits
     /// to avoid column jitter during real-time value updates.
     public static func financialNumber(size: CGFloat = 24, weight: Font.Weight = .semibold) -> Font {
         Font.system(size: size, weight: weight, design: .monospaced)
+    }
+}
+
+public struct AppInputModifier: ViewModifier {
+    public func body(content: Content) -> some View {
+        content
+            .font(AppTypography.inputText)
+    }
+}
+
+public extension View {
+    func appInputStyle() -> some View {
+        modifier(AppInputModifier())
     }
 }

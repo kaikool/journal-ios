@@ -403,17 +403,26 @@ public struct PropFirmLedgerView: View {
                             .font(AppTypography.cardTitle)
                             .foregroundColor(AppColors.primaryText)
                         
+                        let dateFormatter: DateFormatter = {
+                            let df = DateFormatter()
+                            df.dateFormat = "yyyy-MM-dd"
+                            df.timeZone = TimeZone(identifier: "UTC")
+                            return df
+                        }()
+                        let parsedTimeline = timelinePoints.compactMap { pt -> (id: String, date: Date, val: Double)? in
+                            guard let d = dateFormatter.date(from: pt.date) else { return nil }
+                            return (id: pt.date, date: d, val: Double(pt.netMinor) / 100.0)
+                        }
+                        
                         Chart {
                             RuleMark(y: .value("Zero", 0))
                                 .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
                                 .foregroundStyle(AppColors.border.opacity(0.8))
                             
-                            ForEach(timelinePoints, id: \.date) { pt in
-                                let val = Double(pt.netMinor) / 100.0
-                                
+                            ForEach(parsedTimeline, id: \.id) { pt in
                                 AreaMark(
                                     x: .value("Date", pt.date),
-                                    y: .value("Net cash", val)
+                                    y: .value("Net cash", pt.val)
                                 )
                                 .interpolationMethod(.catmullRom)
                                 .foregroundStyle(
@@ -430,7 +439,7 @@ public struct PropFirmLedgerView: View {
                                 
                                 LineMark(
                                     x: .value("Date", pt.date),
-                                    y: .value("Net cash", val)
+                                    y: .value("Net cash", pt.val)
                                 )
                                 .interpolationMethod(.catmullRom)
                                 .foregroundStyle(AppColors.brand)
@@ -452,8 +461,12 @@ public struct PropFirmLedgerView: View {
                             }
                         }
                         .chartXAxis {
-                            AxisMarks(values: .automatic(desiredCount: 5)) { _ in
-                                AxisValueLabel()
+                            AxisMarks(values: .automatic(desiredCount: 4)) { value in
+                                AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
+                                    .foregroundStyle(AppColors.border.opacity(0.3))
+                                AxisTick(stroke: StrokeStyle(lineWidth: 0.5))
+                                    .foregroundStyle(AppColors.border)
+                                AxisValueLabel(format: .dateTime.month(.abbreviated).day())
                                     .font(.system(size: 9, weight: .medium))
                                     .foregroundStyle(AppColors.secondaryText)
                             }
@@ -961,6 +974,7 @@ public struct NewPropAccountSheet: View {
                     TextField("Drawdown rules, profit targets...", text: $notes)
                 }
             }
+            .font(AppTypography.inputText)
             .navigationTitle(parentId == nil ? "Track account" : "Next stage / Phase")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -1049,6 +1063,7 @@ public struct EditPropAccountSheet: View {
                     TextField("Account notes...", text: $notes)
                 }
             }
+            .font(AppTypography.inputText)
             .navigationTitle("Edit account")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -1189,6 +1204,7 @@ public struct NewPropEntrySheet: View {
                     TextField("Invoice number, context...", text: $notes)
                 }
             }
+            .font(AppTypography.inputText)
             .navigationTitle("Record expense / Payout")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

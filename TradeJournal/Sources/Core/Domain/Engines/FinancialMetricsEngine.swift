@@ -185,9 +185,13 @@ public enum FinancialMetricsEngine {
     /// Daily cumulative net P&L from pre-computed daily stats (1:1 port from equity.ts)
     public static func dailyCumulativeFromDays(days: [DayStats]) -> [EquityPoint] {
         var cum: Decimal = 0
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.timeZone = TimeZone(identifier: "UTC")
         return days.map { day in
             cum += day.netPnl
-            return EquityPoint(timestamp: Date(), dateString: day.date, cumNetPnl: cum)
+            let parsedDate = formatter.date(from: day.date) ?? Date()
+            return EquityPoint(timestamp: parsedDate, dateString: day.date, cumNetPnl: cum)
         }
     }
 

@@ -229,17 +229,22 @@ public struct ReportsView: View {
                         Spacer()
                     }
                     
-                    LazyVGrid(columns: [GridItem(.flexible(), spacing: 14), GridItem(.flexible(), spacing: 14)], spacing: 14) {
+                    LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
                         ForEach(summaryKPIs, id: \.label) { kpi in
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(kpi.label)
-                                    .font(AppTypography.caption)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(kpi.label.uppercased())
+                                    .font(.system(size: 10, weight: .semibold))
                                     .foregroundColor(AppColors.secondaryText)
+                                    .tracking(0.5)
                                 Text(kpi.value)
-                                    .font(AppTypography.bodyBold)
+                                    .font(.system(size: 17, weight: .bold, design: .rounded))
                                     .monospacedDigit()
                                     .foregroundColor(kpi.isNet ? (metrics.netPnl >= 0 ? AppColors.profit : AppColors.loss) : AppColors.primaryText)
                             }
+                            .padding(12)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(AppColors.secondaryBackground)
+                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                         }
                     }
                 }
@@ -261,11 +266,18 @@ public struct ReportsView: View {
     private var trendsSection: some View {
         VStack(spacing: 14) {
             // Cumulative Net Equity Curve
-            let overview = FinancialMetricsEngine.computeOverview(trades: trades, timeZone: env.currentTimeZone)
+            let initialBalance: Decimal = {
+                if dataStore.selectedAccountId == "all" {
+                    return dataStore.visibleAccounts.reduce(Decimal.zero) { $0 + $1.initialBalance }
+                }
+                return dataStore.selectedAccount?.initialBalance ?? 0
+            }()
+            let overview = FinancialMetricsEngine.computeOverview(trades: trades, timeZone: env.currentTimeZone, initialBalance: initialBalance)
             var runningPeak: Decimal = 0
             let equityPoints = overview.curve.map { p in
                 if p.cumNetPnl > runningPeak { runningPeak = p.cumNetPnl }
-                let dd = runningPeak > 0 ? (runningPeak - p.cumNetPnl) / runningPeak : Decimal.zero
+                let base = initialBalance + runningPeak
+                let dd: Decimal = base > 0 ? (runningPeak - p.cumNetPnl) / base : (runningPeak > 0 ? (runningPeak - p.cumNetPnl) / runningPeak : Decimal.zero)
                 return EquityPointItem(
                     date: p.timestamp,
                     dateKey: p.dateString,

@@ -314,8 +314,8 @@ public struct AccountsManagerView: View {
                             }
                         }
                         
-                        Text("ID: \(acc.id)")
-                            .font(.system(size: 10, design: .monospaced))
+                        Text("\(acc.broker.isEmpty ? "Standard" : acc.broker) · \(acc.currency)")
+                            .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText)
                     }
                     

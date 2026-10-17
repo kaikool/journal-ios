@@ -24,6 +24,7 @@ public final class TradeDataStore: ObservableObject {
     @Published public var attachments: [Attachment] = []
     @Published public var playbooks: [Playbook] = []
     @Published public var playbookAssessments: [PlaybookRuleAssessment] = []
+    public var deletedPlaybookIds: Set<String> = []
     @Published public var calendarNotes: [String: JournalNote] = [:]
     @Published public var missedTrades: [MissedTrade] = []
     @Published public var progressRules: [ProgressRule] = []
@@ -407,10 +408,14 @@ public final class TradeDataStore: ObservableObject {
             syncWarnings.append("Executions: \(error.localizedDescription)")
         }
 
-        // Internal implementation note
+        // Supabase playbooks sync
         do {
             let remotePlaybooks = try await SupabaseService.shared.fetchPlaybooks()
             for rPb in remotePlaybooks {
+                if deletedPlaybookIds.contains(rPb.id) {
+                    Task { try? await SupabaseService.shared.deletePlaybook(id: rPb.id) }
+                    continue
+                }
                 if let idx = playbooks.firstIndex(where: { $0.id == rPb.id }) {
                     playbooks[idx] = rPb
                 } else {
@@ -418,7 +423,7 @@ public final class TradeDataStore: ObservableObject {
                 }
             }
             let localUserPlaybooks = playbooks.filter { pb in
-                !remotePlaybooks.contains(where: { $0.id == pb.id })
+                !deletedPlaybookIds.contains(pb.id) && !remotePlaybooks.contains(where: { $0.id == pb.id })
             }
             if !localUserPlaybooks.isEmpty {
                 try? await SupabaseService.shared.upsertPlaybooks(localUserPlaybooks)
@@ -970,6 +975,7 @@ public final class TradeDataStore: ObservableObject {
         let currencyConversion: CurrencyConversion?
         let marketConnections: MarketConnectionConfig?
         let aiSettings: AiSettingsConfig?
+        let deletedPlaybookIds: [String]?
     }
     
     public func saveToDisk() {
@@ -997,7 +1003,8 @@ public final class TradeDataStore: ObservableObject {
             generalSettings: generalSettings,
             currencyConversion: currencyConversion,
             marketConnections: marketConnections,
-            aiSettings: aiSettings
+            aiSettings: aiSettings,
+            deletedPlaybookIds: Array(deletedPlaybookIds)
         )
         do {
             let data = try JSONEncoder().encode(store)
@@ -1028,6 +1035,7 @@ public final class TradeDataStore: ObservableObject {
             self.attachments = store.attachments ?? []
             self.playbooks = store.playbooks ?? []
             self.playbookAssessments = store.playbookAssessments ?? []
+            self.deletedPlaybookIds = Set(store.deletedPlaybookIds ?? [])
             self.calendarNotes = store.calendarNotes ?? [:]
             self.missedTrades = store.missedTrades ?? []
             self.progressRules = store.progressRules ?? Self.defaultProgressRules
@@ -1237,7 +1245,11 @@ public final class TradeDataStore: ObservableObject {
     public func deletePlaybook(id: String) {
         playbooks.removeAll { $0.id == id }
         playbookAssessments.removeAll { $0.playbookId == id }
+        deletedPlaybookIds.insert(id)
         saveToDisk()
+        Task {
+            try? await SupabaseService.shared.deletePlaybook(id: id)
+        }
     }
     
     public func setRuleAssessment(tradeKey: String, playbookId: String, rule: String, followed: Bool) {

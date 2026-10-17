@@ -325,6 +325,7 @@ public struct AddTradeSheet: View {
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText)
                         TextEditor(text: $notes)
+                            .font(AppTypography.inputText)
                             .frame(minHeight: 80)
                             .overlay(RoundedRectangle(cornerRadius: 6).stroke(AppColors.border, lineWidth: 1))
                     }

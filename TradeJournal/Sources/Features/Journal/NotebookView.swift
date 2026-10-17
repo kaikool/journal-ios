@@ -550,7 +550,7 @@ public struct NotebookEditorSheet: View {
                                 } else {
                                     if !title.isEmpty {
                                         Text(title)
-                                            .font(AppTypography.title)
+                                            .font(AppTypography.pageTitle)
                                             .foregroundColor(AppColors.primaryText)
                                             .padding(.bottom, 4)
                                     }
@@ -562,7 +562,7 @@ public struct NotebookEditorSheet: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                         } else {
                             TextEditor(text: $content)
-                                .font(AppTypography.body)
+                                .font(AppTypography.inputText)
                                 .foregroundColor(AppColors.primaryText)
                                 .scrollContentBackground(.hidden)
                                 .frame(minHeight: 180)

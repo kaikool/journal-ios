@@ -664,14 +664,14 @@ public struct DailyJournalDetailView: View {
                 ZStack(alignment: .topLeading) {
                     if noteText.isEmpty {
                         Text("Write your review for \(date)...")
-                            .font(AppTypography.body)
+                            .font(AppTypography.inputText)
                             .foregroundColor(AppColors.secondaryText.opacity(0.6))
                             .padding(.horizontal, 8)
                             .padding(.vertical, 10)
                     }
                     
                     TextEditor(text: $noteText)
-                        .font(AppTypography.body)
+                        .font(AppTypography.inputText)
                         .frame(minHeight: 120)
                         .scrollContentBackground(.hidden)
                         .background(AppColors.secondaryBackground)

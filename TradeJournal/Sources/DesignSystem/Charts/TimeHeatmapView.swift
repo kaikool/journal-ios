@@ -170,10 +170,20 @@ public struct TimeHeatmapView: View {
                     }
                 }
                 .chartXAxis {
-                    AxisMarks(position: .bottom) { _ in
-                        AxisValueLabel()
-                            .font(.system(size: 9, weight: .medium))
-                            .foregroundStyle(AppColors.secondaryText)
+                    AxisMarks(position: .bottom) { value in
+                        if let label = value.as(String.self),
+                           let hourNum = Int(label.prefix(2)),
+                           hourNum % 4 == 0 {
+                            AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
+                                .foregroundStyle(AppColors.border.opacity(0.3))
+                            AxisTick(stroke: StrokeStyle(lineWidth: 0.5))
+                                .foregroundStyle(AppColors.border)
+                            AxisValueLabel {
+                                Text(label)
+                                    .font(.system(size: 9, weight: .medium, design: .rounded))
+                                    .foregroundStyle(AppColors.secondaryText)
+                            }
+                        }
                     }
                 }
                 .frame(height: 65)

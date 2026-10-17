@@ -268,26 +268,24 @@ public struct ProgressRoutinesView: View {
                     .foregroundColor(AppColors.secondaryText)
                 
                 // 91-cell grid (13 columns x 7 rows)
-                ScrollView(.horizontal, showsIndicators: false) {
-                    let columns = Array(repeating: GridItem(.fixed(18), spacing: 4), count: 13)
-                    LazyVGrid(columns: columns, spacing: 4) {
-                        ForEach(past91Days, id: \.date) { item in
-                            Button {
-                                selectedDate = item.date
-                            } label: {
-                                RoundedRectangle(cornerRadius: 3)
-                                    .fill(cellColor(percent: item.percent, total: item.total))
-                                    .frame(width: 18, height: 18)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 3)
-                                            .stroke(activeDate == item.date ? AppColors.primaryText : Color.clear, lineWidth: 1.5)
-                                    )
-                            }
-                            .buttonStyle(.plain)
+                let columns = Array(repeating: GridItem(.flexible(minimum: 10, maximum: 24), spacing: 4), count: 13)
+                LazyVGrid(columns: columns, spacing: 4) {
+                    ForEach(past91Days, id: \.date) { item in
+                        Button {
+                            selectedDate = item.date
+                        } label: {
+                            RoundedRectangle(cornerRadius: 3)
+                                .fill(cellColor(percent: item.percent, total: item.total))
+                                .aspectRatio(1.0, contentMode: .fit)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 3)
+                                        .stroke(activeDate == item.date ? AppColors.primaryText : Color.clear, lineWidth: 1.5)
+                                )
                         }
+                        .buttonStyle(.plain)
                     }
-                    .padding(.vertical, 4)
                 }
+                .padding(.vertical, 4)
             }
         }
         .padding(.horizontal, 16)

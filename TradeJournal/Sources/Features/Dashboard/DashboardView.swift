@@ -104,7 +104,8 @@ public struct DashboardView: View {
             if pt.cumNetPnl > runningPeak {
                 runningPeak = pt.cumNetPnl
             }
-            let dd = runningPeak > 0 ? (runningPeak - pt.cumNetPnl) / runningPeak : Decimal.zero
+            let base = initialBalance + runningPeak
+            let dd: Decimal = base > 0 ? (runningPeak - pt.cumNetPnl) / base : (runningPeak > 0 ? (runningPeak - pt.cumNetPnl) / runningPeak : Decimal.zero)
             return EquityPointItem(
                 date: pt.timestamp,
                 dateKey: pt.dateString,
@@ -665,8 +666,10 @@ public struct DashboardView: View {
                                     hint: "Winning trades divided by all closed trades, including breakevens."
                                 )
                                 
+                                Spacer(minLength: 2)
+                                
                                 HStack(alignment: .center, spacing: 8) {
-                                    GaugeView(value: metrics.winRate, label: "Trade win rate", size: 84)
+                                    GaugeView(value: metrics.winRate, label: "Trade win rate", size: 80)
                                     
                                     Spacer()
                                     
@@ -683,6 +686,7 @@ public struct DashboardView: View {
                                     }
                                 }
                             }
+                            .frame(maxWidth: .infinity, minHeight: 124, alignment: .topLeading)
                         }
                     }
                     
@@ -696,8 +700,10 @@ public struct DashboardView: View {
                                     hint: "Gross profit ÷ gross loss. Above 1 means the wins outweigh the losses."
                                 )
                                 
+                                Spacer(minLength: 4)
+                                
                                 Text(metrics.profitFactorIsInfinite ? "∞" : (metrics.profitFactor != nil ? String(format: "%.2f", metrics.profitFactor!) : "–"))
-                                    .font(AppTypography.financialNumber(size: 26, weight: .bold))
+                                    .font(AppTypography.financialNumber(size: 24, weight: .bold))
                                     .monospacedDigit()
                                     .foregroundColor(AppColors.primaryText)
                                 
@@ -705,6 +711,7 @@ public struct DashboardView: View {
                                     .font(AppTypography.caption)
                                     .foregroundColor(AppColors.secondaryText)
                             }
+                            .frame(maxWidth: .infinity, minHeight: 124, alignment: .topLeading)
                         }
                     }
                     
@@ -718,8 +725,10 @@ public struct DashboardView: View {
                                     hint: "Green trading days ÷ all trading days in the selected range."
                                 )
                                 
+                                Spacer(minLength: 2)
+                                
                                 HStack(alignment: .center, spacing: 8) {
-                                    GaugeView(value: metrics.dayWinRate, label: "Day win rate", size: 84)
+                                    GaugeView(value: metrics.dayWinRate, label: "Day win rate", size: 80)
                                     
                                     Spacer()
                                     
@@ -728,6 +737,7 @@ public struct DashboardView: View {
                                         .foregroundColor(AppColors.secondaryText)
                                 }
                             }
+                            .frame(maxWidth: .infinity, minHeight: 124, alignment: .topLeading)
                         }
                     }
                     
@@ -741,15 +751,17 @@ public struct DashboardView: View {
                                     hint: "Average winning trade ÷ average losing trade. The bar shows the two to scale."
                                 )
                                 
+                                Spacer(minLength: 2)
+                                
                                 Text(metrics.avgWinLossRatio != nil ? String(format: "%.2f", metrics.avgWinLossRatio!) : "–")
-                                    .font(AppTypography.financialNumber(size: 26, weight: .bold))
+                                    .font(AppTypography.financialNumber(size: 24, weight: .bold))
                                     .monospacedDigit()
                                     .foregroundColor(AppColors.primaryText)
                                 
                                 if let w = metrics.avgWin, let l = metrics.avgLoss, (w + l) > 0 {
                                     let ratio = (w as NSDecimalNumber).doubleValue / ((w + l) as NSDecimalNumber).doubleValue
                                     AppRatioBar(greenRatio: ratio)
-                                        .padding(.vertical, 2)
+                                        .padding(.vertical, 1)
                                 }
                                 
                                 HStack(spacing: 2) {
@@ -767,6 +779,7 @@ public struct DashboardView: View {
                                 .font(AppTypography.caption)
                                 .lineLimit(1)
                             }
+                            .frame(maxWidth: .infinity, minHeight: 124, alignment: .topLeading)
                         }
                     }
                 }
