@@ -179,9 +179,21 @@ public struct NavigationDrawerView: View {
         
         Button {
             triggerHaptic()
-            env.selectedTab = tab
-            withAnimation(.spring(response: 0.34, dampingFraction: 0.84)) {
+            if env.selectedTab == tab {
+                withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
+                    env.isDrawerOpen = false
+                }
+                return
+            }
+            
+            // 1. Immediately begin closing drawer at 120 FPS
+            withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
                 env.isDrawerOpen = false
+            }
+            
+            // 2. Dispatch tab switch so drawer close animation starts with zero dropped frames
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                env.selectedTab = tab
             }
         } label: {
             HStack(spacing: 12) {

@@ -4,39 +4,7 @@ public struct RootTabView: View {
     @EnvironmentObject private var env: AppEnvironment
     @ObservedObject private var dataStore = TradeDataStore.shared
     
-    // Interactive drawer state for ultra-smooth fluid navigation
-    @State private var dragOffset: CGFloat = 0
-    @State private var isDragging: Bool = false
-    
-    private let drawerWidth: CGFloat = 300
-    
     public init() {}
-    
-    private var drawerXOffset: CGFloat {
-        if isDragging {
-            if env.isDrawerOpen {
-                return min(0, max(-drawerWidth, dragOffset))
-            } else {
-                return min(0, -drawerWidth + max(0, dragOffset))
-            }
-        } else {
-            return env.isDrawerOpen ? 0 : -drawerWidth
-        }
-    }
-    
-    private var scrimOpacity: Double {
-        if isDragging {
-            if env.isDrawerOpen {
-                let ratio = (drawerWidth + dragOffset) / drawerWidth
-                return max(0, min(0.45, 0.45 * Double(ratio)))
-            } else {
-                let ratio = dragOffset / drawerWidth
-                return max(0, min(0.45, 0.45 * Double(ratio)))
-            }
-        } else {
-            return env.isDrawerOpen ? 0.45 : 0.0
-        }
-    }
     
     public var body: some View {
         ZStack(alignment: .leading) {
@@ -83,104 +51,28 @@ public struct RootTabView: View {
             }
             .background(AppColors.background.ignoresSafeArea())
             .scaleEffect(env.isDrawerOpen ? 0.98 : 1.0)
-            .animation(.spring(response: 0.34, dampingFraction: 0.84), value: env.isDrawerOpen)
+            .animation(.spring(response: 0.32, dampingFraction: 0.86), value: env.isDrawerOpen)
             .disabled(env.isDrawerOpen)
             
-            // Native Apple Dimmed Scrim Backdrop (smooth GPU alpha fade)
-            Color.black
-                .opacity(scrimOpacity)
-                .ignoresSafeArea()
-                .animation(isDragging ? nil : .spring(response: 0.34, dampingFraction: 0.84), value: env.isDrawerOpen)
-                .allowsHitTesting(env.isDrawerOpen || isDragging)
-                .onTapGesture {
+            // Dedicated Edge Pan Gesture Strip (Active only when drawer is closed)
+            // Intercepts touches exclusively on the 28pt left screen bezel.
+            // Never interferes with ScrollView or chart scrubbing!
+            if !env.isDrawerOpen {
+                LeftEdgeSwipeTrigger {
                     #if canImport(UIKit)
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     #endif
-                    withAnimation(.spring(response: 0.34, dampingFraction: 0.84)) {
-                        env.isDrawerOpen = false
-                        dragOffset = 0
+                    withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
+                        env.isDrawerOpen = true
                     }
                 }
+            }
             
-            // Elevated Apple HIG Translucent Drawer (Hardware-accelerated offset)
-            NavigationDrawerView()
-                .frame(width: drawerWidth)
-                .offset(x: drawerXOffset)
-                .animation(isDragging ? nil : .spring(response: 0.34, dampingFraction: 0.84), value: env.isDrawerOpen)
-                .animation(isDragging ? nil : .spring(response: 0.34, dampingFraction: 0.84), value: dragOffset)
-                .shadow(
-                    color: Color.black.opacity(env.isDrawerOpen || (isDragging && dragOffset > -drawerWidth) ? 0.32 : 0),
-                    radius: 28,
-                    x: 8,
-                    y: 0
-                )
-                .ignoresSafeArea(.container, edges: .vertical)
-                .allowsHitTesting(env.isDrawerOpen || isDragging)
+            // Isolated Drawer & Scrim Overlay Component
+            // Drag state is isolated here so dragging does NOT re-render the main canvas or run heavy metrics!
+            InteractiveDrawerOverlay()
         }
         .preferredColorScheme(env.colorScheme)
-        .gesture(
-            DragGesture(minimumDistance: 10, coordinateSpace: .global)
-                .onChanged { value in
-                    let startX = value.startLocation.x
-                    let transX = value.translation.width
-                    let transY = value.translation.height
-                    
-                    if !isDragging {
-                        if !env.isDrawerOpen {
-                            if startX <= 38 && transX > 10 && abs(transX) > abs(transY) * 1.2 {
-                                isDragging = true
-                            }
-                        } else {
-                            if transX < -10 && abs(transX) > abs(transY) * 1.2 {
-                                isDragging = true
-                            }
-                        }
-                    }
-                    
-                    if isDragging {
-                        if !env.isDrawerOpen {
-                            dragOffset = max(0, min(drawerWidth, transX))
-                        } else {
-                            dragOffset = min(0, max(-drawerWidth, transX))
-                        }
-                    }
-                }
-                .onEnded { value in
-                    guard isDragging else { return }
-                    isDragging = false
-                    let velocity = value.predictedEndTranslation.width - value.translation.width
-                    
-                    if !env.isDrawerOpen {
-                        if dragOffset > drawerWidth * 0.28 || velocity > 150 {
-                            #if canImport(UIKit)
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            #endif
-                            withAnimation(.spring(response: 0.34, dampingFraction: 0.84)) {
-                                env.isDrawerOpen = true
-                                dragOffset = 0
-                            }
-                        } else {
-                            withAnimation(.spring(response: 0.34, dampingFraction: 0.84)) {
-                                dragOffset = 0
-                            }
-                        }
-                    } else {
-                        if dragOffset < -drawerWidth * 0.22 || velocity < -150 {
-                            #if canImport(UIKit)
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            #endif
-                            withAnimation(.spring(response: 0.34, dampingFraction: 0.84)) {
-                                env.isDrawerOpen = false
-                                dragOffset = 0
-                            }
-                        } else {
-                            withAnimation(.spring(response: 0.34, dampingFraction: 0.84)) {
-                                dragOffset = 0
-                            }
-                        }
-                    }
-                }
-        )
     }
     
     private var bottomNavigationBar: some View {
@@ -247,5 +139,119 @@ public struct RootTabView: View {
             .frame(height: 48)
         }
         .buttonStyle(ApplePressableButtonStyle())
+    }
+}
+
+/// Dedicated edge swipe trigger along the 28pt left screen bezel.
+private struct LeftEdgeSwipeTrigger: View {
+    let onOpen: () -> Void
+    
+    var body: some View {
+        Color.clear
+            .frame(width: 28)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 12, coordinateSpace: .local)
+                    .onEnded { value in
+                        if value.translation.width > 24 && abs(value.translation.width) > abs(value.translation.height) * 1.2 {
+                            onOpen()
+                        }
+                    }
+            )
+            .ignoresSafeArea()
+    }
+}
+
+/// Isolated Drawer and Scrim Overlay.
+/// Encapsulating drag offset in this view prevents RootTabView and the active screen
+/// from re-rendering their bodies 120 times/second during touch drag interactions.
+private struct InteractiveDrawerOverlay: View {
+    @EnvironmentObject private var env: AppEnvironment
+    @State private var dragOffset: CGFloat = 0
+    @State private var isDragging: Bool = false
+    
+    private let drawerWidth: CGFloat = 300
+    
+    private var drawerXOffset: CGFloat {
+        if isDragging {
+            return min(0, max(-drawerWidth, dragOffset))
+        } else {
+            return env.isDrawerOpen ? 0 : -drawerWidth
+        }
+    }
+    
+    private var scrimOpacity: Double {
+        if isDragging {
+            let ratio = (drawerWidth + dragOffset) / drawerWidth
+            return max(0, min(0.45, 0.45 * Double(ratio)))
+        } else {
+            return env.isDrawerOpen ? 0.45 : 0.0
+        }
+    }
+    
+    var body: some View {
+        ZStack(alignment: .leading) {
+            // Scrim backdrop
+            if env.isDrawerOpen || isDragging {
+                Color.black
+                    .opacity(scrimOpacity)
+                    .ignoresSafeArea()
+                    .animation(isDragging ? nil : .spring(response: 0.32, dampingFraction: 0.86), value: env.isDrawerOpen)
+                    .onTapGesture {
+                        #if canImport(UIKit)
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        #endif
+                        withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
+                            env.isDrawerOpen = false
+                            dragOffset = 0
+                        }
+                    }
+            }
+            
+            // Drawer View with hardware-accelerated translation
+            NavigationDrawerView()
+                .frame(width: drawerWidth)
+                .offset(x: drawerXOffset)
+                .animation(isDragging ? nil : .spring(response: 0.32, dampingFraction: 0.86), value: env.isDrawerOpen)
+                .animation(isDragging ? nil : .spring(response: 0.32, dampingFraction: 0.86), value: dragOffset)
+                .shadow(
+                    color: Color.black.opacity(env.isDrawerOpen || isDragging ? 0.30 : 0),
+                    radius: 24,
+                    x: 6,
+                    y: 0
+                )
+                .ignoresSafeArea(.container, edges: .vertical)
+        }
+        .allowsHitTesting(env.isDrawerOpen || isDragging)
+        .gesture(
+            DragGesture(minimumDistance: 10, coordinateSpace: .local)
+                .onChanged { value in
+                    guard env.isDrawerOpen else { return }
+                    if !isDragging && value.translation.width < -6 {
+                        isDragging = true
+                    }
+                    if isDragging {
+                        dragOffset = min(0, max(-drawerWidth, value.translation.width))
+                    }
+                }
+                .onEnded { value in
+                    guard isDragging else { return }
+                    isDragging = false
+                    let velocity = value.predictedEndTranslation.width - value.translation.width
+                    if dragOffset < -drawerWidth * 0.22 || velocity < -150 {
+                        #if canImport(UIKit)
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        #endif
+                        withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
+                            env.isDrawerOpen = false
+                            dragOffset = 0
+                        }
+                    } else {
+                        withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
+                            dragOffset = 0
+                        }
+                    }
+                }
+        )
     }
 }

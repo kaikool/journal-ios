@@ -69,11 +69,76 @@ public struct JournalCalendarView: View {
         String(format: "%04d-%02d", year, month)
     }
     
-    private var overview: (metrics: TradeMetrics, curve: [EquityPoint], days: [DayStats]) {
-        FinancialMetricsEngine.computeOverview(
+    private struct CalendarSnapshot {
+        let overview: (metrics: TradeMetrics, curve: [EquityPoint], days: [DayStats])
+        let dailyStatsMap: [String: DayStats]
+        let tradesByDateMap: [String: [Trade]]
+        let calendarMonth: CalendarMonth
+        let insights: CalendarInsights
+        let maxAbsPnl: Double
+        let peakWeekdayAbsPnl: Double
+    }
+    
+    @State private var cachedSnapshot: CalendarSnapshot? = nil
+    
+    private func computeSnapshot() -> CalendarSnapshot {
+        let ov = FinancialMetricsEngine.computeOverview(
             trades: dataStore.filteredTrades,
             timeZone: env.currentTimeZone
         )
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        f.timeZone = env.currentTimeZone
+        
+        var dayMap: [String: DayStats] = [:]
+        for d in ov.days {
+            dayMap[d.date] = d
+        }
+        
+        var tradesMap: [String: [Trade]] = [:]
+        for trade in dataStore.filteredTrades {
+            let key = f.string(from: trade.closedAt ?? trade.openedAt)
+            tradesMap[key, default: []].append(trade)
+        }
+        
+        let calMonth = AggregateEngine.calendarMonthFromDays(
+            dayStats: ov.days,
+            year: year,
+            month: month
+        )
+        
+        let ins = CalendarInsightsEngine.calendarInsights(calendar: calMonth)
+        
+        let maxVal = calMonth.weeks
+            .flatMap { $0.days }
+            .compactMap { $0 }
+            .map { abs(($0.netPnl as NSDecimalNumber).doubleValue) }
+            .max() ?? 1.0
+        let maxAbs = max(1.0, maxVal)
+        
+        let peak = ins.weekdays.map { abs(($0.netPnl as NSDecimalNumber).doubleValue) }.max() ?? 1.0
+        let peakAbs = max(1.0, peak)
+        
+        return CalendarSnapshot(
+            overview: ov,
+            dailyStatsMap: dayMap,
+            tradesByDateMap: tradesMap,
+            calendarMonth: calMonth,
+            insights: ins,
+            maxAbsPnl: maxAbs,
+            peakWeekdayAbsPnl: peakAbs
+        )
+    }
+    
+    private var snapshot: CalendarSnapshot {
+        if let cached = cachedSnapshot {
+            return cached
+        }
+        return computeSnapshot()
+    }
+    
+    private var overview: (metrics: TradeMetrics, curve: [EquityPoint], days: [DayStats]) {
+        snapshot.overview
     }
     
     private var dateKeyFormatter: DateFormatter {
@@ -84,47 +149,27 @@ public struct JournalCalendarView: View {
     }
     
     private var dailyStatsMap: [String: DayStats] {
-        var map: [String: DayStats] = [:]
-        for d in overview.days {
-            map[d.date] = d
-        }
-        return map
+        snapshot.dailyStatsMap
     }
     
     private var tradesByDateMap: [String: [Trade]] {
-        let f = dateKeyFormatter
-        var map: [String: [Trade]] = [:]
-        for trade in dataStore.filteredTrades {
-            let key = f.string(from: trade.closedAt ?? trade.openedAt)
-            map[key, default: []].append(trade)
-        }
-        return map
+        snapshot.tradesByDateMap
     }
     
     private var calendarMonth: CalendarMonth {
-        AggregateEngine.calendarMonthFromDays(
-            dayStats: overview.days,
-            year: year,
-            month: month
-        )
+        snapshot.calendarMonth
     }
     
     private var insights: CalendarInsights {
-        CalendarInsightsEngine.calendarInsights(calendar: calendarMonth)
+        snapshot.insights
     }
     
     private var maxAbsPnl: Double {
-        let maxVal = calendarMonth.weeks
-            .flatMap { $0.days }
-            .compactMap { $0 }
-            .map { abs(($0.netPnl as NSDecimalNumber).doubleValue) }
-            .max() ?? 1.0
-        return max(1.0, maxVal)
+        snapshot.maxAbsPnl
     }
     
     private var peakWeekdayAbsPnl: Double {
-        let peak = insights.weekdays.map { abs(($0.netPnl as NSDecimalNumber).doubleValue) }.max() ?? 1.0
-        return max(1.0, peak)
+        snapshot.peakWeekdayAbsPnl
     }
     
     private var availableCurrencies: [String] {
@@ -220,6 +265,15 @@ public struct JournalCalendarView: View {
                     .presentationDetents([.large])
                     .presentationDragIndicator(.visible)
                     .presentationCornerRadius(28)
+            }
+            .onAppear {
+                cachedSnapshot = computeSnapshot()
+            }
+            .onChange(of: currentMonth) { _ in
+                cachedSnapshot = computeSnapshot()
+            }
+            .onChange(of: dataStore.filteredTrades) { _ in
+                cachedSnapshot = computeSnapshot()
             }
         }
     }

@@ -14,7 +14,13 @@ public struct DashboardView: View {
     @State private var activityTab: String = "recent" // "recent" or "open"
     @State private var activeTooltip: (title: String, hint: String)? = nil
     
+    // Day detail sheet integration for Widget 8 (Calendar)
+    @State private var selectedDayContext: DayDetailContext? = nil
+    @State private var addTradeDate: Date? = nil
+    
     public init() {}
+    
+    // MARK: - Hidden Cards & Registry
     
     private var hiddenCardIds: Set<String> {
         guard !hiddenWidgetsRaw.isEmpty else { return [] }
@@ -33,6 +39,8 @@ public struct DashboardView: View {
     private var visibleCardCount: Int {
         DashboardCardRegistry.allCards.count - hiddenCardIds.count
     }
+    
+    // MARK: - Filtered Trades by Range
     
     private var scopedTrades: [Trade] {
         let baseTrades = dataStore.filteredTrades
@@ -59,27 +67,40 @@ public struct DashboardView: View {
         return baseTrades.filter { $0.openedAt >= cutoff }
     }
     
-    private var overview: (metrics: TradeMetrics, curve: [EquityPoint], days: [DayStats]) {
+    // MARK: - Memoized Single-Pass Snapshot
+    
+    private struct DashboardSnapshot {
+        let metrics: TradeMetrics
+        let curve: [EquityPoint]
+        let days: [DayStats]
+        let edgeResult: EdgeScoreResult
+        let chartEquityPoints: [EquityPointItem]
+        let hourlyStats: [BucketStats]
+        let weekDelta: Decimal?
+        let bestDay: DayStats?
+        let worstDay: DayStats?
+        let daysWithTradesMap: [String: DayStats]
+        let currentMonthStats: (tradingDays: Int, winningDays: Int, monthPnl: Decimal)
+    }
+    
+    private var snapshot: DashboardSnapshot {
         let initialBalance: Decimal = {
             if dataStore.selectedAccountId == "all" {
                 return dataStore.visibleAccounts.reduce(Decimal.zero) { $0 + $1.initialBalance }
             }
             return dataStore.selectedAccount?.initialBalance ?? 0
         }()
-        return FinancialMetricsEngine.computeOverview(
+        
+        let overview = FinancialMetricsEngine.computeOverview(
             trades: scopedTrades,
             timeZone: env.currentTimeZone,
             initialBalance: initialBalance
         )
-    }
-    
-    private var edgeResult: EdgeScoreResult {
-        EdgeScoreEngine.computeEdgeScore(metrics: overview.metrics)
-    }
-    
-    private var chartEquityPoints: [EquityPointItem] {
+        
+        let edge = EdgeScoreEngine.computeEdgeScore(metrics: overview.metrics)
+        
         var runningPeak: Decimal = 0
-        return overview.curve.map { pt in
+        let chartPoints = overview.curve.map { pt -> EquityPointItem in
             if pt.cumNetPnl > runningPeak {
                 runningPeak = pt.cumNetPnl
             }
@@ -92,15 +113,11 @@ public struct DashboardView: View {
                 drawdown: dd
             )
         }
-    }
-    
-    private var hourlyStats: [BucketStats] {
-        AggregateEngine.byHour(trades: scopedTrades, timeZone: env.currentTimeZone)
-    }
-    
-    // Momentum: net P&L of the last 7 calendar days vs prior 7 days
-    private var weekDelta: Decimal? {
-        let now = Date().timeIntervalSince1970 * 1000
+        
+        let hourly = AggregateEngine.byHour(trades: scopedTrades, timeZone: env.currentTimeZone)
+        
+        // Momentum: net P&L of the last 7 calendar days vs the 7 before them (matching page.tsx lines 207-224)
+        let nowMs = Date().timeIntervalSince1970 * 1000
         var last: Decimal = 0
         var prior: Decimal = 0
         var lastDays = 0
@@ -112,7 +129,7 @@ public struct DashboardView: View {
         
         for day in overview.days {
             if let date = formatter.date(from: day.date) {
-                let ageDays = (now - (date.timeIntervalSince1970 * 1000)) / 86_400_000
+                let ageDays = (nowMs - (date.timeIntervalSince1970 * 1000)) / 86_400_000
                 if ageDays <= 7 {
                     last += day.netPnl
                     lastDays += 1
@@ -122,23 +139,63 @@ public struct DashboardView: View {
                 }
             }
         }
-        return (lastDays > 0 && priorDays > 0) ? (last - prior) : nil
+        let delta = (lastDays > 0 && priorDays > 0) ? (last - prior) : nil
+        
+        let best = overview.days.max(by: { $0.netPnl < $1.netPnl })
+        let worst = overview.days.min(by: { $0.netPnl < $1.netPnl })
+        
+        var dayMap: [String: DayStats] = [:]
+        for d in overview.days {
+            dayMap[d.date] = d
+        }
+        
+        let iso = DateFormatter()
+        iso.dateFormat = "yyyy-MM"
+        let prefix = iso.string(from: Date())
+        let monthDays = overview.days.filter { $0.date.hasPrefix(prefix) }
+        let tradingDays = monthDays.count
+        let winningDays = monthDays.filter { $0.netPnl > 0 }.count
+        let monthPnl = monthDays.reduce(Decimal.zero) { $0 + $1.netPnl }
+        
+        return DashboardSnapshot(
+            metrics: overview.metrics,
+            curve: overview.curve,
+            days: overview.days,
+            edgeResult: edge,
+            chartEquityPoints: chartPoints,
+            hourlyStats: hourly,
+            weekDelta: delta,
+            bestDay: best,
+            worstDay: worst,
+            daysWithTradesMap: dayMap,
+            currentMonthStats: (tradingDays, winningDays, monthPnl)
+        )
     }
     
-    private var bestDay: DayStats? {
-        overview.days.max(by: { $0.netPnl < $1.netPnl })
+    // MARK: - Multi-Currency Group Calculations (matching page.tsx lines 153-188)
+    
+    private var isMultiCurrencyNoticeActive: Bool {
+        dataStore.selectedAccountId == "all" && dataStore.availableCurrencies.count > 1
     }
     
-    private var worstDay: DayStats? {
-        overview.days.min(by: { $0.netPnl < $1.netPnl })
+    private var currencyGroups: [(currency: String, metrics: TradeMetrics)] {
+        let visibleAccs = dataStore.visibleAccounts
+        let currencies = Array(Set(visibleAccs.map { $0.currency.uppercased() })).sorted()
+        return currencies.map { curr in
+            let accIds = Set(visibleAccs.filter { $0.currency.uppercased() == curr }.map { $0.id })
+            let tradesForCurr = scopedTrades.filter { accIds.contains($0.accountId) || accIds.contains("the5ers_\($0.accountId)") }
+            let initBal = visibleAccs.filter { $0.currency.uppercased() == curr }.reduce(Decimal.zero) { $0 + $1.initialBalance }
+            let ov = FinancialMetricsEngine.computeOverview(trades: tradesForCurr, timeZone: env.currentTimeZone, initialBalance: initBal)
+            return (curr, ov.metrics)
+        }
     }
     
-    // Calendar helpers for Widget 8
+    // MARK: - Calendar Widget Helpers
+    
     private var calendarWeeks: [[Date?]] {
         let cal = Calendar.current
         let now = Date()
-        guard let monthInterval = cal.dateInterval(of: .month, for: now),
-              let firstDay = cal.date(from: cal.dateComponents([.year, .month], from: now)),
+        guard let firstDay = cal.date(from: cal.dateComponents([.year, .month], from: now)),
               let range = cal.range(of: .day, in: .month, for: now) else {
             return []
         }
@@ -177,28 +234,11 @@ public struct DashboardView: View {
         return formatter.string(from: Date())
     }
     
-    private var daysWithTradesMap: [String: DayStats] {
-        var map: [String: DayStats] = [:]
-        for d in overview.days {
-            map[d.date] = d
-        }
-        return map
-    }
-    
-    private var currentMonthStats: (tradingDays: Int, winningDays: Int, monthPnl: Decimal) {
-        let isoFormatter = DateFormatter()
-        isoFormatter.dateFormat = "yyyy-MM"
-        let prefix = isoFormatter.string(from: Date())
-        
-        let monthDays = overview.days.filter { $0.date.hasPrefix(prefix) }
-        let tradingDays = monthDays.count
-        let winningDays = monthDays.filter { $0.netPnl > 0 }.count
-        let pnl = monthDays.reduce(Decimal.zero) { $0 + $1.netPnl }
-        return (tradingDays, winningDays, pnl)
-    }
+    // MARK: - Main Body
     
     public var body: some View {
-        let metrics = overview.metrics
+        let snap = snapshot
+        let metrics = snap.metrics
         
         VStack(spacing: 0) {
             // FilterBar matching web filter-bar.tsx
@@ -219,24 +259,31 @@ public struct DashboardView: View {
                 VStack(spacing: 12) {
                     syncNotificationSection
                     
-                    if metrics.totalTrades == 0 {
-                        emptyStateCard
+                    if isMultiCurrencyNoticeActive {
+                        // Multi-currency notice & account breakdown matching page.tsx lines 153-188
+                        multiCurrencySection
+                    } else if metrics.totalTrades == 0 {
+                        if selectedRange != .all {
+                            filteredEmptyState
+                        } else {
+                            emptyStateCard
+                        }
                     } else {
                         // SECTION 1: Summary Group (Widgets 0-4)
-                        summaryGroupSection(metrics: metrics)
+                        summaryGroupSection(snap: snap)
                         
                         // SECTION 2: Visuals Group (Widgets 5, 6, 7)
-                        visualsGroupSection(metrics: metrics)
+                        visualsGroupSection(snap: snap)
                         
                         // SECTION 3: Detail Group (Widgets 8, 9)
-                        detailGroupSection
+                        detailGroupSection(snap: snap)
                         
                         // SECTION 4: Secondary Metrics Group (Widgets 10-14)
-                        secondaryMetricsGrid(metrics: metrics)
+                        secondaryMetricsGrid(snap: snap)
                         
                         // SECTION 5: Full Width Performance (Widget 15)
                         if !hiddenCardIds.contains("widget-15") {
-                            tradeTimePerformanceCard
+                            tradeTimePerformanceCard(snap: snap)
                         }
                     }
                 }
@@ -253,12 +300,43 @@ public struct DashboardView: View {
         }
         .sheet(isPresented: $showCustomizerSheet) {
             DashboardCustomizerSheet(hiddenCardIds: hiddenCardIdsBinding)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(28)
         }
         .sheet(isPresented: $showAIReflection) {
             AIReflectionView()
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(28)
         }
         .sheet(isPresented: $showAddTradeSheet) {
-            AddTradeSheet()
+            AddTradeSheet(initialDate: addTradeDate ?? Date())
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(28)
+        }
+        .sheet(item: $selectedDayContext) { ctx in
+            DayDetailSheet(
+                dateKey: ctx.dateKey,
+                stats: ctx.stats,
+                trades: ctx.trades,
+                note: ctx.note,
+                onSaveNote: { updatedNote in
+                    dataStore.saveCalendarNote(updatedNote)
+                },
+                onAddTrade: {
+                    let targetDate = parseDate(from: ctx.dateKey)
+                    selectedDayContext = nil
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                        addTradeDate = targetDate
+                        showAddTradeSheet = true
+                    }
+                }
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+            .presentationCornerRadius(28)
         }
         .alert(activeTooltip?.title ?? "Info", isPresented: Binding(
             get: { activeTooltip != nil },
@@ -270,23 +348,25 @@ public struct DashboardView: View {
         }
     }
     
-    // MARK: - Top Layout Bar
+    // MARK: - Top Layout Bar (Apple HIG Capsule Toolbar)
     
     private var layoutBar: some View {
         HStack(spacing: 8) {
-            // Saved layout badge
-            HStack(spacing: 4) {
+            // Saved layout badge pill
+            HStack(spacing: 5) {
+                Image(systemName: "square.grid.2x2")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(AppColors.brand)
                 Text("Default layout")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundColor(AppColors.primaryText)
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
             .background(AppColors.cardBackground)
-            .cornerRadius(6)
+            .clipShape(Capsule())
             .overlay(
-                RoundedRectangle(cornerRadius: 6)
-                    .stroke(AppColors.border, lineWidth: 1)
+                Capsule().stroke(AppColors.border.opacity(0.6), lineWidth: 0.5)
             )
             
             Text("\(visibleCardCount) of \(DashboardCardRegistry.allCards.count) cards")
@@ -297,53 +377,131 @@ public struct DashboardView: View {
             
             // Customize button matching web dashboard-customizer.tsx
             Button {
+                #if canImport(UIKit)
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                #endif
                 showCustomizerSheet = true
             } label: {
                 HStack(spacing: 4) {
                     Image(systemName: "slider.horizontal.3")
-                        .font(.system(size: 11))
-                    Text("Customize")
                         .font(.system(size: 11, weight: .medium))
+                    Text("Customize")
+                        .font(.system(size: 11, weight: .semibold))
                     Image(systemName: "chevron.down")
-                        .font(.system(size: 9))
+                        .font(.system(size: 9, weight: .medium))
                 }
                 .foregroundColor(AppColors.primaryText)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
                 .background(AppColors.cardBackground)
-                .cornerRadius(6)
+                .clipShape(Capsule())
                 .overlay(
-                    RoundedRectangle(cornerRadius: 6)
-                        .stroke(AppColors.border, lineWidth: 1)
+                    Capsule().stroke(AppColors.border.opacity(0.6), lineWidth: 0.5)
                 )
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ApplePressableButtonStyle())
         }
         .padding(.horizontal, 14)
         .padding(.top, 8)
     }
     
-    // MARK: - Empty State
+    // MARK: - Multi-Currency Section (matching page.tsx lines 153-188)
     
-    private var emptyStateCard: some View {
-        AppCard {
+    @ViewBuilder
+    private var multiCurrencySection: some View {
+        VStack(spacing: 12) {
+            // Notice Banner
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 16))
+                    .foregroundColor(Color.orange)
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Set up conversion to see your combined dashboard")
+                        .font(AppTypography.captionBold)
+                        .foregroundColor(AppColors.primaryText)
+                    
+                    Text("These accounts use \(dataStore.availableCurrencies.joined(separator: ", ")). Set your conversion rates under Settings to combine their performance. Amounts below remain in their original currencies.")
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.secondaryText)
+                }
+                Spacer()
+            }
+            .padding(14)
+            .background(Color.orange.opacity(0.08))
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(Color.orange.opacity(0.3), lineWidth: 1)
+            )
+            
+            // All Accounts Card
+            let totalClosed = currencyGroups.reduce(0) { $0 + $1.metrics.closedTrades }
+            let totalWins = currencyGroups.reduce(0) { $0 + $1.metrics.wins }
+            let combinedWinRate = totalClosed > 0 ? Double(totalWins) / Double(totalClosed) : nil
+            
+            cardContainer {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("All accounts")
+                        .font(AppTypography.cardTitle)
+                        .foregroundColor(AppColors.primaryText)
+                    
+                    Text("\(totalClosed) closed trades · \(combinedWinRate != nil ? String(format: "%.1f%%", combinedWinRate! * 100) : "–") trade win rate")
+                        .font(AppTypography.body)
+                        .foregroundColor(AppColors.secondaryText)
+                }
+            }
+            
+            // Per-Currency Account Cards
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                ForEach(currencyGroups, id: \.currency) { group in
+                    cardContainer {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("\(group.currency) accounts")
+                                .font(AppTypography.captionBold)
+                                .foregroundColor(AppColors.secondaryText)
+                            
+                            AppMonetaryText(
+                                Formatters.formatPnL(group.metrics.netPnl, currency: group.currency),
+                                isPrivate: env.isPrivacyModeEnabled,
+                                font: AppTypography.financialNumber(size: 20, weight: .bold),
+                                color: group.metrics.netPnl >= 0 ? AppColors.profit : AppColors.loss
+                            )
+                            
+                            Text("\(group.metrics.closedTrades) closed · \(group.metrics.winRate != nil ? String(format: "%.0f%%", group.metrics.winRate! * 100) : "–") win")
+                                .font(AppTypography.caption)
+                                .foregroundColor(AppColors.secondaryText)
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // MARK: - Empty State (matching page.tsx lines 194-203 & 811-851)
+    
+    private var filteredEmptyState: some View {
+        cardContainer {
             VStack(spacing: 12) {
-                Image(systemName: "tray")
-                    .font(.system(size: 36))
+                Image(systemName: "line.3.horizontal.decrease.circle")
+                    .font(.system(size: 32))
                     .foregroundColor(AppColors.secondaryText)
                 
-                Text("Your journal is empty")
+                Text("No trades match these filters")
                     .font(AppTypography.headline)
                     .foregroundColor(AppColors.primaryText)
                 
-                Text("Connect a broker for automatic sync, upload a statement, or add trades manually.")
+                Text("Clear or adjust filters to see more results.")
                     .font(AppTypography.caption)
                     .foregroundColor(AppColors.secondaryText)
-                    .multilineTextAlignment(.center)
                 
-                AppButton("Import your first trades", icon: "square.and.arrow.down", style: .primary) {
-                    env.selectedTab = .settings
+                Button("Reset to All") {
+                    withAnimation {
+                        selectedRange = .all
+                    }
                 }
+                .font(AppTypography.captionBold)
+                .foregroundColor(AppColors.brand)
                 .padding(.top, 4)
             }
             .frame(maxWidth: .infinity)
@@ -351,7 +509,44 @@ public struct DashboardView: View {
         }
     }
     
-    // MARK: - Subviews
+    private var emptyStateCard: some View {
+        cardContainer {
+            VStack(spacing: 14) {
+                Image(systemName: "tray")
+                    .font(.system(size: 38))
+                    .foregroundColor(AppColors.secondaryText)
+                
+                Text("Your journal is empty")
+                    .font(AppTypography.headline)
+                    .foregroundColor(AppColors.primaryText)
+                
+                Text("Connect a broker for automatic sync, upload a statement from 10+ platforms (including your TradeZella export), or add trades manually.")
+                    .font(AppTypography.caption)
+                    .foregroundColor(AppColors.secondaryText)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 16)
+                
+                HStack(spacing: 10) {
+                    AppButton("Import your first trades", icon: "square.and.arrow.down", style: .primary) {
+                        env.selectedTab = .importTrades
+                    }
+                    
+                    AppButton("Load demo data", icon: "sparkles", style: .secondary) {
+                        dataStore.loadDemoData()
+                    }
+                }
+                .padding(.top, 6)
+                
+                Text("Demo data lands in its own account; delete it anytime under Accounts.")
+                    .font(.system(size: 11))
+                    .foregroundColor(AppColors.secondaryText.opacity(0.8))
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 32)
+        }
+    }
+    
+    // MARK: - Sync Notifications
     
     @ViewBuilder
     private var syncNotificationSection: some View {
@@ -374,7 +569,7 @@ public struct DashboardView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .background(AppColors.profit.opacity(0.12))
-            .cornerRadius(6)
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
         
         if let err = dataStore.lastSyncError {
@@ -397,18 +592,20 @@ public struct DashboardView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .background(AppColors.loss.opacity(0.12))
-            .cornerRadius(6)
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
     }
     
     // MARK: - 1. Summary Group (Widgets 0, 1, 2, 3, 4)
+    
     @ViewBuilder
-    private func summaryGroupSection(metrics: TradeMetrics) -> some View {
+    private func summaryGroupSection(snap: DashboardSnapshot) -> some View {
+        let metrics = snap.metrics
         VStack(spacing: 10) {
-            // Widget 0: Net P&L
+            // Widget 0: Net P&L (CircleDollarSign)
             if !hiddenCardIds.contains("widget-0") {
-                AppCard {
-                    VStack(alignment: .leading, spacing: 6) {
+                cardContainer {
+                    VStack(alignment: .leading, spacing: 8) {
                         statHeader(
                             "Net P&L",
                             icon: "dollarsign.circle",
@@ -419,18 +616,19 @@ public struct DashboardView: View {
                             AppMonetaryText(
                                 Formatters.formatPnL(metrics.netPnl, currency: env.currentCurrency),
                                 isPrivate: env.isPrivacyModeEnabled,
-                                font: AppTypography.financialNumber(size: 28, weight: .bold),
+                                font: AppTypography.financialNumber(size: 30, weight: .bold),
                                 color: metrics.netPnl >= 0 ? AppColors.profit : AppColors.loss
                             )
                             
                             Spacer()
                             
-                            if let delta = weekDelta {
+                            if let delta = snap.weekDelta {
                                 HStack(spacing: 3) {
                                     Text(delta >= 0 ? "▲" : "▼")
                                         .font(.system(size: 9, weight: .bold))
                                     Text(Formatters.formatCurrency(abs(delta), currency: env.currentCurrency))
                                         .font(AppTypography.captionBold)
+                                        .monospacedDigit()
                                     Text("vs prior 7d")
                                         .font(AppTypography.caption)
                                 }
@@ -457,9 +655,9 @@ public struct DashboardView: View {
             
             if showW1 || showW2 || showW3 || showW4 {
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                    // Widget 1: Trade win %
+                    // Widget 1: Trade win % (Target)
                     if showW1 {
-                        AppCard {
+                        cardContainer {
                             VStack(alignment: .leading, spacing: 6) {
                                 statHeader(
                                     "Trade win %",
@@ -474,23 +672,23 @@ public struct DashboardView: View {
                                     
                                     VStack(alignment: .trailing, spacing: 2) {
                                         Text("\(metrics.wins) W")
-                                            .font(AppTypography.caption)
-                                            .foregroundColor(AppColors.secondaryText)
+                                            .font(AppTypography.captionBold)
+                                            .foregroundColor(AppColors.profit)
                                         Text("\(metrics.breakevens) BE")
                                             .font(AppTypography.caption)
                                             .foregroundColor(AppColors.secondaryText)
                                         Text("\(metrics.losses) L")
-                                            .font(AppTypography.caption)
-                                            .foregroundColor(AppColors.secondaryText)
+                                            .font(AppTypography.captionBold)
+                                            .foregroundColor(AppColors.loss)
                                     }
                                 }
                             }
                         }
                     }
                     
-                    // Widget 2: Profit factor
+                    // Widget 2: Profit factor (Scale)
                     if showW2 {
-                        AppCard {
+                        cardContainer {
                             VStack(alignment: .leading, spacing: 6) {
                                 statHeader(
                                     "Profit factor",
@@ -499,7 +697,8 @@ public struct DashboardView: View {
                                 )
                                 
                                 Text(metrics.profitFactorIsInfinite ? "∞" : (metrics.profitFactor != nil ? String(format: "%.2f", metrics.profitFactor!) : "–"))
-                                    .font(AppTypography.financialNumber(size: 24, weight: .bold))
+                                    .font(AppTypography.financialNumber(size: 26, weight: .bold))
+                                    .monospacedDigit()
                                     .foregroundColor(AppColors.primaryText)
                                 
                                 Text("gross profit ÷ gross loss")
@@ -509,9 +708,9 @@ public struct DashboardView: View {
                         }
                     }
                     
-                    // Widget 3: Day win %
+                    // Widget 3: Day win % (CalendarCheck2)
                     if showW3 {
-                        AppCard {
+                        cardContainer {
                             VStack(alignment: .leading, spacing: 6) {
                                 statHeader(
                                     "Day win %",
@@ -532,9 +731,9 @@ public struct DashboardView: View {
                         }
                     }
                     
-                    // Widget 4: Avg win / loss
+                    // Widget 4: Avg win / loss (ArrowUpDown)
                     if showW4 {
-                        AppCard {
+                        cardContainer {
                             VStack(alignment: .leading, spacing: 6) {
                                 statHeader(
                                     "Avg win / loss",
@@ -543,7 +742,8 @@ public struct DashboardView: View {
                                 )
                                 
                                 Text(metrics.avgWinLossRatio != nil ? String(format: "%.2f", metrics.avgWinLossRatio!) : "–")
-                                    .font(AppTypography.financialNumber(size: 24, weight: .bold))
+                                    .font(AppTypography.financialNumber(size: 26, weight: .bold))
+                                    .monospacedDigit()
                                     .foregroundColor(AppColors.primaryText)
                                 
                                 if let w = metrics.avgWin, let l = metrics.avgLoss, (w + l) > 0 {
@@ -555,13 +755,16 @@ public struct DashboardView: View {
                                 HStack(spacing: 2) {
                                     Text(Formatters.formatCurrency(metrics.avgWin, currency: env.currentCurrency))
                                         .foregroundColor(AppColors.profit)
+                                        .monospacedDigit()
                                     Text(" win · ")
+                                        .foregroundColor(AppColors.secondaryText)
                                     Text(Formatters.formatCurrency(metrics.avgLoss, currency: env.currentCurrency))
                                         .foregroundColor(AppColors.loss)
+                                        .monospacedDigit()
                                     Text(" loss")
+                                        .foregroundColor(AppColors.secondaryText)
                                 }
                                 .font(AppTypography.caption)
-                                .foregroundColor(AppColors.secondaryText)
                                 .lineLimit(1)
                             }
                         }
@@ -572,12 +775,16 @@ public struct DashboardView: View {
     }
     
     // MARK: - 2. Visuals Group (Widgets 5, 6, 7)
+    
     @ViewBuilder
-    private func visualsGroupSection(metrics: TradeMetrics) -> some View {
+    private func visualsGroupSection(snap: DashboardSnapshot) -> some View {
+        let metrics = snap.metrics
+        let edgeResult = snap.edgeResult
+        
         VStack(spacing: 10) {
             // Widget 5: Edge Score
             if !hiddenCardIds.contains("widget-5") {
-                AppCard {
+                cardContainer {
                     VStack(spacing: 10) {
                         HStack {
                             statHeader(
@@ -590,7 +797,8 @@ public struct DashboardView: View {
                             
                             HStack(spacing: 2) {
                                 Text(edgeResult.score != nil ? "\(Int(edgeResult.score!))" : "–")
-                                    .font(AppTypography.financialNumber(size: 22, weight: .bold))
+                                    .font(AppTypography.financialNumber(size: 24, weight: .bold))
+                                    .monospacedDigit()
                                     .foregroundColor(AppColors.brand)
                                 Text("/100")
                                     .font(AppTypography.caption)
@@ -609,23 +817,26 @@ public struct DashboardView: View {
                             EdgeRadarView(components: edgeResult.components, height: 210)
                             
                             Button {
+                                #if canImport(UIKit)
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                #endif
                                 withAnimation {
                                     showEdgeScoreBreakdown.toggle()
                                 }
                             } label: {
                                 HStack(spacing: 4) {
                                     Text(showEdgeScoreBreakdown ? "Hide component breakdown" : "View component breakdown")
-                                        .font(.system(size: 11, weight: .medium))
+                                        .font(.system(size: 11, weight: .semibold))
                                     Image(systemName: showEdgeScoreBreakdown ? "chevron.up" : "chevron.down")
                                         .font(.system(size: 9))
                                 }
                                 .foregroundColor(AppColors.brand)
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(ApplePressableButtonStyle())
                             .padding(.top, 2)
                             
                             if showEdgeScoreBreakdown, let b = edgeResult.breakdown {
-                                Divider().background(AppColors.border)
+                                Divider().background(AppColors.border.opacity(0.6))
                                 
                                 VStack(spacing: 5) {
                                     scorePillarRow("Win rate", value: b.winRate, max: 15)
@@ -644,7 +855,7 @@ public struct DashboardView: View {
             
             // Widget 6: Daily net cumulative P&L
             if !hiddenCardIds.contains("widget-6") {
-                AppCard {
+                cardContainer {
                     VStack(alignment: .leading, spacing: 10) {
                         statHeader(
                             "Daily net cumulative P&L",
@@ -652,18 +863,18 @@ public struct DashboardView: View {
                             hint: "Running total of net profit and loss over the selected period. The drawdown bars below show declines from the running equity peak."
                         )
                         
-                        EquityCurveChart(points: chartEquityPoints, currency: env.currentCurrency, height: 180)
+                        EquityCurveChart(points: snap.chartEquityPoints, currency: env.currentCurrency, height: 180)
                         
-                        Divider().background(AppColors.border)
+                        Divider().background(AppColors.border.opacity(0.6))
                         
-                        DrawdownChart(points: chartEquityPoints, height: 75)
+                        DrawdownChart(points: snap.chartEquityPoints, height: 75)
                     }
                 }
             }
             
             // Widget 7: Net daily P&L
             if !hiddenCardIds.contains("widget-7") {
-                AppCard {
+                cardContainer {
                     VStack(alignment: .leading, spacing: 10) {
                         statHeader(
                             "Net daily P&L",
@@ -672,7 +883,7 @@ public struct DashboardView: View {
                         )
                         
                         DailyBarsView(
-                            data: overview.days.map { DailyBarDatum(date: $0.date, netPnl: $0.netPnl) },
+                            data: snap.days.map { DailyBarDatum(date: $0.date, netPnl: $0.netPnl) },
                             currency: env.currentCurrency,
                             isPrivate: env.isPrivacyModeEnabled,
                             height: 160
@@ -684,12 +895,13 @@ public struct DashboardView: View {
     }
     
     // MARK: - 3. Detail Group (Widgets 8, 9)
+    
     @ViewBuilder
-    private var detailGroupSection: some View {
+    private func detailGroupSection(snap: DashboardSnapshot) -> some View {
         VStack(spacing: 10) {
             // Widget 8: Calendar Mini Widget (8-column layout matching calendar-pnl.tsx)
             if !hiddenCardIds.contains("widget-8") {
-                AppCard {
+                cardContainer {
                     VStack(alignment: .leading, spacing: 10) {
                         HStack {
                             Text(monthName)
@@ -697,6 +909,9 @@ public struct DashboardView: View {
                                 .foregroundColor(AppColors.primaryText)
                             Spacer()
                             Button {
+                                #if canImport(UIKit)
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                #endif
                                 env.selectedTab = .calendar
                             } label: {
                                 Text("Full calendar")
@@ -704,14 +919,15 @@ public struct DashboardView: View {
                                     .underline()
                                     .foregroundColor(AppColors.brand)
                             }
+                            .buttonStyle(ApplePressableButtonStyle())
                         }
                         
                         // 8-column header (Sun..Sat + Week)
                         let cols = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Wk"]
-                        HStack(spacing: 3) {
+                        HStack(spacing: 4) {
                             ForEach(cols, id: \.self) { c in
                                 Text(c)
-                                    .font(.system(size: 9, weight: .semibold))
+                                    .font(.system(size: 9, weight: .bold))
                                     .foregroundColor(AppColors.secondaryText)
                                     .frame(maxWidth: .infinity, alignment: c == "Wk" ? .trailing : .center)
                             }
@@ -730,31 +946,39 @@ public struct DashboardView: View {
                                 let weekDays = week.compactMap { $0 }
                                 let weekPnl = weekDays.compactMap { d -> Decimal? in
                                     let key = isoFormatter.string(from: d)
-                                    return daysWithTradesMap[key]?.netPnl
+                                    return snap.daysWithTradesMap[key]?.netPnl
                                 }.reduce(Decimal.zero, +)
                                 
-                                HStack(spacing: 3) {
+                                HStack(spacing: 4) {
                                     ForEach(0..<7, id: \.self) { dayIdx in
                                         if let date = week[dayIdx] {
                                             let key = isoFormatter.string(from: date)
-                                            let stats = daysWithTradesMap[key]
+                                            let stats = snap.daysWithTradesMap[key]
                                             let dayNum = Calendar.current.component(.day, from: date)
                                             
-                                            VStack(spacing: 1) {
-                                                Text("\(dayNum)")
-                                                    .font(.system(size: 9))
-                                                    .foregroundColor(stats != nil ? AppColors.primaryText : AppColors.secondaryText)
-                                                
-                                                if let s = stats {
-                                                    Text(s.netPnl >= 0 ? "+" : "-")
-                                                        .font(.system(size: 7, weight: .bold))
-                                                        .foregroundColor(s.netPnl >= 0 ? AppColors.profit : AppColors.loss)
+                                            Button {
+                                                openCalendarDay(dateKey: key, stats: stats)
+                                            } label: {
+                                                VStack(spacing: 1) {
+                                                    Text("\(dayNum)")
+                                                        .font(.system(size: 9, weight: stats != nil ? .bold : .regular))
+                                                        .foregroundColor(stats != nil ? AppColors.primaryText : AppColors.secondaryText)
+                                                    
+                                                    if let s = stats {
+                                                        Text(s.netPnl >= 0 ? "+" : "-")
+                                                            .font(.system(size: 7, weight: .bold))
+                                                            .foregroundColor(s.netPnl >= 0 ? AppColors.profit : AppColors.loss)
+                                                    }
                                                 }
+                                                .frame(height: 26)
+                                                .frame(maxWidth: .infinity)
+                                                .background(stats != nil ? (stats!.netPnl >= 0 ? AppColors.profit.opacity(0.12) : AppColors.loss.opacity(0.12)) : Color.clear)
+                                                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                                                .overlay(
+                                                    stats != nil ? RoundedRectangle(cornerRadius: 6, style: .continuous).stroke(stats!.netPnl >= 0 ? AppColors.profit.opacity(0.24) : AppColors.loss.opacity(0.24), lineWidth: 0.5) : nil
+                                                )
                                             }
-                                            .frame(height: 26)
-                                            .frame(maxWidth: .infinity)
-                                            .background(stats != nil ? (stats!.netPnl >= 0 ? AppColors.profit.opacity(0.12) : AppColors.loss.opacity(0.12)) : Color.clear)
-                                            .cornerRadius(4)
+                                            .buttonStyle(.plain)
                                         } else {
                                             Color.clear
                                                 .frame(height: 26)
@@ -764,7 +988,7 @@ public struct DashboardView: View {
                                     
                                     // Week total column
                                     Text(weekPnl != 0 ? Formatters.formatPnL(weekPnl, currency: env.currentCurrency) : "–")
-                                        .font(.system(size: 8, weight: .semibold, design: .rounded))
+                                        .font(.system(size: 9, weight: .semibold, design: .rounded))
                                         .monospacedDigit()
                                         .foregroundColor(weekPnl > 0 ? AppColors.profit : (weekPnl < 0 ? AppColors.loss : AppColors.secondaryText))
                                         .frame(maxWidth: .infinity, alignment: .trailing)
@@ -772,16 +996,17 @@ public struct DashboardView: View {
                             }
                         }
                         
-                        Divider().background(AppColors.border)
+                        Divider().background(AppColors.border.opacity(0.6))
                         
                         HStack {
-                            Text("\(currentMonthStats.tradingDays) trading days · \(currentMonthStats.winningDays) green")
+                            Text("\(snap.currentMonthStats.tradingDays) trading days · \(snap.currentMonthStats.winningDays) green")
                                 .font(AppTypography.caption)
                                 .foregroundColor(AppColors.secondaryText)
                             Spacer()
-                            Text("Month: \(Formatters.formatPnL(currentMonthStats.monthPnl, currency: env.currentCurrency))")
+                            Text("Month: \(Formatters.formatPnL(snap.currentMonthStats.monthPnl, currency: env.currentCurrency))")
                                 .font(AppTypography.captionBold)
-                                .foregroundColor(currentMonthStats.monthPnl >= 0 ? AppColors.profit : AppColors.loss)
+                                .monospacedDigit()
+                                .foregroundColor(snap.currentMonthStats.monthPnl >= 0 ? AppColors.profit : AppColors.loss)
                         }
                     }
                 }
@@ -789,8 +1014,8 @@ public struct DashboardView: View {
             
             // Widget 9: Activity (Recent trades & Open positions)
             if !hiddenCardIds.contains("widget-9") {
-                AppCard {
-                    VStack(alignment: .leading, spacing: 8) {
+                cardContainer {
+                    VStack(alignment: .leading, spacing: 10) {
                         HStack {
                             Text("Activity")
                                 .font(AppTypography.headline)
@@ -798,11 +1023,35 @@ public struct DashboardView: View {
                             Spacer()
                         }
                         
-                        Picker("Activity Tab", selection: $activityTab) {
-                            Text("Recent trades").tag("recent")
-                            Text("Open positions").tag("open")
+                        // Apple HIG Sliding Pill Segmented Control
+                        HStack(spacing: 4) {
+                            ForEach(["recent", "open"], id: \.self) { tab in
+                                let isSelected = activityTab == tab
+                                Button {
+                                    #if canImport(UIKit)
+                                    UISelectionFeedbackGenerator().selectionChanged()
+                                    #endif
+                                    withAnimation(.spring(response: 0.28, dampingFraction: 0.75)) {
+                                        activityTab = tab
+                                    }
+                                } label: {
+                                    Text(tab == "recent" ? "Recent trades" : "Open positions")
+                                        .font(.system(size: 12, weight: isSelected ? .semibold : .medium))
+                                        .foregroundColor(isSelected ? AppColors.primaryText : AppColors.secondaryText)
+                                        .frame(maxWidth: .infinity)
+                                        .frame(height: 28)
+                                        .background(
+                                            isSelected ? AppColors.cardBackground : Color.clear
+                                        )
+                                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                        .shadow(color: isSelected ? Color.black.opacity(0.08) : Color.clear, radius: 4, x: 0, y: 1)
+                                }
+                                .buttonStyle(.plain)
+                            }
                         }
-                        .pickerStyle(.segmented)
+                        .padding(3)
+                        .background(AppColors.secondaryBackground.opacity(0.6))
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                         
                         if activityTab == "recent" {
                             let recent = scopedTrades.filter { $0.status != .open }.prefix(5)
@@ -811,7 +1060,7 @@ public struct DashboardView: View {
                                     .font(AppTypography.caption)
                                     .foregroundColor(AppColors.secondaryText)
                                     .frame(maxWidth: .infinity, alignment: .center)
-                                    .padding(.vertical, 12)
+                                    .padding(.vertical, 16)
                             } else {
                                 VStack(spacing: 6) {
                                     ForEach(recent) { t in
@@ -837,10 +1086,10 @@ public struct DashboardView: View {
                                                 color: t.netPnl >= 0 ? AppColors.profit : AppColors.loss
                                             )
                                         }
-                                        .padding(.vertical, 2)
+                                        .padding(.vertical, 3)
                                         
                                         if t.id != recent.last?.id {
-                                            Divider().background(AppColors.border)
+                                            Divider().background(AppColors.border.opacity(0.5))
                                         }
                                     }
                                 }
@@ -852,7 +1101,7 @@ public struct DashboardView: View {
                                     .font(AppTypography.caption)
                                     .foregroundColor(AppColors.secondaryText)
                                     .frame(maxWidth: .infinity, alignment: .center)
-                                    .padding(.vertical, 12)
+                                    .padding(.vertical, 16)
                             } else {
                                 VStack(spacing: 6) {
                                     ForEach(openPos) { p in
@@ -867,12 +1116,13 @@ public struct DashboardView: View {
                                             
                                             Text("\(p.quantity) @ \(Formatters.formatCurrency(p.avgEntry, currency: env.currentCurrency))")
                                                 .font(AppTypography.caption)
+                                                .monospacedDigit()
                                                 .foregroundColor(AppColors.secondaryText)
                                         }
-                                        .padding(.vertical, 2)
+                                        .padding(.vertical, 3)
                                         
                                         if p.id != openPos.last?.id {
-                                            Divider().background(AppColors.border)
+                                            Divider().background(AppColors.border.opacity(0.5))
                                         }
                                     }
                                 }
@@ -885,8 +1135,10 @@ public struct DashboardView: View {
     }
     
     // MARK: - 4. Secondary Metrics (Widgets 10, 11, 12, 13, 14)
+    
     @ViewBuilder
-    private func secondaryMetricsGrid(metrics: TradeMetrics) -> some View {
+    private func secondaryMetricsGrid(snap: DashboardSnapshot) -> some View {
+        let metrics = snap.metrics
         let showW10 = !hiddenCardIds.contains("widget-10")
         let showW11 = !hiddenCardIds.contains("widget-11")
         let showW12 = !hiddenCardIds.contains("widget-12")
@@ -895,9 +1147,9 @@ public struct DashboardView: View {
         
         if showW10 || showW11 || showW12 || showW13 || showW14 {
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                // Widget 10: Max drawdown
+                // Widget 10: Max drawdown (TrendingDown)
                 if showW10 {
-                    AppCard {
+                    cardContainer {
                         VStack(alignment: .leading, spacing: 4) {
                             statHeader(
                                 "Max drawdown",
@@ -908,20 +1160,28 @@ public struct DashboardView: View {
                             AppMonetaryText(
                                 Formatters.formatCurrency(metrics.maxDrawdown, currency: env.currentCurrency),
                                 isPrivate: env.isPrivacyModeEnabled,
-                                font: AppTypography.financialNumber(size: 18, weight: .bold),
+                                font: AppTypography.financialNumber(size: 20, weight: .bold),
                                 color: AppColors.loss
                             )
                             
-                            Text(metrics.maxDrawdownPct != nil ? String(format: "-%.1f%%", metrics.maxDrawdownPct! * 100) : "–")
-                                .font(AppTypography.caption)
-                                .foregroundColor(AppColors.secondaryText)
+                            HStack(spacing: 3) {
+                                Text(metrics.maxDrawdownPct != nil ? String(format: "-%.1f%%", metrics.maxDrawdownPct! * 100) : "set balance for %")
+                                    .font(AppTypography.caption)
+                                    .foregroundColor(AppColors.secondaryText)
+                                
+                                if let rec = metrics.recoveryFactor {
+                                    Text("· rec \(String(format: "%.1f", rec))x")
+                                        .font(AppTypography.caption)
+                                        .foregroundColor(AppColors.secondaryText)
+                                }
+                            }
                         }
                     }
                 }
                 
-                // Widget 11: Streaks
+                // Widget 11: Streaks (Flame)
                 if showW11 {
-                    AppCard {
+                    cardContainer {
                         VStack(alignment: .leading, spacing: 4) {
                             statHeader(
                                 "Streaks",
@@ -930,7 +1190,8 @@ public struct DashboardView: View {
                             )
                             
                             Text(metrics.currentStreak > 0 ? "\(metrics.currentStreak)W" : (metrics.currentStreak < 0 ? "\(-metrics.currentStreak)L" : "–"))
-                                .font(AppTypography.financialNumber(size: 18, weight: .bold))
+                                .font(AppTypography.financialNumber(size: 20, weight: .bold))
+                                .monospacedDigit()
                                 .foregroundColor(metrics.currentStreak > 0 ? AppColors.profit : (metrics.currentStreak < 0 ? AppColors.loss : AppColors.primaryText))
                             
                             Text("best \(metrics.maxWinStreak)W · worst \(metrics.maxLossStreak)L")
@@ -940,9 +1201,9 @@ public struct DashboardView: View {
                     }
                 }
                 
-                // Widget 12: Expectancy / trade
+                // Widget 12: Expectancy / trade (Sigma)
                 if showW12 {
-                    AppCard {
+                    cardContainer {
                         VStack(alignment: .leading, spacing: 4) {
                             statHeader(
                                 "Expectancy / trade",
@@ -953,11 +1214,11 @@ public struct DashboardView: View {
                             AppMonetaryText(
                                 metrics.expectancy != nil ? Formatters.formatPnL(metrics.expectancy!, currency: env.currentCurrency) : "–",
                                 isPrivate: env.isPrivacyModeEnabled,
-                                font: AppTypography.financialNumber(size: 18, weight: .bold),
+                                font: AppTypography.financialNumber(size: 20, weight: .bold),
                                 color: (metrics.expectancy ?? 0) >= 0 ? AppColors.profit : AppColors.loss
                             )
                             
-                            Text(metrics.avgRealizedR != nil ? String(format: "avg %.2fR over %d trades", metrics.avgRealizedR!, metrics.tradesWithRisk) : "net P&L ÷ closed trades")
+                            Text(metrics.avgRealizedR != nil && metrics.tradesWithRisk > 0 ? String(format: "avg %.2fR over %d trades", metrics.avgRealizedR!, metrics.tradesWithRisk) : "tag stops for R multiples")
                                 .font(AppTypography.caption)
                                 .foregroundColor(AppColors.secondaryText)
                                 .lineLimit(1)
@@ -965,9 +1226,9 @@ public struct DashboardView: View {
                     }
                 }
                 
-                // Widget 13: Avg duration
+                // Widget 13: Avg duration (Timer)
                 if showW13 {
-                    AppCard {
+                    cardContainer {
                         VStack(alignment: .leading, spacing: 4) {
                             statHeader(
                                 "Avg duration",
@@ -976,7 +1237,8 @@ public struct DashboardView: View {
                             )
                             
                             Text(Formatters.formatDuration(ms: metrics.avgDurationMs))
-                                .font(AppTypography.financialNumber(size: 18, weight: .bold))
+                                .font(AppTypography.financialNumber(size: 20, weight: .bold))
+                                .monospacedDigit()
                                 .foregroundColor(AppColors.primaryText)
                             
                             Text("winners vs losers in Reports")
@@ -986,9 +1248,9 @@ public struct DashboardView: View {
                     }
                 }
                 
-                // Widget 14: Best / worst day
+                // Widget 14: Best / worst day (Trophy)
                 if showW14 {
-                    AppCard {
+                    cardContainer {
                         VStack(alignment: .leading, spacing: 4) {
                             statHeader(
                                 "Best / worst day",
@@ -996,7 +1258,7 @@ public struct DashboardView: View {
                                 hint: "Highest and lowest single-day net P&L in the selected range."
                             )
                             
-                            if let best = bestDay, let worst = worstDay {
+                            if let best = snap.bestDay, let worst = snap.worstDay {
                                 VStack(alignment: .leading, spacing: 3) {
                                     HStack {
                                         AppMonetaryText(
@@ -1036,8 +1298,9 @@ public struct DashboardView: View {
     }
     
     // MARK: - 5. Full Width Performance (Widget 15)
-    private var tradeTimePerformanceCard: some View {
-        AppCard {
+    
+    private func tradeTimePerformanceCard(snap: DashboardSnapshot) -> some View {
+        cardContainer {
             VStack(alignment: .leading, spacing: 10) {
                 statHeader(
                     "Trade time performance",
@@ -1045,7 +1308,7 @@ public struct DashboardView: View {
                     hint: "Trades grouped by their opening hour. The upper chart shows net P&L; the lower chart shows trade count."
                 )
                 
-                if hourlyStats.isEmpty {
+                if snap.hourlyStats.isEmpty {
                     Text("No hourly trade data available.")
                         .font(AppTypography.caption)
                         .foregroundColor(AppColors.secondaryText)
@@ -1053,13 +1316,28 @@ public struct DashboardView: View {
                         .frame(maxWidth: .infinity, alignment: .center)
                 } else {
                     TimeHeatmapView(
-                        hours: hourlyStats,
+                        hours: snap.hourlyStats,
                         currency: env.currentCurrency,
                         isPrivate: env.isPrivacyModeEnabled
                     )
                 }
             }
         }
+    }
+    
+    // MARK: - Apple HIG Reusable Card Container & Header
+    
+    private func cardContainer<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        content()
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(AppColors.cardBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(AppColors.border.opacity(0.6), lineWidth: 0.5)
+            )
+            .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 2)
     }
     
     private func statHeader(_ title: String, icon: String, hint: String) -> some View {
@@ -1069,13 +1347,19 @@ public struct DashboardView: View {
                 .foregroundColor(AppColors.primaryText)
             Spacer()
             Button {
+                #if canImport(UIKit)
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                #endif
                 activeTooltip = (title: title, hint: hint)
             } label: {
                 Image(systemName: icon)
-                    .font(.system(size: 12))
+                    .font(.system(size: 12, weight: .medium))
                     .foregroundColor(AppColors.secondaryText.opacity(0.8))
+                    .frame(width: 24, height: 24)
+                    .background(AppColors.secondaryBackground.opacity(0.5))
+                    .clipShape(Circle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ApplePressableButtonStyle())
         }
     }
     
@@ -1087,7 +1371,36 @@ public struct DashboardView: View {
             Spacer()
             Text(String(format: "%.1f / %.0f", value, max))
                 .font(AppTypography.captionBold)
+                .monospacedDigit()
                 .foregroundColor(AppColors.primaryText)
         }
+    }
+    
+    // MARK: - Day Selection Action
+    
+    private func openCalendarDay(dateKey: String, stats: DayStats?) {
+        #if canImport(UIKit)
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        #endif
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        f.timeZone = env.currentTimeZone
+        let tradesForDay = dataStore.filteredTrades.filter {
+            f.string(from: $0.closedAt ?? $0.openedAt) == dateKey
+        }
+        let note = dataStore.calendarNotes[dateKey] ?? JournalNote(date: dateKey)
+        selectedDayContext = DayDetailContext(
+            dateKey: dateKey,
+            stats: stats,
+            trades: tradesForDay,
+            note: note
+        )
+    }
+    
+    private func parseDate(from key: String) -> Date {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        f.timeZone = env.currentTimeZone
+        return f.date(from: key) ?? Date()
     }
 }
