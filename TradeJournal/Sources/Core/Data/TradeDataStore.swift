@@ -180,6 +180,14 @@ public final class TradeDataStore: ObservableObject {
         }
     }
     
+    public func toggleAccountVisibility(id: String) {
+        if let idx = accounts.firstIndex(where: { $0.id == id }) {
+            let current = accounts[idx].visibleInJournal ?? true
+            accounts[idx].visibleInJournal = !current
+            saveToDisk()
+        }
+    }
+    
     public func setBulkAccountVisibility(action: String) {
         for idx in accounts.indices {
             switch action {
