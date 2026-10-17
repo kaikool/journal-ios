@@ -30,7 +30,7 @@ public struct MissedTradesView: View {
                 title: "Missed trades",
                 showFilters: false
             ) {
-                AppActionPill("Log opportunity", icon: "plus", style: .brand) {
+                AppActionPill("Log opportunity", icon: "plus") {
                     editingTrade = nil
                     showAddSheet = true
                 }

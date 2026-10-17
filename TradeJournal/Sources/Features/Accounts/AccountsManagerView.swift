@@ -93,7 +93,7 @@ public struct AccountsManagerView: View {
                 title: "Accounts",
                 showFilters: false
             ) {
-                AppActionPill("New account", icon: "plus", style: .brand) {
+                AppActionPill("New account", icon: "plus") {
                     showNewAccountSheet = true
                 }
             }
