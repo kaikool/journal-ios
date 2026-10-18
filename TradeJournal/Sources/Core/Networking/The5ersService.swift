@@ -660,7 +660,7 @@ public final class The5ersService: ObservableObject {
                         profitCalcMethod: old.profitCalcMethod,
                         autoSync: isActive,
                         lastSyncAt: Date(),
-                        archivedAt: old.archivedAt ?? (isActive ? nil : JournalIds.nowIso()),
+                        archivedAt: old.archivedAt ?? (isActive ? nil : Date()),
                         visibleInJournal: old.visibleInJournal ?? isActive,
                         createdAt: old.createdAt
                     )
@@ -673,7 +673,7 @@ public final class The5ersService: ObservableObject {
                         currency: acc.currency,
                         initialBalance: acc.startingBalance ?? acc.balance,
                         autoSync: isActive,
-                        archivedAt: isActive ? nil : JournalIds.nowIso(),
+                        archivedAt: isActive ? nil : Date(),
                         visibleInJournal: isActive
                     )
                     dataStore.accounts.append(newAcc)
