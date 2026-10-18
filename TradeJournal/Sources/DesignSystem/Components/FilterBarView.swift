@@ -293,24 +293,31 @@ public struct FilterBarView<Actions: View>: View {
             .background(activeFilterCount > 0 ? AppColors.brand.opacity(colorScheme == .dark ? 0.2 : 0.12) : AppColors.cardBackground.opacity(colorScheme == .dark ? 0.65 : 0.85))
             .foregroundColor(activeFilterCount > 0 ? AppColors.brand : AppColors.secondaryText)
             .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 11, style: .continuous)
-                    .stroke(
-                        activeFilterCount > 0 ? AppColors.brand.opacity(0.4) :
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(colorScheme == .dark ? 0.16 : 0.45),
-                                Color.white.opacity(colorScheme == .dark ? 0.04 : 0.12)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 0.6
-                    )
-            )
+            .overlay(filterButtonBorder)
             .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.2 : 0.04), radius: 4, x: 0, y: 1.5)
         }
         .buttonStyle(ApplePressableButtonStyle())
+    }
+    
+    @ViewBuilder
+    private var filterButtonBorder: some View {
+        if activeFilterCount > 0 {
+            RoundedRectangle(cornerRadius: 11, style: .continuous)
+                .stroke(AppColors.brand.opacity(0.4), lineWidth: 0.6)
+        } else {
+            RoundedRectangle(cornerRadius: 11, style: .continuous)
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(colorScheme == .dark ? 0.16 : 0.45),
+                            Color.white.opacity(colorScheme == .dark ? 0.04 : 0.12)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 0.6
+                )
+        }
     }
     
     private var topSpecularHighlight: some View {
