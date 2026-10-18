@@ -173,6 +173,7 @@ public struct AppButton: View {
     private let iconName: String?
     private let style: Style
     private let size: Size
+    private let fullWidth: Bool
     private let isLoading: Bool
     private let action: () -> Void
     
@@ -181,6 +182,7 @@ public struct AppButton: View {
         icon: String? = nil,
         style: Style = .primary,
         size: Size = .regular,
+        fullWidth: Bool = false,
         isLoading: Bool = false,
         action: @escaping () -> Void
     ) {
@@ -188,6 +190,7 @@ public struct AppButton: View {
         self.iconName = icon
         self.style = style
         self.size = size
+        self.fullWidth = fullWidth
         self.isLoading = isLoading
         self.action = action
     }
@@ -210,9 +213,11 @@ public struct AppButton: View {
                 Text(title)
                     .font(size == .compact ? AppTypography.captionBold : AppTypography.bodyBold)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.75)
             }
-            .padding(.vertical, size == .compact ? 5 : 9)
-            .padding(.horizontal, size == .compact ? 10 : 14)
+            .padding(.vertical, size == .compact ? 6 : 9)
+            .padding(.horizontal, size == .compact ? 8 : 14)
+            .frame(maxWidth: fullWidth ? .infinity : nil)
             .frame(minHeight: size == .compact ? 30 : 38)
             .background(backgroundColor)
             .foregroundColor(foregroundColor)
@@ -223,6 +228,7 @@ public struct AppButton: View {
             )
             .shadow(color: style == .primary ? AppColors.brand.opacity(0.25) : Color.clear, radius: 4, x: 0, y: 2)
         }
+        .frame(maxWidth: fullWidth ? .infinity : nil)
         .buttonStyle(ApplePressableButtonStyle())
         .disabled(isLoading)
     }

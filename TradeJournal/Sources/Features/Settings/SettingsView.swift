@@ -751,7 +751,7 @@ public struct MarketDataSettingsView: View {
                                     binanceStatus = "Public market data enabled."
                                 }
                             } else {
-                                AppButton("Test", icon: "network", style: .secondary, size: .compact) {
+                                AppButton("Test Connection", icon: "network", style: .secondary, size: .compact) {
                                     testBinance()
                                 }
                                 
@@ -818,11 +818,11 @@ public struct MarketDataSettingsView: View {
                                 dataStore.marketConnections.oandaAccountId = oandaAccountId
                                 dataStore.marketConnections.oandaEnvironment = oandaEnvironment
                                 dataStore.saveToDisk()
-                                oandaStatus = "Credentials saved. Test the connection to verify access."
+                                oandaStatus = "Credentials saved. Test connection to verify access."
                             }
                             
                             if !dataStore.marketConnections.oandaApiKey.isEmpty {
-                                AppButton("Test", icon: "network", style: .secondary, size: .compact) {
+                                AppButton("Test Connection", icon: "network", style: .secondary, size: .compact) {
                                     oandaStatus = "Connecting to OANDA v20 servers..."
                                     Task {
                                         let res = await MarketDataService.shared.testOandaConnection(
@@ -883,14 +883,10 @@ public struct ConnectionsSettingsView: View {
     @State private var mcpToken: String = The5ersService.shared.mcpToken
     @State private var the5ersStatus: String = ""
     @State private var isConnectingThe5ers: Bool = false
-    @State private var showManualThe5ersToken: Bool = false
     
     @State private var supabaseUrl: String = SupabaseService.shared.supabaseUrl
     @State private var supabaseAnonKey: String = SupabaseService.shared.supabaseAnonKey
-    @State private var supabaseEmail: String = ""
-    @State private var supabasePassword: String = ""
     @State private var supabaseSyncStatus: String? = nil
-    @State private var showEmailAuthSection: Bool = false
     @State private var showWipeConfirmation: Bool = false
     @State private var isWipingSupabase: Bool = false
     
@@ -915,32 +911,30 @@ public struct ConnectionsSettingsView: View {
                     // Main Action: OAuth Login vs Connected Actions
                     if !the5ers.isConnected {
                         HStack(spacing: 8) {
-                            AppButton("Log in with The5ers", icon: "person.badge.key.fill", style: .primary, size: .compact, isLoading: isConnectingThe5ers) {
+                            AppButton("Log in with The5ers", icon: "person.badge.key.fill", style: .primary, size: .compact, fullWidth: true, isLoading: isConnectingThe5ers) {
                                 loginThe5ersOAuth()
                             }
                             
                             if !mcpToken.trimmingCharacters(in: .whitespaces).isEmpty {
-                                AppButton("Sync Data", icon: "arrow.triangle.2.circlepath", style: .secondary, size: .compact, isLoading: the5ers.isSyncing || dataStore.isSyncing) {
-                                    syncThe5ers()
+                                AppButton("Test Connection", icon: "network", style: .secondary, size: .compact, fullWidth: true) {
+                                    pingMcp()
                                 }
                             }
                         }
                     } else {
-                        VStack(alignment: .leading, spacing: 10) {
-                            AppButton("Sync All The5ers Data Now", icon: "arrow.triangle.2.circlepath", style: .primary, size: .compact, isLoading: the5ers.isSyncing || dataStore.isSyncing) {
+                        HStack(spacing: 8) {
+                            AppButton("Sync all data", icon: "arrow.triangle.2.circlepath", style: .primary, size: .compact, fullWidth: true, isLoading: the5ers.isSyncing || dataStore.isSyncing) {
                                 syncThe5ers()
                             }
                             
-                            HStack(spacing: 8) {
-                                AppButton("Verify MCP", icon: "checkmark.shield", style: .secondary, size: .compact) {
-                                    pingMcp()
-                                }
-                                
-                                AppButton("Disconnect", icon: "xmark.circle", style: .destructive, size: .compact) {
-                                    the5ers.disconnect()
-                                    mcpToken = ""
-                                    the5ersStatus = "Disconnected from The5ers MCP."
-                                }
+                            AppButton("Test Connection", icon: "network", style: .secondary, size: .compact, fullWidth: true) {
+                                pingMcp()
+                            }
+                            
+                            AppButton("Disconnect", icon: "xmark.circle", style: .destructive, size: .compact, fullWidth: true) {
+                                the5ers.disconnect()
+                                mcpToken = ""
+                                the5ersStatus = "Disconnected from The5ers MCP."
                             }
                         }
                     }
@@ -950,32 +944,6 @@ public struct ConnectionsSettingsView: View {
                             .font(AppTypography.caption)
                             .foregroundColor(the5ersStatus.contains("Error") || the5ersStatus.contains("failed") ? AppColors.loss : AppColors.profit)
                     }
-                    
-                    // Collapsible Advanced: Session Token Manual Override
-                    DisclosureGroup("Manual Token Settings (Advanced)", isExpanded: $showManualThe5ersToken) {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("The5ers MCP Bearer Token:")
-                                .font(AppTypography.captionBold)
-                                .foregroundColor(AppColors.secondaryText)
-                            
-                            HStack {
-                                SecureField("Paste The5ers MCP Bearer token...", text: $mcpToken)
-                                    .font(AppTypography.inputText)
-                                    .textFieldStyle(.roundedBorder)
-                                    .textInputAutocapitalization(.never)
-                                    .autocorrectionDisabled(true)
-                                
-                                AppButton("Save token", icon: "checkmark", style: .primary, size: .compact) {
-                                    the5ers.configure(token: mcpToken)
-                                    the5ersStatus = "Saved The5ers MCP session token."
-                                }
-                                .disabled(mcpToken.trimmingCharacters(in: .whitespaces).isEmpty)
-                            }
-                        }
-                        .padding(.top, 6)
-                    }
-                    .font(AppTypography.caption)
-                    .foregroundColor(AppColors.secondaryText)
                     
                     // Sync Info Box
                     VStack(alignment: .leading, spacing: 8) {
@@ -996,9 +964,9 @@ public struct ConnectionsSettingsView: View {
             }
             
             // Card 2: Supabase Cloud Database Sync
-            SettingsCard(title: "Supabase Cloud Database (PostgreSQL + RLS)") {
+            SettingsCard(title: "Supabase connection") {
                 VStack(alignment: .leading, spacing: 14) {
-                    Text("Bi-directional database sync with Supabase PostgreSQL via PostgREST API.")
+                    Text("Cloud database sync with Supabase PostgreSQL via PostgREST API.")
                         .font(AppTypography.caption)
                         .foregroundColor(AppColors.secondaryText)
                     
@@ -1014,86 +982,35 @@ public struct ConnectionsSettingsView: View {
                     }
                     
                     VStack(alignment: .leading, spacing: 6) {
-                        HStack {
-                            Text("Supabase API Key:")
-                                .font(AppTypography.captionBold)
-                                .foregroundColor(AppColors.secondaryText)
-                            Spacer()
-                            Text("Recommended: service_role key")
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundColor(AppColors.accent)
-                        }
-                        SecureField("Paste anon key or service_role key...", text: $supabaseAnonKey)
+                        Text("Supabase API Key:")
+                            .font(AppTypography.captionBold)
+                            .foregroundColor(AppColors.secondaryText)
+                        SecureField("Paste API key (service_role or anon)...", text: $supabaseAnonKey)
                             .font(AppTypography.inputText)
                             .textFieldStyle(.roundedBorder)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled(true)
                         
-                        Text("💡 Tip: Use `service_role` (Secret key from Project Settings → API) for full bypass of RLS constraints. If using `anon` key, copy the migration SQL below to enable RLS policies.")
-                            .font(.system(size: 11))
+                        Text("Use your Project URL and API Key from Supabase Dashboard → Project Settings → API.")
+                            .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText)
                     }
                     
                     HStack(spacing: 8) {
-                        AppButton("Sync Supabase Cloud Now", icon: "arrow.triangle.2.circlepath", style: .primary, size: .compact, isLoading: dataStore.isSyncing) {
+                        AppButton("Sync Supabase", icon: "arrow.triangle.2.circlepath", style: .primary, size: .compact, fullWidth: true, isLoading: dataStore.isSyncing) {
                             syncSupabase()
                         }
                         .disabled(supabaseUrl.trimmingCharacters(in: .whitespaces).isEmpty || supabaseAnonKey.trimmingCharacters(in: .whitespaces).isEmpty)
                         
-                        AppButton("Test Connection", icon: "network", style: .secondary, size: .compact) {
+                        AppButton("Test Connection", icon: "network", style: .secondary, size: .compact, fullWidth: true) {
                             checkSupabaseConnection()
                         }
                         .disabled(supabaseUrl.trimmingCharacters(in: .whitespaces).isEmpty || supabaseAnonKey.trimmingCharacters(in: .whitespaces).isEmpty)
                         
-                        AppButton("Wipe Supabase Data", icon: "trash", style: .destructive, size: .compact, isLoading: isWipingSupabase) {
+                        AppButton("Wipe Data", icon: "trash", style: .destructive, size: .compact, fullWidth: true, isLoading: isWipingSupabase) {
                             showWipeConfirmation = true
                         }
                         .disabled(supabaseUrl.trimmingCharacters(in: .whitespaces).isEmpty || supabaseAnonKey.trimmingCharacters(in: .whitespaces).isEmpty || isWipingSupabase)
-                    }
-                    
-                    // Email/Password Login Section for RLS
-                    VStack(alignment: .leading, spacing: 10) {
-                        Button {
-                            withAnimation { showEmailAuthSection.toggle() }
-                        } label: {
-                            HStack {
-                                Image(systemName: showEmailAuthSection ? "chevron.down" : "chevron.right")
-                                Text("Supabase User Authentication (Optional)")
-                                    .font(AppTypography.captionBold)
-                            }
-                            .foregroundColor(AppColors.secondaryText)
-                        }
-                        
-                        if showEmailAuthSection {
-                            VStack(alignment: .leading, spacing: 8) {
-                                TextField("Account email...", text: $supabaseEmail)
-                                    .font(AppTypography.inputText)
-                                    .textFieldStyle(.roundedBorder)
-                                    .textInputAutocapitalization(.never)
-                                    .autocorrectionDisabled(true)
-                                
-                                SecureField("Password...", text: $supabasePassword)
-                                    .font(AppTypography.inputText)
-                                    .textFieldStyle(.roundedBorder)
-                                
-                                HStack(spacing: 8) {
-                                    AppButton("Sign in with Email", icon: "envelope", style: .secondary, size: .compact) {
-                                        loginSupabaseEmail()
-                                    }
-                                    .disabled(supabaseEmail.isEmpty || supabasePassword.isEmpty)
-                                    
-                                    if SupabaseService.shared.accessToken != nil {
-                                        AppButton("Sign out", icon: "arrow.right.square", style: .destructive, size: .compact) {
-                                            SupabaseService.shared.logout()
-                                            supabaseSyncStatus = "Signed out. Defaulting to Anon Key access."
-                                        }
-                                    }
-                                }
-                            }
-                            .padding(8)
-                            .background(AppColors.secondaryBackground)
-                            .cornerRadius(6)
-                        }
                     }
                     
                     if let status = supabaseSyncStatus {
@@ -1124,7 +1041,7 @@ public struct ConnectionsSettingsView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This will delete all application records across all tables in your Supabase PostgreSQL database while keeping all table schemas, DDL, and RLS policies completely intact. You can then perform a fresh The5ers sync.")
+            Text("This will delete all application records across all tables in your Supabase database and reset local cache. You can then perform a fresh sync.")
         }
     }
     
@@ -1193,33 +1110,6 @@ public struct ConnectionsSettingsView: View {
         }
     }
     
-    private func loginSupabaseEmail() {
-        SupabaseService.shared.configure(url: supabaseUrl, anonKey: supabaseAnonKey)
-        Task {
-            supabaseSyncStatus = "Authenticating with Supabase Auth..."
-            do {
-                _ = try await SupabaseService.shared.loginWithEmail(email: supabaseEmail, password: supabasePassword)
-                supabaseSyncStatus = "Signed in successfully! Session JWT saved to Keychain."
-            } catch {
-                supabaseSyncStatus = "Sign-in error: \(error.localizedDescription)"
-            }
-        }
-    }
-    
-    private func copySqlScript() {
-        #if canImport(UIKit)
-        UIPasteboard.general.string = SupabaseService.shared.generateDatabaseInitSql()
-        supabaseSyncStatus = "Copied migration DDL SQL (23 tables + RLS) to Clipboard! Paste into Supabase SQL Editor and run."
-        #endif
-    }
-    
-    private func copyTruncateSql() {
-        #if canImport(UIKit)
-        UIPasteboard.general.string = SupabaseService.shared.generateTruncateAllSql()
-        supabaseSyncStatus = "Copied TRUNCATE SQL script to Clipboard! Paste and run in Supabase SQL Editor to wipe all rows."
-        #endif
-    }
-    
     private func wipeSupabaseData() {
         isWipingSupabase = true
         supabaseSyncStatus = "Wiping all tables on Supabase cloud database..."
@@ -1229,7 +1119,7 @@ public struct ConnectionsSettingsView: View {
                 await MainActor.run {
                     self.isWipingSupabase = false
                     self.dataStore.resetAllData()
-                    self.supabaseSyncStatus = "All Supabase tables and local data wiped cleanly! Schemas preserved. Ready for fresh The5ers sync."
+                    self.supabaseSyncStatus = "All Supabase tables and local data wiped successfully. You can sync again."
                 }
             } catch {
                 await MainActor.run {
@@ -1245,12 +1135,14 @@ public struct ConnectionsSettingsView: View {
         Task {
             supabaseSyncStatus = "Performing bi-directional sync with Supabase..."
             await dataStore.syncWithSupabase()
-            if let err = dataStore.lastSyncError {
-                supabaseSyncStatus = "Sync error: \(err)"
-            } else if let summary = dataStore.lastSyncSummary {
-                supabaseSyncStatus = summary
-            } else {
-                supabaseSyncStatus = "Bi-directional sync completed successfully!"
+            await MainActor.run {
+                if let err = dataStore.lastSyncError {
+                    self.supabaseSyncStatus = "Sync error: \(err)"
+                } else if let summary = dataStore.lastSyncSummary {
+                    self.supabaseSyncStatus = summary
+                } else {
+                    self.supabaseSyncStatus = "Bi-directional sync completed successfully!"
+                }
             }
         }
     }
