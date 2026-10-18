@@ -134,6 +134,76 @@ public struct TradeDetailView: View {
                                         .foregroundColor(AppColors.primaryText)
                                 }
                             }
+                            
+                            // Visual Financial Breakdown (Gross - Fees = Net)
+                            VStack(spacing: 8) {
+                                HStack {
+                                    Text("FINANCIAL BREAKDOWN")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundColor(AppColors.secondaryText)
+                                    Spacer()
+                                    Text("Gross - Fees = Net")
+                                        .font(.system(size: 10, weight: .medium))
+                                        .foregroundColor(AppColors.secondaryText.opacity(0.8))
+                                }
+                                
+                                HStack(spacing: 6) {
+                                    // Gross P&L
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("Gross P&L")
+                                            .font(.system(size: 10, weight: .medium))
+                                            .foregroundColor(AppColors.secondaryText)
+                                        AppMonetaryText(
+                                            Formatters.formatPnL(trade.grossPnl, currency: env.currentCurrency),
+                                            isPrivate: env.isPrivacyModeEnabled,
+                                            font: AppTypography.subheadlineBold,
+                                            color: Formatters.pnlColor(trade.grossPnl)
+                                        )
+                                    }
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    
+                                    Image(systemName: "minus")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundColor(AppColors.secondaryText.opacity(0.6))
+                                    
+                                    // Fees & Commission
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("Fees & Costs")
+                                            .font(.system(size: 10, weight: .medium))
+                                            .foregroundColor(AppColors.secondaryText)
+                                        Text(Formatters.formatCurrency(trade.fees, currency: env.currentCurrency))
+                                            .font(AppTypography.subheadlineBold)
+                                            .monospacedDigit()
+                                            .foregroundColor(trade.fees > 0 ? AppColors.warning : AppColors.primaryText)
+                                    }
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    
+                                    Image(systemName: "equal")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundColor(AppColors.secondaryText.opacity(0.6))
+                                    
+                                    // Net P&L
+                                    VStack(alignment: .trailing, spacing: 2) {
+                                        Text("Net P&L")
+                                            .font(.system(size: 10, weight: .bold))
+                                            .foregroundColor(AppColors.secondaryText)
+                                        AppMonetaryText(
+                                            Formatters.formatPnL(trade.netPnl, currency: env.currentCurrency),
+                                            isPrivate: env.isPrivacyModeEnabled,
+                                            font: AppTypography.subheadlineBold,
+                                            color: Formatters.pnlColor(trade.netPnl)
+                                        )
+                                    }
+                                    .frame(maxWidth: .infinity, alignment: .trailing)
+                                }
+                                .padding(10)
+                                .background(AppColors.secondaryBackground.opacity(0.6))
+                                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                        .stroke(AppColors.border.opacity(0.4), lineWidth: 0.5)
+                                )
+                            }
                         }
                     }
                     
@@ -163,6 +233,18 @@ public struct TradeDetailView: View {
                                         .font(AppTypography.subheadlineBold)
                                         .monospacedDigit()
                                         .foregroundColor(AppColors.primaryText)
+                                }
+                                Spacer()
+                                VStack(alignment: .center, spacing: 3) {
+                                    Text("Gross P&L")
+                                        .font(AppTypography.caption)
+                                        .foregroundColor(AppColors.secondaryText)
+                                    AppMonetaryText(
+                                        Formatters.formatPnL(trade.grossPnl, currency: env.currentCurrency),
+                                        isPrivate: env.isPrivacyModeEnabled,
+                                        font: AppTypography.subheadlineBold,
+                                        color: Formatters.pnlColor(trade.grossPnl)
+                                    )
                                 }
                                 Spacer()
                                 VStack(alignment: .trailing, spacing: 3) {

@@ -55,7 +55,7 @@ public final class TradeDataStore: ObservableObject {
             folders = NotebookEngine.defaultSystemFolders
         }
         if selectedAccountId == "default-acc" || (!accounts.contains(where: { $0.id == selectedAccountId }) && selectedAccountId != "all") {
-            selectedAccountId = "all"
+            selectedAccountId = mostRecentActiveAccount?.id ?? "all"
         }
         rebuildAllAccounts()
     }

@@ -778,8 +778,9 @@ public final class The5ersService: ObservableObject {
             lastSyncTime = Date()
             dataStore.rebuildAllAccounts()
             
-            // Internal implementation note
-            if dataStore.filteredTrades.isEmpty, let firstWithTrade = dataStore.accounts.first(where: { acc in dataStore.trades.contains(where: { $0.accountId == acc.id }) }) {
+            if let activeAcc = dataStore.mostRecentActiveAccount {
+                dataStore.selectedAccountId = activeAcc.id
+            } else if let firstWithTrade = dataStore.accounts.first(where: { acc in dataStore.trades.contains(where: { $0.accountId == acc.id }) }) {
                 dataStore.selectedAccountId = firstWithTrade.id
             }
             
@@ -925,7 +926,7 @@ public final class The5ersService: ObservableObject {
             }
         }
         
-        let pnlKeys = ["profitandloss", "profit", "netpnl", "pnl", "net_pnl", "gross", "realizedpnl"]
+        let pnlKeys = ["profitandloss", "netpnl", "net_pnl", "realizedpnl", "net", "profit", "pnl", "gross"]
         let pnlVal = firstValue(in: row, keys: pnlKeys)
         let netPnl = isClosed ? (sourceNumber(pnlVal) ?? 0) : 0
         
@@ -1029,13 +1030,14 @@ public final class The5ersService: ObservableObject {
             }()
             
             // Internal implementation note
-            // Provider net already includes signed swap and commission. Reverse costs for gross only.
-            let fee = position.fee ?? 0
-            let swap = position.swap ?? 0
-            let hasCosts = (position.fee != nil && position.swap != nil)
-            let costsReversed = hasCosts ? (-fee - swap) : 0
-            let grossPnl = position.netPnl + costsReversed
-            let fees = hasCosts ? costsReversed : 0
+            let rawFee = position.fee ?? 0
+            let rawSwap = position.swap ?? 0
+            let hasCosts = (position.fee != nil || position.swap != nil)
+            let feeCost = abs(rawFee)
+            let swapCost = -rawSwap
+            let netCosts = hasCosts ? (feeCost + swapCost) : Decimal.zero
+            let grossPnl = position.netPnl + netCosts
+            let fees = hasCosts ? max(0, netCosts) : Decimal.zero
             let netPnl = position.netPnl
             
             let durationMs: Int64? = (isClosed && position.closedAtDate != nil)

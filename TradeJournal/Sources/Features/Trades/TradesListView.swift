@@ -130,8 +130,8 @@ public struct TradesListView: View {
                         color: pnlColor
                     )
                     
-                    Text("\(overviewMetrics.closedTrades) closed trades")
-                        .font(.system(size: 10))
+                    Text("\(overviewMetrics.closedTrades) closed · Gross \(Formatters.formatPnL(overviewMetrics.grossPnl ?? overviewMetrics.netPnl, currency: env.currentCurrency)) · Fees \(Formatters.formatCurrency(overviewMetrics.fees ?? 0, currency: env.currentCurrency))")
+                        .font(.system(size: 9))
                         .monospacedDigit()
                         .foregroundColor(AppColors.secondaryText)
                 }
@@ -333,10 +333,18 @@ private struct TradeTerminalRow: View {
                     color: trade.netPnl >= 0 ? AppColors.profit : AppColors.loss
                 )
                 
-                Text("Entry \(Formatters.price(trade.avgEntry))")
-                    .font(AppTypography.caption)
-                    .monospacedDigit()
-                    .foregroundColor(AppColors.secondaryText)
+                HStack(spacing: 3) {
+                    if trade.fees > 0 {
+                        Text("Fee \(Formatters.formatCurrency(trade.fees, currency: env.currentCurrency))")
+                            .foregroundColor(AppColors.secondaryText.opacity(0.8))
+                        Text("·")
+                            .foregroundColor(AppColors.secondaryText.opacity(0.5))
+                    }
+                    Text("Entry \(Formatters.price(trade.avgEntry))")
+                        .foregroundColor(AppColors.secondaryText)
+                }
+                .font(AppTypography.caption)
+                .monospacedDigit()
             }
             
             Image(systemName: "chevron.right")

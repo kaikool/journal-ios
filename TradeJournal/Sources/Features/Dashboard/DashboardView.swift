@@ -850,7 +850,7 @@ public struct DashboardView: View {
                 statHeader(
                     "Net P&L",
                     icon: "dollarsign.circle",
-                    hint: "Realized profit and loss net of fees, over the selected range."
+                    hint: "Realized net profit (Gross P&L minus fees). Sum of all trade net results; fees are already accounted for."
                 )
                 
                 if isCompact {
@@ -879,8 +879,9 @@ public struct DashboardView: View {
                         .clipShape(Capsule())
                     }
                     
-                    Text("\(metrics.closedTrades) closed · \(Formatters.formatCurrency(metrics.fees, currency: env.currentCurrency)) fees")
-                        .font(AppTypography.caption)
+                    Text("\(metrics.closedTrades) closed · Gross: \(Formatters.formatPnL(metrics.grossPnl ?? metrics.netPnl, currency: env.currentCurrency)) · Fees: \(Formatters.formatCurrency(metrics.fees ?? 0, currency: env.currentCurrency))")
+                        .font(.system(size: 10))
+                        .monospacedDigit()
                         .foregroundColor(AppColors.secondaryText)
                         .lineLimit(1)
                 } else {
@@ -912,9 +913,16 @@ public struct DashboardView: View {
                         }
                     }
                     
-                    Text("\(metrics.closedTrades) closed trades · \(Formatters.formatCurrency(metrics.fees, currency: env.currentCurrency)) fees")
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.secondaryText)
+                    HStack(spacing: 6) {
+                        Text("\(metrics.closedTrades) closed trades")
+                        Text("·")
+                        Text("Gross: \(Formatters.formatPnL(metrics.grossPnl ?? metrics.netPnl, currency: env.currentCurrency))")
+                        Text("·")
+                        Text("Fees: \(Formatters.formatCurrency(metrics.fees ?? 0, currency: env.currentCurrency))")
+                    }
+                    .font(AppTypography.caption)
+                    .monospacedDigit()
+                    .foregroundColor(AppColors.secondaryText)
                 }
             }
             .frame(maxWidth: .infinity, minHeight: isCompact ? 98 : nil, alignment: .topLeading)
