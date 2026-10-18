@@ -273,9 +273,10 @@ public struct ReportsView: View {
                         Image(systemName: "chart.line.uptrend.xyaxis")
                             .font(.system(size: 13))
                             .foregroundColor(AppColors.brand)
-                        Text("Equity Curve")
-                            .font(AppTypography.headline)
-                            .foregroundColor(AppColors.primaryText)
+                        Text("EQUITY CURVE")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(AppColors.secondaryText)
+                            .tracking(0.5)
                     }
                     
                     EquityCurveChart(points: equityPoints, currency: env.currentCurrency, height: 200)
@@ -290,9 +291,10 @@ public struct ReportsView: View {
                         Image(systemName: "chart.bar.xaxis")
                             .font(.system(size: 13))
                             .foregroundColor(AppColors.loss)
-                        Text("Drawdown Analysis")
-                            .font(AppTypography.headline)
-                            .foregroundColor(AppColors.primaryText)
+                        Text("DRAWDOWN ANALYSIS")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(AppColors.secondaryText)
+                            .tracking(0.5)
                     }
                     
                     DrawdownChart(points: equityPoints, height: 120)

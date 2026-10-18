@@ -26,9 +26,10 @@ public struct WeekdayChart: View {
                 // Header with live active readout
                 HStack(alignment: .lastTextBaseline) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(activeBucket != nil ? activeBucket!.key : "Performance by Weekday")
-                            .font(AppTypography.headline)
-                            .foregroundColor(AppColors.primaryText)
+                        Text(activeBucket != nil ? activeBucket!.key.uppercased() : "PERFORMANCE BY WEEKDAY")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(AppColors.secondaryText)
+                            .tracking(0.5)
                         
                         Text(activeBucket != nil ? "\(activeBucket!.trades) trades · WR \(activeBucket!.winRate != nil ? Formatters.formatPercent(activeBucket!.winRate!) : "–")" : "Net P&L grouped by trading day")
                             .font(AppTypography.caption)

@@ -173,8 +173,6 @@ public struct DashboardView: View {
         
         let best = overview.days.max(by: { $0.netPnl < $1.netPnl })
         let worst = overview.days.min(by: { $0.netPnl < $1.netPnl })
-            dayMap[d.date] = d
-        }
         
         let iso = DateFormatter()
         iso.dateFormat = "yyyy-MM"
@@ -658,9 +656,10 @@ public struct DashboardView: View {
             
             cardContainer {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("All accounts")
-                        .font(AppTypography.cardTitle)
-                        .foregroundColor(AppColors.primaryText)
+                    Text("ALL ACCOUNTS")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(AppColors.secondaryText)
+                        .tracking(0.5)
                     
                     Text("\(totalClosed) closed trades · \(combinedWinRate != nil ? String(format: "%.1f%%", combinedWinRate! * 100) : "–") trade win rate")
                         .font(AppTypography.body)
@@ -673,9 +672,10 @@ public struct DashboardView: View {
                 ForEach(currencyGroups, id: \.currency) { group in
                     cardContainer {
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("\(group.currency) accounts")
-                                .font(AppTypography.captionBold)
+                            Text("\(group.currency) ACCOUNTS")
+                                .font(.system(size: 11, weight: .semibold))
                                 .foregroundColor(AppColors.secondaryText)
+                                .tracking(0.5)
                             
                             AppMonetaryText(
                                 Formatters.formatPnL(group.metrics.netPnl, currency: group.currency),
@@ -1303,9 +1303,10 @@ public struct DashboardView: View {
         cardContainer {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
-                    Text("Activity")
-                        .font(AppTypography.headline)
-                        .foregroundColor(AppColors.primaryText)
+                    Text("ACTIVITY")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(AppColors.secondaryText)
+                        .tracking(0.5)
                     Spacer()
                 }
                 
@@ -1634,9 +1635,10 @@ public struct DashboardView: View {
     
     private func statHeader(_ title: String, icon: String, hint: String) -> some View {
         HStack(alignment: .center) {
-            Text(title)
-                .font(AppTypography.cardTitle)
-                .foregroundColor(AppColors.primaryText)
+            Text(title.uppercased())
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(AppColors.secondaryText)
+                .tracking(0.5)
             Spacer()
             Button {
                 #if canImport(UIKit)

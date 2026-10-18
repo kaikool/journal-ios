@@ -299,9 +299,10 @@ public struct PropFirmLedgerView: View {
             cardContainer {
                 VStack(spacing: 12) {
                     HStack {
-                        Text("Net Prop Cash")
-                            .font(AppTypography.cardTitle)
-                            .foregroundColor(AppColors.primaryText)
+                        Text("NET PROP CASH")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(AppColors.secondaryText)
+                            .tracking(0.5)
                         Spacer()
                         if let roi = summary.roi {
                             Text(String(format: "ROI %+.1f%%", roi * 100))
@@ -384,9 +385,10 @@ public struct PropFirmLedgerView: View {
             if !timelinePoints.isEmpty {
                 cardContainer {
                     VStack(alignment: .leading, spacing: 10) {
-                        Text("Cumulative cash timeline")
-                            .font(AppTypography.cardTitle)
-                            .foregroundColor(AppColors.primaryText)
+                        Text("CUMULATIVE CASH TIMELINE")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(AppColors.secondaryText)
+                            .tracking(0.5)
                         
                         let dateFormatter: DateFormatter = {
                             let df = DateFormatter()
@@ -491,9 +493,10 @@ public struct PropFirmLedgerView: View {
     
     private func subMetricBlock(title: String, value: String, color: Color) -> some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text(title)
-                .font(AppTypography.caption)
+            Text(title.uppercased())
+                .font(.system(size: 10, weight: .semibold))
                 .foregroundColor(AppColors.secondaryText)
+                .tracking(0.5)
             Text(value)
                 .font(AppTypography.bodyBold)
                 .monospacedDigit()

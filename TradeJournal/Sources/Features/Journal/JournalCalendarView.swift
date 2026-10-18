@@ -1086,9 +1086,10 @@ public struct JournalCalendarView: View {
     private func metricCard(title: String, value: String, detail: String, valueColor: Color) -> some View {
         AppCard {
             VStack(alignment: .leading, spacing: 3) {
-                Text(title)
-                    .font(AppTypography.cardTitle)
+                Text(title.uppercased())
+                    .font(.system(size: 11, weight: .semibold))
                     .foregroundColor(AppColors.secondaryText)
+                    .tracking(0.5)
                 
                 AppMonetaryText(
                     value,

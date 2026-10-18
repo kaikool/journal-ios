@@ -119,9 +119,10 @@ public struct TradesListView: View {
         LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
             cardContainer {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Net cumulative P&L")
-                        .font(AppTypography.cardTitle)
-                        .foregroundColor(AppColors.primaryText)
+                    Text("NET CUMULATIVE P&L")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(AppColors.secondaryText)
+                        .tracking(0.5)
                     
                     AppMonetaryText(
                         Formatters.formatPnL(overviewMetrics.netPnl, currency: env.currentCurrency),
@@ -139,9 +140,10 @@ public struct TradesListView: View {
             
             cardContainer {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Profit factor")
-                        .font(AppTypography.cardTitle)
-                        .foregroundColor(AppColors.primaryText)
+                    Text("PROFIT FACTOR")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(AppColors.secondaryText)
+                        .tracking(0.5)
                     
                     Text(pfStr)
                         .font(AppTypography.financialNumber(size: 19, weight: .bold))
@@ -156,9 +158,10 @@ public struct TradesListView: View {
             
             cardContainer {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Trade win %")
-                        .font(AppTypography.cardTitle)
-                        .foregroundColor(AppColors.primaryText)
+                    Text("TRADE WIN %")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(AppColors.secondaryText)
+                        .tracking(0.5)
                     
                     Text(winRateStr)
                         .font(AppTypography.financialNumber(size: 19, weight: .bold))
@@ -174,9 +177,10 @@ public struct TradesListView: View {
             
             cardContainer {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Avg win / loss")
-                        .font(AppTypography.cardTitle)
-                        .foregroundColor(AppColors.primaryText)
+                    Text("AVG WIN / LOSS")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(AppColors.secondaryText)
+                        .tracking(0.5)
                     
                     Text(avgWlStr)
                         .font(AppTypography.financialNumber(size: 19, weight: .bold))
