@@ -314,7 +314,8 @@ public final class TradeDataStore: ObservableObject {
             accounts[i].name = Formatters.cleanAccountName(accounts[i].name, balance: accounts[i].initialBalance)
         }
         for i in 0..<propAccounts.count {
-            propAccounts[i].name = Formatters.cleanAccountName(propAccounts[i].name, balance: Decimal(propAccounts[i].sizeMinor) / 100)
+            let sizeBal = propAccounts[i].sizeMinor.map { Decimal($0) / 100 }
+            propAccounts[i].name = Formatters.cleanAccountName(propAccounts[i].name, balance: sizeBal)
         }
         for acc in accounts {
             rebuildAccount(accountId: acc.id)

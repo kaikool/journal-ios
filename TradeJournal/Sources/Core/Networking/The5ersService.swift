@@ -780,11 +780,11 @@ public final class The5ersService: ObservableObject {
                             firm: "The5ers",
                             kind: "payout",
                             category: "payout",
-                            status: .completed,
                             currency: primaryCurrency,
                             amountMinor: amtMinor,
                             splitBps: 8000,
                             occurredOn: dateStr,
+                            status: .completed,
                             reference: shortRef,
                             notes: "The5ers Funded Payout"
                         )
@@ -1295,10 +1295,10 @@ public final class The5ersService: ObservableObject {
                     firm: "The5ers",
                     kind: "expense",
                     category: productType,
-                    status: .completed,
                     currency: currency,
                     amountMinor: amountMinor,
                     occurredOn: dateStr,
+                    status: .completed,
                     reference: shortRef,
                     notes: "\(title) (The5ers official order)"
                 )
