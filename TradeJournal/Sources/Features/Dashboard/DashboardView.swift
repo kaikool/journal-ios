@@ -6,6 +6,10 @@ public struct DashboardView: View {
     @ObservedObject private var dataStore = TradeDataStore.shared
     
     @AppStorage("dashboard_hidden_widgets") private var hiddenWidgetsRaw: String = ""
+    @AppStorage("dashboard_card_order") private var cardOrderRaw: String = ""
+    @AppStorage("dashboard_active_preset") private var activePresetRaw: String = "Overview"
+    
+    @State private var isEditingLayout: Bool = false
     @State private var selectedRange: JournalTimeRange = .all
     @State private var showEdgeScoreBreakdown: Bool = false
     @State private var showCustomizerSheet: Bool = false
@@ -20,18 +24,69 @@ public struct DashboardView: View {
     
     public init() {}
     
-    // MARK: - Hidden Cards & Registry
+    // MARK: - Arrangement & Presets
+    
+    private var cardOrder: [String] {
+        get {
+            if cardOrderRaw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                return DashboardCardRegistry.defaultOrder
+            }
+            let list = cardOrderRaw.split(separator: ",").map(String.init)
+            var result = list.filter { DashboardCardRegistry.defaultOrder.contains($0) }
+            for card in DashboardCardRegistry.defaultOrder {
+                if !result.contains(card) {
+                    result.append(card)
+                }
+            }
+            return result
+        }
+        set {
+            cardOrderRaw = newValue.joined(separator: ",")
+        }
+    }
+    
+    private var cardOrderBinding: Binding<[String]> {
+        Binding(
+            get: { cardOrder },
+            set: { newOrder in
+                cardOrder = newOrder
+            }
+        )
+    }
     
     private var hiddenCardIds: Set<String> {
-        guard !hiddenWidgetsRaw.isEmpty else { return [] }
-        return Set(hiddenWidgetsRaw.split(separator: ",").map(String.init))
+        get {
+            guard !hiddenWidgetsRaw.isEmpty else { return [] }
+            return Set(hiddenWidgetsRaw.split(separator: ",").map(String.init))
+        }
+        set {
+            hiddenWidgetsRaw = newValue.joined(separator: ",")
+        }
     }
     
     private var hiddenCardIdsBinding: Binding<Set<String>> {
         Binding(
             get: { hiddenCardIds },
             set: { newSet in
-                hiddenWidgetsRaw = newSet.joined(separator: ",")
+                hiddenCardIds = newSet
+            }
+        )
+    }
+    
+    private var activePreset: DashboardPreset {
+        get {
+            DashboardPreset(rawValue: activePresetRaw) ?? .overview
+        }
+        set {
+            activePresetRaw = newValue.rawValue
+        }
+    }
+    
+    private var activePresetBinding: Binding<DashboardPreset> {
+        Binding(
+            get: { activePreset },
+            set: { newPreset in
+                activePreset = newPreset
             }
         )
     }
@@ -48,99 +103,70 @@ public struct DashboardView: View {
         
         let now = Date()
         let calendar = Calendar.current
-        let cutoff: Date
-        
-        switch selectedRange {
-        case .all:
-            return baseTrades
-        case .d7:
-            cutoff = calendar.date(byAdding: .day, value: -7, to: now) ?? now
-        case .d30:
-            cutoff = calendar.date(byAdding: .day, value: -30, to: now) ?? now
-        case .d90:
-            cutoff = calendar.date(byAdding: .day, value: -90, to: now) ?? now
-        case .ytd:
-            let comps = calendar.dateComponents([.year], from: now)
-            cutoff = calendar.date(from: comps) ?? now
+        return baseTrades.filter { trade in
+            let date = trade.closedAt ?? trade.openedAt
+            switch selectedRange {
+            case .all:
+                return true
+            case .today:
+                return calendar.isDateInToday(date)
+            case .yesterday:
+                return calendar.isDateInYesterday(date)
+            case .thisWeek:
+                return calendar.isDate(date, equalTo: now, toGranularity: .weekOfYear)
+            case .lastWeek:
+                guard let lastWeek = calendar.date(byAdding: .weekOfYear, value: -1, to: now) else { return false }
+                return calendar.isDate(date, equalTo: lastWeek, toGranularity: .weekOfYear)
+            case .thisMonth:
+                return calendar.isDate(date, equalTo: now, toGranularity: .month)
+            case .lastMonth:
+                guard let lastMonth = calendar.date(byAdding: .month, value: -1, to: now) else { return false }
+                return calendar.isDate(date, equalTo: lastMonth, toGranularity: .month)
+            case .thisYear:
+                return calendar.isDate(date, equalTo: now, toGranularity: .year)
+            case .lastYear:
+                guard let lastYear = calendar.date(byAdding: .year, value: -1, to: now) else { return false }
+                return calendar.isDate(date, equalTo: lastYear, toGranularity: .year)
+            case .last30Days:
+                guard let thirtyDaysAgo = calendar.date(byAdding: .day, value: -30, to: now) else { return false }
+                return date >= thirtyDaysAgo && date <= now
+            case .last90Days:
+                guard let ninetyDaysAgo = calendar.date(byAdding: .day, value: -90, to: now) else { return false }
+                return date >= ninetyDaysAgo && date <= now
+            case .custom(let start, let end):
+                return date >= start && date <= end
+            }
         }
-        
-        return baseTrades.filter { $0.openedAt >= cutoff }
     }
     
-    // MARK: - Memoized Single-Pass Snapshot
-    
-    private struct DashboardSnapshot {
-        let metrics: TradeMetrics
-        let curve: [EquityPoint]
-        let days: [DayStats]
-        let edgeResult: EdgeScoreResult
-        let chartEquityPoints: [EquityPointItem]
-        let hourlyStats: [BucketStats]
-        let weekDelta: Decimal?
-        let bestDay: DayStats?
-        let worstDay: DayStats?
-        let daysWithTradesMap: [String: DayStats]
-        let currentMonthStats: (tradingDays: Int, winningDays: Int, monthPnl: Decimal)
-    }
+    // MARK: - Computed Financial Snapshot
     
     private var snapshot: DashboardSnapshot {
-        let initialBalance: Decimal = {
-            if dataStore.selectedAccountId == "all" {
-                return dataStore.visibleAccounts.reduce(Decimal.zero) { $0 + $1.initialBalance }
-            }
-            return dataStore.selectedAccount?.initialBalance ?? 0
-        }()
-        
+        let trades = scopedTrades
         let overview = FinancialMetricsEngine.computeOverview(
-            trades: scopedTrades,
+            trades: trades,
             timeZone: env.currentTimeZone,
-            initialBalance: initialBalance
+            initialBalance: dataStore.selectedAccount?.initialBalance ?? 100000
         )
         
-        let edge = EdgeScoreEngine.computeEdgeScore(metrics: overview.metrics)
+        let edge = FinancialMetricsEngine.computeEdgeScore(trades: trades, metrics: overview.metrics)
         
-        var runningPeak: Decimal = 0
-        let chartPoints = overview.curve.map { pt -> EquityPointItem in
-            if pt.cumNetPnl > runningPeak {
-                runningPeak = pt.cumNetPnl
-            }
-            let base = initialBalance + runningPeak
-            let dd: Decimal = base > 0 ? (runningPeak - pt.cumNetPnl) / base : (runningPeak > 0 ? (runningPeak - pt.cumNetPnl) / runningPeak : Decimal.zero)
-            return EquityPointItem(
-                date: pt.timestamp,
-                dateKey: pt.dateString,
-                netPnl: pt.cumNetPnl,
-                cumulativePnl: pt.cumNetPnl,
-                drawdown: dd
-            )
-        }
-        
-        let hourly = AggregateEngine.byHour(trades: scopedTrades, timeZone: env.currentTimeZone)
-        
-        // Momentum: net P&L of the last 7 calendar days vs the 7 before them (matching page.tsx lines 207-224)
-        let nowMs = Date().timeIntervalSince1970 * 1000
-        var last: Decimal = 0
-        var prior: Decimal = 0
-        var lastDays = 0
-        var priorDays = 0
-        
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        formatter.timeZone = TimeZone(identifier: "UTC")
-        
+        var cumulative: Decimal = 0
+        var chartPoints: [EquityPoint] = []
         for day in overview.days {
-            if let date = formatter.date(from: day.date) {
-                let ageDays = (nowMs - (date.timeIntervalSince1970 * 1000)) / 86_400_000
-                if ageDays <= 7 {
-                    last += day.netPnl
-                    lastDays += 1
-                } else if ageDays <= 14 {
-                    prior += day.netPnl
-                    priorDays += 1
-                }
-            }
+            cumulative += day.netPnl
+            let parsedDate = FlexibleDateParser.parse(day.date, defaultTimeZone: env.currentTimeZone) ?? Date()
+            chartPoints.append(EquityPoint(date: parsedDate, pnl: cumulative))
         }
-        let delta = (lastDays > 0 && priorDays > 0) ? (last - prior) : nil
+        
+        let hourly = FinancialMetricsEngine.computeHourlyPerformance(trades: trades, timeZone: env.currentTimeZone)
+        
+        // 7-day prior delta comparison matching page.tsx line 255
+        let delta = FinancialMetricsEngine.computePriorDelta(
+            days: overview.days,
+            selectedRange: selectedRange,
+            timeZone: env.currentTimeZone
+        )
         
         let best = overview.days.max(by: { $0.netPnl < $1.netPnl })
         let worst = overview.days.min(by: { $0.netPnl < $1.netPnl })
@@ -173,7 +199,7 @@ public struct DashboardView: View {
         )
     }
     
-    // MARK: - Multi-Currency Group Calculations (matching page.tsx lines 153-188)
+    // MARK: - Multi-Currency Group Calculations
     
     private var isMultiCurrencyNoticeActive: Bool {
         dataStore.selectedAccountId == "all" && dataStore.availableCurrencies.count > 1
@@ -235,6 +261,44 @@ public struct DashboardView: View {
         return formatter.string(from: Date())
     }
     
+    // MARK: - Dynamic Responsive Grid Computation (1:1 port of balancedDashboardSpans)
+    
+    private struct DashboardRowItem: Identifiable {
+        let id: String
+        let items: [String]
+    }
+    
+    private var dashboardRows: [DashboardRowItem] {
+        let visible = cardOrder.filter { !hiddenCardIds.contains($0) }
+        var rows: [DashboardRowItem] = []
+        var i = 0
+        while i < visible.count {
+            let currentId = visible[i]
+            let currentSize = DashboardCardRegistry.size(for: currentId)
+            
+            if currentSize == .small {
+                // If the next card is also .small, pair them side-by-side
+                if i + 1 < visible.count {
+                    let nextId = visible[i + 1]
+                    let nextSize = DashboardCardRegistry.size(for: nextId)
+                    if nextSize == .small {
+                        rows.append(DashboardRowItem(id: "\(currentId)_\(nextId)", items: [currentId, nextId]))
+                        i += 2
+                        continue
+                    }
+                }
+                // Isolated small card spans full width
+                rows.append(DashboardRowItem(id: currentId, items: [currentId]))
+                i += 1
+            } else {
+                // Medium, wide, or full width card
+                rows.append(DashboardRowItem(id: currentId, items: [currentId]))
+                i += 1
+            }
+        }
+        return rows
+    }
+    
     // MARK: - Main Body
     
     public var body: some View {
@@ -260,6 +324,10 @@ public struct DashboardView: View {
                 VStack(spacing: 12) {
                     syncNotificationSection
                     
+                    if isEditingLayout {
+                        reorderBanner
+                    }
+                    
                     if isMultiCurrencyNoticeActive {
                         // Multi-currency notice & account breakdown matching page.tsx lines 153-188
                         multiCurrencySection
@@ -270,21 +338,16 @@ public struct DashboardView: View {
                             emptyStateCard
                         }
                     } else {
-                        // SECTION 1: Summary Group (Widgets 0-4)
-                        summaryGroupSection(snap: snap)
-                        
-                        // SECTION 2: Visuals Group (Widgets 5, 6, 7)
-                        visualsGroupSection(snap: snap)
-                        
-                        // SECTION 3: Detail Group (Widgets 8, 9)
-                        detailGroupSection(snap: snap)
-                        
-                        // SECTION 4: Secondary Metrics Group (Widgets 10-14)
-                        secondaryMetricsGrid(snap: snap)
-                        
-                        // SECTION 5: Full Width Performance (Widget 15)
-                        if !hiddenCardIds.contains("widget-15") {
-                            tradeTimePerformanceCard(snap: snap)
+                        // Dynamic Grid Conforming 1:1 to balancedDashboardSpans
+                        ForEach(dashboardRows) { row in
+                            if row.items.count == 2 {
+                                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                                    renderWidget(id: row.items[0], snap: snap, isCompact: true)
+                                    renderWidget(id: row.items[1], snap: snap, isCompact: true)
+                                }
+                            } else if let id = row.items.first {
+                                renderWidget(id: id, snap: snap, isCompact: false)
+                            }
                         }
                     }
                 }
@@ -300,10 +363,11 @@ public struct DashboardView: View {
             .background(AppColors.background)
         }
         .sheet(isPresented: $showCustomizerSheet) {
-            DashboardCustomizerSheet(hiddenCardIds: hiddenCardIdsBinding)
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
-                .presentationCornerRadius(28)
+            DashboardCustomizerSheet(
+                hiddenCardIds: hiddenCardIdsBinding,
+                cardOrder: cardOrderBinding,
+                activePreset: activePresetBinding
+            )
         }
         .sheet(isPresented: $showAIReflection) {
             AIReflectionView()
@@ -349,26 +413,99 @@ public struct DashboardView: View {
         }
     }
     
-    // MARK: - Top Layout Bar (Apple HIG Capsule Toolbar)
+    // MARK: - Reorder Mode Banner
+    
+    private var reorderBanner: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "hand.draw")
+                .foregroundColor(AppColors.brand)
+                .font(.system(size: 14))
+            
+            Text("Reorder mode: tap arrows to move cards")
+                .font(AppTypography.captionBold)
+                .foregroundColor(AppColors.primaryText)
+            
+            Spacer()
+            
+            Button("Done") {
+                #if canImport(UIKit)
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                #endif
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                    isEditingLayout = false
+                }
+            }
+            .font(AppTypography.captionBold)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .background(AppColors.brand)
+            .foregroundColor(.white)
+            .clipShape(Capsule())
+        }
+        .padding(10)
+        .background(AppColors.cardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(AppColors.brand.opacity(0.35), lineWidth: 1)
+        )
+        .transition(.move(edge: .top).combined(with: .opacity))
+    }
+    
+    // MARK: - Top Layout Bar (Apple HIG Presets Menu & Customize)
     
     private var layoutBar: some View {
         HStack(spacing: 8) {
-            // Saved layout badge pill
-            HStack(spacing: 5) {
-                Image(systemName: "square.grid.2x2")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundColor(AppColors.brand)
-                Text("Default layout")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(AppColors.primaryText)
+            // Presets Menu
+            Menu {
+                Section("Presets") {
+                    ForEach(DashboardPreset.allCases.filter { $0 != .custom }) { preset in
+                        Button {
+                            applyPreset(preset)
+                        } label: {
+                            HStack {
+                                Text(preset.name)
+                                if activePreset == preset {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                if activePreset == .custom {
+                    Section {
+                        Text("Custom arrangement active")
+                    }
+                }
+                
+                Section {
+                    Button {
+                        applyPreset(.overview)
+                    } label: {
+                        Label("Restore default layout", systemImage: "arrow.counterclockwise")
+                    }
+                }
+            } label: {
+                HStack(spacing: 5) {
+                    Image(systemName: activePreset.icon)
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(AppColors.brand)
+                    Text(activePreset.name)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(AppColors.primaryText)
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 8, weight: .semibold))
+                        .foregroundColor(AppColors.secondaryText)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(AppColors.cardBackground)
+                .clipShape(Capsule())
+                .overlay(
+                    Capsule().stroke(AppColors.border.opacity(0.6), lineWidth: 0.5)
+                )
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(AppColors.cardBackground)
-            .clipShape(Capsule())
-            .overlay(
-                Capsule().stroke(AppColors.border.opacity(0.6), lineWidth: 0.5)
-            )
             
             Text("\(visibleCardCount) of \(DashboardCardRegistry.allCards.count) cards")
                 .font(AppTypography.caption)
@@ -376,7 +513,33 @@ public struct DashboardView: View {
             
             Spacer()
             
-            // Customize button matching web dashboard-customizer.tsx
+            // Reorder / Edit Layout Mode Button
+            Button {
+                #if canImport(UIKit)
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                #endif
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                    isEditingLayout.toggle()
+                }
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: isEditingLayout ? "checkmark" : "arrow.up.arrow.down")
+                        .font(.system(size: 11, weight: .medium))
+                    Text(isEditingLayout ? "Done" : "Reorder")
+                        .font(.system(size: 11, weight: .semibold))
+                }
+                .foregroundColor(isEditingLayout ? .white : AppColors.primaryText)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(isEditingLayout ? AppColors.brand : AppColors.cardBackground)
+                .clipShape(Capsule())
+                .overlay(
+                    Capsule().stroke(isEditingLayout ? Color.clear : AppColors.border.opacity(0.6), lineWidth: 0.5)
+                )
+            }
+            .buttonStyle(ApplePressableButtonStyle())
+            
+            // Customize button (Sheet)
             Button {
                 #if canImport(UIKit)
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -388,8 +551,6 @@ public struct DashboardView: View {
                         .font(.system(size: 11, weight: .medium))
                     Text("Customize")
                         .font(.system(size: 11, weight: .semibold))
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 9, weight: .medium))
                 }
                 .foregroundColor(AppColors.primaryText)
                 .padding(.horizontal, 10)
@@ -406,7 +567,44 @@ public struct DashboardView: View {
         .padding(.top, 8)
     }
     
-    // MARK: - Multi-Currency Section (matching page.tsx lines 153-188)
+    // MARK: - Presets & Reorder Actions
+    
+    private func applyPreset(_ preset: DashboardPreset) {
+        #if canImport(UIKit)
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        #endif
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+            activePreset = preset
+            cardOrder = preset.canonicalOrder
+            hiddenCardIds = preset.canonicalHidden
+        }
+    }
+    
+    private func moveCard(cardId: String, direction: Int) {
+        guard let currentIndex = cardOrder.firstIndex(of: cardId) else { return }
+        let newIndex = currentIndex + direction
+        guard newIndex >= 0 && newIndex < cardOrder.count else { return }
+        
+        #if canImport(UIKit)
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        #endif
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+            cardOrder.swapAt(currentIndex, newIndex)
+            activePreset = .custom
+        }
+    }
+    
+    private func hideCard(cardId: String) {
+        #if canImport(UIKit)
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        #endif
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+            hiddenCardIds.insert(cardId)
+            activePreset = .custom
+        }
+    }
+    
+    // MARK: - Multi-Currency Section
     
     @ViewBuilder
     private var multiCurrencySection: some View {
@@ -479,7 +677,7 @@ public struct DashboardView: View {
         }
     }
     
-    // MARK: - Empty State (matching page.tsx lines 194-203 & 811-851)
+    // MARK: - Empty States
     
     private var filteredEmptyState: some View {
         cardContainer {
@@ -597,737 +795,790 @@ public struct DashboardView: View {
         }
     }
     
-    // MARK: - 1. Summary Group (Widgets 0, 1, 2, 3, 4)
+    // MARK: - Universal Widget Dispatcher & Reorder Wrapper
     
     @ViewBuilder
-    private func summaryGroupSection(snap: DashboardSnapshot) -> some View {
+    private func renderWidget(id: String, snap: DashboardSnapshot, isCompact: Bool) -> some View {
+        DashboardCardWrapper(
+            cardId: id,
+            isEditing: isEditingLayout,
+            onMoveUp: { moveCard(cardId: id, direction: -1) },
+            onMoveDown: { moveCard(cardId: id, direction: 1) },
+            onHide: { hideCard(cardId: id) }
+        ) {
+            switch id {
+            case "widget-0": widget0NetPnl(snap: snap, isCompact: isCompact)
+            case "widget-1": widget1TradeWin(snap: snap, isCompact: isCompact)
+            case "widget-2": widget2ProfitFactor(snap: snap, isCompact: isCompact)
+            case "widget-3": widget3DayWin(snap: snap, isCompact: isCompact)
+            case "widget-4": widget4AvgWinLoss(snap: snap, isCompact: isCompact)
+            case "widget-5": widget5EdgeScore(snap: snap)
+            case "widget-6": widget6CumulativePnl(snap: snap)
+            case "widget-7": widget7DailyPnl(snap: snap)
+            case "widget-8": widget8Calendar(snap: snap)
+            case "widget-9": widget9Activity(snap: snap)
+            case "widget-10": widget10MaxDrawdown(snap: snap, isCompact: isCompact)
+            case "widget-11": widget11Streaks(snap: snap, isCompact: isCompact)
+            case "widget-12": widget12Expectancy(snap: snap, isCompact: isCompact)
+            case "widget-13": widget13AvgDuration(snap: snap, isCompact: isCompact)
+            case "widget-14": widget14BestWorstDay(snap: snap, isCompact: isCompact)
+            case "widget-15": widget15TradeTimePerformance(snap: snap)
+            default: EmptyView()
+            }
+        }
+    }
+    
+    // MARK: - 16 Canonical Widgets (1:1 port from apps/web/src/app/page.tsx)
+    
+    // Widget 0: Net P&L (CircleDollarSign)
+    @ViewBuilder
+    private func widget0NetPnl(snap: DashboardSnapshot, isCompact: Bool) -> some View {
         let metrics = snap.metrics
-        VStack(spacing: 10) {
-            // Widget 0: Net P&L (CircleDollarSign)
-            if !hiddenCardIds.contains("widget-0") {
-                cardContainer {
-                    VStack(alignment: .leading, spacing: 8) {
-                        statHeader(
-                            "Net P&L",
-                            icon: "dollarsign.circle",
-                            hint: "Realized profit and loss net of fees, over the selected range."
+        cardContainer {
+            VStack(alignment: .leading, spacing: 6) {
+                statHeader(
+                    "Net P&L",
+                    icon: "dollarsign.circle",
+                    hint: "Realized profit and loss net of fees, over the selected range."
+                )
+                
+                if isCompact {
+                    Spacer(minLength: 2)
+                    AppMonetaryText(
+                        Formatters.formatPnL(metrics.netPnl, currency: env.currentCurrency),
+                        isPrivate: env.isPrivacyModeEnabled,
+                        font: AppTypography.financialNumber(size: 20, weight: .bold),
+                        color: metrics.netPnl >= 0 ? AppColors.profit : AppColors.loss
+                    )
+                    
+                    if let delta = snap.weekDelta {
+                        HStack(spacing: 3) {
+                            Text(delta >= 0 ? "▲" : "▼")
+                                .font(.system(size: 9, weight: .bold))
+                            Text(Formatters.formatCurrency(abs(delta), currency: env.currentCurrency))
+                                .font(AppTypography.captionBold)
+                                .monospacedDigit()
+                            Text("vs 7d")
+                                .font(AppTypography.caption)
+                        }
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(delta >= 0 ? AppColors.profit.opacity(0.12) : AppColors.loss.opacity(0.12))
+                        .foregroundColor(delta >= 0 ? AppColors.profit : AppColors.loss)
+                        .clipShape(Capsule())
+                    }
+                    
+                    Text("\(metrics.closedTrades) closed · \(Formatters.formatCurrency(metrics.fees, currency: env.currentCurrency)) fees")
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.secondaryText)
+                        .lineLimit(1)
+                } else {
+                    HStack(alignment: .firstTextBaseline) {
+                        AppMonetaryText(
+                            Formatters.formatPnL(metrics.netPnl, currency: env.currentCurrency),
+                            isPrivate: env.isPrivacyModeEnabled,
+                            font: AppTypography.financialNumber(size: 28, weight: .bold),
+                            color: metrics.netPnl >= 0 ? AppColors.profit : AppColors.loss
                         )
                         
-                        HStack(alignment: .firstTextBaseline) {
-                            AppMonetaryText(
-                                Formatters.formatPnL(metrics.netPnl, currency: env.currentCurrency),
-                                isPrivate: env.isPrivacyModeEnabled,
-                                font: AppTypography.financialNumber(size: 30, weight: .bold),
-                                color: metrics.netPnl >= 0 ? AppColors.profit : AppColors.loss
-                            )
-                            
-                            Spacer()
-                            
-                            if let delta = snap.weekDelta {
-                                HStack(spacing: 3) {
-                                    Text(delta >= 0 ? "▲" : "▼")
-                                        .font(.system(size: 9, weight: .bold))
-                                    Text(Formatters.formatCurrency(abs(delta), currency: env.currentCurrency))
-                                        .font(AppTypography.captionBold)
-                                        .monospacedDigit()
-                                    Text("vs prior 7d")
-                                        .font(AppTypography.caption)
+                        Spacer()
+                        
+                        if let delta = snap.weekDelta {
+                            HStack(spacing: 3) {
+                                Text(delta >= 0 ? "▲" : "▼")
+                                    .font(.system(size: 9, weight: .bold))
+                                Text(Formatters.formatCurrency(abs(delta), currency: env.currentCurrency))
+                                    .font(AppTypography.captionBold)
+                                    .monospacedDigit()
+                                Text("vs prior 7d")
+                                    .font(AppTypography.caption)
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(delta >= 0 ? AppColors.profit.opacity(0.12) : AppColors.loss.opacity(0.12))
+                            .foregroundColor(delta >= 0 ? AppColors.profit : AppColors.loss)
+                            .clipShape(Capsule())
+                        }
+                    }
+                    
+                    Text("\(metrics.closedTrades) closed trades · \(Formatters.formatCurrency(metrics.fees, currency: env.currentCurrency)) fees")
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.secondaryText)
+                }
+            }
+            .frame(maxWidth: .infinity, minHeight: isCompact ? 98 : nil, alignment: .topLeading)
+        }
+    }
+    
+    // Widget 1: Trade win % (Target)
+    @ViewBuilder
+    private func widget1TradeWin(snap: DashboardSnapshot, isCompact: Bool) -> some View {
+        let metrics = snap.metrics
+        cardContainer {
+            VStack(alignment: .leading, spacing: 6) {
+                statHeader(
+                    "Trade win %",
+                    icon: "target",
+                    hint: "Winning trades divided by all closed trades, including breakevens."
+                )
+                
+                Spacer(minLength: 2)
+                
+                HStack(alignment: .center, spacing: 8) {
+                    GaugeView(value: metrics.winRate, label: "Trade win rate", size: 68)
+                    
+                    Spacer()
+                    
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text("\(metrics.wins) W")
+                            .font(AppTypography.captionBold)
+                            .foregroundColor(AppColors.profit)
+                        Text("\(metrics.breakevens) BE")
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.secondaryText)
+                        Text("\(metrics.losses) L")
+                            .font(AppTypography.captionBold)
+                            .foregroundColor(AppColors.loss)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, minHeight: isCompact ? 98 : nil, alignment: .topLeading)
+        }
+    }
+    
+    // Widget 2: Profit factor (Scale)
+    @ViewBuilder
+    private func widget2ProfitFactor(snap: DashboardSnapshot, isCompact: Bool) -> some View {
+        let metrics = snap.metrics
+        cardContainer {
+            VStack(alignment: .leading, spacing: 6) {
+                statHeader(
+                    "Profit factor",
+                    icon: "scalemass",
+                    hint: "Gross profit ÷ gross loss. Above 1 means the wins outweigh the losses."
+                )
+                
+                Spacer(minLength: 4)
+                
+                Text(metrics.profitFactorIsInfinite ? "∞" : (metrics.profitFactor != nil ? String(format: "%.2f", metrics.profitFactor!) : "–"))
+                    .font(AppTypography.financialNumber(size: 24, weight: .bold))
+                    .monospacedDigit()
+                    .foregroundColor(AppColors.primaryText)
+                
+                Text("gross profit ÷ gross loss")
+                    .font(AppTypography.caption)
+                    .foregroundColor(AppColors.secondaryText)
+            }
+            .frame(maxWidth: .infinity, minHeight: isCompact ? 98 : nil, alignment: .topLeading)
+        }
+    }
+    
+    // Widget 3: Day win % (CalendarCheck2)
+    @ViewBuilder
+    private func widget3DayWin(snap: DashboardSnapshot, isCompact: Bool) -> some View {
+        let metrics = snap.metrics
+        cardContainer {
+            VStack(alignment: .leading, spacing: 6) {
+                statHeader(
+                    "Day win %",
+                    icon: "calendar.badge.clock",
+                    hint: "Green trading days ÷ all trading days in the selected range."
+                )
+                
+                Spacer(minLength: 2)
+                
+                HStack(alignment: .center, spacing: 8) {
+                    GaugeView(value: metrics.dayWinRate, label: "Day win rate", size: 68)
+                    
+                    Spacer()
+                    
+                    Text("\(metrics.tradingDays) days")
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.secondaryText)
+                }
+            }
+            .frame(maxWidth: .infinity, minHeight: isCompact ? 98 : nil, alignment: .topLeading)
+        }
+    }
+    
+    // Widget 4: Avg win / loss (ArrowUpDown)
+    @ViewBuilder
+    private func widget4AvgWinLoss(snap: DashboardSnapshot, isCompact: Bool) -> some View {
+        let metrics = snap.metrics
+        cardContainer {
+            VStack(alignment: .leading, spacing: 6) {
+                statHeader(
+                    "Avg win / loss",
+                    icon: "arrow.up.arrow.down",
+                    hint: "Average winning trade ÷ average losing trade. The bar shows the two to scale."
+                )
+                
+                Spacer(minLength: 2)
+                
+                Text(metrics.avgWinLossRatio != nil ? String(format: "%.2f", metrics.avgWinLossRatio!) : "–")
+                    .font(AppTypography.financialNumber(size: 24, weight: .bold))
+                    .monospacedDigit()
+                    .foregroundColor(AppColors.primaryText)
+                
+                if let w = metrics.avgWin, let l = metrics.avgLoss, (w + l) > 0 {
+                    let ratio = (w as NSDecimalNumber).doubleValue / ((w + l) as NSDecimalNumber).doubleValue
+                    AppRatioBar(greenRatio: ratio)
+                        .padding(.vertical, 1)
+                }
+                
+                HStack(spacing: 2) {
+                    Text(Formatters.formatCurrency(metrics.avgWin, currency: env.currentCurrency))
+                        .foregroundColor(AppColors.profit)
+                        .monospacedDigit()
+                    Text(" win · ")
+                        .foregroundColor(AppColors.secondaryText)
+                    Text(Formatters.formatCurrency(metrics.avgLoss, currency: env.currentCurrency))
+                        .foregroundColor(AppColors.loss)
+                        .monospacedDigit()
+                    Text(" loss")
+                        .foregroundColor(AppColors.secondaryText)
+                }
+                .font(AppTypography.caption)
+                .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, minHeight: isCompact ? 98 : nil, alignment: .topLeading)
+        }
+    }
+    
+    // Widget 5: Edge Score (Gauge)
+    @ViewBuilder
+    private func widget5EdgeScore(snap: DashboardSnapshot) -> some View {
+        let metrics = snap.metrics
+        let edgeResult = snap.edgeResult
+        cardContainer {
+            VStack(spacing: 10) {
+                HStack {
+                    statHeader(
+                        "Edge Score",
+                        icon: "gauge.with.dots.needle.bottom.50percent",
+                        hint: "A 0–100 score combining win rate, profit factor, average win/loss, drawdown, recovery, and consistency. Requires at least five closed trades."
+                    )
+                    
+                    Spacer()
+                    
+                    HStack(spacing: 2) {
+                        Text(edgeResult.score != nil ? "\(Int(edgeResult.score!))" : "–")
+                            .font(AppTypography.financialNumber(size: 24, weight: .bold))
+                            .monospacedDigit()
+                            .foregroundColor(AppColors.brand)
+                        Text("/100")
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.secondaryText)
+                    }
+                }
+                
+                if metrics.closedTrades < 5 {
+                    Text("Needs 5+ closed trades. A 0–100 score combining win rate, profit factor, average win/loss, drawdown, recovery, and consistency.")
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.secondaryText)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, 16)
+                } else {
+                    EdgeRadarView(components: edgeResult.components, height: 210)
+                    
+                    Button {
+                        #if canImport(UIKit)
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        #endif
+                        withAnimation {
+                            showEdgeScoreBreakdown.toggle()
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text(showEdgeScoreBreakdown ? "Hide component breakdown" : "View component breakdown")
+                                .font(.system(size: 11, weight: .semibold))
+                            Image(systemName: showEdgeScoreBreakdown ? "chevron.up" : "chevron.down")
+                                .font(.system(size: 9))
+                        }
+                        .foregroundColor(AppColors.brand)
+                    }
+                    .buttonStyle(ApplePressableButtonStyle())
+                    .padding(.top, 2)
+                    
+                    if showEdgeScoreBreakdown, let b = edgeResult.breakdown {
+                        Divider().background(AppColors.border.opacity(0.6))
+                        
+                        VStack(spacing: 5) {
+                            scorePillarRow("Win rate", value: b.winRate, max: 15)
+                            scorePillarRow("Profit factor", value: b.profitFactor, max: 25)
+                            scorePillarRow("Avg win / loss", value: b.avgWinLoss, max: 20)
+                            scorePillarRow("Drawdown", value: b.drawdown, max: 15)
+                            scorePillarRow("Recovery", value: b.recovery, max: 10)
+                            scorePillarRow("Consistency", value: b.consistency, max: 15)
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // Widget 6: Daily net cumulative P&L
+    @ViewBuilder
+    private func widget6CumulativePnl(snap: DashboardSnapshot) -> some View {
+        cardContainer {
+            VStack(alignment: .leading, spacing: 10) {
+                statHeader(
+                    "Daily net cumulative P&L",
+                    icon: "chart.line.uptrend.xyaxis",
+                    hint: "Running total of net profit and loss over the selected period. The drawdown bars below show declines from the running equity peak."
+                )
+                
+                EquityCurveChart(points: snap.chartEquityPoints, currency: env.currentCurrency, height: 180)
+                
+                Divider().background(AppColors.border.opacity(0.6))
+                
+                DrawdownChart(points: snap.chartEquityPoints, height: 75)
+            }
+        }
+    }
+    
+    // Widget 7: Net daily P&L
+    @ViewBuilder
+    private func widget7DailyPnl(snap: DashboardSnapshot) -> some View {
+        cardContainer {
+            VStack(alignment: .leading, spacing: 10) {
+                statHeader(
+                    "Net daily P&L",
+                    icon: "chart.bar.xaxis",
+                    hint: "Net profit or loss for each trading day. Bars above zero are profitable; bars below zero are losses."
+                )
+                
+                DailyBarsView(
+                    data: snap.days.map { DailyBarDatum(date: $0.date, netPnl: $0.netPnl) },
+                    currency: env.currentCurrency,
+                    isPrivate: env.isPrivacyModeEnabled,
+                    height: 160
+                )
+            }
+        }
+    }
+    
+    // Widget 8: Calendar Mini Widget (8-column layout matching calendar-pnl.tsx)
+    @ViewBuilder
+    private func widget8Calendar(snap: DashboardSnapshot) -> some View {
+        cardContainer {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Text(monthName)
+                        .font(AppTypography.headline)
+                        .foregroundColor(AppColors.primaryText)
+                    Spacer()
+                    Button {
+                        #if canImport(UIKit)
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        #endif
+                        env.selectedTab = .calendar
+                    } label: {
+                        Text("Full calendar")
+                            .font(AppTypography.captionBold)
+                            .underline()
+                            .foregroundColor(AppColors.brand)
+                    }
+                    .buttonStyle(ApplePressableButtonStyle())
+                }
+                
+                // 8-column header (Sun..Sat + Week)
+                let cols = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Wk"]
+                HStack(spacing: 4) {
+                    ForEach(cols, id: \.self) { c in
+                        Text(c)
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor(AppColors.secondaryText)
+                            .frame(maxWidth: .infinity, alignment: c == "Wk" ? .trailing : .center)
+                    }
+                }
+                
+                let isoFormatter: DateFormatter = {
+                    let f = DateFormatter()
+                    f.dateFormat = "yyyy-MM-dd"
+                    return f
+                }()
+                
+                // Calendar Weeks with Week Total Column
+                VStack(spacing: 4) {
+                    ForEach(0..<calendarWeeks.count, id: \.self) { wIndex in
+                        let week = calendarWeeks[wIndex]
+                        let weekDays = week.compactMap { $0 }
+                        let weekPnl = weekDays.compactMap { d -> Decimal? in
+                            let key = isoFormatter.string(from: d)
+                            return snap.daysWithTradesMap[key]?.netPnl
+                        }.reduce(Decimal.zero, +)
+                        
+                        HStack(spacing: 4) {
+                            ForEach(0..<7, id: \.self) { dayIdx in
+                                if let date = week[dayIdx] {
+                                    let key = isoFormatter.string(from: date)
+                                    let stats = snap.daysWithTradesMap[key]
+                                    let dayNum = Calendar.current.component(.day, from: date)
+                                    
+                                    Button {
+                                        openCalendarDay(dateKey: key, stats: stats)
+                                    } label: {
+                                        VStack(spacing: 1) {
+                                            Text("\(dayNum)")
+                                                .font(.system(size: 9, weight: stats != nil ? .bold : .regular))
+                                                .foregroundColor(stats != nil ? AppColors.primaryText : AppColors.secondaryText)
+                                            
+                                            if let s = stats {
+                                                Text(s.netPnl >= 0 ? "+" : "-")
+                                                    .font(.system(size: 7, weight: .bold))
+                                                    .foregroundColor(s.netPnl >= 0 ? AppColors.profit : AppColors.loss)
+                                            }
+                                        }
+                                        .frame(height: 26)
+                                        .frame(maxWidth: .infinity)
+                                        .background(stats != nil ? (stats!.netPnl >= 0 ? AppColors.profit.opacity(0.12) : AppColors.loss.opacity(0.12)) : Color.clear)
+                                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                                        .overlay(
+                                            stats != nil ? RoundedRectangle(cornerRadius: 6, style: .continuous).stroke(stats!.netPnl >= 0 ? AppColors.profit.opacity(0.24) : AppColors.loss.opacity(0.24), lineWidth: 0.5) : nil
+                                        )
+                                    }
+                                    .buttonStyle(.plain)
+                                } else {
+                                    Color.clear
+                                        .frame(height: 26)
+                                        .frame(maxWidth: .infinity)
                                 }
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 3)
-                                .background(delta >= 0 ? AppColors.profit.opacity(0.12) : AppColors.loss.opacity(0.12))
-                                .foregroundColor(delta >= 0 ? AppColors.profit : AppColors.loss)
+                            }
+                            
+                            // Week total column
+                            Text(weekPnl != 0 ? Formatters.formatPnL(weekPnl, currency: env.currentCurrency) : "–")
+                                .font(.system(size: 9, weight: .semibold, design: .rounded))
+                                .monospacedDigit()
+                                .foregroundColor(weekPnl > 0 ? AppColors.profit : (weekPnl < 0 ? AppColors.loss : AppColors.secondaryText))
+                                .frame(maxWidth: .infinity, alignment: .trailing)
+                        }
+                    }
+                }
+                
+                Divider().background(AppColors.border.opacity(0.6))
+                
+                HStack {
+                    Text("\(snap.currentMonthStats.tradingDays) trading days · \(snap.currentMonthStats.winningDays) green")
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.secondaryText)
+                    Spacer()
+                    Text("Month: \(Formatters.formatPnL(snap.currentMonthStats.monthPnl, currency: env.currentCurrency))")
+                        .font(AppTypography.captionBold)
+                        .monospacedDigit()
+                        .foregroundColor(snap.currentMonthStats.monthPnl >= 0 ? AppColors.profit : AppColors.loss)
+                }
+            }
+        }
+    }
+    
+    // Widget 9: Activity (Recent trades & Open positions)
+    @ViewBuilder
+    private func widget9Activity(snap: DashboardSnapshot) -> some View {
+        cardContainer {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Text("Activity")
+                        .font(AppTypography.headline)
+                        .foregroundColor(AppColors.primaryText)
+                    Spacer()
+                }
+                
+                // Apple HIG Sliding Pill Segmented Control
+                HStack(spacing: 4) {
+                    ForEach(["recent", "open"], id: \.self) { tab in
+                        let isSelected = activityTab == tab
+                        Button {
+                            #if canImport(UIKit)
+                            UISelectionFeedbackGenerator().selectionChanged()
+                            #endif
+                            withAnimation(.spring(response: 0.28, dampingFraction: 0.75)) {
+                                activityTab = tab
+                            }
+                        } label: {
+                            Text(tab == "recent" ? "Recent Trades" : "Open Positions")
+                                .font(AppTypography.captionBold)
+                                .foregroundColor(isSelected ? .white : AppColors.primaryText)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 5)
+                                .background(isSelected ? AppColors.brand : Color.clear)
                                 .clipShape(Capsule())
+                        }
+                    }
+                }
+                .padding(3)
+                .background(AppColors.secondaryBackground)
+                .clipShape(Capsule())
+                
+                if activityTab == "recent" {
+                    let recentTrades = Array(scopedTrades.filter { $0.closedAt != nil }.prefix(5))
+                    if recentTrades.isEmpty {
+                        Text("No recent closed trades.")
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.secondaryText)
+                            .padding(.vertical, 10)
+                    } else {
+                        VStack(spacing: 6) {
+                            ForEach(recentTrades) { trade in
+                                NavigationLink(destination: TradeDetailView(trade: trade)) {
+                                    HStack {
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            HStack(spacing: 6) {
+                                                Text(trade.symbol)
+                                                    .font(AppTypography.bodyBold)
+                                                    .foregroundColor(AppColors.primaryText)
+                                                
+                                                Text(trade.direction.rawValue.uppercased())
+                                                    .font(.system(size: 9, weight: .bold))
+                                                    .padding(.horizontal, 4)
+                                                    .padding(.vertical, 1)
+                                                    .background(trade.direction == .long ? AppColors.profit.opacity(0.15) : AppColors.loss.opacity(0.15))
+                                                    .foregroundColor(trade.direction == .long ? AppColors.profit : AppColors.loss)
+                                                    .clipShape(RoundedRectangle(cornerRadius: 3))
+                                            }
+                                            
+                                            if let closed = trade.closedAt {
+                                                Text(closed.formatted(date: .abbreviated, time: .shortened))
+                                                    .font(AppTypography.caption)
+                                                    .foregroundColor(AppColors.secondaryText)
+                                            }
+                                        }
+                                        
+                                        Spacer()
+                                        
+                                        if let pnl = trade.netPnl {
+                                            AppMonetaryText(
+                                                Formatters.formatPnL(pnl, currency: trade.currency),
+                                                isPrivate: env.isPrivacyModeEnabled,
+                                                font: AppTypography.financialNumber(size: 14, weight: .bold),
+                                                color: pnl >= 0 ? AppColors.profit : AppColors.loss
+                                            )
+                                        }
+                                        
+                                        Image(systemName: "chevron.right")
+                                            .font(.system(size: 10))
+                                            .foregroundColor(AppColors.secondaryText)
+                                    }
+                                    .padding(.vertical, 4)
+                                }
+                                .buttonStyle(.plain)
+                                
+                                if trade.id != recentTrades.last?.id {
+                                    Divider().background(AppColors.border.opacity(0.4))
+                                }
                             }
                         }
-                        
-                        Text("\(metrics.closedTrades) closed trades · \(Formatters.formatCurrency(metrics.fees, currency: env.currentCurrency)) fees")
+                    }
+                } else {
+                    let openTrades = scopedTrades.filter { $0.status == .open }
+                    if openTrades.isEmpty {
+                        Text("No open positions.")
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.secondaryText)
+                            .padding(.vertical, 10)
+                    } else {
+                        VStack(spacing: 6) {
+                            ForEach(openTrades) { trade in
+                                NavigationLink(destination: TradeDetailView(trade: trade)) {
+                                    HStack {
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(trade.symbol)
+                                                .font(AppTypography.bodyBold)
+                                                .foregroundColor(AppColors.primaryText)
+                                            Text("Opened \(trade.openedAt.formatted(date: .abbreviated, time: .shortened))")
+                                                .font(AppTypography.caption)
+                                                .foregroundColor(AppColors.secondaryText)
+                                        }
+                                        Spacer()
+                                        Text(trade.direction.rawValue.uppercased())
+                                            .font(AppTypography.captionBold)
+                                            .foregroundColor(trade.direction == .long ? AppColors.profit : AppColors.loss)
+                                    }
+                                    .padding(.vertical, 4)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // Widget 10: Max drawdown (TrendingDown)
+    @ViewBuilder
+    private func widget10MaxDrawdown(snap: DashboardSnapshot, isCompact: Bool) -> some View {
+        let metrics = snap.metrics
+        cardContainer {
+            VStack(alignment: .leading, spacing: 4) {
+                statHeader(
+                    "Max drawdown",
+                    icon: "chart.line.downtrend.xyaxis",
+                    hint: "Largest peak-to-trough drop of the cumulative P&L curve."
+                )
+                
+                Spacer(minLength: 4)
+                
+                AppMonetaryText(
+                    Formatters.formatCurrency(metrics.maxDrawdown, currency: env.currentCurrency),
+                    isPrivate: env.isPrivacyModeEnabled,
+                    font: AppTypography.financialNumber(size: 20, weight: .bold),
+                    color: AppColors.loss
+                )
+                
+                HStack(spacing: 3) {
+                    Text(metrics.maxDrawdownPct != nil ? String(format: "-%.1f%%", metrics.maxDrawdownPct! * 100) : "set balance for %")
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.secondaryText)
+                    
+                    if let rec = metrics.recoveryFactor {
+                        Text("· rec \(String(format: "%.1f", rec))x")
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText)
                     }
                 }
             }
-            
-            // 2x2 Grid for Widgets 1, 2, 3, 4
-            let showW1 = !hiddenCardIds.contains("widget-1")
-            let showW2 = !hiddenCardIds.contains("widget-2")
-            let showW3 = !hiddenCardIds.contains("widget-3")
-            let showW4 = !hiddenCardIds.contains("widget-4")
-            
-            if showW1 || showW2 || showW3 || showW4 {
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                    // Widget 1: Trade win % (Target)
-                    if showW1 {
-                        cardContainer {
-                            VStack(alignment: .leading, spacing: 6) {
-                                statHeader(
-                                    "Trade win %",
-                                    icon: "target",
-                                    hint: "Winning trades divided by all closed trades, including breakevens."
-                                )
-                                
-                                Spacer(minLength: 2)
-                                
-                                HStack(alignment: .center, spacing: 8) {
-                                    GaugeView(value: metrics.winRate, label: "Trade win rate", size: 68)
-                                    
-                                    Spacer()
-                                    
-                                    VStack(alignment: .trailing, spacing: 2) {
-                                        Text("\(metrics.wins) W")
-                                            .font(AppTypography.captionBold)
-                                            .foregroundColor(AppColors.profit)
-                                        Text("\(metrics.breakevens) BE")
-                                            .font(AppTypography.caption)
-                                            .foregroundColor(AppColors.secondaryText)
-                                        Text("\(metrics.losses) L")
-                                            .font(AppTypography.captionBold)
-                                            .foregroundColor(AppColors.loss)
-                                    }
-                                }
-                            }
-                            .frame(maxWidth: .infinity, minHeight: 98, alignment: .topLeading)
-                        }
-                    }
-                    
-                    // Widget 2: Profit factor (Scale)
-                    if showW2 {
-                        cardContainer {
-                            VStack(alignment: .leading, spacing: 6) {
-                                statHeader(
-                                    "Profit factor",
-                                    icon: "scalemass",
-                                    hint: "Gross profit ÷ gross loss. Above 1 means the wins outweigh the losses."
-                                )
-                                
-                                Spacer(minLength: 4)
-                                
-                                Text(metrics.profitFactorIsInfinite ? "∞" : (metrics.profitFactor != nil ? String(format: "%.2f", metrics.profitFactor!) : "–"))
-                                    .font(AppTypography.financialNumber(size: 24, weight: .bold))
-                                    .monospacedDigit()
-                                    .foregroundColor(AppColors.primaryText)
-                                
-                                Text("gross profit ÷ gross loss")
-                                    .font(AppTypography.caption)
-                                    .foregroundColor(AppColors.secondaryText)
-                            }
-                            .frame(maxWidth: .infinity, minHeight: 98, alignment: .topLeading)
-                        }
-                    }
-                    
-                    // Widget 3: Day win % (CalendarCheck2)
-                    if showW3 {
-                        cardContainer {
-                            VStack(alignment: .leading, spacing: 6) {
-                                statHeader(
-                                    "Day win %",
-                                    icon: "calendar.badge.clock",
-                                    hint: "Green trading days ÷ all trading days in the selected range."
-                                )
-                                
-                                Spacer(minLength: 2)
-                                
-                                HStack(alignment: .center, spacing: 8) {
-                                    GaugeView(value: metrics.dayWinRate, label: "Day win rate", size: 68)
-                                    
-                                    Spacer()
-                                    
-                                    Text("\(metrics.tradingDays) days")
-                                        .font(AppTypography.caption)
-                                        .foregroundColor(AppColors.secondaryText)
-                                }
-                            }
-                            .frame(maxWidth: .infinity, minHeight: 98, alignment: .topLeading)
-                        }
-                    }
-                    
-                    // Widget 4: Avg win / loss (ArrowUpDown)
-                    if showW4 {
-                        cardContainer {
-                            VStack(alignment: .leading, spacing: 6) {
-                                statHeader(
-                                    "Avg win / loss",
-                                    icon: "arrow.up.arrow.down",
-                                    hint: "Average winning trade ÷ average losing trade. The bar shows the two to scale."
-                                )
-                                
-                                Spacer(minLength: 2)
-                                
-                                Text(metrics.avgWinLossRatio != nil ? String(format: "%.2f", metrics.avgWinLossRatio!) : "–")
-                                    .font(AppTypography.financialNumber(size: 24, weight: .bold))
-                                    .monospacedDigit()
-                                    .foregroundColor(AppColors.primaryText)
-                                
-                                if let w = metrics.avgWin, let l = metrics.avgLoss, (w + l) > 0 {
-                                    let ratio = (w as NSDecimalNumber).doubleValue / ((w + l) as NSDecimalNumber).doubleValue
-                                    AppRatioBar(greenRatio: ratio)
-                                        .padding(.vertical, 1)
-                                }
-                                
-                                HStack(spacing: 2) {
-                                    Text(Formatters.formatCurrency(metrics.avgWin, currency: env.currentCurrency))
-                                        .foregroundColor(AppColors.profit)
-                                        .monospacedDigit()
-                                    Text(" win · ")
-                                        .foregroundColor(AppColors.secondaryText)
-                                    Text(Formatters.formatCurrency(metrics.avgLoss, currency: env.currentCurrency))
-                                        .foregroundColor(AppColors.loss)
-                                        .monospacedDigit()
-                                    Text(" loss")
-                                        .foregroundColor(AppColors.secondaryText)
-                                }
-                                .font(AppTypography.caption)
-                                .lineLimit(1)
-                            }
-                            .frame(maxWidth: .infinity, minHeight: 98, alignment: .topLeading)
-                        }
-                    }
-                }
-            }
+            .frame(maxWidth: .infinity, minHeight: isCompact ? 98 : nil, alignment: .topLeading)
         }
     }
     
-    // MARK: - 2. Visuals Group (Widgets 5, 6, 7)
-    
+    // Widget 11: Streaks (Flame)
     @ViewBuilder
-    private func visualsGroupSection(snap: DashboardSnapshot) -> some View {
+    private func widget11Streaks(snap: DashboardSnapshot, isCompact: Bool) -> some View {
         let metrics = snap.metrics
-        let edgeResult = snap.edgeResult
-        
-        VStack(spacing: 10) {
-            // Widget 5: Edge Score
-            if !hiddenCardIds.contains("widget-5") {
-                cardContainer {
-                    VStack(spacing: 10) {
-                        HStack {
-                            statHeader(
-                                "Edge Score",
-                                icon: "info.circle",
-                                hint: "A 0–100 score combining win rate, profit factor, average win/loss, drawdown, recovery, and consistency. Requires at least five closed trades."
-                            )
-                            
-                            Spacer()
-                            
-                            HStack(spacing: 2) {
-                                Text(edgeResult.score != nil ? "\(Int(edgeResult.score!))" : "–")
-                                    .font(AppTypography.financialNumber(size: 24, weight: .bold))
-                                    .monospacedDigit()
-                                    .foregroundColor(AppColors.brand)
-                                Text("/100")
-                                    .font(AppTypography.caption)
-                                    .foregroundColor(AppColors.secondaryText)
-                            }
-                        }
-                        
-                        if metrics.closedTrades < 5 {
-                            Text("Needs 5+ closed trades. A 0–100 score combining win rate, profit factor, average win/loss, drawdown, recovery, and consistency.")
-                                .font(AppTypography.caption)
-                                .foregroundColor(AppColors.secondaryText)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.vertical, 16)
-                        } else {
-                            // Apple HIG 6-Axis Radar Chart
-                            EdgeRadarView(components: edgeResult.components, height: 210)
-                            
-                            Button {
-                                #if canImport(UIKit)
-                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                #endif
-                                withAnimation {
-                                    showEdgeScoreBreakdown.toggle()
-                                }
-                            } label: {
-                                HStack(spacing: 4) {
-                                    Text(showEdgeScoreBreakdown ? "Hide component breakdown" : "View component breakdown")
-                                        .font(.system(size: 11, weight: .semibold))
-                                    Image(systemName: showEdgeScoreBreakdown ? "chevron.up" : "chevron.down")
-                                        .font(.system(size: 9))
-                                }
-                                .foregroundColor(AppColors.brand)
-                            }
-                            .buttonStyle(ApplePressableButtonStyle())
-                            .padding(.top, 2)
-                            
-                            if showEdgeScoreBreakdown, let b = edgeResult.breakdown {
-                                Divider().background(AppColors.border.opacity(0.6))
-                                
-                                VStack(spacing: 5) {
-                                    scorePillarRow("Win rate", value: b.winRate, max: 15)
-                                    scorePillarRow("Profit factor", value: b.profitFactor, max: 25)
-                                    scorePillarRow("Avg win / loss", value: b.avgWinLoss, max: 20)
-                                    scorePillarRow("Drawdown", value: b.drawdown, max: 15)
-                                    scorePillarRow("Recovery", value: b.recovery, max: 10)
-                                    scorePillarRow("Consistency", value: b.consistency, max: 15)
-                                }
-                                .padding(.top, 4)
-                            }
-                        }
-                    }
-                }
+        cardContainer {
+            VStack(alignment: .leading, spacing: 4) {
+                statHeader(
+                    "Streaks",
+                    icon: "flame",
+                    hint: "Current run of consecutive wins (W) or losses (L), with the best and worst runs."
+                )
+                
+                Spacer(minLength: 4)
+                
+                Text(metrics.currentStreak > 0 ? "\(metrics.currentStreak)W" : (metrics.currentStreak < 0 ? "\(-metrics.currentStreak)L" : "–"))
+                    .font(AppTypography.financialNumber(size: 20, weight: .bold))
+                    .monospacedDigit()
+                    .foregroundColor(metrics.currentStreak > 0 ? AppColors.profit : (metrics.currentStreak < 0 ? AppColors.loss : AppColors.primaryText))
+                
+                Text("best \(metrics.maxWinStreak)W · worst \(metrics.maxLossStreak)L")
+                    .font(AppTypography.caption)
+                    .foregroundColor(AppColors.secondaryText)
             }
-            
-            // Widget 6: Daily net cumulative P&L
-            if !hiddenCardIds.contains("widget-6") {
-                cardContainer {
-                    VStack(alignment: .leading, spacing: 10) {
-                        statHeader(
-                            "Daily net cumulative P&L",
-                            icon: "info.circle",
-                            hint: "Running total of net profit and loss over the selected period. The drawdown bars below show declines from the running equity peak."
-                        )
-                        
-                        EquityCurveChart(points: snap.chartEquityPoints, currency: env.currentCurrency, height: 180)
-                        
-                        Divider().background(AppColors.border.opacity(0.6))
-                        
-                        DrawdownChart(points: snap.chartEquityPoints, height: 75)
-                    }
-                }
-            }
-            
-            // Widget 7: Net daily P&L
-            if !hiddenCardIds.contains("widget-7") {
-                cardContainer {
-                    VStack(alignment: .leading, spacing: 10) {
-                        statHeader(
-                            "Net daily P&L",
-                            icon: "info.circle",
-                            hint: "Net profit or loss for each trading day. Bars above zero are profitable; bars below zero are losses."
-                        )
-                        
-                        DailyBarsView(
-                            data: snap.days.map { DailyBarDatum(date: $0.date, netPnl: $0.netPnl) },
-                            currency: env.currentCurrency,
-                            isPrivate: env.isPrivacyModeEnabled,
-                            height: 160
-                        )
-                    }
-                }
-            }
+            .frame(maxWidth: .infinity, minHeight: isCompact ? 98 : nil, alignment: .topLeading)
         }
     }
     
-    // MARK: - 3. Detail Group (Widgets 8, 9)
-    
+    // Widget 12: Expectancy / trade (Sigma)
     @ViewBuilder
-    private func detailGroupSection(snap: DashboardSnapshot) -> some View {
-        VStack(spacing: 10) {
-            // Widget 8: Calendar Mini Widget (8-column layout matching calendar-pnl.tsx)
-            if !hiddenCardIds.contains("widget-8") {
-                cardContainer {
-                    VStack(alignment: .leading, spacing: 10) {
-                        HStack {
-                            Text(monthName)
-                                .font(AppTypography.headline)
-                                .foregroundColor(AppColors.primaryText)
-                            Spacer()
-                            Button {
-                                #if canImport(UIKit)
-                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                #endif
-                                env.selectedTab = .calendar
-                            } label: {
-                                Text("Full calendar")
-                                    .font(AppTypography.captionBold)
-                                    .underline()
-                                    .foregroundColor(AppColors.brand)
-                            }
-                            .buttonStyle(ApplePressableButtonStyle())
-                        }
-                        
-                        // 8-column header (Sun..Sat + Week)
-                        let cols = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Wk"]
-                        HStack(spacing: 4) {
-                            ForEach(cols, id: \.self) { c in
-                                Text(c)
-                                    .font(.system(size: 9, weight: .bold))
-                                    .foregroundColor(AppColors.secondaryText)
-                                    .frame(maxWidth: .infinity, alignment: c == "Wk" ? .trailing : .center)
-                            }
-                        }
-                        
-                        let isoFormatter: DateFormatter = {
-                            let f = DateFormatter()
-                            f.dateFormat = "yyyy-MM-dd"
-                            return f
-                        }()
-                        
-                        // Calendar Weeks with Week Total Column
-                        VStack(spacing: 4) {
-                            ForEach(0..<calendarWeeks.count, id: \.self) { wIndex in
-                                let week = calendarWeeks[wIndex]
-                                let weekDays = week.compactMap { $0 }
-                                let weekPnl = weekDays.compactMap { d -> Decimal? in
-                                    let key = isoFormatter.string(from: d)
-                                    return snap.daysWithTradesMap[key]?.netPnl
-                                }.reduce(Decimal.zero, +)
-                                
-                                HStack(spacing: 4) {
-                                    ForEach(0..<7, id: \.self) { dayIdx in
-                                        if let date = week[dayIdx] {
-                                            let key = isoFormatter.string(from: date)
-                                            let stats = snap.daysWithTradesMap[key]
-                                            let dayNum = Calendar.current.component(.day, from: date)
-                                            
-                                            Button {
-                                                openCalendarDay(dateKey: key, stats: stats)
-                                            } label: {
-                                                VStack(spacing: 1) {
-                                                    Text("\(dayNum)")
-                                                        .font(.system(size: 9, weight: stats != nil ? .bold : .regular))
-                                                        .foregroundColor(stats != nil ? AppColors.primaryText : AppColors.secondaryText)
-                                                    
-                                                    if let s = stats {
-                                                        Text(s.netPnl >= 0 ? "+" : "-")
-                                                            .font(.system(size: 7, weight: .bold))
-                                                            .foregroundColor(s.netPnl >= 0 ? AppColors.profit : AppColors.loss)
-                                                    }
-                                                }
-                                                .frame(height: 26)
-                                                .frame(maxWidth: .infinity)
-                                                .background(stats != nil ? (stats!.netPnl >= 0 ? AppColors.profit.opacity(0.12) : AppColors.loss.opacity(0.12)) : Color.clear)
-                                                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                                                .overlay(
-                                                    stats != nil ? RoundedRectangle(cornerRadius: 6, style: .continuous).stroke(stats!.netPnl >= 0 ? AppColors.profit.opacity(0.24) : AppColors.loss.opacity(0.24), lineWidth: 0.5) : nil
-                                                )
-                                            }
-                                            .buttonStyle(.plain)
-                                        } else {
-                                            Color.clear
-                                                .frame(height: 26)
-                                                .frame(maxWidth: .infinity)
-                                        }
-                                    }
-                                    
-                                    // Week total column
-                                    Text(weekPnl != 0 ? Formatters.formatPnL(weekPnl, currency: env.currentCurrency) : "–")
-                                        .font(.system(size: 9, weight: .semibold, design: .rounded))
-                                        .monospacedDigit()
-                                        .foregroundColor(weekPnl > 0 ? AppColors.profit : (weekPnl < 0 ? AppColors.loss : AppColors.secondaryText))
-                                        .frame(maxWidth: .infinity, alignment: .trailing)
-                                }
-                            }
-                        }
-                        
-                        Divider().background(AppColors.border.opacity(0.6))
-                        
-                        HStack {
-                            Text("\(snap.currentMonthStats.tradingDays) trading days · \(snap.currentMonthStats.winningDays) green")
-                                .font(AppTypography.caption)
-                                .foregroundColor(AppColors.secondaryText)
-                            Spacer()
-                            Text("Month: \(Formatters.formatPnL(snap.currentMonthStats.monthPnl, currency: env.currentCurrency))")
-                                .font(AppTypography.captionBold)
-                                .monospacedDigit()
-                                .foregroundColor(snap.currentMonthStats.monthPnl >= 0 ? AppColors.profit : AppColors.loss)
-                        }
-                    }
-                }
-            }
-            
-            // Widget 9: Activity (Recent trades & Open positions)
-            if !hiddenCardIds.contains("widget-9") {
-                cardContainer {
-                    VStack(alignment: .leading, spacing: 10) {
-                        HStack {
-                            Text("Activity")
-                                .font(AppTypography.headline)
-                                .foregroundColor(AppColors.primaryText)
-                            Spacer()
-                        }
-                        
-                        // Apple HIG Sliding Pill Segmented Control
-                        HStack(spacing: 4) {
-                            ForEach(["recent", "open"], id: \.self) { tab in
-                                let isSelected = activityTab == tab
-                                Button {
-                                    #if canImport(UIKit)
-                                    UISelectionFeedbackGenerator().selectionChanged()
-                                    #endif
-                                    withAnimation(.spring(response: 0.28, dampingFraction: 0.75)) {
-                                        activityTab = tab
-                                    }
-                                } label: {
-                                    Text(tab == "recent" ? "Recent trades" : "Open positions")
-                                        .font(.system(size: 12, weight: isSelected ? .semibold : .medium))
-                                        .foregroundColor(isSelected ? AppColors.primaryText : AppColors.secondaryText)
-                                        .frame(maxWidth: .infinity)
-                                        .frame(height: 28)
-                                        .background(
-                                            isSelected ? AppColors.cardBackground : Color.clear
-                                        )
-                                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                                        .shadow(color: isSelected ? Color.black.opacity(0.08) : Color.clear, radius: 4, x: 0, y: 1)
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                        .padding(3)
-                        .background(AppColors.secondaryBackground.opacity(0.6))
-                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                        
-                        if activityTab == "recent" {
-                            let recent = scopedTrades.filter { $0.status != .open }.prefix(5)
-                            if recent.isEmpty {
-                                Text("No closed trades yet")
-                                    .font(AppTypography.caption)
-                                    .foregroundColor(AppColors.secondaryText)
-                                    .frame(maxWidth: .infinity, alignment: .center)
-                                    .padding(.vertical, 16)
-                            } else {
-                                VStack(spacing: 6) {
-                                    ForEach(recent) { t in
-                                        HStack {
-                                            AppBadge(t.status.rawValue.uppercased(), color: Formatters.statusColor(t.status))
-                                            
-                                            Text(t.symbol)
-                                                .font(AppTypography.bodyBold)
-                                                .foregroundColor(AppColors.primaryText)
-                                            
-                                            Spacer()
-                                            
-                                            if let closed = t.closedAt {
-                                                Text(Formatters.formatDate(closed))
-                                                    .font(AppTypography.caption)
-                                                    .foregroundColor(AppColors.secondaryText)
-                                            }
-                                            
-                                            AppMonetaryText(
-                                                Formatters.formatPnL(t.netPnl, currency: env.currentCurrency),
-                                                isPrivate: env.isPrivacyModeEnabled,
-                                                font: AppTypography.financialNumber(size: 13, weight: .semibold),
-                                                color: t.netPnl >= 0 ? AppColors.profit : AppColors.loss
-                                            )
-                                        }
-                                        .padding(.vertical, 3)
-                                        
-                                        if t.id != recent.last?.id {
-                                            Divider().background(AppColors.border.opacity(0.5))
-                                        }
-                                    }
-                                }
-                            }
-                        } else {
-                            let openPos = dataStore.trades.filter { $0.status == .open }
-                            if openPos.isEmpty {
-                                Text("Flat — no open positions")
-                                    .font(AppTypography.caption)
-                                    .foregroundColor(AppColors.secondaryText)
-                                    .frame(maxWidth: .infinity, alignment: .center)
-                                    .padding(.vertical, 16)
-                            } else {
-                                VStack(spacing: 6) {
-                                    ForEach(openPos) { p in
-                                        HStack {
-                                            AppBadge(p.direction.rawValue.uppercased(), color: p.direction == .long ? AppColors.profit : AppColors.loss)
-                                            
-                                            Text(p.symbol)
-                                                .font(AppTypography.bodyBold)
-                                                .foregroundColor(AppColors.primaryText)
-                                            
-                                            Spacer()
-                                            
-                                            Text("\(p.quantity) @ \(Formatters.formatCurrency(p.avgEntry, currency: env.currentCurrency))")
-                                                .font(AppTypography.caption)
-                                                .monospacedDigit()
-                                                .foregroundColor(AppColors.secondaryText)
-                                        }
-                                        .padding(.vertical, 3)
-                                        
-                                        if p.id != openPos.last?.id {
-                                            Divider().background(AppColors.border.opacity(0.5))
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-    
-    // MARK: - 4. Secondary Metrics (Widgets 10, 11, 12, 13, 14)
-    
-    @ViewBuilder
-    private func secondaryMetricsGrid(snap: DashboardSnapshot) -> some View {
+    private func widget12Expectancy(snap: DashboardSnapshot, isCompact: Bool) -> some View {
         let metrics = snap.metrics
-        let showW10 = !hiddenCardIds.contains("widget-10")
-        let showW11 = !hiddenCardIds.contains("widget-11")
-        let showW12 = !hiddenCardIds.contains("widget-12")
-        let showW13 = !hiddenCardIds.contains("widget-13")
-        let showW14 = !hiddenCardIds.contains("widget-14")
-        
-        if showW10 || showW11 || showW12 || showW13 || showW14 {
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                // Widget 10: Max drawdown (TrendingDown)
-                if showW10 {
-                    cardContainer {
-                        VStack(alignment: .leading, spacing: 4) {
-                            statHeader(
-                                "Max drawdown",
-                                icon: "chart.line.downtrend.xyaxis",
-                                hint: "Largest peak-to-trough drop of the cumulative P&L curve."
-                            )
-                            
-                            Spacer(minLength: 4)
-                            
+        cardContainer {
+            VStack(alignment: .leading, spacing: 4) {
+                statHeader(
+                    "Expectancy / trade",
+                    icon: "sum",
+                    hint: "Average net P&L per closed trade: what one more trade is worth on your numbers."
+                )
+                
+                Spacer(minLength: 4)
+                
+                AppMonetaryText(
+                    metrics.expectancy != nil ? Formatters.formatPnL(metrics.expectancy!, currency: env.currentCurrency) : "–",
+                    isPrivate: env.isPrivacyModeEnabled,
+                    font: AppTypography.financialNumber(size: 20, weight: .bold),
+                    color: (metrics.expectancy ?? 0) >= 0 ? AppColors.profit : AppColors.loss
+                )
+                
+                Text(metrics.avgRealizedR != nil && metrics.tradesWithRisk > 0 ? String(format: "avg %.2fR over %d trades", metrics.avgRealizedR!, metrics.tradesWithRisk) : "tag stops for R multiples")
+                    .font(AppTypography.caption)
+                    .foregroundColor(AppColors.secondaryText)
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, minHeight: isCompact ? 98 : nil, alignment: .topLeading)
+        }
+    }
+    
+    // Widget 13: Avg duration (Timer)
+    @ViewBuilder
+    private func widget13AvgDuration(snap: DashboardSnapshot, isCompact: Bool) -> some View {
+        let metrics = snap.metrics
+        cardContainer {
+            VStack(alignment: .leading, spacing: 4) {
+                statHeader(
+                    "Avg duration",
+                    icon: "timer",
+                    hint: "Average time from first entry fill to final exit."
+                )
+                
+                Spacer(minLength: 4)
+                
+                Text(Formatters.formatDuration(ms: metrics.avgDurationMs))
+                    .font(AppTypography.financialNumber(size: 20, weight: .bold))
+                    .monospacedDigit()
+                    .foregroundColor(AppColors.primaryText)
+                
+                Text("winners vs losers in Reports")
+                    .font(AppTypography.caption)
+                    .foregroundColor(AppColors.secondaryText)
+            }
+            .frame(maxWidth: .infinity, minHeight: isCompact ? 98 : nil, alignment: .topLeading)
+        }
+    }
+    
+    // Widget 14: Best / worst day (Trophy)
+    @ViewBuilder
+    private func widget14BestWorstDay(snap: DashboardSnapshot, isCompact: Bool) -> some View {
+        cardContainer {
+            VStack(alignment: .leading, spacing: 4) {
+                statHeader(
+                    "Best / worst day",
+                    icon: "trophy",
+                    hint: "Highest and lowest single-day net P&L in the selected range."
+                )
+                
+                Spacer(minLength: 4)
+                
+                if let best = snap.bestDay, let worst = snap.worstDay {
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack {
                             AppMonetaryText(
-                                Formatters.formatCurrency(metrics.maxDrawdown, currency: env.currentCurrency),
+                                Formatters.formatPnL(best.netPnl, currency: env.currentCurrency),
                                 isPrivate: env.isPrivacyModeEnabled,
-                                font: AppTypography.financialNumber(size: 20, weight: .bold),
+                                font: AppTypography.financialNumber(size: 13, weight: .semibold),
+                                color: AppColors.profit
+                            )
+                            Spacer()
+                            Text(String(best.date.suffix(5)))
+                                .font(AppTypography.caption)
+                                .foregroundColor(AppColors.secondaryText)
+                        }
+                        HStack {
+                            AppMonetaryText(
+                                Formatters.formatPnL(worst.netPnl, currency: env.currentCurrency),
+                                isPrivate: env.isPrivacyModeEnabled,
+                                font: AppTypography.financialNumber(size: 13, weight: .semibold),
                                 color: AppColors.loss
                             )
-                            
-                            HStack(spacing: 3) {
-                                Text(metrics.maxDrawdownPct != nil ? String(format: "-%.1f%%", metrics.maxDrawdownPct! * 100) : "set balance for %")
-                                    .font(AppTypography.caption)
-                                    .foregroundColor(AppColors.secondaryText)
-                                
-                                if let rec = metrics.recoveryFactor {
-                                    Text("· rec \(String(format: "%.1f", rec))x")
-                                        .font(AppTypography.caption)
-                                        .foregroundColor(AppColors.secondaryText)
-                                }
-                            }
-                        }
-                        .frame(maxWidth: .infinity, minHeight: 98, alignment: .topLeading)
-                    }
-                }
-                
-                // Widget 11: Streaks (Flame)
-                if showW11 {
-                    cardContainer {
-                        VStack(alignment: .leading, spacing: 4) {
-                            statHeader(
-                                "Streaks",
-                                icon: "flame",
-                                hint: "Current run of consecutive wins (W) or losses (L), with the best and worst runs."
-                            )
-                            
-                            Spacer(minLength: 4)
-                            
-                            Text(metrics.currentStreak > 0 ? "\(metrics.currentStreak)W" : (metrics.currentStreak < 0 ? "\(-metrics.currentStreak)L" : "–"))
-                                .font(AppTypography.financialNumber(size: 20, weight: .bold))
-                                .monospacedDigit()
-                                .foregroundColor(metrics.currentStreak > 0 ? AppColors.profit : (metrics.currentStreak < 0 ? AppColors.loss : AppColors.primaryText))
-                            
-                            Text("best \(metrics.maxWinStreak)W · worst \(metrics.maxLossStreak)L")
+                            Spacer()
+                            Text(String(worst.date.suffix(5)))
                                 .font(AppTypography.caption)
                                 .foregroundColor(AppColors.secondaryText)
                         }
-                        .frame(maxWidth: .infinity, minHeight: 98, alignment: .topLeading)
                     }
-                }
-                
-                // Widget 12: Expectancy / trade (Sigma)
-                if showW12 {
-                    cardContainer {
-                        VStack(alignment: .leading, spacing: 4) {
-                            statHeader(
-                                "Expectancy / trade",
-                                icon: "sum",
-                                hint: "Average net P&L per closed trade: what one more trade is worth on your numbers."
-                            )
-                            
-                            Spacer(minLength: 4)
-                            
-                            AppMonetaryText(
-                                metrics.expectancy != nil ? Formatters.formatPnL(metrics.expectancy!, currency: env.currentCurrency) : "–",
-                                isPrivate: env.isPrivacyModeEnabled,
-                                font: AppTypography.financialNumber(size: 20, weight: .bold),
-                                color: (metrics.expectancy ?? 0) >= 0 ? AppColors.profit : AppColors.loss
-                            )
-                            
-                            Text(metrics.avgRealizedR != nil && metrics.tradesWithRisk > 0 ? String(format: "avg %.2fR over %d trades", metrics.avgRealizedR!, metrics.tradesWithRisk) : "tag stops for R multiples")
-                                .font(AppTypography.caption)
-                                .foregroundColor(AppColors.secondaryText)
-                                .lineLimit(1)
-                        }
-                        .frame(maxWidth: .infinity, minHeight: 98, alignment: .topLeading)
-                    }
-                }
-                
-                // Widget 13: Avg duration (Timer)
-                if showW13 {
-                    cardContainer {
-                        VStack(alignment: .leading, spacing: 4) {
-                            statHeader(
-                                "Avg duration",
-                                icon: "timer",
-                                hint: "Average time from first entry fill to final exit."
-                            )
-                            
-                            Spacer(minLength: 4)
-                            
-                            Text(Formatters.formatDuration(ms: metrics.avgDurationMs))
-                                .font(AppTypography.financialNumber(size: 20, weight: .bold))
-                                .monospacedDigit()
-                                .foregroundColor(AppColors.primaryText)
-                            
-                            Text("winners vs losers in Reports")
-                                .font(AppTypography.caption)
-                                .foregroundColor(AppColors.secondaryText)
-                        }
-                        .frame(maxWidth: .infinity, minHeight: 98, alignment: .topLeading)
-                    }
-                }
-                
-                // Widget 14: Best / worst day (Trophy)
-                if showW14 {
-                    cardContainer {
-                        VStack(alignment: .leading, spacing: 4) {
-                            statHeader(
-                                "Best / worst day",
-                                icon: "trophy",
-                                hint: "Highest and lowest single-day net P&L in the selected range."
-                            )
-                            
-                            Spacer(minLength: 4)
-                            
-                            if let best = snap.bestDay, let worst = snap.worstDay {
-                                VStack(alignment: .leading, spacing: 3) {
-                                    HStack {
-                                        AppMonetaryText(
-                                            Formatters.formatPnL(best.netPnl, currency: env.currentCurrency),
-                                            isPrivate: env.isPrivacyModeEnabled,
-                                            font: AppTypography.financialNumber(size: 13, weight: .semibold),
-                                            color: AppColors.profit
-                                        )
-                                        Spacer()
-                                        Text(String(best.date.suffix(5)))
-                                            .font(AppTypography.caption)
-                                            .foregroundColor(AppColors.secondaryText)
-                                    }
-                                    HStack {
-                                        AppMonetaryText(
-                                            Formatters.formatPnL(worst.netPnl, currency: env.currentCurrency),
-                                            isPrivate: env.isPrivacyModeEnabled,
-                                            font: AppTypography.financialNumber(size: 13, weight: .semibold),
-                                            color: AppColors.loss
-                                        )
-                                        Spacer()
-                                        Text(String(worst.date.suffix(5)))
-                                            .font(AppTypography.caption)
-                                            .foregroundColor(AppColors.secondaryText)
-                                    }
-                                }
-                            } else {
-                                Text("No closed trades yet")
-                                    .font(AppTypography.caption)
-                                    .foregroundColor(AppColors.secondaryText)
-                            }
-                        }
-                        .frame(maxWidth: .infinity, minHeight: 98, alignment: .topLeading)
-                    }
+                } else {
+                    Text("No closed trades yet")
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.secondaryText)
                 }
             }
+            .frame(maxWidth: .infinity, minHeight: isCompact ? 98 : nil, alignment: .topLeading)
         }
     }
     
-    // MARK: - 5. Full Width Performance (Widget 15)
-    
-    private func tradeTimePerformanceCard(snap: DashboardSnapshot) -> some View {
+    // Widget 15: Trade time performance (Clock)
+    @ViewBuilder
+    private func widget15TradeTimePerformance(snap: DashboardSnapshot) -> some View {
         cardContainer {
             VStack(alignment: .leading, spacing: 10) {
                 statHeader(
@@ -1430,5 +1681,78 @@ public struct DashboardView: View {
         f.dateFormat = "yyyy-MM-dd"
         f.timeZone = env.currentTimeZone
         return f.date(from: key) ?? Date()
+    }
+}
+
+// MARK: - Dashboard Card Wrapper with Interactive Reorder Bar
+
+private struct DashboardCardWrapper<Content: View>: View {
+    let cardId: String
+    let isEditing: Bool
+    let onMoveUp: () -> Void
+    let onMoveDown: () -> Void
+    let onHide: () -> Void
+    @ViewBuilder let content: () -> Content
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            if isEditing, let item = DashboardCardRegistry.item(for: cardId) {
+                HStack(spacing: 6) {
+                    Image(systemName: "line.3.horizontal")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundColor(AppColors.secondaryText)
+                    
+                    Text(item.label)
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(AppColors.primaryText)
+                        .lineLimit(1)
+                    
+                    Spacer()
+                    
+                    // Move Up Button
+                    Button {
+                        onMoveUp()
+                    } label: {
+                        Image(systemName: "arrow.up.circle.fill")
+                            .font(.system(size: 16))
+                            .foregroundColor(AppColors.brand)
+                    }
+                    .buttonStyle(.plain)
+                    
+                    // Move Down Button
+                    Button {
+                        onMoveDown()
+                    } label: {
+                        Image(systemName: "arrow.down.circle.fill")
+                            .font(.system(size: 16))
+                            .foregroundColor(AppColors.brand)
+                    }
+                    .buttonStyle(.plain)
+                    
+                    // Hide Button
+                    Button {
+                        onHide()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 16))
+                            .foregroundColor(AppColors.loss)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(AppColors.secondaryBackground)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .padding(.bottom, 6)
+            }
+            
+            content()
+        }
+        .overlay(
+            isEditing ?
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(AppColors.brand.opacity(0.4), lineWidth: 1.5)
+                : nil
+        )
     }
 }
