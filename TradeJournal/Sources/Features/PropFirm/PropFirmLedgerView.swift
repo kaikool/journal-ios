@@ -421,7 +421,7 @@ public struct PropFirmLedgerView: View {
                                     x: .value("Date", pt.date),
                                     y: .value("Net cash", pt.val)
                                 )
-                                .interpolationMethod(.stepAfter)
+                                .interpolationMethod(.stepEnd)
                                 .foregroundStyle(
                                     LinearGradient(
                                         stops: [
@@ -438,7 +438,7 @@ public struct PropFirmLedgerView: View {
                                     x: .value("Date", pt.date),
                                     y: .value("Net cash", pt.val)
                                 )
-                                .interpolationMethod(.stepAfter)
+                                .interpolationMethod(.stepEnd)
                                 .foregroundStyle(AppColors.brand)
                                 .lineStyle(StrokeStyle(lineWidth: 2.2, lineCap: .round, lineJoin: .round))
                             }
