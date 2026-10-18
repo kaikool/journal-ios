@@ -367,6 +367,8 @@ public final class SupabaseService {
         self.accessToken = token
         UserDefaults.standard.set(token, forKey: "supabase_access_token")
         return token
+    }
+    
     // MARK: - Database Wipe / Truncate Operations
     
     /// Generates safe TRUNCATE SQL for Supabase SQL Editor that wipes all rows across 20 tables while keeping table structures and RLS intact.
