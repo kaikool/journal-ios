@@ -95,7 +95,7 @@ public struct ExitAttribution: Codable, Equatable, Hashable {
 public struct Trade: Identifiable, Codable, Equatable {
     public var id: String { key }
     public let key: String
-    public let accountId: String
+    public var accountId: String
     public let symbol: String
     public let assetClass: AssetClass?
     public let direction: TradeDirection
