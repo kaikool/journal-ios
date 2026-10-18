@@ -26,67 +26,54 @@ public struct DashboardView: View {
     
     // MARK: - Arrangement & Presets
     
+    // MARK: - Arrangement & Presets
+    
     private var cardOrder: [String] {
-        get {
-            if cardOrderRaw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                return DashboardCardRegistry.defaultOrder
-            }
-            let list = cardOrderRaw.split(separator: ",").map(String.init)
-            var result = list.filter { DashboardCardRegistry.defaultOrder.contains($0) }
-            for card in DashboardCardRegistry.defaultOrder {
-                if !result.contains(card) {
-                    result.append(card)
-                }
-            }
-            return result
+        if cardOrderRaw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return DashboardCardRegistry.defaultOrder
         }
-        set {
-            cardOrderRaw = newValue.joined(separator: ",")
+        let list = cardOrderRaw.split(separator: ",").map(String.init)
+        var result = list.filter { DashboardCardRegistry.defaultOrder.contains($0) }
+        for card in DashboardCardRegistry.defaultOrder {
+            if !result.contains(card) {
+                result.append(card)
+            }
         }
+        return result
     }
     
     private var cardOrderBinding: Binding<[String]> {
         Binding(
             get: { cardOrder },
             set: { newOrder in
-                cardOrder = newOrder
+                cardOrderRaw = newOrder.joined(separator: ",")
             }
         )
     }
     
     private var hiddenCardIds: Set<String> {
-        get {
-            guard !hiddenWidgetsRaw.isEmpty else { return [] }
-            return Set(hiddenWidgetsRaw.split(separator: ",").map(String.init))
-        }
-        set {
-            hiddenWidgetsRaw = newValue.joined(separator: ",")
-        }
+        guard !hiddenWidgetsRaw.isEmpty else { return [] }
+        return Set(hiddenWidgetsRaw.split(separator: ",").map(String.init))
     }
     
     private var hiddenCardIdsBinding: Binding<Set<String>> {
         Binding(
             get: { hiddenCardIds },
             set: { newSet in
-                hiddenCardIds = newSet
+                hiddenWidgetsRaw = newSet.joined(separator: ",")
             }
         )
     }
     
     private var activePreset: DashboardPreset {
-        get {
-            DashboardPreset(rawValue: activePresetRaw) ?? .overview
-        }
-        set {
-            activePresetRaw = newValue.rawValue
-        }
+        DashboardPreset(rawValue: activePresetRaw) ?? .overview
     }
     
     private var activePresetBinding: Binding<DashboardPreset> {
         Binding(
             get: { activePreset },
             set: { newPreset in
-                activePreset = newPreset
+                activePresetRaw = newPreset.rawValue
             }
         )
     }
@@ -103,40 +90,23 @@ public struct DashboardView: View {
         
         let now = Date()
         let calendar = Calendar.current
-        return baseTrades.filter { trade in
-            let date = trade.closedAt ?? trade.openedAt
-            switch selectedRange {
-            case .all:
-                return true
-            case .today:
-                return calendar.isDateInToday(date)
-            case .yesterday:
-                return calendar.isDateInYesterday(date)
-            case .thisWeek:
-                return calendar.isDate(date, equalTo: now, toGranularity: .weekOfYear)
-            case .lastWeek:
-                guard let lastWeek = calendar.date(byAdding: .weekOfYear, value: -1, to: now) else { return false }
-                return calendar.isDate(date, equalTo: lastWeek, toGranularity: .weekOfYear)
-            case .thisMonth:
-                return calendar.isDate(date, equalTo: now, toGranularity: .month)
-            case .lastMonth:
-                guard let lastMonth = calendar.date(byAdding: .month, value: -1, to: now) else { return false }
-                return calendar.isDate(date, equalTo: lastMonth, toGranularity: .month)
-            case .thisYear:
-                return calendar.isDate(date, equalTo: now, toGranularity: .year)
-            case .lastYear:
-                guard let lastYear = calendar.date(byAdding: .year, value: -1, to: now) else { return false }
-                return calendar.isDate(date, equalTo: lastYear, toGranularity: .year)
-            case .last30Days:
-                guard let thirtyDaysAgo = calendar.date(byAdding: .day, value: -30, to: now) else { return false }
-                return date >= thirtyDaysAgo && date <= now
-            case .last90Days:
-                guard let ninetyDaysAgo = calendar.date(byAdding: .day, value: -90, to: now) else { return false }
-                return date >= ninetyDaysAgo && date <= now
-            case .custom(let start, let end):
-                return date >= start && date <= end
-            }
+        let cutoff: Date
+        
+        switch selectedRange {
+        case .all:
+            return baseTrades
+        case .d7:
+            cutoff = calendar.date(byAdding: .day, value: -7, to: now) ?? now
+        case .d30:
+            cutoff = calendar.date(byAdding: .day, value: -30, to: now) ?? now
+        case .d90:
+            cutoff = calendar.date(byAdding: .day, value: -90, to: now) ?? now
+        case .ytd:
+            let comps = calendar.dateComponents([.year], from: now)
+            cutoff = calendar.date(from: comps) ?? now
         }
+        
+        return baseTrades.filter { $0.openedAt >= cutoff }
     }
     
     // MARK: - Memoized Single-Pass Snapshot
@@ -620,23 +590,25 @@ public struct DashboardView: View {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         #endif
         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-            activePreset = preset
-            cardOrder = preset.canonicalOrder
-            hiddenCardIds = preset.canonicalHidden
+            activePresetRaw = preset.rawValue
+            cardOrderRaw = preset.canonicalOrder.joined(separator: ",")
+            hiddenWidgetsRaw = preset.canonicalHidden.joined(separator: ",")
         }
     }
     
     private func moveCard(cardId: String, direction: Int) {
-        guard let currentIndex = cardOrder.firstIndex(of: cardId) else { return }
+        var currentOrder = cardOrder
+        guard let currentIndex = currentOrder.firstIndex(of: cardId) else { return }
         let newIndex = currentIndex + direction
-        guard newIndex >= 0 && newIndex < cardOrder.count else { return }
+        guard newIndex >= 0 && newIndex < currentOrder.count else { return }
         
         #if canImport(UIKit)
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         #endif
         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-            cardOrder.swapAt(currentIndex, newIndex)
-            activePreset = .custom
+            currentOrder.swapAt(currentIndex, newIndex)
+            cardOrderRaw = currentOrder.joined(separator: ",")
+            activePresetRaw = DashboardPreset.custom.rawValue
         }
     }
     
@@ -644,9 +616,11 @@ public struct DashboardView: View {
         #if canImport(UIKit)
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         #endif
+        var currentHidden = hiddenCardIds
+        currentHidden.insert(cardId)
         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-            hiddenCardIds.insert(cardId)
-            activePreset = .custom
+            hiddenWidgetsRaw = currentHidden.joined(separator: ",")
+            activePresetRaw = DashboardPreset.custom.rawValue
         }
     }
     
