@@ -120,8 +120,8 @@ public struct TradesListView: View {
             cardContainer {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Net cumulative P&L")
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.secondaryText)
+                        .font(AppTypography.cardTitle)
+                        .foregroundColor(AppColors.primaryText)
                     
                     AppMonetaryText(
                         Formatters.formatPnL(overviewMetrics.netPnl, currency: env.currentCurrency),
@@ -140,8 +140,8 @@ public struct TradesListView: View {
             cardContainer {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Profit factor")
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.secondaryText)
+                        .font(AppTypography.cardTitle)
+                        .foregroundColor(AppColors.primaryText)
                     
                     Text(pfStr)
                         .font(AppTypography.financialNumber(size: 19, weight: .bold))
@@ -157,8 +157,8 @@ public struct TradesListView: View {
             cardContainer {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Trade win %")
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.secondaryText)
+                        .font(AppTypography.cardTitle)
+                        .foregroundColor(AppColors.primaryText)
                     
                     Text(winRateStr)
                         .font(AppTypography.financialNumber(size: 19, weight: .bold))
@@ -175,8 +175,8 @@ public struct TradesListView: View {
             cardContainer {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Avg win / loss")
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.secondaryText)
+                        .font(AppTypography.cardTitle)
+                        .foregroundColor(AppColors.primaryText)
                     
                     Text(avgWlStr)
                         .font(AppTypography.financialNumber(size: 19, weight: .bold))

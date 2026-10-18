@@ -9,10 +9,10 @@ import SwiftUI
 public enum AppTypography {
     // Web Tailwind Parity Scales
     public static let pageTitle = Font.system(size: 16, weight: .semibold)
-    public static let cardTitle = Font.system(size: 11, weight: .medium)
-    public static let metricHero = Font.system(size: 26, weight: .semibold)
-    public static let metricLarge = Font.system(size: 20, weight: .semibold)
-    public static let metricMedium = Font.system(size: 16, weight: .semibold)
+    public static let cardTitle = Font.system(size: 13, weight: .bold)
+    public static let metricHero = Font.system(size: 26, weight: .bold)
+    public static let metricLarge = Font.system(size: 20, weight: .bold)
+    public static let metricMedium = Font.system(size: 16, weight: .bold)
     public static let body = Font.system(size: 13, weight: .regular)
     public static let bodyMedium = Font.system(size: 13, weight: .medium)
     public static let bodyBold = Font.system(size: 13, weight: .semibold)
@@ -27,13 +27,13 @@ public enum AppTypography {
     
     // Backwards-compatible iOS definitions
     public static let largeTitle = Font.system(size: 28, weight: .bold)
-    public static let title = Font.system(size: 20, weight: .semibold)
-    public static let title2 = Font.system(size: 18, weight: .semibold)
+    public static let title = Font.system(size: 20, weight: .bold)
+    public static let title2 = Font.system(size: 18, weight: .bold)
     public static let title3 = Font.system(size: 16, weight: .semibold)
-    public static let headline = Font.system(size: 14, weight: .semibold)
+    public static let headline = Font.system(size: 14, weight: .bold)
     public static let subheadline = Font.system(size: 12, weight: .regular)
     public static let subheading = subheadline
-    public static let subheadlineBold = Font.system(size: 12, weight: .semibold)
+    public static let subheadlineBold = Font.system(size: 12, weight: .bold)
     public static let subheadingBold = subheadlineBold
     
     /// Standard Apple HIG input and editor typography
@@ -43,8 +43,8 @@ public enum AppTypography {
     
     /// Specialized font for financial numbers and monetary amounts: monospaced digits
     /// to avoid column jitter during real-time value updates.
-    public static func financialNumber(size: CGFloat = 24, weight: Font.Weight = .semibold) -> Font {
-        Font.system(size: size, weight: weight, design: .monospaced)
+    public static func financialNumber(size: CGFloat = 24, weight: Font.Weight = .bold) -> Font {
+        Font.system(size: size, weight: weight, design: .default)
     }
 }
 
