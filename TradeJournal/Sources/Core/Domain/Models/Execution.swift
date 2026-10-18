@@ -102,9 +102,9 @@ public struct Trade: Identifiable, Codable, Equatable, Hashable {
     public var status: TradeStatus
     public let openedAt: Date
     public var closedAt: Date?
-    public let quantity: Decimal
+    public var quantity: Decimal
     public var openQuantity: Decimal
-    public let avgEntry: Decimal
+    public var avgEntry: Decimal
     public var avgExit: Decimal?
     public var grossPnl: Decimal
     public var fees: Decimal
