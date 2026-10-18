@@ -571,7 +571,8 @@ public struct DashboardView: View {
             }
         }
         .padding(.horizontal, 14)
-        .padding(.top, 8)
+        .padding(.top, 6)
+        .padding(.bottom, 10)
     }
     
     // MARK: - Presets & Reorder Actions

@@ -462,6 +462,26 @@ public final class TradeDataStore: ObservableObject {
                 // Internal implementation note
                 accounts.removeAll(where: { $0.id == "default-acc" && accounts.count > 1 })
             }
+            
+            // Ensure all accounts referenced by prop accounts and trades exist prior to upload
+            var mergedAccountList = accounts
+            let existingAccIds = Set(mergedAccountList.map { $0.id })
+            
+            for p in propAccounts {
+                if let jId = p.journalAccountId, !jId.isEmpty && !existingAccIds.contains(jId) {
+                    if !mergedAccountList.contains(where: { Self.isSameAccountId($0.id, jId) }) {
+                        mergedAccountList.append(Account(id: jId, name: p.name, broker: p.firm, kind: .sync, currency: p.currency))
+                    }
+                }
+            }
+            for t in trades where !t.accountId.isEmpty && !existingAccIds.contains(t.accountId) {
+                if !mergedAccountList.contains(where: { Self.isSameAccountId($0.id, t.accountId) }) {
+                    mergedAccountList.append(Account(id: t.accountId, name: "Account \(t.accountId)", broker: "The5ers", kind: .sync))
+                }
+            }
+            self.accounts = mergedAccountList
+            deduplicateAndCleanAccounts()
+            
             if !accounts.isEmpty {
                 do {
                     try await SupabaseService.shared.upsertAccounts(accounts)
@@ -597,6 +617,26 @@ public final class TradeDataStore: ObservableObject {
                     propAccounts.append(rAcc)
                 }
             }
+            // Sanitize journalAccountId and parentId before uploading prop accounts
+            let validAccIds = Set(accounts.map { $0.id })
+            let validPropIds = Set(propAccounts.map { $0.id })
+            for idx in 0..<propAccounts.count {
+                if let jId = propAccounts[idx].journalAccountId, !jId.isEmpty {
+                    if !validAccIds.contains(jId) {
+                        if let matched = accounts.first(where: { Self.isSameAccountId($0.id, jId) }) {
+                            propAccounts[idx].journalAccountId = matched.id
+                        } else {
+                            propAccounts[idx].journalAccountId = nil
+                        }
+                    }
+                }
+                if let pId = propAccounts[idx].parentId, !pId.isEmpty {
+                    if !validPropIds.contains(pId) {
+                        propAccounts[idx].parentId = nil
+                    }
+                }
+            }
+            
             if !propAccounts.isEmpty {
                 do {
                     try await SupabaseService.shared.upsertPropAccounts(propAccounts)
@@ -624,6 +664,29 @@ public final class TradeDataStore: ObservableObject {
                     propEntries.append(rEntry)
                 }
             }
+            
+            // Sanitize accountId and parentId before uploading prop entries
+            let currentPropIds = Set(propAccounts.map { $0.id })
+            let currentEntryIds = Set(propEntries.map { $0.id })
+            for idx in 0..<propEntries.count {
+                if let aId = propEntries[idx].accountId, !aId.isEmpty {
+                    if !currentPropIds.contains(aId) {
+                        if let matched = propAccounts.first(where: { Self.isSameAccountId($0.id, aId) }) {
+                            propEntries[idx].accountId = matched.id
+                        } else if let firstProp = propAccounts.first {
+                            propEntries[idx].accountId = firstProp.id
+                        } else {
+                            propEntries[idx].accountId = nil
+                        }
+                    }
+                }
+                if let pId = propEntries[idx].parentId, !pId.isEmpty {
+                    if !currentEntryIds.contains(pId) {
+                        propEntries[idx].parentId = nil
+                    }
+                }
+            }
+            
             if !propEntries.isEmpty {
                 do {
                     try await SupabaseService.shared.upsertPropEntries(propEntries)
@@ -649,9 +712,24 @@ public final class TradeDataStore: ObservableObject {
                     propReceipts.append(rRcpt)
                 }
             }
-            if !propReceipts.isEmpty {
+            
+            // Filter receipts to ensure referenced payout entry exists to avoid FK errors
+            let validEntryIds = Set(propEntries.map { $0.id })
+            var validReceipts: [PropReceiptItem] = []
+            for var rcpt in propReceipts {
+                if validEntryIds.contains(rcpt.payoutId) {
+                    validReceipts.append(rcpt)
+                } else if let matched = propEntries.first(where: { $0.id.contains(rcpt.payoutId) || rcpt.payoutId.contains($0.id) }) {
+                    rcpt.payoutId = matched.id
+                    validReceipts.append(rcpt)
+                } else {
+                    AppLogger.warning("Supabase sync: Skipping receipt \(rcpt.id) because referenced payout entry \(rcpt.payoutId) does not exist.")
+                }
+            }
+            
+            if !validReceipts.isEmpty {
                 do {
-                    try await SupabaseService.shared.upsertPropReceipts(propReceipts)
+                    try await SupabaseService.shared.upsertPropReceipts(validReceipts)
                 } catch {
                     if Self.isCancellation(error) { return }
                     AppLogger.warning("Supabase prop receipts upsert warning: \(error.localizedDescription)")
@@ -706,6 +784,7 @@ public final class TradeDataStore: ObservableObject {
             return
         }
 
+        deduplicateAndCleanAccounts()
         saveToDisk()
 
         let totalRecords = fetchedAccountsCount + fetchedTradesCount + fetchedExecutionsCount + fetchedPropCount

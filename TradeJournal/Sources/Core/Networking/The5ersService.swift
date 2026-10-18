@@ -1022,23 +1022,24 @@ public final class The5ersService: ObservableObject {
             let tradeKey = JournalIds.the5ersTradeKey(sourceAccountId: acc.id, positionIdentity: posIdentity)
             
             let isClosed = position.closedAtDate != nil
-            let status: TradeStatus = {
-                if !isClosed { return .open }
-                if position.netPnl > 0.0001 { return .win }
-                if position.netPnl < -0.0001 { return .loss }
-                return .breakeven
-            }()
-            
-            // Internal implementation note
+            let rawProfit = position.netPnl
             let rawFee = position.fee ?? 0
             let rawSwap = position.swap ?? 0
-            let hasCosts = (position.fee != nil || position.swap != nil)
             let feeCost = abs(rawFee)
-            let swapCost = -rawSwap
-            let netCosts = hasCosts ? (feeCost + swapCost) : Decimal.zero
-            let grossPnl = position.netPnl + netCosts
-            let fees = hasCosts ? max(0, netCosts) : Decimal.zero
-            let netPnl = position.netPnl
+            let swapCost = rawSwap < 0 ? abs(rawSwap) : Decimal.zero
+            let swapCredit = rawSwap > 0 ? rawSwap : Decimal.zero
+            let totalCosts = feeCost + swapCost
+            
+            let grossPnl = isClosed ? rawProfit : Decimal.zero
+            let fees = totalCosts
+            let netPnl = isClosed ? (grossPnl - totalCosts + swapCredit) : Decimal.zero
+            
+            let status: TradeStatus = {
+                if !isClosed { return .open }
+                if netPnl > 0.0001 { return .win }
+                if netPnl < -0.0001 { return .loss }
+                return .breakeven
+            }()
             
             let durationMs: Int64? = (isClosed && position.closedAtDate != nil)
                 ? Int64(position.closedAtDate!.timeIntervalSince(position.openedAtDate) * 1000)
@@ -1454,14 +1455,14 @@ public final class The5ersService: ObservableObject {
             let matchedAcc = targetAccounts.first(where: {
                 $0.id == payAccRef || $0.ref == payAccRef || "the5ers_\($0.id)" == payAccRef
             })
-            let primaryAccId: String = {
+            let primaryAccId: String? = {
                 if let m = matchedAcc {
                     return m.id.hasPrefix("the5ers_") ? m.id : "the5ers_\(m.id)"
                 }
                 if let f = targetAccounts.first {
                     return f.id.hasPrefix("the5ers_") ? f.id : "the5ers_\(f.id)"
                 }
-                return "the5ers_payout_account"
+                return dataStore.propAccounts.first?.id
             }()
             let currency = String(describing: fields["currency"] ?? matchedAcc?.currency ?? "USD").uppercased()
             

@@ -764,14 +764,61 @@ public final class SupabaseService {
         return records.map { $0.toAccount() }
     }
     
+    // MARK: - PostgREST Batching & Payload Normalization
+    
+    /// Encodes and normalizes a batch of records for PostgREST bulk upsert,
+    /// ensuring every object in the JSON array has the exact same set of keys (with NSNull for nil values)
+    /// to satisfy PostgREST's strict "All object keys must match" requirement.
+    private func encodeNormalizedBatch<T: Encodable>(_ items: [T]) throws -> Data {
+        let rawData = try jsonEncoder.encode(items)
+        guard let jsonArray = try JSONSerialization.jsonObject(with: rawData, options: []) as? [[String: Any]],
+              !jsonArray.isEmpty else {
+            return rawData
+        }
+        
+        // Collect all distinct keys across every object in this batch
+        var allKeys = Set<String>()
+        for dict in jsonArray {
+            for key in dict.keys {
+                allKeys.insert(key)
+            }
+        }
+        
+        // Normalize each dictionary so that all objects have the exact same keys
+        var normalizedArray: [[String: Any]] = []
+        normalizedArray.reserveCapacity(jsonArray.count)
+        for var dict in jsonArray {
+            for key in allKeys {
+                if dict[key] == nil {
+                    dict[key] = NSNull()
+                }
+            }
+            normalizedArray.append(dict)
+        }
+        
+        return try JSONSerialization.data(withJSONObject: normalizedArray, options: [])
+    }
+    
+    /// Executes bulk upsert in chunks of 200 items, normalizing all JSON keys per batch to satisfy PostgREST.
+    private func upsertBatches<T: Encodable>(endpoint: String, items: [T], batchSize: Int = 200) async throws {
+        guard isConfigured, !items.isEmpty else { return }
+        
+        let chunks = stride(from: 0, to: items.count, by: batchSize).map {
+            Array(items[$0..<min($0 + batchSize, items.count)])
+        }
+        
+        for chunk in chunks {
+            let body = try encodeNormalizedBatch(chunk)
+            let request = try makeRequest(endpoint: endpoint, method: "POST", body: body, preferMerge: true)
+            let (data, response) = try await session.data(for: request)
+            try validateResponse(response, data: data, endpoint: endpoint)
+        }
+    }
+    
     public func upsertAccounts(_ items: [Account]) async throws {
         guard isConfigured, !items.isEmpty else { return }
         let dtos = items.map { SupabaseAccountRecord(account: $0) }
-        let body = try jsonEncoder.encode(dtos)
-        let endpoint = "accounts"
-        let request = try makeRequest(endpoint: endpoint, method: "POST", body: body, preferMerge: true)
-        let (data, response) = try await session.data(for: request)
-        try validateResponse(response, data: data, endpoint: endpoint)
+        try await upsertBatches(endpoint: "accounts", items: dtos)
     }
     
     public func fetchExecutions(accountId: String? = nil) async throws -> [Execution] {
@@ -792,11 +839,7 @@ public final class SupabaseService {
     public func upsertExecutions(_ items: [Execution]) async throws {
         guard isConfigured, !items.isEmpty else { return }
         let dtos = items.map { SupabaseExecutionRecord(execution: $0) }
-        let body = try jsonEncoder.encode(dtos)
-        let endpoint = "executions"
-        let request = try makeRequest(endpoint: endpoint, method: "POST", body: body, preferMerge: true)
-        let (data, response) = try await session.data(for: request)
-        try validateResponse(response, data: data, endpoint: endpoint)
+        try await upsertBatches(endpoint: "executions", items: dtos)
     }
     
     public func fetchTrades(accountId: String? = nil) async throws -> [Trade] {
@@ -817,11 +860,7 @@ public final class SupabaseService {
     public func upsertTrades(_ items: [Trade]) async throws {
         guard isConfigured, !items.isEmpty else { return }
         let dtos = items.map { SupabaseTradeRecord(trade: $0) }
-        let body = try jsonEncoder.encode(dtos)
-        let endpoint = "trades"
-        let request = try makeRequest(endpoint: endpoint, method: "POST", body: body, preferMerge: true)
-        let (data, response) = try await session.data(for: request)
-        try validateResponse(response, data: data, endpoint: endpoint)
+        try await upsertBatches(endpoint: "trades", items: dtos)
     }
 
     public func fetchPlaybooks() async throws -> [Playbook] {
@@ -837,11 +876,7 @@ public final class SupabaseService {
     public func upsertPlaybooks(_ items: [Playbook]) async throws {
         guard isConfigured, !items.isEmpty else { return }
         let dtos = items.map { SupabasePlaybookRecord(playbook: $0) }
-        let body = try jsonEncoder.encode(dtos)
-        let endpoint = "playbooks"
-        let request = try makeRequest(endpoint: endpoint, method: "POST", body: body, preferMerge: true)
-        let (data, response) = try await session.data(for: request)
-        try validateResponse(response, data: data, endpoint: endpoint)
+        try await upsertBatches(endpoint: "playbooks", items: dtos)
     }
 
     public func deletePlaybook(id: String) async throws {
@@ -863,11 +898,7 @@ public final class SupabaseService {
     
     public func upsertSettings(_ items: [JournalSettingRecord]) async throws {
         guard isConfigured, !items.isEmpty else { return }
-        let body = try jsonEncoder.encode(items)
-        let endpoint = "settings"
-        let request = try makeRequest(endpoint: endpoint, method: "POST", body: body, preferMerge: true)
-        let (data, response) = try await session.data(for: request)
-        try validateResponse(response, data: data, endpoint: endpoint)
+        try await upsertBatches(endpoint: "settings", items: items)
     }
     
     // MARK: - Prop Firms Sync
@@ -885,11 +916,7 @@ public final class SupabaseService {
     public func upsertPropAccounts(_ items: [PropAccountItem]) async throws {
         guard isConfigured, !items.isEmpty else { return }
         let dtos = items.map { SupabasePropAccountRecord(item: $0) }
-        let body = try jsonEncoder.encode(dtos)
-        let endpoint = "prop_accounts"
-        let request = try makeRequest(endpoint: endpoint, method: "POST", body: body, preferMerge: true)
-        let (data, response) = try await session.data(for: request)
-        try validateResponse(response, data: data, endpoint: endpoint)
+        try await upsertBatches(endpoint: "prop_accounts", items: dtos)
     }
     
     public func fetchPropEntries() async throws -> [PropEntryItem] {
@@ -905,11 +932,7 @@ public final class SupabaseService {
     public func upsertPropEntries(_ items: [PropEntryItem]) async throws {
         guard isConfigured, !items.isEmpty else { return }
         let dtos = items.map { SupabasePropEntryRecord(item: $0) }
-        let body = try jsonEncoder.encode(dtos)
-        let endpoint = "prop_entries"
-        let request = try makeRequest(endpoint: endpoint, method: "POST", body: body, preferMerge: true)
-        let (data, response) = try await session.data(for: request)
-        try validateResponse(response, data: data, endpoint: endpoint)
+        try await upsertBatches(endpoint: "prop_entries", items: dtos)
     }
     
     public func fetchPropReceipts() async throws -> [PropReceiptItem] {
@@ -925,11 +948,7 @@ public final class SupabaseService {
     public func upsertPropReceipts(_ items: [PropReceiptItem]) async throws {
         guard isConfigured, !items.isEmpty else { return }
         let dtos = items.map { SupabasePropReceiptRecord(item: $0) }
-        let body = try jsonEncoder.encode(dtos)
-        let endpoint = "prop_receipts"
-        let request = try makeRequest(endpoint: endpoint, method: "POST", body: body, preferMerge: true)
-        let (data, response) = try await session.data(for: request)
-        try validateResponse(response, data: data, endpoint: endpoint)
+        try await upsertBatches(endpoint: "prop_receipts", items: dtos)
     }
     
     public func fetchPropAudits() async throws -> [PropAuditItem] {
@@ -945,11 +964,7 @@ public final class SupabaseService {
     public func upsertPropAudits(_ items: [PropAuditItem]) async throws {
         guard isConfigured, !items.isEmpty else { return }
         let dtos = items.map { SupabasePropAuditRecord(item: $0) }
-        let body = try jsonEncoder.encode(dtos)
-        let endpoint = "prop_audit"
-        let request = try makeRequest(endpoint: endpoint, method: "POST", body: body, preferMerge: true)
-        let (data, response) = try await session.data(for: request)
-        try validateResponse(response, data: data, endpoint: endpoint)
+        try await upsertBatches(endpoint: "prop_audit", items: dtos)
     }
     
     // MARK: - Attachments & Storage
@@ -967,11 +982,7 @@ public final class SupabaseService {
     public func upsertAttachments(_ items: [Attachment]) async throws {
         guard isConfigured, !items.isEmpty else { return }
         let dtos = items.map { SupabaseAttachmentRecord(attachment: $0) }
-        let body = try jsonEncoder.encode(dtos)
-        let endpoint = "attachments"
-        let request = try makeRequest(endpoint: endpoint, method: "POST", body: body, preferMerge: true)
-        let (data, response) = try await session.data(for: request)
-        try validateResponse(response, data: data, endpoint: endpoint)
+        try await upsertBatches(endpoint: "attachments", items: dtos)
     }
     
     public func uploadAttachmentFile(storagePath: String, data: Data, mime: String) async throws {
