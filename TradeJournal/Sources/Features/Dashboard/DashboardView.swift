@@ -1316,107 +1316,95 @@ public struct DashboardView: View {
                                 activityTab = tab
                             }
                         } label: {
-                            Text(tab == "recent" ? "Recent Trades" : "Open Positions")
-                                .font(AppTypography.captionBold)
-                                .foregroundColor(isSelected ? .white : AppColors.primaryText)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 5)
-                                .background(isSelected ? AppColors.brand : Color.clear)
-                                .clipShape(Capsule())
+                            Text(tab == "recent" ? "Recent trades" : "Open positions")
+                                .font(.system(size: 12, weight: isSelected ? .semibold : .medium))
+                                .foregroundColor(isSelected ? AppColors.primaryText : AppColors.secondaryText)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 28)
+                                .background(
+                                    isSelected ? AppColors.cardBackground : Color.clear
+                                )
+                                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                .shadow(color: isSelected ? Color.black.opacity(0.08) : Color.clear, radius: 4, x: 0, y: 1)
                         }
+                        .buttonStyle(.plain)
                     }
                 }
                 .padding(3)
-                .background(AppColors.secondaryBackground)
-                .clipShape(Capsule())
+                .background(AppColors.secondaryBackground.opacity(0.6))
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 
                 if activityTab == "recent" {
-                    let recentTrades = Array(scopedTrades.filter { $0.closedAt != nil }.prefix(5))
-                    if recentTrades.isEmpty {
-                        Text("No recent closed trades.")
+                    let recent = Array(scopedTrades.filter { $0.status != .open }.prefix(5))
+                    if recent.isEmpty {
+                        Text("No closed trades yet")
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText)
-                            .padding(.vertical, 10)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .padding(.vertical, 16)
                     } else {
                         VStack(spacing: 6) {
-                            ForEach(recentTrades) { trade in
-                                NavigationLink(destination: TradeDetailView(trade: trade)) {
-                                    HStack {
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            HStack(spacing: 6) {
-                                                Text(trade.symbol)
-                                                    .font(AppTypography.bodyBold)
-                                                    .foregroundColor(AppColors.primaryText)
-                                                
-                                                Text(trade.direction.rawValue.uppercased())
-                                                    .font(.system(size: 9, weight: .bold))
-                                                    .padding(.horizontal, 4)
-                                                    .padding(.vertical, 1)
-                                                    .background(trade.direction == .long ? AppColors.profit.opacity(0.15) : AppColors.loss.opacity(0.15))
-                                                    .foregroundColor(trade.direction == .long ? AppColors.profit : AppColors.loss)
-                                                    .clipShape(RoundedRectangle(cornerRadius: 3))
-                                            }
-                                            
-                                            if let closed = trade.closedAt {
-                                                Text(closed.formatted(date: .abbreviated, time: .shortened))
-                                                    .font(AppTypography.caption)
-                                                    .foregroundColor(AppColors.secondaryText)
-                                            }
-                                        }
-                                        
-                                        Spacer()
-                                        
-                                        if let pnl = trade.netPnl {
-                                            AppMonetaryText(
-                                                Formatters.formatPnL(pnl, currency: trade.currency),
-                                                isPrivate: env.isPrivacyModeEnabled,
-                                                font: AppTypography.financialNumber(size: 14, weight: .bold),
-                                                color: pnl >= 0 ? AppColors.profit : AppColors.loss
-                                            )
-                                        }
-                                        
-                                        Image(systemName: "chevron.right")
-                                            .font(.system(size: 10))
+                            ForEach(recent) { t in
+                                HStack {
+                                    AppBadge(t.status.rawValue.uppercased(), color: Formatters.statusColor(t.status))
+                                    
+                                    Text(t.symbol)
+                                        .font(AppTypography.bodyBold)
+                                        .foregroundColor(AppColors.primaryText)
+                                    
+                                    Spacer()
+                                    
+                                    if let closed = t.closedAt {
+                                        Text(Formatters.formatDate(closed))
+                                            .font(AppTypography.caption)
                                             .foregroundColor(AppColors.secondaryText)
                                     }
-                                    .padding(.vertical, 4)
+                                    
+                                    AppMonetaryText(
+                                        Formatters.formatPnL(t.netPnl, currency: env.currentCurrency),
+                                        isPrivate: env.isPrivacyModeEnabled,
+                                        font: AppTypography.financialNumber(size: 13, weight: .semibold),
+                                        color: t.netPnl >= 0 ? AppColors.profit : AppColors.loss
+                                    )
                                 }
-                                .buttonStyle(.plain)
+                                .padding(.vertical, 3)
                                 
-                                if trade.id != recentTrades.last?.id {
-                                    Divider().background(AppColors.border.opacity(0.4))
+                                if t.id != recent.last?.id {
+                                    Divider().background(AppColors.border.opacity(0.5))
                                 }
                             }
                         }
                     }
                 } else {
-                    let openTrades = scopedTrades.filter { $0.status == .open }
-                    if openTrades.isEmpty {
-                        Text("No open positions.")
+                    let openPos = dataStore.trades.filter { $0.status == .open }
+                    if openPos.isEmpty {
+                        Text("Flat -- no open positions")
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText)
-                            .padding(.vertical, 10)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .padding(.vertical, 16)
                     } else {
                         VStack(spacing: 6) {
-                            ForEach(openTrades) { trade in
-                                NavigationLink(destination: TradeDetailView(trade: trade)) {
-                                    HStack {
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text(trade.symbol)
-                                                .font(AppTypography.bodyBold)
-                                                .foregroundColor(AppColors.primaryText)
-                                            Text("Opened \(trade.openedAt.formatted(date: .abbreviated, time: .shortened))")
-                                                .font(AppTypography.caption)
-                                                .foregroundColor(AppColors.secondaryText)
-                                        }
-                                        Spacer()
-                                        Text(trade.direction.rawValue.uppercased())
-                                            .font(AppTypography.captionBold)
-                                            .foregroundColor(trade.direction == .long ? AppColors.profit : AppColors.loss)
-                                    }
-                                    .padding(.vertical, 4)
+                            ForEach(openPos) { p in
+                                HStack {
+                                    AppBadge(p.direction.rawValue.uppercased(), color: p.direction == .long ? AppColors.profit : AppColors.loss)
+                                    
+                                    Text(p.symbol)
+                                        .font(AppTypography.bodyBold)
+                                        .foregroundColor(AppColors.primaryText)
+                                    
+                                    Spacer()
+                                    
+                                    Text("\(p.quantity) @ \(Formatters.formatCurrency(p.avgEntry, currency: env.currentCurrency))")
+                                        .font(AppTypography.caption)
+                                        .monospacedDigit()
+                                        .foregroundColor(AppColors.secondaryText)
                                 }
-                                .buttonStyle(.plain)
+                                .padding(.vertical, 3)
+                                
+                                if p.id != openPos.last?.id {
+                                    Divider().background(AppColors.border.opacity(0.5))
+                                }
                             }
                         }
                     }
