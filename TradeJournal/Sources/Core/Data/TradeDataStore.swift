@@ -231,15 +231,39 @@ public final class TradeDataStore: ObservableObject {
             saveToDisk()
         }
     }
+
+    public func updateAccount(
+        id: String,
+        name: String,
+        broker: String,
+        kind: AccountKind,
+        currency: String,
+        initialBalance: Decimal
+    ) {
+        guard let idx = accounts.firstIndex(where: { $0.id == id }) else { return }
+        accounts[idx].name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        accounts[idx].broker = broker.trimmingCharacters(in: .whitespacesAndNewlines)
+        accounts[idx].kind = kind
+        accounts[idx].currency = currency
+        accounts[idx].initialBalance = initialBalance
+        saveToDisk()
+        let updatedAcc = accounts[idx]
+        Task {
+            try? await SupabaseService.shared.upsertAccounts([updatedAcc])
+        }
+    }
     
     public func deleteAccount(id: String) {
         accounts.removeAll(where: { $0.id == id })
         trades.removeAll(where: { $0.accountId == id })
         executions.removeAll(where: { $0.accountId == id })
         if selectedAccountId == id {
-            selectedAccountId = accounts.first?.id ?? "default-acc"
+            selectedAccountId = accounts.first?.id ?? "all"
         }
         saveToDisk()
+        Task {
+            try? await SupabaseService.shared.deleteAccount(id: id)
+        }
     }
     
     public func toggleAccountAutoSync(id: String) {
@@ -1032,6 +1056,12 @@ public final class TradeDataStore: ObservableObject {
         saveToDisk()
         return folder
     }
+
+    public func renameFolder(id: String, name: String) throws {
+        let updated = try NotebookEngine.renameFolder(id: id, name: name, existingFolders: folders)
+        self.folders = updated
+        saveToDisk()
+    }
     
     public func deleteFolder(id: String) throws {
         let (updatedFolders, updatedNotes) = try NotebookEngine.deleteFolder(id: id, folders: folders, notes: notebookNotes)
@@ -1090,6 +1120,11 @@ public final class TradeDataStore: ObservableObject {
     }
     
     public func saveJournalDayNote(date: String, note: String) {
+        let trimmed = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            deleteCalendarNote(for: date)
+            return
+        }
         self.journalDays[date] = note
         let jNote = JournalNote(date: date, content: note, updatedAt: Date())
         self.calendarNotes[date] = jNote
@@ -1197,9 +1232,25 @@ public final class TradeDataStore: ObservableObject {
             )
             propAudits.append(audit)
         }
+    public func deletePropAccount(id: String) {
+        propAccounts.removeAll { $0.id == id }
+        propEntries.removeAll { $0.accountId == id }
+        propReceipts.removeAll { $0.accountId == id }
         saveToDisk()
+        Task {
+            try? await SupabaseService.shared.deletePropAccount(id: id)
+        }
     }
-    
+
+    public func deletePropEntry(id: String) {
+        propEntries.removeAll { $0.id == id }
+        propReceipts.removeAll { $0.entryId == id }
+        saveToDisk()
+        Task {
+            try? await SupabaseService.shared.deletePropEntry(id: id)
+        }
+    }
+
     public func voidPropEntry(id: String, voided: Bool, reason: String = "User void") throws {
         guard let idx = propEntries.firstIndex(where: { $0.id == id }) else {
             throw PropFirmError.notFound("Entry not found.")
@@ -1577,6 +1628,9 @@ public final class TradeDataStore: ObservableObject {
         progressRules.removeAll(where: { $0.id == id })
         progressChecks.removeAll(where: { $0.ruleId == id })
         saveToDisk()
+        Task {
+            try? await SupabaseService.shared.deleteProgressRule(id: id)
+        }
     }
     
     public func toggleProgressCheck(ruleId: String, date: String) {
@@ -1727,6 +1781,102 @@ public final class TradeDataStore: ObservableObject {
         rebuildAccount(accountId: trade.accountId)
         saveToDisk()
         AppLogger.info("Deleted trade \(key), remaining trades: \(trades.count)")
+        Task {
+            try? await SupabaseService.shared.deleteTrade(key: key)
+        }
+    }
+
+    public func updateManualTrade(
+        key: String,
+        symbol: String,
+        direction: TradeDirection,
+        quantity: Decimal,
+        entryPrice: Decimal,
+        exitPrice: Decimal?,
+        openedAt: Date,
+        closedAt: Date?,
+        fee: Decimal = 0,
+        notes: String? = nil,
+        tags: [String] = [],
+        mistakes: [String] = [],
+        rating: Int? = nil,
+        stopLoss: Decimal? = nil,
+        profitTarget: Decimal? = nil,
+        playbookId: String? = nil
+    ) {
+        guard let trade = trades.first(where: { $0.key == key }) else { return }
+        let accId = trade.accountId
+        
+        // Remove old executions
+        let oldIds = Set(trade.executionIds)
+        let oldFills = executions.filter { oldIds.contains($0.id) }
+        for fill in oldFills {
+            executionHashes.remove(fill.contentHash)
+        }
+        executions.removeAll { oldIds.contains($0.id) }
+        
+        // Build new executions
+        let cleanSymbol = symbol.uppercased().trimmingCharacters(in: .whitespaces)
+        let entrySide: ExecutionSide = (direction == .long) ? .buy : .sell
+        let halfFee = (exitPrice != nil) ? (fee / 2) : fee
+        
+        let entryFill = Execution(
+            accountId: accId,
+            symbol: cleanSymbol,
+            side: entrySide,
+            quantity: quantity,
+            price: entryPrice,
+            fee: halfFee,
+            executedAt: openedAt,
+            source: "manual"
+        )
+        var newExecutions = [entryFill]
+        
+        if let exitP = exitPrice {
+            let exitSide: ExecutionSide = (direction == .long) ? .sell : .buy
+            let exitTime = closedAt ?? openedAt.addingTimeInterval(3600)
+            let exitFill = Execution(
+                accountId: accId,
+                symbol: cleanSymbol,
+                side: exitSide,
+                quantity: quantity,
+                price: exitP,
+                fee: halfFee,
+                executedAt: exitTime,
+                source: "manual"
+            )
+            newExecutions.append(exitFill)
+        }
+        
+        for fill in newExecutions {
+            executionHashes.insert(fill.contentHash)
+            executions.append(fill)
+        }
+        
+        rebuildAccount(accountId: accId)
+        
+        if let idx = trades.firstIndex(where: { t in
+            t.accountId == accId &&
+            t.symbol == cleanSymbol &&
+            abs(t.openedAt.timeIntervalSince(openedAt)) < 2
+        }) {
+            trades[idx].notes = notes
+            trades[idx].tags = tags
+            trades[idx].mistakes = mistakes
+            trades[idx].rating = rating
+            trades[idx].stopLoss = stopLoss
+            trades[idx].profitTarget = profitTarget
+            trades[idx].playbookId = playbookId
+        }
+        
+        saveToDisk()
+        Task {
+            try? await SupabaseService.shared.deleteTrade(key: key)
+            try? await SupabaseService.shared.upsertExecutions(newExecutions)
+            if let t = self.trades.first(where: { $0.accountId == accId && $0.symbol == cleanSymbol && abs($0.openedAt.timeIntervalSince(openedAt)) < 2 }) {
+                try? await SupabaseService.shared.upsertTrades([t])
+            }
+        }
     }
     
     // MARK: - Playbooks & Discipline Assessments
@@ -1738,6 +1888,19 @@ public final class TradeDataStore: ObservableObject {
             playbooks.append(playbook)
         }
         saveToDisk()
+    }
+
+    public func updatePlaybook(id: String, title: String, description: String, rules: [String]) {
+        guard let idx = playbooks.firstIndex(where: { $0.id == id }) else { return }
+        playbooks[idx].name = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        playbooks[idx].title = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        playbooks[idx].description = description.trimmingCharacters(in: .whitespacesAndNewlines)
+        playbooks[idx].rules = rules
+        saveToDisk()
+        let updated = playbooks[idx]
+        Task {
+            try? await SupabaseService.shared.upsertPlaybooks([updated])
+        }
     }
     
     public func deletePlaybook(id: String) {
@@ -1772,6 +1935,11 @@ public final class TradeDataStore: ObservableObject {
     // MARK: - Calendar Notes
     
     public func saveCalendarNote(_ note: JournalNote) {
+        let trimmed = note.content.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty && (note.rating == nil || note.rating == 0) {
+            deleteCalendarNote(for: note.date)
+            return
+        }
         calendarNotes[note.date] = note
         journalDays[note.date] = note.content
         saveToDisk()

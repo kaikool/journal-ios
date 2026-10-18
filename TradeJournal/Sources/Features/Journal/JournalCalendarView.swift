@@ -1184,6 +1184,8 @@ public struct DayDetailSheet: View {
     
     @State private var noteContent: String = ""
     @State private var rating: Int = 0
+    @State private var showDeleteNoteAlert: Bool = false
+    @State private var saveStatus: String = ""
     
     public init(
         dateKey: String,
@@ -1230,13 +1232,35 @@ public struct DayDetailSheet: View {
             .navigationTitle(formattedDateTitle(dateKey))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    if !noteContent.isEmpty || rating > 0 {
+                        Button {
+                            showDeleteNoteAlert = true
+                        } label: {
+                            Image(systemName: "trash")
+                                .foregroundColor(AppColors.loss)
+                        }
+                    }
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") {
+                        save()
                         dismiss()
                     }
                     .font(AppTypography.captionBold)
                     .foregroundColor(AppColors.brand)
                 }
+            }
+            .alert("Delete note for this day?", isPresented: $showDeleteNoteAlert) {
+                Button("Cancel", role: .cancel) {}
+                Button("Delete", role: .destructive) {
+                    noteContent = ""
+                    rating = 0
+                    TradeDataStore.shared.deleteCalendarNote(for: dateKey)
+                    saveStatus = "Deleted"
+                }
+            } message: {
+                Text("This note will be permanently removed from your calendar and Supabase.")
             }
         }
     }
@@ -1279,6 +1303,16 @@ public struct DayDetailSheet: View {
                 HStack {
                     AppCardHeader("Daily Note")
                     Spacer()
+                    if !noteContent.isEmpty || rating > 0 {
+                        Button {
+                            showDeleteNoteAlert = true
+                        } label: {
+                            Image(systemName: "trash")
+                                .font(.system(size: 13))
+                                .foregroundColor(AppColors.loss.opacity(0.8))
+                        }
+                        .buttonStyle(.plain)
+                    }
                     HStack(spacing: 4) {
                         ForEach(1...5, id: \.self) { star in
                             Image(systemName: star <= rating ? "star.fill" : "star")
@@ -1357,9 +1391,36 @@ public struct DayDetailSheet: View {
                         RoundedRectangle(cornerRadius: 8)
                             .stroke(AppColors.border.opacity(0.6), lineWidth: 0.5)
                     )
-                    .onChange(of: noteContent) { _ in
-                        save()
+                
+                HStack(spacing: 12) {
+                    if !saveStatus.isEmpty {
+                        Text(saveStatus)
+                            .font(.system(size: 11))
+                            .foregroundColor(AppColors.secondaryText)
                     }
+                    
+                    Spacer()
+                    
+                    if !noteContent.isEmpty {
+                        Button("Clear") {
+                            noteContent = ""
+                            save()
+                        }
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.secondaryText)
+                    }
+                    
+                    Button {
+                        save()
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "checkmark")
+                            Text("Save")
+                        }
+                        .font(AppTypography.captionBold)
+                        .foregroundColor(AppColors.brand)
+                    }
+                }
                 
                 if noteContent.contains("*") || noteContent.contains("- ") || noteContent.contains("1. ") || noteContent.contains("#") {
                     VStack(alignment: .leading, spacing: 4) {
@@ -1506,10 +1567,17 @@ public struct DayDetailSheet: View {
     }
 
     private func save() {
+        let trimmed = noteContent.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty && rating == 0 {
+            TradeDataStore.shared.deleteCalendarNote(for: dateKey)
+            saveStatus = "Deleted"
+            return
+        }
         var updated = note
         updated.content = noteContent
         updated.rating = rating > 0 ? rating : nil
         updated.updatedAt = Date()
         onSaveNote(updated)
+        saveStatus = "Saved"
     }
 }

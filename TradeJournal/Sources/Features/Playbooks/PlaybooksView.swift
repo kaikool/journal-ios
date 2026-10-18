@@ -10,6 +10,7 @@ public struct PlaybooksView: View {
     @ObservedObject private var dataStore = TradeDataStore.shared
     
     @State private var showNewPlaybookSheet: Bool = false
+    @State private var playbookToEdit: Playbook? = nil
     @State private var playbookToDelete: Playbook? = nil
     @State private var showDeleteConfirmation: Bool = false
     
@@ -67,6 +68,12 @@ public struct PlaybooksView: View {
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
             .presentationCornerRadius(28)
+        }
+        .sheet(item: $playbookToEdit) { pb in
+            EditPlaybookSheet(playbook: pb)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(28)
         }
         .alert("Delete “\(playbookToDelete?.title ?? "")”?", isPresented: $showDeleteConfirmation) {
             Button("Cancel", role: .cancel) { playbookToDelete = nil }
@@ -174,6 +181,26 @@ public struct PlaybooksView: View {
                         #if canImport(UIKit)
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         #endif
+                        playbookToEdit = summary.playbook
+                    } label: {
+                        Image(systemName: "pencil")
+                            .font(.system(size: 13))
+                            .foregroundColor(AppColors.secondaryText.opacity(0.7))
+                            .padding(6)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .highPriorityGesture(TapGesture().onEnded {
+                        #if canImport(UIKit)
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        #endif
+                        playbookToEdit = summary.playbook
+                    })
+                    
+                    Button {
+                        #if canImport(UIKit)
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        #endif
                         playbookToDelete = summary.playbook
                         showDeleteConfirmation = true
                     } label: {
@@ -258,6 +285,11 @@ public struct PlaybookDetailView: View {
     let trades: [Trade]
     
     @State private var showDeleteAlert = false
+    @State private var showEditSheet = false
+    
+    private var currentPlaybook: Playbook {
+        dataStore.playbooks.first(where: { $0.id == playbook.id }) ?? playbook
+    }
     
     // MARK: - Apple HIG Card Container
     private func cardContainer<Content: View>(@ViewBuilder content: () -> Content) -> some View {
@@ -276,10 +308,14 @@ public struct PlaybookDetailView: View {
     public var body: some View {
         VStack(spacing: 0) {
             FilterBarView(
-                title: playbook.title,
+                title: currentPlaybook.title,
                 showFilters: false,
                 onBack: { dismiss() }
-            )
+            ) {
+                AppActionPill("Edit", icon: "pencil") {
+                    showEditSheet = true
+                }
+            }
             
             ScrollView {
                 VStack(spacing: 14) {
@@ -294,10 +330,16 @@ public struct PlaybookDetailView: View {
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
         .background(AppColors.background)
-        .alert("Delete “\(playbook.title)”? ", isPresented: $showDeleteAlert) {
+        .sheet(isPresented: $showEditSheet) {
+            EditPlaybookSheet(playbook: currentPlaybook)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(28)
+        }
+        .alert("Delete “\(currentPlaybook.title)”? ", isPresented: $showDeleteAlert) {
             Button("Cancel", role: .cancel) {}
             Button("Delete", role: .destructive) {
-                dataStore.deletePlaybook(id: playbook.id)
+                dataStore.deletePlaybook(id: currentPlaybook.id)
                 dismiss()
             }
         } message: {
@@ -312,7 +354,7 @@ public struct PlaybookDetailView: View {
                 Text("Strategy Description")
                     .font(AppTypography.caption)
                     .foregroundColor(AppColors.secondaryText)
-                Text(playbook.description.isEmpty ? "No description provided." : playbook.description)
+                Text(currentPlaybook.description.isEmpty ? "No description provided." : currentPlaybook.description)
                     .font(AppTypography.body)
                     .foregroundColor(AppColors.primaryText)
             }
@@ -323,11 +365,11 @@ public struct PlaybookDetailView: View {
     private var rulesCard: some View {
         cardContainer {
             VStack(alignment: .leading, spacing: 10) {
-                Text("Checklist Rules (\(playbook.rules.count))")
+                Text("Checklist Rules (\(currentPlaybook.rules.count))")
                     .font(AppTypography.headline)
                     .foregroundColor(AppColors.primaryText)
                 
-                ForEach(Array(playbook.rules.enumerated()), id: \.offset) { index, rule in
+                ForEach(Array(currentPlaybook.rules.enumerated()), id: \.offset) { index, rule in
                     HStack(alignment: .top, spacing: 8) {
                         Text("\(index + 1).")
                             .font(AppTypography.captionBold)
@@ -337,7 +379,7 @@ public struct PlaybookDetailView: View {
                             .foregroundColor(AppColors.primaryText)
                         Spacer()
                     }
-                    if index < playbook.rules.count - 1 {
+                    if index < currentPlaybook.rules.count - 1 {
                         Divider().background(AppColors.border.opacity(0.4))
                     }
                 }
@@ -499,6 +541,73 @@ public struct NewPlaybookSheet: View {
                             rules: parsedRules
                         )
                         onSave(pb)
+                        dismiss()
+                    }
+                    .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Edit Playbook Sheet
+
+public struct EditPlaybookSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var dataStore = TradeDataStore.shared
+    
+    let playbook: Playbook
+    
+    @State private var title: String
+    @State private var description: String
+    @State private var rulesText: String
+    
+    public init(playbook: Playbook) {
+        self.playbook = playbook
+        _title = State(initialValue: playbook.title)
+        _description = State(initialValue: playbook.description)
+        _rulesText = State(initialValue: playbook.rules.joined(separator: "\n"))
+    }
+    
+    public var body: some View {
+        NavigationStack {
+            Form {
+                Section("Playbook Details") {
+                    TextField("Name", text: $title)
+                        .font(AppTypography.inputText)
+                    TextField("One-line description", text: $description)
+                        .font(AppTypography.inputText)
+                }
+                
+                Section {
+                    TextEditor(text: $rulesText)
+                        .font(AppTypography.inputText)
+                        .frame(minHeight: 140)
+                } header: {
+                    Text("Checklist Rules")
+                } footer: {
+                    Text("One rule per line. These checklist conditions appear when logging trades.")
+                }
+            }
+            .navigationTitle("Edit playbook")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        let parsedRules = rulesText
+                            .components(separatedBy: .newlines)
+                            .map { $0.trimmingCharacters(in: .whitespaces) }
+                            .filter { !$0.isEmpty }
+                        
+                        dataStore.updatePlaybook(
+                            id: playbook.id,
+                            title: title.isEmpty ? playbook.title : title,
+                            description: description,
+                            rules: parsedRules
+                        )
                         dismiss()
                     }
                     .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty)

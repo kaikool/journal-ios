@@ -270,6 +270,7 @@ public struct DailyJournalDetailView: View {
     @State private var noteText: String = ""
     @State private var isSaving: Bool = false
     @State private var saveStatusMessage: String = ""
+    @State private var showDeleteNoteAlert: Bool = false
     @State private var isGeneratingAiRecap: Bool = false
     @State private var aiErrorMessage: String? = nil
     @State private var showExportSheet: Bool = false
@@ -354,6 +355,16 @@ public struct DailyJournalDetailView: View {
         .toolbar(.hidden, for: .navigationBar)
         .sheet(isPresented: $showExportSheet) {
             ReviewExportModal(title: "Journal · \(date)", exportText: exportText)
+        }
+        .alert("Delete note for \(date)?", isPresented: $showDeleteNoteAlert) {
+            Button("Cancel", role: .cancel) {}
+            Button("Delete", role: .destructive) {
+                noteText = ""
+                dataStore.deleteCalendarNote(for: date)
+                saveStatusMessage = "Deleted"
+            }
+        } message: {
+            Text("This note will be permanently removed from your calendar and Supabase.")
         }
         .onAppear {
             loadNote()
@@ -623,6 +634,18 @@ public struct DailyJournalDetailView: View {
                     
                     Spacer()
                     
+                    if !noteText.isEmpty {
+                        Button {
+                            showDeleteNoteAlert = true
+                        } label: {
+                            Image(systemName: "trash")
+                                .font(.system(size: 13))
+                                .foregroundColor(AppColors.loss.opacity(0.85))
+                                .padding(4)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    
                     // AI Recap button
                     Button {
                         generateAiRecap()
@@ -743,7 +766,7 @@ public struct DailyJournalDetailView: View {
                     .padding(.top, 2)
                 }
                 
-                HStack {
+                HStack(spacing: 12) {
                     if !saveStatusMessage.isEmpty {
                         Text(saveStatusMessage)
                             .font(.system(size: 11))
@@ -751,6 +774,16 @@ public struct DailyJournalDetailView: View {
                     }
                     
                     Spacer()
+                    
+                    if !noteText.isEmpty {
+                        Button("Clear") {
+                            noteText = ""
+                            dataStore.deleteCalendarNote(for: date)
+                            saveStatusMessage = "Cleared"
+                        }
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.secondaryText)
+                    }
                     
                     Button("Save now") {
                         saveNoteImmediately()
@@ -787,6 +820,12 @@ public struct DailyJournalDetailView: View {
     }
     
     private func saveNoteImmediately() {
+        let trimmed = noteText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            dataStore.deleteCalendarNote(for: date)
+            saveStatusMessage = "Deleted"
+            return
+        }
         dataStore.saveJournalDayNote(date: date, note: noteText)
         var calNote = dataStore.calendarNotes[date] ?? JournalNote(date: date, content: noteText)
         calNote.content = noteText

@@ -8,6 +8,7 @@ public struct TradeDetailView: View {
     
     @State var trade: Trade
     @State private var showReplayView: Bool = false
+    @State private var showEditTradeSheet: Bool = false
     @State private var showDeleteAlert: Bool = false
     @State private var newTag: String = ""
     @State private var newMistake: String = ""
@@ -78,6 +79,9 @@ public struct TradeDetailView: View {
                 showFilters: false,
                 onBack: { dismiss() }
             ) {
+                AppActionPill("Edit", icon: "pencil") {
+                    showEditTradeSheet = true
+                }
                 AppActionPill("Replay", icon: "play.fill") {
                     showReplayView = true
                 }
@@ -765,6 +769,15 @@ public struct TradeDetailView: View {
             }
         } message: {
             Text("This trade and its associated executions will be permanently removed.")
+        }
+        .sheet(isPresented: $showEditTradeSheet) {
+            EditManualTradeSheet(trade: trade) { updated in
+                self.trade = updated
+                self.noteContent = updated.notes ?? ""
+                self.stopLossText = updated.stopLoss != nil ? "\(updated.stopLoss!)" : ""
+                self.profitTargetText = updated.profitTarget != nil ? "\(updated.profitTarget!)" : ""
+                self.selectedPlaybookId = updated.playbookId ?? ""
+            }
         }
     }
     

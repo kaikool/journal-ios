@@ -22,6 +22,7 @@ public struct AccountsManagerView: View {
     @State private var filterTab: AccountFilterTab = .visible
     @State private var searchText: String = ""
     @State private var showNewAccountSheet: Bool = false
+    @State private var accountToEdit: Account? = nil
     @State private var accountToDelete: Account? = nil
     @State private var showDeleteAlert: Bool = false
     @State private var syncingAccountId: String? = nil
@@ -124,6 +125,12 @@ public struct AccountsManagerView: View {
         }
         .sheet(isPresented: $showNewAccountSheet) {
             CreateAccountSheet()
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(28)
+        }
+        .sheet(item: $accountToEdit) { acc in
+            EditAccountSheet(account: acc)
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(28)
@@ -421,6 +428,19 @@ public struct AccountsManagerView: View {
                     
                     Spacer()
                     
+                    // Edit Account
+                    Button {
+                        #if canImport(UIKit)
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        #endif
+                        accountToEdit = acc
+                    } label: {
+                        Image(systemName: "pencil")
+                            .font(.system(size: 14))
+                            .foregroundColor(AppColors.secondaryText)
+                    }
+                    .buttonStyle(ApplePressableButtonStyle())
+                    
                     // Archive / Restore
                     Button {
                         #if canImport(UIKit)
@@ -538,6 +558,87 @@ public struct CreateAccountSheet: View {
                             currency: currency,
                             initialBalance: bal,
                             profitCalcMethod: calcMethod
+                        )
+                        dismiss()
+                    }
+                    .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .font(AppTypography.headline)
+                }
+            }
+        }
+    }
+}
+
+/// Sheet to edit an existing trading account
+public struct EditAccountSheet: View {
+    @ObservedObject private var dataStore = TradeDataStore.shared
+    @Environment(\.dismiss) private var dismiss
+    
+    let account: Account
+    
+    @State private var name: String
+    @State private var broker: String
+    @State private var currency: String
+    @State private var initialBalanceText: String
+    @State private var kind: AccountKind
+    
+    private let commonBrokers = ["The5ers", "FTMO", "Topstep", "Oanda", "MetaTrader 5", "Binance", "Manual"]
+    private let commonCurrencies = ["USD", "EUR", "GBP", "JPY", "CAD", "AUD"]
+    
+    public init(account: Account) {
+        self.account = account
+        _name = State(initialValue: account.name)
+        _broker = State(initialValue: account.broker)
+        _currency = State(initialValue: account.currency)
+        _initialBalanceText = State(initialValue: "\(account.initialBalance)")
+        _kind = State(initialValue: account.kind)
+    }
+    
+    public var body: some View {
+        NavigationStack {
+            Form {
+                Section(header: Text("Account & Broker")) {
+                    TextField("Account name", text: $name)
+                    
+                    AppDropdownField(
+                        label: "Broker",
+                        selection: $broker,
+                        options: commonBrokers,
+                        titleFor: { $0 }
+                    )
+                }
+                
+                Section(header: Text("Financials")) {
+                    AppDropdownField(
+                        label: "Currency",
+                        selection: $currency,
+                        options: commonCurrencies,
+                        titleFor: { $0 }
+                    )
+                    
+                    TextField("Initial balance", text: $initialBalanceText)
+                        .keyboardType(.decimalPad)
+                        .monospacedDigit()
+                }
+            }
+            .navigationTitle("Edit account")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        let bal = Decimal(string: initialBalanceText) ?? account.initialBalance
+                        dataStore.updateAccount(
+                            id: account.id,
+                            name: name.trimmingCharacters(in: .whitespacesAndNewlines),
+                            broker: broker,
+                            kind: kind,
+                            currency: currency,
+                            initialBalance: bal
                         )
                         dismiss()
                     }

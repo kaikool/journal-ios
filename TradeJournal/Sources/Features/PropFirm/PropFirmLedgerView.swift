@@ -246,10 +246,10 @@ public struct PropFirmLedgerView: View {
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(28)
         }
-            .alert("Void transaction", isPresented: $showVoidAlert) {
-                TextField("Void reason (required)...", text: $voidReason)
+            .alert("Transaction Action", isPresented: $showVoidAlert) {
+                TextField("Void reason (optional)...", text: $voidReason)
                 Button("Cancel", role: .cancel) { itemToVoid = nil; voidReason = "" }
-                Button("Confirm void", role: .destructive) {
+                Button("Void transaction", role: .destructive) {
                     if let target = itemToVoid {
                         if target.isEntry {
                             try? dataStore.voidPropEntry(id: target.id, voided: true, reason: voidReason.isEmpty ? "Void transaction" : voidReason)
@@ -258,8 +258,17 @@ public struct PropFirmLedgerView: View {
                         voidReason = ""
                     }
                 }
+                Button("Delete permanently", role: .destructive) {
+                    if let target = itemToVoid {
+                        if target.isEntry {
+                            dataStore.deletePropEntry(id: target.id)
+                        }
+                        itemToVoid = nil
+                        voidReason = ""
+                    }
+                }
             } message: {
-                Text("The transaction will be voided and excluded from cash flow totals, but preserved for audit history.")
+                Text("You can void this transaction to keep it in audit history, or delete it permanently from your journal and Supabase.")
             }
     }
     
@@ -1061,6 +1070,7 @@ public struct EditPropAccountSheet: View {
     @State private var renewalDateText: String
     @State private var renewalAmountText: String
     @State private var closedDateText: String
+    @State private var showDeleteConfirm: Bool = false
     
     public init(account: PropAccountItem, onSave: @escaping (PropAccountItem) -> Void) {
         self.account = account
@@ -1103,6 +1113,20 @@ public struct EditPropAccountSheet: View {
                 Section("Notes") {
                     TextField("Account notes...", text: $notes)
                 }
+                
+                Section {
+                    Button(role: .destructive) {
+                        showDeleteConfirm = true
+                    } label: {
+                        HStack {
+                            Spacer()
+                            Text("Delete Prop Account")
+                                .font(AppTypography.captionBold)
+                                .foregroundColor(AppColors.loss)
+                            Spacer()
+                        }
+                    }
+                }
             }
             .font(AppTypography.inputText)
             .navigationTitle("Edit account")
@@ -1133,6 +1157,15 @@ public struct EditPropAccountSheet: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                 }
+            }
+            .alert("Delete “\(account.name)”? ", isPresented: $showDeleteConfirm) {
+                Button("Cancel", role: .cancel) {}
+                Button("Delete permanently", role: .destructive) {
+                    TradeDataStore.shared.deletePropAccount(id: account.id)
+                    dismiss()
+                }
+            } message: {
+                Text("This will permanently remove this prop account and all its transactions from your device and Supabase.")
             }
         }
     }

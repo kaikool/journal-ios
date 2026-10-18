@@ -106,6 +106,32 @@ public enum NotebookEngine {
         updated.append(newFolder)
         return (newFolder, updated)
     }
+
+    public static func renameFolder(
+        id: String,
+        name: String,
+        existingFolders: [NotebookFolder]
+    ) throws -> [NotebookFolder] {
+        if id == systemFolderAll || id == systemFolderTradeNotes || id == systemFolderMyNotes {
+            throw NotebookError.cannotDeleteSystemFolder
+        }
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            throw NotebookError.invalidFolderName("Enter a folder name.")
+        }
+        if trimmed.count > 100 {
+            throw NotebookError.invalidFolderName("Folder names must be 100 characters or fewer.")
+        }
+        guard let index = existingFolders.firstIndex(where: { $0.id == id && $0.deletedAt == nil }) else {
+            throw NotebookError.folderNotFound
+        }
+        var updated = existingFolders
+        var target = updated[index]
+        target.name = trimmed
+        target.updatedAt = JournalIds.nowIso()
+        updated[index] = target
+        return updated
+    }
     
     /// Internal domain documentation
     /// Internal domain documentation

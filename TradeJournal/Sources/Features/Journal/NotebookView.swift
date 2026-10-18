@@ -21,6 +21,10 @@ public struct NotebookView: View {
     @State private var folderToDelete: NotebookFolder? = nil
     @State private var showDeleteFolderAlert: Bool = false
     
+    @State private var folderToRename: NotebookFolder? = nil
+    @State private var renameFolderName: String = ""
+    @State private var showRenameFolderSheet: Bool = false
+    
     @State private var noteToDelete: NotebookNote? = nil
     @State private var showDeleteNoteAlert: Bool = false
     
@@ -105,6 +109,12 @@ public struct NotebookView: View {
         }
         .sheet(isPresented: $showNewFolderSheet) {
             newFolderSheet
+                .presentationDetents([.medium])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(28)
+        }
+        .sheet(isPresented: $showRenameFolderSheet) {
+            renameFolderSheet
                 .presentationDetents([.medium])
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(28)
@@ -202,8 +212,20 @@ public struct NotebookView: View {
                                 .background(isSelected ? Color.white.opacity(0.22) : AppColors.secondaryText.opacity(0.12))
                                 .clipShape(Capsule())
                             
-                            // Delete folder button for custom user folders
+                            // Rename and Delete buttons for custom user folders
                             if folder.id != NotebookEngine.systemFolderAll && folder.id != NotebookEngine.systemFolderMyNotes && isSelected {
+                                Button {
+                                    folderToRename = folder
+                                    renameFolderName = folder.name
+                                    folderError = nil
+                                    showRenameFolderSheet = true
+                                } label: {
+                                    Image(systemName: "pencil")
+                                        .font(.system(size: 10))
+                                        .foregroundColor(Color.white.opacity(0.9))
+                                }
+                                .padding(.leading, 2)
+                                
                                 Button {
                                     folderToDelete = folder
                                     showDeleteFolderAlert = true
@@ -409,6 +431,45 @@ public struct NotebookView: View {
                         }
                     }
                     .disabled(newFolderName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+        }
+    }
+
+    // MARK: - Rename Folder Sheet
+    
+    private var renameFolderSheet: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TextField("Folder name", text: $renameFolderName)
+                    if let err = folderError {
+                        Text(err)
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.loss)
+                    }
+                } header: {
+                    Text("Folder details")
+                }
+            }
+            .navigationTitle("Rename folder")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { showRenameFolderSheet = false }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        if let folder = folderToRename {
+                            do {
+                                try dataStore.renameFolder(id: folder.id, name: renameFolderName)
+                                showRenameFolderSheet = false
+                            } catch {
+                                folderError = error.localizedDescription
+                            }
+                        }
+                    }
+                    .disabled(renameFolderName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }
         }

@@ -820,6 +820,22 @@ public final class SupabaseService {
         let dtos = items.map { SupabaseAccountRecord(account: $0) }
         try await upsertBatches(endpoint: "accounts", items: dtos)
     }
+
+    public func deleteAccount(id: String) async throws {
+        guard isConfigured else { return }
+        _ = try? await session.data(for: try makeRequest(endpoint: "prop_receipts?account_id=eq.\(id)", method: "DELETE"))
+        _ = try? await session.data(for: try makeRequest(endpoint: "prop_entries?account_id=eq.\(id)", method: "DELETE"))
+        _ = try? await session.data(for: try makeRequest(endpoint: "prop_accounts?journal_account_id=eq.\(id)", method: "DELETE"))
+        _ = try? await session.data(for: try makeRequest(endpoint: "trade_rule_checks?account_id=eq.\(id)", method: "DELETE"))
+        _ = try? await session.data(for: try makeRequest(endpoint: "trade_excursions?account_id=eq.\(id)", method: "DELETE"))
+        _ = try? await session.data(for: try makeRequest(endpoint: "trades?account_id=eq.\(id)", method: "DELETE"))
+        _ = try? await session.data(for: try makeRequest(endpoint: "executions?account_id=eq.\(id)", method: "DELETE"))
+        
+        let endpoint = "accounts?id=eq.\(id)"
+        let request = try makeRequest(endpoint: endpoint, method: "DELETE")
+        let (data, response) = try await session.data(for: request)
+        try validateResponse(response, data: data, endpoint: endpoint)
+    }
     
     public func fetchExecutions(accountId: String? = nil) async throws -> [Execution] {
         guard isConfigured else { return [] }
@@ -861,6 +877,16 @@ public final class SupabaseService {
         guard isConfigured, !items.isEmpty else { return }
         let dtos = items.map { SupabaseTradeRecord(trade: $0) }
         try await upsertBatches(endpoint: "trades", items: dtos)
+    }
+
+    public func deleteTrade(key: String) async throws {
+        guard isConfigured else { return }
+        _ = try? await session.data(for: try makeRequest(endpoint: "trade_rule_checks?trade_key=eq.\(key)", method: "DELETE"))
+        _ = try? await session.data(for: try makeRequest(endpoint: "trade_excursions?trade_key=eq.\(key)", method: "DELETE"))
+        let endpoint = "trades?key=eq.\(key)"
+        let request = try makeRequest(endpoint: endpoint, method: "DELETE")
+        let (data, response) = try await session.data(for: request)
+        try validateResponse(response, data: data, endpoint: endpoint)
     }
 
     public func fetchPlaybooks() async throws -> [Playbook] {
@@ -962,6 +988,16 @@ public final class SupabaseService {
         let dtos = items.map { SupabasePropAccountRecord(item: $0) }
         try await upsertBatches(endpoint: "prop_accounts", items: dtos)
     }
+
+    public func deletePropAccount(id: String) async throws {
+        guard isConfigured else { return }
+        _ = try? await session.data(for: try makeRequest(endpoint: "prop_receipts?account_id=eq.\(id)", method: "DELETE"))
+        _ = try? await session.data(for: try makeRequest(endpoint: "prop_entries?account_id=eq.\(id)", method: "DELETE"))
+        let endpoint = "prop_accounts?id=eq.\(id)"
+        let request = try makeRequest(endpoint: endpoint, method: "DELETE")
+        let (data, response) = try await session.data(for: request)
+        try validateResponse(response, data: data, endpoint: endpoint)
+    }
     
     public func fetchPropEntries() async throws -> [PropEntryItem] {
         guard isConfigured else { return [] }
@@ -977,6 +1013,15 @@ public final class SupabaseService {
         guard isConfigured, !items.isEmpty else { return }
         let dtos = items.map { SupabasePropEntryRecord(item: $0) }
         try await upsertBatches(endpoint: "prop_entries", items: dtos)
+    }
+
+    public func deletePropEntry(id: String) async throws {
+        guard isConfigured else { return }
+        _ = try? await session.data(for: try makeRequest(endpoint: "prop_receipts?entry_id=eq.\(id)", method: "DELETE"))
+        let endpoint = "prop_entries?id=eq.\(id)"
+        let request = try makeRequest(endpoint: endpoint, method: "DELETE")
+        let (data, response) = try await session.data(for: request)
+        try validateResponse(response, data: data, endpoint: endpoint)
     }
     
     public func fetchPropReceipts() async throws -> [PropReceiptItem] {
@@ -1009,6 +1054,15 @@ public final class SupabaseService {
         guard isConfigured, !items.isEmpty else { return }
         let dtos = items.map { SupabasePropAuditRecord(item: $0) }
         try await upsertBatches(endpoint: "prop_audit", items: dtos)
+    }
+
+    public func deleteProgressRule(id: String) async throws {
+        guard isConfigured else { return }
+        _ = try? await session.data(for: try makeRequest(endpoint: "progress_checks?rule_id=eq.\(id)", method: "DELETE"))
+        let endpoint = "progress_rules?id=eq.\(id)"
+        let request = try makeRequest(endpoint: endpoint, method: "DELETE")
+        let (data, response) = try await session.data(for: request)
+        try validateResponse(response, data: data, endpoint: endpoint)
     }
     
     // MARK: - Attachments & Storage
