@@ -120,19 +120,19 @@ public struct DashboardView: View {
         
         let edge = EdgeScoreEngine.computeEdgeScore(metrics: overview.metrics)
         
-        var runningPeak: Decimal = 0
-        let chartPoints = overview.curve.map { pt -> EquityPointItem in
-            if pt.cumNetPnl > runningPeak {
-                runningPeak = pt.cumNetPnl
-            }
-            let base = initialBalance + runningPeak
-            let dd: Decimal = base > 0 ? (runningPeak - pt.cumNetPnl) / base : (runningPeak > 0 ? (runningPeak - pt.cumNetPnl) / runningPeak : Decimal.zero)
+        let dailyCurve = FinancialMetricsEngine.dailyCumulativeFromDays(days: overview.days)
+        let rdCurve = FinancialMetricsEngine.relativeDrawdownCurve(curve: dailyCurve, initialBalance: initialBalance)
+        
+        let chartPoints: [EquityPointItem] = zip(dailyCurve, rdCurve).map { dc, rd in
+            let dayStat = overview.days.first(where: { $0.date == dc.dateString })
+            let dayPnl = dayStat?.netPnl ?? 0
+            let ddDecimal = Decimal(rd.drawdownPct ?? 0)
             return EquityPointItem(
-                date: pt.timestamp,
-                dateKey: pt.dateString,
-                netPnl: pt.cumNetPnl,
-                cumulativePnl: pt.cumNetPnl,
-                drawdown: dd
+                date: dc.timestamp,
+                dateKey: dc.dateString,
+                netPnl: dayPnl,
+                cumulativePnl: dc.cumNetPnl,
+                drawdown: ddDecimal
             )
         }
         

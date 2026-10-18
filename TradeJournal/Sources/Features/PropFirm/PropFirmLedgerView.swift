@@ -407,16 +407,27 @@ public struct PropFirmLedgerView: View {
                             ForEach(parsedTimeline, id: \.id) { pt in
                                 AreaMark(
                                     x: .value("Date", pt.date),
-                                    y: .value("Net cash", pt.val)
+                                    yStart: .value("Baseline", 0.0),
+                                    yEnd: .value("Net cash", max(0.0, pt.val))
                                 )
                                 .interpolationMethod(.stepEnd)
                                 .foregroundStyle(
                                     LinearGradient(
-                                        stops: [
-                                            .init(color: AppColors.brand.opacity(0.3), location: 0.0),
-                                            .init(color: AppColors.brand.opacity(0.06), location: 0.6),
-                                            .init(color: Color.clear, location: 1.0)
-                                        ],
+                                        colors: [AppColors.brand.opacity(0.28), AppColors.brand.opacity(0.03)],
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    )
+                                )
+                                
+                                AreaMark(
+                                    x: .value("Date", pt.date),
+                                    yStart: .value("Baseline", 0.0),
+                                    yEnd: .value("Loss", min(0.0, pt.val))
+                                )
+                                .interpolationMethod(.stepEnd)
+                                .foregroundStyle(
+                                    LinearGradient(
+                                        colors: [AppColors.loss.opacity(0.03), AppColors.loss.opacity(0.28)],
                                         startPoint: .top,
                                         endPoint: .bottom
                                     )

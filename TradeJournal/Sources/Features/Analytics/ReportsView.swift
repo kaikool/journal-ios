@@ -252,17 +252,18 @@ public struct ReportsView: View {
                 return dataStore.selectedAccount?.initialBalance ?? 0
             }()
             let overview = FinancialMetricsEngine.computeOverview(trades: trades, timeZone: env.currentTimeZone, initialBalance: initialBalance)
-            var runningPeak: Decimal = 0
-            let equityPoints = overview.curve.map { p in
-                if p.cumNetPnl > runningPeak { runningPeak = p.cumNetPnl }
-                let base = initialBalance + runningPeak
-                let dd: Decimal = base > 0 ? (runningPeak - p.cumNetPnl) / base : (runningPeak > 0 ? (runningPeak - p.cumNetPnl) / runningPeak : Decimal.zero)
+            let dailyCurve = FinancialMetricsEngine.dailyCumulativeFromDays(days: overview.days)
+            let rdCurve = FinancialMetricsEngine.relativeDrawdownCurve(curve: dailyCurve, initialBalance: initialBalance)
+            let equityPoints: [EquityPointItem] = zip(dailyCurve, rdCurve).map { dc, rd in
+                let dayStat = overview.days.first(where: { $0.date == dc.dateString })
+                let dayPnl = dayStat?.netPnl ?? 0
+                let ddDecimal = Decimal(rd.drawdownPct ?? 0)
                 return EquityPointItem(
-                    date: p.timestamp,
-                    dateKey: p.dateString,
-                    netPnl: p.cumNetPnl,
-                    cumulativePnl: p.cumNetPnl,
-                    drawdown: dd
+                    date: dc.timestamp,
+                    dateKey: dc.dateString,
+                    netPnl: dayPnl,
+                    cumulativePnl: dc.cumNetPnl,
+                    drawdown: ddDecimal
                 )
             }
             

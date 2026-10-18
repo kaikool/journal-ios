@@ -18,13 +18,12 @@ public struct EquityPointItem: Identifiable, Sendable {
     }
 }
 
-/// Apple HIG Stocks-tier Interactive Equity Curve Chart.
-/// Features:
-/// - Smooth Catmull-Rom spline interpolation (no jagged polygonal steps)
-/// - Multi-stop ambient luminous gradient fill
-/// - Interactive touch scrubbing with vertical tracking line and haloed cursor node
-/// - Real-time live header updating with monospaced digits and haptic feedback
-/// - Clean minimal zero-baseline and quiet typographic axes
+/// Cumulative Net P&L Area Chart ported 1:1 from `components/charts/equity-area.tsx`.
+/// Visualizes cumulative profit/loss anchored strictly to the zero baseline:
+/// - Positive values (profits) fill upwards from 0 to curve in brand cyan-blue (#1197e2).
+/// - Negative values (losses) fill downwards from 0 to curve in loss crimson-red (#d03b3b).
+/// - Continuous zero reference line.
+/// - Interactive touch scrubbing with HUD display and haptics.
 public struct EquityCurveChart: View {
     public let points: [EquityPointItem]
     public let currency: String
@@ -38,7 +37,7 @@ public struct EquityCurveChart: View {
         points: [EquityPointItem],
         currency: String = "USD",
         showArea: Bool = true,
-        height: CGFloat = 220
+        height: CGFloat = 200
     ) {
         self.points = points
         self.currency = currency
@@ -47,89 +46,114 @@ public struct EquityCurveChart: View {
     }
     
     private var activePoint: EquityPointItem? {
-        guard let target = selectedDate else { return points.last }
+        guard let target = selectedDate else { return nil }
         return points.min(by: {
             abs($0.date.timeIntervalSince(target)) < abs($1.date.timeIntervalSince(target))
-        }) ?? points.last
+        })
     }
     
-    private var isNetPositive: Bool {
-        (activePoint?.cumulativePnl ?? points.last?.cumulativePnl ?? 0) >= 0
+    private var lastPoint: EquityPointItem? {
+        points.last
     }
     
-    private var chartColor: Color {
-        isNetPositive ? AppColors.profit : AppColors.loss
+    private var doubleVals: [Double] {
+        points.map { ($0.cumulativePnl as NSDecimalNumber).doubleValue }
+    }
+    
+    private var maxVal: Double {
+        max(0.0, doubleVals.max() ?? 0.0)
+    }
+    
+    private var minVal: Double {
+        min(0.0, doubleVals.min() ?? 0.0)
+    }
+    
+    private var zeroStop: CGFloat {
+        let range = maxVal - minVal
+        guard range > 0 else { return 1.0 }
+        return CGFloat(maxVal / range)
+    }
+    
+    private var lineGradient: LinearGradient {
+        if minVal >= 0 {
+            return LinearGradient(
+                colors: [AppColors.brand, AppColors.brand],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        } else if maxVal <= 0 {
+            return LinearGradient(
+                colors: [AppColors.loss, AppColors.loss],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        } else {
+            return LinearGradient(
+                stops: [
+                    .init(color: AppColors.brand, location: 0.0),
+                    .init(color: AppColors.brand, location: max(0.0, zeroStop - 0.005)),
+                    .init(color: AppColors.loss, location: min(1.0, zeroStop + 0.005)),
+                    .init(color: AppColors.loss, location: 1.0)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        }
     }
     
     public var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            // Apple HIG Live Header
-            if let active = activePoint {
-                HStack(alignment: .lastTextBaseline) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(selectedDate != nil ? formatDate(active.date) : "Cumulative Equity")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(AppColors.secondaryText)
-                            .textCase(.uppercase)
-                            .tracking(0.5)
-                        
-                        Text(Formatters.formatCurrency(active.cumulativePnl, currency: currency))
-                            .font(.system(size: 26, weight: .bold, design: .rounded))
-                            .monospacedDigit()
-                            .foregroundColor(active.cumulativePnl >= 0 ? AppColors.profit : AppColors.loss)
-                    }
-                    
-                    Spacer()
-                    
-                    // Day P&L Pill
-                    HStack(spacing: 3) {
-                        Image(systemName: active.netPnl >= 0 ? "arrow.up.right" : "arrow.down.right")
-                            .font(.system(size: 9, weight: .bold))
-                        Text(Formatters.formatPnL(active.netPnl, currency: currency))
-                            .font(.system(size: 11, weight: .bold, design: .rounded))
-                            .monospacedDigit()
-                    }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(
-                        (active.netPnl >= 0 ? AppColors.profit : AppColors.loss)
-                            .opacity(0.12)
-                    )
-                    .foregroundColor(active.netPnl >= 0 ? AppColors.profit : AppColors.loss)
-                    .clipShape(Capsule())
-                }
-                .padding(.horizontal, 2)
-            }
+        VStack(alignment: .leading, spacing: 6) {
+            // Interactive HUD / Scrub Header
+            headerBar
             
             if points.isEmpty {
                 EmptyStateView(
                     icon: "chart.line.uptrend.xyaxis",
-                    title: "No Equity Data",
-                    message: "Import trades or execute orders to see your cumulative equity curve."
+                    title: "No Data",
+                    message: "Execute or import trades to visualize your cumulative P&L curve."
                 )
                 .frame(height: height)
             } else {
                 Chart {
-                    // Crisp Zero Baseline
-                    RuleMark(y: .value("Zero", 0))
+                    // Reference Zero Baseline (Breakeven)
+                    RuleMark(y: .value("Zero", 0.0))
                         .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
-                        .foregroundStyle(AppColors.border.opacity(0.8))
+                        .foregroundStyle(AppColors.border.opacity(0.85))
                     
                     ForEach(points) { point in
                         let val = (point.cumulativePnl as NSDecimalNumber).doubleValue
                         
                         if showArea {
+                            // Profit Area: fills strictly between baseline 0 and positive cumulative P&L
                             AreaMark(
                                 x: .value("Date", point.date),
-                                y: .value("Equity", val)
+                                yStart: .value("Baseline", 0.0),
+                                yEnd: .value("Profit", max(0.0, val))
                             )
-                            .interpolationMethod(.catmullRom)
+                            .interpolationMethod(.monotone)
                             .foregroundStyle(
                                 LinearGradient(
-                                    stops: [
-                                        .init(color: chartColor.opacity(0.32), location: 0.0),
-                                        .init(color: chartColor.opacity(0.08), location: 0.6),
-                                        .init(color: chartColor.opacity(0.0), location: 1.0)
+                                    colors: [
+                                        AppColors.brand.opacity(0.28),
+                                        AppColors.brand.opacity(0.03)
+                                    ],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                            
+                            // Loss Area: fills strictly between baseline 0 and negative cumulative P&L
+                            AreaMark(
+                                x: .value("Date", point.date),
+                                yStart: .value("Baseline", 0.0),
+                                yEnd: .value("Loss", min(0.0, val))
+                            )
+                            .interpolationMethod(.monotone)
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [
+                                        AppColors.loss.opacity(0.03),
+                                        AppColors.loss.opacity(0.28)
                                     ],
                                     startPoint: .top,
                                     endPoint: .bottom
@@ -137,46 +161,59 @@ public struct EquityCurveChart: View {
                             )
                         }
                         
+                        // Cumulative P&L Curve Stroke
                         LineMark(
                             x: .value("Date", point.date),
                             y: .value("Equity", val)
                         )
-                        .interpolationMethod(.catmullRom)
-                        .foregroundStyle(chartColor)
-                        .lineStyle(StrokeStyle(lineWidth: 2.4, lineCap: .round, lineJoin: .round))
+                        .interpolationMethod(.monotone)
+                        .foregroundStyle(lineGradient)
+                        .lineStyle(StrokeStyle(lineWidth: 2.2, lineCap: .round, lineJoin: .round))
                     }
                     
-                    // Interactive Touch Cursor & Glowing Node
-                    if let active = activePoint, selectedDate != nil {
+                    // Single-point dot fallback
+                    if points.count == 1, let single = points.first {
+                        let sVal = (single.cumulativePnl as NSDecimalNumber).doubleValue
+                        PointMark(
+                            x: .value("Date", single.date),
+                            y: .value("Equity", sVal)
+                        )
+                        .foregroundStyle(sVal >= 0 ? AppColors.brand : AppColors.loss)
+                        .symbolSize(42)
+                    }
+                    
+                    // Interactive Touch Crosshair & Cursor Node
+                    if let active = activePoint {
                         let activeVal = (active.cumulativePnl as NSDecimalNumber).doubleValue
+                        let cursorColor = activeVal >= 0 ? AppColors.brand : AppColors.loss
                         
                         RuleMark(x: .value("Cursor", active.date))
                             .lineStyle(StrokeStyle(lineWidth: 1.2, dash: [3, 3]))
-                            .foregroundStyle(AppColors.primaryText.opacity(0.4))
+                            .foregroundStyle(AppColors.primaryText.opacity(0.45))
                         
-                        // Outer Halo
+                        // Halo
                         PointMark(
                             x: .value("Date", active.date),
                             y: .value("Equity", activeVal)
                         )
-                        .foregroundStyle(chartColor.opacity(0.25))
-                        .symbolSize(140)
+                        .foregroundStyle(cursorColor.opacity(0.25))
+                        .symbolSize(120)
                         
-                        // Inner Glowing Bead
+                        // Glowing bead
                         PointMark(
                             x: .value("Date", active.date),
                             y: .value("Equity", activeVal)
                         )
-                        .foregroundStyle(chartColor)
+                        .foregroundStyle(cursorColor)
                         .symbolSize(36)
                         
-                        // Core White Point
+                        // Core center
                         PointMark(
                             x: .value("Date", active.date),
                             y: .value("Equity", activeVal)
                         )
                         .foregroundStyle(Color.white)
-                        .symbolSize(12)
+                        .symbolSize(10)
                     }
                 }
                 .chartXSelection(value: $selectedDate)
@@ -215,6 +252,62 @@ public struct EquityCurveChart: View {
                     }
                 }
             }
+        }
+    }
+    
+    @ViewBuilder
+    private var headerBar: some View {
+        if let active = activePoint {
+            // Live Scrubbing HUD
+            HStack(spacing: 8) {
+                Text(formatDate(active.date))
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(AppColors.secondaryText)
+                
+                Spacer()
+                
+                Text(Formatters.formatCurrency(active.cumulativePnl, currency: currency))
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundColor(active.cumulativePnl >= 0 ? AppColors.brand : AppColors.loss)
+                
+                if active.netPnl != 0 {
+                    HStack(spacing: 2) {
+                        Image(systemName: active.netPnl > 0 ? "arrow.up.right" : "arrow.down.right")
+                            .font(.system(size: 8, weight: .bold))
+                        Text(Formatters.formatPnL(active.netPnl, currency: currency))
+                            .font(.system(size: 10, weight: .bold, design: .rounded))
+                            .monospacedDigit()
+                    }
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background((active.netPnl > 0 ? AppColors.profit : AppColors.loss).opacity(0.14))
+                    .foregroundColor(active.netPnl > 0 ? AppColors.profit : AppColors.loss)
+                    .clipShape(Capsule())
+                }
+            }
+            .padding(.horizontal, 2)
+            .padding(.bottom, 2)
+        } else if let last = lastPoint {
+            // Quiet, elegant latest value
+            HStack {
+                Text("Running Net:")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(AppColors.secondaryText)
+                
+                Text(Formatters.formatCurrency(last.cumulativePnl, currency: currency))
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundColor(last.cumulativePnl >= 0 ? AppColors.brand : AppColors.loss)
+                
+                Spacer()
+                
+                Text("Drag to inspect")
+                    .font(.system(size: 10))
+                    .foregroundColor(AppColors.secondaryText.opacity(0.65))
+            }
+            .padding(.horizontal, 2)
+            .padding(.bottom, 2)
         }
     }
     
