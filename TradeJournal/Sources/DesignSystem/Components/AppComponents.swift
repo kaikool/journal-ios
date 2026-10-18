@@ -731,3 +731,84 @@ public struct AppleSlidingSegmentedBar<T: Hashable & Identifiable>: View {
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }
+
+/// Custom Apple HIG Styled Dropdown Field matching app rounded rectangle card aesthetic.
+/// Replaces generic system picker grey button with a crisp, theme-aware selector.
+public struct AppDropdownField<T: Hashable>: View {
+    public let label: String?
+    @Binding public var selection: T
+    public let options: [T]
+    public let titleFor: (T) -> String
+    public let iconFor: ((T) -> String?)?
+    
+    public init(
+        label: String? = nil,
+        selection: Binding<T>,
+        options: [T],
+        titleFor: @escaping (T) -> String,
+        iconFor: ((T) -> String?)? = nil
+    ) {
+        self.label = label
+        self._selection = selection
+        self.options = options
+        self.titleFor = titleFor
+        self.iconFor = iconFor
+    }
+    
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if let label = label, !label.isEmpty {
+                Text(label)
+                    .font(AppTypography.caption)
+                    .foregroundColor(AppColors.secondaryText)
+            }
+            
+            Menu {
+                ForEach(options, id: \.self) { opt in
+                    Button {
+                        selection = opt
+                    } label: {
+                        HStack {
+                            if let icon = iconFor?(opt) {
+                                Image(systemName: icon)
+                            }
+                            Text(titleFor(opt))
+                            if selection == opt {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    if let icon = iconFor?(selection) {
+                        Image(systemName: icon)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(AppColors.brand)
+                    }
+                    
+                    Text(titleFor(selection))
+                        .font(AppTypography.subheadline)
+                        .foregroundColor(AppColors.primaryText)
+                        .lineLimit(1)
+                    
+                    Spacer()
+                    
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(AppColors.secondaryText)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 11)
+                .background(AppColors.secondaryBackground)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(AppColors.border.opacity(0.8), lineWidth: 1)
+                )
+            }
+            .buttonStyle(ApplePressableButtonStyle())
+        }
+    }
+}
+

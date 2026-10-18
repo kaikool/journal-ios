@@ -74,11 +74,17 @@ public struct AddTradeSheet: View {
             Form {
                 // Section 1: Account & Symbol
                 Section("Account & Instrument") {
-                    Picker("Account", selection: $accountId) {
-                        ForEach(dataStore.accounts) { acc in
-                            Text("\(acc.name) (\(acc.currency))").tag(acc.id)
+                    AppDropdownField(
+                        label: "Account",
+                        selection: $accountId,
+                        options: dataStore.accounts.map { $0.id },
+                        titleFor: { id in
+                            if let acc = dataStore.accounts.first(where: { $0.id == id }) {
+                                return "\(acc.name) (\(acc.currency))"
+                            }
+                            return id
                         }
-                    }
+                    )
                     
                     VStack(alignment: .leading, spacing: 6) {
                         TextField("Symbol (e.g. NQ, EURUSD, AAPL...)", text: $symbol)
@@ -207,12 +213,16 @@ public struct AddTradeSheet: View {
                             .multilineTextAlignment(.trailing)
                     }
                     
-                    Picker("Playbook", selection: $selectedPlaybookId) {
-                        Text("None").tag("")
-                        ForEach(dataStore.playbooks) { pb in
-                            Text(pb.name).tag(pb.id)
+                    let playbookOptions = [""] + dataStore.playbooks.map { $0.id }
+                    AppDropdownField(
+                        label: "Playbook",
+                        selection: $selectedPlaybookId,
+                        options: playbookOptions,
+                        titleFor: { id in
+                            if id.isEmpty { return "None" }
+                            return dataStore.playbooks.first(where: { $0.id == id })?.name ?? id
                         }
-                    }
+                    )
                 }
                 
                 // Section 5: Discipline & Journal

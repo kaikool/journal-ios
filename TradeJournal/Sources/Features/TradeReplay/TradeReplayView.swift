@@ -661,22 +661,20 @@ public struct TradeReplayHubView: View {
                                 .foregroundColor(AppColors.secondaryText)
                         }
                         
-                        Picker("Trade", selection: Binding(
-                            get: { activeTrade?.id ?? "" },
-                            set: { selectedTradeId = $0 }
-                        )) {
-                            ForEach(trades) { t in
-                                let sign = t.netPnl >= 0 ? "+" : ""
-                                Text("\(t.symbol) - \(t.direction.rawValue.uppercased()) (\(sign)\(Formatters.currency(t.netPnl)))")
-                                    .tag(t.id)
+                        AppDropdownField(
+                            selection: Binding(
+                                get: { activeTrade?.id ?? "" },
+                                set: { selectedTradeId = $0 }
+                            ),
+                            options: trades.map { $0.id },
+                            titleFor: { id in
+                                if let t = trades.first(where: { $0.id == id }) {
+                                    let sign = t.netPnl >= 0 ? "+" : ""
+                                    return "\(t.symbol) - \(t.direction.rawValue.uppercased()) (\(sign)\(Formatters.currency(t.netPnl)))"
+                                }
+                                return id
                             }
-                        }
-                        .pickerStyle(.menu)
-                        .tint(AppColors.brand)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(AppColors.secondaryBackground)
-                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        )
                     }
                 }
                 .padding(.horizontal, 16)

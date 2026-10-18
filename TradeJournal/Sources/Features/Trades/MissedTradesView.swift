@@ -332,12 +332,16 @@ public struct AddMissedTradeSheet: View {
                 }
                 
                 Section("Playbook") {
-                    Picker("Associated playbook", selection: $selectedPlaybookId) {
-                        Text("None").tag("")
-                        ForEach(dataStore.playbooks) { pb in
-                            Text(pb.name).tag(pb.id)
+                    let playbookOptions = [""] + dataStore.playbooks.map { $0.id }
+                    AppDropdownField(
+                        label: "Associated playbook",
+                        selection: $selectedPlaybookId,
+                        options: playbookOptions,
+                        titleFor: { id in
+                            if id.isEmpty { return "None" }
+                            return dataStore.playbooks.first(where: { $0.id == id })?.name ?? id
                         }
-                    }
+                    )
                 }
                 
                 Section("Review & Notes") {

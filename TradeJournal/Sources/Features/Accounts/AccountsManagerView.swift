@@ -476,29 +476,38 @@ public struct CreateAccountSheet: View {
                 Section(header: Text("Account & Broker")) {
                     TextField("Account name (e.g. The5ers 100K Bootcamp)", text: $name)
                     
-                    Picker("Broker", selection: $broker) {
-                        ForEach(commonBrokers, id: \.self) { b in
-                            Text(b).tag(b)
-                        }
-                    }
+                    AppDropdownField(
+                        label: "Broker",
+                        selection: $broker,
+                        options: commonBrokers,
+                        titleFor: { $0 }
+                    )
                 }
                 
                 Section(header: Text("Financials & Calculation Method")) {
-                    Picker("Currency", selection: $currency) {
-                        ForEach(commonCurrencies, id: \.self) { c in
-                            Text(c).tag(c)
-                        }
-                    }
+                    AppDropdownField(
+                        label: "Currency",
+                        selection: $currency,
+                        options: commonCurrencies,
+                        titleFor: { $0 }
+                    )
                     
                     TextField("Initial balance", text: $initialBalanceText)
                         .keyboardType(.decimalPad)
                         .monospacedDigit()
                     
-                    Picker("P&L Method", selection: $calcMethod) {
-                        Text("FIFO (First In First Out)").tag(ProfitCalcMethod.fifo)
-                        Text("LIFO (Last In First Out)").tag(ProfitCalcMethod.lifo)
-                        Text("Weighted Average").tag(ProfitCalcMethod.wavg)
-                    }
+                    AppDropdownField(
+                        label: "P&L Method",
+                        selection: $calcMethod,
+                        options: [ProfitCalcMethod.fifo, ProfitCalcMethod.lifo, ProfitCalcMethod.wavg],
+                        titleFor: { method in
+                            switch method {
+                            case .fifo: return "FIFO (First In First Out)"
+                            case .lifo: return "LIFO (Last In First Out)"
+                            case .wavg: return "Weighted Average"
+                            }
+                        }
+                    )
                 }
             }
             .navigationTitle("New account")

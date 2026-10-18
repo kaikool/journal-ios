@@ -997,11 +997,12 @@ public struct NewPropAccountSheet: View {
                 }
                 
                 Section("Program Type & Size") {
-                    Picker("Stage", selection: $program) {
-                        ForEach(PropProgram.allCases, id: \.self) { prog in
-                            Text(prog.label).tag(prog)
-                        }
-                    }
+                    AppDropdownField(
+                        label: "Stage",
+                        selection: $program,
+                        options: PropProgram.allCases,
+                        titleFor: { $0.label }
+                    )
                     TextField("Account size (\(defaultCurrency))", text: $sizeText)
                         .keyboardType(.numberPad)
                 }
@@ -1079,11 +1080,12 @@ public struct EditPropAccountSheet: View {
                 }
                 
                 Section("Status") {
-                    Picker("Status", selection: $status) {
-                        ForEach(PropStatus.allCases, id: \.self) { st in
-                            Text(st.label).tag(st)
-                        }
-                    }
+                    AppDropdownField(
+                        label: "Account Status",
+                        selection: $status,
+                        options: PropStatus.allCases,
+                        titleFor: { $0.label }
+                    )
                     if status == .passed || status == .breached || status == .closed {
                         TextField("Closed date (YYYY-MM-DD)", text: $closedDateText)
                     }
@@ -1212,26 +1214,36 @@ public struct NewPropEntrySheet: View {
         NavigationStack {
             Form {
                 Section("Linked Account") {
-                    Picker("Account", selection: $selectedAccountId) {
-                        Text("Shared firm cost").tag("")
-                        ForEach(accounts) { acc in
-                            Text("\(acc.firm) - \(acc.name)").tag(acc.id)
+                    let accountOptions = [""] + accounts.map { $0.id }
+                    AppDropdownField(
+                        label: "Account",
+                        selection: $selectedAccountId,
+                        options: accountOptions,
+                        titleFor: { id in
+                            if id.isEmpty { return "Shared firm cost" }
+                            if let a = accounts.first(where: { $0.id == id }) {
+                                return "\(a.firm) - \(a.name)"
+                            }
+                            return id
                         }
-                    }
+                    )
                 }
                 
                 Section("Classification") {
-                    Picker("Transaction type", selection: $kind) {
-                        Text("Expense (Fee, reset...)").tag("expense")
-                        Text("Payout request").tag("payout")
-                    }
+                    AppDropdownField(
+                        label: "Transaction Type",
+                        selection: $kind,
+                        options: ["expense", "payout"],
+                        titleFor: { $0 == "expense" ? "Expense (Fee, reset...)" : "Payout request" }
+                    )
                     
                     if kind == "expense" {
-                        Picker("Expense category", selection: $category) {
-                            ForEach(PropExpenseCategory.allCases, id: \.self) { cat in
-                                Text(cat.label).tag(cat)
-                            }
-                        }
+                        AppDropdownField(
+                            label: "Expense Category",
+                            selection: $category,
+                            options: PropExpenseCategory.allCases,
+                            titleFor: { $0.label }
+                        )
                     }
                 }
                 

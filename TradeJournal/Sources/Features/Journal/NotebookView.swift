@@ -458,13 +458,15 @@ public struct NotebookEditorSheet: View {
                     
                     HStack {
                         // Folder selector
-                        Picker("Folder", selection: $selectedFolderId) {
-                            ForEach(activeFolders.filter { $0.id != NotebookEngine.systemFolderAll }) { folder in
-                                Text(folder.name).tag(folder.id)
-                            }
-                        }
-                        .pickerStyle(.menu)
-                        .tint(AppColors.brand)
+                        let folderOptions = activeFolders.filter { $0.id != NotebookEngine.systemFolderAll }.map { $0.id }
+                        AppDropdownField(
+                            selection: $selectedFolderId,
+                            options: folderOptions,
+                            titleFor: { id in
+                                activeFolders.first(where: { $0.id == id })?.name ?? id
+                            },
+                            iconFor: { _ in "folder" }
+                        )
                         .onChange(of: selectedFolderId) { _ in autoSave() }
                         
                         Spacer()

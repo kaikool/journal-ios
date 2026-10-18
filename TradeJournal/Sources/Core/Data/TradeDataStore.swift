@@ -264,7 +264,7 @@ public final class TradeDataStore: ObservableObject {
         guard let account = accounts.first(where: { $0.id == accountId }) else { return }
         
         // The5ers accounts store reported positions directly as round trips and do not use atomic execution reconstruction
-        if accountId.hasPrefix("the5ers_") || (account.broker?.lowercased() == "the5ers") {
+        if accountId.hasPrefix("the5ers_") || (account.broker.lowercased() == "the5ers") {
             return
         }
         

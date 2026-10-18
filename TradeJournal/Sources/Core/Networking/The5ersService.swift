@@ -586,22 +586,23 @@ public final class The5ersService: ObservableObject {
             
             // Internal implementation note
             for acc in accountsList {
+                let rawStatus = acc.status.trimmingCharacters(in: .whitespaces).lowercased()
                 let mappedStatus: PropStatus = {
-                    switch acc.status.lowercased() {
-                    case "passed": return .passed
-                    case "breached", "failed": return .breached
-                    case "closed": return .closed
-                    default: return .active
-                    }
+                    if rawStatus == "passed" || rawStatus.contains("pass") || rawStatus.contains("qualif") { return .passed }
+                    if rawStatus == "breached" || rawStatus == "failed" || rawStatus.contains("breach") || rawStatus.contains("fail") || rawStatus.contains("viola") { return .breached }
+                    if rawStatus == "closed" || rawStatus.contains("term") || rawStatus.contains("ended") || rawStatus.contains("expir") { return .closed }
+                    if rawStatus == "inactive" || rawStatus == "disabled" || rawStatus.contains("inact") { return .inactive }
+                    if rawStatus == "active" || rawStatus == "available" || rawStatus.contains("trad") || rawStatus.contains("open") { return .active }
+                    return .closed
                 }()
                 
+                let rawProg = acc.program.trimmingCharacters(in: .whitespaces).lowercased()
+                let rawLabel = acc.label.trimmingCharacters(in: .whitespaces).lowercased()
                 let mappedProgram: PropProgram = {
-                    switch acc.program.lowercased() {
-                    case "verification", "step2": return .verification
-                    case "funded", "live": return .funded
-                    case "instant_funded", "instant": return .instantFunded
-                    default: return .evaluation
-                    }
+                    if rawProg.contains("instant") || rawLabel.contains("instant") { return .instantFunded }
+                    if rawProg.contains("step2") || rawProg.contains("step 2") || rawProg.contains("phase2") || rawProg.contains("phase 2") || rawProg.contains("verification") || rawLabel.contains("phase 2") || rawLabel.contains("step 2") || rawLabel.contains("high stakes - 2") { return .verification }
+                    if rawProg.contains("fund") || rawProg.contains("live") || rawLabel.contains("funded") || rawLabel.contains("live") { return .funded }
+                    return .evaluation
                 }()
                 
                 let startingMinor = NSDecimalNumber(decimal: (acc.startingBalance ?? acc.balance) * 100).int64Value
@@ -903,23 +904,31 @@ public final class The5ersService: ObservableObject {
         }
         
         let closedFlag = firstValue(in: row, keys: ["isclosed", "closed", "isclose"])
-        let isClosed = sourceBoolean(closedFlag) ?? (row["closedate"] != nil || row["exit"] != nil || row["closetime"] != nil || row["closeprice"] != nil)
+        let rawStatusField = String(describing: firstValue(in: row, keys: ["status", "state"]) ?? "").lowercased()
+        let isClosedByStatus = rawStatusField == "closed" || rawStatusField == "win" || rawStatusField == "loss"
+        let isClosed = sourceBoolean(closedFlag) ?? (isClosedByStatus || row["closedate"] != nil || row["exit"] != nil || row["closetime"] != nil || row["closeprice"] != nil)
         
-        let closeKeys = ["closedate", "closedat", "closetime", "close_date", "closedatetime", "exittime", "exitdate"]
+        let closeKeys = ["closedate", "closedat", "closetime", "close_date", "closedatetime", "exittime", "exitdate", "timeclose", "time_close"]
         let closeVal = firstValue(in: row, keys: closeKeys)
-        let closedAtTuple = isClosed ? sourceInstant(closeVal) : nil
+        var closedAtTuple = isClosed ? sourceInstant(closeVal) : nil
         
-        let exitKeys = ["exit", "closeprice", "exitprice", "close_price", "price"]
+        let exitKeys = ["exit", "closeprice", "exitprice", "close_price", "price", "closedprice", "outprice"]
         let exitVal = firstValue(in: row, keys: exitKeys)
-        let exit = isClosed ? sourceNumber(exitVal) : nil
+        var exit = isClosed ? sourceNumber(exitVal) : nil
         
-        let pnlKeys = ["profitandloss", "profit", "netpnl", "pnl", "net_pnl", "gross"]
+        if isClosed {
+            if closedAtTuple == nil {
+                closedAtTuple = (openedAtIso, openedAtDate)
+            }
+            if exit == nil {
+                exit = entry
+            }
+        }
+        
+        let pnlKeys = ["profitandloss", "profit", "netpnl", "pnl", "net_pnl", "gross", "realizedpnl"]
         let pnlVal = firstValue(in: row, keys: pnlKeys)
         let netPnl = isClosed ? (sourceNumber(pnlVal) ?? 0) : 0
         
-        if isClosed && (closedAtTuple == nil || exit == nil) {
-            return nil
-        }
         if let cl = closedAtTuple, cl.date < openedAtDate {
             return nil
         }
@@ -1012,9 +1021,12 @@ public final class The5ersService: ObservableObject {
             let tradeKey = JournalIds.the5ersTradeKey(sourceAccountId: acc.id, positionIdentity: posIdentity)
             
             let isClosed = position.closedAtDate != nil
-            let status: TradeStatus = isClosed
-                ? (position.netPnl > 0 ? .win : (position.netPnl < 0 ? .loss : .breakeven))
-                : .open
+            let status: TradeStatus = {
+                if !isClosed { return .open }
+                if position.netPnl > 0.0001 { return .win }
+                if position.netPnl < -0.0001 { return .loss }
+                return .breakeven
+            }()
             
             // Internal implementation note
             // Provider net already includes signed swap and commission. Reverse costs for gross only.

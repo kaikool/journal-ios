@@ -332,12 +332,12 @@ public struct AddProgressRoutineSheet: View {
                 }
                 
                 Section(header: Text("When")) {
-                    Picker("Stage", selection: $stage) {
-                        ForEach(ProgressRoutinesView.stages, id: \.self) { st in
-                            Text(st).tag(st)
-                        }
-                    }
-                    .pickerStyle(.menu)
+                    AppDropdownField(
+                        label: "Stage",
+                        selection: $stage,
+                        options: ProgressRoutinesView.stages,
+                        titleFor: { $0 }
+                    )
                 }
                 
                 Section(header: Text("Scheduled days")) {
