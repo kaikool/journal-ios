@@ -1093,6 +1093,10 @@ public final class TradeDataStore: ObservableObject {
     // MARK: - Unified Global Synchronization
     
     public func performGlobalSync() async {
+        await SyncManager.shared.performQuickSync()
+    }
+    
+    private func legacyPerformGlobalSync() async {
         guard !isSyncing else { return }
         
         await MainActor.run {

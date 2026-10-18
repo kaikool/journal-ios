@@ -50,11 +50,11 @@ public enum SettingsSection: String, CaseIterable, Identifiable {
         case .marketData:
             return "Connect price history or upload candles for replay and trade analysis."
         case .connections:
-            return "Manage The5ers authorization and the read-only connection."
+            return "Connect broker APIs, cTrader accounts, and prop firm read-only feeds."
         case .aiSettings:
             return "Choose your AI provider and manage your model and API key."
         case .yourData:
-            return "Download your journal data for safekeeping or use in other tools."
+            return "Manage Supabase Cloud PostgreSQL database, local storage, and export backups."
         }
     }
 }
@@ -894,12 +894,6 @@ public struct ConnectionsSettingsView: View {
     @State private var isSyncingCTrader: Bool = false
     @State private var showAdvancedCTrader: Bool = false
     
-    @State private var supabaseUrl: String = SupabaseService.shared.supabaseUrl
-    @State private var supabaseAnonKey: String = SupabaseService.shared.supabaseAnonKey
-    @State private var supabaseSyncStatus: String? = nil
-    @State private var showWipeConfirmation: Bool = false
-    @State private var isWipingSupabase: Bool = false
-    
     public var body: some View {
         VStack(spacing: 20) {
             // Card 1: The5ers MCP Connection
@@ -1155,63 +1149,6 @@ public struct ConnectionsSettingsView: View {
                 }
             }
             
-            // Card 3: Supabase Cloud Database Sync
-            SettingsCard(title: "Supabase connection") {
-                VStack(alignment: .leading, spacing: 14) {
-                    Text("Cloud database sync with Supabase PostgreSQL via PostgREST API.")
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.secondaryText)
-                    
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Project URL:")
-                            .font(AppTypography.captionBold)
-                            .foregroundColor(AppColors.secondaryText)
-                        TextField("https://xyz.supabase.co", text: $supabaseUrl)
-                            .font(AppTypography.inputText)
-                            .textFieldStyle(.roundedBorder)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled(true)
-                    }
-                    
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Supabase API Key:")
-                            .font(AppTypography.captionBold)
-                            .foregroundColor(AppColors.secondaryText)
-                        SecureField("Paste API key (service_role or anon)...", text: $supabaseAnonKey)
-                            .font(AppTypography.inputText)
-                            .textFieldStyle(.roundedBorder)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled(true)
-                        
-                        Text("Use your Project URL and API Key from Supabase Dashboard → Project Settings → API.")
-                            .font(AppTypography.caption)
-                            .foregroundColor(AppColors.secondaryText)
-                    }
-                    
-                    HStack(spacing: 8) {
-                        AppButton("Sync Supabase", icon: "arrow.triangle.2.circlepath", style: .primary, size: .compact, fullWidth: true, isLoading: dataStore.isSyncing) {
-                            syncSupabase()
-                        }
-                        .disabled(supabaseUrl.trimmingCharacters(in: .whitespaces).isEmpty || supabaseAnonKey.trimmingCharacters(in: .whitespaces).isEmpty)
-                        
-                        AppButton("Test Connection", icon: "network", style: .secondary, size: .compact, fullWidth: true) {
-                            checkSupabaseConnection()
-                        }
-                        .disabled(supabaseUrl.trimmingCharacters(in: .whitespaces).isEmpty || supabaseAnonKey.trimmingCharacters(in: .whitespaces).isEmpty)
-                        
-                        AppButton("Wipe Data", icon: "trash", style: .destructive, size: .compact, fullWidth: true, isLoading: isWipingSupabase) {
-                            showWipeConfirmation = true
-                        }
-                        .disabled(supabaseUrl.trimmingCharacters(in: .whitespaces).isEmpty || supabaseAnonKey.trimmingCharacters(in: .whitespaces).isEmpty || isWipingSupabase)
-                    }
-                    
-                    if let status = supabaseSyncStatus {
-                        Text(status)
-                            .font(AppTypography.caption)
-                            .foregroundColor(status.contains("Error") || status.contains("missing") ? AppColors.loss : AppColors.profit)
-                    }
-                }
-            }
         }
         .onAppear {
             mcpToken = the5ers.mcpToken
@@ -1219,8 +1156,6 @@ public struct ConnectionsSettingsView: View {
             ctraderClientId = ctrader.clientId
             ctraderClientSecret = ctrader.clientSecret
             ctraderIsLive = ctrader.isLive
-            supabaseUrl = SupabaseService.shared.supabaseUrl
-            supabaseAnonKey = SupabaseService.shared.supabaseAnonKey
         }
         .onChange(of: ctraderToken) { val in
             ctrader.accessToken = val
@@ -1234,22 +1169,8 @@ public struct ConnectionsSettingsView: View {
         .onChange(of: ctraderIsLive) { val in
             ctrader.isLive = val
         }
-        .onChange(of: supabaseUrl) { val in
-            SupabaseService.shared.configure(url: val, anonKey: supabaseAnonKey)
-        }
-        .onChange(of: supabaseAnonKey) { val in
-            SupabaseService.shared.configure(url: supabaseUrl, anonKey: val)
-        }
         .onChange(of: mcpToken) { val in
             the5ers.configure(token: val)
-        }
-        .alert("Wipe All Supabase Remote Data?", isPresented: $showWipeConfirmation) {
-            Button("Wipe All Remote Data", role: .destructive) {
-                wipeSupabaseData()
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("This will delete all application records across all tables in your Supabase database and reset local cache. You can then perform a fresh sync.")
         }
     }
     
@@ -1300,56 +1221,6 @@ public struct ConnectionsSettingsView: View {
                     self.the5ersStatus = summary
                 } else {
                     self.the5ersStatus = "Successfully synchronized with The5ers!"
-                }
-            }
-        }
-    }
-    
-    private func checkSupabaseConnection() {
-        SupabaseService.shared.configure(url: supabaseUrl, anonKey: supabaseAnonKey)
-        Task {
-            supabaseSyncStatus = "Validating Project URL and Anon Key..."
-            do {
-                let res = try await SupabaseService.shared.pingConnection()
-                supabaseSyncStatus = res.message
-            } catch {
-                supabaseSyncStatus = error.localizedDescription
-            }
-        }
-    }
-    
-    private func wipeSupabaseData() {
-        isWipingSupabase = true
-        supabaseSyncStatus = "Wiping all tables on Supabase cloud database..."
-        Task {
-            do {
-                try await SupabaseService.shared.wipeAllRemoteData()
-                await MainActor.run {
-                    self.isWipingSupabase = false
-                    self.dataStore.resetAllData()
-                    self.supabaseSyncStatus = "All Supabase tables and local data wiped successfully. You can sync again."
-                }
-            } catch {
-                await MainActor.run {
-                    self.isWipingSupabase = false
-                    self.supabaseSyncStatus = "Wipe error: \(error.localizedDescription)"
-                }
-            }
-        }
-    }
-    
-    private func syncSupabase() {
-        SupabaseService.shared.configure(url: supabaseUrl, anonKey: supabaseAnonKey)
-        Task {
-            supabaseSyncStatus = "Performing bi-directional sync with Supabase..."
-            await dataStore.syncWithSupabase()
-            await MainActor.run {
-                if let err = dataStore.lastSyncError {
-                    self.supabaseSyncStatus = "Sync error: \(err)"
-                } else if let summary = dataStore.lastSyncSummary {
-                    self.supabaseSyncStatus = summary
-                } else {
-                    self.supabaseSyncStatus = "Bi-directional sync completed successfully!"
                 }
             }
         }
@@ -1544,9 +1415,74 @@ public struct YourDataSettingsView: View {
     @State private var showResetConfirmation: Bool = false
     @State private var seedMessage: String = ""
     
+    // Supabase Cloud Configuration
+    @State private var supabaseUrl: String = SupabaseService.shared.supabaseUrl
+    @State private var supabaseAnonKey: String = SupabaseService.shared.supabaseAnonKey
+    @State private var supabaseSyncStatus: String? = nil
+    @State private var showWipeConfirmation: Bool = false
+    @State private var isWipingSupabase: Bool = false
+    
     public var body: some View {
         VStack(spacing: 20) {
-            // Card 1: Export your data
+            // Card 1: Supabase Cloud Database & Storage
+            SettingsCard(title: "Supabase Cloud Database & Storage") {
+                VStack(alignment: .leading, spacing: 14) {
+                    Text("Secure remote PostgreSQL cloud backup and multi-device synchronization via Supabase PostgREST API.")
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.secondaryText)
+                    
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Project URL:")
+                            .font(AppTypography.captionBold)
+                            .foregroundColor(AppColors.secondaryText)
+                        TextField("https://xyz.supabase.co", text: $supabaseUrl)
+                            .font(AppTypography.inputText)
+                            .textFieldStyle(.roundedBorder)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled(true)
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Supabase API Key:")
+                            .font(AppTypography.captionBold)
+                            .foregroundColor(AppColors.secondaryText)
+                        SecureField("Paste API key (service_role or anon)...", text: $supabaseAnonKey)
+                            .font(AppTypography.inputText)
+                            .textFieldStyle(.roundedBorder)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled(true)
+                        
+                        Text("Obtain your Project URL and API Key from Supabase Dashboard → Project Settings → API.")
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.secondaryText)
+                    }
+                    
+                    HStack(spacing: 8) {
+                        AppButton("Sync Supabase", icon: "arrow.triangle.2.circlepath", style: .primary, size: .compact, fullWidth: true, isLoading: dataStore.isSyncing) {
+                            syncSupabase()
+                        }
+                        .disabled(supabaseUrl.trimmingCharacters(in: .whitespaces).isEmpty || supabaseAnonKey.trimmingCharacters(in: .whitespaces).isEmpty)
+                        
+                        AppButton("Test Connection", icon: "network", style: .secondary, size: .compact, fullWidth: true) {
+                            checkSupabaseConnection()
+                        }
+                        .disabled(supabaseUrl.trimmingCharacters(in: .whitespaces).isEmpty || supabaseAnonKey.trimmingCharacters(in: .whitespaces).isEmpty)
+                        
+                        AppButton("Wipe Data", icon: "trash", style: .destructive, size: .compact, fullWidth: true, isLoading: isWipingSupabase) {
+                            showWipeConfirmation = true
+                        }
+                        .disabled(supabaseUrl.trimmingCharacters(in: .whitespaces).isEmpty || supabaseAnonKey.trimmingCharacters(in: .whitespaces).isEmpty || isWipingSupabase)
+                    }
+                    
+                    if let status = supabaseSyncStatus {
+                        Text(status)
+                            .font(AppTypography.caption)
+                            .foregroundColor(status.contains("Error") || status.contains("missing") ? AppColors.loss : AppColors.profit)
+                    }
+                }
+            }
+            
+            // Card 2: Export your data
             SettingsCard(title: "Export your data") {
                 VStack(alignment: .leading, spacing: 14) {
                     Text("Save a full journal backup, or export your trades as a CSV.")
@@ -1565,7 +1501,7 @@ public struct YourDataSettingsView: View {
                 }
             }
             
-            // Card 2: Reset Database
+            // Card 3: Reset Database
             SettingsCard(title: "Local Database Management") {
                 VStack(alignment: .leading, spacing: 14) {
                     Text("Manage on-device storage or reset your local database.")
@@ -1577,6 +1513,16 @@ public struct YourDataSettingsView: View {
                     }
                 }
             }
+        }
+        .onAppear {
+            supabaseUrl = SupabaseService.shared.supabaseUrl
+            supabaseAnonKey = SupabaseService.shared.supabaseAnonKey
+        }
+        .onChange(of: supabaseUrl) { val in
+            SupabaseService.shared.configure(url: val, anonKey: supabaseAnonKey)
+        }
+        .onChange(of: supabaseAnonKey) { val in
+            SupabaseService.shared.configure(url: supabaseUrl, anonKey: val)
         }
         .sheet(isPresented: $showExportSheet) {
             if let fileUrl = exportedFileUrl {
@@ -1590,6 +1536,64 @@ public struct YourDataSettingsView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("All trades, journal logs, and notes will be permanently erased from this device.")
+        }
+        .alert("Wipe All Supabase Remote Data?", isPresented: $showWipeConfirmation) {
+            Button("Wipe All Remote Data", role: .destructive) {
+                wipeSupabaseData()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will delete all application records across all tables in your Supabase database and reset local cache. You can then perform a fresh sync.")
+        }
+    }
+    
+    private func checkSupabaseConnection() {
+        SupabaseService.shared.configure(url: supabaseUrl, anonKey: supabaseAnonKey)
+        Task {
+            supabaseSyncStatus = "Validating Project URL and Anon Key..."
+            do {
+                let res = try await SupabaseService.shared.pingConnection()
+                supabaseSyncStatus = res.message
+            } catch {
+                supabaseSyncStatus = error.localizedDescription
+            }
+        }
+    }
+    
+    private func wipeSupabaseData() {
+        isWipingSupabase = true
+        supabaseSyncStatus = "Wiping all tables on Supabase cloud database..."
+        Task {
+            do {
+                try await SupabaseService.shared.wipeAllRemoteData()
+                await MainActor.run {
+                    self.isWipingSupabase = false
+                    self.dataStore.resetAllData()
+                    self.supabaseSyncStatus = "All Supabase tables and local data wiped successfully. You can sync again."
+                }
+            } catch {
+                await MainActor.run {
+                    self.isWipingSupabase = false
+                    self.supabaseSyncStatus = "Wipe error: \(error.localizedDescription)"
+                }
+            }
+        }
+    }
+    
+    private func syncSupabase() {
+        SupabaseService.shared.configure(url: supabaseUrl, anonKey: supabaseAnonKey)
+        Task {
+            supabaseSyncStatus = "Performing bi-directional sync with Supabase..."
+            await dataStore.syncWithSupabase()
+            await MainActor.run {
+                if let err = dataStore.lastSyncError {
+                    self.supabaseSyncStatus = "Sync error: \(err)"
+                } else if let summary = dataStore.lastSyncSummary {
+                    self.supabaseSyncStatus = summary
+                } else {
+                    self.supabaseSyncStatus = "Bi-directional sync completed successfully!"
+                }
+            }
         }
     }
     

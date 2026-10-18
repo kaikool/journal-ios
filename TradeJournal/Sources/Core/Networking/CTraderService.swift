@@ -428,7 +428,12 @@ public final class CTraderService: ObservableObject {
     // MARK: - Full Synchronization with TradeDataStore
     
     /// Fully synchronizes selected cTrader accounts and their deal histories into TradeDataStore.
-    public func syncWithTradeStore(dataStore: TradeDataStore) async throws -> CTraderSyncSummary {
+    public func syncWithTradeStore(
+        dataStore: TradeDataStore,
+        fromTimestamp: Int64? = nil,
+        toTimestamp: Int64? = nil,
+        targetAccountIds: Set<Int64>? = nil
+    ) async throws -> CTraderSyncSummary {
         guard isConfigured else {
             throw NSError(domain: "cTrader", code: 401, userInfo: [NSLocalizedDescriptionKey: "cTrader Access Token is not configured."])
         }
@@ -442,7 +447,12 @@ public final class CTraderService: ObservableObject {
         }
         
         let allAccounts = try await fetchAccounts()
-        let activeAccounts = allAccounts.filter { selectedAccountIds.isEmpty || selectedAccountIds.contains($0.ctidTraderAccountId) }
+        let activeAccounts = allAccounts.filter { acc in
+            if let targets = targetAccountIds, !targets.isEmpty {
+                return targets.contains(acc.ctidTraderAccountId)
+            }
+            return selectedAccountIds.isEmpty || selectedAccountIds.contains(acc.ctidTraderAccountId)
+        }
         
         guard !activeAccounts.isEmpty else {
             let msg = "No cTrader accounts selected for synchronization."
@@ -478,12 +488,14 @@ public final class CTraderService: ObservableObject {
             
             // 3. Fetch Historical Deals (Completed executions)
             let nowMs = Int64(Date().timeIntervalSince1970 * 1000)
+            let dealsFrom = fromTimestamp ?? 0
+            let dealsTo = toTimestamp ?? nowMs
             let dealsRes = try await sendRequest(
                 payloadType: 2133,
                 payload: [
                     "ctidTraderAccountId": accId,
-                    "fromTimestamp": 0,
-                    "toTimestamp": nowMs,
+                    "fromTimestamp": dealsFrom,
+                    "toTimestamp": dealsTo,
                     "maxRows": 2000
                 ]
             )

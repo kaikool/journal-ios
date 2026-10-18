@@ -9,6 +9,7 @@ import SwiftUI
 public struct ShellHeaderView: View {
     @EnvironmentObject private var env: AppEnvironment
     @ObservedObject private var dataStore = TradeDataStore.shared
+    @State private var showSyncCenter: Bool = false
     
     public init() {}
     
@@ -81,6 +82,24 @@ public struct ShellHeaderView: View {
             }
             .buttonStyle(ApplePressableButtonStyle())
             .accessibilityLabel("Sync accounts")
+            .contextMenu {
+                Button {
+                    #if os(iOS)
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    #endif
+                    Task {
+                        await SyncManager.shared.performQuickSync()
+                    }
+                } label: {
+                    Label("Quick Sync Now", systemImage: "arrow.triangle.2.circlepath")
+                }
+                
+                Button {
+                    showSyncCenter = true
+                } label: {
+                    Label("Sync Center & Options...", systemImage: "slider.horizontal.3")
+                }
+            }
             
             // Privacy Toggle Button
             Button {
@@ -131,6 +150,9 @@ public struct ShellHeaderView: View {
             Divider().background(AppColors.border.opacity(0.4)),
             alignment: .bottom
         )
+        .sheet(isPresented: $showSyncCenter) {
+            SyncCenterSheet()
+        }
     }
 }
 
