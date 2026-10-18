@@ -167,7 +167,9 @@ public final class The5ersService: ObservableObject {
             "mcp:purchases.read"
         ].joined(separator: " ")
         
-        var comp = URLComponents(string: "\(Self.authHost)/oauth2/v1/apps/agentic/\(Self.tenantPath)/authorize")!
+        guard var comp = URLComponents(string: "\(Self.authHost)/oauth2/v1/apps/agentic/\(Self.tenantPath)/authorize") else {
+            throw URLError(.badURL)
+        }
         comp.queryItems = [
             URLQueryItem(name: "response_type", value: "code"),
             URLQueryItem(name: "resource", value: Self.mcpUrl),
@@ -238,12 +240,12 @@ public final class The5ersService: ObservableObject {
     
     // MARK: - 2. JSON-RPC 2.0 MCP Client (`https://mcp.the5ers.com/mcp`)
     
-    /// Internal domain documentation
+    /// Initializes JSON-RPC protocol handshake with The5ers MCP server
     public func ensureInitialized() async throws {
         guard !isSessionInitialized else { return }
         guard isConfigured else { return }
         
-        // Internal implementation note
+        // Protocol initialization handshake
         _ = try await sendRawMcpRpc(method: "initialize", params: [
             "protocolVersion": Self.protocolVersion,
             "capabilities": [String: Any](),
@@ -253,12 +255,12 @@ public final class The5ersService: ObservableObject {
             ]
         ])
         
-        // Internal implementation note
+        // Notify server that client initialization completed
         try await sendMcpNotification(method: "notifications/initialized")
         self.isSessionInitialized = true
     }
     
-    /// Internal domain documentation
+    /// Sends a one-way notification without expecting a response
     public func sendMcpNotification(method: String, params: [String: Any]? = nil) async throws {
         guard let url = URL(string: Self.mcpUrl) else { throw URLError(.badURL) }
         var request = URLRequest(url: url)
@@ -286,7 +288,7 @@ public final class The5ersService: ObservableObject {
         }
     }
     
-    /// Internal domain documentation
+    /// Dispatches a raw JSON-RPC 2.0 request to the MCP endpoint
     private func sendRawMcpRpc(method: String, params: [String: Any]) async throws -> [String: Any] {
         guard isConfigured else {
             throw NSError(domain: "The5ersMCP", code: 401, userInfo: [NSLocalizedDescriptionKey: "Bearer Session Token not configured"])
@@ -299,7 +301,6 @@ public final class The5ersService: ObservableObject {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        // Internal implementation note
         request.setValue("application/json, text/event-stream", forHTTPHeaderField: "Accept")
         request.setValue("Bearer \(mcpToken)", forHTTPHeaderField: "Authorization")
         request.setValue(Self.protocolVersion, forHTTPHeaderField: "MCP-Protocol-Version")
@@ -336,7 +337,7 @@ public final class The5ersService: ObservableObject {
             throw NSError(domain: "The5ersMCP", code: http.statusCode, userInfo: [NSLocalizedDescriptionKey: msg])
         }
         
-        // Internal implementation note
+        // Handle SSE (Server-Sent Events) formatting if streamed
         var jsonData = data
         if let text = String(data: data, encoding: .utf8), text.contains("data:") {
             let lines = text.components(separatedBy: .newlines)
@@ -369,7 +370,7 @@ public final class The5ersService: ObservableObject {
         return result
     }
     
-    /// Internal domain documentation
+    /// Sends an authenticated JSON-RPC call ensuring initialized session
     public func sendMcpRpc(method: String, params: [String: Any]) async throws -> [String: Any] {
         if method != "initialize" {
             try await ensureInitialized()
@@ -377,7 +378,7 @@ public final class The5ersService: ObservableObject {
         return try await sendRawMcpRpc(method: method, params: params)
     }
     
-    /// Internal domain documentation
+    /// Invokes an MCP tool by name with arguments
     public func callMcpTool(name: String, arguments: [String: Any] = [:]) async throws -> [String: Any] {
         return try await sendMcpRpc(method: "tools/call", params: [
             "name": name,
@@ -385,7 +386,7 @@ public final class The5ersService: ObservableObject {
         ])
     }
     
-    /// Internal domain documentation
+    /// Pings the MCP connection by listing available tools
     public func pingMcpConnection() async throws -> (success: Bool, message: String) {
         guard isConfigured else {
             return (false, "The5ers MCP is not connected. Click 'Log in to The5ers Hub (OAuth)'.")
@@ -401,9 +402,7 @@ public final class The5ersService: ObservableObject {
         }
     }
     
-    // Internal implementation note
-    
-    /// Internal domain documentation
+    /// Unwraps JSON string, markdown fences, or structured dictionary from MCP tool responses
     private func unwrapMcpToolResult(_ result: [String: Any]) -> Any? {
         if let structured = result["structuredContent"] {
             return structured
@@ -445,26 +444,22 @@ public final class The5ersService: ObservableObject {
         return result
     }
     
-    /// Internal domain documentation
+    /// Traverses flexible JSON response envelopes to find an array of items
     private func extractMcpCollection(_ unwrapped: Any?, collectionKey: String) -> [[String: Any]] {
         guard let unwrapped = unwrapped else { return [] }
         
         if let dict = unwrapped as? [String: Any] {
-            // Internal implementation note
             if let dataDict = dict["data"] as? [String: Any] {
                 if let items = (dataDict[collectionKey] ?? dataDict["items"] ?? dataDict["rows"] ?? dataDict["trades"]) as? [[String: Any]] {
                     return items
                 }
             }
-            // Internal implementation note
             if let dataArray = dict["data"] as? [[String: Any]] {
                 return dataArray
             }
-            // Internal implementation note
             if let resDict = dict["result"] as? [String: Any] {
                 return extractMcpCollection(resDict, collectionKey: collectionKey)
             }
-            // Internal implementation note
             if let items = (dict[collectionKey] ?? dict["items"] ?? dict["rows"] ?? dict["trades"]) as? [[String: Any]] {
                 return items
             }
@@ -473,8 +468,6 @@ public final class The5ersService: ObservableObject {
         }
         return []
     }
-    
-    // Internal implementation note
     
     @MainActor
     public func syncWithTradeStore(dataStore: TradeDataStore) async throws -> Int {
@@ -487,10 +480,8 @@ public final class The5ersService: ObservableObject {
         defer { isSyncing = false }
         
         do {
-            // Internal implementation note
             try await ensureInitialized()
             
-            // Internal implementation note
             var rawAccountsList: [[String: Any]] = []
             var seenAccountRefs = Set<String>()
             
@@ -535,7 +526,7 @@ public final class The5ersService: ObservableObject {
                     }
                 }
                 
-                // Internal implementation note
+                // Break pagination loop if end of stream reached
                 if pageRows.count < 50 || newCount == 0 {
                     break
                 }
@@ -578,13 +569,12 @@ public final class The5ersService: ObservableObject {
                 ))
             }
             
-            // Internal implementation note
             if accountsList.isEmpty {
                 lastStatus = "The5ers MCP responded successfully but no trading accounts were found."
                 return 0
             }
             
-            // Internal implementation note
+            // Sync accounts into local PropAccountItem and Account models
             for acc in accountsList {
                 let rawStatus = acc.status.trimmingCharacters(in: .whitespaces).lowercased()
                 let mappedStatus: PropStatus = {
@@ -803,8 +793,6 @@ public final class The5ersService: ObservableObject {
         }
     }
     
-    // Internal implementation note
-    
     private struct SourcePosition {
         var identityDiscriminator: String?
         let providerId: String?
@@ -823,8 +811,7 @@ public final class The5ersService: ObservableObject {
         let isValid: Bool?
     }
     
-    /// Internal domain documentation
-/// Ported 1:1 from `the5ers-normalize.ts` `sourceFields`
+    /// Sanitizes dictionary keys by removing whitespaces, underscores, and hyphens
     private func sourceFields(_ dict: [String: Any]) -> [String: Any] {
         var result: [String: Any] = [:]
         for (key, val) in dict {
@@ -873,7 +860,7 @@ public final class The5ersService: ObservableObject {
         return nil
     }
     
-    /// Internal domain documentation
+    /// Normalizes raw position record into SourcePosition model
     private func normalizePosition(from raw: [String: Any]) -> SourcePosition? {
         let row = sourceFields(raw)
         
@@ -973,8 +960,7 @@ public final class The5ersService: ObservableObject {
         )
     }
     
-    /// Internal domain documentation
-/// Ported 1:1 from `source-repo/apps/web/src/server/the5ers/journal.ts` (`saveJournalPositions` & `journalTradeRow`)
+    /// Reconciles and merges remote positions from The5ers into local TradeDataStore
     @MainActor
     private func mergePositions(
         _ rawPositions: [[String: Any]],
@@ -987,7 +973,7 @@ public final class The5ersService: ObservableObject {
         
         let journalAccId = acc.id.hasPrefix("the5ers_") ? acc.id : "the5ers_\(acc.id)"
         
-        // Internal implementation note
+        // Group duplicate positions to compute disambiguation discriminators
         var groups: [String: [SourcePosition]] = [:]
         for p in parsed {
             let baseKey = JournalIds.positionIdentity(symbol: p.symbol, direction: p.direction.rawValue, openedAt: p.openedAtIso, discriminator: nil)
@@ -1000,7 +986,7 @@ public final class The5ersService: ObservableObject {
                 valid.append(group[0])
                 continue
             }
-            // Internal implementation note
+            // Assign deterministic discriminator to distinguish identical concurrent positions
             for p in group {
                 var item = p
                 let disc: String
@@ -1014,7 +1000,6 @@ public final class The5ersService: ObservableObject {
             }
         }
         
-        // Internal implementation note
         for position in valid {
             let posIdentity = JournalIds.positionIdentity(
                 symbol: position.symbol,
@@ -1022,7 +1007,6 @@ public final class The5ersService: ObservableObject {
                 openedAt: position.openedAtIso,
                 discriminator: position.identityDiscriminator
             )
-            // Internal implementation note
             let tradeKey = JournalIds.the5ersTradeKey(sourceAccountId: acc.id, positionIdentity: posIdentity)
             
             let isClosed = position.closedAtDate != nil
@@ -1048,9 +1032,10 @@ public final class The5ersService: ObservableObject {
                 return .breakeven
             }()
             
-            let durationMs: Int64? = (isClosed && position.closedAtDate != nil)
-                ? Int64(position.closedAtDate!.timeIntervalSince(position.openedAtDate) * 1000)
-                : nil
+            let durationMs: Int64? = {
+                guard isClosed, let closedDate = position.closedAtDate else { return nil }
+                return Int64(closedDate.timeIntervalSince(position.openedAtDate) * 1000)
+            }()
             
             if let tIdx = dataStore.trades.firstIndex(where: { $0.key == tradeKey }) {
                 var existing = dataStore.trades[tIdx]
@@ -1063,7 +1048,6 @@ public final class The5ersService: ObservableObject {
                 existing.fees = fees
                 existing.netPnl = netPnl
                 existing.durationMs = durationMs
-                // Internal implementation note
                 if existing.notes == nil || existing.notes?.isEmpty == true {
                     existing.notes = "Position synced from The5ers Hub (Ticket: \(position.providerId ?? ""))"
                 }

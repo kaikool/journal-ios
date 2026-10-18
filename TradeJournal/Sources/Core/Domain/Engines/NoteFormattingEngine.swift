@@ -12,22 +12,22 @@ public struct FormattedSelection: Equatable, Sendable {
     }
 }
 
-/// Internal domain documentation
+/// Markdown inline formatting engine for journal and notebook text editors
 public enum NoteFormattingEngine {
     
-    /// Internal domain documentation
+    /// Wraps selection with markdown markers (** for bold, * for italic) preserving whitespace according to CommonMark spec
     public static func formatInlineSelection(
         value: String,
         start: Int,
         end: Int,
-        marker: String // Core implementation detail
+        marker: String // Marker token e.g. ** or *
     ) -> FormattedSelection {
         let nsString = value as NSString
         let safeStart = max(0, min(start, nsString.length))
         let safeEnd = max(safeStart, min(end, nsString.length))
         let selected = nsString.substring(with: NSRange(location: safeStart, length: safeEnd - safeStart))
         
-        // Internal implementation note
+        // Preserve leading whitespace outside delimiter
         var leading = ""
         for char in selected {
             if char.isWhitespace { leading.append(char) }
@@ -43,7 +43,7 @@ public enum NoteFormattingEngine {
             trailing = ""
         } else {
             content = trimmed
-            // Internal implementation note
+            // Preserve trailing whitespace outside delimiter
             var trail = ""
             for char in selected.reversed() {
                 if char.isWhitespace { trail.append(char) }

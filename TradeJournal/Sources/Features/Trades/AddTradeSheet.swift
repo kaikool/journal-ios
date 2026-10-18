@@ -734,7 +734,7 @@ public struct AddTradeSheet: View {
         !symbol.trimmingCharacters(in: .whitespaces).isEmpty &&
         quantity > 0 &&
         entryPrice > 0 &&
-        (!isClosed || (exitPrice != nil && exitPrice! > 0))
+        (!isClosed || (exitPrice.map { $0 > 0 } ?? false))
     }
     
     private func saveTrade() {

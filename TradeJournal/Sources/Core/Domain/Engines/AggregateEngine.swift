@@ -67,6 +67,8 @@ public enum AggregateEngine {
     
     // MARK: - Time Calculations
     
+    public static let utcTimeZone: TimeZone = TimeZone(identifier: "UTC") ?? TimeZone(secondsFromGMT: 0) ?? .current
+
     /// Determines trading session based on trade open time in UTC:
     /// - Asian: 00:00 - 08:00 UTC
     /// - London: 08:00 - 13:00 UTC
@@ -75,7 +77,7 @@ public enum AggregateEngine {
     /// - Off-hours: 21:00 - 24:00 UTC
     public static func session(for date: Date) -> TradingSession {
         var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(identifier: "UTC")!
+        calendar.timeZone = utcTimeZone
         let hour = calendar.component(.hour, from: date)
         
         switch hour {
@@ -93,7 +95,7 @@ public enum AggregateEngine {
     }
     
     /// Weekday short name (Sun, Mon, Tue, Wed, Thu, Fri, Sat) in given timezone
-    public static func weekday(for date: Date, timeZone: TimeZone = TimeZone(identifier: "UTC")!) -> Weekday {
+    public static func weekday(for date: Date, timeZone: TimeZone = utcTimeZone) -> Weekday {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = timeZone
         let weekdayIndex = calendar.component(.weekday, from: date) // 1 = Sunday, 7 = Saturday
@@ -104,7 +106,7 @@ public enum AggregateEngine {
     }
     
     /// Hour of day (0-23) in given timezone
-    public static func hour(for date: Date, timeZone: TimeZone = TimeZone(identifier: "UTC")!) -> Int {
+    public static func hour(for date: Date, timeZone: TimeZone = utcTimeZone) -> Int {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = timeZone
         return calendar.component(.hour, from: date)
@@ -190,7 +192,7 @@ public enum AggregateEngine {
         group(trades: trades) { [$0.direction.rawValue] }
     }
     
-    public static func byWeekday(trades: [Trade], timeZone: TimeZone = TimeZone(identifier: "UTC")!) -> [BucketStats] {
+    public static func byWeekday(trades: [Trade], timeZone: TimeZone = utcTimeZone) -> [BucketStats] {
         let buckets = group(trades: trades) { [weekday(for: $0.openedAt, timeZone: timeZone).rawValue] }
         let order = Weekday.allCases.map { $0.rawValue }
         return buckets.sorted {
@@ -210,7 +212,7 @@ public enum AggregateEngine {
         }
     }
     
-    public static func byHour(trades: [Trade], timeZone: TimeZone = TimeZone(identifier: "UTC")!) -> [BucketStats] {
+    public static func byHour(trades: [Trade], timeZone: TimeZone = utcTimeZone) -> [BucketStats] {
         group(trades: trades) { [String(format: "%02d", hour(for: $0.openedAt, timeZone: timeZone))] }
             .sorted { $0.key < $1.key }
     }
@@ -218,7 +220,7 @@ public enum AggregateEngine {
     public static func byDuration(trades: [Trade]) -> [BucketStats] {
         let tradesWithDuration = trades.filter { $0.durationMs != nil }
         let buckets = group(trades: tradesWithDuration) { trade in
-            let ms = trade.durationMs!
+            guard let ms = trade.durationMs else { return [] }
             let found = DurationBucket.standard.first { Double(ms) < $0.maxMs }
             return [found?.key ?? "> 1d"]
         }
@@ -230,7 +232,7 @@ public enum AggregateEngine {
         }
     }
 
-    public static func byMonth(trades: [Trade], timeZone: TimeZone = TimeZone(identifier: "UTC")!) -> [BucketStats] {
+    public static func byMonth(trades: [Trade], timeZone: TimeZone = utcTimeZone) -> [BucketStats] {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM"
         formatter.timeZone = timeZone
@@ -260,7 +262,7 @@ public enum AggregateEngine {
         trades: [Trade],
         year: Int,
         month: Int,
-        timeZone: TimeZone = TimeZone(identifier: "UTC")!
+        timeZone: TimeZone = utcTimeZone
     ) -> CalendarMonth {
         calendarMonthFromDays(
             dayStats: FinancialMetricsEngine.dailyStats(trades: trades, timeZone: timeZone),
@@ -281,7 +283,7 @@ public enum AggregateEngine {
         }
 
         var cal = Calendar(identifier: .gregorian)
-        cal.timeZone = TimeZone(identifier: "UTC")!
+        cal.timeZone = utcTimeZone
         var comp = DateComponents()
         comp.year = year
         comp.month = month

@@ -36,10 +36,10 @@ public struct TradeMetrics: Equatable {
 
 extension TradeMetrics {
     public var profit: Decimal {
-        grossPnl != nil ? max(0, grossPnl!) : (netPnl > 0 ? netPnl : 0)
+        grossPnl.map { max(0, $0) } ?? (netPnl > 0 ? netPnl : 0)
     }
     public var loss: Decimal {
-        grossPnl != nil ? max(0, -min(0, grossPnl!)) : (netPnl < 0 ? abs(netPnl) : 0)
+        grossPnl.map { max(0, -$0) } ?? (netPnl < 0 ? abs(netPnl) : 0)
     }
     public var winningTrades: Int { wins }
     public var losingTrades: Int { losses }
@@ -89,9 +89,9 @@ public struct IntradayPoint: Equatable {
     }
 }
 
-/// Internal domain documentation
-/// Domain specification matching core web repository
+/// High-performance financial metrics calculation engine matching web domain specifications
 public enum FinancialMetricsEngine {
+    public static let utcTimeZone: TimeZone = TimeZone(identifier: "UTC") ?? TimeZone(secondsFromGMT: 0) ?? .current
     
     public static func computeOverview(trades: [Trade], timeZone: TimeZone = .current, initialBalance: Decimal = 0) -> (metrics: TradeMetrics, curve: [EquityPoint], days: [DayStats]) {
         let curve = equityCurve(trades: trades)
@@ -100,36 +100,41 @@ public enum FinancialMetricsEngine {
         return (metrics, curve, days)
     }
     
-    /// Internal domain documentation
+    /// Computes chronological cumulative equity points for all closed trades
     public static func equityCurve(trades: [Trade]) -> [EquityPoint] {
         let closedTrades = trades
             .filter { $0.status != .open && $0.closedAt != nil }
             .sorted {
-                if $0.closedAt! != $1.closedAt! {
-                    return $0.closedAt! < $1.closedAt!
+                let d0 = $0.closedAt ?? .distantPast
+                let d1 = $1.closedAt ?? .distantPast
+                if d0 != d1 {
+                    return d0 < d1
                 }
                 return $0.key < $1.key
             }
         
         var cum: Decimal = 0
         let formatter = ISO8601DateFormatter()
-        return closedTrades.map { trade in
+        return closedTrades.compactMap { trade in
+            guard let closedAt = trade.closedAt else { return nil }
             cum += trade.netPnl
             return EquityPoint(
-                timestamp: trade.closedAt!,
-                dateString: formatter.string(from: trade.closedAt!),
+                timestamp: closedAt,
+                dateString: formatter.string(from: closedAt),
                 cumNetPnl: cum
             )
         }
     }
     
-    /// Internal domain documentation
+    /// Aggregates trade performance by calendar date according to the specified timezone
     public static func dailyStats(trades: [Trade], timeZone: TimeZone = .current) -> [DayStats] {
         let closedTrades = trades
             .filter { $0.status != .open && $0.closedAt != nil }
             .sorted {
-                if $0.closedAt! != $1.closedAt! {
-                    return $0.closedAt! < $1.closedAt!
+                let d0 = $0.closedAt ?? .distantPast
+                let d1 = $1.closedAt ?? .distantPast
+                if d0 != d1 {
+                    return d0 < d1
                 }
                 return $0.key < $1.key
             }
@@ -141,7 +146,8 @@ public enum FinancialMetricsEngine {
         var dayMap: [String: DayStats] = [:]
         
         for trade in closedTrades {
-            let dateKey = dateFormatter.string(from: trade.closedAt!)
+            guard let closedAt = trade.closedAt else { continue }
+            let dateKey = dateFormatter.string(from: closedAt)
             var day = dayMap[dateKey] ?? DayStats(
                 date: dateKey,
                 netPnl: 0,
@@ -200,7 +206,7 @@ public enum FinancialMetricsEngine {
         trades: [Trade],
         executionTimes: [String: Date],
         date: String,
-        timeZone: TimeZone = TimeZone(identifier: "UTC")!
+        timeZone: TimeZone = utcTimeZone
     ) -> [IntradayPoint] {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd"
@@ -235,7 +241,7 @@ public enum FinancialMetricsEngine {
         }
     }
     
-    /// Internal domain documentation
+    /// Computes max drawdown absolute amount and percentage against initial balance
     public static func drawdown(curve: [EquityPoint], initialBalance: Decimal) -> DrawdownStats {
         var peak: Decimal = 0
         var maxDrawdown: Decimal = 0
@@ -258,7 +264,7 @@ public enum FinancialMetricsEngine {
         return DrawdownStats(maxDrawdown: maxDrawdown, maxDrawdownPct: maxDrawdownPct, peak: peak)
     }
     
-    /// Internal domain documentation
+    /// Calculates high-level performance metrics including profit factor, win rates, and streaks
     public static func computeMetrics(
         trades: [Trade],
         curve: [EquityPoint]? = nil,
@@ -284,8 +290,11 @@ public enum FinancialMetricsEngine {
         let winningDays = dayStatsList.filter { $0.netPnl > 0 }.count
         let dayWinRate: Double? = !dayStatsList.isEmpty ? (Double(winningDays) / Double(dayStatsList.count)) : nil
         
-        // Internal implementation note
-        let ordered = closed.compactMap { $0.closedAt != nil ? $0 : nil }.sorted { $0.closedAt! < $1.closedAt! }
+        // Chronological order for streak analysis
+        let ordered = closed.compactMap { trade -> (Trade, Date)? in
+            guard let closedAt = trade.closedAt else { return nil }
+            return (trade, closedAt)
+        }.sorted { $0.1 < $1.1 }.map { $0.0 }
         var maxWinStreak = 0
         var maxLossStreak = 0
         var run = 0

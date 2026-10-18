@@ -315,7 +315,7 @@ public final class MarketDataService: Sendable {
     
     // MARK: - 4. Validation & De-duplication
     
-    /// Internal domain documentation
+    /// Deduplicates and chronologically sorts market candle bars
     public func validateBars(_ bars: [MarketBar]) -> [MarketBar] {
         var unique: [Int64: MarketBar] = [:]
         for bar in bars {
@@ -326,7 +326,7 @@ public final class MarketDataService: Sendable {
     
     // MARK: - 5. Unified Trade Candles Fetcher
     
-    /// Internal domain documentation
+    /// Fetches market candle bars matching the trade timeframe across active providers
     public func fetchBarsForTrade(
         trade: Trade,
         config: MarketConnectionConfig,
@@ -363,7 +363,7 @@ public final class MarketDataService: Sendable {
             )
             return ("OANDA v20", validateBars(bars))
         } else {
-            // Internal implementation note
+            // Fallback attempt to query Binance USDT pair when provider is unspecified
             let binanceBars = try? await fetchBinanceBars(
                 symbol: "\(trade.symbol)USDT",
                 interval: resolution,

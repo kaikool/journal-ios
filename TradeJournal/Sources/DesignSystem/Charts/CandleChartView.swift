@@ -312,12 +312,10 @@ public struct CandleChartView: View {
         }
     }
     
-    // Internal implementation note
-    
+    /// Fills overlay displaying execution arrows and lots on the candle timeline
     private func fillsOverlay(plotWidth: CGFloat, plotHeight: CGFloat, stepX: CGFloat, minP: Double, span: Double) -> some View {
         ForEach(activeFills) { fill in
             let fillMs = Int64(fill.executedAt.timeIntervalSince1970 * 1000)
-            // Internal implementation note
             let barIndex = visibleBars.firstIndex { $0.timestamp >= fillMs } ?? (visibleBars.count - 1)
             let x = CGFloat(barIndex) * stepX + (stepX / 2.0)
             let fillPriceD = (fill.price as NSDecimalNumber).doubleValue
@@ -341,11 +339,10 @@ public struct CandleChartView: View {
         }
     }
     
-    // Internal implementation note
-    
+    /// Fallback trajectory view when external candle feeds are not available
     private func executionPathFallbackView(size: CGSize) -> some View {
         let entryD = (trade.avgEntry as NSDecimalNumber).doubleValue
-        let exitD = trade.avgExit != nil ? (trade.avgExit! as NSDecimalNumber).doubleValue : entryD
+        let exitD = trade.avgExit.map { ($0 as NSDecimalNumber).doubleValue } ?? entryD
         
         let minP = min(entryD, exitD) * 0.998
         let maxP = max(entryD, exitD) * 1.002

@@ -1,7 +1,6 @@
 import Foundation
 
-/// Internal domain documentation
-/// Internal domain documentation
+/// Robust RFC 4180 compliant CSV parser supporting quoted strings and delimiter splitting
 public enum CSVParser {
     
     public static func parse(_ text: String, delimiter: Character = ",") -> [[String]] {
@@ -19,7 +18,7 @@ public enum CSVParser {
             
             if char == "\"" {
                 if insideQuotes && i + 1 < count && chars[i + 1] == "\"" {
-                    // Internal implementation note
+                    // Escaped double quote inside quoted field ("")
                     currentField.append("\"")
                     i += 1
                 } else {
@@ -29,14 +28,14 @@ public enum CSVParser {
                 currentRow.append(currentField.trimmingCharacters(in: .whitespaces))
                 currentField = ""
             } else if (char == "\r" || char == "\n") && !insideQuotes {
-                // Internal implementation note
+                // Consume trailing LF on CRLF windows line endings
                 if char == "\r" && i + 1 < count && chars[i + 1] == "\n" {
                     i += 1
                 }
                 currentRow.append(currentField.trimmingCharacters(in: .whitespaces))
                 currentField = ""
                 
-                // Internal implementation note
+                // Exclude empty rows
                 if !currentRow.allSatisfy({ $0.isEmpty }) {
                     rows.append(currentRow)
                 }

@@ -1,10 +1,9 @@
 import Foundation
 
-/// Domain specification matching core web repository
-/// Internal domain documentation
+/// Trade reconstruction engine pairing raw executions into complete round-trips using FIFO/LIFO
 public enum TradeReconstructionEngine {
     
-    public static let flatEpsilon: Decimal = Decimal(string: "0.000000001")! // 1e-9
+    public static let flatEpsilon: Decimal = Decimal(sign: .plus, exponent: -9, significand: 1) // 1e-9
     
     public struct Options {
         public let method: ProfitCalcMethod
@@ -181,7 +180,7 @@ public enum TradeReconstructionEngine {
 // 2. Process each group sequentially
         for (_, groupExecutions) in groups {
             var group = groupExecutions
-            // Internal implementation note
+            // Stable chronological ordering of executions within the symbol group
             group.sort {
                 if $0.executedAt != $1.executedAt {
                     return $0.executedAt < $1.executedAt
@@ -282,7 +281,6 @@ public enum TradeReconstructionEngine {
                                 )
                             )
                             cycle = nil
-                            // Internal implementation note
                         }
                     }
                 }
@@ -292,7 +290,7 @@ public enum TradeReconstructionEngine {
                 }
             }
             
-            // Internal implementation note
+            // Finalize any remaining open position at the end of the execution stream
             if let activeCycle = cycle {
                 trips.append(
                     finalizeCycle(
@@ -309,7 +307,7 @@ public enum TradeReconstructionEngine {
             }
         }
         
-        // Internal implementation note
+        // Sort reconstructed trades chronologically by open time
         trips.sort {
             if $0.openedAt != $1.openedAt {
                 return $0.openedAt < $1.openedAt

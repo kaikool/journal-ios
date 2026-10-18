@@ -44,12 +44,12 @@ public struct EditManualTradeSheet: View {
         _isClosed = State(initialValue: trade.closedAt != nil || trade.avgExit != nil)
         _quantityText = State(initialValue: "\(trade.quantity)")
         _entryPriceText = State(initialValue: "\(trade.avgEntry)")
-        _exitPriceText = State(initialValue: trade.avgExit != nil ? "\(trade.avgExit!)" : "")
+        _exitPriceText = State(initialValue: trade.avgExit.map { "\($0)" } ?? "")
         _openedAt = State(initialValue: trade.openedAt)
         _closedAt = State(initialValue: trade.closedAt ?? trade.openedAt)
         _feeText = State(initialValue: "\(trade.fees)")
-        _stopLossText = State(initialValue: trade.stopLoss != nil ? "\(trade.stopLoss!)" : "")
-        _profitTargetText = State(initialValue: trade.profitTarget != nil ? "\(trade.profitTarget!)" : "")
+        _stopLossText = State(initialValue: trade.stopLoss.map { "\($0)" } ?? "")
+        _profitTargetText = State(initialValue: trade.profitTarget.map { "\($0)" } ?? "")
         _selectedPlaybookId = State(initialValue: trade.playbookId ?? "")
         _rating = State(initialValue: trade.rating ?? 0)
         _notes = State(initialValue: trade.notes ?? "")
@@ -708,7 +708,7 @@ public struct EditManualTradeSheet: View {
         !symbol.trimmingCharacters(in: .whitespaces).isEmpty &&
         quantity > 0 &&
         entryPrice > 0 &&
-        (!isClosed || (exitPrice != nil && exitPrice! > 0))
+        (!isClosed || (exitPrice.map { $0 > 0 } ?? false))
     }
     
     private func saveChanges() {

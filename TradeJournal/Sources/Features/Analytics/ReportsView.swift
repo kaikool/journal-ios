@@ -88,7 +88,7 @@ public struct ReportsView: View {
     
     private var summaryKPIs: [(label: String, value: String, isNet: Bool)] {
         let s = metrics
-        let pfStr: String = s.profitFactorIsInfinite ? "∞" : (s.profitFactor != nil ? String(format: "%.2f", s.profitFactor!) : "–")
+        let pfStr: String = s.profitFactorIsInfinite ? "∞" : (s.profitFactor.map { String(format: "%.2f", $0) } ?? "–")
         let netStr = s.netPnl >= 0 ? "+\(Formatters.currency(s.netPnl))" : Formatters.currency(s.netPnl)
         let wrStr = s.winRate != nil ? Formatters.percent(s.winRate) : "–"
         let volStr = "\(s.totalVolume.formatted())"
@@ -96,8 +96,8 @@ public struct ReportsView: View {
         let summary = TradeAnalysisEngine.summarizeGroup(all: trades)
         let avgRealizedR = summary.avgRealizedR
         let avgPlannedR = summary.avgPlannedR
-        let avgRStr = avgRealizedR != nil ? String(format: "%.2f R", avgRealizedR!) : "–"
-        let avgPlanRStr = avgPlannedR != nil ? String(format: "%.2f R", avgPlannedR!) : "–"
+        let avgRStr = avgRealizedR.map { String(format: "%.2f R", $0) } ?? "–"
+        let avgPlanRStr = avgPlannedR.map { String(format: "%.2f R", $0) } ?? "–"
         
         return [
             ("Closed trades", "\(s.closedTrades)", false),

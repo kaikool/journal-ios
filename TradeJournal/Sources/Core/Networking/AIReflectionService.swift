@@ -76,8 +76,8 @@ public actor AIReflectionService {
         }
         
         let wr = (m.winRate ?? 0.0) * 100
-        let pf = m.profitFactor != nil ? String(format: "%.2f", m.profitFactor!) : "N/A"
-        let score = edgeScore != nil ? "\(Int(edgeScore!))" : "N/A"
+        let pf = m.profitFactor.map { String(format: "%.2f", $0) } ?? "N/A"
+        let score = edgeScore.map { "\(Int($0))" } ?? "N/A"
         
         switch action {
         case .ask:
@@ -110,7 +110,7 @@ public actor AIReflectionService {
             [Performance Summary]
             - Net Cumulative P&L: \(m.netPnl >= 0 ? "+" : "")\(m.netPnl)
             - Largest win: \(m.largestWin) | Largest loss: \(m.largestLoss)
-            - Total fees paid: \(m.fees != nil ? "\(m.fees!)" : "0")
+            - Total fees paid: \(m.fees.map { "\($0)" } ?? "0")
             - Total trade volume: \(m.totalVolume)
             
             Assessment: \(m.netPnl >= 0 ? "Profitable period. Maintain playbook execution rules." : "Net negative period. Review rule-violating trades and tighten risk parameters.")

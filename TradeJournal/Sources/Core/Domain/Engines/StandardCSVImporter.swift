@@ -18,8 +18,7 @@ public struct ImportPreview: Equatable {
     }
 }
 
-/// Internal domain documentation
-/// Internal domain documentation
+/// Universal CSV trade importer supporting standard broker formats and column auto-mapping
 public enum StandardCSVImporter {
     
     private static let isoFormatter: ISO8601DateFormatter = {
@@ -41,7 +40,7 @@ public enum StandardCSVImporter {
         "yyyy-MM-dd"
     ]
     
-    /// Internal domain documentation
+    /// Multi-format date parser supporting ISO-8601, US, European, and standard timestamps
     private static func parseDateTime(_ string: String, timeZone: TimeZone = .current) -> Date? {
         let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
         if let d = isoFormatter.date(from: trimmed) { return d }
@@ -59,7 +58,7 @@ public enum StandardCSVImporter {
         return nil
     }
     
-    /// Internal domain documentation
+    /// Parses localized numbers, currency symbols, and accounting negative formats (e.g. ($100))
     private static func parseDecimal(_ string: String) -> Decimal? {
         var clean = string.trimmingCharacters(in: .whitespacesAndNewlines)
         clean = clean.replacingOccurrences(of: "$", with: "")
@@ -67,7 +66,7 @@ public enum StandardCSVImporter {
         clean = clean.replacingOccurrences(of: "£", with: "")
         clean = clean.replacingOccurrences(of: ",", with: "")
         
-        // Internal implementation note
+        // Financial accounting negative numbers wrapped in parentheses: (100) -> -100
         if clean.hasPrefix("(") && clean.hasSuffix(")") {
             clean = "-" + clean.dropFirst().dropLast()
         }
@@ -75,7 +74,7 @@ public enum StandardCSVImporter {
         return Decimal(string: clean)
     }
     
-    /// Internal domain documentation
+    /// Parses CSV content and builds an import preview with conflict detection
     public static func preview(
         csvText: String,
         accountId: String,
@@ -178,7 +177,7 @@ public enum StandardCSVImporter {
                 continue
             }
             
-            // Internal implementation note
+            // Unique signature deduplicating identical fills across batches
             let isoTime = ISO8601DateFormatter().string(from: validDate)
             let hash = "\(accountId)|\(symbol)|\(side.rawValue)|\(quantity)|\(price)|\(isoTime)"
             

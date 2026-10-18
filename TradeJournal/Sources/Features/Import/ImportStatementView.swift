@@ -52,7 +52,7 @@ public struct ImportStatementView: View {
                             }
                             
                             let selectedAcc = dataStore.accounts.first(where: { $0.id == dataStore.selectedAccountId })
-                            let label = selectedAcc != nil ? "\(selectedAcc!.name) (\(selectedAcc!.currency))" : "Select account"
+                            let label = selectedAcc.map { "\($0.name) (\($0.currency))" } ?? "Select account"
                             
                             AppleMenuChip(
                                 selectionText: label,

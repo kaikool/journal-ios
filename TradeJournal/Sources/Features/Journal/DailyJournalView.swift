@@ -70,7 +70,7 @@ public struct DailyJournalListView: View {
         // Collect all dates with trades or notes
         var dateMap: [String: [Trade]] = [:]
         for t in trades {
-            let key = t.closedAt != nil ? isoFormatter.string(from: t.closedAt!) : isoFormatter.string(from: t.openedAt)
+            let key = t.closedAt.map { isoFormatter.string(from: $0) } ?? isoFormatter.string(from: t.openedAt)
             dateMap[key, default: []].append(t)
         }
         
@@ -309,7 +309,7 @@ public struct DailyJournalDetailView: View {
         isoFormatter.timeZone = env.currentTimeZone
         
         return dataStore.filteredTrades.filter { t in
-            let closeKey = t.closedAt != nil ? isoFormatter.string(from: t.closedAt!) : nil
+            let closeKey = t.closedAt.map { isoFormatter.string(from: $0) }
             let openKey = isoFormatter.string(from: t.openedAt)
             return closeKey == date || (t.status == .open && openKey == date)
         }.sorted { ($0.closedAt ?? $0.openedAt) < ($1.closedAt ?? $1.openedAt) }
@@ -326,10 +326,13 @@ public struct DailyJournalDetailView: View {
         timeFormatter.dateFormat = "HH:mm"
         timeFormatter.timeZone = env.currentTimeZone
         
-        let closed = dayTrades.filter { $0.closedAt != nil }
-        for t in closed {
-            running += t.netPnl
-            let tStr = timeFormatter.string(from: t.closedAt!)
+        let closed = dayTrades.compactMap { trade -> (Date, Decimal)? in
+            guard let close = trade.closedAt else { return nil }
+            return (close, trade.netPnl)
+        }
+        for (closeDate, pnl) in closed {
+            running += pnl
+            let tStr = timeFormatter.string(from: closeDate)
             points.append((timeStr: tStr, cumPnl: running))
         }
         return points
@@ -453,9 +456,9 @@ public struct DailyJournalDetailView: View {
                         
                         statItem(label: "Fees", value: Formatters.currency(metrics.fees ?? 0))
                         statItem(label: "Volume", value: "\(metrics.totalVolume.formatted())")
-                        statItem(label: "Profit Factor", value: metrics.profitFactorIsInfinite ? "∞" : (metrics.profitFactor != nil ? String(format: "%.2f", metrics.profitFactor!) : "–"))
+                        statItem(label: "Profit Factor", value: metrics.profitFactorIsInfinite ? "∞" : (metrics.profitFactor.map { String(format: "%.2f", $0) } ?? "–"))
                         
-                        statItem(label: "Expectancy", value: metrics.expectancy != nil ? Formatters.currency(metrics.expectancy!) : "–")
+                        statItem(label: "Expectancy", value: metrics.expectancy.map { Formatters.currency($0) } ?? "–")
                     }
                 } else {
                     Text("No closed trades this day.")
@@ -490,7 +493,7 @@ public struct DailyJournalDetailView: View {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(alignment: .lastTextBaseline) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(selectedTime != nil ? "At \(selectedTime!)" : "Intraday Cumulative Net P&L")
+                        Text(selectedTime.map { "At \($0)" } ?? "Intraday Cumulative Net P&L")
                             .font(.system(size: 11, weight: .medium))
                             .foregroundColor(AppColors.secondaryText)
                             .textCase(.uppercase)

@@ -107,7 +107,7 @@ public final class SupabaseService {
         return request
     }
     
-    /// Internal domain documentation
+    /// Validates HTTP status and parses PostgREST error messages
     private func validateResponse(_ response: URLResponse, data: Data, endpoint: String) throws {
         guard let http = response as? HTTPURLResponse else {
             throw SupabaseError.networkError("No HTTP response received from Supabase.")
@@ -163,8 +163,7 @@ public final class SupabaseService {
         return encoder
     }
     
-    /// Internal domain documentation
-    /// Internal domain documentation
+    /// Resilient array decoding supporting both arrays and single JSON objects
     public func decodeArray<T: Decodable>(_ type: T.Type, from data: Data) -> [T] {
         if data.isEmpty { return [] }
         if let str = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -172,17 +171,17 @@ public final class SupabaseService {
             return []
         }
         
-        // Internal implementation note
+        // Try standard array decoding
         if let decoded = try? jsonDecoder.decode([T].self, from: data) {
             return decoded
         }
         
-        // Internal implementation note
+        // Try single object decoding wrapped into array
         if let singleItem = try? jsonDecoder.decode(T.self, from: data) {
             return [singleItem]
         }
         
-        // Internal implementation note
+        // Fallback to row-by-row parsing skipping malformed records
         guard let jsonArray = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
             return []
         }
@@ -200,14 +199,12 @@ public final class SupabaseService {
         return results
     }
     
-    // Internal implementation note
-    
     public func pingConnection() async throws -> (success: Bool, message: String) {
         guard isConfigured else {
             return (false, "Please provide both Supabase Project URL and Anon Key.")
         }
         
-        // Internal implementation note
+        // Check Auth service health endpoint
         guard let authSettingsUrl = URL(string: "\(supabaseUrl)/auth/v1/settings") else {
             return (false, "Invalid Project URL format: \(supabaseUrl)")
         }
@@ -234,7 +231,7 @@ public final class SupabaseService {
             return (false, "Cannot connect to Project URL: \(error.localizedDescription). Please check your network connection or URL.")
         }
         
-        // Internal implementation note
+        // Check PostgREST API access and schema presence
         guard let restUrl = URL(string: "\(supabaseUrl)/rest/v1/accounts?select=id&limit=1") else {
             return (false, "PostgREST URL is not properly formatted.")
         }
@@ -269,7 +266,7 @@ public final class SupabaseService {
         }
     }
     
-    /// Internal domain documentation
+    /// Verifies whether core database tables exist in Supabase
     public func checkDatabaseTables() async -> (allExist: Bool, missing: [String]) {
         let tables = ["accounts", "trades", "executions", "playbooks", "prop_accounts"]
         var missing: [String] = []
@@ -293,8 +290,6 @@ public final class SupabaseService {
         
         return (missing.isEmpty, missing)
     }
-    
-    // Internal implementation note
     
     public func loginWithEmail(email: String, password: String) async throws -> String {
         guard isConfigured else { throw SupabaseError.notConfigured }
@@ -337,7 +332,7 @@ public final class SupabaseService {
     
     // MARK: - Web OAuth Login Helper
     
-    /// Internal domain documentation
+    /// Initiates PKCE / OAuth web flow with external identity providers
     @MainActor
     public func startWebOAuthLogin(provider: String = "google") async throws -> String {
         guard !supabaseUrl.isEmpty else { throw SupabaseError.notConfigured }
@@ -347,7 +342,7 @@ public final class SupabaseService {
         
         let callbackUrl = try await WebAuthHelper.shared.startSession(url: authUrl, callbackScheme: callbackScheme)
         
-        // Internal implementation note
+        // Extract access token from URL fragment
         guard let fragment = callbackUrl.fragment, !fragment.isEmpty else {
             throw SupabaseError.unauthorized(message: "Token not found in authentication response.")
         }
@@ -454,8 +449,7 @@ public final class SupabaseService {
     
     // MARK: - SQL Migration Script Generator
     
-    /// Internal domain documentation
-    /// Internal domain documentation
+    /// Generates idempotent PostgreSQL DDL schema matching web parity
     public func generateDatabaseInitSql() -> String {
         return """
         -- ========================================================
@@ -1134,6 +1128,16 @@ extension KeyedDecodingContainer where K == AnyCodingKey {
         return nil
     }
     
+    func decodeArray<T: Decodable>(type: T.Type, forKeys keys: [String]) -> [T]? {
+        for key in keys {
+            guard let k = AnyCodingKey(stringValue: key) else { continue }
+            if let arr = try? decode([T].self, forKey: k) {
+                return arr
+            }
+        }
+        return nil
+    }
+    
     func decodeDouble(forKeys keys: [String]) -> Double? {
         for key in keys {
             guard let k = AnyCodingKey(stringValue: key) else { continue }
@@ -1294,23 +1298,19 @@ public struct SupabaseTradeRecord: Codable {
         self.netPnl = c.decodeDouble(forKeys: ["net_pnl", "netPnl", "profit", "pnl"]) ?? 0
         self.executionCount = c.decodeInt(forKeys: ["execution_count", "executionCount"]) ?? 0
         
-        // Internal implementation note
+        // JSON string or native array of execution IDs
         if let str = c.decodeString(forKeys: ["execution_ids_json", "executionIdsJson", "execution_ids"]) {
             self.executionIdsJson = str
-        } else if let arr = (try? c.decode([String].self, forKey: AnyCodingKey(stringValue: "execution_ids_json")!)) ??
-                            (try? c.decode([String].self, forKey: AnyCodingKey(stringValue: "executionIdsJson")!)) ??
-                            (try? c.decode([String].self, forKey: AnyCodingKey(stringValue: "execution_ids")!)) {
+        } else if let arr = c.decodeArray(type: String.self, forKeys: ["execution_ids_json", "executionIdsJson", "execution_ids"]) {
             self.executionIdsJson = (try? String(data: JSONEncoder().encode(arr), encoding: .utf8)) ?? "[]"
         } else {
             self.executionIdsJson = "[]"
         }
         
-        // Internal implementation note
+        // JSON string or native array of exit attributions
         if let str = c.decodeString(forKeys: ["exits_json", "exitsJson", "exits"]) {
             self.exitsJson = str
-        } else if let arr = (try? c.decode([ExitAttribution].self, forKey: AnyCodingKey(stringValue: "exits_json")!)) ??
-                            (try? c.decode([ExitAttribution].self, forKey: AnyCodingKey(stringValue: "exitsJson")!)) ??
-                            (try? c.decode([ExitAttribution].self, forKey: AnyCodingKey(stringValue: "exits")!)) {
+        } else if let arr = c.decodeArray(type: ExitAttribution.self, forKeys: ["exits_json", "exitsJson", "exits"]) {
             self.exitsJson = (try? String(data: JSONEncoder().encode(arr), encoding: .utf8)) ?? "[]"
         } else {
             self.exitsJson = "[]"
@@ -1321,9 +1321,7 @@ public struct SupabaseTradeRecord: Codable {
         
         if let str = c.decodeString(forKeys: ["tags_json", "tagsJson", "tags"]) {
             self.tagsJson = str
-        } else if let arr = (try? c.decode([String].self, forKey: AnyCodingKey(stringValue: "tags_json")!)) ??
-                            (try? c.decode([String].self, forKey: AnyCodingKey(stringValue: "tagsJson")!)) ??
-                            (try? c.decode([String].self, forKey: AnyCodingKey(stringValue: "tags")!)) {
+        } else if let arr = c.decodeArray(type: String.self, forKeys: ["tags_json", "tagsJson", "tags"]) {
             self.tagsJson = (try? String(data: JSONEncoder().encode(arr), encoding: .utf8)) ?? "[]"
         } else {
             self.tagsJson = nil
@@ -1331,9 +1329,7 @@ public struct SupabaseTradeRecord: Codable {
         
         if let str = c.decodeString(forKeys: ["mistakes_json", "mistakesJson", "mistakes"]) {
             self.mistakesJson = str
-        } else if let arr = (try? c.decode([String].self, forKey: AnyCodingKey(stringValue: "mistakes_json")!)) ??
-                            (try? c.decode([String].self, forKey: AnyCodingKey(stringValue: "mistakesJson")!)) ??
-                            (try? c.decode([String].self, forKey: AnyCodingKey(stringValue: "mistakes")!)) {
+        } else if let arr = c.decodeArray(type: String.self, forKeys: ["mistakes_json", "mistakesJson", "mistakes"]) {
             self.mistakesJson = (try? String(data: JSONEncoder().encode(arr), encoding: .utf8)) ?? "[]"
         } else {
             self.mistakesJson = nil
@@ -1495,9 +1491,7 @@ public struct SupabasePlaybookRecord: Codable {
         self.description = c.decodeString(forKeys: ["description"]) ?? ""
         if let str = c.decodeString(forKeys: ["rules_json", "rulesJson", "rules"]) {
             self.rulesJson = str
-        } else if let arr = (try? c.decode([String].self, forKey: AnyCodingKey(stringValue: "rules_json")!)) ??
-                            (try? c.decode([String].self, forKey: AnyCodingKey(stringValue: "rulesJson")!)) ??
-                            (try? c.decode([String].self, forKey: AnyCodingKey(stringValue: "rules")!)) {
+        } else if let arr = c.decodeArray(type: String.self, forKeys: ["rules_json", "rulesJson", "rules"]) {
             self.rulesJson = (try? String(data: JSONEncoder().encode(arr), encoding: .utf8)) ?? "[]"
         } else {
             self.rulesJson = "[]"

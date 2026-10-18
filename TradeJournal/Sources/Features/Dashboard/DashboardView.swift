@@ -681,7 +681,7 @@ public struct DashboardView: View {
                         .foregroundColor(AppColors.secondaryText)
                         .tracking(0.5)
                     
-                    Text("\(totalClosed) closed trades · \(combinedWinRate != nil ? String(format: "%.1f%%", combinedWinRate! * 100) : "–") trade win rate")
+                    Text("\(totalClosed) closed trades · \(combinedWinRate.map { String(format: "%.1f%%", $0 * 100) } ?? "–") trade win rate")
                         .font(AppTypography.body)
                         .foregroundColor(AppColors.secondaryText)
                 }
@@ -704,7 +704,7 @@ public struct DashboardView: View {
                                 color: group.metrics.netPnl >= 0 ? AppColors.profit : AppColors.loss
                             )
                             
-                            Text("\(group.metrics.closedTrades) closed · \(group.metrics.winRate != nil ? String(format: "%.0f%%", group.metrics.winRate! * 100) : "–") win")
+                            Text("\(group.metrics.closedTrades) closed · \(group.metrics.winRate.map { String(format: "%.0f%%", $0 * 100) } ?? "–") win")
                                 .font(AppTypography.caption)
                                 .foregroundColor(AppColors.secondaryText)
                         }
@@ -1005,7 +1005,7 @@ public struct DashboardView: View {
                 
                 Spacer(minLength: 4)
                 
-                Text(metrics.profitFactorIsInfinite ? "∞" : (metrics.profitFactor != nil ? String(format: "%.2f", metrics.profitFactor!) : "–"))
+                Text(metrics.profitFactorIsInfinite ? "∞" : (metrics.profitFactor.map { String(format: "%.2f", $0) } ?? "–"))
                     .font(AppTypography.financialNumber(size: 24, weight: .bold))
                     .monospacedDigit()
                     .foregroundColor(AppColors.primaryText)
@@ -1060,7 +1060,7 @@ public struct DashboardView: View {
                 
                 Spacer(minLength: 2)
                 
-                Text(metrics.avgWinLossRatio != nil ? String(format: "%.2f", metrics.avgWinLossRatio!) : "–")
+                Text(metrics.avgWinLossRatio.map { String(format: "%.2f", $0) } ?? "–")
                     .font(AppTypography.financialNumber(size: 24, weight: .bold))
                     .monospacedDigit()
                     .foregroundColor(AppColors.primaryText)
@@ -1107,7 +1107,7 @@ public struct DashboardView: View {
                     Spacer()
                     
                     HStack(spacing: 2) {
-                        Text(edgeResult.score != nil ? "\(Int(edgeResult.score!))" : "–")
+                        Text(edgeResult.score.map { "\(Int($0))" } ?? "–")
                             .font(AppTypography.financialNumber(size: 24, weight: .bold))
                             .monospacedDigit()
                             .foregroundColor(AppColors.brand)
@@ -1277,10 +1277,10 @@ public struct DashboardView: View {
                                         }
                                         .frame(height: 26)
                                         .frame(maxWidth: .infinity)
-                                        .background(stats != nil ? (stats!.netPnl >= 0 ? AppColors.profit.opacity(0.12) : AppColors.loss.opacity(0.12)) : Color.clear)
+                                        .background(stats.map { $0.netPnl >= 0 ? AppColors.profit.opacity(0.12) : AppColors.loss.opacity(0.12) } ?? Color.clear)
                                         .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                                         .overlay(
-                                            stats != nil ? RoundedRectangle(cornerRadius: 6, style: .continuous).stroke(stats!.netPnl >= 0 ? AppColors.profit.opacity(0.24) : AppColors.loss.opacity(0.24), lineWidth: 0.5) : nil
+                                            stats.map { RoundedRectangle(cornerRadius: 6, style: .continuous).stroke($0.netPnl >= 0 ? AppColors.profit.opacity(0.24) : AppColors.loss.opacity(0.24), lineWidth: 0.5) }
                                         )
                                     }
                                     .buttonStyle(.plain)
@@ -1461,7 +1461,7 @@ public struct DashboardView: View {
                 )
                 
                 HStack(spacing: 3) {
-                    Text(metrics.maxDrawdownPct != nil ? String(format: "-%.1f%%", metrics.maxDrawdownPct! * 100) : "set balance for %")
+                    Text(metrics.maxDrawdownPct.map { String(format: "-%.1f%%", $0 * 100) } ?? "set balance for %")
                         .font(AppTypography.caption)
                         .foregroundColor(AppColors.secondaryText)
                     
@@ -1518,13 +1518,13 @@ public struct DashboardView: View {
                 Spacer(minLength: 4)
                 
                 AppMonetaryText(
-                    metrics.expectancy != nil ? Formatters.formatPnL(metrics.expectancy!, currency: env.currentCurrency) : "–",
+                    metrics.expectancy.map { Formatters.formatPnL($0, currency: env.currentCurrency) } ?? "–",
                     isPrivate: env.isPrivacyModeEnabled,
                     font: AppTypography.financialNumber(size: 20, weight: .bold),
                     color: (metrics.expectancy ?? 0) >= 0 ? AppColors.profit : AppColors.loss
                 )
                 
-                Text(metrics.avgRealizedR != nil && metrics.tradesWithRisk > 0 ? String(format: "avg %.2fR over %d trades", metrics.avgRealizedR!, metrics.tradesWithRisk) : "tag stops for R multiples")
+                Text(metrics.avgRealizedR.map { String(format: "avg %.2fR over %d trades", $0, metrics.tradesWithRisk) } ?? "tag stops for R multiples")
                     .font(AppTypography.caption)
                     .foregroundColor(AppColors.secondaryText)
                     .lineLimit(1)

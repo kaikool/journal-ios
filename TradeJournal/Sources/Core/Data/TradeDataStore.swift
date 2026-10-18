@@ -1,9 +1,7 @@
 import SwiftUI
 import Combine
 
-/// Internal domain documentation
-/// Internal domain documentation
-/// Internal domain documentation
+/// Central reactive data store managing accounts, trades, executions, notes, playbooks, and prop accounts
 @MainActor
 public final class TradeDataStore: ObservableObject {
     public static let shared = TradeDataStore()
@@ -428,8 +426,7 @@ public final class TradeDataStore: ObservableObject {
         objectWillChange.send()
     }
     
-    /// Internal domain documentation
-    /// Internal domain documentation
+    /// Imports new fills for an account and triggers reconstruction
     public func importExecutions(accountId: String, newExecutions: [Execution]) {
         let uniqueNew = newExecutions.filter { !executionHashes.contains($0.contentHash) }
         guard !uniqueNew.isEmpty else {
@@ -447,8 +444,7 @@ public final class TradeDataStore: ObservableObject {
         AppLogger.info("Imported \(uniqueNew.count) executions for account \(accountId). Rebuilt \(trades.count) trades.")
     }
     
-    /// Internal domain documentation
-    /// Ported 1:1 from `source-repo/apps/web/src/server/rebuild.ts`
+    /// Reconstructs round trips from raw executions using account profit calculation method
     public func rebuildAccount(accountId: String) {
         guard let account = accounts.first(where: { $0.id == accountId }) else { return }
         
@@ -463,7 +459,7 @@ public final class TradeDataStore: ObservableObject {
             options: .init(method: account.profitCalcMethod, multipliers: multipliers)
         )
         
-        // Internal implementation note
+        // Preserve existing user annotations (notes, tags, mistakes, ratings, risk levels) across rebuilds
         var existingAnnotations: [String: (notes: String?, tags: [String], mistakes: [String], rating: Int?, stopLoss: Decimal?, profitTarget: Decimal?, reviewedAt: Date?, playbookId: String?)] = [:]
         for t in trades where t.accountId == accountId {
             existingAnnotations[t.key] = (t.notes, t.tags, t.mistakes, t.rating, t.stopLoss, t.profitTarget, t.reviewedAt, t.playbookId)
@@ -481,7 +477,7 @@ public final class TradeDataStore: ObservableObject {
                 t.reviewedAt = ann.reviewedAt
                 t.playbookId = ann.playbookId
             } else {
-                // Internal implementation note
+                // Apply default account risk rules if annotations do not set stop loss / target
                 let defaultRisk = JournalDefaultsEngine.defaultRisk(
                     entry: t.avgEntry,
                     direction: t.direction,
@@ -659,7 +655,7 @@ public final class TradeDataStore: ObservableObject {
         var fetchedPropCount = 0
         var syncWarnings: [String] = []
 
-        // Internal implementation note
+        // 1. Synchronize Accounts
         do {
             let remoteAccounts = (try await SupabaseService.shared.fetchAccounts()).filter { !$0.name.hasPrefix("Account ") }
             fetchedAccountsCount = remoteAccounts.count
@@ -675,11 +671,9 @@ public final class TradeDataStore: ObservableObject {
                         accounts.append(rAcc)
                     }
                 }
-                // Internal implementation note
                 if selectedAccountId == "default-acc" || (!accounts.contains(where: { $0.id == selectedAccountId }) && selectedAccountId != "all") {
                     selectedAccountId = "all"
                 }
-                // Internal implementation note
                 accounts.removeAll(where: { $0.id == "default-acc" && accounts.count > 1 })
             }
             
@@ -721,16 +715,15 @@ public final class TradeDataStore: ObservableObject {
 
         if Task.isCancelled { return }
 
-        // Internal implementation note
+        // 2. Synchronize Trades
         do {
             let remoteTrades = try await SupabaseService.shared.fetchTrades(accountId: nil)
             fetchedTradesCount = remoteTrades.count
             for rTrade in remoteTrades {
                 if let idx = trades.firstIndex(where: { $0.key == rTrade.key }) {
                     let local = trades[idx]
-                    // Internal implementation note
                     if (local.netPnl != 0 || local.grossPnl != 0) && (rTrade.netPnl == 0 && rTrade.grossPnl == 0) {
-                        // Internal implementation note
+                        // Keep local non-zero PnL if remote has zero PnL
                     } else {
                         trades[idx] = rTrade
                     }
@@ -766,7 +759,7 @@ public final class TradeDataStore: ObservableObject {
 
         if Task.isCancelled { return }
 
-        // Internal implementation note
+        // 3. Synchronize Executions
         do {
             let remoteExecutions = try await SupabaseService.shared.fetchExecutions(accountId: nil)
             fetchedExecutionsCount = remoteExecutions.count
@@ -853,7 +846,7 @@ public final class TradeDataStore: ObservableObject {
 
         if Task.isCancelled { return }
 
-        // Internal implementation note
+        // 4. Synchronize Prop Accounts
         do {
             let remotePropAccounts = try await SupabaseService.shared.fetchPropAccounts()
             fetchedPropCount = remotePropAccounts.count
@@ -1015,7 +1008,7 @@ public final class TradeDataStore: ObservableObject {
 
         if Task.isCancelled { return }
 
-        // Internal implementation note
+        // 5. Synchronize Attachments
         do {
             let remoteAttachments = try await SupabaseService.shared.fetchAttachments()
             for rAtt in remoteAttachments {
@@ -1183,7 +1176,7 @@ public final class TradeDataStore: ObservableObject {
         }
     }
     
-    // Internal implementation note
+    // MARK: - Notebook & Folders Management
     
     public func createFolder(name: String) throws -> NotebookFolder {
         let (folder, updated) = try NotebookEngine.createFolder(name: name, existingFolders: folders)
@@ -1431,7 +1424,7 @@ public final class TradeDataStore: ObservableObject {
         
         propReceipts.append(item)
         
-        // Internal implementation note
+        // Automatically transition payout status to approved if receipt is recorded
         let allReceiptsForPayout = propReceipts.filter { $0.payoutId == item.payoutId && !$0.voided }
         let totalNetReceived = allReceiptsForPayout.reduce(0) { sum, r in
             sum + (r.kind == "reversal" ? -r.amountMinor : r.amountMinor)
@@ -1464,7 +1457,7 @@ public final class TradeDataStore: ObservableObject {
         updated.voided = voided
         propReceipts[rIdx] = updated
         
-        // Internal implementation note
+        // Ensure cumulative receipt sum is non-negative after receipt void/reversal
         let receiptsForPayout = propReceipts.filter { $0.payoutId == payoutId && !$0.voided }
         let totalNet = receiptsForPayout.reduce(0) { $0 + ($1.kind == "reversal" ? -$1.amountMinor : $1.amountMinor) }
         if totalNet < 0 {
@@ -1511,7 +1504,7 @@ public final class TradeDataStore: ObservableObject {
         return res
     }
 
-    // Internal implementation note
+    // MARK: - Attachments Management
     
     private var attachmentsBaseUrl: URL {
         let paths = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
@@ -2286,7 +2279,7 @@ public final class TradeDataStore: ObservableObject {
         AppLogger.info("Loaded demo data: \(fills.count) executions for demo account \(demoAccountId)")
     }
     
-    /// Internal domain documentation
+    /// Exports all reconstructed trades into an RFC 4180 CSV table
     public func exportTradesCsv() -> String {
         let header = "key,account_id,symbol,direction,status,opened_at,closed_at,quantity,avg_entry,avg_exit,gross_pnl,fees,net_pnl,tags,notes"
         let iso = ISO8601DateFormatter()

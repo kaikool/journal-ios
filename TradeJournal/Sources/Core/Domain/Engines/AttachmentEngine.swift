@@ -1,19 +1,17 @@
 import Foundation
 
-/// Internal domain documentation
-/// Domain specification matching core web repository
+/// Attachment validation, MIME detection, and storage sanitization engine
 public enum AttachmentEngine {
     
-    /// Internal domain documentation
+    /// Maximum allowed attachment size (8 MB)
     public static let maxAttachmentSize: Int = 8 * 1024 * 1024
     
-    /// Internal domain documentation
+    /// Permitted parent owner entity types
     public static let validOwnerTypes: Set<String> = [
         "trade", "day", "note", "missed", "prop-account", "prop-entry"
     ]
     
-    /// Internal domain documentation
-/// Ported 1:1 from `attachmentMime` trong `attachment-validation.ts`
+    /// Determines MIME type by inspecting magic header bytes
     public static func attachmentMime(data: Data) -> String? {
         let bytes = [UInt8](data.prefix(32))
         guard !bytes.isEmpty else { return nil }
@@ -49,8 +47,7 @@ public enum AttachmentEngine {
         return nil
     }
     
-    /// Internal domain documentation
-/// Ported 1:1 from `safeName` trong `route.ts`
+    /// Sanitizes file names to ensure filesystem and URL safety
     public static func safeName(_ name: String) -> String {
         let trimmed = String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(200))
         let basename = (trimmed as NSString).lastPathComponent
@@ -62,17 +59,14 @@ public enum AttachmentEngine {
         return result.isEmpty ? "attachment" : result
     }
     
-    /// Internal domain documentation
-/// Ported 1:1 from `storagePath` trong `route.ts`:
-    /// `attachments/<ownerType>/<ownerId>/<id>/<name>`
+    /// Generates canonical storage path: attachments/<ownerType>/<ownerId>/<id>/<name>
     public static func storagePath(ownerType: String, ownerId: String, id: String, name: String) -> String {
         let encOwnerId = ownerId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? ownerId
         let encName = name.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? name
         return "attachments/\(ownerType)/\(encOwnerId)/\(id)/\(encName)"
     }
     
-    /// Internal domain documentation
-/// Ported 1:1 from `uploadChartScreenshot` trong `chart-screenshot-upload.ts`
+    /// Validates and extracts PNG byte stream from base64 data URI
     public static func validateChartScreenshotPng(dataUrl: String) throws -> Data {
         let prefix = "data:image/png;base64,"
         guard dataUrl.hasPrefix(prefix) else {
@@ -84,7 +78,7 @@ public enum AttachmentEngine {
             throw AttachmentError.invalidData
         }
         
-        // Internal implementation note
+        // Validate PNG magic number signature
         let signature: [UInt8] = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]
         guard data.count >= signature.count else {
             throw AttachmentError.invalidData
@@ -97,7 +91,7 @@ public enum AttachmentEngine {
         return data
     }
     
-    /// Internal domain documentation
+    /// Validates file size, MIME type, and sanitized filename
     public static func validateAttachment(
         data: Data,
         declaredName: String

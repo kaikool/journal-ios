@@ -60,20 +60,14 @@ public enum NotebookError: LocalizedError, Equatable {
     }
 }
 
-/// Internal domain documentation
-/// - `source-repo/apps/web/src/app/api/folders/route.ts`
-/// - `source-repo/apps/web/src/app/api/folders/[id]/route.ts`
-/// - `source-repo/apps/web/src/app/api/notes/route.ts`
-/// - `source-repo/apps/web/src/app/api/notes/[id]/route.ts`
-/// - `source-repo/apps/web/src/app/api/journal/route.ts`
-/// - `source-repo/apps/web/src/app/api/journal/[date]/route.ts`
+/// Notebook engine providing folder hierarchies, note CRUD, tagging, and daily journal chronology
 public enum NotebookEngine {
     
     public static let systemFolderAll = "all"
     public static let systemFolderTradeNotes = "trade-notes"
     public static let systemFolderMyNotes = "my-notes"
     
-    /// Internal domain documentation
+    /// Built-in immutable system folders
     public static var defaultSystemFolders: [NotebookFolder] {
         [
             NotebookFolder(id: systemFolderAll, name: "All notes", kind: "system", createdAt: "2026-01-01T00:00:00.000Z"),
@@ -82,7 +76,7 @@ public enum NotebookEngine {
         ]
     }
     
-    /// Internal domain documentation
+    /// Validates and adds a new folder to the active hierarchy
     public static func createFolder(
         name: String,
         existingFolders: [NotebookFolder]
@@ -132,9 +126,7 @@ public enum NotebookEngine {
         return updated
     }
     
-    /// Internal domain documentation
-    /// Internal domain documentation
-    /// Internal domain documentation
+    /// Soft deletes a user folder and moves its existing notes to 'My notes'
     public static func deleteFolder(
         id: String,
         folders: [NotebookFolder],
@@ -153,7 +145,7 @@ public enum NotebookEngine {
         targetFolder.deletedAt = JournalIds.nowIso()
         updatedFolders[index] = targetFolder
         
-        // Internal implementation note
+        // Re-assign orphan notes to the default user folder
         let updatedNotes = notes.map { note -> NotebookNote in
             if note.folderId == id {
                 var modified = note
@@ -167,7 +159,7 @@ public enum NotebookEngine {
         return (updatedFolders, updatedNotes)
     }
     
-    /// Internal domain documentation
+    /// Creates and persists a new notebook entry with folder validation
     public static func createNote(
         folderId: String? = nil,
         title: String = "",
@@ -213,7 +205,7 @@ public enum NotebookEngine {
         return (newNote, updated)
     }
     
-    /// Internal domain documentation
+    /// Updates note title, content, folder assignment, or tags
     public static func patchNote(
         id: String,
         title: String? = nil,
@@ -253,7 +245,7 @@ public enum NotebookEngine {
         return (target, updated)
     }
     
-    /// Internal domain documentation
+    /// Permanently deletes a notebook note
     public static func deleteNote(
         id: String,
         notes: [NotebookNote]
@@ -261,7 +253,7 @@ public enum NotebookEngine {
         notes.filter { $0.id != id }
     }
     
-    /// Internal domain documentation
+    /// Filters notes by folder, search query, or tag, with custom sort ordering
     public static func filterNotes(
         notes: [NotebookNote],
         folders: [NotebookFolder],
@@ -273,7 +265,7 @@ public enum NotebookEngine {
         let activeFolders = folders.filter { $0.deletedAt == nil }
         let activeFolderIds = Set(activeFolders.map { $0.id })
         
-        // Internal implementation note
+        // Filter out notes belonging to soft-deleted folders
         var result = notes.filter { activeFolderIds.contains($0.folderId) }
         
         if let targetFolder = folderId, targetFolder != systemFolderAll {
@@ -297,7 +289,7 @@ public enum NotebookEngine {
             }
         }
         
-        // Internal implementation note
+        // Sort notes based on selected ordering criteria
         result.sort { a, b in
             switch sort {
             case .created:
@@ -313,8 +305,7 @@ public enum NotebookEngine {
         return (result, sortedFolders)
     }
     
-    /// Internal domain documentation
-    /// Internal domain documentation
+    /// Constructs calendar day chronology combining trading performance and daily reflections
     public static func journalChronology(
         trades: [Trade],
         journalDays: [String: String], // date -> note
@@ -355,7 +346,7 @@ public enum NotebookEngine {
         }
     }
     
-    /// Internal domain documentation
+    /// Aggregates trades and intraday equity movements for a single calendar day
     public static func journalDayDetail(
         date: String,
         trades: [Trade],
@@ -365,7 +356,7 @@ public enum NotebookEngine {
     ) -> JournalDayDetail {
         let tz = TimeZone(identifier: timeZone) ?? TimeZone(identifier: "UTC") ?? .current
         
-        // Internal implementation note
+        // Filter trades closed on the specified calendar date
         let dayTrades = trades.filter { trade in
             guard let closed = trade.closedAt else { return false }
             return AggregateEngine.dayKeyOf(date: closed, timeZone: tz) == date

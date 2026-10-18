@@ -20,8 +20,8 @@ public struct TradeDetailView: View {
     public init(trade: Trade) {
         self._trade = State(initialValue: trade)
         self._noteContent = State(initialValue: trade.notes ?? "")
-        self._stopLossText = State(initialValue: trade.stopLoss != nil ? "\(trade.stopLoss!)" : "")
-        self._profitTargetText = State(initialValue: trade.profitTarget != nil ? "\(trade.profitTarget!)" : "")
+        self._stopLossText = State(initialValue: trade.stopLoss.map { "\($0)" } ?? "")
+        self._profitTargetText = State(initialValue: trade.profitTarget.map { "\($0)" } ?? "")
         self._selectedPlaybookId = State(initialValue: trade.playbookId ?? "")
     }
     
@@ -233,7 +233,7 @@ public struct TradeDetailView: View {
                                     Text("Avg exit")
                                         .font(AppTypography.caption)
                                         .foregroundColor(AppColors.secondaryText)
-                                    Text(trade.avgExit != nil ? Formatters.price(trade.avgExit!) : "Open")
+                                    Text(trade.avgExit.map(Formatters.price) ?? "Open")
                                         .font(AppTypography.subheadlineBold)
                                         .monospacedDigit()
                                         .foregroundColor(AppColors.primaryText)
@@ -776,8 +776,8 @@ public struct TradeDetailView: View {
             EditManualTradeSheet(trade: trade) { updated in
                 self.trade = updated
                 self.noteContent = updated.notes ?? ""
-                self.stopLossText = updated.stopLoss != nil ? "\(updated.stopLoss!)" : ""
-                self.profitTargetText = updated.profitTarget != nil ? "\(updated.profitTarget!)" : ""
+                self.stopLossText = updated.stopLoss.map { "\($0)" } ?? ""
+                self.profitTargetText = updated.profitTarget.map { "\($0)" } ?? ""
                 self.selectedPlaybookId = updated.playbookId ?? ""
             }
         }

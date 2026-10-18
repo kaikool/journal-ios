@@ -112,7 +112,7 @@ public enum TradeAnalysisEngine {
         
         let formatter = DateFormatter()
         formatter.dateFormat = "HH:mm"
-        formatter.timeZone = TimeZone(identifier: timeZone) ?? TimeZone(identifier: "UTC")!
+        formatter.timeZone = TimeZone(identifier: timeZone) ?? TimeZone(secondsFromGMT: 0) ?? .current
         return formatter.string(from: date)
     }
     
@@ -151,7 +151,7 @@ public enum TradeAnalysisEngine {
         let isoFormatter = ISO8601DateFormatter()
         isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         let openedIso = isoFormatter.string(from: trade.openedAt)
-        let closedIso = trade.closedAt != nil ? isoFormatter.string(from: trade.closedAt!) : nil
+        let closedIso = trade.closedAt.map(isoFormatter.string)
         
         if let accounts = filters["accounts"], !accounts.isEmpty {
             if !list(accounts).contains(trade.accountId) { return false }
@@ -215,13 +215,13 @@ public enum TradeAnalysisEngine {
             if (reviewed == "yes") != isReviewed { return false }
         }
         
-        let ratingDouble = trade.rating != nil ? Double(trade.rating!) : nil
+        let ratingDouble = trade.rating.map(Double.init)
         if !within(ratingDouble, min: filters["ratingMin"], max: filters["ratingMax"]) { return false }
         if !withinDecimal(trade.quantity, min: filters["quantityMin"], max: filters["quantityMax"]) { return false }
         if !withinDecimal(trade.avgEntry, min: filters["entryMin"], max: filters["entryMax"]) { return false }
         if !withinDecimal(trade.avgExit, min: filters["exitMin"], max: filters["exitMax"]) { return false }
         
-        let durationMinutes = trade.durationMs != nil ? Double(trade.durationMs!) / 60000.0 : nil
+        let durationMinutes = trade.durationMs.map { Double($0) / 60000.0 }
         if !within(durationMinutes, min: filters["durationMin"], max: filters["durationMax"]) { return false }
         
         if filters["rMin"] != nil || filters["rMax"] != nil {
@@ -298,7 +298,7 @@ public enum TradeAnalysisEngine {
         case .exit15:
             return [bucketTime(trade.closedAt, 15)]
         case .duration:
-            let minutes = trade.durationMs != nil ? Double(trade.durationMs!) / 60000.0 : nil
+            let minutes = trade.durationMs.map { Double($0) / 60000.0 }
             return [bands(minutes, bounds: [1, 5, 15, 60, 240, 1440], labels: ["<1m", "1–5m", "5–15m", "15–60m", "1–4h", "4–24h", "1d+"])]
         case .quantity:
             let q = NSDecimalNumber(decimal: trade.quantity).doubleValue
@@ -307,7 +307,7 @@ public enum TradeAnalysisEngine {
             let p = NSDecimalNumber(decimal: trade.avgEntry).doubleValue
             return [bands(p, bounds: [1, 10, 50, 100, 500], labels: ["<1", "1–10", "10–50", "50–100", "100–500", "500+"])]
         case .exitPrice:
-            let p = trade.avgExit != nil ? NSDecimalNumber(decimal: trade.avgExit!).doubleValue : nil
+            let p = trade.avgExit.map { NSDecimalNumber(decimal: $0).doubleValue }
             return [bands(p, bounds: [1, 10, 50, 100, 500], labels: ["<1", "1–10", "10–50", "50–100", "100–500", "500+"])]
         case .realizedR:
             return [bands(tradeR(trade: trade), bounds: [-2, -1, 0, 1, 2, 3], labels: ["<-2R", "-2 to -1R", "-1 to 0R", "0–1R", "1–2R", "2–3R", "3R+"])]
@@ -328,7 +328,7 @@ public enum TradeAnalysisEngine {
         let winRate = !ts.isEmpty ? Double(ts.filter { $0.status == .win }.count) / Double(ts.count) : nil
         let profitFactor = loss > 0 ? (NSDecimalNumber(decimal: profit).doubleValue / NSDecimalNumber(decimal: loss).doubleValue) : nil
         let noLosses = profit > 0 && loss == 0
-        let avgDuration = mean(ts.map { $0.durationMs != nil ? Double($0.durationMs!) : nil })
+        let avgDuration = mean(ts.map { $0.durationMs.map(Double.init) })
         let avgR = mean(ts.map { tradeR(trade: $0) })
         let avgPlanR = mean(ts.map { plannedR(trade: $0) })
         let volume = ts.reduce(Decimal(0)) { $0 + $1.quantity }
@@ -355,7 +355,7 @@ public enum TradeAnalysisEngine {
         var groups: [String: (row: String, column: String, trades: [Trade])] = [:]
         for t in trades where t.status != .open {
             let rowKeys = Set(dimensionKeys(trade: t, dimension: primary, timeZone: timeZone))
-            let colKeys: Set<String> = secondary != nil ? Set(dimensionKeys(trade: t, dimension: secondary!, timeZone: timeZone)) : [""]
+            let colKeys: Set<String> = secondary.map { Set(dimensionKeys(trade: t, dimension: $0, timeZone: timeZone)) } ?? [""]
             for r in rowKeys {
                 for c in colKeys {
                     let key = "\(r)\u{0}\(c)"

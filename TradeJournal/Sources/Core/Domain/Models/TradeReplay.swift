@@ -231,7 +231,7 @@ public enum TradeReplayEngine {
         var bars: [MarketBar] = []
         
         let entryPrice = (trade.avgEntry as NSDecimalNumber).doubleValue
-        let exitPrice = trade.avgExit != nil ? (trade.avgExit! as NSDecimalNumber).doubleValue : (entryPrice + (trade.netPnl > 0 ? 0.005 : -0.005) * entryPrice)
+        let exitPrice = trade.avgExit.map { ($0 as NSDecimalNumber).doubleValue } ?? (entryPrice + (trade.netPnl > 0 ? 0.005 : -0.005) * entryPrice)
         let priceSpan = exitPrice - entryPrice
         
         for i in 0..<totalSteps {

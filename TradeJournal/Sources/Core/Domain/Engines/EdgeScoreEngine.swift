@@ -11,7 +11,7 @@ public struct EdgeScoreComponents: Equatable {
 
 public struct EdgeScore: Equatable {
     public let version: Int
-    /// Internal domain documentation
+    /// Normalized score between 0 and 100, or nil if fewer than 5 closed trades
     public let score: Double?
     public let components: EdgeScoreComponents
     public let closedTrades: Int
@@ -25,8 +25,7 @@ extension EdgeScore {
     }
 }
 
-/// Internal domain documentation
-/// Ported 1:1 from `packages/core/src/edge-score.ts`.
+/// Proprietary composite Edge Score engine evaluating statistical trading edge
 public enum EdgeScoreEngine {
     public static let version = 2
     

@@ -522,7 +522,7 @@ public struct PropFirmLedgerView: View {
             return mAccId == account.id ||
                    mAccId == account.journalAccountId ||
                    TradeDataStore.isSameAccountId(mAccId, account.id) ||
-                   (account.journalAccountId != nil && TradeDataStore.isSameAccountId(mAccId, account.journalAccountId!))
+                   (account.journalAccountId.map { TradeDataStore.isSameAccountId(mAccId, $0) } ?? false)
         }
         return (try? PropFirmEngine.cashSummary(rows: accMovements)) ?? CashSummaryResult(
             spentMinor: 0, refundsMinor: 0, netSpendMinor: 0, receivedMinor: 0, netMinor: 0, roi: nil
@@ -569,7 +569,7 @@ public struct PropFirmLedgerView: View {
                                 )
                             }
                             
-                            Text(Formatters.cleanAccountName(acc.name, balance: acc.sizeMinor != nil ? Decimal(acc.sizeMinor!) / 100 : nil))
+                            Text(Formatters.cleanAccountName(acc.name, balance: acc.sizeMinor.map { Decimal($0) / 100 }))
                                 .font(AppTypography.headline)
                                 .foregroundColor(AppColors.primaryText)
                             
@@ -733,7 +733,7 @@ public struct PropFirmLedgerView: View {
                             }
                             
                             // Subtitle matching web prop-firm-tracker.tsx:980
-                            Text("Requested \(p.entry.occurredOn) • Trader split \(p.entry.splitBps / 100)% • Gross \(Formatters.formatCurrency(Decimal(p.entry.amountMinor) / 100, currency: p.entry.currency))\(p.entry.dueOn != nil ? " • Expected \(p.entry.dueOn!)" : "")")
+                            Text("Requested \(p.entry.occurredOn) • Trader split \(p.entry.splitBps / 100)% • Gross \(Formatters.formatCurrency(Decimal(p.entry.amountMinor) / 100, currency: p.entry.currency))\(p.entry.dueOn.map { " • Expected \($0)" } ?? "")")
                                 .font(AppTypography.caption)
                                 .foregroundColor(AppColors.secondaryText)
                             

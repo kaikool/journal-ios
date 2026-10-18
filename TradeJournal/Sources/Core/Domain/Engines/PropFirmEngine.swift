@@ -386,7 +386,7 @@ public enum PropFirmEngine {
         "BHD", "IQD", "JOD", "KWD", "LYD", "OMR", "TND"
     ]
     
-    /// Internal domain documentation
+    /// Returns decimal digit precision for currency (0 for JPY, 3 for BHD/KWD, 2 for USD/EUR/etc.)
     public static func currencyDigits(_ currency: String) throws -> Int {
         let code = currency.trimmingCharacters(in: .whitespaces).uppercased()
         guard code.count == 3, code.range(of: "^[A-Z]{3}$", options: .regularExpression) != nil else {
@@ -397,8 +397,7 @@ public enum PropFirmEngine {
         return 2
     }
     
-    /// Internal domain documentation
-    /// Internal domain documentation
+    /// Converts decimal string to minor currency units (cents)
     public static func toMinor(value: Any?, currency: String) throws -> Int64 {
         let digits = try currencyDigits(currency)
         guard let str = value as? String else {
@@ -433,7 +432,7 @@ public enum PropFirmEngine {
         return result
     }
     
-    /// Internal domain documentation
+    /// Formats minor currency units back to localized decimal string
     public static func fromMinor(_ value: Int64, currency: String) throws -> String {
         let digits = try currencyDigits(currency)
         let factor = pow(10.0, Double(digits))
@@ -441,8 +440,7 @@ public enum PropFirmEngine {
         return String(format: "%.\(digits)f", doubleVal)
     }
     
-    /// Internal domain documentation
-    /// `((amountMinor * splitBps + 5000) / 10000) - feeMinor`
+    /// Calculates expected net payout taking into account profit split and fees: ((amountMinor * splitBps + 5000) / 10000) - feeMinor
     public static func expectedPayout(entry: PropEntryItem) -> Int64 {
         let amount = entry.amountMinor
         let split = Int64(entry.splitBps)
@@ -450,7 +448,7 @@ public enum PropFirmEngine {
         return calc - entry.feeMinor
     }
     
-    /// Internal domain documentation
+    /// Computes total received payout factoring in any reversals
     public static func receivedPayout(id: String, receipts: [PropReceiptItem]) -> Int64 {
         receipts.reduce(0) { sum, row in
             guard !row.voided && row.payoutId == id else { return sum }
@@ -466,7 +464,7 @@ public enum PropFirmEngine {
         return receipt.occurredOn
     }
     
-    /// Internal domain documentation
+    /// Constructs unified cash movement timeline combining expenses, payouts, and refunds
     public static func cashMovements(entries: [PropEntryItem], receipts: [PropReceiptItem]) -> [CashMovementItem] {
         let activeEntries = entries.filter { !$0.voided }
         let entryMap = Dictionary(uniqueKeysWithValues: activeEntries.map { ($0.id, $0) })
@@ -514,8 +512,7 @@ public enum PropFirmEngine {
         }
     }
     
-    /// Internal domain documentation
-    /// Internal domain documentation
+    /// Aggregates net spend, total payouts, and overall ROI across prop firm activities
     public static func cashSummary(rows: [CashMovementItem]) throws -> CashSummaryResult {
         let currencies = Set(rows.map { $0.currency })
         if currencies.count > 1 {
@@ -549,25 +546,26 @@ public enum PropFirmEngine {
         )
     }
     
-    /// Internal domain documentation
+    /// Builds chronological cumulative net balance curve from cash movements
     public static func cashTimeline(rows: [CashMovementItem]) throws -> [CashTimelinePoint] {
-        _ = try cashSummary(rows: rows) // Core implementation detail
+        _ = try cashSummary(rows: rows)
         var daysMap: [String: Int64] = [:]
-        for row in rows where row.date != nil {
+        for row in rows {
+            guard let date = row.date else { continue }
             let mult: Int64 = (row.kind == "expense" || row.kind == "reversal") ? -1 : 1
-            daysMap[row.date!, default: 0] += row.amountMinor * mult
+            daysMap[date, default: 0] += row.amountMinor * mult
         }
         let sortedDates = daysMap.keys.sorted()
         var runningNet: Int64 = 0
         var points: [CashTimelinePoint] = []
         for d in sortedDates {
-            runningNet += daysMap[d]!
+            runningNet += daysMap[d] ?? 0
             points.append(CashTimelinePoint(date: d, netMinor: runningNet))
         }
         return points
     }
     
-    /// Internal domain documentation
+    /// Evaluates payout request progress, remaining balances, and overdue status
     public static func payoutProgress(
         entries: [PropEntryItem],
         receipts: [PropReceiptItem],
@@ -588,7 +586,7 @@ public enum PropFirmEngine {
                 let remaining = isOpen ? max(0, expected - actual) : 0
                 let variance = actual - expected
                 let isPartial = isOpen && actual > 0 && actual < expected
-                let isOverdue = isOpen && (entry.dueOn != nil && entry.dueOn! < today) && actual < expected
+                let isOverdue = isOpen && (entry.dueOn.map { $0 < today } ?? false) && actual < expected
                 
                 return PayoutProgressResult(
                     entry: entry,
@@ -602,7 +600,7 @@ public enum PropFirmEngine {
             }
     }
     
-    /// Internal domain documentation
+    /// Computes percentage of challenge phases successfully passed
     public static func resolvedPhasePassRate(accounts: [PropAccountItem]) -> Double? {
         let relevant = accounts.filter {
             ($0.program == .evaluation || $0.program == .verification) &&
@@ -615,8 +613,7 @@ public enum PropFirmEngine {
     
     // MARK: - Generic Prop CSV Import
     
-    /// Internal domain documentation
-    /// `id,kind,firm,account_id,currency,date,amount,category,expense_id,reference,notes`
+    /// Imports prop transactions from generic CSV matching the schema: id,kind,firm,account_id,currency,date,amount,category,expense_id,reference,notes
     public static func importPropCsv(
         csvText: String,
         preview: Bool,
@@ -791,7 +788,7 @@ public enum PropFirmEngine {
         let importResult = PropCsvImportResult(imported: importedCount, skipped: skippedCount, sample: sample)
         
         if preview {
-            // Internal implementation note
+            // Preview mode returns dry-run results without mutating persistent state
             return (importResult, existingEntries, existingReceipts, existingAudits)
         }
         

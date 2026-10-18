@@ -23,7 +23,7 @@ public struct TradeReplayView: View {
     public init(trade: Trade, executions: [Execution]) {
         self.trade = trade
         self.executions = executions
-        let durationMs = trade.durationMs ?? (trade.closedAt != nil ? Int64(trade.closedAt!.timeIntervalSince(trade.openedAt) * 1000) : 3_600_000)
+        let durationMs = trade.durationMs ?? (trade.closedAt.map { Int64($0.timeIntervalSince(trade.openedAt) * 1000) } ?? 3_600_000)
         let minutes = Double(max(60_000, durationMs)) / 60_000.0
         let res: MarketResolution = {
             if minutes <= 90 { return .m1 }

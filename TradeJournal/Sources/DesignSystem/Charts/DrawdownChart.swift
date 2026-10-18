@@ -31,7 +31,7 @@ public struct DrawdownChart: View {
         VStack(alignment: .leading, spacing: 6) {
             // Header: Relative Drawdown and Max / Active Value
             HStack {
-                Text(activePoint != nil ? formatDate(activePoint!.date) : "Relative Drawdown")
+                Text(activePoint.map { formatDate($0.date) } ?? "Relative Drawdown")
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundColor(AppColors.secondaryText)
                     .textCase(.uppercase)

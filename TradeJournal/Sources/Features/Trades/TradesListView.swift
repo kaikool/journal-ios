@@ -133,9 +133,9 @@ public struct TradesListView: View {
     private var summaryCardsGrid: some View {
         let isProfit = overviewMetrics.netPnl >= 0
         let pnlColor = isProfit ? AppColors.profit : AppColors.loss
-        let pfStr = overviewMetrics.profitFactorIsInfinite ? "∞" : (overviewMetrics.profitFactor != nil ? String(format: "%.2f", overviewMetrics.profitFactor!) : "–")
-        let winRateStr = overviewMetrics.winRate != nil ? String(format: "%.1f%%", overviewMetrics.winRate! * 100) : "–"
-        let avgWlStr = overviewMetrics.avgWinLossRatio != nil ? String(format: "%.2f", overviewMetrics.avgWinLossRatio!) : "–"
+        let pfStr = overviewMetrics.profitFactorIsInfinite ? "∞" : (overviewMetrics.profitFactor.map { String(format: "%.2f", $0) } ?? "–")
+        let winRateStr = overviewMetrics.winRate.map { String(format: "%.1f%%", $0 * 100) } ?? "–"
+        let avgWlStr = overviewMetrics.avgWinLossRatio.map { String(format: "%.2f", $0) } ?? "–"
         
         LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
             cardContainer {
@@ -302,6 +302,13 @@ public struct TradesListView: View {
                         TradeTerminalRow(trade: trade)
                     }
                     .buttonStyle(ApplePressableButtonStyle())
+                    .contextMenu {
+                        Button(role: .destructive) {
+                            dataStore.deleteTrade(key: trade.key)
+                        } label: {
+                            Label("Delete Trade", systemImage: "trash")
+                        }
+                    }
                 }
             }
             .navigationDestination(for: Trade.self) { trade in
@@ -342,7 +349,7 @@ private struct TradeTerminalRow: View {
                     .foregroundColor(AppColors.primaryText)
                 
                 HStack(spacing: 4) {
-                    Text(trade.closedAt != nil ? Formatters.dateOnly(trade.closedAt!, timeZone: env.currentTimeZone) : "Open")
+                    Text(trade.closedAt.map { Formatters.dateOnly($0, timeZone: env.currentTimeZone) } ?? "Open")
                     Text("·")
                     Text("Vol: \(Formatters.formatNumber(trade.quantity))")
                         .monospacedDigit()

@@ -297,9 +297,9 @@ public struct AddMissedTradeSheet: View {
         if let t = tradeToEdit {
             _symbol = State(initialValue: t.symbol)
             _direction = State(initialValue: t.direction)
-            _entryText = State(initialValue: t.entry != nil ? "\(t.entry!)" : "")
-            _stopText = State(initialValue: t.stop != nil ? "\(t.stop!)" : "")
-            _targetText = State(initialValue: t.target != nil ? "\(t.target!)" : "")
+            _entryText = State(initialValue: t.entry.map { "\($0)" } ?? "")
+            _stopText = State(initialValue: t.stop.map { "\($0)" } ?? "")
+            _targetText = State(initialValue: t.target.map { "\($0)" } ?? "")
             _selectedPlaybookId = State(initialValue: t.playbookId ?? "")
             _notes = State(initialValue: t.notes)
             _observedDate = State(initialValue: FlexibleDateParser.parse(t.observedAt) ?? Date())
