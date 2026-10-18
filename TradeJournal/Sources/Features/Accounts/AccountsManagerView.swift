@@ -277,11 +277,22 @@ public struct AccountsManagerView: View {
         .padding(.horizontal, 16)
     }
     
+    private var tradeCountMap: [String: Int] {
+        var map: [String: Int] = [:]
+        for t in dataStore.trades {
+            map[t.accountId, default: 0] += 1
+            let clean = t.accountId.hasPrefix("the5ers_") ? String(t.accountId.dropFirst(8)) : t.accountId
+            map[clean, default: 0] += 1
+        }
+        return map
+    }
+    
     @ViewBuilder
     private func accountCard(_ acc: Account) -> some View {
         let isSelected = dataStore.selectedAccountId == acc.id
         let isArchived = acc.archivedAt != nil
-        let tradeCount = dataStore.trades.filter { $0.accountId == acc.id }.count
+        let altId = acc.id.hasPrefix("the5ers_") ? String(acc.id.dropFirst(8)) : "the5ers_\(acc.id)"
+        let tradeCount = tradeCountMap[acc.id] ?? tradeCountMap[altId] ?? 0
         let isVisible = acc.visibleInJournal ?? true
         
         cardContainer {

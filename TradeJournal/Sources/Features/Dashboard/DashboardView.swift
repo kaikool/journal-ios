@@ -22,6 +22,13 @@ public struct DashboardView: View {
     @State private var selectedDayContext: DayDetailContext? = nil
     @State private var addTradeDate: Date? = nil
     
+    private static let dashboardUtcDateFormatter: DateFormatter = {
+        let fmt = DateFormatter()
+        fmt.dateFormat = "yyyy-MM-dd"
+        fmt.timeZone = TimeZone(identifier: "UTC")
+        return fmt
+    }()
+    
     public init() {}
     
     // MARK: - Arrangement & Presets
@@ -123,8 +130,13 @@ public struct DashboardView: View {
         let dailyCurve = FinancialMetricsEngine.dailyCumulativeFromDays(days: overview.days)
         let rdCurve = FinancialMetricsEngine.relativeDrawdownCurve(curve: dailyCurve, initialBalance: initialBalance)
         
+        var dayMap: [String: DayStats] = [:]
+        for d in overview.days {
+            dayMap[d.date] = d
+        }
+        
         let chartPoints: [EquityPointItem] = zip(dailyCurve, rdCurve).map { dc, rd in
-            let dayStat = overview.days.first(where: { $0.date == dc.dateString })
+            let dayStat = dayMap[dc.dateString]
             let dayPnl = dayStat?.netPnl ?? 0
             let ddDecimal = Decimal(rd.drawdownPct ?? 0)
             return EquityPointItem(
@@ -145,12 +157,8 @@ public struct DashboardView: View {
         var lastDays = 0
         var priorDays = 0
         
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        formatter.timeZone = TimeZone(identifier: "UTC")
-        
         for day in overview.days {
-            if let date = formatter.date(from: day.date) {
+            if let date = Self.dashboardUtcDateFormatter.date(from: day.date) {
                 let ageDays = (nowMs - (date.timeIntervalSince1970 * 1000)) / 86_400_000
                 if ageDays <= 7 {
                     last += day.netPnl
@@ -165,9 +173,6 @@ public struct DashboardView: View {
         
         let best = overview.days.max(by: { $0.netPnl < $1.netPnl })
         let worst = overview.days.min(by: { $0.netPnl < $1.netPnl })
-        
-        var dayMap: [String: DayStats] = [:]
-        for d in overview.days {
             dayMap[d.date] = d
         }
         

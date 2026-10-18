@@ -123,9 +123,7 @@ public struct RootTabView: View {
                 #if os(iOS)
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 #endif
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.72)) {
-                    env.selectedTab = tab
-                }
+                env.selectedTab = tab
             }
         } label: {
             VStack(spacing: 3) {

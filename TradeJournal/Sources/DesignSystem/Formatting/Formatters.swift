@@ -188,13 +188,18 @@ public enum Formatters {
         
         let lower = trimmed.lowercased()
         
+        let isRawIdOrPrefix = lower.hasPrefix("account the5ers_") ||
+                              lower.hasPrefix("account ") ||
+                              lower.hasPrefix("the5ers_")
+        
         let isRawPlatform = lower.contains("meta-trader") ||
                             lower.contains("meta-trade") ||
                             lower.contains("metatrader") ||
                             lower.contains("c-trader") ||
                             lower.contains("ctrader") ||
                             lower.contains("trader-evolution") ||
-                            lower.contains("traderevolution")
+                            lower.contains("traderevolution") ||
+                            isRawIdOrPrefix
         
         guard isRawPlatform else {
             return trimmed

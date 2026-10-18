@@ -272,11 +272,14 @@ public struct TradesListView: View {
         } else {
             LazyVStack(spacing: 10) {
                 ForEach(filteredTrades) { trade in
-                    NavigationLink(destination: TradeDetailView(trade: trade)) {
+                    NavigationLink(value: trade) {
                         TradeTerminalRow(trade: trade)
                     }
                     .buttonStyle(ApplePressableButtonStyle())
                 }
+            }
+            .navigationDestination(for: Trade.self) { trade in
+                TradeDetailView(trade: trade)
             }
         }
     }

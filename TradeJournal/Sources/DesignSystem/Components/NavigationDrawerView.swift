@@ -186,14 +186,12 @@ public struct NavigationDrawerView: View {
                 return
             }
             
-            // 1. Immediately begin closing drawer at 120 FPS
+            // 1. Switch tab immediately
+            env.selectedTab = tab
+            
+            // 2. Close drawer smoothly
             withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
                 env.isDrawerOpen = false
-            }
-            
-            // 2. Dispatch tab switch so drawer close animation starts with zero dropped frames
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                env.selectedTab = tab
             }
         } label: {
             HStack(spacing: 12) {

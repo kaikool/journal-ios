@@ -66,16 +66,50 @@ public final class TradeDataStore: ObservableObject {
         return unique.isEmpty ? ["USD"] : unique
     }
     
+    private var activePropAccountIdsCache: Set<String>? = nil
+    private var inactivePropAccountIdsCache: Set<String>? = nil
+    
+    public func refreshActiveAccountCache() {
+        var activeIds = Set<String>()
+        var inactiveIds = Set<String>()
+        for p in propAccounts {
+            let s = p.status.rawValue.lowercased()
+            let isActive = (s == "active" || s == "funded" || s == "open")
+            let candidates = [
+                p.id,
+                p.journalAccountId ?? "",
+                p.id.hasPrefix("the5ers_") ? String(p.id.dropFirst(8)) : "the5ers_\(p.id)"
+            ].filter { !$0.isEmpty }
+            for c in candidates {
+                if isActive {
+                    activeIds.insert(c)
+                } else {
+                    inactiveIds.insert(c)
+                }
+            }
+        }
+        activePropAccountIdsCache = activeIds
+        inactivePropAccountIdsCache = inactiveIds
+    }
+    
     public func isAccountActive(_ account: Account) -> Bool {
         if account.archivedAt != nil { return false }
-        if let prop = propAccounts.first(where: {
-            $0.journalAccountId == account.id ||
-            $0.id == account.id ||
-            $0.journalAccountId == "the5ers_\(account.id)" ||
-            account.id == "the5ers_\($0.id)"
-        }) {
-            let s = prop.status.rawValue.lowercased()
-            return s == "active" || s == "funded" || s == "open"
+        if activePropAccountIdsCache == nil {
+            refreshActiveAccountCache()
+        }
+        let accId = account.id
+        if activePropAccountIdsCache?.contains(accId) == true {
+            return true
+        }
+        if inactivePropAccountIdsCache?.contains(accId) == true {
+            return false
+        }
+        let clean = accId.hasPrefix("the5ers_") ? String(accId.dropFirst(8)) : "the5ers_\(accId)"
+        if activePropAccountIdsCache?.contains(clean) == true {
+            return true
+        }
+        if inactivePropAccountIdsCache?.contains(clean) == true {
+            return false
         }
         return true
     }
@@ -327,7 +361,33 @@ public final class TradeDataStore: ObservableObject {
     }
     
     public func deduplicateAndCleanAccounts() {
-        // 1. Deduplicate accounts (merge '12345' into 'the5ers_12345')
+        refreshActiveAccountCache()
+        
+        // 0. Build canonical account ID map and re-link any trades pointing to phantom accounts
+        var canonicalMap: [String: String] = [:]
+        for acc in accounts where !acc.name.hasPrefix("Account ") {
+            let clean = acc.id.hasPrefix("the5ers_") ? String(acc.id.dropFirst(8)) : acc.id
+            canonicalMap[clean] = acc.id
+            canonicalMap["the5ers_\(clean)"] = acc.id
+            canonicalMap[acc.id] = acc.id
+        }
+        for i in 0..<trades.count {
+            if let canonical = canonicalMap[trades[i].accountId] {
+                trades[i].accountId = canonical
+            } else {
+                let clean = trades[i].accountId.hasPrefix("the5ers_") ? String(trades[i].accountId.dropFirst(8)) : trades[i].accountId
+                if let canonical = canonicalMap[clean] {
+                    trades[i].accountId = canonical
+                }
+            }
+        }
+        
+        // 1. Purge phantom accounts generated previously with "Account <id>"
+        if accounts.contains(where: { !$0.name.hasPrefix("Account ") }) {
+            accounts.removeAll(where: { $0.name.hasPrefix("Account ") })
+        }
+
+        // 2. Deduplicate accounts (merge '12345' into 'the5ers_12345')
         var seenCleanAccIds = Set<String>()
         var cleanedAccounts: [Account] = []
         for acc in accounts {
@@ -446,7 +506,7 @@ public final class TradeDataStore: ObservableObject {
 
         // Internal implementation note
         do {
-            let remoteAccounts = try await SupabaseService.shared.fetchAccounts()
+            let remoteAccounts = (try await SupabaseService.shared.fetchAccounts()).filter { !$0.name.hasPrefix("Account ") }
             fetchedAccountsCount = remoteAccounts.count
             if !remoteAccounts.isEmpty {
                 for rAcc in remoteAccounts {
@@ -465,7 +525,7 @@ public final class TradeDataStore: ObservableObject {
             }
             
             // Ensure all accounts referenced by prop accounts and trades exist prior to upload
-            var mergedAccountList = accounts
+            var mergedAccountList = accounts.filter { !$0.name.hasPrefix("Account ") }
             let existingAccIds = Set(mergedAccountList.map { $0.id })
             
             for p in propAccounts {
@@ -475,9 +535,11 @@ public final class TradeDataStore: ObservableObject {
                     }
                 }
             }
-            for t in trades where !t.accountId.isEmpty && !existingAccIds.contains(t.accountId) {
-                if !mergedAccountList.contains(where: { Self.isSameAccountId($0.id, t.accountId) }) {
-                    mergedAccountList.append(Account(id: t.accountId, name: "Account \(t.accountId)", broker: "The5ers", kind: .sync))
+            // Normalize trades to link with known accounts without creating phantom accounts
+            for i in 0..<trades.count {
+                let tAcc = trades[i].accountId
+                if let matched = mergedAccountList.first(where: { Self.isSameAccountId($0.id, tAcc) }) {
+                    trades[i].accountId = matched.id
                 }
             }
             self.accounts = mergedAccountList
@@ -516,12 +578,12 @@ public final class TradeDataStore: ObservableObject {
                 } else {
                     trades.append(rTrade)
                 }
-                // Only create account entry if account doesn't exist under any ID prefix form
+                // Re-link trade accountId to known accounts without creating phantom accounts
                 if !rTrade.accountId.isEmpty {
-                    let hasAccount = accounts.contains(where: { Self.isSameAccountId($0.id, rTrade.accountId) })
-                    if !hasAccount {
-                        let normId = rTrade.accountId.hasPrefix("the5ers_") ? rTrade.accountId : "the5ers_\(rTrade.accountId)"
-                        accounts.append(Account(id: normId, name: "Account \(rTrade.accountId)", kind: .sync))
+                    if let matched = accounts.first(where: { Self.isSameAccountId($0.id, rTrade.accountId) }) {
+                        if let lastIdx = trades.indices.last, trades[lastIdx].key == rTrade.key {
+                            trades[lastIdx].accountId = matched.id
+                        }
                     }
                 }
             }
