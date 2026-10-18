@@ -309,7 +309,69 @@ public final class TradeDataStore: ObservableObject {
         trades = otherTrades + preservedThe5ers + mergedTrades
     }
     
+    public static func isSameAccountId(_ a: String, _ b: String) -> Bool {
+        if a == b { return true }
+        let cleanA = a.hasPrefix("the5ers_") ? String(a.dropFirst(8)) : a
+        let cleanB = b.hasPrefix("the5ers_") ? String(b.dropFirst(8)) : b
+        return cleanA == cleanB
+    }
+    
+    public func deduplicateAndCleanAccounts() {
+        // 1. Deduplicate accounts (merge '12345' into 'the5ers_12345')
+        var seenCleanAccIds = Set<String>()
+        var cleanedAccounts: [Account] = []
+        for acc in accounts {
+            let clean = acc.id.hasPrefix("the5ers_") ? String(acc.id.dropFirst(8)) : acc.id
+            if seenCleanAccIds.contains(clean) {
+                if acc.id.hasPrefix("the5ers_"), let idx = cleanedAccounts.firstIndex(where: { Self.isSameAccountId($0.id, acc.id) }) {
+                    cleanedAccounts[idx] = acc
+                }
+                continue
+            }
+            seenCleanAccIds.insert(clean)
+            cleanedAccounts.append(acc)
+        }
+        if cleanedAccounts.count != accounts.count {
+            AppLogger.info("Deduplicated accounts: \(accounts.count) -> \(cleanedAccounts.count)")
+            self.accounts = cleanedAccounts
+        }
+
+        // 2. Deduplicate propAccounts
+        var seenCleanPropIds = Set<String>()
+        var cleanedPropAccounts: [PropAccountItem] = []
+        for p in propAccounts {
+            let clean = p.id.hasPrefix("the5ers_") ? String(p.id.dropFirst(8)) : p.id
+            if seenCleanPropIds.contains(clean) {
+                if p.id.hasPrefix("the5ers_"), let idx = cleanedPropAccounts.firstIndex(where: { Self.isSameAccountId($0.id, p.id) }) {
+                    cleanedPropAccounts[idx] = p
+                }
+                continue
+            }
+            seenCleanPropIds.insert(clean)
+            cleanedPropAccounts.append(p)
+        }
+        if cleanedPropAccounts.count != propAccounts.count {
+            AppLogger.info("Deduplicated prop accounts: \(propAccounts.count) -> \(cleanedPropAccounts.count)")
+            self.propAccounts = cleanedPropAccounts
+        }
+
+        // 3. Deduplicate trades by key
+        var seenTradeKeys = Set<String>()
+        var cleanedTrades: [Trade] = []
+        for t in trades {
+            if !seenTradeKeys.contains(t.key) {
+                seenTradeKeys.insert(t.key)
+                cleanedTrades.append(t)
+            }
+        }
+        if cleanedTrades.count != trades.count {
+            AppLogger.info("Deduplicated trades: \(trades.count) -> \(cleanedTrades.count)")
+            self.trades = cleanedTrades
+        }
+    }
+    
     public func rebuildAllAccounts() {
+        deduplicateAndCleanAccounts()
         for i in 0..<accounts.count {
             accounts[i].name = Formatters.cleanAccountName(accounts[i].name, balance: accounts[i].initialBalance)
         }
@@ -371,7 +433,7 @@ public final class TradeDataStore: ObservableObject {
             fetchedAccountsCount = remoteAccounts.count
             if !remoteAccounts.isEmpty {
                 for rAcc in remoteAccounts {
-                    if let idx = accounts.firstIndex(where: { $0.id == rAcc.id }) {
+                    if let idx = accounts.firstIndex(where: { Self.isSameAccountId($0.id, rAcc.id) }) {
                         accounts[idx] = rAcc
                     } else {
                         accounts.append(rAcc)
@@ -413,9 +475,13 @@ public final class TradeDataStore: ObservableObject {
                 } else {
                     trades.append(rTrade)
                 }
-                // Internal implementation note
-                if !rTrade.accountId.isEmpty && !accounts.contains(where: { $0.id == rTrade.accountId }) {
-                    accounts.append(Account(id: rTrade.accountId, name: "Account \(rTrade.accountId)", kind: .sync))
+                // Only create account entry if account doesn't exist under any ID prefix form
+                if !rTrade.accountId.isEmpty {
+                    let hasAccount = accounts.contains(where: { Self.isSameAccountId($0.id, rTrade.accountId) })
+                    if !hasAccount {
+                        let normId = rTrade.accountId.hasPrefix("the5ers_") ? rTrade.accountId : "the5ers_\(rTrade.accountId)"
+                        accounts.append(Account(id: normId, name: "Account \(rTrade.accountId)", kind: .sync))
+                    }
                 }
             }
             if selectedAccountId != "all" && !accounts.contains(where: { $0.id == selectedAccountId }) {
@@ -491,7 +557,7 @@ public final class TradeDataStore: ObservableObject {
             let remotePropAccounts = try await SupabaseService.shared.fetchPropAccounts()
             fetchedPropCount = remotePropAccounts.count
             for rAcc in remotePropAccounts {
-                if let idx = propAccounts.firstIndex(where: { $0.id == rAcc.id }) {
+                if let idx = propAccounts.firstIndex(where: { Self.isSameAccountId($0.id, rAcc.id) }) {
                     if rAcc.revision >= propAccounts[idx].revision {
                         propAccounts[idx] = rAcc
                     }

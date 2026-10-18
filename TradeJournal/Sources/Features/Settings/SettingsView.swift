@@ -1045,20 +1045,10 @@ public struct ConnectionsSettingsView: View {
                         }
                         .disabled(supabaseUrl.trimmingCharacters(in: .whitespaces).isEmpty || supabaseAnonKey.trimmingCharacters(in: .whitespaces).isEmpty)
                         
-                        AppButton("Copy Migration SQL", icon: "doc.on.doc", style: .secondary, size: .compact) {
-                            copySqlScript()
-                        }
-                    }
-                    
-                    HStack(spacing: 8) {
                         AppButton("Wipe Supabase Data", icon: "trash", style: .destructive, size: .compact, isLoading: isWipingSupabase) {
                             showWipeConfirmation = true
                         }
                         .disabled(supabaseUrl.trimmingCharacters(in: .whitespaces).isEmpty || supabaseAnonKey.trimmingCharacters(in: .whitespaces).isEmpty || isWipingSupabase)
-                        
-                        AppButton("Copy TRUNCATE SQL", icon: "doc.on.clipboard", style: .secondary, size: .compact) {
-                            copyTruncateSql()
-                        }
                     }
                     
                     // Email/Password Login Section for RLS
@@ -1238,12 +1228,13 @@ public struct ConnectionsSettingsView: View {
                 try await SupabaseService.shared.wipeAllRemoteData()
                 await MainActor.run {
                     self.isWipingSupabase = false
-                    self.supabaseSyncStatus = "All Supabase tables wiped cleanly! Schemas preserved. Ready for fresh The5ers sync."
+                    self.dataStore.resetAllData()
+                    self.supabaseSyncStatus = "All Supabase tables and local data wiped cleanly! Schemas preserved. Ready for fresh The5ers sync."
                 }
             } catch {
                 await MainActor.run {
                     self.isWipingSupabase = false
-                    self.supabaseSyncStatus = "Wipe notice: \(error.localizedDescription). You can also run the copied TRUNCATE SQL script directly in Supabase SQL Editor."
+                    self.supabaseSyncStatus = "Wipe error: \(error.localizedDescription)"
                 }
             }
         }

@@ -74,6 +74,39 @@ public struct EquityCurveChart: View {
         return CGFloat(maxVal / range)
     }
     
+    private var areaGradient: LinearGradient {
+        if minVal >= 0 {
+            return LinearGradient(
+                stops: [
+                    .init(color: AppColors.brand.opacity(0.28), location: 0.0),
+                    .init(color: AppColors.brand.opacity(0.035), location: 1.0)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        } else if maxVal <= 0 {
+            return LinearGradient(
+                stops: [
+                    .init(color: AppColors.loss.opacity(0.035), location: 0.0),
+                    .init(color: AppColors.loss.opacity(0.28), location: 1.0)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        } else {
+            return LinearGradient(
+                stops: [
+                    .init(color: AppColors.brand.opacity(0.28), location: 0.0),
+                    .init(color: AppColors.brand.opacity(0.035), location: max(0.0, zeroStop - 0.008)),
+                    .init(color: AppColors.loss.opacity(0.035), location: min(1.0, zeroStop + 0.008)),
+                    .init(color: AppColors.loss.opacity(0.28), location: 1.0)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        }
+    }
+    
     private var lineGradient: LinearGradient {
         if minVal >= 0 {
             return LinearGradient(
@@ -124,41 +157,14 @@ public struct EquityCurveChart: View {
                         let val = (point.cumulativePnl as NSDecimalNumber).doubleValue
                         
                         if showArea {
-                            // Profit Area: fills strictly between baseline 0 and positive cumulative P&L
+                            // Single continuous area fill anchored directly to zero baseline
                             AreaMark(
                                 x: .value("Date", point.date),
                                 yStart: .value("Baseline", 0.0),
-                                yEnd: .value("Profit", max(0.0, val))
+                                yEnd: .value("Equity", val)
                             )
                             .interpolationMethod(.monotone)
-                            .foregroundStyle(
-                                LinearGradient(
-                                    colors: [
-                                        AppColors.brand.opacity(0.28),
-                                        AppColors.brand.opacity(0.03)
-                                    ],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
-                            )
-                            
-                            // Loss Area: fills strictly between baseline 0 and negative cumulative P&L
-                            AreaMark(
-                                x: .value("Date", point.date),
-                                yStart: .value("Baseline", 0.0),
-                                yEnd: .value("Loss", min(0.0, val))
-                            )
-                            .interpolationMethod(.monotone)
-                            .foregroundStyle(
-                                LinearGradient(
-                                    colors: [
-                                        AppColors.loss.opacity(0.03),
-                                        AppColors.loss.opacity(0.28)
-                                    ],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
-                            )
+                            .foregroundStyle(areaGradient)
                         }
                         
                         // Cumulative P&L Curve Stroke

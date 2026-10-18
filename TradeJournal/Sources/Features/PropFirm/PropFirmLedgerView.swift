@@ -504,7 +504,14 @@ public struct PropFirmLedgerView: View {
     // MARK: - 2. Accounts Tab
     
     private func accountCashSummary(account: PropAccountItem) -> CashSummaryResult {
-        let accMovements = movements.filter { $0.accountId == account.id && $0.currency == account.currency }
+        let accMovements = movements.filter { mov in
+            guard mov.currency == account.currency else { return false }
+            guard let mAccId = mov.accountId else { return false }
+            return mAccId == account.id ||
+                   mAccId == account.journalAccountId ||
+                   TradeDataStore.isSameAccountId(mAccId, account.id) ||
+                   (account.journalAccountId != nil && TradeDataStore.isSameAccountId(mAccId, account.journalAccountId!))
+        }
         return (try? PropFirmEngine.cashSummary(rows: accMovements)) ?? CashSummaryResult(
             spentMinor: 0, refundsMinor: 0, netSpendMinor: 0, receivedMinor: 0, netMinor: 0, roi: nil
         )

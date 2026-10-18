@@ -607,7 +607,9 @@ public final class The5ersService: ObservableObject {
                 let startingMinor = NSDecimalNumber(decimal: (acc.startingBalance ?? acc.balance) * 100).int64Value
                 let journalAccId = acc.id.hasPrefix("the5ers_") ? acc.id : "the5ers_\(acc.id)"
                 
-                if let existingIndex = dataStore.propAccounts.firstIndex(where: { $0.id == journalAccId || $0.id == acc.id || $0.name == acc.label }) {
+                let isActive = (mappedStatus == .active)
+                
+                if let existingIndex = dataStore.propAccounts.firstIndex(where: { TradeDataStore.isSameAccountId($0.id, journalAccId) || $0.name == acc.label }) {
                     let old = dataStore.propAccounts[existingIndex]
                     dataStore.propAccounts[existingIndex] = PropAccountItem(
                         id: journalAccId,
@@ -641,12 +643,12 @@ public final class The5ersService: ObservableObject {
                         journalAccountId: journalAccId,
                         openedOn: acc.createdAt ?? DateFormatter.localizedString(from: Date(), dateStyle: .short, timeStyle: .none),
                         notes: "Synced from The5ers MCP Hub (Protocol 2025-03-26)",
-                        archived: false
+                        archived: !isActive
                     )
                     dataStore.propAccounts.append(newPropAccount)
                 }
                 
-                if let accIdx = dataStore.accounts.firstIndex(where: { $0.id == journalAccId || $0.id == acc.id }) {
+                if let accIdx = dataStore.accounts.firstIndex(where: { TradeDataStore.isSameAccountId($0.id, journalAccId) || $0.name == acc.label }) {
                     let old = dataStore.accounts[accIdx]
                     dataStore.accounts[accIdx] = Account(
                         id: journalAccId,
@@ -656,10 +658,10 @@ public final class The5ersService: ObservableObject {
                         currency: acc.currency,
                         initialBalance: acc.startingBalance ?? acc.balance,
                         profitCalcMethod: old.profitCalcMethod,
-                        autoSync: true,
+                        autoSync: isActive,
                         lastSyncAt: Date(),
-                        archivedAt: old.archivedAt,
-                        visibleInJournal: old.visibleInJournal,
+                        archivedAt: old.archivedAt ?? (isActive ? nil : JournalIds.nowIso()),
+                        visibleInJournal: old.visibleInJournal ?? isActive,
                         createdAt: old.createdAt
                     )
                 } else {
@@ -670,8 +672,9 @@ public final class The5ersService: ObservableObject {
                         kind: .sync,
                         currency: acc.currency,
                         initialBalance: acc.startingBalance ?? acc.balance,
-                        autoSync: true,
-                        visibleInJournal: true
+                        autoSync: isActive,
+                        archivedAt: isActive ? nil : JournalIds.nowIso(),
+                        visibleInJournal: isActive
                     )
                     dataStore.accounts.append(newAcc)
                 }
@@ -747,72 +750,7 @@ public final class The5ersService: ObservableObject {
             }
             
             // 5. Sync payouts & withdrawal settlements
-            lastStatus = "Loading withdrawal history from the5ers_payout..."
-            let payoutArgs: [String: Any] = [
-                "operation": "history",
-                "contract_version": "1.0",
-                "request_context": ["timezone": "UTC", "locale": "en"]
-            ]
-            if let payoutResult = try? await callMcpTool(name: "the5ers_payout", arguments: payoutArgs) {
-                let unwrappedPayout = unwrapMcpToolResult(payoutResult)
-                let rawPayouts = extractMcpCollection(unwrappedPayout, collectionKey: "payouts")
-                
-                for pay in rawPayouts {
-                    let id = String(describing: pay["id"] ?? pay["payout_id"] ?? UUID().uuidString)
-                    let amtMinor = Int64(Double(String(describing: pay["amount"] ?? pay["net_amount"] ?? "0")) ?? 0) * 100
-                    guard amtMinor > 0 else { continue }
-                    
-                    let rawDate = String(describing: pay["paidAt"] ?? pay["date"] ?? pay["createdAt"] ?? "")
-                    let dateStr = rawDate.prefix(10).isEmpty ? String(JournalIds.nowIso().prefix(10)) : String(rawDate.prefix(10))
-                    let payoutEntryId = "the5ers_payout_\(id)"
-                    let rcptId = "the5ers_rcpt_\(id)"
-                    let shortRef = "Payout #\(id.prefix(8))"
-                    
-                    let payAccRef = String(describing: pay["account_ref"] ?? pay["account_id"] ?? pay["accountId"] ?? pay["ref"] ?? "")
-                    let matchedAcc = targetAccounts.first(where: { $0.id == payAccRef || $0.ref == payAccRef || "the5ers_\($0.id)" == payAccRef })
-                    let primaryAccId: String = {
-                        if let m = matchedAcc {
-                            return m.id.hasPrefix("the5ers_") ? m.id : "the5ers_\(m.id)"
-                        }
-                        if let f = targetAccounts.first {
-                            return f.id.hasPrefix("the5ers_") ? f.id : "the5ers_\(f.id)"
-                        }
-                        return "the5ers_payout_account"
-                    }()
-                    let primaryCurrency = matchedAcc?.currency ?? targetAccounts.first?.currency ?? "USD"
-                    
-                    if !dataStore.propEntries.contains(where: { $0.id == payoutEntryId }) {
-                        let payoutEntry = PropEntryItem(
-                            id: payoutEntryId,
-                            accountId: primaryAccId,
-                            firm: "The5ers",
-                            kind: "payout",
-                            category: "payout",
-                            currency: primaryCurrency,
-                            amountMinor: amtMinor,
-                            splitBps: 8000,
-                            occurredOn: dateStr,
-                            status: .completed,
-                            reference: shortRef,
-                            notes: "The5ers Funded Payout"
-                        )
-                        dataStore.propEntries.append(payoutEntry)
-                    }
-                    
-                    if !dataStore.propReceipts.contains(where: { $0.id == rcptId }) {
-                        let rcpt = PropReceiptItem(
-                            id: rcptId,
-                            payoutId: payoutEntryId,
-                            kind: "receipt",
-                            amountMinor: amtMinor,
-                            occurredOn: dateStr,
-                            reference: "Receipt #\(id.prefix(8))",
-                            notes: "The5ers Official Withdrawal Receipt"
-                        )
-                        dataStore.propReceipts.append(rcpt)
-                    }
-                }
-            }
+            await syncPayouts(into: dataStore, targetAccounts: targetAccounts)
             
             lastSyncTime = Date()
             dataStore.rebuildAllAccounts()
@@ -1339,6 +1277,184 @@ public final class The5ersService: ObservableObject {
                     notes: "\(title) (The5ers official order)"
                 )
                 dataStore.propEntries.append(entry)
+            }
+        }
+    }
+    
+    // MARK: - Payouts & Settlement Receipts Synchronization
+    
+    private func extractAnyPayoutCollection(from unwrapped: Any) -> [[String: Any]] {
+        if let dict = unwrapped as? [String: Any] {
+            let possibleKeys = ["payouts", "withdrawals", "items", "history", "notifications", "data"]
+            for k in possibleKeys {
+                if let arr = dict[k] as? [[String: Any]], !arr.isEmpty {
+                    return arr
+                }
+            }
+            if let dataDict = dict["data"] as? [String: Any] {
+                for k in possibleKeys {
+                    if let arr = dataDict[k] as? [[String: Any]], !arr.isEmpty {
+                        return arr
+                    }
+                }
+            }
+        } else if let arr = unwrapped as? [[String: Any]] {
+            return arr
+        }
+        return []
+    }
+    
+    @MainActor
+    private func syncPayouts(
+        into dataStore: TradeDataStore,
+        targetAccounts: [The5ersMcpAccount]
+    ) async {
+        lastStatus = "Loading withdrawal and payout history from the5ers_payout..."
+        
+        var allRawPayouts: [[String: Any]] = []
+        var seenPayoutIds = Set<String>()
+        
+        // 1. Query per-account history (The5ers official contract requires account_ref)
+        for acc in targetAccounts {
+            let perAccArgs: [String: Any] = [
+                "operation": "history",
+                "account_ref": acc.ref,
+                "contract_version": "1.0",
+                "request_context": ["timezone": "UTC", "locale": "en"]
+            ]
+            if let payoutResult = try? await callMcpTool(name: "the5ers_payout", arguments: perAccArgs) {
+                let unwrapped = unwrapMcpToolResult(payoutResult)
+                let rows = extractAnyPayoutCollection(from: unwrapped)
+                for var r in rows {
+                    if r["account_ref"] == nil { r["account_ref"] = acc.ref }
+                    if r["currency"] == nil { r["currency"] = acc.currency }
+                    let pId = String(describing: r["id"] ?? r["payout_id"] ?? r["withdrawalid"] ?? UUID().uuidString)
+                    if !seenPayoutIds.contains(pId) {
+                        seenPayoutIds.insert(pId)
+                        allRawPayouts.append(r)
+                    }
+                }
+            }
+        }
+        
+        // 2. Also query global payout history fallback
+        let globalArgs: [String: Any] = [
+            "operation": "history",
+            "contract_version": "1.0",
+            "request_context": ["timezone": "UTC", "locale": "en"]
+        ]
+        if let globalResult = try? await callMcpTool(name: "the5ers_payout", arguments: globalArgs) {
+            let unwrapped = unwrapMcpToolResult(globalResult)
+            let rows = extractAnyPayoutCollection(from: unwrapped)
+            for r in rows {
+                let pId = String(describing: r["id"] ?? r["payout_id"] ?? r["withdrawalid"] ?? UUID().uuidString)
+                if !seenPayoutIds.contains(pId) {
+                    seenPayoutIds.insert(pId)
+                    allRawPayouts.append(r)
+                }
+            }
+        }
+        
+        for pay in allRawPayouts {
+            let fields = sourceFields(pay)
+            let id = String(describing: fields["id"] ?? fields["payoutid"] ?? fields["withdrawalid"] ?? fields["requestid"] ?? UUID().uuidString)
+            
+            let status = String(describing: fields["status"] ?? "completed").lowercased().trimmingCharacters(in: .whitespaces)
+            let isReversed = (fields["reversed"] as? Bool) == true
+            let isCompleted = ["completed", "paid", "received", "settled"].contains(status)
+            
+            let amountCandidates = [
+                fields["receivedamount"],
+                fields["netamount"],
+                fields["paidamount"],
+                fields["netpaid"],
+                fields["amount"],
+                fields["total"],
+                fields["value"]
+            ]
+            var parsedAmount: Double = 0
+            for cand in amountCandidates {
+                if let num = cand as? NSNumber, num.doubleValue > 0 {
+                    parsedAmount = num.doubleValue
+                    break
+                } else if let str = cand as? String, let d = Double(str.trimmingCharacters(in: .whitespaces)), d > 0 {
+                    parsedAmount = d
+                    break
+                }
+            }
+            guard parsedAmount > 0 else { continue }
+            let amtMinor = Int64(round(parsedAmount * 100))
+            
+            let dateVal = fields["receivedat"] ?? fields["paidat"] ?? fields["settledat"] ?? fields["paymentdate"] ?? fields["completedat"] ?? fields["requestedat"] ?? fields["createdat"] ?? fields["date"]
+            let rawDate = String(describing: dateVal ?? "")
+            let parsedDate = FlexibleDateParser.parse(rawDate) ?? Date()
+            let fmt = DateFormatter()
+            fmt.dateFormat = "yyyy-MM-dd"
+            fmt.locale = Locale(identifier: "en_US_POSIX")
+            let dateStr = fmt.string(from: parsedDate)
+            
+            let payoutEntryId = "the5ers_payout_\(id)"
+            let rcptId = "the5ers_rcpt_\(id)"
+            let shortRef = "Payout #\(id.prefix(8))"
+            
+            let payAccRef = String(describing: fields["accountref"] ?? fields["accountid"] ?? fields["ref"] ?? "")
+            let matchedAcc = targetAccounts.first(where: {
+                $0.id == payAccRef || $0.ref == payAccRef || "the5ers_\($0.id)" == payAccRef
+            })
+            let primaryAccId: String = {
+                if let m = matchedAcc {
+                    return m.id.hasPrefix("the5ers_") ? m.id : "the5ers_\(m.id)"
+                }
+                if let f = targetAccounts.first {
+                    return f.id.hasPrefix("the5ers_") ? f.id : "the5ers_\(f.id)"
+                }
+                return "the5ers_payout_account"
+            }()
+            let currency = String(describing: fields["currency"] ?? matchedAcc?.currency ?? "USD").uppercased()
+            
+            if let existingIdx = dataStore.propEntries.firstIndex(where: { $0.id == payoutEntryId }) {
+                var existing = dataStore.propEntries[existingIdx]
+                existing.amountMinor = amtMinor
+                existing.status = isCompleted ? .completed : .requested
+                existing.occurredOn = dateStr
+                dataStore.propEntries[existingIdx] = existing
+            } else {
+                let payoutEntry = PropEntryItem(
+                    id: payoutEntryId,
+                    accountId: primaryAccId,
+                    firm: "The5ers",
+                    kind: "payout",
+                    category: "payout",
+                    currency: currency,
+                    amountMinor: amtMinor,
+                    splitBps: 8000,
+                    occurredOn: dateStr,
+                    status: isCompleted ? .completed : .requested,
+                    reference: shortRef,
+                    notes: "The5ers Official Withdrawal"
+                )
+                dataStore.propEntries.append(payoutEntry)
+            }
+            
+            // Settlement receipt records actual cash in-pocket
+            if isCompleted && !isReversed {
+                if let rIdx = dataStore.propReceipts.firstIndex(where: { $0.id == rcptId || $0.payoutId == payoutEntryId }) {
+                    var existingRcpt = dataStore.propReceipts[rIdx]
+                    existingRcpt.amountMinor = amtMinor
+                    existingRcpt.occurredOn = dateStr
+                    dataStore.propReceipts[rIdx] = existingRcpt
+                } else {
+                    let rcpt = PropReceiptItem(
+                        id: rcptId,
+                        payoutId: payoutEntryId,
+                        kind: "receipt",
+                        amountMinor: amtMinor,
+                        occurredOn: dateStr,
+                        reference: "Receipt #\(id.prefix(8))",
+                        notes: "The5ers Settlement Receipt"
+                    )
+                    dataStore.propReceipts.append(rcpt)
+                }
             }
         }
     }
