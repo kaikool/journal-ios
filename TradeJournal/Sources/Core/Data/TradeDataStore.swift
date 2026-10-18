@@ -598,7 +598,7 @@ public final class TradeDataStore: ObservableObject {
         }
     }
     
-    public func rebuildAllAccounts() {
+    public func rebuildAllAccounts(forceRebuildTrades: Bool = false) {
         deduplicateAndCleanAccounts()
         for i in 0..<accounts.count {
             accounts[i].name = Formatters.cleanAccountName(accounts[i].name, balance: accounts[i].initialBalance)
@@ -607,8 +607,11 @@ public final class TradeDataStore: ObservableObject {
             let sizeBal = propAccounts[i].sizeMinor.map { Decimal($0) / 100 }
             propAccounts[i].name = Formatters.cleanAccountName(propAccounts[i].name, balance: sizeBal)
         }
-        for acc in accounts {
-            rebuildAccount(accountId: acc.id)
+        // Only reconstruct round trips from raw executions if explicitly requested or if trades are missing
+        if forceRebuildTrades || (trades.isEmpty && !executions.isEmpty) {
+            for acc in accounts {
+                rebuildAccount(accountId: acc.id)
+            }
         }
     }
     

@@ -565,7 +565,7 @@ public struct TradingSettingsView: View {
         }
         
         dataStore.multipliers = parsed
-        dataStore.rebuildAllAccounts()
+        dataStore.rebuildAllAccounts(forceRebuildTrades: true)
         dataStore.saveToDisk()
         multiplierStatus = "Contract multipliers saved."
     }
