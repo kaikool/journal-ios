@@ -669,7 +669,7 @@ public struct DashboardView: View {
                                 Spacer(minLength: 2)
                                 
                                 HStack(alignment: .center, spacing: 8) {
-                                    GaugeView(value: metrics.winRate, label: "Trade win rate", size: 80)
+                                    GaugeView(value: metrics.winRate, label: "Trade win rate", size: 68)
                                     
                                     Spacer()
                                     
@@ -686,7 +686,7 @@ public struct DashboardView: View {
                                     }
                                 }
                             }
-                            .frame(maxWidth: .infinity, minHeight: 124, alignment: .topLeading)
+                            .frame(maxWidth: .infinity, minHeight: 98, alignment: .topLeading)
                         }
                     }
                     
@@ -711,7 +711,7 @@ public struct DashboardView: View {
                                     .font(AppTypography.caption)
                                     .foregroundColor(AppColors.secondaryText)
                             }
-                            .frame(maxWidth: .infinity, minHeight: 124, alignment: .topLeading)
+                            .frame(maxWidth: .infinity, minHeight: 98, alignment: .topLeading)
                         }
                     }
                     
@@ -728,7 +728,7 @@ public struct DashboardView: View {
                                 Spacer(minLength: 2)
                                 
                                 HStack(alignment: .center, spacing: 8) {
-                                    GaugeView(value: metrics.dayWinRate, label: "Day win rate", size: 80)
+                                    GaugeView(value: metrics.dayWinRate, label: "Day win rate", size: 68)
                                     
                                     Spacer()
                                     
@@ -737,7 +737,7 @@ public struct DashboardView: View {
                                         .foregroundColor(AppColors.secondaryText)
                                 }
                             }
-                            .frame(maxWidth: .infinity, minHeight: 124, alignment: .topLeading)
+                            .frame(maxWidth: .infinity, minHeight: 98, alignment: .topLeading)
                         }
                     }
                     
@@ -779,7 +779,7 @@ public struct DashboardView: View {
                                 .font(AppTypography.caption)
                                 .lineLimit(1)
                             }
-                            .frame(maxWidth: .infinity, minHeight: 124, alignment: .topLeading)
+                            .frame(maxWidth: .infinity, minHeight: 98, alignment: .topLeading)
                         }
                     }
                 }
@@ -1170,6 +1170,8 @@ public struct DashboardView: View {
                                 hint: "Largest peak-to-trough drop of the cumulative P&L curve."
                             )
                             
+                            Spacer(minLength: 4)
+                            
                             AppMonetaryText(
                                 Formatters.formatCurrency(metrics.maxDrawdown, currency: env.currentCurrency),
                                 isPrivate: env.isPrivacyModeEnabled,
@@ -1189,6 +1191,7 @@ public struct DashboardView: View {
                                 }
                             }
                         }
+                        .frame(maxWidth: .infinity, minHeight: 98, alignment: .topLeading)
                     }
                 }
                 
@@ -1202,6 +1205,8 @@ public struct DashboardView: View {
                                 hint: "Current run of consecutive wins (W) or losses (L), with the best and worst runs."
                             )
                             
+                            Spacer(minLength: 4)
+                            
                             Text(metrics.currentStreak > 0 ? "\(metrics.currentStreak)W" : (metrics.currentStreak < 0 ? "\(-metrics.currentStreak)L" : "–"))
                                 .font(AppTypography.financialNumber(size: 20, weight: .bold))
                                 .monospacedDigit()
@@ -1211,6 +1216,7 @@ public struct DashboardView: View {
                                 .font(AppTypography.caption)
                                 .foregroundColor(AppColors.secondaryText)
                         }
+                        .frame(maxWidth: .infinity, minHeight: 98, alignment: .topLeading)
                     }
                 }
                 
@@ -1224,6 +1230,8 @@ public struct DashboardView: View {
                                 hint: "Average net P&L per closed trade: what one more trade is worth on your numbers."
                             )
                             
+                            Spacer(minLength: 4)
+                            
                             AppMonetaryText(
                                 metrics.expectancy != nil ? Formatters.formatPnL(metrics.expectancy!, currency: env.currentCurrency) : "–",
                                 isPrivate: env.isPrivacyModeEnabled,
@@ -1236,6 +1244,7 @@ public struct DashboardView: View {
                                 .foregroundColor(AppColors.secondaryText)
                                 .lineLimit(1)
                         }
+                        .frame(maxWidth: .infinity, minHeight: 98, alignment: .topLeading)
                     }
                 }
                 
@@ -1249,6 +1258,8 @@ public struct DashboardView: View {
                                 hint: "Average time from first entry fill to final exit."
                             )
                             
+                            Spacer(minLength: 4)
+                            
                             Text(Formatters.formatDuration(ms: metrics.avgDurationMs))
                                 .font(AppTypography.financialNumber(size: 20, weight: .bold))
                                 .monospacedDigit()
@@ -1258,6 +1269,7 @@ public struct DashboardView: View {
                                 .font(AppTypography.caption)
                                 .foregroundColor(AppColors.secondaryText)
                         }
+                        .frame(maxWidth: .infinity, minHeight: 98, alignment: .topLeading)
                     }
                 }
                 
@@ -1270,6 +1282,8 @@ public struct DashboardView: View {
                                 icon: "trophy",
                                 hint: "Highest and lowest single-day net P&L in the selected range."
                             )
+                            
+                            Spacer(minLength: 4)
                             
                             if let best = snap.bestDay, let worst = snap.worstDay {
                                 VStack(alignment: .leading, spacing: 3) {
@@ -1304,6 +1318,7 @@ public struct DashboardView: View {
                                     .foregroundColor(AppColors.secondaryText)
                             }
                         }
+                        .frame(maxWidth: .infinity, minHeight: 98, alignment: .topLeading)
                     }
                 }
             }

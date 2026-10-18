@@ -32,7 +32,7 @@ public enum SettingsSection: String, CaseIterable, Identifiable {
         case .general: return "globe"
         case .trading: return "slider.horizontal.3"
         case .currencyConversion: return "arrow.left.arrow.right"
-        case .marketData: return "chart.candlestick"
+        case .marketData: return "chart.xyaxis.line"
         case .connections: return "link"
         case .aiSettings: return "sparkles"
         case .yourData: return "cylinder.split.1x2"
@@ -349,24 +349,21 @@ public struct TradingSettingsView: View {
             SettingsCard(title: "Breakeven, fees and risk defaults") {
                 VStack(alignment: .leading, spacing: 16) {
                     // Breakeven Range
-                    VStack(alignment: .leading, spacing: 6) {
+                    VStack(alignment: .leading, spacing: 8) {
                         Text("Breakeven range (±)")
                             .font(AppTypography.captionBold)
                             .foregroundColor(AppColors.secondaryText)
                         
-                        HStack {
-                            TextField("0", text: $breakevenText)
-                                .font(AppTypography.inputText)
-                                .keyboardType(.decimalPad)
-                                .textFieldStyle(.roundedBorder)
-                                .frame(maxWidth: 140)
-                            
-                            Picker("Unit", selection: $breakevenMode) {
-                                Text("Account currency").tag("money")
-                                Text("% of entry notional").tag("percent")
-                            }
-                            .pickerStyle(.segmented)
+                        TextField("0", text: $breakevenText)
+                            .font(AppTypography.inputText)
+                            .keyboardType(.decimalPad)
+                            .textFieldStyle(.roundedBorder)
+                        
+                        Picker("Range unit", selection: $breakevenMode) {
+                            Text("Account currency").tag("money")
+                            Text("% of entry notional").tag("percent")
                         }
+                        .pickerStyle(.segmented)
                         
                         Text("Closed trades within this net P&L range count as breakeven. Actual P&L is unchanged. Percentage mode uses entry price × total entry quantity × contract multiplier; configure multipliers for derivatives first.")
                             .font(AppTypography.caption)
@@ -629,6 +626,7 @@ public struct CurrencyConversionSettingsView: View {
                                 get: { code == reportingCurrency ? "1" : (rates[code] ?? "") },
                                 set: { rates[code] = $0 }
                             ))
+                            .font(AppTypography.inputText)
                             .keyboardType(.decimalPad)
                             .textFieldStyle(.roundedBorder)
                             .disabled(code == reportingCurrency)
@@ -814,8 +812,8 @@ public struct MarketDataSettingsView: View {
                             .pickerStyle(.segmented)
                         }
                         
-                        VStack(alignment: .leading, spacing: 8) {
-                            AppButton("Save credentials", icon: "checkmark", style: .primary, size: .compact) {
+                        HStack(spacing: 8) {
+                            AppButton(!dataStore.marketConnections.oandaApiKey.isEmpty ? "Save" : "Save credentials", icon: "checkmark", style: .primary, size: .compact) {
                                 dataStore.marketConnections.oandaApiKey = oandaToken
                                 dataStore.marketConnections.oandaAccountId = oandaAccountId
                                 dataStore.marketConnections.oandaEnvironment = oandaEnvironment
@@ -824,27 +822,25 @@ public struct MarketDataSettingsView: View {
                             }
                             
                             if !dataStore.marketConnections.oandaApiKey.isEmpty {
-                                HStack(spacing: 8) {
-                                    AppButton("Test", icon: "network", style: .secondary, size: .compact) {
-                                        oandaStatus = "Connecting to OANDA v20 servers..."
-                                        Task {
-                                            let res = await MarketDataService.shared.testOandaConnection(
-                                                apiKey: oandaToken,
-                                                accountId: oandaAccountId,
-                                                environment: oandaEnvironment
-                                            )
-                                            oandaStatus = res.message
-                                        }
+                                AppButton("Test", icon: "network", style: .secondary, size: .compact) {
+                                    oandaStatus = "Connecting to OANDA v20 servers..."
+                                    Task {
+                                        let res = await MarketDataService.shared.testOandaConnection(
+                                            apiKey: oandaToken,
+                                            accountId: oandaAccountId,
+                                            environment: oandaEnvironment
+                                        )
+                                        oandaStatus = res.message
                                     }
-                                    
-                                    AppButton("Remove", icon: "trash", style: .destructive, size: .compact) {
-                                        oandaToken = ""
-                                        oandaAccountId = ""
-                                        dataStore.marketConnections.oandaApiKey = ""
-                                        dataStore.marketConnections.oandaAccountId = ""
-                                        dataStore.saveToDisk()
-                                        oandaStatus = "Connection removed."
-                                    }
+                                }
+                                
+                                AppButton("Remove", icon: "trash", style: .destructive, size: .compact) {
+                                    oandaToken = ""
+                                    oandaAccountId = ""
+                                    dataStore.marketConnections.oandaApiKey = ""
+                                    dataStore.marketConnections.oandaAccountId = ""
+                                    dataStore.saveToDisk()
+                                    oandaStatus = "Connection removed."
                                 }
                             }
                         }
@@ -948,6 +944,7 @@ public struct ConnectionsSettingsView: View {
                             
                             HStack {
                                 SecureField("Paste The5ers MCP Bearer token...", text: $mcpToken)
+                                    .font(AppTypography.inputText)
                                     .textFieldStyle(.roundedBorder)
                                     .textInputAutocapitalization(.never)
                                     .autocorrectionDisabled(true)
@@ -994,6 +991,7 @@ public struct ConnectionsSettingsView: View {
                             .font(AppTypography.captionBold)
                             .foregroundColor(AppColors.secondaryText)
                         TextField("https://xyz.supabase.co", text: $supabaseUrl)
+                            .font(AppTypography.inputText)
                             .textFieldStyle(.roundedBorder)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled(true)
@@ -1010,6 +1008,7 @@ public struct ConnectionsSettingsView: View {
                                 .foregroundColor(AppColors.accent)
                         }
                         SecureField("Paste anon key or service_role key...", text: $supabaseAnonKey)
+                            .font(AppTypography.inputText)
                             .textFieldStyle(.roundedBorder)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled(true)
@@ -1046,11 +1045,13 @@ public struct ConnectionsSettingsView: View {
                         if showEmailAuthSection {
                             VStack(alignment: .leading, spacing: 8) {
                                 TextField("Account email...", text: $supabaseEmail)
+                                    .font(AppTypography.inputText)
                                     .textFieldStyle(.roundedBorder)
                                     .textInputAutocapitalization(.never)
                                     .autocorrectionDisabled(true)
                                 
                                 SecureField("Password...", text: $supabasePassword)
+                                    .font(AppTypography.inputText)
                                     .textFieldStyle(.roundedBorder)
                                 
                                 HStack(spacing: 8) {
@@ -1241,12 +1242,14 @@ public struct AiSettingsView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Model ID").font(AppTypography.captionBold)
                     TextField(defaultModels[provider] ?? "", text: $model)
+                        .font(AppTypography.inputText)
                         .textFieldStyle(.roundedBorder)
                 }
                 
                 VStack(alignment: .leading, spacing: 6) {
                     Text("\(providerName(provider)) API key").font(AppTypography.captionBold)
                     SecureField(isKeyConfigured ? "Key configured (leave blank to keep)" : (provider == "anthropic" ? "sk-ant-…" : "sk-…"), text: $apiKey)
+                        .font(AppTypography.inputText)
                         .textFieldStyle(.roundedBorder)
                     
                     Text("Leave blank to keep your saved key, or enter a replacement.")
@@ -1358,11 +1361,8 @@ public struct YourDataSettingsView: View {
                         .font(AppTypography.caption)
                         .foregroundColor(AppColors.secondaryText)
                     
-                    Button(role: .destructive) {
+                    AppButton("Reset and delete all local data", icon: "trash", style: .destructive, size: .compact) {
                         showResetConfirmation = true
-                    } label: {
-                        Label("Reset and delete all local data", systemImage: "trash")
-                            .foregroundColor(AppColors.loss)
                     }
                 }
             }
