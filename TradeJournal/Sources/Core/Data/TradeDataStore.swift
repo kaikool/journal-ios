@@ -259,9 +259,14 @@ public final class TradeDataStore: ObservableObject {
     }
     
     /// Internal domain documentation
-/// Ported 1:1 from `source-repo/apps/web/src/server/rebuild.ts`
+    /// Ported 1:1 from `source-repo/apps/web/src/server/rebuild.ts`
     public func rebuildAccount(accountId: String) {
         guard let account = accounts.first(where: { $0.id == accountId }) else { return }
+        
+        // The5ers accounts store reported positions directly as round trips and do not use atomic execution reconstruction
+        if accountId.hasPrefix("the5ers_") || (account.broker?.lowercased() == "the5ers") {
+            return
+        }
         
         let accountFills = executions.filter { $0.accountId == accountId }
         let reconstructed = TradeReconstructionEngine.buildRoundTrips(
@@ -301,12 +306,17 @@ public final class TradeDataStore: ObservableObject {
             return t
         }
         
-// Ported 1:1 from `source-repo/apps/web/src/server/rebuild.ts` (lines 44-48):
-        // Internal implementation note
-        // Internal implementation note
-        let preservedThe5ers = trades.filter { $0.accountId == accountId && $0.key.hasPrefix("the5ers_") }
         let otherTrades = trades.filter { $0.accountId != accountId }
-        trades = otherTrades + preservedThe5ers + mergedTrades
+        trades = otherTrades + mergedTrades
+    }
+    
+    public static func isCancellation(_ error: Error) -> Bool {
+        if Task.isCancelled || error is CancellationError { return true }
+        let ns = error as NSError
+        if ns.domain == NSURLErrorDomain && ns.code == NSURLErrorCancelled { return true }
+        let desc = error.localizedDescription.lowercased()
+        if desc.contains("cancel") { return true }
+        return false
     }
     
     public static func isSameAccountId(_ a: String, _ b: String) -> Bool {
@@ -355,7 +365,13 @@ public final class TradeDataStore: ObservableObject {
             self.propAccounts = cleanedPropAccounts
         }
 
-        // 3. Deduplicate trades by key
+        // 3. Remove synthetic executions and reconstructed trades on The5ers accounts
+        executions.removeAll(where: { $0.id.hasPrefix("the5ers_exec_") || $0.source == "the5ers" })
+        trades.removeAll(where: { trade in
+            (trade.accountId.hasPrefix("the5ers_") || trade.tags.contains("the5ers")) && !trade.key.hasPrefix("the5ers_")
+        })
+
+        // 4. Deduplicate trades by key
         var seenTradeKeys = Set<String>()
         var cleanedTrades: [Trade] = []
         for t in trades {
@@ -450,14 +466,18 @@ public final class TradeDataStore: ObservableObject {
                 do {
                     try await SupabaseService.shared.upsertAccounts(accounts)
                 } catch {
+                    if Self.isCancellation(error) { return }
                     AppLogger.error("Supabase accounts upsert warning: \(error.localizedDescription)")
                     syncWarnings.append("Accounts upload: \(error.localizedDescription)")
                 }
             }
         } catch {
+            if Self.isCancellation(error) { return }
             AppLogger.error("Supabase accounts sync warning: \(error.localizedDescription)")
             syncWarnings.append("Accounts: \(error.localizedDescription)")
         }
+
+        if Task.isCancelled { return }
 
         // Internal implementation note
         do {
@@ -491,14 +511,18 @@ public final class TradeDataStore: ObservableObject {
                 do {
                     try await SupabaseService.shared.upsertTrades(trades)
                 } catch {
+                    if Self.isCancellation(error) { return }
                     AppLogger.error("Supabase trades upsert warning: \(error.localizedDescription)")
                     syncWarnings.append("Trades upload: \(error.localizedDescription)")
                 }
             }
         } catch {
+            if Self.isCancellation(error) { return }
             AppLogger.error("Supabase trades sync warning: \(error.localizedDescription)")
             syncWarnings.append("Trades: \(error.localizedDescription)")
         }
+
+        if Task.isCancelled { return }
 
         // Internal implementation note
         do {
@@ -515,14 +539,18 @@ public final class TradeDataStore: ObservableObject {
                 do {
                     try await SupabaseService.shared.upsertExecutions(executions)
                 } catch {
+                    if Self.isCancellation(error) { return }
                     AppLogger.error("Supabase executions upsert warning: \(error.localizedDescription)")
                     syncWarnings.append("Executions upload: \(error.localizedDescription)")
                 }
             }
         } catch {
+            if Self.isCancellation(error) { return }
             AppLogger.error("Supabase executions sync warning: \(error.localizedDescription)")
             syncWarnings.append("Executions: \(error.localizedDescription)")
         }
+
+        if Task.isCancelled { return }
 
         // Supabase playbooks sync
         do {
@@ -545,12 +573,16 @@ public final class TradeDataStore: ObservableObject {
                 do {
                     try await SupabaseService.shared.upsertPlaybooks(localUserPlaybooks)
                 } catch {
+                    if Self.isCancellation(error) { return }
                     AppLogger.warning("Supabase playbooks upsert warning: \(error.localizedDescription)")
                 }
             }
         } catch {
+            if Self.isCancellation(error) { return }
             AppLogger.warning("Supabase playbooks sync warning: \(error.localizedDescription)")
         }
+
+        if Task.isCancelled { return }
 
         // Internal implementation note
         do {
@@ -569,13 +601,17 @@ public final class TradeDataStore: ObservableObject {
                 do {
                     try await SupabaseService.shared.upsertPropAccounts(propAccounts)
                 } catch {
+                    if Self.isCancellation(error) { return }
                     AppLogger.warning("Supabase prop accounts upsert warning: \(error.localizedDescription)")
                     syncWarnings.append("Prop accounts upload: \(error.localizedDescription)")
                 }
             }
         } catch {
+            if Self.isCancellation(error) { return }
             AppLogger.warning("Supabase prop accounts warning: \(error.localizedDescription)")
         }
+
+        if Task.isCancelled { return }
 
         do {
             let remotePropEntries = try await SupabaseService.shared.fetchPropEntries()
@@ -592,13 +628,17 @@ public final class TradeDataStore: ObservableObject {
                 do {
                     try await SupabaseService.shared.upsertPropEntries(propEntries)
                 } catch {
+                    if Self.isCancellation(error) { return }
                     AppLogger.warning("Supabase prop entries upsert warning: \(error.localizedDescription)")
                     syncWarnings.append("Prop entries upload: \(error.localizedDescription)")
                 }
             }
         } catch {
+            if Self.isCancellation(error) { return }
             AppLogger.warning("Supabase prop entries warning: \(error.localizedDescription)")
         }
+
+        if Task.isCancelled { return }
 
         do {
             let remotePropReceipts = try await SupabaseService.shared.fetchPropReceipts()
@@ -613,13 +653,17 @@ public final class TradeDataStore: ObservableObject {
                 do {
                     try await SupabaseService.shared.upsertPropReceipts(propReceipts)
                 } catch {
+                    if Self.isCancellation(error) { return }
                     AppLogger.warning("Supabase prop receipts upsert warning: \(error.localizedDescription)")
                     syncWarnings.append("Prop receipts upload: \(error.localizedDescription)")
                 }
             }
         } catch {
+            if Self.isCancellation(error) { return }
             AppLogger.warning("Supabase prop receipts warning: \(error.localizedDescription)")
         }
+
+        if Task.isCancelled { return }
 
         do {
             let remotePropAudits = try await SupabaseService.shared.fetchPropAudits()
@@ -632,13 +676,17 @@ public final class TradeDataStore: ObservableObject {
                 do {
                     try await SupabaseService.shared.upsertPropAudits(propAudits)
                 } catch {
+                    if Self.isCancellation(error) { return }
                     AppLogger.warning("Supabase prop audits upsert warning: \(error.localizedDescription)")
                     syncWarnings.append("Prop audits upload: \(error.localizedDescription)")
                 }
             }
         } catch {
+            if Self.isCancellation(error) { return }
             AppLogger.warning("Supabase prop audits warning: \(error.localizedDescription)")
         }
+
+        if Task.isCancelled { return }
 
         // Internal implementation note
         do {
@@ -649,7 +697,13 @@ public final class TradeDataStore: ObservableObject {
                 }
             }
         } catch {
+            if Self.isCancellation(error) { return }
             AppLogger.warning("Supabase attachments warning: \(error.localizedDescription)")
+        }
+
+        if Task.isCancelled {
+            await MainActor.run { self.isSyncing = false }
+            return
         }
 
         saveToDisk()
@@ -726,6 +780,7 @@ public final class TradeDataStore: ObservableObject {
         
         // 1. Pull fresh accounts, positions, purchases, and payouts from The5ers MCP Hub
         if hasThe5ers {
+            if Task.isCancelled { return }
             await MainActor.run {
                 self.lastSyncSummary = "Fetching accounts & positions from The5ers Hub..."
             }
@@ -733,6 +788,10 @@ public final class TradeDataStore: ObservableObject {
                 the5ersCount = try await The5ersService.shared.syncWithTradeStore(dataStore: self)
                 the5ersSuccess = true
             } catch {
+                if Self.isCancellation(error) {
+                    AppLogger.info("The5ers sync cancelled.")
+                    return
+                }
                 AppLogger.error("The5ers sync failed: \(error.localizedDescription)")
                 let nsErr = error as NSError
                 if nsErr.code == 401 || error.localizedDescription.contains("401") || error.localizedDescription.localizedCaseInsensitiveContains("unauthorized") {
@@ -743,20 +802,28 @@ public final class TradeDataStore: ObservableObject {
             }
         }
         
+        if Task.isCancelled { return }
+        
         // 2. Synchronize with Supabase Cloud PostgreSQL database
         var supabaseErrorMsg: String? = nil
         var supabaseSuccess = false
         if hasSupabase {
+            if Task.isCancelled { return }
             await MainActor.run {
                 self.lastSyncSummary = "Synchronizing with Supabase Cloud Database..."
             }
             await syncWithSupabase()
+            if Task.isCancelled { return }
             if let supErr = self.lastSyncError {
-                supabaseErrorMsg = supErr
+                if !supErr.lowercased().contains("cancel") {
+                    supabaseErrorMsg = supErr
+                }
             } else {
                 supabaseSuccess = true
             }
         }
+        
+        if Task.isCancelled { return }
         
         // 3. Final summary state update
         await MainActor.run {

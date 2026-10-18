@@ -68,70 +68,27 @@ public struct EquityCurveChart: View {
         min(0.0, doubleVals.min() ?? 0.0)
     }
     
-    private var zeroStop: CGFloat {
-        let range = maxVal - minVal
-        guard range > 0 else { return 1.0 }
-        return CGFloat(maxVal / range)
+    private var lastCumVal: Double {
+        (lastPoint?.cumulativePnl as NSDecimalNumber?)?.doubleValue ?? 0.0
+    }
+    
+    private var isProfitable: Bool {
+        lastCumVal >= 0
     }
     
     private var areaGradient: LinearGradient {
-        if minVal >= 0 {
-            return LinearGradient(
-                stops: [
-                    .init(color: AppColors.brand.opacity(0.28), location: 0.0),
-                    .init(color: AppColors.brand.opacity(0.035), location: 1.0)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        } else if maxVal <= 0 {
-            return LinearGradient(
-                stops: [
-                    .init(color: AppColors.loss.opacity(0.035), location: 0.0),
-                    .init(color: AppColors.loss.opacity(0.28), location: 1.0)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        } else {
-            return LinearGradient(
-                stops: [
-                    .init(color: AppColors.brand.opacity(0.28), location: 0.0),
-                    .init(color: AppColors.brand.opacity(0.035), location: max(0.0, zeroStop - 0.008)),
-                    .init(color: AppColors.loss.opacity(0.035), location: min(1.0, zeroStop + 0.008)),
-                    .init(color: AppColors.loss.opacity(0.28), location: 1.0)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        }
+        LinearGradient(
+            colors: [
+                (isProfitable ? AppColors.brand : AppColors.loss).opacity(0.20),
+                (isProfitable ? AppColors.brand : AppColors.loss).opacity(0.01)
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
     }
     
-    private var lineGradient: LinearGradient {
-        if minVal >= 0 {
-            return LinearGradient(
-                colors: [AppColors.brand, AppColors.brand],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        } else if maxVal <= 0 {
-            return LinearGradient(
-                colors: [AppColors.loss, AppColors.loss],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        } else {
-            return LinearGradient(
-                stops: [
-                    .init(color: AppColors.brand, location: 0.0),
-                    .init(color: AppColors.brand, location: max(0.0, zeroStop - 0.005)),
-                    .init(color: AppColors.loss, location: min(1.0, zeroStop + 0.005)),
-                    .init(color: AppColors.loss, location: 1.0)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        }
+    private var lineStrokeColor: Color {
+        isProfitable ? AppColors.brand : AppColors.loss
     }
     
     public var body: some View {
@@ -173,7 +130,7 @@ public struct EquityCurveChart: View {
                             y: .value("Equity", val)
                         )
                         .interpolationMethod(.monotone)
-                        .foregroundStyle(lineGradient)
+                        .foregroundStyle(lineStrokeColor)
                         .lineStyle(StrokeStyle(lineWidth: 2.2, lineCap: .round, lineJoin: .round))
                     }
                     

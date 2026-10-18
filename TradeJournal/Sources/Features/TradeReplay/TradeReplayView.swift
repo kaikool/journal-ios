@@ -488,7 +488,7 @@ public struct TradeReplayView: View {
             if !fetchedBars.isEmpty {
                 self.bars = fetchedBars
                 self.dataSourceName = provider
-                self.currentStep = min(10, fetchedBars.count)
+                self.currentStep = fetchedBars.count
                 self.excursionEstimate = TradeReplayEngine.estimateExcursions(
                     trade: trade,
                     fills: executions,
@@ -503,7 +503,7 @@ public struct TradeReplayView: View {
                 )
                 self.bars = simulated
                 self.dataSourceName = "Price Path Replay"
-                self.currentStep = min(6, simulated.count)
+                self.currentStep = simulated.count
                 self.excursionEstimate = TradeReplayEngine.estimateExcursions(
                     trade: trade,
                     fills: executions,
@@ -519,7 +519,7 @@ public struct TradeReplayView: View {
             )
             self.bars = simulated
             self.dataSourceName = "Execution Path"
-            self.currentStep = min(6, simulated.count)
+            self.currentStep = simulated.count
             self.excursionEstimate = TradeReplayEngine.estimateExcursions(
                 trade: trade,
                 fills: executions,

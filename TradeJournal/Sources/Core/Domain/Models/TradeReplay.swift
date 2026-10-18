@@ -123,11 +123,19 @@ public enum TradeReplayEngine {
         var unrealized: Decimal = 0
         if trade.status != .open && clampedIndex >= bars.count {
             unrealized = trade.netPnl
+        } else if let exit = trade.avgExit, abs(exit - trade.avgEntry) > 0 {
+            // Proportional progress based on actual realized trade PnL
+            let totalMove = (trade.direction == .long) ? (exit - trade.avgEntry) : (trade.avgEntry - exit)
+            let currentMove = (trade.direction == .long) ? (lastBar.close - trade.avgEntry) : (trade.avgEntry - lastBar.close)
+            unrealized = (currentMove / totalMove) * trade.netPnl
         } else {
+            // Default calculation with asset multiplier support (forex standard lot = 100,000)
+            let isForex = trade.symbol.uppercased().contains("USD") && !trade.symbol.uppercased().contains("BTC") && !trade.symbol.uppercased().contains("ETH")
+            let mult: Decimal = isForex ? 100_000 : 1
             if trade.direction == .long {
-                unrealized = (lastBar.close - trade.avgEntry) * trade.quantity
+                unrealized = (lastBar.close - trade.avgEntry) * trade.quantity * mult
             } else {
-                unrealized = (trade.avgEntry - lastBar.close) * trade.quantity
+                unrealized = (trade.avgEntry - lastBar.close) * trade.quantity * mult
             }
         }
         

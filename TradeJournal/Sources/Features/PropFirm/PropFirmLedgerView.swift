@@ -50,8 +50,8 @@ public struct PropFirmLedgerView: View {
     
     private var filteredEntries: [PropEntryItem] {
         dataStore.propEntries.filter { entry in
-            entry.currency == selectedCurrency &&
-            dataStore.isPropEntryVisible(entry)
+            !entry.voided &&
+            entry.currency == selectedCurrency
         }
     }
     

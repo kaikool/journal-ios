@@ -691,9 +691,17 @@ public final class The5ersService: ObservableObject {
                 }
             }
             
+            // Incremental sync optimization: only query positions for active accounts or accounts with 0 trades
+            let accountsToSyncPositions = targetAccounts.filter { acc in
+                let isActive = (acc.status.lowercased() == "active" || acc.status.lowercased() == "available")
+                let hasTrades = dataStore.trades.contains(where: { TradeDataStore.isSameAccountId($0.accountId, acc.id) })
+                return isActive || !hasTrades
+            }
+            
             var importedPositionsCount = 0
-            for (idx, acc) in targetAccounts.enumerated() {
-                lastStatus = "Syncing trades (\(idx + 1)/\(targetAccounts.count)): \(acc.label)..."
+            for (idx, acc) in accountsToSyncPositions.enumerated() {
+                if Task.isCancelled { break }
+                lastStatus = "Syncing trades (\(idx + 1)/\(accountsToSyncPositions.count)): \(acc.label)..."
                 await Task.yield()
                 
                 let posArgs: [String: Any] = [
@@ -716,10 +724,11 @@ public final class The5ersService: ObservableObject {
                     let rawPositions = extractMcpCollection(unwrappedPos, collectionKey: "positions")
                     mergePositions(rawPositions, for: acc, into: dataStore, count: &importedPositionsCount)
                     
-                    // Internal implementation note
+                    // Paginate if full page returned
                     if rawPositions.count >= 50 {
                         var page = 2
                         while page <= 10 {
+                            if Task.isCancelled { break }
                             var pArgs = posArgs
                             pArgs["page"] = page
                             guard let nextRes = try? await callMcpTool(name: "the5ers_positions", arguments: pArgs) else { break }
@@ -732,21 +741,34 @@ public final class The5ersService: ObservableObject {
                         }
                     }
                 } catch {
+                    if Task.isCancelled { break }
                     AppLogger.error("Error syncing trades for account \(acc.label) (\(acc.id)): \(error.localizedDescription)")
                 }
             }
             
-            // 4. Sync purchases / challenges & evaluation fees
+            // 4. Sync purchases / challenges & evaluation fees across all pages
             lastStatus = "Loading purchases and evaluation fees from the5ers_purchase..."
-            let purchaseArgs: [String: Any] = [
-                "operation": "list",
-                "contract_version": "1.0",
-                "request_context": ["timezone": "UTC", "locale": "en"]
-            ]
-            if let purchaseResult = try? await callMcpTool(name: "the5ers_purchase", arguments: purchaseArgs) {
+            var allPurchases: [[String: Any]] = []
+            var purchasePage = 1
+            while purchasePage <= 10 {
+                if Task.isCancelled { break }
+                let purchaseArgs: [String: Any] = [
+                    "operation": "list",
+                    "page": purchasePage,
+                    "limit": 50,
+                    "contract_version": "1.0",
+                    "request_context": ["timezone": "UTC", "locale": "en"]
+                ]
+                guard let purchaseResult = try? await callMcpTool(name: "the5ers_purchase", arguments: purchaseArgs) else { break }
                 let unwrappedPurchases = unwrapMcpToolResult(purchaseResult)
                 let rawPurchases = extractMcpCollection(unwrappedPurchases, collectionKey: "purchases")
-                mergePurchases(rawPurchases, into: dataStore, targetAccounts: accountsList)
+                if rawPurchases.isEmpty { break }
+                allPurchases.append(contentsOf: rawPurchases)
+                if rawPurchases.count < 50 { break }
+                purchasePage += 1
+            }
+            if !allPurchases.isEmpty {
+                mergePurchases(allPurchases, into: dataStore, targetAccounts: accountsList)
             }
             
             // 5. Sync payouts & withdrawal settlements
@@ -766,6 +788,10 @@ public final class The5ersService: ObservableObject {
             
             return accountsList.count
         } catch {
+            if Task.isCancelled || error is CancellationError || (error as? URLError)?.code == .cancelled || error.localizedDescription.lowercased().contains("cancel") {
+                lastStatus = "Sync cancelled."
+                throw CancellationError()
+            }
             lastStatus = "The5ers MCP sync error: \(error.localizedDescription)"
             throw error
         }
@@ -1045,41 +1071,6 @@ public final class The5ersService: ObservableObject {
                 )
                 dataStore.trades.append(trade)
                 count += 1
-            }
-            
-            // Maintain corresponding Execution records for executions table and trade reconstruction
-            let entryExecId = "the5ers_exec_\(tradeKey)_entry"
-            if !dataStore.executions.contains(where: { $0.id == entryExecId }) {
-                dataStore.executions.append(Execution(
-                    id: entryExecId,
-                    accountId: journalAccId,
-                    symbol: position.symbol,
-                    side: position.direction == .long ? .buy : .sell,
-                    quantity: position.quantity,
-                    price: position.entry,
-                    fee: 0,
-                    executedAt: position.openedAtDate,
-                    assetClass: "forex",
-                    source: "the5ers"
-                ))
-            }
-            
-            if isClosed, let exitDate = position.closedAtDate, let exitPrice = position.exit {
-                let exitExecId = "the5ers_exec_\(tradeKey)_exit"
-                if !dataStore.executions.contains(where: { $0.id == exitExecId }) {
-                    dataStore.executions.append(Execution(
-                        id: exitExecId,
-                        accountId: journalAccId,
-                        symbol: position.symbol,
-                        side: position.direction == .long ? .sell : .buy,
-                        quantity: position.quantity,
-                        price: exitPrice,
-                        fee: position.fee ?? 0,
-                        executedAt: exitDate,
-                        assetClass: "forex",
-                        source: "the5ers"
-                    ))
-                }
             }
         }
     }
@@ -1363,27 +1354,75 @@ public final class The5ersService: ObservableObject {
             let isReversed = (fields["reversed"] as? Bool) == true
             let isCompleted = ["completed", "paid", "received", "settled"].contains(status)
             
-            let amountCandidates = [
-                fields["receivedamount"],
-                fields["netamount"],
-                fields["paidamount"],
-                fields["netpaid"],
-                fields["amount"],
-                fields["total"],
-                fields["value"]
-            ]
-            var parsedAmount: Double = 0
-            for cand in amountCandidates {
-                if let num = cand as? NSNumber, num.doubleValue > 0 {
-                    parsedAmount = num.doubleValue
-                    break
-                } else if let str = cand as? String, let d = Double(str.trimmingCharacters(in: .whitespaces)), d > 0 {
-                    parsedAmount = d
-                    break
+            // Extract Gross, Net, and Split information matching web source specification
+            let splitPercentVal: Double? = {
+                if let sp = fields["splitpercent"] ?? fields["split_percent"] ?? fields["profitshare"] ?? fields["split"] {
+                    if let n = sp as? NSNumber { return n.doubleValue }
+                    if let s = sp as? String, let d = Double(s.trimmingCharacters(in: .whitespaces)) { return d }
                 }
+                return nil
+            }()
+            
+            let grossAmountVal: Double? = {
+                for k in ["grossamount", "gross_amount", "profit", "amount", "total"] {
+                    if let val = fields[k] {
+                        if let n = val as? NSNumber, n.doubleValue > 0 { return n.doubleValue }
+                        if let s = val as? String, let d = Double(s.trimmingCharacters(in: .whitespaces)), d > 0 { return d }
+                    }
+                }
+                return nil
+            }()
+            
+            let netAmountVal: Double? = {
+                for k in ["receivedamount", "received_amount", "netamount", "net_amount", "paidamount", "paid_amount", "netpaid", "usershare", "user_share"] {
+                    if let val = fields[k] {
+                        if let n = val as? NSNumber, n.doubleValue > 0 { return n.doubleValue }
+                        if let s = val as? String, let d = Double(s.trimmingCharacters(in: .whitespaces)), d > 0 { return d }
+                    }
+                }
+                return nil
+            }()
+            
+            let feeVal: Double = {
+                if let f = fields["fee"] ?? fields["transfer_fee"] {
+                    if let n = f as? NSNumber { return n.doubleValue }
+                    if let s = f as? String, let d = Double(s.trimmingCharacters(in: .whitespaces)) { return d }
+                }
+                return 0
+            }()
+            let feeMinor = Int64(round(feeVal * 100))
+            
+            // Determine split bps (default 80% / 8000 or from ratio)
+            let splitBps: Int = {
+                if let sp = splitPercentVal, sp > 0 {
+                    return Int(round(sp > 1.0 ? sp * 100 : sp * 10000))
+                }
+                if let net = netAmountVal, let gross = grossAmountVal, gross > 0, net < gross {
+                    return Int(round((net / gross) * 10000))
+                }
+                if netAmountVal != nil && grossAmountVal == nil {
+                    return 10000
+                }
+                return 8000 // Standard The5ers trader split
+            }()
+            
+            // Determine Gross Minor and Net Received Minor
+            let grossMinor: Int64
+            let netReceivedMinor: Int64
+            
+            if let gross = grossAmountVal, gross > 0 {
+                grossMinor = Int64(round(gross * 100))
+                if let net = netAmountVal, net > 0 {
+                    netReceivedMinor = Int64(round(net * 100))
+                } else {
+                    netReceivedMinor = max(0, Int64((Double(grossMinor) * Double(splitBps) + 5000) / 10000) - feeMinor)
+                }
+            } else if let net = netAmountVal, net > 0 {
+                netReceivedMinor = Int64(round(net * 100))
+                grossMinor = Int64(round(Double(netReceivedMinor + feeMinor) * 10000 / Double(splitBps)))
+            } else {
+                continue
             }
-            guard parsedAmount > 0 else { continue }
-            let amtMinor = Int64(round(parsedAmount * 100))
             
             let dateVal = fields["receivedat"] ?? fields["paidat"] ?? fields["settledat"] ?? fields["paymentdate"] ?? fields["completedat"] ?? fields["requestedat"] ?? fields["createdat"] ?? fields["date"]
             let rawDate = String(describing: dateVal ?? "")
@@ -1414,7 +1453,9 @@ public final class The5ersService: ObservableObject {
             
             if let existingIdx = dataStore.propEntries.firstIndex(where: { $0.id == payoutEntryId }) {
                 var existing = dataStore.propEntries[existingIdx]
-                existing.amountMinor = amtMinor
+                existing.amountMinor = grossMinor
+                existing.splitBps = splitBps
+                existing.feeMinor = feeMinor
                 existing.status = isCompleted ? .completed : .requested
                 existing.occurredOn = dateStr
                 dataStore.propEntries[existingIdx] = existing
@@ -1426,8 +1467,9 @@ public final class The5ersService: ObservableObject {
                     kind: "payout",
                     category: "payout",
                     currency: currency,
-                    amountMinor: amtMinor,
-                    splitBps: 8000,
+                    amountMinor: grossMinor,
+                    splitBps: splitBps,
+                    feeMinor: feeMinor,
                     occurredOn: dateStr,
                     status: isCompleted ? .completed : .requested,
                     reference: shortRef,
@@ -1440,7 +1482,7 @@ public final class The5ersService: ObservableObject {
             if isCompleted && !isReversed {
                 if let rIdx = dataStore.propReceipts.firstIndex(where: { $0.id == rcptId || $0.payoutId == payoutEntryId }) {
                     var existingRcpt = dataStore.propReceipts[rIdx]
-                    existingRcpt.amountMinor = amtMinor
+                    existingRcpt.amountMinor = netReceivedMinor
                     existingRcpt.occurredOn = dateStr
                     dataStore.propReceipts[rIdx] = existingRcpt
                 } else {
@@ -1448,7 +1490,7 @@ public final class The5ersService: ObservableObject {
                         id: rcptId,
                         payoutId: payoutEntryId,
                         kind: "receipt",
-                        amountMinor: amtMinor,
+                        amountMinor: netReceivedMinor,
                         occurredOn: dateStr,
                         reference: "Receipt #\(id.prefix(8))",
                         notes: "The5ers Settlement Receipt"
