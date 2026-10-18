@@ -879,10 +879,20 @@ public struct MarketDataSettingsView: View {
 public struct ConnectionsSettingsView: View {
     @ObservedObject private var dataStore = TradeDataStore.shared
     @ObservedObject private var the5ers = The5ersService.shared
+    @ObservedObject private var ctrader = CTraderService.shared
     
     @State private var mcpToken: String = The5ersService.shared.mcpToken
     @State private var the5ersStatus: String = ""
     @State private var isConnectingThe5ers: Bool = false
+    
+    @State private var ctraderToken: String = CTraderService.shared.accessToken
+    @State private var ctraderClientId: String = CTraderService.shared.clientId
+    @State private var ctraderClientSecret: String = CTraderService.shared.clientSecret
+    @State private var ctraderIsLive: Bool = CTraderService.shared.isLive
+    @State private var ctraderStatus: String = ""
+    @State private var isTestingCTrader: Bool = false
+    @State private var isSyncingCTrader: Bool = false
+    @State private var showAdvancedCTrader: Bool = false
     
     @State private var supabaseUrl: String = SupabaseService.shared.supabaseUrl
     @State private var supabaseAnonKey: String = SupabaseService.shared.supabaseAnonKey
@@ -963,7 +973,189 @@ public struct ConnectionsSettingsView: View {
                 }
             }
             
-            // Card 2: Supabase Cloud Database Sync
+            // Card 2: cTrader Open API Connection
+            SettingsCard(title: "cTrader Open API") {
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack {
+                        Text("cTrader Cloud Sync")
+                            .font(AppTypography.headline)
+                        Spacer()
+                        Text(ctrader.isConfigured ? (ctrader.isConnected ? "Active · Connected" : "Configured") : "Not configured")
+                            .font(AppTypography.captionBold)
+                            .foregroundColor(ctrader.isConfigured ? AppColors.profit : AppColors.secondaryText)
+                    }
+                    
+                    Text("Direct high-speed synchronization with cTrader Open API via JSON WebSocket on port 5036. Imports accounts, historical deals, execution fills, and open positions.")
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.secondaryText)
+                    
+                    // Environment Picker (Live vs Demo)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Gateway Environment:")
+                            .font(AppTypography.captionBold)
+                            .foregroundColor(AppColors.secondaryText)
+                        
+                        Picker("Environment", selection: $ctraderIsLive) {
+                            Text("Live Accounts (wss://live.ctraderapi.com:5036)").tag(true)
+                            Text("Demo Accounts (wss://demo.ctraderapi.com:5036)").tag(false)
+                        }
+                        .pickerStyle(.segmented)
+                    }
+                    
+                    // Access Token Field
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Text("cTrader Access Token:")
+                                .font(AppTypography.captionBold)
+                                .foregroundColor(AppColors.secondaryText)
+                            Spacer()
+                            #if canImport(UIKit)
+                            Button("Paste") {
+                                if let str = UIPasteboard.general.string {
+                                    ctraderToken = str.trimmingCharacters(in: .whitespacesAndNewlines)
+                                }
+                            }
+                            .font(AppTypography.captionBold)
+                            .foregroundColor(AppColors.brand)
+                            #endif
+                        }
+                        
+                        SecureField("Paste cTrader Access Token...", text: $ctraderToken)
+                            .font(AppTypography.inputText)
+                            .textFieldStyle(.roundedBorder)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled(true)
+                        
+                        Text("Obtain your Access Token from openapi.ctrader.com → Applications → Playground or OAuth.")
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.secondaryText)
+                    }
+                    
+                    // Advanced App Credentials (Client ID & Secret)
+                    DisclosureGroup(isExpanded: $showAdvancedCTrader) {
+                        VStack(alignment: .leading, spacing: 10) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Client ID:")
+                                    .font(AppTypography.captionBold)
+                                    .foregroundColor(AppColors.secondaryText)
+                                TextField("Enter cTrader App Client ID", text: $ctraderClientId)
+                                    .font(AppTypography.inputText)
+                                    .textFieldStyle(.roundedBorder)
+                                    .textInputAutocapitalization(.never)
+                                    .autocorrectionDisabled(true)
+                            }
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Client Secret:")
+                                    .font(AppTypography.captionBold)
+                                    .foregroundColor(AppColors.secondaryText)
+                                SecureField("Enter cTrader App Client Secret", text: $ctraderClientSecret)
+                                    .font(AppTypography.inputText)
+                                    .textFieldStyle(.roundedBorder)
+                                    .textInputAutocapitalization(.never)
+                                    .autocorrectionDisabled(true)
+                            }
+                        }
+                        .padding(.top, 6)
+                    } label: {
+                        Text("Application Credentials (Client ID & Secret)")
+                            .font(AppTypography.captionBold)
+                            .foregroundColor(AppColors.brand)
+                    }
+                    
+                    // Discovered Accounts List
+                    if !ctrader.discoveredAccounts.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Linked Trading Accounts (\(ctrader.discoveredAccounts.count)):")
+                                .font(AppTypography.captionBold)
+                                .foregroundColor(AppColors.secondaryText)
+                            
+                            ForEach(ctrader.discoveredAccounts) { acc in
+                                let isSelected = ctrader.selectedAccountIds.contains(acc.ctidTraderAccountId)
+                                Button {
+                                    if isSelected {
+                                        ctrader.selectedAccountIds.remove(acc.ctidTraderAccountId)
+                                    } else {
+                                        ctrader.selectedAccountIds.insert(acc.ctidTraderAccountId)
+                                    }
+                                } label: {
+                                    HStack {
+                                        Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                                            .foregroundColor(isSelected ? AppColors.brand : AppColors.secondaryText)
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text("Account: \(acc.traderLogin) • \(acc.brokerTitleShort)")
+                                                .font(AppTypography.bodyBold)
+                                                .foregroundColor(AppColors.primaryText)
+                                            Text("\(acc.isLive ? "Live" : "Demo") • Balance: \(Formatters.formatCurrency(acc.balance, currency: acc.currency)) • 1:\(acc.leverage)")
+                                                .font(AppTypography.caption)
+                                                .foregroundColor(AppColors.secondaryText)
+                                        }
+                                        Spacer()
+                                    }
+                                    .padding(8)
+                                    .background(AppColors.cardBackground)
+                                    .cornerRadius(8)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                    
+                    // Action Buttons
+                    HStack(spacing: 8) {
+                        AppButton(
+                            "Sync cTrader",
+                            icon: "arrow.triangle.2.circlepath",
+                            style: .primary,
+                            size: .compact,
+                            fullWidth: true,
+                            isLoading: isSyncingCTrader || ctrader.isSyncing
+                        ) {
+                            syncCTrader()
+                        }
+                        .disabled(ctraderToken.trimmingCharacters(in: .whitespaces).isEmpty || isSyncingCTrader)
+                        
+                        AppButton(
+                            "Fetch Accounts",
+                            icon: "person.crop.circle.badge.checkmark",
+                            style: .secondary,
+                            size: .compact,
+                            fullWidth: true,
+                            isLoading: isTestingCTrader
+                        ) {
+                            testCTraderConnection()
+                        }
+                        .disabled(ctraderToken.trimmingCharacters(in: .whitespaces).isEmpty || isTestingCTrader)
+                        
+                        if !ctraderToken.isEmpty {
+                            AppButton("Clear", icon: "xmark.circle", style: .destructive, size: .compact, fullWidth: true) {
+                                ctraderToken = ""
+                                ctraderClientId = ""
+                                ctraderClientSecret = ""
+                                ctrader.accessToken = ""
+                                ctrader.clientId = ""
+                                ctrader.clientSecret = ""
+                                ctrader.disconnect()
+                                ctraderStatus = "cTrader credentials cleared."
+                            }
+                        }
+                    }
+                    
+                    if !ctraderStatus.isEmpty {
+                        Text(ctraderStatus)
+                            .font(AppTypography.caption)
+                            .foregroundColor(ctraderStatus.contains("Error") || ctraderStatus.contains("failed") ? AppColors.loss : AppColors.profit)
+                    }
+                    
+                    if let lastSync = ctrader.lastSyncDate {
+                        Text("Last synchronized: \(Formatters.formatDateTime(lastSync))")
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.secondaryText)
+                    }
+                }
+            }
+            
+            // Card 3: Supabase Cloud Database Sync
             SettingsCard(title: "Supabase connection") {
                 VStack(alignment: .leading, spacing: 14) {
                     Text("Cloud database sync with Supabase PostgreSQL via PostgREST API.")
@@ -1023,8 +1215,24 @@ public struct ConnectionsSettingsView: View {
         }
         .onAppear {
             mcpToken = the5ers.mcpToken
+            ctraderToken = ctrader.accessToken
+            ctraderClientId = ctrader.clientId
+            ctraderClientSecret = ctrader.clientSecret
+            ctraderIsLive = ctrader.isLive
             supabaseUrl = SupabaseService.shared.supabaseUrl
             supabaseAnonKey = SupabaseService.shared.supabaseAnonKey
+        }
+        .onChange(of: ctraderToken) { val in
+            ctrader.accessToken = val
+        }
+        .onChange(of: ctraderClientId) { val in
+            ctrader.clientId = val
+        }
+        .onChange(of: ctraderClientSecret) { val in
+            ctrader.clientSecret = val
+        }
+        .onChange(of: ctraderIsLive) { val in
+            ctrader.isLive = val
         }
         .onChange(of: supabaseUrl) { val in
             SupabaseService.shared.configure(url: val, anonKey: supabaseAnonKey)
@@ -1142,6 +1350,59 @@ public struct ConnectionsSettingsView: View {
                     self.supabaseSyncStatus = summary
                 } else {
                     self.supabaseSyncStatus = "Bi-directional sync completed successfully!"
+                }
+            }
+        }
+    }
+    
+    private func testCTraderConnection() {
+        ctrader.accessToken = ctraderToken
+        ctrader.clientId = ctraderClientId
+        ctrader.clientSecret = ctraderClientSecret
+        ctrader.isLive = ctraderIsLive
+        
+        isTestingCTrader = true
+        ctraderStatus = "Connecting to cTrader Open API..."
+        
+        Task {
+            do {
+                let res = try await ctrader.testConnection()
+                await MainActor.run {
+                    self.isTestingCTrader = false
+                    self.ctraderStatus = res.message
+                    if self.ctrader.selectedAccountIds.isEmpty {
+                        self.ctrader.selectedAccountIds = Set(res.accounts.map { $0.ctidTraderAccountId })
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    self.isTestingCTrader = false
+                    self.ctraderStatus = "cTrader error: \(error.localizedDescription)"
+                }
+            }
+        }
+    }
+    
+    private func syncCTrader() {
+        ctrader.accessToken = ctraderToken
+        ctrader.clientId = ctraderClientId
+        ctrader.clientSecret = ctraderClientSecret
+        ctrader.isLive = ctraderIsLive
+        
+        isSyncingCTrader = true
+        ctraderStatus = "Starting cTrader synchronization..."
+        
+        Task {
+            do {
+                let summary = try await dataStore.syncWithCTrader()
+                await MainActor.run {
+                    self.isSyncingCTrader = false
+                    self.ctraderStatus = summary.message
+                }
+            } catch {
+                await MainActor.run {
+                    self.isSyncingCTrader = false
+                    self.ctraderStatus = "Sync failed: \(error.localizedDescription)"
                 }
             }
         }

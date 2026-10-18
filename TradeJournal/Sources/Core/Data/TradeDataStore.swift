@@ -1070,6 +1070,23 @@ public final class TradeDataStore: ObservableObject {
         return count
     }
     
+    // MARK: - cTrader Open API Synchronization
+    
+    public func syncWithCTrader() async throws -> CTraderSyncSummary {
+        await MainActor.run {
+            self.isSyncing = true
+            self.lastSyncError = nil
+        }
+        defer {
+            Task { @MainActor in self.isSyncing = false }
+        }
+        let summary = try await CTraderService.shared.syncWithTradeStore(dataStore: self)
+        await MainActor.run {
+            self.lastSyncSummary = summary.message
+        }
+        return summary
+    }
+    
     // MARK: - Unified Global Synchronization
     
     public func performGlobalSync() async {
@@ -1085,11 +1102,12 @@ public final class TradeDataStore: ObservableObject {
         }
         
         let hasThe5ers = The5ersService.shared.isConfigured
+        let hasCTrader = CTraderService.shared.isConfigured
         let hasSupabase = SupabaseService.shared.isConfigured
         
-        guard hasThe5ers || hasSupabase else {
+        guard hasThe5ers || hasCTrader || hasSupabase else {
             await MainActor.run {
-                self.lastSyncError = "No sync provider configured. Open Settings to connect The5ers MCP or Supabase Cloud."
+                self.lastSyncError = "No sync provider configured. Open Settings to connect cTrader, The5ers MCP, or Supabase Cloud."
                 self.lastSyncSummary = nil
             }
             return
@@ -1125,7 +1143,29 @@ public final class TradeDataStore: ObservableObject {
         
         if Task.isCancelled { return }
         
-        // 2. Synchronize with Supabase Cloud PostgreSQL database
+        // 2. Synchronize cTrader accounts and executions
+        var cTraderErrorMsg: String? = nil
+        var cTraderSummary: CTraderSyncSummary? = nil
+        if hasCTrader {
+            if Task.isCancelled { return }
+            await MainActor.run {
+                self.lastSyncSummary = "Fetching accounts & deals from cTrader Open API..."
+            }
+            do {
+                cTraderSummary = try await CTraderService.shared.syncWithTradeStore(dataStore: self)
+            } catch {
+                if Self.isCancellation(error) {
+                    AppLogger.info("cTrader sync cancelled.")
+                    return
+                }
+                AppLogger.error("cTrader sync failed: \(error.localizedDescription)")
+                cTraderErrorMsg = "cTrader: \(error.localizedDescription)"
+            }
+        }
+        
+        if Task.isCancelled { return }
+        
+        // 3. Synchronize with Supabase Cloud PostgreSQL database
         var supabaseErrorMsg: String? = nil
         var supabaseSuccess = false
         if hasSupabase {
@@ -1146,32 +1186,33 @@ public final class TradeDataStore: ObservableObject {
         
         if Task.isCancelled { return }
         
-        // 3. Final summary state update
+        // 4. Final summary state update
         await MainActor.run {
-            if let tErr = the5ersErrorMsg, let sErr = supabaseErrorMsg {
-                self.lastSyncError = "\(tErr)\n\(sErr)"
-                self.lastSyncSummary = nil
-            } else if let tErr = the5ersErrorMsg {
-                self.lastSyncError = tErr
-                if supabaseSuccess {
-                    self.lastSyncSummary = "Supabase updated, but The5ers sync failed."
-                }
-            } else if let sErr = supabaseErrorMsg {
-                self.lastSyncError = "Supabase warning: \(sErr)"
-                if the5ersSuccess {
-                    self.lastSyncSummary = "The5ers synced \(the5ersCount) accounts, but Supabase had warnings."
-                }
+            var errors: [String] = []
+            if let tErr = the5ersErrorMsg { errors.append(tErr) }
+            if let cErr = cTraderErrorMsg { errors.append(cErr) }
+            if let sErr = supabaseErrorMsg { errors.append("Supabase: \(sErr)") }
+            
+            if !errors.isEmpty {
+                self.lastSyncError = errors.joined(separator: "\n")
             } else {
-                var details: [String] = []
-                if hasThe5ers {
-                    let the5ersTradesCount = self.trades.filter { $0.tags.contains("the5ers") }.count
-                    details.append("The5ers: \(the5ersCount) accounts (\(the5ersTradesCount) trades)")
-                }
-                if hasSupabase {
-                    details.append("Supabase Cloud backed up")
-                }
-                self.lastSyncSummary = "Sync completed: \(details.joined(separator: " - "))"
                 self.lastSyncError = nil
+            }
+            
+            var details: [String] = []
+            if hasThe5ers && the5ersSuccess {
+                let the5ersTradesCount = self.trades.filter { $0.tags.contains("the5ers") }.count
+                details.append("The5ers: \(the5ersCount) accounts (\(the5ersTradesCount) trades)")
+            }
+            if let cSummary = cTraderSummary {
+                details.append("cTrader: \(cSummary.accountsSynced) accounts (\(cSummary.dealsImported) deals)")
+            }
+            if hasSupabase && supabaseSuccess {
+                details.append("Supabase Cloud backed up")
+            }
+            
+            if !details.isEmpty {
+                self.lastSyncSummary = "Sync completed: \(details.joined(separator: " • "))"
             }
         }
     }
