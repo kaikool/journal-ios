@@ -139,34 +139,80 @@ public struct DashboardView: View {
         }
     }
     
-    // MARK: - Computed Financial Snapshot
+    // MARK: - Memoized Single-Pass Snapshot
+    
+    private struct DashboardSnapshot {
+        let metrics: TradeMetrics
+        let curve: [EquityPoint]
+        let days: [DayStats]
+        let edgeResult: EdgeScore
+        let chartEquityPoints: [EquityPointItem]
+        let hourlyStats: [BucketStats]
+        let weekDelta: Decimal?
+        let bestDay: DayStats?
+        let worstDay: DayStats?
+        let daysWithTradesMap: [String: DayStats]
+        let currentMonthStats: (tradingDays: Int, winningDays: Int, monthPnl: Decimal)
+    }
     
     private var snapshot: DashboardSnapshot {
-        let trades = scopedTrades
+        let initialBalance: Decimal = {
+            if dataStore.selectedAccountId == "all" {
+                return dataStore.visibleAccounts.reduce(Decimal.zero) { $0 + $1.initialBalance }
+            }
+            return dataStore.selectedAccount?.initialBalance ?? 0
+        }()
+        
         let overview = FinancialMetricsEngine.computeOverview(
-            trades: trades,
+            trades: scopedTrades,
             timeZone: env.currentTimeZone,
-            initialBalance: dataStore.selectedAccount?.initialBalance ?? 100000
+            initialBalance: initialBalance
         )
         
-        let edge = FinancialMetricsEngine.computeEdgeScore(trades: trades, metrics: overview.metrics)
+        let edge = EdgeScoreEngine.computeEdgeScore(metrics: overview.metrics)
         
-        var cumulative: Decimal = 0
-        var chartPoints: [EquityPoint] = []
-        for day in overview.days {
-            cumulative += day.netPnl
-            let parsedDate = FlexibleDateParser.parse(day.date, defaultTimeZone: env.currentTimeZone) ?? Date()
-            chartPoints.append(EquityPoint(date: parsedDate, pnl: cumulative))
+        var runningPeak: Decimal = 0
+        let chartPoints = overview.curve.map { pt -> EquityPointItem in
+            if pt.cumNetPnl > runningPeak {
+                runningPeak = pt.cumNetPnl
+            }
+            let base = initialBalance + runningPeak
+            let dd: Decimal = base > 0 ? (runningPeak - pt.cumNetPnl) / base : (runningPeak > 0 ? (runningPeak - pt.cumNetPnl) / runningPeak : Decimal.zero)
+            return EquityPointItem(
+                date: pt.timestamp,
+                dateKey: pt.dateString,
+                netPnl: pt.cumNetPnl,
+                cumulativePnl: pt.cumNetPnl,
+                drawdown: dd
+            )
         }
         
-        let hourly = FinancialMetricsEngine.computeHourlyPerformance(trades: trades, timeZone: env.currentTimeZone)
+        let hourly = AggregateEngine.byHour(trades: scopedTrades, timeZone: env.currentTimeZone)
         
-        // 7-day prior delta comparison matching page.tsx line 255
-        let delta = FinancialMetricsEngine.computePriorDelta(
-            days: overview.days,
-            selectedRange: selectedRange,
-            timeZone: env.currentTimeZone
-        )
+        // Momentum: net P&L of the last 7 calendar days vs the 7 before them (matching page.tsx lines 207-224)
+        let nowMs = Date().timeIntervalSince1970 * 1000
+        var last: Decimal = 0
+        var prior: Decimal = 0
+        var lastDays = 0
+        var priorDays = 0
+        
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        
+        for day in overview.days {
+            if let date = formatter.date(from: day.date) {
+                let ageDays = (nowMs - (date.timeIntervalSince1970 * 1000)) / 86_400_000
+                if ageDays <= 7 {
+                    last += day.netPnl
+                    lastDays += 1
+                } else if ageDays <= 14 {
+                    prior += day.netPnl
+                    priorDays += 1
+                }
+            }
+        }
+        let delta = (lastDays > 0 && priorDays > 0) ? (last - prior) : nil
         
         let best = overview.days.max(by: { $0.netPnl < $1.netPnl })
         let worst = overview.days.min(by: { $0.netPnl < $1.netPnl })
