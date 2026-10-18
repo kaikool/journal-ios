@@ -888,7 +888,8 @@ public final class SupabaseService {
         }
         // 2. Clear playbook_id in trades so foreign key constraint is satisfied
         let trEndpoint = "trades?playbook_id=eq.\(id)"
-        if let req = try? makeRequest(endpoint: trEndpoint, method: "PATCH", body: ["playbook_id": nil as String?]) {
+        let patchData = "{\"playbook_id\":null}".data(using: .utf8)
+        if let req = try? makeRequest(endpoint: trEndpoint, method: "PATCH", body: patchData) {
             _ = try? await session.data(for: req)
         }
         // 3. Delete playbook record
