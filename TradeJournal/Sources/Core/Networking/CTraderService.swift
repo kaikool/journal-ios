@@ -495,29 +495,22 @@ public final class CTraderService: ObservableObject {
             if let existingIdx = dataStore.accounts.firstIndex(where: { $0.id == journalAccId || $0.name.contains("\(account.traderLogin)") }) {
                 var acc = dataStore.accounts[existingIdx]
                 acc.currency = account.currency
+                acc.kind = .sync
+                acc.autoSync = true
                 dataStore.accounts[existingIdx] = acc
             } else {
-                dataStore.addAccount(
+                let newAcc = Account(
+                    id: journalAccId,
                     name: "cTrader \(account.traderLogin) (\(account.brokerTitleShort))",
                     broker: "cTrader",
+                    kind: .sync,
                     currency: account.currency,
                     initialBalance: account.balance,
-                    profitCalcMethod: .fifo
+                    profitCalcMethod: .fifo,
+                    autoSync: true
                 )
-                // Re-key the newly added account to our stable ID
-                if let last = dataStore.accounts.last, last.broker == "cTrader" {
-                    var modified = last
-                    modified = Account(
-                        id: journalAccId,
-                        name: "cTrader \(account.traderLogin) (\(account.brokerTitleShort))",
-                        broker: "cTrader",
-                        currency: account.currency,
-                        initialBalance: account.balance,
-                        profitCalcMethod: .fifo,
-                        autoSync: true
-                    )
-                    dataStore.accounts[dataStore.accounts.count - 1] = modified
-                }
+                dataStore.accounts.append(newAcc)
+                dataStore.saveToDisk()
             }
             
             // 5. Convert Deals to Atomic Executions
