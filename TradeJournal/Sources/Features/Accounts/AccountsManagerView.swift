@@ -107,6 +107,9 @@ public struct AccountsManagerView: View {
                     // Bulk Visibility Actions
                     bulkVisibilityBar
                     
+                    // All Accounts View Scope Banner
+                    allAccountsScopeCard
+                    
                     // Account Cards List
                     if filteredAccounts.isEmpty {
                         emptyStateView
@@ -263,6 +266,72 @@ public struct AccountsManagerView: View {
         .padding(.horizontal, 16)
     }
     
+    private var allAccountsScopeCard: some View {
+        let isAllSelected = dataStore.selectedAccountId == "all"
+        let visibleCount = dataStore.visibleAccounts.count
+        let totalCount = dataStore.accounts.count
+        
+        return cardContainer {
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(isAllSelected ? AppColors.brand.opacity(0.15) : AppColors.secondaryText.opacity(0.08))
+                        .frame(width: 36, height: 36)
+                    Image(systemName: "square.stack.3d.up.fill")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(isAllSelected ? AppColors.brand : AppColors.secondaryText)
+                }
+                
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 6) {
+                        Text("All Accounts (Combined View)")
+                            .font(AppTypography.headline)
+                            .foregroundColor(AppColors.primaryText)
+                        
+                        if isAllSelected {
+                            Image(systemName: "checkmark.seal.fill")
+                                .foregroundColor(AppColors.profit)
+                                .font(.system(size: 13))
+                        }
+                    }
+                    
+                    Text("\(visibleCount) of \(totalCount) accounts visible in Journal & Dashboard")
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.secondaryText)
+                }
+                
+                Spacer()
+                
+                if !isAllSelected {
+                    Button {
+                        #if canImport(UIKit)
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        #endif
+                        dataStore.selectAccount(id: "all")
+                    } label: {
+                        Text("View All")
+                            .font(.system(size: 11, weight: .semibold))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 5)
+                            .background(AppColors.brand.opacity(0.12))
+                            .foregroundColor(AppColors.brand)
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(ApplePressableButtonStyle())
+                } else {
+                    Text("Viewing All")
+                        .font(.system(size: 11, weight: .semibold))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 5)
+                        .background(AppColors.profit.opacity(0.15))
+                        .foregroundColor(AppColors.profit)
+                        .clipShape(Capsule())
+                }
+            }
+        }
+        .padding(.horizontal, 16)
+    }
+
     private var emptyStateView: some View {
         cardContainer {
             VStack(spacing: 12) {
@@ -300,7 +369,7 @@ public struct AccountsManagerView: View {
         let isArchived = acc.archivedAt != nil
         let altId = acc.id.hasPrefix("the5ers_") ? String(acc.id.dropFirst(8)) : "the5ers_\(acc.id)"
         let tradeCount = tradeCountMap[acc.id] ?? tradeCountMap[altId] ?? 0
-        let isVisible = acc.visibleInJournal ?? true
+        let isVisible = dataStore.isAccountVisible(acc)
         
         cardContainer {
             VStack(alignment: .leading, spacing: 12) {

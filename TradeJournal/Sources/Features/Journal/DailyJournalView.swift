@@ -51,7 +51,7 @@ public struct DailyJournalListView: View {
     }
     
     private var daysList: [JournalDaySummary] {
-        let key = "\(dataStore.selectedAccountId)_\(dataStore.filteredTrades.count)_\(dataStore.journalDays.count)_\(dataStore.calendarNotes.count)_\(searchText)_\(env.currentTimeZone.identifier)"
+        let key = "\(dataStore.selectedAccountId)_\(dataStore.filteredTrades.count)_\(dataStore.journalDays.count)_\(dataStore.calendarNotes.count)_\(dataStore.cacheVersion)_\(searchText)_\(env.currentTimeZone.identifier)"
         if DailyJournalCache.lastKey == key {
             return DailyJournalCache.lastList
         }

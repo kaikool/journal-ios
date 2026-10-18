@@ -32,7 +32,7 @@ public struct TradesListView: View {
     }
     
     private var filteredTrades: [Trade] {
-        let key = "\(selectedRange.rawValue)_\(statusFilter.rawValue)_\(searchText)_\(dataStore.selectedAccountId)_\(dataStore.filteredTrades.count)"
+        let key = "\(selectedRange.rawValue)_\(statusFilter.rawValue)_\(searchText)_\(dataStore.selectedAccountId)_\(dataStore.filteredTrades.count)_\(dataStore.cacheVersion)"
         if TradesListCache.lastFilterKey == key {
             return TradesListCache.lastFilteredTrades
         }
@@ -65,7 +65,7 @@ public struct TradesListView: View {
     }
     
     private var overviewMetrics: TradeMetrics {
-        let key = "\(selectedRange.rawValue)_\(dataStore.selectedAccountId)_\(dataStore.filteredTrades.count)"
+        let key = "\(selectedRange.rawValue)_\(dataStore.selectedAccountId)_\(dataStore.filteredTrades.count)_\(dataStore.cacheVersion)"
         if TradesListCache.lastMetricsKey == key, let m = TradesListCache.lastMetrics {
             return m
         }

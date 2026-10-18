@@ -8,10 +8,27 @@ import Combine
 public final class TradeDataStore: ObservableObject {
     public static let shared = TradeDataStore()
     
-    @Published public var accounts: [Account] = []
-    @Published public var executions: [Execution] = []
-    @Published public var trades: [Trade] = []
-    @Published public var selectedAccountId: String = "default-acc"
+    @Published public var accounts: [Account] = [] {
+        didSet {
+            invalidatePerformanceCaches()
+        }
+    }
+    @Published public var executions: [Execution] = [] {
+        didSet {
+            invalidatePerformanceCaches()
+        }
+    }
+    @Published public var trades: [Trade] = [] {
+        didSet {
+            invalidatePerformanceCaches()
+        }
+    }
+    @Published public var selectedAccountId: String = "default-acc" {
+        didSet {
+            invalidatePerformanceCaches()
+        }
+    }
+    @Published public private(set) var cacheVersion: Int = 0
     @Published public var defaults: JournalDefaults = .empty
     @Published public var multipliers: [String: Decimal] = [:]
     @Published public var folders: [NotebookFolder] = []
@@ -42,13 +59,10 @@ public final class TradeDataStore: ObservableObject {
     // MARK: - Performance Caching
     private var _cachedFilteredTrades: [Trade]? = nil
     private var _cachedFilteredTradesAccountId: String? = nil
-    private var _cachedFilteredTradesCount: Int = -1
     
     private var _cachedVisibleAccounts: [Account]? = nil
-    private var _cachedVisibleAccountsCount: Int = -1
     
     private var _cachedActiveAccounts: [Account]? = nil
-    private var _cachedActiveAccountsCount: Int = -1
     
     private var _cachedMostRecentActiveAccount: Account? = nil
     private var _cachedMostRecentActiveAccountValid: Bool = false
@@ -56,15 +70,13 @@ public final class TradeDataStore: ObservableObject {
     public func invalidatePerformanceCaches() {
         _cachedFilteredTrades = nil
         _cachedFilteredTradesAccountId = nil
-        _cachedFilteredTradesCount = -1
         _cachedVisibleAccounts = nil
-        _cachedVisibleAccountsCount = -1
         _cachedActiveAccounts = nil
-        _cachedActiveAccountsCount = -1
         _cachedMostRecentActiveAccount = nil
         _cachedMostRecentActiveAccountValid = false
         activePropAccountIdsCache = nil
         inactivePropAccountIdsCache = nil
+        cacheVersion &+= 1
     }
     
     private var persistenceUrl: URL {
@@ -150,13 +162,37 @@ public final class TradeDataStore: ObservableObject {
     }
 
     public var visibleAccounts: [Account] {
-        if let cached = _cachedVisibleAccounts, _cachedVisibleAccountsCount == accounts.count {
+        if let cached = _cachedVisibleAccounts {
             return cached
         }
         let result = accounts.filter { isAccountVisible($0) }
         _cachedVisibleAccounts = result
-        _cachedVisibleAccountsCount = accounts.count
         return result
+    }
+
+    public var visibleAccountIds: Set<String> {
+        var ids = Set<String>()
+        for acc in visibleAccounts {
+            ids.insert(acc.id)
+            let clean = acc.id.hasPrefix("the5ers_") ? String(acc.id.dropFirst(8)) : acc.id
+            ids.insert(clean)
+            ids.insert("the5ers_\(clean)")
+        }
+        for prop in propAccounts {
+            if isPropAccountVisible(prop) {
+                ids.insert(prop.id)
+                let clean = prop.id.hasPrefix("the5ers_") ? String(prop.id.dropFirst(8)) : prop.id
+                ids.insert(clean)
+                ids.insert("the5ers_\(clean)")
+                if let jId = prop.journalAccountId, !jId.isEmpty {
+                    ids.insert(jId)
+                    let cleanJ = jId.hasPrefix("the5ers_") ? String(jId.dropFirst(8)) : jId
+                    ids.insert(cleanJ)
+                    ids.insert("the5ers_\(cleanJ)")
+                }
+            }
+        }
+        return ids
     }
 
     public func isPropAccountVisible(_ prop: PropAccountItem) -> Bool {
@@ -189,12 +225,11 @@ public final class TradeDataStore: ObservableObject {
     }
 
     public var activeAccounts: [Account] {
-        if let cached = _cachedActiveAccounts, _cachedActiveAccountsCount == accounts.count {
+        if let cached = _cachedActiveAccounts {
             return cached
         }
         let result = accounts.filter { isAccountActive($0) }
         _cachedActiveAccounts = result
-        _cachedActiveAccountsCount = accounts.count
         return result
     }
 
@@ -252,33 +287,36 @@ public final class TradeDataStore: ObservableObject {
             return mostRecentActiveAccount ?? visibleAccounts.first ?? accounts.first
         }
         let selId = selectedAccountId
-        let altId = selId.hasPrefix("the5ers_") ? String(selId.dropFirst(8)) : "the5ers_\(selId)"
-        return accounts.first(where: { $0.id == selId || $0.id == altId }) ?? mostRecentActiveAccount ?? accounts.first
+        let cleanSel = selId.hasPrefix("the5ers_") ? String(selId.dropFirst(8)) : selId
+        let altId = "the5ers_\(cleanSel)"
+        return accounts.first(where: { $0.id == selId || $0.id == cleanSel || $0.id == altId }) ?? mostRecentActiveAccount ?? accounts.first
     }
 
     public var filteredTrades: [Trade] {
         if let cached = _cachedFilteredTrades,
-           _cachedFilteredTradesAccountId == selectedAccountId,
-           _cachedFilteredTradesCount == trades.count {
+           _cachedFilteredTradesAccountId == selectedAccountId {
             return cached
         }
         let result: [Trade]
         if selectedAccountId == "all" {
-            let visibleIds = Set(visibleAccounts.map { $0.id })
+            let visibleIds = visibleAccountIds
             result = trades.filter { trade in
                 if visibleIds.contains(trade.accountId) { return true }
-                if visibleIds.contains("the5ers_\(trade.accountId)") { return true }
-                if trade.accountId.hasPrefix("the5ers_") && visibleIds.contains(String(trade.accountId.dropFirst(8))) { return true }
+                let clean = trade.accountId.hasPrefix("the5ers_") ? String(trade.accountId.dropFirst(8)) : trade.accountId
+                if visibleIds.contains(clean) { return true }
+                if visibleIds.contains("the5ers_\(clean)") { return true }
                 return false
             }
         } else {
             let selId = selectedAccountId
-            let altId = selId.hasPrefix("the5ers_") ? String(selId.dropFirst(8)) : "the5ers_\(selId)"
-            result = trades.filter { $0.accountId == selId || $0.accountId == altId }
+            let cleanSel = selId.hasPrefix("the5ers_") ? String(selId.dropFirst(8)) : selId
+            let altId = "the5ers_\(cleanSel)"
+            result = trades.filter { trade in
+                trade.accountId == selId || trade.accountId == cleanSel || trade.accountId == altId
+            }
         }
         _cachedFilteredTrades = result
         _cachedFilteredTradesAccountId = selectedAccountId
-        _cachedFilteredTradesCount = trades.count
         return result
     }
     
@@ -287,9 +325,11 @@ public final class TradeDataStore: ObservableObject {
     }
     
     public func selectAccount(id: String) {
+        guard selectedAccountId != id else { return }
         selectedAccountId = id
-        _cachedFilteredTrades = nil
-        _cachedFilteredTradesAccountId = nil
+        invalidatePerformanceCaches()
+        saveToDisk()
+        objectWillChange.send()
     }
     
     public func addAccount(name: String, broker: String = "", currency: String = "USD", initialBalance: Decimal = 0, profitCalcMethod: ProfitCalcMethod = .fifo) {
@@ -309,7 +349,9 @@ public final class TradeDataStore: ObservableObject {
     public func archiveAccount(id: String, archived: Bool) {
         if let idx = accounts.firstIndex(where: { $0.id == id }) {
             accounts[idx].archivedAt = archived ? Date() : nil
+            invalidatePerformanceCaches()
             saveToDisk()
+            objectWillChange.send()
         }
     }
 
@@ -327,7 +369,9 @@ public final class TradeDataStore: ObservableObject {
         accounts[idx].kind = kind
         accounts[idx].currency = currency
         accounts[idx].initialBalance = initialBalance
+        invalidatePerformanceCaches()
         saveToDisk()
+        objectWillChange.send()
         let updatedAcc = accounts[idx]
         Task {
             try? await SupabaseService.shared.upsertAccounts([updatedAcc])
@@ -341,7 +385,9 @@ public final class TradeDataStore: ObservableObject {
         if selectedAccountId == id {
             selectedAccountId = accounts.first?.id ?? "all"
         }
+        invalidatePerformanceCaches()
         saveToDisk()
+        objectWillChange.send()
         Task {
             try? await SupabaseService.shared.deleteAccount(id: id)
         }
@@ -356,9 +402,11 @@ public final class TradeDataStore: ObservableObject {
     
     public func toggleAccountVisibility(id: String) {
         if let idx = accounts.firstIndex(where: { $0.id == id }) {
-            let current = accounts[idx].visibleInJournal ?? true
+            let current = isAccountVisible(accounts[idx])
             accounts[idx].visibleInJournal = !current
+            invalidatePerformanceCaches()
             saveToDisk()
+            objectWillChange.send()
         }
     }
     
@@ -375,7 +423,9 @@ public final class TradeDataStore: ObservableObject {
                 break
             }
         }
+        invalidatePerformanceCaches()
         saveToDisk()
+        objectWillChange.send()
     }
     
     /// Internal domain documentation
@@ -616,7 +666,11 @@ public final class TradeDataStore: ObservableObject {
             if !remoteAccounts.isEmpty {
                 for rAcc in remoteAccounts {
                     if let idx = accounts.firstIndex(where: { Self.isSameAccountId($0.id, rAcc.id) }) {
-                        accounts[idx] = rAcc
+                        var updated = rAcc
+                        if let localVisible = accounts[idx].visibleInJournal {
+                            updated.visibleInJournal = localVisible
+                        }
+                        accounts[idx] = updated
                     } else {
                         accounts.append(rAcc)
                     }

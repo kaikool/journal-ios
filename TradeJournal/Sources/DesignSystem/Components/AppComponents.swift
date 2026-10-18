@@ -23,6 +23,8 @@ public struct AppCard<Content: View>: View {
     }
 }
 
+public typealias AppleCard = AppCard
+
 /// Stat card header component
 public struct AppCardHeader: View {
     private let title: String

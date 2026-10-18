@@ -59,7 +59,7 @@ public struct ReportsView: View {
     }
     
     private var metrics: TradeMetrics {
-        let key = "\(selectedRange.rawValue)_\(dataStore.selectedAccountId)_\(dataStore.filteredTrades.count)"
+        let key = "\(selectedRange.rawValue)_\(dataStore.selectedAccountId)_\(dataStore.filteredTrades.count)_\(dataStore.cacheVersion)"
         if ReportsCache.lastKey == key, let m = ReportsCache.lastMetrics {
             return m
         }
@@ -71,7 +71,7 @@ public struct ReportsView: View {
     
     private var groupResults: [GroupAnalysisResult] {
         let sec: Dimension? = selectedMode == .cross ? secondaryDimension : nil
-        let groupKey = "\(selectedRange.rawValue)_\(selectedMode.rawValue)_\(primaryDimension.rawValue)_\(secondaryDimension.rawValue)_\(dataStore.selectedAccountId)_\(dataStore.filteredTrades.count)"
+        let groupKey = "\(selectedRange.rawValue)_\(selectedMode.rawValue)_\(primaryDimension.rawValue)_\(secondaryDimension.rawValue)_\(dataStore.selectedAccountId)_\(dataStore.filteredTrades.count)_\(dataStore.cacheVersion)"
         if ReportsCache.lastGroupKey == groupKey {
             return ReportsCache.lastGroupResults
         }

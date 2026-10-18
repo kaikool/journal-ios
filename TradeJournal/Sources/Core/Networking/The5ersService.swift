@@ -778,10 +778,14 @@ public final class The5ersService: ObservableObject {
             lastSyncTime = Date()
             dataStore.rebuildAllAccounts()
             
-            if let activeAcc = dataStore.mostRecentActiveAccount {
-                dataStore.selectedAccountId = activeAcc.id
-            } else if let firstWithTrade = dataStore.accounts.first(where: { acc in dataStore.trades.contains(where: { $0.accountId == acc.id }) }) {
-                dataStore.selectedAccountId = firstWithTrade.id
+            if dataStore.selectedAccountId == "default-acc" || dataStore.selectedAccountId.isEmpty {
+                if let activeAcc = dataStore.mostRecentActiveAccount {
+                    dataStore.selectAccount(id: activeAcc.id)
+                } else if let firstWithTrade = dataStore.accounts.first(where: { acc in dataStore.trades.contains(where: { $0.accountId == acc.id }) }) {
+                    dataStore.selectAccount(id: firstWithTrade.id)
+                } else {
+                    dataStore.selectAccount(id: "all")
+                }
             }
             
             dataStore.saveToDisk()

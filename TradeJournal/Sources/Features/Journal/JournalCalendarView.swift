@@ -139,7 +139,7 @@ public struct JournalCalendarView: View {
     }
     
     private var snapshot: CalendarSnapshot {
-        let key = "\(year)_\(month)_\(dataStore.selectedAccountId)_\(dataStore.filteredTrades.count)_\(env.currentTimeZone.identifier)"
+        let key = "\(year)_\(month)_\(dataStore.selectedAccountId)_\(dataStore.filteredTrades.count)_\(dataStore.cacheVersion)_\(env.currentTimeZone.identifier)"
         if CalendarCache.lastKey == key, let cached = CalendarCache.lastSnapshot {
             return cached
         }

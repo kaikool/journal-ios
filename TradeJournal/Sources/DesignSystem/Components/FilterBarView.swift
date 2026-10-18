@@ -162,10 +162,10 @@ public struct FilterBarView<Actions: View>: View {
                 #if os(iOS)
                 UISelectionFeedbackGenerator().selectionChanged()
                 #endif
-                dataStore.selectedAccountId = "all"
+                dataStore.selectAccount(id: "all")
             } label: {
                 HStack {
-                    Text("All accounts")
+                    Text("All accounts (\(dataStore.visibleAccounts.count))")
                     if dataStore.selectedAccountId == "all" {
                         Image(systemName: "checkmark")
                     }
@@ -179,7 +179,7 @@ public struct FilterBarView<Actions: View>: View {
                     #if os(iOS)
                     UISelectionFeedbackGenerator().selectionChanged()
                     #endif
-                    dataStore.selectedAccountId = acc.id
+                    dataStore.selectAccount(id: acc.id)
                 } label: {
                     accountMenuItemLabel(acc: acc)
                 }
@@ -354,12 +354,12 @@ public struct FilterBarView<Actions: View>: View {
     
     private var currentAccountName: String {
         if dataStore.selectedAccountId == "all" {
-            return "All accounts"
+            return "All accounts (\(dataStore.visibleAccounts.count))"
         }
         if let acc = dataStore.accounts.first(where: { $0.id == dataStore.selectedAccountId }) {
             let title = acc.name.isEmpty ? "\(acc.broker.isEmpty ? "Standard" : acc.broker) Account" : acc.name
             return Formatters.cleanAccountName(title, balance: acc.initialBalance)
         }
-        return "All accounts"
+        return "All accounts (\(dataStore.visibleAccounts.count))"
     }
 }

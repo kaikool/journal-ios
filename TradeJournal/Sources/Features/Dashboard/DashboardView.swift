@@ -123,7 +123,7 @@ public struct DashboardView: View {
     }
     
     private var snapshot: DashboardSnapshot {
-        let key = "\(selectedRange.rawValue)_\(dataStore.selectedAccountId)_\(dataStore.filteredTrades.count)_\(dataStore.accounts.count)_\(env.currentTimeZone.identifier)"
+        let key = "\(selectedRange.rawValue)_\(dataStore.selectedAccountId)_\(dataStore.filteredTrades.count)_\(dataStore.visibleAccounts.count)_\(dataStore.cacheVersion)_\(env.currentTimeZone.identifier)"
         if DashboardCache.lastKey == key, let cached = DashboardCache.lastSnapshot {
             return cached
         }
