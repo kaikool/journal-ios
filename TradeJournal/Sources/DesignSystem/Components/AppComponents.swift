@@ -447,14 +447,24 @@ public struct AppActionPill: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
             .frame(height: 30)
-            .background(isPrimary ? AppColors.brand : AppColors.cardBackground)
+            .background(isPrimary ? AppColors.brand : AppColors.cardBackground.opacity(0.85))
             .foregroundColor(isPrimary ? AppColors.brandTextOnDark : AppColors.primaryText)
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .stroke(isPrimary ? Color.clear : AppColors.border.opacity(0.6), lineWidth: 0.5)
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(isPrimary ? 0.35 : 0.2),
+                                Color.white.opacity(isPrimary ? 0.08 : 0.04)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 0.6
+                    )
             )
-            .shadow(color: isPrimary ? AppColors.brand.opacity(0.2) : Color.clear, radius: 4, x: 0, y: 1)
+            .shadow(color: isPrimary ? AppColors.brand.opacity(0.28) : Color.black.opacity(0.04), radius: 6, x: 0, y: 1.5)
         }
         .buttonStyle(ApplePressableButtonStyle())
         .fixedSize()
@@ -490,13 +500,23 @@ public struct AppBackButton: View {
             .padding(.horizontal, title != nil ? 9 : 8)
             .padding(.vertical, 6)
             .frame(height: 30)
-            .background(AppColors.cardBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .background(AppColors.cardBackground.opacity(0.85))
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .stroke(AppColors.border.opacity(0.6), lineWidth: 0.5)
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(0.25),
+                                Color.white.opacity(0.06)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 0.6
+                    )
             )
-            .shadow(color: Color.black.opacity(0.04), radius: 2, x: 0, y: 1)
+            .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 1.5)
         }
         .buttonStyle(ApplePressableButtonStyle())
         .fixedSize()
@@ -536,14 +556,24 @@ public struct AppActionPillLink<Destination: View>: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
             .frame(height: 30)
-            .background(isPrimary ? AppColors.brand : AppColors.cardBackground)
+            .background(isPrimary ? AppColors.brand : AppColors.cardBackground.opacity(0.85))
             .foregroundColor(isPrimary ? AppColors.brandTextOnDark : AppColors.primaryText)
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .stroke(isPrimary ? Color.clear : AppColors.border.opacity(0.6), lineWidth: 0.5)
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(isPrimary ? 0.35 : 0.2),
+                                Color.white.opacity(isPrimary ? 0.08 : 0.04)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 0.6
+                    )
             )
-            .shadow(color: isPrimary ? AppColors.brand.opacity(0.2) : Color.clear, radius: 4, x: 0, y: 1)
+            .shadow(color: isPrimary ? AppColors.brand.opacity(0.28) : Color.black.opacity(0.04), radius: 6, x: 0, y: 1.5)
         }
         .buttonStyle(ApplePressableButtonStyle())
         .fixedSize()
@@ -587,14 +617,24 @@ public struct AppActionMenu<MenuContent: View>: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
             .frame(height: 30)
-            .background(isPrimary ? AppColors.brand : AppColors.cardBackground)
+            .background(isPrimary ? AppColors.brand : AppColors.cardBackground.opacity(0.85))
             .foregroundColor(isPrimary ? AppColors.brandTextOnDark : AppColors.primaryText)
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .stroke(isPrimary ? Color.clear : AppColors.border.opacity(0.6), lineWidth: 0.5)
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(isPrimary ? 0.35 : 0.2),
+                                Color.white.opacity(isPrimary ? 0.08 : 0.04)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 0.6
+                    )
             )
-            .shadow(color: isPrimary ? AppColors.brand.opacity(0.2) : Color.clear, radius: 4, x: 0, y: 1)
+            .shadow(color: isPrimary ? AppColors.brand.opacity(0.28) : Color.black.opacity(0.04), radius: 6, x: 0, y: 1.5)
         }
         .buttonStyle(ApplePressableButtonStyle())
         .fixedSize()

@@ -79,7 +79,7 @@ public struct RootTabView: View {
     }
     
     private var bottomNavigationBar: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: 2) {
             bottomBarItem(tab: .dashboard, label: "Dashboard", icon: "square.grid.2x2", selectedIcon: "square.grid.2x2.fill")
             bottomBarItem(tab: .calendar, label: "Calendar", icon: "calendar", selectedIcon: "calendar.badge.clock")
             bottomBarItem(tab: .journal, label: "Journal", icon: "book.closed", selectedIcon: "book.closed.fill")
@@ -96,23 +96,51 @@ public struct RootTabView: View {
                 }
             } label: {
                 VStack(spacing: 3) {
-                    Image(systemName: "line.3.horizontal")
-                        .font(.system(size: 17, weight: .semibold))
+                    Image(systemName: env.isDrawerOpen ? "xmark" : "line.3.horizontal")
+                        .font(.system(size: 15, weight: .semibold))
+                        .scaleEffect(env.isDrawerOpen ? 1.05 : 1.0)
+                        .animation(.spring(response: 0.28, dampingFraction: 0.72), value: env.isDrawerOpen)
+                    
                     Text("Menu")
-                        .font(.system(size: 10, weight: env.isDrawerOpen ? .bold : .medium))
+                        .font(.system(size: 9.5, weight: env.isDrawerOpen ? .bold : .medium, design: .rounded))
+                        .lineLimit(1)
+                    
+                    Circle()
+                        .fill(env.isDrawerOpen ? AppColors.brand : Color.clear)
+                        .frame(width: 3.5, height: 3.5)
                 }
                 .foregroundColor(env.isDrawerOpen ? AppColors.brand : AppColors.secondaryText)
                 .frame(maxWidth: .infinity)
                 .frame(height: 48)
+                .background(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .fill(env.isDrawerOpen ? AppColors.brand.opacity(env.colorScheme == .dark ? 0.18 : 0.10) : Color.clear)
+                )
             }
             .buttonStyle(ApplePressableButtonStyle())
         }
-        .padding(.horizontal, 4)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 5)
         .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
         .overlay(
-            Divider().background(AppColors.border.opacity(0.4)),
-            alignment: .top
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(env.colorScheme == .dark ? 0.22 : 0.45),
+                            Color.white.opacity(env.colorScheme == .dark ? 0.05 : 0.12)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 0.75
+                )
         )
+        .shadow(color: Color.black.opacity(env.colorScheme == .dark ? 0.36 : 0.10), radius: 20, x: 0, y: 8)
+        .shadow(color: AppColors.brand.opacity(env.colorScheme == .dark ? 0.06 : 0.02), radius: 6, x: 0, y: 2)
+        .padding(.horizontal, 14)
+        .padding(.bottom, 6)
     }
     
     private func bottomBarItem(tab: AppTab, label: String, icon: String, selectedIcon: String) -> some View {
@@ -121,23 +149,34 @@ public struct RootTabView: View {
         return Button {
             if !isSelected {
                 #if os(iOS)
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                UISelectionFeedbackGenerator().selectionChanged()
                 #endif
-                env.selectedTab = tab
+                withAnimation(.spring(response: 0.28, dampingFraction: 0.72)) {
+                    env.selectedTab = tab
+                }
             }
         } label: {
             VStack(spacing: 3) {
                 Image(systemName: isSelected ? selectedIcon : icon)
-                    .font(.system(size: 17, weight: isSelected ? .semibold : .regular))
+                    .font(.system(size: 15.5, weight: isSelected ? .semibold : .regular))
                     .scaleEffect(isSelected ? 1.08 : 1.0)
                     .animation(.spring(response: 0.28, dampingFraction: 0.65), value: isSelected)
                 
                 Text(label)
-                    .font(.system(size: 10, weight: isSelected ? .bold : .medium))
+                    .font(.system(size: 9.5, weight: isSelected ? .bold : .medium, design: .rounded))
+                    .lineLimit(1)
+                
+                Circle()
+                    .fill(isSelected ? AppColors.brand : Color.clear)
+                    .frame(width: 3.5, height: 3.5)
             }
             .foregroundColor(isSelected ? AppColors.brand : AppColors.secondaryText)
             .frame(maxWidth: .infinity)
             .frame(height: 48)
+            .background(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(isSelected ? AppColors.brand.opacity(env.colorScheme == .dark ? 0.18 : 0.10) : Color.clear)
+            )
         }
         .buttonStyle(ApplePressableButtonStyle())
     }
