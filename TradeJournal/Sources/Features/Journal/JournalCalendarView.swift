@@ -79,16 +79,24 @@ public struct JournalCalendarView: View {
         let peakWeekdayAbsPnl: Double
     }
     
-    @State private var cachedSnapshot: CalendarSnapshot? = nil
+    private final class CalendarCache {
+        static var lastKey: String = ""
+        static var lastSnapshot: CalendarSnapshot? = nil
+    }
+    
+    private static let isoDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        return f
+    }()
     
     private func computeSnapshot() -> CalendarSnapshot {
         let ov = FinancialMetricsEngine.computeOverview(
             trades: dataStore.filteredTrades,
             timeZone: env.currentTimeZone
         )
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd"
-        f.timeZone = env.currentTimeZone
+        Self.isoDateFormatter.timeZone = env.currentTimeZone
+        let f = Self.isoDateFormatter
         
         var dayMap: [String: DayStats] = [:]
         for d in ov.days {
@@ -131,10 +139,14 @@ public struct JournalCalendarView: View {
     }
     
     private var snapshot: CalendarSnapshot {
-        if let cached = cachedSnapshot {
+        let key = "\(year)_\(month)_\(dataStore.selectedAccountId)_\(dataStore.filteredTrades.count)_\(env.currentTimeZone.identifier)"
+        if CalendarCache.lastKey == key, let cached = CalendarCache.lastSnapshot {
             return cached
         }
-        return computeSnapshot()
+        let fresh = computeSnapshot()
+        CalendarCache.lastKey = key
+        CalendarCache.lastSnapshot = fresh
+        return fresh
     }
     
     private var overview: (metrics: TradeMetrics, curve: [EquityPoint], days: [DayStats]) {
@@ -279,15 +291,6 @@ public struct JournalCalendarView: View {
                     .presentationDetents([.large])
                     .presentationDragIndicator(.visible)
                     .presentationCornerRadius(28)
-            }
-            .onAppear {
-                cachedSnapshot = computeSnapshot()
-            }
-            .onChange(of: currentMonth) { _ in
-                cachedSnapshot = computeSnapshot()
-            }
-            .onChange(of: dataStore.filteredTrades) { _ in
-                cachedSnapshot = computeSnapshot()
             }
         }
     }

@@ -20,11 +20,22 @@ public struct TradesListView: View {
     
     public init() {}
     
+    private final class TradesListCache {
+        static var lastMetricsKey: String = ""
+        static var lastMetrics: TradeMetrics? = nil
+        static var lastFilterKey: String = ""
+        static var lastFilteredTrades: [Trade] = []
+    }
+    
     private var scopedTrades: [Trade] {
         selectedRange.filterTrades(dataStore.filteredTrades, timeZone: env.currentTimeZone)
     }
     
     private var filteredTrades: [Trade] {
+        let key = "\(selectedRange.rawValue)_\(statusFilter.rawValue)_\(searchText)_\(dataStore.selectedAccountId)_\(dataStore.filteredTrades.count)"
+        if TradesListCache.lastFilterKey == key {
+            return TradesListCache.lastFilteredTrades
+        }
         var list = scopedTrades
         
         switch statusFilter {
@@ -47,14 +58,24 @@ public struct TradesListView: View {
             }
         }
         
-        return list.sorted { $0.openedAt > $1.openedAt }
+        let sorted = list.sorted { $0.openedAt > $1.openedAt }
+        TradesListCache.lastFilterKey = key
+        TradesListCache.lastFilteredTrades = sorted
+        return sorted
     }
     
     private var overviewMetrics: TradeMetrics {
-        FinancialMetricsEngine.computeMetrics(
+        let key = "\(selectedRange.rawValue)_\(dataStore.selectedAccountId)_\(dataStore.filteredTrades.count)"
+        if TradesListCache.lastMetricsKey == key, let m = TradesListCache.lastMetrics {
+            return m
+        }
+        let fresh = FinancialMetricsEngine.computeMetrics(
             trades: scopedTrades,
             timeZone: env.currentTimeZone
         )
+        TradesListCache.lastMetricsKey = key
+        TradesListCache.lastMetrics = fresh
+        return fresh
     }
     
     public var body: some View {

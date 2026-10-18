@@ -44,21 +44,33 @@ public enum JournalTimeRange: String, CaseIterable, Identifiable {
         }
     }
     
-    /// Filters trades using `trade.closedAt ?? trade.openedAt` matching web `matchesFilters` in `packages/core/src/analysis.ts`
+    /// High-performance filtering using numerical Date boundaries without expensive DateFormatter string allocations
     public func filterTrades(_ trades: [Trade], timeZone: TimeZone = .current, referenceDate: Date = Date()) -> [Trade] {
         guard self != .all else { return trades }
-        let (from, to) = dayBounds(timeZone: timeZone, referenceDate: referenceDate)
         
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        formatter.timeZone = timeZone
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        let startOfToday = calendar.startOfDay(for: referenceDate)
+        guard let endOfToday = calendar.date(byAdding: .day, value: 1, to: startOfToday) else { return trades }
+        
+        let fromDate: Date
+        switch self {
+        case .all:
+            return trades
+        case .ytd:
+            let year = calendar.component(.year, from: referenceDate)
+            fromDate = calendar.date(from: DateComponents(year: year, month: 1, day: 1)) ?? startOfToday
+        case .d7:
+            fromDate = calendar.date(byAdding: .day, value: -6, to: startOfToday) ?? startOfToday
+        case .d30:
+            fromDate = calendar.date(byAdding: .day, value: -29, to: startOfToday) ?? startOfToday
+        case .d90:
+            fromDate = calendar.date(byAdding: .day, value: -89, to: startOfToday) ?? startOfToday
+        }
         
         return trades.filter { trade in
             let date = trade.closedAt ?? trade.openedAt
-            let day = formatter.string(from: date)
-            if let from = from, day < from { return false }
-            if let to = to, day > to { return false }
-            return true
+            return date >= fromDate && date < endOfToday
         }
     }
 }

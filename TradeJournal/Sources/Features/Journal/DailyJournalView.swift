@@ -27,23 +27,45 @@ public struct DailyJournalListView: View {
     
     public init() {}
     
+    private final class DailyJournalCache {
+        static var lastKey: String = ""
+        static var lastList: [JournalDaySummary] = []
+    }
+    
+    private static let isoFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        return f
+    }()
+    
+    private static let weekdayFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "EEEE"
+        f.locale = Locale(identifier: "en_US")
+        return f
+    }()
+    
     private var todayKey: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        formatter.timeZone = env.currentTimeZone
-        return formatter.string(from: Date())
+        Self.isoFormatter.timeZone = env.currentTimeZone
+        return Self.isoFormatter.string(from: Date())
     }
     
     private var daysList: [JournalDaySummary] {
+        let key = "\(dataStore.selectedAccountId)_\(dataStore.filteredTrades.count)_\(dataStore.journalDays.count)_\(dataStore.calendarNotes.count)_\(searchText)_\(env.currentTimeZone.identifier)"
+        if DailyJournalCache.lastKey == key {
+            return DailyJournalCache.lastList
+        }
+        let fresh = computeDaysList()
+        DailyJournalCache.lastKey = key
+        DailyJournalCache.lastList = fresh
+        return fresh
+    }
+    
+    private func computeDaysList() -> [JournalDaySummary] {
         let trades = dataStore.filteredTrades
-        let calendar = Calendar.current
-        let isoFormatter = DateFormatter()
-        isoFormatter.dateFormat = "yyyy-MM-dd"
-        isoFormatter.timeZone = env.currentTimeZone
-        
-        let weekdayFormatter = DateFormatter()
-        weekdayFormatter.dateFormat = "EEEE"
-        weekdayFormatter.locale = Locale(identifier: "en_US")
+        Self.isoFormatter.timeZone = env.currentTimeZone
+        let isoFormatter = Self.isoFormatter
+        let weekdayFormatter = Self.weekdayFormatter
         
         // Collect all dates with trades or notes
         var dateMap: [String: [Trade]] = [:]

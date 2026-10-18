@@ -97,6 +97,17 @@ public struct DashboardView: View {
     
     // MARK: - Memoized Single-Pass Snapshot
     
+    private final class DashboardCache {
+        static var lastKey: String = ""
+        static var lastSnapshot: DashboardSnapshot? = nil
+    }
+    
+    private static let monthPrefixFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM"
+        return f
+    }()
+    
     private struct DashboardSnapshot {
         let metrics: TradeMetrics
         let curve: [EquityPoint]
@@ -112,6 +123,17 @@ public struct DashboardView: View {
     }
     
     private var snapshot: DashboardSnapshot {
+        let key = "\(selectedRange.rawValue)_\(dataStore.selectedAccountId)_\(dataStore.filteredTrades.count)_\(dataStore.accounts.count)_\(env.currentTimeZone.identifier)"
+        if DashboardCache.lastKey == key, let cached = DashboardCache.lastSnapshot {
+            return cached
+        }
+        let fresh = computeSnapshot()
+        DashboardCache.lastKey = key
+        DashboardCache.lastSnapshot = fresh
+        return fresh
+    }
+    
+    private func computeSnapshot() -> DashboardSnapshot {
         let initialBalance: Decimal = {
             if dataStore.selectedAccountId == "all" {
                 return dataStore.visibleAccounts.reduce(Decimal.zero) { $0 + $1.initialBalance }
@@ -174,9 +196,7 @@ public struct DashboardView: View {
         let best = overview.days.max(by: { $0.netPnl < $1.netPnl })
         let worst = overview.days.min(by: { $0.netPnl < $1.netPnl })
         
-        let iso = DateFormatter()
-        iso.dateFormat = "yyyy-MM"
-        let prefix = iso.string(from: Date())
+        let prefix = Self.monthPrefixFormatter.string(from: Date())
         let monthDays = overview.days.filter { $0.date.hasPrefix(prefix) }
         let tradingDays = monthDays.count
         let winningDays = monthDays.filter { $0.netPnl > 0 }.count

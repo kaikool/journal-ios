@@ -47,22 +47,43 @@ public struct ReportsView: View {
     
     public init() {}
     
+    private final class ReportsCache {
+        static var lastKey: String = ""
+        static var lastMetrics: TradeMetrics? = nil
+        static var lastGroupKey: String = ""
+        static var lastGroupResults: [GroupAnalysisResult] = []
+    }
+    
     private var trades: [Trade] {
         selectedRange.filterTrades(dataStore.filteredTrades, timeZone: env.currentTimeZone)
     }
     
     private var metrics: TradeMetrics {
-        FinancialMetricsEngine.computeMetrics(trades: trades)
+        let key = "\(selectedRange.rawValue)_\(dataStore.selectedAccountId)_\(dataStore.filteredTrades.count)"
+        if ReportsCache.lastKey == key, let m = ReportsCache.lastMetrics {
+            return m
+        }
+        let fresh = FinancialMetricsEngine.computeMetrics(trades: trades)
+        ReportsCache.lastKey = key
+        ReportsCache.lastMetrics = fresh
+        return fresh
     }
     
     private var groupResults: [GroupAnalysisResult] {
         let sec: Dimension? = selectedMode == .cross ? secondaryDimension : nil
-        return TradeAnalysisEngine.analyzeGroups(
+        let groupKey = "\(selectedRange.rawValue)_\(selectedMode.rawValue)_\(primaryDimension.rawValue)_\(secondaryDimension.rawValue)_\(dataStore.selectedAccountId)_\(dataStore.filteredTrades.count)"
+        if ReportsCache.lastGroupKey == groupKey {
+            return ReportsCache.lastGroupResults
+        }
+        let fresh = TradeAnalysisEngine.analyzeGroups(
             trades: trades,
             primary: primaryDimension,
             secondary: sec,
             timeZone: env.currentTimeZone.identifier
         )
+        ReportsCache.lastGroupKey = groupKey
+        ReportsCache.lastGroupResults = fresh
+        return fresh
     }
     
     private var summaryKPIs: [(label: String, value: String, isNet: Bool)] {
@@ -72,8 +93,9 @@ public struct ReportsView: View {
         let wrStr = s.winRate != nil ? Formatters.percent(s.winRate) : "–"
         let volStr = "\(s.totalVolume.formatted())"
         
-        let avgRealizedR = TradeAnalysisEngine.summarizeGroup(all: trades).avgRealizedR
-        let avgPlannedR = TradeAnalysisEngine.summarizeGroup(all: trades).avgPlannedR
+        let summary = TradeAnalysisEngine.summarizeGroup(all: trades)
+        let avgRealizedR = summary.avgRealizedR
+        let avgPlannedR = summary.avgPlannedR
         let avgRStr = avgRealizedR != nil ? String(format: "%.2f R", avgRealizedR!) : "–"
         let avgPlanRStr = avgPlannedR != nil ? String(format: "%.2f R", avgPlannedR!) : "–"
         
