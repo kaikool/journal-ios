@@ -891,6 +891,8 @@ public struct ConnectionsSettingsView: View {
     @State private var supabasePassword: String = ""
     @State private var supabaseSyncStatus: String? = nil
     @State private var showEmailAuthSection: Bool = false
+    @State private var showWipeConfirmation: Bool = false
+    @State private var isWipingSupabase: Bool = false
     
     public var body: some View {
         VStack(spacing: 20) {
@@ -1024,8 +1026,19 @@ public struct ConnectionsSettingsView: View {
                         }
                         .disabled(supabaseUrl.trimmingCharacters(in: .whitespaces).isEmpty || supabaseAnonKey.trimmingCharacters(in: .whitespaces).isEmpty)
                         
-                        AppButton("Copy SQL", icon: "doc.on.doc", style: .secondary, size: .compact) {
+                        AppButton("Copy Migration SQL", icon: "doc.on.doc", style: .secondary, size: .compact) {
                             copySqlScript()
+                        }
+                    }
+                    
+                    HStack(spacing: 8) {
+                        AppButton("Wipe Supabase Data", icon: "trash", style: .destructive, size: .compact, isLoading: isWipingSupabase) {
+                            showWipeConfirmation = true
+                        }
+                        .disabled(supabaseUrl.trimmingCharacters(in: .whitespaces).isEmpty || supabaseAnonKey.trimmingCharacters(in: .whitespaces).isEmpty || isWipingSupabase)
+                        
+                        AppButton("Copy TRUNCATE SQL", icon: "doc.on.clipboard", style: .secondary, size: .compact) {
+                            copyTruncateSql()
                         }
                     }
                     
@@ -1095,6 +1108,14 @@ public struct ConnectionsSettingsView: View {
         }
         .onChange(of: mcpToken) { val in
             the5ers.configure(token: val)
+        }
+        .alert("Wipe All Supabase Remote Data?", isPresented: $showWipeConfirmation) {
+            Button("Wipe All Remote Data", role: .destructive) {
+                wipeSupabaseData()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will delete all application records across all tables in your Supabase PostgreSQL database while keeping all table schemas, DDL, and RLS policies completely intact. You can then perform a fresh The5ers sync.")
         }
     }
     
@@ -1180,6 +1201,32 @@ public struct ConnectionsSettingsView: View {
         UIPasteboard.general.string = SupabaseService.shared.generateDatabaseInitSql()
         supabaseSyncStatus = "Copied migration DDL SQL (23 tables + RLS) to Clipboard! Paste into Supabase SQL Editor and run."
         #endif
+    }
+    
+    private func copyTruncateSql() {
+        #if canImport(UIKit)
+        UIPasteboard.general.string = SupabaseService.shared.generateTruncateAllSql()
+        supabaseSyncStatus = "Copied TRUNCATE SQL script to Clipboard! Paste and run in Supabase SQL Editor to wipe all rows."
+        #endif
+    }
+    
+    private func wipeSupabaseData() {
+        isWipingSupabase = true
+        supabaseSyncStatus = "Wiping all tables on Supabase cloud database..."
+        Task {
+            do {
+                try await SupabaseService.shared.wipeAllRemoteData()
+                await MainActor.run {
+                    self.isWipingSupabase = false
+                    self.supabaseSyncStatus = "All Supabase tables wiped cleanly! Schemas preserved. Ready for fresh The5ers sync."
+                }
+            } catch {
+                await MainActor.run {
+                    self.isWipingSupabase = false
+                    self.supabaseSyncStatus = "Wipe notice: \(error.localizedDescription). You can also run the copied TRUNCATE SQL script directly in Supabase SQL Editor."
+                }
+            }
+        }
     }
     
     private func syncSupabase() {

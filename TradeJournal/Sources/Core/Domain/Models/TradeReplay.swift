@@ -121,10 +121,14 @@ public enum TradeReplayEngine {
         
         // Calculate unrealized P&L at current bar close
         var unrealized: Decimal = 0
-        if trade.direction == .long {
-            unrealized = (lastBar.close - trade.avgEntry) * trade.quantity
+        if trade.status != .open && clampedIndex >= bars.count {
+            unrealized = trade.netPnl
         } else {
-            unrealized = (trade.avgEntry - lastBar.close) * trade.quantity
+            if trade.direction == .long {
+                unrealized = (lastBar.close - trade.avgEntry) * trade.quantity
+            } else {
+                unrealized = (trade.avgEntry - lastBar.close) * trade.quantity
+            }
         }
         
         return ReplayFrame(

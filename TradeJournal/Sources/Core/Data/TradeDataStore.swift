@@ -61,7 +61,7 @@ public final class TradeDataStore: ObservableObject {
     }
     
     public var availableCurrencies: [String] {
-        let list = accounts.map { $0.currency.uppercased() }
+        let list = (visibleAccounts.isEmpty ? accounts : visibleAccounts).map { $0.currency.uppercased() }
         let unique = Array(Set(list)).sorted()
         return unique.isEmpty ? ["USD"] : unique
     }
@@ -84,12 +84,40 @@ public final class TradeDataStore: ObservableObject {
         if let v = account.visibleInJournal {
             return v
         }
-        return isAccountActive(account)
+        return account.archivedAt == nil
     }
 
     public var visibleAccounts: [Account] {
-        let matching = accounts.filter { isAccountVisible($0) }
-        return matching.isEmpty ? accounts : matching
+        accounts.filter { isAccountVisible($0) }
+    }
+
+    public func isPropAccountVisible(_ prop: PropAccountItem) -> Bool {
+        if let acc = accounts.first(where: {
+            $0.id == prop.journalAccountId ||
+            $0.id == prop.id ||
+            $0.id == "the5ers_\(prop.id)" ||
+            (prop.id.hasPrefix("the5ers_") && $0.id == String(prop.id.dropFirst(8)))
+        }) {
+            return isAccountVisible(acc)
+        }
+        return !prop.archived
+    }
+
+    public func isPropEntryVisible(_ entry: PropEntryItem) -> Bool {
+        guard let entryAccId = entry.accountId, !entryAccId.isEmpty else {
+            return true
+        }
+        if let prop = propAccounts.first(where: { $0.id == entryAccId }) {
+            return isPropAccountVisible(prop)
+        }
+        if let acc = accounts.first(where: {
+            $0.id == entryAccId ||
+            $0.id == "the5ers_\(entryAccId)" ||
+            (entryAccId.hasPrefix("the5ers_") && $0.id == String(entryAccId.dropFirst(8)))
+        }) {
+            return isAccountVisible(acc)
+        }
+        return true
     }
 
     public var activeAccounts: [Account] {
@@ -282,6 +310,12 @@ public final class TradeDataStore: ObservableObject {
     }
     
     public func rebuildAllAccounts() {
+        for i in 0..<accounts.count {
+            accounts[i].name = Formatters.cleanAccountName(accounts[i].name, balance: accounts[i].initialBalance)
+        }
+        for i in 0..<propAccounts.count {
+            propAccounts[i].name = Formatters.cleanAccountName(propAccounts[i].name, balance: Decimal(propAccounts[i].sizeMinor) / 100)
+        }
         for acc in accounts {
             rebuildAccount(accountId: acc.id)
         }

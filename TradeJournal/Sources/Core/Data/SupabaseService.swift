@@ -367,6 +367,87 @@ public final class SupabaseService {
         self.accessToken = token
         UserDefaults.standard.set(token, forKey: "supabase_access_token")
         return token
+    // MARK: - Database Wipe / Truncate Operations
+    
+    /// Generates safe TRUNCATE SQL for Supabase SQL Editor that wipes all rows across 20 tables while keeping table structures and RLS intact.
+    public func generateTruncateAllSql() -> String {
+        return """
+        -- ========================================================
+        -- Trade Journal: Clean Wipe All Records (Preserve Schemas)
+        -- ========================================================
+        TRUNCATE TABLE 
+            "prop_audit",
+            "prop_receipts",
+            "prop_entries",
+            "prop_accounts",
+            "trade_excursions",
+            "trade_rule_checks",
+            "trades",
+            "executions",
+            "import_batches",
+            "import_source_aliases",
+            "import_sources",
+            "notes",
+            "folders",
+            "journal_days",
+            "playbooks",
+            "progress_checks",
+            "progress_rules",
+            "missed_trades",
+            "attachments",
+            "accounts"
+        CASCADE;
+        """
+    }
+    
+    /// Wipes all remote application records across all PostgreSQL tables on Supabase PostgREST.
+    /// Preserves database tables, DDL structures, indexes, and RLS policies.
+    public func wipeAllRemoteData() async throws {
+        guard isConfigured else { throw SupabaseError.notConfigured }
+        
+        let tablesToWipe = [
+            "prop_audit",
+            "prop_receipts",
+            "prop_entries",
+            "prop_accounts",
+            "trade_excursions",
+            "trade_rule_checks",
+            "trades",
+            "executions",
+            "import_batches",
+            "import_source_aliases",
+            "import_sources",
+            "notes",
+            "folders",
+            "journal_days",
+            "playbooks",
+            "progress_checks",
+            "progress_rules",
+            "missed_trades",
+            "attachments",
+            "accounts"
+        ]
+        
+        for table in tablesToWipe {
+            let endpoint: String
+            switch table {
+            case "trades":
+                endpoint = "trades?key=not.is.null"
+            case "journal_days":
+                endpoint = "journal_days?date=not.is.null"
+            default:
+                endpoint = "\(table)?id=not.is.null"
+            }
+            
+            do {
+                let req = try makeRequest(endpoint: endpoint, method: "DELETE")
+                let (data, response) = try await session.data(for: req)
+                try validateResponse(response, data: data, endpoint: endpoint)
+                AppLogger.info("Successfully wiped Supabase table: \(table)")
+            } catch {
+                AppLogger.warning("Supabase table wipe notice for \(table): \(error.localizedDescription)")
+            }
+        }
     }
     
     // MARK: - SQL Migration Script Generator

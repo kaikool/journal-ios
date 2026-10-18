@@ -153,9 +153,12 @@ public struct TradeReplayView: View {
                                 .foregroundColor(curBar.isUp ? AppColors.profit : AppColors.loss)
                             
                             if trade.status != .open {
-                                Text("• Replay: \(Formatters.formatPnL(frame.unrealizedPnl, currency: env.currentCurrency))")
+                                let isEnd = replayEngine.currentBarIndex >= replayEngine.bars.count
+                                let label = isEnd ? "Final Net P&L" : "Frame P&L"
+                                let pnlVal = isEnd ? trade.netPnl : frame.unrealizedPnl
+                                Text("• \(label): \(Formatters.formatPnL(pnlVal, currency: env.currentCurrency))")
                                     .font(AppTypography.caption)
-                                    .foregroundColor(Formatters.pnlColor(frame.unrealizedPnl))
+                                    .foregroundColor(Formatters.pnlColor(pnlVal))
                             }
                         }
                     }

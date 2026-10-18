@@ -539,10 +539,19 @@ public final class The5ersService: ObservableObject {
                 let platform = String(describing: item["tradingPlatform"] ?? item["platform"] ?? item["tradingSystem"] ?? "MT5")
                 let createdAt = item["createdAt"] as? String ?? item["creationDate"] as? String ?? item["created_at"] as? String
                 
+                let defaultName = Self.the5ersDefaultName(
+                    from: item,
+                    fallbackLabel: label,
+                    platform: platform,
+                    startingBalance: startBal,
+                    balance: bal
+                )
+                let cleanLabel = defaultName.isEmpty ? Formatters.cleanAccountName(label, balance: startBal) : defaultName
+                
                 accountsList.append(The5ersMcpAccount(
                     id: ref,
                     ref: ref,
-                    label: label,
+                    label: cleanLabel,
                     platform: platform,
                     balance: bal,
                     equity: eq,
@@ -635,6 +644,7 @@ public final class The5ersService: ObservableObject {
                         autoSync: true,
                         lastSyncAt: Date(),
                         archivedAt: old.archivedAt,
+                        visibleInJournal: old.visibleInJournal,
                         createdAt: old.createdAt
                     )
                 } else {
@@ -645,7 +655,8 @@ public final class The5ersService: ObservableObject {
                         kind: .sync,
                         currency: acc.currency,
                         initialBalance: acc.startingBalance ?? acc.balance,
-                        autoSync: true
+                        autoSync: true,
+                        visibleInJournal: true
                     )
                     dataStore.accounts.append(newAcc)
                 }
@@ -724,7 +735,20 @@ public final class The5ersService: ObservableObject {
                 }
             }
             
-            // Internal implementation note
+            // 4. Sync purchases / challenges & evaluation fees
+            lastStatus = "Loading purchases and evaluation fees from the5ers_purchase..."
+            let purchaseArgs: [String: Any] = [
+                "operation": "list",
+                "contract_version": "1.0",
+                "request_context": ["timezone": "UTC", "locale": "en"]
+            ]
+            if let purchaseResult = try? await callMcpTool(name: "the5ers_purchase", arguments: purchaseArgs) {
+                let unwrappedPurchases = unwrapMcpToolResult(purchaseResult)
+                let rawPurchases = extractMcpCollection(unwrappedPurchases, collectionKey: "purchases")
+                mergePurchases(rawPurchases, into: dataStore, targetAccounts: accountsList)
+            }
+            
+            // 5. Sync payouts & withdrawal settlements
             lastStatus = "Loading withdrawal history from the5ers_payout..."
             let payoutArgs: [String: Any] = [
                 "operation": "history",
@@ -738,18 +762,44 @@ public final class The5ersService: ObservableObject {
                 for pay in rawPayouts {
                     let id = String(describing: pay["id"] ?? pay["payout_id"] ?? UUID().uuidString)
                     let amtMinor = Int64(Double(String(describing: pay["amount"] ?? pay["net_amount"] ?? "0")) ?? 0) * 100
-                    let dateStr = String(describing: pay["paidAt"] ?? pay["date"] ?? pay["createdAt"] ?? "")
+                    guard amtMinor > 0 else { continue }
+                    
+                    let rawDate = String(describing: pay["paidAt"] ?? pay["date"] ?? pay["createdAt"] ?? "")
+                    let dateStr = rawDate.prefix(10).isEmpty ? String(JournalIds.nowIso().prefix(10)) : String(rawDate.prefix(10))
+                    let payoutEntryId = "the5ers_payout_\(id)"
                     let rcptId = "the5ers_rcpt_\(id)"
+                    let shortRef = "Payout #\(id.prefix(8))"
+                    
+                    let primaryAccId = targetAccounts.first?.id.hasPrefix("the5ers_") == true ? targetAccounts.first?.id : "the5ers_\(targetAccounts.first?.id ?? "")"
+                    let primaryCurrency = targetAccounts.first?.currency ?? "USD"
+                    
+                    if !dataStore.propEntries.contains(where: { $0.id == payoutEntryId }) {
+                        let payoutEntry = PropEntryItem(
+                            id: payoutEntryId,
+                            accountId: primaryAccId,
+                            firm: "The5ers",
+                            kind: "payout",
+                            category: "payout",
+                            status: .completed,
+                            currency: primaryCurrency,
+                            amountMinor: amtMinor,
+                            splitBps: 8000,
+                            occurredOn: dateStr,
+                            reference: shortRef,
+                            notes: "The5ers Funded Payout"
+                        )
+                        dataStore.propEntries.append(payoutEntry)
+                    }
                     
                     if !dataStore.propReceipts.contains(where: { $0.id == rcptId }) {
                         let rcpt = PropReceiptItem(
                             id: rcptId,
-                            payoutId: id,
+                            payoutId: payoutEntryId,
                             kind: "receipt",
                             amountMinor: amtMinor,
                             occurredOn: dateStr,
-                            reference: "THE5ERS-\(id)",
-                            notes: "The5ers MCP Withdrawal Receipt"
+                            reference: "Receipt #\(id.prefix(8))",
+                            notes: "The5ers Official Withdrawal Receipt"
                         )
                         dataStore.propReceipts.append(rcpt)
                     }
@@ -1056,6 +1106,203 @@ public final class The5ersService: ObservableObject {
                 )
                 dataStore.trades.append(trade)
                 count += 1
+            }
+        }
+    }
+    
+    // MARK: - Purchase & Account Normalization
+    
+    /// Derives a clean, professional display name for a The5ers account matching the web source specification.
+    public static func the5ersDefaultName(
+        from item: [String: Any],
+        fallbackLabel: String,
+        platform: String? = nil,
+        startingBalance: Decimal? = nil,
+        balance: Decimal? = nil
+    ) -> String {
+        var fields: [String: Any] = [:]
+        for (k, v) in item {
+            let clean = k.replacingOccurrences(of: " ", with: "")
+                .replacingOccurrences(of: "_", with: "")
+                .replacingOccurrences(of: "-", with: "")
+                .lowercased()
+            fields[clean] = v
+        }
+        
+        let pkgCandidates: [Any?] = [
+            fields["packagename"],
+            fields["programname"],
+            fields["productname"],
+            fields["planname"],
+            fields["program"],
+            fields["type"],
+            fields["accounttype"]
+        ]
+        var packageName: String? = nil
+        for cand in pkgCandidates {
+            if let str = cand as? String, !str.trimmingCharacters(in: .whitespaces).isEmpty {
+                let cleanStr = str.trimmingCharacters(in: .whitespaces)
+                let l = cleanStr.lowercased()
+                if !l.contains("standard") && l != "funded" && l != "active" {
+                    packageName = cleanStr
+                    break
+                }
+            }
+        }
+        
+        var accountSize: Decimal? = startingBalance ?? balance
+        let sizeCandidates: [Any?] = [
+            fields["accountsize"],
+            fields["startingbalance"],
+            fields["initialbalance"],
+            fields["nominalbalance"],
+            fields["size"],
+            fields["balance"]
+        ]
+        for cand in sizeCandidates {
+            if let num = cand as? NSNumber, num.doubleValue > 0 {
+                accountSize = Decimal(string: num.stringValue)
+                break
+            } else if let str = cand as? String, let dec = Decimal(string: str.trimmingCharacters(in: .whitespaces)), dec > 0 {
+                accountSize = dec
+                break
+            }
+        }
+        
+        var accountNumber: String? = nil
+        let accNumCandidates: [Any?] = [
+            fields["accountnumber"],
+            fields["tradingaccountnumber"],
+            fields["login"],
+            fields["accountlogin"]
+        ]
+        for cand in accNumCandidates {
+            if let num = cand as? NSNumber, num.intValue > 0 {
+                accountNumber = num.stringValue
+                break
+            } else if let str = cand as? String, !str.isEmpty {
+                accountNumber = str.trimmingCharacters(in: .whitespaces)
+                break
+            }
+        }
+        
+        let suffix: String? = {
+            if let acc = accountNumber { return acc }
+            let pattern = #"(?:…|\.{3}|[-_·\s])?(\d{3,12})\s*$"#
+            if let regex = try? NSRegularExpression(pattern: pattern),
+               let match = regex.firstMatch(in: fallbackLabel, range: NSRange(fallbackLabel.startIndex..., in: fallbackLabel)),
+               let range = Range(match.range(at: 1), in: fallbackLabel) {
+                return String(fallbackLabel[range])
+            }
+            return nil
+        }()
+        
+        let pLower = (platform ?? String(describing: fields["platform"] ?? fields["tradingplatform"] ?? "")).lowercased()
+        let platformTag: String = {
+            if pLower.contains("meta-trader-5") || pLower.contains("mt5") { return "MT5" }
+            if pLower.contains("meta-trader-4") || pLower.contains("mt4") { return "MT4" }
+            if pLower.contains("c-trader") || pLower.contains("ctrader") { return "cTrader" }
+            return "MT5"
+        }()
+        
+        let leadTitle = packageName ?? "The5ers \(platformTag)"
+        var parts: [String] = [leadTitle]
+        
+        if let sz = accountSize, sz > 0 {
+            let formatter = NumberFormatter()
+            formatter.numberStyle = .currency
+            formatter.currencyCode = "USD"
+            formatter.maximumFractionDigits = 0
+            if let formatted = formatter.string(from: sz as NSDecimalNumber),
+               !leadTitle.contains(formatted) && !leadTitle.contains("\(sz)") {
+                parts.append(formatted)
+            }
+        }
+        
+        if let s = suffix, !leadTitle.contains(s) {
+            parts.append("#\(s)")
+        }
+        
+        return parts.joined(separator: " · ")
+    }
+    
+    @MainActor
+    private func mergePurchases(
+        _ rawPurchases: [[String: Any]],
+        into dataStore: TradeDataStore,
+        targetAccounts: [The5ersMcpAccount]
+    ) {
+        for purchase in rawPurchases {
+            var fields: [String: Any] = [:]
+            for (k, v) in purchase {
+                let clean = k.replacingOccurrences(of: " ", with: "")
+                    .replacingOccurrences(of: "_", with: "")
+                    .replacingOccurrences(of: "-", with: "")
+                    .lowercased()
+                fields[clean] = v
+            }
+            
+            let status = String(describing: fields["status"] ?? "completed").lowercased()
+            let isRefunded = (fields["refunded"] as? Bool) ?? (fields["isrefunded"] as? Bool) ?? false
+            guard (status == "completed" || status == "paid" || status == "approved") && !isRefunded else { continue }
+            
+            let rawDate = String(describing: fields["placedat"] ?? fields["date"] ?? fields["createdat"] ?? "")
+            guard let date = FlexibleDateParser.parse(rawDate) else { continue }
+            let fmt = DateFormatter()
+            fmt.dateFormat = "yyyy-MM-dd"
+            fmt.locale = Locale(identifier: "en_US_POSIX")
+            let dateStr = fmt.string(from: date)
+            
+            let currency = String(describing: fields["currency"] ?? "USD").uppercased()
+            
+            var itemNames: [String] = []
+            var productType = "challenge_fee"
+            var itemsTotal: Double = 0
+            if let items = fields["items"] as? [[String: Any]] {
+                for it in items {
+                    if let n = (it["name"] ?? it["productName"]) as? String, !n.isEmpty {
+                        itemNames.append(n)
+                    }
+                    if let pt = (it["producttype"] ?? it["product_type"] ?? it["category"]) as? String, !pt.isEmpty {
+                        productType = pt.lowercased()
+                    }
+                    if let np = it["netpaid"] as? NSNumber {
+                        itemsTotal += np.doubleValue
+                    } else if let np = it["netpaid"] as? String, let d = Double(np) {
+                        itemsTotal += d
+                    }
+                }
+            }
+            
+            let priceNum = Double(String(describing: fields["price"] ?? fields["amount"] ?? "\(itemsTotal)")) ?? itemsTotal
+            guard priceNum > 0 else { continue }
+            let amountMinor = Int64(round(priceNum * 100))
+            
+            let title = itemNames.isEmpty ? "The5ers Program Evaluation" : itemNames.joined(separator: ", ")
+            let purchaseHash = JournalIds.sha256("\(dateStr)_\(currency)_\(amountMinor)_\(title)")
+            let entryId = "the5ers_purchase_\(purchaseHash.prefix(16))"
+            let shortRef = "Order #\(purchaseHash.prefix(8))"
+            
+            let matchingAccId = targetAccounts.first(where: {
+                title.contains("\($0.startingBalance ?? 0)") || $0.currency == currency
+            })?.id
+            let journalAccId = matchingAccId.map { $0.hasPrefix("the5ers_") ? $0 : "the5ers_\($0)" }
+            
+            if !dataStore.propEntries.contains(where: { $0.id == entryId }) {
+                let entry = PropEntryItem(
+                    id: entryId,
+                    accountId: journalAccId,
+                    firm: "The5ers",
+                    kind: "expense",
+                    category: productType,
+                    status: .completed,
+                    currency: currency,
+                    amountMinor: amountMinor,
+                    occurredOn: dateStr,
+                    reference: shortRef,
+                    notes: "\(title) (The5ers official order)"
+                )
+                dataStore.propEntries.append(entry)
             }
         }
     }

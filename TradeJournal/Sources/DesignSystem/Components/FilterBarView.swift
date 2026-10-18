@@ -142,7 +142,8 @@ public struct FilterBarView<Actions: View>: View {
                                 dataStore.selectedAccountId = acc.id
                             } label: {
                                 HStack {
-                                    Text(acc.name.isEmpty ? acc.id : acc.name + (acc.archivedAt != nil ? " (archived)" : ""))
+                                    let displayName = Formatters.cleanAccountName(acc.name.isEmpty ? "\(acc.broker.isEmpty ? "Standard" : acc.broker) Account" : acc.name, balance: acc.initialBalance)
+                                    Text(displayName + (acc.archivedAt != nil ? " (archived)" : ""))
                                     if dataStore.selectedAccountId == acc.id {
                                         Image(systemName: "checkmark")
                                     }
@@ -254,7 +255,8 @@ public struct FilterBarView<Actions: View>: View {
             return "All accounts"
         }
         if let acc = dataStore.accounts.first(where: { $0.id == dataStore.selectedAccountId }) {
-            return acc.name.isEmpty ? acc.id : acc.name
+            let title = acc.name.isEmpty ? "\(acc.broker.isEmpty ? "Standard" : acc.broker) Account" : acc.name
+            return Formatters.cleanAccountName(title, balance: acc.initialBalance)
         }
         return "All accounts"
     }

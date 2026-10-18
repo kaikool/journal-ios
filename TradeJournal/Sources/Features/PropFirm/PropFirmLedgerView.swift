@@ -41,13 +41,18 @@ public struct PropFirmLedgerView: View {
     }
     
     private var filteredAccounts: [PropAccountItem] {
-        dataStore.propAccounts.filter {
-            (showArchivedAccounts || !$0.archived) && ($0.currency == selectedCurrency)
+        dataStore.propAccounts.filter { prop in
+            (showArchivedAccounts || !prop.archived) &&
+            (prop.currency == selectedCurrency) &&
+            dataStore.isPropAccountVisible(prop)
         }
     }
     
     private var filteredEntries: [PropEntryItem] {
-        dataStore.propEntries.filter { $0.currency == selectedCurrency }
+        dataStore.propEntries.filter { entry in
+            entry.currency == selectedCurrency &&
+            dataStore.isPropEntryVisible(entry)
+        }
     }
     
     private var movements: [CashMovementItem] {
@@ -77,7 +82,7 @@ public struct PropFirmLedgerView: View {
     }
     
     private var passRate: Double? {
-        PropFirmEngine.resolvedPhasePassRate(accounts: dataStore.propAccounts.filter { $0.currency == selectedCurrency })
+        PropFirmEngine.resolvedPhasePassRate(accounts: filteredAccounts)
     }
     
     public var body: some View {
@@ -534,7 +539,7 @@ public struct PropFirmLedgerView: View {
                                 )
                             }
                             
-                            Text(acc.name)
+                            Text(Formatters.cleanAccountName(acc.name, balance: acc.sizeMinor != nil ? Decimal(acc.sizeMinor!) / 100 : nil))
                                 .font(AppTypography.headline)
                                 .foregroundColor(AppColors.primaryText)
                             
@@ -543,7 +548,7 @@ public struct PropFirmLedgerView: View {
                                     Image(systemName: "arrow.turn.down.right")
                                         .font(.system(size: 10))
                                         .foregroundColor(AppColors.brand)
-                                    Text("Next phase of: \(parentAcc.name)")
+                                    Text("Next phase of: \(Formatters.cleanAccountName(parentAcc.name))")
                                         .font(.system(size: 11, weight: .medium))
                                         .foregroundColor(AppColors.brand)
                                 }
@@ -847,11 +852,17 @@ public struct PropFirmLedgerView: View {
                                         .foregroundColor(AppColors.secondaryText)
                                 }
                                 
+                                if let entry = dataStore.propEntries.first(where: { $0.id == m.entryId }), !entry.notes.isEmpty {
+                                    Text(entry.notes.components(separatedBy: "\n").first ?? entry.notes)
+                                        .font(AppTypography.caption)
+                                        .foregroundColor(AppColors.primaryText)
+                                }
+                                
                                 Text(m.date ?? "Pending settlement")
                                     .font(AppTypography.caption)
                                     .foregroundColor(AppColors.secondaryText)
                                 if !m.reference.isEmpty {
-                                    Text("Ref: \(m.reference)")
+                                    Text(Formatters.formatReference(m.reference))
                                         .font(.system(size: 10, design: .monospaced))
                                         .foregroundColor(AppColors.secondaryText.opacity(0.8))
                                 }
@@ -1108,6 +1119,7 @@ public struct EditPropAccountSheet: View {
 
 public struct PropAuditTrailSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var dataStore: TradeDataStore
     let audits: [PropAuditItem]
     
     public var body: some View {
@@ -1131,8 +1143,18 @@ public struct PropAuditTrailSheet: View {
                             Text(a.reason)
                                 .font(AppTypography.captionBold)
                                 .foregroundColor(AppColors.primaryText)
-                            Text("ID: \(a.entityId)")
-                                .font(.system(size: 10, design: .monospaced))
+                            
+                            let entityName: String = {
+                                if let acc = dataStore.propAccounts.first(where: { $0.id == a.entityId }) {
+                                    return Formatters.cleanAccountName(acc.name)
+                                }
+                                if let acc = dataStore.accounts.first(where: { $0.id == a.entityId }) {
+                                    return Formatters.cleanAccountName(acc.name)
+                                }
+                                return Formatters.formatEntityId(a.entityId)
+                            }()
+                            Text("Target: \(entityName)")
+                                .font(.system(size: 10))
                                 .foregroundColor(AppColors.secondaryText)
                         }
                         .padding(.vertical, 4)

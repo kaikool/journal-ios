@@ -19,7 +19,7 @@ public struct AccountsManagerView: View {
     @ObservedObject private var dataStore = TradeDataStore.shared
     @EnvironmentObject private var env: AppEnvironment
     
-    @State private var filterTab: AccountFilterTab = .default
+    @State private var filterTab: AccountFilterTab = .visible
     @State private var searchText: String = ""
     @State private var showNewAccountSheet: Bool = false
     @State private var accountToDelete: Account? = nil
@@ -34,7 +34,7 @@ public struct AccountsManagerView: View {
     }
     
     private var defaultCount: Int {
-        accounts.filter { dataStore.isAccountActive($0) || dataStore.isAccountVisible($0) }.count
+        accounts.filter { dataStore.isAccountVisible($0) }.count
     }
     
     private var activeCount: Int {
@@ -52,7 +52,7 @@ public struct AccountsManagerView: View {
             
             switch filterTab {
             case .default:
-                if !isActive && !isVisible { return false }
+                if !isVisible { return false }
             case .active:
                 if !isActive { return false }
             case .visible:
@@ -303,7 +303,7 @@ public struct AccountsManagerView: View {
                     
                     VStack(alignment: .leading, spacing: 3) {
                         HStack(spacing: 6) {
-                            Text(acc.name)
+                            Text(Formatters.cleanAccountName(acc.name, balance: acc.initialBalance))
                                 .font(AppTypography.headline)
                                 .foregroundColor(AppColors.primaryText)
                             
