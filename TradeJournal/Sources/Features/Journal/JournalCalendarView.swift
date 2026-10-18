@@ -1238,7 +1238,8 @@ public struct DayDetailSheet: View {
                             showDeleteNoteAlert = true
                         } label: {
                             Image(systemName: "trash")
-                                .foregroundColor(AppColors.loss)
+                                .font(.system(size: 13, weight: .regular))
+                                .foregroundColor(AppColors.loss.opacity(0.85))
                         }
                     }
                 }
@@ -1308,8 +1309,8 @@ public struct DayDetailSheet: View {
                             showDeleteNoteAlert = true
                         } label: {
                             Image(systemName: "trash")
-                                .font(.system(size: 13))
-                                .foregroundColor(AppColors.loss.opacity(0.8))
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundColor(AppColors.loss.opacity(0.75))
                         }
                         .buttonStyle(.plain)
                     }

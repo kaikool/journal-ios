@@ -639,8 +639,8 @@ public struct DailyJournalDetailView: View {
                             showDeleteNoteAlert = true
                         } label: {
                             Image(systemName: "trash")
-                                .font(.system(size: 13))
-                                .foregroundColor(AppColors.loss.opacity(0.85))
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundColor(AppColors.loss.opacity(0.75))
                                 .padding(4)
                         }
                         .buttonStyle(.plain)

@@ -688,7 +688,8 @@ public struct NotebookEditorSheet: View {
                         showDeleteConfirmation = true
                     } label: {
                         Image(systemName: "trash")
-                            .foregroundColor(AppColors.loss)
+                            .font(.system(size: 13, weight: .regular))
+                            .foregroundColor(AppColors.loss.opacity(0.85))
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
