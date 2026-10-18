@@ -8,6 +8,59 @@ public enum JournalTimeRange: String, CaseIterable, Identifiable {
     case all = "ALL"
     
     public var id: String { rawValue }
+    
+    /// Ported 1:1 from `apps/web/src/components/filter-bar.tsx` useFilters:
+    /// Returns `(from: String?, to: String?)` date strings in `YYYY-MM-DD` format according to the given timezone.
+    public func dayBounds(timeZone: TimeZone = .current, referenceDate: Date = Date()) -> (from: String?, to: String?) {
+        guard self != .all else { return (nil, nil) }
+        
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.timeZone = timeZone
+        
+        let today = formatter.string(from: referenceDate)
+        
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        
+        switch self {
+        case .all:
+            return (nil, nil)
+        case .ytd:
+            let year = String(today.prefix(4))
+            return ("\(year)-01-01", today)
+        case .d7:
+            // Web: d.setUTCDate(d.getUTCDate() - 7 + 1) -> 7 calendar days including today (-6 days)
+            let fromDate = calendar.date(byAdding: .day, value: -6, to: referenceDate) ?? referenceDate
+            return (formatter.string(from: fromDate), today)
+        case .d30:
+            // Web: d.setUTCDate(d.getUTCDate() - 30 + 1) -> 30 calendar days including today (-29 days)
+            let fromDate = calendar.date(byAdding: .day, value: -29, to: referenceDate) ?? referenceDate
+            return (formatter.string(from: fromDate), today)
+        case .d90:
+            // Web: d.setUTCDate(d.getUTCDate() - 90 + 1) -> 90 calendar days including today (-89 days)
+            let fromDate = calendar.date(byAdding: .day, value: -89, to: referenceDate) ?? referenceDate
+            return (formatter.string(from: fromDate), today)
+        }
+    }
+    
+    /// Filters trades using `trade.closedAt ?? trade.openedAt` matching web `matchesFilters` in `packages/core/src/analysis.ts`
+    public func filterTrades(_ trades: [Trade], timeZone: TimeZone = .current, referenceDate: Date = Date()) -> [Trade] {
+        guard self != .all else { return trades }
+        let (from, to) = dayBounds(timeZone: timeZone, referenceDate: referenceDate)
+        
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.timeZone = timeZone
+        
+        return trades.filter { trade in
+            let date = trade.closedAt ?? trade.openedAt
+            let day = formatter.string(from: date)
+            if let from = from, day < from { return false }
+            if let to = to, day > to { return false }
+            return true
+        }
+    }
 }
 
 /// FilterBar component matching 100% of `source-repo/apps/web/src/components/filter-bar.tsx`:

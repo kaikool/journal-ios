@@ -116,13 +116,15 @@ public struct TradeReplayView: View {
                     Spacer()
                     
                     VStack(alignment: .trailing, spacing: 2) {
-                        Text("UNREALIZED P&L")
+                        let isTradeOpen = trade.status == .open
+                        Text(isTradeOpen ? "UNREALIZED P&L" : "NET P&L")
                             .font(AppTypography.cardTitle)
                             .foregroundColor(AppColors.secondaryText)
                         
-                        Text(Formatters.formatPnL(frame.unrealizedPnl, currency: env.currentCurrency))
+                        let displayPnl = isTradeOpen ? frame.unrealizedPnl : trade.netPnl
+                        Text(Formatters.formatPnL(displayPnl, currency: env.currentCurrency))
                             .font(AppTypography.financialNumber(size: 18, weight: .bold))
-                            .foregroundColor(Formatters.pnlColor(frame.unrealizedPnl))
+                            .foregroundColor(Formatters.pnlColor(displayPnl))
                     }
                 }
                 
@@ -136,9 +138,17 @@ public struct TradeReplayView: View {
                     Spacer()
                     
                     if let curBar = frame.currentBar {
-                        Text("Bar Close: \(Formatters.price(curBar.close))")
-                            .font(AppTypography.captionBold)
-                            .foregroundColor(curBar.isUp ? AppColors.profit : AppColors.loss)
+                        HStack(spacing: 4) {
+                            Text("Bar Close: \(Formatters.price(curBar.close))")
+                                .font(AppTypography.captionBold)
+                                .foregroundColor(curBar.isUp ? AppColors.profit : AppColors.loss)
+                            
+                            if trade.status != .open {
+                                Text("• Replay: \(Formatters.formatPnL(frame.unrealizedPnl, currency: env.currentCurrency))")
+                                    .font(AppTypography.caption)
+                                    .foregroundColor(Formatters.pnlColor(frame.unrealizedPnl))
+                            }
+                        }
                     }
                 }
             }

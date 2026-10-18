@@ -85,28 +85,7 @@ public struct DashboardView: View {
     // MARK: - Filtered Trades by Range
     
     private var scopedTrades: [Trade] {
-        let baseTrades = dataStore.filteredTrades
-        guard selectedRange != .all else { return baseTrades }
-        
-        let now = Date()
-        let calendar = Calendar.current
-        let cutoff: Date
-        
-        switch selectedRange {
-        case .all:
-            return baseTrades
-        case .d7:
-            cutoff = calendar.date(byAdding: .day, value: -7, to: now) ?? now
-        case .d30:
-            cutoff = calendar.date(byAdding: .day, value: -30, to: now) ?? now
-        case .d90:
-            cutoff = calendar.date(byAdding: .day, value: -90, to: now) ?? now
-        case .ytd:
-            let comps = calendar.dateComponents([.year], from: now)
-            cutoff = calendar.date(from: comps) ?? now
-        }
-        
-        return baseTrades.filter { $0.openedAt >= cutoff }
+        selectedRange.filterTrades(dataStore.filteredTrades, timeZone: env.currentTimeZone)
     }
     
     // MARK: - Memoized Single-Pass Snapshot

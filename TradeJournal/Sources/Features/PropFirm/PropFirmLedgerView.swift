@@ -6,7 +6,6 @@ public enum PropLedgerTab: String, CaseIterable, Identifiable {
     case accounts = "Accounts"
     case payouts = "Payouts"
     case transactions = "Transactions"
-    case activity = "Activity"
     
     public var id: String { rawValue }
 }
@@ -187,8 +186,6 @@ public struct PropFirmLedgerView: View {
                             payoutsProgressView
                         case .transactions:
                             transactionsListView
-                        case .activity:
-                            activityAuditView
                         }
                     }
                     .padding(14)
@@ -424,7 +421,7 @@ public struct PropFirmLedgerView: View {
                                     x: .value("Date", pt.date),
                                     y: .value("Net cash", pt.val)
                                 )
-                                .interpolationMethod(.catmullRom)
+                                .interpolationMethod(.stepAfter)
                                 .foregroundStyle(
                                     LinearGradient(
                                         stops: [
@@ -441,7 +438,7 @@ public struct PropFirmLedgerView: View {
                                     x: .value("Date", pt.date),
                                     y: .value("Net cash", pt.val)
                                 )
-                                .interpolationMethod(.catmullRom)
+                                .interpolationMethod(.stepAfter)
                                 .foregroundStyle(AppColors.brand)
                                 .lineStyle(StrokeStyle(lineWidth: 2.2, lineCap: .round, lineJoin: .round))
                             }
@@ -452,7 +449,7 @@ public struct PropFirmLedgerView: View {
                                     .foregroundStyle(AppColors.border.opacity(0.3))
                                 AxisValueLabel {
                                     if let d = value.as(Double.self) {
-                                        Text(Formatters.formatCurrency(Decimal(d), currency: "USD"))
+                                        Text(Formatters.formatCurrency(Decimal(d), currency: selectedCurrency))
                                             .font(.system(size: 9, weight: .medium, design: .rounded))
                                             .monospacedDigit()
                                             .foregroundStyle(AppColors.secondaryText)
@@ -461,7 +458,7 @@ public struct PropFirmLedgerView: View {
                             }
                         }
                         .chartXAxis {
-                            AxisMarks(values: .automatic(desiredCount: 4)) { value in
+                            AxisMarks(values: .automatic(desiredCount: 3)) { value in
                                 AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
                                     .foregroundStyle(AppColors.border.opacity(0.3))
                                 AxisTick(stroke: StrokeStyle(lineWidth: 0.5))
@@ -506,6 +503,13 @@ public struct PropFirmLedgerView: View {
     }
     
     // MARK: - 2. Accounts Tab
+    
+    private func accountCashSummary(account: PropAccountItem) -> CashSummaryResult {
+        let accMovements = movements.filter { $0.accountId == account.id && $0.currency == account.currency }
+        return (try? PropFirmEngine.cashSummary(rows: accMovements)) ?? CashSummaryResult(
+            spentMinor: 0, refundsMinor: 0, netSpendMinor: 0, receivedMinor: 0, netMinor: 0, roi: nil
+        )
+    }
     
     private var accountsListView: some View {
         VStack(spacing: 12) {
@@ -574,6 +578,45 @@ public struct PropFirmLedgerView: View {
                                     .font(AppTypography.caption)
                                     .foregroundColor(AppColors.secondaryText)
                             }
+                            
+                            // 3-Column Account Economics matching web prop-firm-tracker.tsx:900-913
+                            let accSummary = accountCashSummary(account: acc)
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Net spend")
+                                        .font(AppTypography.caption)
+                                        .foregroundColor(AppColors.secondaryText)
+                                    Text(Formatters.formatCurrency(Decimal(accSummary.netSpendMinor) / 100, currency: acc.currency))
+                                        .font(AppTypography.captionBold)
+                                        .monospacedDigit()
+                                        .foregroundColor(AppColors.primaryText)
+                                }
+                                Spacer()
+                                VStack(alignment: .center, spacing: 2) {
+                                    Text("Payout cash")
+                                        .font(AppTypography.caption)
+                                        .foregroundColor(AppColors.secondaryText)
+                                    Text(Formatters.formatCurrency(Decimal(accSummary.receivedMinor) / 100, currency: acc.currency))
+                                        .font(AppTypography.captionBold)
+                                        .monospacedDigit()
+                                        .foregroundColor(AppColors.profit)
+                                }
+                                Spacer()
+                                VStack(alignment: .trailing, spacing: 2) {
+                                    Text("Net return")
+                                        .font(AppTypography.caption)
+                                        .foregroundColor(AppColors.secondaryText)
+                                    let isNetPos = accSummary.netMinor >= 0
+                                    Text("\(isNetPos ? "+" : "")\(Formatters.formatCurrency(Decimal(accSummary.netMinor) / 100, currency: acc.currency))")
+                                        .font(AppTypography.captionBold)
+                                        .monospacedDigit()
+                                        .foregroundColor(isNetPos ? AppColors.profit : AppColors.loss)
+                                }
+                            }
+                            .padding(.vertical, 6)
+                            .padding(.horizontal, 10)
+                            .background(AppColors.secondaryBackground.opacity(0.6))
+                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                             
                             Divider().background(AppColors.border.opacity(0.5))
                             
@@ -671,9 +714,52 @@ public struct PropFirmLedgerView: View {
                                 )
                             }
                             
+                            // Subtitle matching web prop-firm-tracker.tsx:980
+                            Text("Requested \(p.entry.occurredOn) • Trader split \(p.entry.splitBps / 100)% • Gross \(Formatters.formatCurrency(Decimal(p.entry.amountMinor) / 100, currency: p.entry.currency))\(p.entry.dueOn != nil ? " • Expected \(p.entry.dueOn!)" : "")")
+                                .font(AppTypography.caption)
+                                .foregroundColor(AppColors.secondaryText)
+                            
+                            // Primary Headline Amount (Received if receipts exist, or Expected Net)
+                            let hasReceipt = p.actualMinor > 0
+                            HStack(alignment: .firstTextBaseline) {
+                                Text(hasReceipt ? "Received:" : "Expected net:")
+                                    .font(AppTypography.caption)
+                                    .foregroundColor(AppColors.secondaryText)
+                                Text(Formatters.formatCurrency(Decimal(hasReceipt ? p.actualMinor : p.expectedMinor) / 100, currency: p.entry.currency))
+                                    .font(AppTypography.financialNumber(size: 20, weight: .bold))
+                                    .foregroundColor(hasReceipt ? AppColors.profit : AppColors.primaryText)
+                                Spacer()
+                                if hasReceipt && p.remainingMinor > 0 {
+                                    Text("Remaining \(Formatters.formatCurrency(Decimal(p.remainingMinor) / 100, currency: p.entry.currency))")
+                                        .font(AppTypography.captionBold)
+                                        .foregroundColor(AppColors.loss)
+                                }
+                            }
+                            
+                            // 4-Column Metric Details matching web prop-firm-tracker.tsx:1024-1041
                             HStack {
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text("Expected payout (after split):")
+                                    Text("Gross profit")
+                                        .font(AppTypography.caption)
+                                        .foregroundColor(AppColors.secondaryText)
+                                    Text(Formatters.formatCurrency(Decimal(p.entry.amountMinor) / 100, currency: p.entry.currency))
+                                        .font(AppTypography.captionBold)
+                                        .monospacedDigit()
+                                        .foregroundColor(AppColors.primaryText)
+                                }
+                                Spacer()
+                                VStack(alignment: .center, spacing: 2) {
+                                    Text("Trader split")
+                                        .font(AppTypography.caption)
+                                        .foregroundColor(AppColors.secondaryText)
+                                    Text("\(p.entry.splitBps / 100)%")
+                                        .font(AppTypography.captionBold)
+                                        .monospacedDigit()
+                                        .foregroundColor(AppColors.primaryText)
+                                }
+                                Spacer()
+                                VStack(alignment: .center, spacing: 2) {
+                                    Text("Expected net")
                                         .font(AppTypography.caption)
                                         .foregroundColor(AppColors.secondaryText)
                                     Text(Formatters.formatCurrency(Decimal(p.expectedMinor) / 100, currency: p.entry.currency))
@@ -683,7 +769,7 @@ public struct PropFirmLedgerView: View {
                                 }
                                 Spacer()
                                 VStack(alignment: .trailing, spacing: 2) {
-                                    Text("Actually received:")
+                                    Text("Actual received")
                                         .font(AppTypography.caption)
                                         .foregroundColor(AppColors.secondaryText)
                                     Text(Formatters.formatCurrency(Decimal(p.actualMinor) / 100, currency: p.entry.currency))
@@ -692,19 +778,10 @@ public struct PropFirmLedgerView: View {
                                         .foregroundColor(AppColors.profit)
                                 }
                             }
-                            
-                            if p.remainingMinor > 0 {
-                                HStack {
-                                    Text("Remaining payout:")
-                                        .font(AppTypography.caption)
-                                        .foregroundColor(AppColors.secondaryText)
-                                    Spacer()
-                                    Text(Formatters.formatCurrency(Decimal(p.remainingMinor) / 100, currency: p.entry.currency))
-                                        .font(AppTypography.captionBold)
-                                        .monospacedDigit()
-                                        .foregroundColor(AppColors.loss)
-                                }
-                            }
+                            .padding(.vertical, 6)
+                            .padding(.horizontal, 10)
+                            .background(AppColors.secondaryBackground.opacity(0.6))
+                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                             
                             if p.varianceMinor != 0 && p.entry.status == .completed {
                                 HStack {
@@ -767,11 +844,26 @@ public struct PropFirmLedgerView: View {
                                     Text(m.firm)
                                         .font(AppTypography.subheadlineBold)
                                         .foregroundColor(AppColors.primaryText)
-                                    AppBadge(
-                                        text: m.category.capitalized,
-                                        color: m.kind == "payout" || m.kind == "receipt" ? AppColors.profit : AppColors.secondaryText
-                                    )
+                                    
+                                    let badgeLabel: String = {
+                                        if m.kind == "refund" { return "Fee refund" }
+                                        if m.kind == "expense" { return m.category.capitalized }
+                                        return "Payout receipt"
+                                    }()
+                                    let badgeColor: Color = {
+                                        if m.kind == "refund" { return AppColors.brand }
+                                        if m.kind == "receipt" || m.kind == "payout" { return AppColors.profit }
+                                        return AppColors.secondaryText
+                                    }()
+                                    AppBadge(text: badgeLabel, color: badgeColor)
                                 }
+                                
+                                if m.kind == "refund" {
+                                    Text("Refund of evaluation fee from prop firm")
+                                        .font(AppTypography.caption)
+                                        .foregroundColor(AppColors.secondaryText)
+                                }
+                                
                                 Text(m.date ?? "Pending settlement")
                                     .font(AppTypography.caption)
                                     .foregroundColor(AppColors.secondaryText)
@@ -802,9 +894,13 @@ public struct PropFirmLedgerView: View {
                                                 selectedExpenseForRefund = entry
                                             }
                                         } label: {
-                                            Text("Refund")
-                                                .font(.system(size: 11, weight: .semibold))
-                                                .foregroundColor(AppColors.brand)
+                                            HStack(spacing: 3) {
+                                                Image(systemName: "arrow.counterclockwise")
+                                                    .font(.system(size: 10))
+                                                Text("Fee refund")
+                                            }
+                                            .font(.system(size: 11, weight: .semibold))
+                                            .foregroundColor(AppColors.brand)
                                         }
                                         .buttonStyle(ApplePressableButtonStyle())
                                     }
@@ -822,78 +918,6 @@ public struct PropFirmLedgerView: View {
                                     }
                                     .buttonStyle(ApplePressableButtonStyle())
                                 }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-    
-    // MARK: - Activity / Audit Trail View
-    private var activityAuditView: some View {
-        cardContainer {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack {
-                    HStack(spacing: 6) {
-                        Image(systemName: "clock.arrow.circlepath")
-                            .font(.system(size: 14))
-                            .foregroundColor(AppColors.brand)
-                        Text("Activity & Audit Trail")
-                            .font(AppTypography.headline)
-                            .foregroundColor(AppColors.primaryText)
-                    }
-                    Spacer()
-                    Text("\(dataStore.propAudits.count) events")
-                        .font(AppTypography.caption)
-                        .monospacedDigit()
-                        .foregroundColor(AppColors.secondaryText)
-                }
-                
-                Divider().background(AppColors.border.opacity(0.5))
-                
-                if dataStore.propAudits.isEmpty {
-                    Text("No audit events recorded yet.")
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.secondaryText)
-                        .padding(.vertical, 8)
-                } else {
-                    VStack(spacing: 12) {
-                        ForEach(dataStore.propAudits.reversed()) { a in
-                            HStack(alignment: .top, spacing: 12) {
-                                Image(systemName: "circle.fill")
-                                    .font(.system(size: 6))
-                                    .foregroundColor(AppColors.brand)
-                                    .padding(.top, 5)
-                                
-                                VStack(alignment: .leading, spacing: 4) {
-                                    HStack {
-                                        Text(a.entityType.uppercased())
-                                            .font(.system(size: 10, weight: .bold))
-                                            .foregroundColor(AppColors.brand)
-                                            .padding(.horizontal, 6)
-                                            .padding(.vertical, 2)
-                                            .background(AppColors.brand.opacity(0.12))
-                                            .clipShape(Capsule())
-                                        Spacer()
-                                        Text(a.createdAt.prefix(19))
-                                            .font(.system(size: 10))
-                                            .monospacedDigit()
-                                            .foregroundColor(AppColors.secondaryText)
-                                    }
-                                    
-                                    Text(a.reason)
-                                        .font(AppTypography.captionBold)
-                                        .foregroundColor(AppColors.primaryText)
-                                    
-                                    Text("ID: \(a.entityId)")
-                                        .font(.system(size: 10, design: .monospaced))
-                                        .foregroundColor(AppColors.secondaryText.opacity(0.8))
-                                }
-                            }
-                            
-                            if a.id != dataStore.propAudits.first?.id {
-                                Divider().background(AppColors.border.opacity(0.3))
                             }
                         }
                     }
@@ -1323,18 +1347,27 @@ public struct AddRefundSheet: View {
     public var body: some View {
         NavigationStack {
             Form {
+                Section {
+                    Text("In prop trading, evaluation or challenge fees are often reimbursed by the firm upon passing and reaching the first payout. Recording a fee refund reduces your net spend.")
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.secondaryText)
+                } header: {
+                    Text("Fee reimbursement")
+                }
+                
                 Section("Original Expense") {
                     Text("Firm: \(expense.firm)")
                     Text("Amount spent: \(Formatters.formatCurrency(Decimal(expense.amountMinor) / 100, currency: expense.currency))")
                 }
                 
-                Section("Refund Amount") {
+                Section("Refund Details") {
                     TextField("Refunded amount (\(expense.currency))", text: $amountText)
                         .keyboardType(.decimalPad)
                     TextField("Notes...", text: $notes)
                 }
             }
-            .navigationTitle("Record refund")
+            .font(AppTypography.inputText)
+            .navigationTitle("Record fee refund")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
