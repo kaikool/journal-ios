@@ -1022,7 +1022,7 @@ public final class The5ersService: ObservableObject {
             let tradeKey = JournalIds.the5ersTradeKey(sourceAccountId: acc.id, positionIdentity: posIdentity)
             
             let isClosed = position.closedAtDate != nil
-            let rawProfit = position.netPnl
+            let rawNetProfit = position.netPnl
             let rawFee = position.fee ?? 0
             let rawSwap = position.swap ?? 0
             let feeCost = abs(rawFee)
@@ -1030,9 +1030,12 @@ public final class The5ersService: ObservableObject {
             let swapCredit = rawSwap > 0 ? rawSwap : Decimal.zero
             let totalCosts = feeCost + swapCost
             
-            let grossPnl = isClosed ? rawProfit : Decimal.zero
+            // The5ers MCP reports netPnl which already includes signed swap and commission.
+            // Reverse costs for gross only (1:1 with source-repo/apps/web/src/server/the5ers/journal.ts lines 67-75).
+            // Invariant: grossPnl - fees + swapCredit == netPnl
+            let netPnl = isClosed ? rawNetProfit : Decimal.zero
             let fees = totalCosts
-            let netPnl = isClosed ? (grossPnl - totalCosts + swapCredit) : Decimal.zero
+            let grossPnl = isClosed ? (netPnl + totalCosts - swapCredit) : Decimal.zero
             
             let status: TradeStatus = {
                 if !isClosed { return .open }
@@ -1047,7 +1050,7 @@ public final class The5ersService: ObservableObject {
             
             if let tIdx = dataStore.trades.firstIndex(where: { $0.key == tradeKey }) {
                 var existing = dataStore.trades[tIdx]
-                // Internal implementation note
+                existing.accountId = journalAccId
                 existing.status = status
                 existing.closedAt = position.closedAtDate
                 existing.openQuantity = isClosed ? 0 : position.quantity

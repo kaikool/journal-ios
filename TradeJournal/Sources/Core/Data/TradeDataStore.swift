@@ -366,9 +366,10 @@ public final class TradeDataStore: ObservableObject {
         }
 
         // 3. Remove synthetic executions and reconstructed trades on The5ers accounts
+        let the5ersAccountIds = Set(accounts.filter { $0.broker.lowercased() == "the5ers" || $0.id.hasPrefix("the5ers_") }.flatMap { [$0.id, $0.id.hasPrefix("the5ers_") ? String($0.id.dropFirst(8)) : "the5ers_\($0.id)"] })
         executions.removeAll(where: { $0.id.hasPrefix("the5ers_exec_") || $0.source == "the5ers" })
         trades.removeAll(where: { trade in
-            (trade.accountId.hasPrefix("the5ers_") || trade.tags.contains("the5ers")) && !trade.key.hasPrefix("the5ers_")
+            (the5ersAccountIds.contains(trade.accountId) || trade.accountId.hasPrefix("the5ers_") || trade.tags.contains("the5ers")) && !trade.key.hasPrefix("the5ers_")
         })
 
         // 4. Deduplicate trades by key
