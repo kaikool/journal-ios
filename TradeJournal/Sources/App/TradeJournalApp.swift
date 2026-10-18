@@ -48,6 +48,33 @@ public struct RootTabView: View {
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .simultaneousGesture(
+                    // Horizontal swipe across primary tabs with strict horizontal dominance
+                    DragGesture(minimumDistance: 35, coordinateSpace: .local)
+                        .onEnded { value in
+                            guard env.selectedTab.isPrimaryTab, !env.isDrawerOpen else { return }
+                            let h = value.translation.width
+                            let v = value.translation.height
+                            // Must be predominantly horizontal to avoid conflicting with vertical scroll
+                            guard abs(h) > 55 && abs(h) > abs(v) * 2.2 else { return }
+                            let velocity = value.predictedEndTranslation.width - value.translation.width
+                            
+                            if h < -50 || velocity < -140 {
+                                env.navigateToNextTab()
+                            } else if h > 50 || velocity > 140 {
+                                if env.selectedTab == .dashboard {
+                                    #if canImport(UIKit)
+                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                    #endif
+                                    withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
+                                        env.isDrawerOpen = true
+                                    }
+                                } else {
+                                    env.navigateToPreviousTab()
+                                }
+                            }
+                        }
+                )
                 
                 // Quick Bottom Bar for thumb navigation matching Apple HIG
                 bottomNavigationBar
@@ -67,6 +94,27 @@ public struct RootTabView: View {
                     #endif
                     withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
                         env.isDrawerOpen = true
+                    }
+                }
+            }
+            
+            // Dedicated Right Edge Swipe Trigger (Active on primary tabs to advance)
+            if !env.isDrawerOpen && env.selectedTab.isPrimaryTab {
+                HStack {
+                    Spacer()
+                    RightEdgeSwipeTrigger {
+                        #if canImport(UIKit)
+                        UISelectionFeedbackGenerator().selectionChanged()
+                        #endif
+                        if let next = env.selectedTab.nextPrimaryTab {
+                            withAnimation(.spring(response: 0.32, dampingFraction: 0.84)) {
+                                env.selectedTab = next
+                            }
+                        } else {
+                            withAnimation(.spring(response: 0.32, dampingFraction: 0.84)) {
+                                env.isDrawerOpen = true
+                            }
+                        }
                     }
                 }
             }
@@ -141,6 +189,50 @@ public struct RootTabView: View {
         .shadow(color: AppColors.brand.opacity(env.colorScheme == .dark ? 0.06 : 0.02), radius: 6, x: 0, y: 2)
         .padding(.horizontal, 14)
         .padding(.bottom, 6)
+        .gesture(
+            DragGesture(minimumDistance: 15, coordinateSpace: .local)
+                .onEnded { value in
+                    let h = value.translation.width
+                    let v = value.translation.height
+                    guard abs(h) > abs(v) * 1.3 && abs(h) > 20 else { return }
+                    
+                    if h < -20 {
+                        // Swipe Left: Next Tab
+                        if let next = env.selectedTab.nextPrimaryTab {
+                            #if canImport(UIKit)
+                            UISelectionFeedbackGenerator().selectionChanged()
+                            #endif
+                            withAnimation(.spring(response: 0.32, dampingFraction: 0.84)) {
+                                env.selectedTab = next
+                            }
+                        } else {
+                            #if canImport(UIKit)
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            #endif
+                            withAnimation(.spring(response: 0.32, dampingFraction: 0.84)) {
+                                env.isDrawerOpen = true
+                            }
+                        }
+                    } else if h > 20 {
+                        // Swipe Right: Previous Tab
+                        if let prev = env.selectedTab.previousPrimaryTab {
+                            #if canImport(UIKit)
+                            UISelectionFeedbackGenerator().selectionChanged()
+                            #endif
+                            withAnimation(.spring(response: 0.32, dampingFraction: 0.84)) {
+                                env.selectedTab = prev
+                            }
+                        } else {
+                            #if canImport(UIKit)
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            #endif
+                            withAnimation(.spring(response: 0.32, dampingFraction: 0.84)) {
+                                env.isDrawerOpen = true
+                            }
+                        }
+                    }
+                }
+        )
     }
     
     private func bottomBarItem(tab: AppTab, label: String, icon: String, selectedIcon: String) -> some View {
@@ -154,6 +246,11 @@ public struct RootTabView: View {
                 withAnimation(.spring(response: 0.28, dampingFraction: 0.72)) {
                     env.selectedTab = tab
                 }
+            } else {
+                #if os(iOS)
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                #endif
+                NotificationCenter.default.post(name: .appScrollToTop, object: tab)
             }
         } label: {
             VStack(spacing: 3) {

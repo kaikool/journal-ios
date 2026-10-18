@@ -329,6 +329,8 @@ public struct PlaybookDetailView: View {
         }
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
+        .interactiveEdgeBack(onBack: { dismiss() })
+        .enableNativePopGesture()
         .background(AppColors.background)
         .sheet(isPresented: $showEditSheet) {
             EditPlaybookSheet(playbook: currentPlaybook)

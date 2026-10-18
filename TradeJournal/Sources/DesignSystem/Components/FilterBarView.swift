@@ -112,6 +112,7 @@ public struct FilterBarView<Actions: View>: View {
         .background(.ultraThinMaterial)
         .overlay(topSpecularHighlight, alignment: .top)
         .overlay(bottomBorder, alignment: .bottom)
+        .enableNativePopGesture()
     }
     
     private var headerRow: some View {

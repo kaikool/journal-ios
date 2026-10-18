@@ -353,6 +353,8 @@ public struct DailyJournalDetailView: View {
         }
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
+        .interactiveEdgeBack(onBack: { dismiss() })
+        .enableNativePopGesture()
         .sheet(isPresented: $showExportSheet) {
             ReviewExportModal(title: "Journal · \(date)", exportText: exportText)
         }

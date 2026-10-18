@@ -51,6 +51,29 @@ public final class AppEnvironment: ObservableObject {
         appTheme = (appTheme == .dark) ? .light : .dark
         AppLogger.debug("Theme toggled to: \(appTheme.rawValue)")
     }
+    
+    // MARK: - Gesture-based Tab Navigation
+    public func navigateToNextTab() {
+        if let next = selectedTab.nextPrimaryTab {
+            #if canImport(UIKit)
+            UISelectionFeedbackGenerator().selectionChanged()
+            #endif
+            withAnimation(.spring(response: 0.32, dampingFraction: 0.84)) {
+                selectedTab = next
+            }
+        }
+    }
+    
+    public func navigateToPreviousTab() {
+        if let prev = selectedTab.previousPrimaryTab {
+            #if canImport(UIKit)
+            UISelectionFeedbackGenerator().selectionChanged()
+            #endif
+            withAnimation(.spring(response: 0.32, dampingFraction: 0.84)) {
+                selectedTab = prev
+            }
+        }
+    }
 }
 
 /// 13 navigation sections mapped 1:1 from `source-repo/apps/web/src/components/shell.tsx`
@@ -119,5 +142,26 @@ public enum AppTab: String, CaseIterable, Identifiable {
     
     // Backward compatibility alias
     public static var analytics: AppTab { .reports }
+    
+    // MARK: - Gesture Navigation Order
+    public static let primaryTabs: [AppTab] = [.dashboard, .calendar, .journal, .trades, .reports]
+    
+    public var isPrimaryTab: Bool {
+        Self.primaryTabs.contains(self)
+    }
+    
+    public var nextPrimaryTab: AppTab? {
+        guard let idx = Self.primaryTabs.firstIndex(of: self), idx < Self.primaryTabs.count - 1 else { return nil }
+        return Self.primaryTabs[idx + 1]
+    }
+    
+    public var previousPrimaryTab: AppTab? {
+        guard let idx = Self.primaryTabs.firstIndex(of: self), idx > 0 else { return nil }
+        return Self.primaryTabs[idx - 1]
+    }
+}
+
+extension Notification.Name {
+    public static let appScrollToTop = Notification.Name("AppScrollToTopNotification")
 }
 

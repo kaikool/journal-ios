@@ -79,6 +79,8 @@ public struct TradeReplayView: View {
         }
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
+        .interactiveEdgeBack(onBack: { dismiss() })
+        .enableNativePopGesture()
         .background(AppColors.background.ignoresSafeArea())
         .task(id: "\(trade.id)_\(selectedResolution.rawValue)") {
             await loadMarketCandles()

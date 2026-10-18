@@ -758,6 +758,8 @@ public struct TradeDetailView: View {
         .background(AppColors.background)
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
+        .interactiveEdgeBack(onBack: { dismiss() })
+        .enableNativePopGesture()
         .navigationDestination(isPresented: $showReplayView) {
             TradeReplayView(trade: trade, executions: fills)
         }
