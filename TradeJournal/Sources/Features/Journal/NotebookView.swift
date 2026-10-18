@@ -63,7 +63,7 @@ public struct NotebookView: View {
                 title: "Notebook",
                 showFilters: false
             ) {
-                AppButton("New note", icon: "plus", style: .primary) {
+                AppActionPill("New note", icon: "plus") {
                     createNewNote()
                 }
             }

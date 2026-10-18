@@ -76,6 +76,7 @@ public struct FilterBarView<Actions: View>: View {
     private let showFilters: Bool
     private let activeFilterCount: Int
     private let onOpenFilterDialog: (() -> Void)?
+    private let onBack: (() -> Void)?
     private let actions: Actions
     
     public init(
@@ -84,6 +85,7 @@ public struct FilterBarView<Actions: View>: View {
         showFilters: Bool = true,
         activeFilterCount: Int = 0,
         onOpenFilterDialog: (() -> Void)? = nil,
+        onBack: (() -> Void)? = nil,
         @ViewBuilder actions: () -> Actions = { EmptyView() }
     ) {
         self.title = title
@@ -91,12 +93,17 @@ public struct FilterBarView<Actions: View>: View {
         self.showFilters = showFilters
         self.activeFilterCount = activeFilterCount
         self.onOpenFilterDialog = onOpenFilterDialog
+        self.onBack = onBack
         self.actions = actions()
     }
     
     public var body: some View {
         VStack(spacing: 8) {
             HStack(spacing: 8) {
+                if let onBack = onBack {
+                    AppBackButton(action: onBack)
+                }
+                
                 Text(title)
                     .font(AppTypography.pageTitle)
                     .foregroundColor(AppColors.primaryText)

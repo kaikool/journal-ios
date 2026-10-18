@@ -87,7 +87,7 @@ public struct PropFirmLedgerView: View {
                     title: "Prop firms",
                     showFilters: false
                 ) {
-                    Menu {
+                    AppActionMenu("New", icon: "plus") {
                         Button {
                             showNewAccountSheet = true
                         } label: {
@@ -103,24 +103,7 @@ public struct PropFirmLedgerView: View {
                         } label: {
                             Label("Track Payout", systemImage: "arrow.down.left")
                         }
-                    } label: {
-                        HStack(spacing: 5) {
-                            Image(systemName: "plus")
-                                .font(.system(size: 11, weight: .bold))
-                            Text("New")
-                                .font(AppTypography.actionPill)
-                            Image(systemName: "chevron.down")
-                                .font(.system(size: 9, weight: .semibold))
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .frame(minHeight: 32)
-                        .background(AppColors.brand)
-                        .foregroundColor(.white)
-                        .clipShape(Capsule())
-                        .shadow(color: AppColors.brand.opacity(0.25), radius: 4, x: 0, y: 2)
                     }
-                    .buttonStyle(ApplePressableButtonStyle())
                 }
                 
             // Universal Apple HIG Sliding Segmented Bar

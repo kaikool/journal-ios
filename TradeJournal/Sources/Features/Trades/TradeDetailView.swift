@@ -75,7 +75,8 @@ public struct TradeDetailView: View {
         VStack(spacing: 0) {
             FilterBarView(
                 title: "\(trade.symbol) · \(trade.direction.rawValue.uppercased())",
-                showFilters: false
+                showFilters: false,
+                onBack: { dismiss() }
             ) {
                 AppActionPill("Replay", icon: "play.fill") {
                     showReplayView = true
@@ -669,6 +670,8 @@ public struct TradeDetailView: View {
             .background(AppColors.background)
         }
         .background(AppColors.background)
+        .navigationBarBackButtonHidden(true)
+        .toolbar(.hidden, for: .navigationBar)
         .navigationDestination(isPresented: $showReplayView) {
             TradeReplayView(trade: trade, executions: fills)
         }

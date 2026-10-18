@@ -115,21 +115,7 @@ public struct DailyJournalListView: View {
                     title: "Daily journal",
                     showFilters: false
                 ) {
-                    NavigationLink(destination: DailyJournalDetailView(date: todayKey)) {
-                        HStack(spacing: 5) {
-                            Image(systemName: "sun.max")
-                                .font(.system(size: 11, weight: .semibold))
-                            Text("View my day")
-                                .font(AppTypography.actionPill)
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(AppColors.brand)
-                        .foregroundColor(AppColors.brandTextOnDark)
-                        .clipShape(Capsule())
-                        .shadow(color: AppColors.brand.opacity(0.25), radius: 4, x: 0, y: 1.5)
-                    }
-                    .buttonStyle(ApplePressableButtonStyle())
+                    AppActionPillLink("View my day", icon: "sun.max", destination: DailyJournalDetailView(date: todayKey))
                 }
                 
                 ScrollView {
@@ -277,6 +263,7 @@ public struct DailyJournalListView: View {
 public struct DailyJournalDetailView: View {
     public let date: String
     
+    @Environment(\.dismiss) private var dismiss
     @ObservedObject private var dataStore = TradeDataStore.shared
     @EnvironmentObject private var env: AppEnvironment
     
@@ -329,9 +316,10 @@ public struct DailyJournalDetailView: View {
         VStack(spacing: 0) {
             FilterBarView(
                 title: "Journal · \(date)",
-                showFilters: false
+                showFilters: false,
+                onBack: { dismiss() }
             ) {
-                AppButton("Export", icon: "square.and.arrow.up", style: .outline) {
+                AppActionPill("Export", icon: "square.and.arrow.up", isPrimary: false) {
                     prepareExport()
                 }
             }
@@ -362,6 +350,8 @@ public struct DailyJournalDetailView: View {
             }
             .background(AppColors.background)
         }
+        .navigationBarBackButtonHidden(true)
+        .toolbar(.hidden, for: .navigationBar)
         .sheet(isPresented: $showExportSheet) {
             ReviewExportModal(title: "Journal · \(date)", exportText: exportText)
         }

@@ -185,18 +185,25 @@ public struct JournalCalendarView: View {
                     showFilters: false
                 ) {
                     HStack(spacing: 6) {
-                        Button(action: { changeMonth(by: -1) }) {
+                        Button(action: {
+                            #if os(iOS)
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            #endif
+                            changeMonth(by: -1)
+                        }) {
                             Image(systemName: "chevron.left")
-                                .font(.system(size: 11, weight: .semibold))
+                                .font(.system(size: 11, weight: .bold))
                                 .foregroundColor(AppColors.primaryText)
-                                .frame(width: 28, height: 28)
+                                .frame(width: 30, height: 30)
                                 .background(AppColors.cardBackground)
-                                .cornerRadius(6)
+                                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                                 .overlay(
-                                    RoundedRectangle(cornerRadius: 6)
-                                        .stroke(AppColors.border, lineWidth: 1)
-                                )
+                                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                        .stroke(AppColors.border.opacity(0.6), lineWidth: 0.5)
+                                    )
+                                .shadow(color: Color.black.opacity(0.04), radius: 2, x: 0, y: 1)
                         }
+                        .buttonStyle(ApplePressableButtonStyle())
                         .accessibilityLabel("Previous month")
                         
                         Text(monthTitle(for: currentMonth))
@@ -204,18 +211,25 @@ public struct JournalCalendarView: View {
                             .foregroundColor(AppColors.primaryText)
                             .frame(minWidth: 124, alignment: .center)
                         
-                        Button(action: { changeMonth(by: 1) }) {
+                        Button(action: {
+                            #if os(iOS)
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            #endif
+                            changeMonth(by: 1)
+                        }) {
                             Image(systemName: "chevron.right")
-                                .font(.system(size: 11, weight: .semibold))
+                                .font(.system(size: 11, weight: .bold))
                                 .foregroundColor(AppColors.primaryText)
-                                .frame(width: 28, height: 28)
+                                .frame(width: 30, height: 30)
                                 .background(AppColors.cardBackground)
-                                .cornerRadius(6)
+                                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                                 .overlay(
-                                    RoundedRectangle(cornerRadius: 6)
-                                        .stroke(AppColors.border, lineWidth: 1)
-                                )
+                                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                        .stroke(AppColors.border.opacity(0.6), lineWidth: 0.5)
+                                    )
+                                .shadow(color: Color.black.opacity(0.04), radius: 2, x: 0, y: 1)
                         }
+                        .buttonStyle(ApplePressableButtonStyle())
                         .accessibilityLabel("Next month")
                     }
                 }

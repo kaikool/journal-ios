@@ -4,6 +4,7 @@ import SwiftUI
 /// Ported 1:1 from `trade-market-data.tsx`, `trade-replay.ts`, and `excursions.ts`.
 /// Adheres strictly to Apple HIG with crisp typography and smooth playback controls.
 public struct TradeReplayView: View {
+    @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var env: AppEnvironment
     let trade: Trade
     let executions: [Execution]
@@ -45,32 +46,40 @@ public struct TradeReplayView: View {
     }
     
     public var body: some View {
-        ScrollView {
-            VStack(spacing: 12) {
-                // Header: Trade info and dynamic replay P&L
-                headerCard
-                
-                // Timeframe Selector: 1m, 5m, 15m, 1h, 1d
-                resolutionSelectorBar
-                
-                // Professional Candlestick Chart
-                chartCard
-                
-                // Replay Playback Controls (Play/Pause, Step, Speed)
-                playbackControlsCard
-                
-                // MAE & MFE Excursion Statistics
-                excursionMetricsCard
-                
-                // Broker Data Notes
-                dataCoverageNote
+        VStack(spacing: 0) {
+            FilterBarView(
+                title: "Trade Replay · \(trade.symbol)",
+                showFilters: false,
+                onBack: { dismiss() }
+            )
+            
+            ScrollView {
+                VStack(spacing: 12) {
+                    // Header: Trade info and dynamic replay P&L
+                    headerCard
+                    
+                    // Timeframe Selector: 1m, 5m, 15m, 1h, 1d
+                    resolutionSelectorBar
+                    
+                    // Professional Candlestick Chart
+                    chartCard
+                    
+                    // Replay Playback Controls (Play/Pause, Step, Speed)
+                    playbackControlsCard
+                    
+                    // MAE & MFE Excursion Statistics
+                    excursionMetricsCard
+                    
+                    // Broker Data Notes
+                    dataCoverageNote
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
         }
+        .navigationBarBackButtonHidden(true)
+        .toolbar(.hidden, for: .navigationBar)
         .background(AppColors.background.ignoresSafeArea())
-        .navigationTitle("Trade Replay")
-        .navigationBarTitleDisplayMode(.inline)
         .task(id: "\(trade.id)_\(selectedResolution.rawValue)") {
             await loadMarketCandles()
         }

@@ -58,7 +58,7 @@ public struct ProgressRoutinesView: View {
                 title: "Progress",
                 showFilters: false
             ) {
-                AppButton("Add routine", icon: "plus", style: .primary) {
+                AppActionPill("Add routine", icon: "plus") {
                     showAddRoutineSheet = true
                 }
             }

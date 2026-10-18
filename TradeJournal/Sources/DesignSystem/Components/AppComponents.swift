@@ -455,6 +455,146 @@ public struct AppActionPill: View {
     }
 }
 
+/// Standardized Apple HIG Back Button for sub-pages and pushed navigation.
+public struct AppBackButton: View {
+    private let title: String?
+    private let action: () -> Void
+    
+    public init(_ title: String? = nil, action: @escaping () -> Void) {
+        self.title = title
+        self.action = action
+    }
+    
+    public var body: some View {
+        Button {
+            #if os(iOS)
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            #endif
+            action()
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 11, weight: .bold))
+                if let title = title, !title.isEmpty {
+                    Text(title)
+                        .font(AppTypography.actionPill)
+                }
+            }
+            .foregroundColor(AppColors.primaryText)
+            .padding(.horizontal, title != nil ? 9 : 8)
+            .padding(.vertical, 6)
+            .frame(height: 30)
+            .background(AppColors.cardBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(AppColors.border.opacity(0.6), lineWidth: 0.5)
+            )
+            .shadow(color: Color.black.opacity(0.04), radius: 2, x: 0, y: 1)
+        }
+        .buttonStyle(ApplePressableButtonStyle())
+        .fixedSize()
+    }
+}
+
+/// Standardized Apple HIG Action Pill Navigation Link (e.g. View my day).
+public struct AppActionPillLink<Destination: View>: View {
+    private let title: String
+    private let icon: String?
+    private let isPrimary: Bool
+    private let destination: Destination
+    
+    public init(
+        _ title: String,
+        icon: String? = nil,
+        isPrimary: Bool = true,
+        destination: Destination
+    ) {
+        self.title = title
+        self.icon = icon
+        self.isPrimary = isPrimary
+        self.destination = destination
+    }
+    
+    public var body: some View {
+        NavigationLink(destination: destination) {
+            HStack(spacing: 5) {
+                if let icon = icon {
+                    Image(systemName: icon)
+                        .font(.system(size: 11, weight: .semibold))
+                }
+                Text(title)
+                    .font(AppTypography.actionPill)
+                    .lineLimit(1)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .frame(height: 30)
+            .background(isPrimary ? AppColors.brand : AppColors.cardBackground)
+            .foregroundColor(isPrimary ? AppColors.brandTextOnDark : AppColors.primaryText)
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(isPrimary ? Color.clear : AppColors.border.opacity(0.6), lineWidth: 0.5)
+            )
+            .shadow(color: isPrimary ? AppColors.brand.opacity(0.2) : Color.clear, radius: 4, x: 0, y: 1)
+        }
+        .buttonStyle(ApplePressableButtonStyle())
+        .fixedSize()
+    }
+}
+
+/// Standardized Apple HIG Action Menu Pill for top action slot with a dropdown menu (e.g. Prop Firm "New").
+public struct AppActionMenu<MenuContent: View>: View {
+    private let title: String
+    private let icon: String?
+    private let isPrimary: Bool
+    private let menuContent: MenuContent
+    
+    public init(
+        _ title: String,
+        icon: String? = nil,
+        isPrimary: Bool = true,
+        @ViewBuilder menuContent: () -> MenuContent
+    ) {
+        self.title = title
+        self.icon = icon
+        self.isPrimary = isPrimary
+        self.menuContent = menuContent()
+    }
+    
+    public var body: some View {
+        Menu {
+            menuContent
+        } label: {
+            HStack(spacing: 4) {
+                if let icon = icon {
+                    Image(systemName: icon)
+                        .font(.system(size: 11, weight: .bold))
+                }
+                Text(title)
+                    .font(AppTypography.actionPill)
+                    .lineLimit(1)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 9, weight: .semibold))
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .frame(height: 30)
+            .background(isPrimary ? AppColors.brand : AppColors.cardBackground)
+            .foregroundColor(isPrimary ? AppColors.brandTextOnDark : AppColors.primaryText)
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(isPrimary ? Color.clear : AppColors.border.opacity(0.6), lineWidth: 0.5)
+            )
+            .shadow(color: isPrimary ? AppColors.brand.opacity(0.2) : Color.clear, radius: 4, x: 0, y: 1)
+        }
+        .buttonStyle(ApplePressableButtonStyle())
+        .fixedSize()
+    }
+}
+
 /// Standardized Apple HIG Menu Picker Chip with chevron and subtle background.
 public struct AppleMenuChip<Content: View>: View {
     private let title: String

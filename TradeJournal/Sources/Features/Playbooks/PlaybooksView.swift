@@ -43,7 +43,7 @@ public struct PlaybooksView: View {
                 title: "Playbooks",
                 showFilters: false
             ) {
-                AppButton("New playbook", icon: "plus", style: .primary) {
+                AppActionPill("New playbook", icon: "plus") {
                     showNewPlaybookSheet = true
                 }
             }
@@ -266,16 +266,25 @@ public struct PlaybookDetailView: View {
     }
     
     public var body: some View {
-        ScrollView {
-            VStack(spacing: 14) {
-                infoCard
-                rulesCard
-                tradesSection
-                deleteButton
+        VStack(spacing: 0) {
+            FilterBarView(
+                title: playbook.title,
+                showFilters: false,
+                onBack: { dismiss() }
+            )
+            
+            ScrollView {
+                VStack(spacing: 14) {
+                    infoCard
+                    rulesCard
+                    tradesSection
+                    deleteButton
+                }
+                .padding(16)
             }
-            .padding(16)
         }
-        .navigationTitle(playbook.title)
+        .navigationBarBackButtonHidden(true)
+        .toolbar(.hidden, for: .navigationBar)
         .background(AppColors.background)
         .alert("Delete “\(playbook.title)”? ", isPresented: $showDeleteAlert) {
             Button("Cancel", role: .cancel) {}
