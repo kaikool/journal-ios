@@ -823,7 +823,6 @@ public final class SupabaseService {
 
     public func deleteAccount(id: String) async throws {
         guard isConfigured else { return }
-        _ = try? await session.data(for: try makeRequest(endpoint: "prop_receipts?account_id=eq.\(id)", method: "DELETE"))
         _ = try? await session.data(for: try makeRequest(endpoint: "prop_entries?account_id=eq.\(id)", method: "DELETE"))
         _ = try? await session.data(for: try makeRequest(endpoint: "prop_accounts?journal_account_id=eq.\(id)", method: "DELETE"))
         _ = try? await session.data(for: try makeRequest(endpoint: "trade_rule_checks?account_id=eq.\(id)", method: "DELETE"))
@@ -991,7 +990,6 @@ public final class SupabaseService {
 
     public func deletePropAccount(id: String) async throws {
         guard isConfigured else { return }
-        _ = try? await session.data(for: try makeRequest(endpoint: "prop_receipts?account_id=eq.\(id)", method: "DELETE"))
         _ = try? await session.data(for: try makeRequest(endpoint: "prop_entries?account_id=eq.\(id)", method: "DELETE"))
         let endpoint = "prop_accounts?id=eq.\(id)"
         let request = try makeRequest(endpoint: endpoint, method: "DELETE")
@@ -1017,7 +1015,7 @@ public final class SupabaseService {
 
     public func deletePropEntry(id: String) async throws {
         guard isConfigured else { return }
-        _ = try? await session.data(for: try makeRequest(endpoint: "prop_receipts?entry_id=eq.\(id)", method: "DELETE"))
+        _ = try? await session.data(for: try makeRequest(endpoint: "prop_receipts?payout_id=eq.\(id)", method: "DELETE"))
         let endpoint = "prop_entries?id=eq.\(id)"
         let request = try makeRequest(endpoint: endpoint, method: "DELETE")
         let (data, response) = try await session.data(for: request)

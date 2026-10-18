@@ -128,7 +128,6 @@ public enum NotebookEngine {
         var updated = existingFolders
         var target = updated[index]
         target.name = trimmed
-        target.updatedAt = JournalIds.nowIso()
         updated[index] = target
         return updated
     }

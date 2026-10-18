@@ -1236,9 +1236,10 @@ public final class TradeDataStore: ObservableObject {
     }
     
     public func deletePropAccount(id: String) {
+        let entryIds = Set(propEntries.filter { $0.accountId == id }.map { $0.id })
         propAccounts.removeAll { $0.id == id }
         propEntries.removeAll { $0.accountId == id }
-        propReceipts.removeAll { $0.accountId == id }
+        propReceipts.removeAll { entryIds.contains($0.payoutId) }
         saveToDisk()
         Task {
             try? await SupabaseService.shared.deletePropAccount(id: id)
@@ -1247,7 +1248,7 @@ public final class TradeDataStore: ObservableObject {
 
     public func deletePropEntry(id: String) {
         propEntries.removeAll { $0.id == id }
-        propReceipts.removeAll { $0.entryId == id }
+        propReceipts.removeAll { $0.payoutId == id }
         saveToDisk()
         Task {
             try? await SupabaseService.shared.deletePropEntry(id: id)
