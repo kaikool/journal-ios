@@ -436,15 +436,22 @@ public struct AppActionPill: View {
                 }
                 Text(title)
                     .font(AppTypography.actionPill)
+                    .lineLimit(1)
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, 10)
             .padding(.vertical, 6)
-            .background(isPrimary ? AppColors.brand : AppColors.secondaryBackground)
+            .frame(height: 30)
+            .background(isPrimary ? AppColors.brand : AppColors.cardBackground)
             .foregroundColor(isPrimary ? AppColors.brandTextOnDark : AppColors.primaryText)
-            .clipShape(Capsule())
-            .shadow(color: isPrimary ? AppColors.brand.opacity(0.25) : Color.clear, radius: 4, x: 0, y: 1.5)
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(isPrimary ? Color.clear : AppColors.border.opacity(0.6), lineWidth: 0.5)
+            )
+            .shadow(color: isPrimary ? AppColors.brand.opacity(0.2) : Color.clear, radius: 4, x: 0, y: 1)
         }
         .buttonStyle(ApplePressableButtonStyle())
+        .fixedSize()
     }
 }
 

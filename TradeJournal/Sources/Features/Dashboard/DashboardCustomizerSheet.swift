@@ -357,15 +357,18 @@ public struct DashboardCustomizerSheet: View {
                                             .font(.system(size: 10, weight: .bold))
                                     }
                                 }
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 7)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .frame(height: 28)
                                 .background(activePreset == preset ? AppColors.brand : AppColors.cardBackground)
                                 .foregroundColor(activePreset == preset ? .white : AppColors.primaryText)
-                                .clipShape(Capsule())
+                                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                                 .overlay(
-                                    Capsule().stroke(activePreset == preset ? Color.clear : AppColors.border, lineWidth: 0.5)
+                                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                        .stroke(activePreset == preset ? Color.clear : AppColors.border, lineWidth: 0.5)
                                 )
                             }
+                            .fixedSize()
                         }
                     }
                     .padding(.horizontal, 16)

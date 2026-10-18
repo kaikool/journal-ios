@@ -440,6 +440,7 @@ public struct DashboardView: View {
             Text("Reorder mode: tap arrows to move cards")
                 .font(AppTypography.captionBold)
                 .foregroundColor(AppColors.primaryText)
+                .lineLimit(1)
             
             Spacer()
             
@@ -456,7 +457,8 @@ public struct DashboardView: View {
             .padding(.vertical, 4)
             .background(AppColors.brand)
             .foregroundColor(.white)
-            .clipShape(Capsule())
+            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .fixedSize()
         }
         .padding(10)
         .background(AppColors.cardBackground)
@@ -505,79 +507,93 @@ public struct DashboardView: View {
             } label: {
                 HStack(spacing: 5) {
                     Image(systemName: activePreset.icon)
-                        .font(.system(size: 10, weight: .semibold))
+                        .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(AppColors.brand)
                     Text(activePreset.name)
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(AppTypography.captionBold)
                         .foregroundColor(AppColors.primaryText)
+                        .lineLimit(1)
+                    Text("(\(visibleCardCount))")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(AppColors.secondaryText)
+                        .lineLimit(1)
                     Image(systemName: "chevron.down")
-                        .font(.system(size: 8, weight: .semibold))
+                        .font(.system(size: 8, weight: .bold))
                         .foregroundColor(AppColors.secondaryText)
                 }
-                .padding(.horizontal, 10)
+                .padding(.horizontal, 9)
                 .padding(.vertical, 5)
+                .frame(height: 28)
                 .background(AppColors.cardBackground)
-                .clipShape(Capsule())
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 .overlay(
-                    Capsule().stroke(AppColors.border.opacity(0.6), lineWidth: 0.5)
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(AppColors.border.opacity(0.6), lineWidth: 0.5)
                 )
             }
+            .fixedSize()
             
-            Text("\(visibleCardCount) of \(DashboardCardRegistry.allCards.count) cards")
-                .font(AppTypography.caption)
-                .foregroundColor(AppColors.secondaryText)
+            Spacer(minLength: 8)
             
-            Spacer()
-            
-            // Reorder / Edit Layout Mode Button
-            Button {
-                #if canImport(UIKit)
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                #endif
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                    isEditingLayout.toggle()
+            HStack(spacing: 6) {
+                // Reorder / Edit Layout Mode Button
+                Button {
+                    #if canImport(UIKit)
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    #endif
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                        isEditingLayout.toggle()
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: isEditingLayout ? "checkmark" : "arrow.up.arrow.down")
+                            .font(.system(size: 10, weight: .semibold))
+                        Text(isEditingLayout ? "Done" : "Reorder")
+                            .font(AppTypography.captionBold)
+                            .lineLimit(1)
+                    }
+                    .foregroundColor(isEditingLayout ? .white : AppColors.primaryText)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 5)
+                    .frame(height: 28)
+                    .background(isEditingLayout ? AppColors.brand : AppColors.cardBackground)
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .stroke(isEditingLayout ? Color.clear : AppColors.border.opacity(0.6), lineWidth: 0.5)
+                    )
                 }
-            } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: isEditingLayout ? "checkmark" : "arrow.up.arrow.down")
-                        .font(.system(size: 11, weight: .medium))
-                    Text(isEditingLayout ? "Done" : "Reorder")
-                        .font(.system(size: 11, weight: .semibold))
+                .buttonStyle(ApplePressableButtonStyle())
+                .fixedSize()
+                
+                // Customize button (Sheet)
+                Button {
+                    #if canImport(UIKit)
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    #endif
+                    showCustomizerSheet = true
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "slider.horizontal.3")
+                            .font(.system(size: 10, weight: .semibold))
+                        Text("Customize")
+                            .font(AppTypography.captionBold)
+                            .lineLimit(1)
+                    }
+                    .foregroundColor(AppColors.primaryText)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 5)
+                    .frame(height: 28)
+                    .background(AppColors.cardBackground)
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .stroke(AppColors.border.opacity(0.6), lineWidth: 0.5)
+                    )
                 }
-                .foregroundColor(isEditingLayout ? .white : AppColors.primaryText)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(isEditingLayout ? AppColors.brand : AppColors.cardBackground)
-                .clipShape(Capsule())
-                .overlay(
-                    Capsule().stroke(isEditingLayout ? Color.clear : AppColors.border.opacity(0.6), lineWidth: 0.5)
-                )
+                .buttonStyle(ApplePressableButtonStyle())
+                .fixedSize()
             }
-            .buttonStyle(ApplePressableButtonStyle())
-            
-            // Customize button (Sheet)
-            Button {
-                #if canImport(UIKit)
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                #endif
-                showCustomizerSheet = true
-            } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: "slider.horizontal.3")
-                        .font(.system(size: 11, weight: .medium))
-                    Text("Customize")
-                        .font(.system(size: 11, weight: .semibold))
-                }
-                .foregroundColor(AppColors.primaryText)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(AppColors.cardBackground)
-                .clipShape(Capsule())
-                .overlay(
-                    Capsule().stroke(AppColors.border.opacity(0.6), lineWidth: 0.5)
-                )
-            }
-            .buttonStyle(ApplePressableButtonStyle())
         }
         .padding(.horizontal, 14)
         .padding(.top, 8)
