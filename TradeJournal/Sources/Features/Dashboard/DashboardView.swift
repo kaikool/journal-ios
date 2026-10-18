@@ -349,11 +349,7 @@ public struct DashboardView: View {
                 .padding(14)
             }
             .refreshable {
-                if The5ersService.shared.isConfigured {
-                    _ = try? await dataStore.syncWithThe5ers()
-                } else if SupabaseService.shared.isConfigured {
-                    await dataStore.syncWithSupabase()
-                }
+                await dataStore.performGlobalSync()
             }
             .background(AppColors.background)
         }

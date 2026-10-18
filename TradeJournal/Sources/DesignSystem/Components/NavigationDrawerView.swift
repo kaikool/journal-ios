@@ -258,11 +258,7 @@ public struct NavigationDrawerView: View {
                 Button {
                     triggerHaptic()
                     Task {
-                        if The5ersService.shared.isConfigured {
-                            _ = try? await dataStore.syncWithThe5ers()
-                        } else if SupabaseService.shared.isConfigured {
-                            await dataStore.syncWithSupabase()
-                        }
+                        await dataStore.performGlobalSync()
                     }
                 } label: {
                     HStack(spacing: 10) {

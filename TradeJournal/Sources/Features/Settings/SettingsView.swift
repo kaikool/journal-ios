@@ -914,19 +914,33 @@ public struct ConnectionsSettingsView: View {
                     
                     // Main Action: OAuth Login vs Connected Actions
                     if !the5ers.isConnected {
-                        AppButton("Log in with The5ers", icon: "person.badge.key.fill", style: .primary, size: .compact, isLoading: isConnectingThe5ers) {
-                            loginThe5ersOAuth()
-                        }
-                    } else {
                         HStack(spacing: 8) {
-                            AppButton("Verify MCP", icon: "checkmark.shield", style: .primary, size: .compact) {
-                                pingMcp()
+                            AppButton("Log in with The5ers", icon: "person.badge.key.fill", style: .primary, size: .compact, isLoading: isConnectingThe5ers) {
+                                loginThe5ersOAuth()
                             }
                             
-                            AppButton("Disconnect", icon: "xmark.circle", style: .destructive, size: .compact) {
-                                the5ers.disconnect()
-                                mcpToken = ""
-                                the5ersStatus = "Disconnected from The5ers MCP."
+                            if !mcpToken.trimmingCharacters(in: .whitespaces).isEmpty {
+                                AppButton("Sync Data", icon: "arrow.triangle.2.circlepath", style: .secondary, size: .compact, isLoading: the5ers.isSyncing || dataStore.isSyncing) {
+                                    syncThe5ers()
+                                }
+                            }
+                        }
+                    } else {
+                        VStack(alignment: .leading, spacing: 10) {
+                            AppButton("Sync All The5ers Data Now", icon: "arrow.triangle.2.circlepath", style: .primary, size: .compact, isLoading: the5ers.isSyncing || dataStore.isSyncing) {
+                                syncThe5ers()
+                            }
+                            
+                            HStack(spacing: 8) {
+                                AppButton("Verify MCP", icon: "checkmark.shield", style: .secondary, size: .compact) {
+                                    pingMcp()
+                                }
+                                
+                                AppButton("Disconnect", icon: "xmark.circle", style: .destructive, size: .compact) {
+                                    the5ers.disconnect()
+                                    mcpToken = ""
+                                    the5ersStatus = "Disconnected from The5ers MCP."
+                                }
                             }
                         }
                     }
@@ -934,7 +948,7 @@ public struct ConnectionsSettingsView: View {
                     if !the5ersStatus.isEmpty {
                         Text(the5ersStatus)
                             .font(AppTypography.caption)
-                            .foregroundColor(the5ersStatus.contains("Error") ? AppColors.loss : AppColors.profit)
+                            .foregroundColor(the5ersStatus.contains("Error") || the5ersStatus.contains("failed") ? AppColors.loss : AppColors.profit)
                     }
                     
                     // Collapsible Advanced: Session Token Manual Override
@@ -1021,7 +1035,12 @@ public struct ConnectionsSettingsView: View {
                     }
                     
                     HStack(spacing: 8) {
-                        AppButton("Test Connection", icon: "network", style: .primary, size: .compact) {
+                        AppButton("Sync Supabase Cloud Now", icon: "arrow.triangle.2.circlepath", style: .primary, size: .compact, isLoading: dataStore.isSyncing) {
+                            syncSupabase()
+                        }
+                        .disabled(supabaseUrl.trimmingCharacters(in: .whitespaces).isEmpty || supabaseAnonKey.trimmingCharacters(in: .whitespaces).isEmpty)
+                        
+                        AppButton("Test Connection", icon: "network", style: .secondary, size: .compact) {
                             checkSupabaseConnection()
                         }
                         .disabled(supabaseUrl.trimmingCharacters(in: .whitespaces).isEmpty || supabaseAnonKey.trimmingCharacters(in: .whitespaces).isEmpty)
@@ -1156,16 +1175,17 @@ public struct ConnectionsSettingsView: View {
     
     private func syncThe5ers() {
         the5ers.configure(token: mcpToken)
+        the5ersStatus = "Starting synchronization with The5ers MCP Hub..."
         Task {
-            do {
-                let count = try await the5ers.syncWithTradeStore(dataStore: dataStore)
-                if count > 0 {
-                    the5ersStatus = "Successfully synchronized \(count) The5ers accounts via MCP!"
+            await dataStore.performGlobalSync()
+            await MainActor.run {
+                if let err = dataStore.lastSyncError {
+                    self.the5ersStatus = "Sync failed: \(err)"
+                } else if let summary = dataStore.lastSyncSummary {
+                    self.the5ersStatus = summary
                 } else {
-                    the5ersStatus = the5ers.lastStatus
+                    self.the5ersStatus = "Successfully synchronized with The5ers!"
                 }
-            } catch {
-                the5ersStatus = "Sync error: \(error.localizedDescription)"
             }
         }
     }

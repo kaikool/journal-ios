@@ -13,6 +13,9 @@ public struct RootTabView: View {
                 // Shell Header Bar matching Shell.tsx mobile header
                 ShellHeaderView()
                 
+                // Real-time synchronization notification banner
+                GlobalSyncBannerView()
+                
                 // Screen body based on active route
                 ZStack {
                     switch env.selectedTab {

@@ -63,11 +63,7 @@ public struct ShellHeaderView: View {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 #endif
                 Task {
-                    if The5ersService.shared.isConfigured {
-                        _ = try? await dataStore.syncWithThe5ers()
-                    } else if SupabaseService.shared.isConfigured {
-                        await dataStore.syncWithSupabase()
-                    }
+                    await dataStore.performGlobalSync()
                 }
             } label: {
                 Image(systemName: "arrow.triangle.2.circlepath")

@@ -503,9 +503,24 @@ public final class The5ersService: ObservableObject {
                     "contract_version": "1.0",
                     "request_context": ["timezone": "UTC", "locale": "en"]
                 ]
-                guard let accountResult = try? await callMcpTool(name: "the5ers_account", arguments: accountToolArgs) else {
-                    break
+                
+                let accountResult: [String: Any]
+                if page == 1 {
+                    accountResult = try await callMcpTool(name: "the5ers_account", arguments: accountToolArgs)
+                } else {
+                    guard let res = try? await callMcpTool(name: "the5ers_account", arguments: accountToolArgs) else { break }
+                    accountResult = res
                 }
+                
+                if let isErr = accountResult["isError"] as? Bool, isErr {
+                    let errMsg = (accountResult["content"] as? [[String: Any]])?.compactMap { $0["text"] as? String }.joined(separator: " ") ?? "The5ers MCP returned an error"
+                    if page == 1 {
+                        throw NSError(domain: "The5ersMCP", code: 500, userInfo: [NSLocalizedDescriptionKey: errMsg])
+                    } else {
+                        break
+                    }
+                }
+                
                 let unwrappedAccounts = unwrapMcpToolResult(accountResult)
                 let pageRows = extractMcpCollection(unwrappedAccounts, collectionKey: "accounts")
                 if pageRows.isEmpty { break }
@@ -662,32 +677,15 @@ public final class The5ersService: ObservableObject {
                 }
             }
             
-            // Internal implementation note
-            // Internal implementation note
-            // Internal implementation note
-            // Internal implementation note
+            // Target all available accounts from The5ers
             var targetAccounts: [The5ersMcpAccount] = []
             var seenTargetIds = Set<String>()
             
             for acc in accountsList {
-                let s = acc.status.lowercased()
-                let isActiveLike = (s == "active" || s == "available" || s == "passed" || s == "funded" || s == "open" || s == "evaluation" || s == "verification" || s == "step1" || s == "step2")
-                let hasExistingTrades = dataStore.trades.contains(where: { $0.accountId == acc.id || $0.accountId == "the5ers_\(acc.id)" })
-                if (isActiveLike || hasExistingTrades) && !seenTargetIds.contains(acc.id) {
-                    seenTargetIds.insert(acc.id)
-                    targetAccounts.append(acc)
-                }
-            }
-            
-            for acc in accountsList.prefix(5) {
                 if !seenTargetIds.contains(acc.id) {
                     seenTargetIds.insert(acc.id)
                     targetAccounts.append(acc)
                 }
-            }
-            
-            if targetAccounts.isEmpty {
-                targetAccounts = Array(accountsList.prefix(5))
             }
             
             var importedPositionsCount = 0
@@ -770,8 +768,18 @@ public final class The5ersService: ObservableObject {
                     let rcptId = "the5ers_rcpt_\(id)"
                     let shortRef = "Payout #\(id.prefix(8))"
                     
-                    let primaryAccId = targetAccounts.first?.id.hasPrefix("the5ers_") == true ? targetAccounts.first?.id : "the5ers_\(targetAccounts.first?.id ?? "")"
-                    let primaryCurrency = targetAccounts.first?.currency ?? "USD"
+                    let payAccRef = String(describing: pay["account_ref"] ?? pay["account_id"] ?? pay["accountId"] ?? pay["ref"] ?? "")
+                    let matchedAcc = targetAccounts.first(where: { $0.id == payAccRef || $0.ref == payAccRef || "the5ers_\($0.id)" == payAccRef })
+                    let primaryAccId: String = {
+                        if let m = matchedAcc {
+                            return m.id.hasPrefix("the5ers_") ? m.id : "the5ers_\(m.id)"
+                        }
+                        if let f = targetAccounts.first {
+                            return f.id.hasPrefix("the5ers_") ? f.id : "the5ers_\(f.id)"
+                        }
+                        return "the5ers_payout_account"
+                    }()
+                    let primaryCurrency = matchedAcc?.currency ?? targetAccounts.first?.currency ?? "USD"
                     
                     if !dataStore.propEntries.contains(where: { $0.id == payoutEntryId }) {
                         let payoutEntry = PropEntryItem(
@@ -817,13 +825,6 @@ public final class The5ersService: ObservableObject {
             dataStore.saveToDisk()
             let activeCount = accountsList.filter { $0.status.lowercased() == "active" || $0.status.lowercased() == "available" }.count
             lastStatus = "Successfully synced \(accountsList.count) accounts (\(activeCount) active) and \(importedPositionsCount) positions from The5ers MCP."
-            
-            // Internal implementation note
-            if SupabaseService.shared.isConfigured {
-                lastStatus = "The5ers sync complete (\(importedPositionsCount) trades). Backing up to Supabase cloud..."
-                await dataStore.syncWithSupabase()
-                lastStatus = "Successfully synced \(accountsList.count) accounts (\(activeCount) active), \(importedPositionsCount) positions from The5ers and backed up to Supabase."
-            }
             
             return accountsList.count
         } catch {
@@ -1106,6 +1107,41 @@ public final class The5ersService: ObservableObject {
                 )
                 dataStore.trades.append(trade)
                 count += 1
+            }
+            
+            // Maintain corresponding Execution records for executions table and trade reconstruction
+            let entryExecId = "the5ers_exec_\(tradeKey)_entry"
+            if !dataStore.executions.contains(where: { $0.id == entryExecId }) {
+                dataStore.executions.append(Execution(
+                    id: entryExecId,
+                    accountId: journalAccId,
+                    symbol: position.symbol,
+                    side: position.direction == .long ? .buy : .sell,
+                    quantity: position.quantity,
+                    price: position.entry,
+                    fee: 0,
+                    executedAt: position.openedAtDate,
+                    assetClass: "forex",
+                    source: "the5ers"
+                ))
+            }
+            
+            if isClosed, let exitDate = position.closedAtDate, let exitPrice = position.exit {
+                let exitExecId = "the5ers_exec_\(tradeKey)_exit"
+                if !dataStore.executions.contains(where: { $0.id == exitExecId }) {
+                    dataStore.executions.append(Execution(
+                        id: exitExecId,
+                        accountId: journalAccId,
+                        symbol: position.symbol,
+                        side: position.direction == .long ? .sell : .buy,
+                        quantity: position.quantity,
+                        price: exitPrice,
+                        fee: position.fee ?? 0,
+                        executedAt: exitDate,
+                        assetClass: "forex",
+                        source: "the5ers"
+                    ))
+                }
             }
         }
     }

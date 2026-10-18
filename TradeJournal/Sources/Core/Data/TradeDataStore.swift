@@ -385,7 +385,12 @@ public final class TradeDataStore: ObservableObject {
                 accounts.removeAll(where: { $0.id == "default-acc" && accounts.count > 1 })
             }
             if !accounts.isEmpty {
-                try? await SupabaseService.shared.upsertAccounts(accounts)
+                do {
+                    try await SupabaseService.shared.upsertAccounts(accounts)
+                } catch {
+                    AppLogger.error("Supabase accounts upsert warning: \(error.localizedDescription)")
+                    syncWarnings.append("Accounts upload: \(error.localizedDescription)")
+                }
             }
         } catch {
             AppLogger.error("Supabase accounts sync warning: \(error.localizedDescription)")
@@ -417,7 +422,12 @@ public final class TradeDataStore: ObservableObject {
                 selectedAccountId = "all"
             }
             if !trades.isEmpty {
-                try? await SupabaseService.shared.upsertTrades(trades)
+                do {
+                    try await SupabaseService.shared.upsertTrades(trades)
+                } catch {
+                    AppLogger.error("Supabase trades upsert warning: \(error.localizedDescription)")
+                    syncWarnings.append("Trades upload: \(error.localizedDescription)")
+                }
             }
         } catch {
             AppLogger.error("Supabase trades sync warning: \(error.localizedDescription)")
@@ -436,7 +446,12 @@ public final class TradeDataStore: ObservableObject {
                 }
             }
             if !executions.isEmpty {
-                try? await SupabaseService.shared.upsertExecutions(executions)
+                do {
+                    try await SupabaseService.shared.upsertExecutions(executions)
+                } catch {
+                    AppLogger.error("Supabase executions upsert warning: \(error.localizedDescription)")
+                    syncWarnings.append("Executions upload: \(error.localizedDescription)")
+                }
             }
         } catch {
             AppLogger.error("Supabase executions sync warning: \(error.localizedDescription)")
@@ -461,7 +476,11 @@ public final class TradeDataStore: ObservableObject {
                 !deletedPlaybookIds.contains(pb.id) && !remotePlaybooks.contains(where: { $0.id == pb.id })
             }
             if !localUserPlaybooks.isEmpty {
-                try? await SupabaseService.shared.upsertPlaybooks(localUserPlaybooks)
+                do {
+                    try await SupabaseService.shared.upsertPlaybooks(localUserPlaybooks)
+                } catch {
+                    AppLogger.warning("Supabase playbooks upsert warning: \(error.localizedDescription)")
+                }
             }
         } catch {
             AppLogger.warning("Supabase playbooks sync warning: \(error.localizedDescription)")
@@ -481,7 +500,12 @@ public final class TradeDataStore: ObservableObject {
                 }
             }
             if !propAccounts.isEmpty {
-                try? await SupabaseService.shared.upsertPropAccounts(propAccounts)
+                do {
+                    try await SupabaseService.shared.upsertPropAccounts(propAccounts)
+                } catch {
+                    AppLogger.warning("Supabase prop accounts upsert warning: \(error.localizedDescription)")
+                    syncWarnings.append("Prop accounts upload: \(error.localizedDescription)")
+                }
             }
         } catch {
             AppLogger.warning("Supabase prop accounts warning: \(error.localizedDescription)")
@@ -499,7 +523,12 @@ public final class TradeDataStore: ObservableObject {
                 }
             }
             if !propEntries.isEmpty {
-                try? await SupabaseService.shared.upsertPropEntries(propEntries)
+                do {
+                    try await SupabaseService.shared.upsertPropEntries(propEntries)
+                } catch {
+                    AppLogger.warning("Supabase prop entries upsert warning: \(error.localizedDescription)")
+                    syncWarnings.append("Prop entries upload: \(error.localizedDescription)")
+                }
             }
         } catch {
             AppLogger.warning("Supabase prop entries warning: \(error.localizedDescription)")
@@ -515,7 +544,12 @@ public final class TradeDataStore: ObservableObject {
                 }
             }
             if !propReceipts.isEmpty {
-                try? await SupabaseService.shared.upsertPropReceipts(propReceipts)
+                do {
+                    try await SupabaseService.shared.upsertPropReceipts(propReceipts)
+                } catch {
+                    AppLogger.warning("Supabase prop receipts upsert warning: \(error.localizedDescription)")
+                    syncWarnings.append("Prop receipts upload: \(error.localizedDescription)")
+                }
             }
         } catch {
             AppLogger.warning("Supabase prop receipts warning: \(error.localizedDescription)")
@@ -529,7 +563,12 @@ public final class TradeDataStore: ObservableObject {
                 }
             }
             if !propAudits.isEmpty {
-                try? await SupabaseService.shared.upsertPropAudits(propAudits)
+                do {
+                    try await SupabaseService.shared.upsertPropAudits(propAudits)
+                } catch {
+                    AppLogger.warning("Supabase prop audits upsert warning: \(error.localizedDescription)")
+                    syncWarnings.append("Prop audits upload: \(error.localizedDescription)")
+                }
             }
         } catch {
             AppLogger.warning("Supabase prop audits warning: \(error.localizedDescription)")
@@ -588,6 +627,99 @@ public final class TradeDataStore: ObservableObject {
             }
         }
         return count
+    }
+    
+    // MARK: - Unified Global Synchronization
+    
+    public func performGlobalSync() async {
+        guard !isSyncing else { return }
+        
+        await MainActor.run {
+            self.isSyncing = true
+            self.lastSyncError = nil
+            self.lastSyncSummary = "Connecting to services..."
+        }
+        defer {
+            Task { @MainActor in self.isSyncing = false }
+        }
+        
+        let hasThe5ers = The5ersService.shared.isConfigured
+        let hasSupabase = SupabaseService.shared.isConfigured
+        
+        guard hasThe5ers || hasSupabase else {
+            await MainActor.run {
+                self.lastSyncError = "No sync provider configured. Open Settings to connect The5ers MCP or Supabase Cloud."
+                self.lastSyncSummary = nil
+            }
+            return
+        }
+        
+        var the5ersCount = 0
+        var the5ersErrorMsg: String? = nil
+        var the5ersSuccess = false
+        
+        // 1. Pull fresh accounts, positions, purchases, and payouts from The5ers MCP Hub
+        if hasThe5ers {
+            await MainActor.run {
+                self.lastSyncSummary = "Fetching accounts & positions from The5ers Hub..."
+            }
+            do {
+                the5ersCount = try await The5ersService.shared.syncWithTradeStore(dataStore: self)
+                the5ersSuccess = true
+            } catch {
+                AppLogger.error("The5ers sync failed: \(error.localizedDescription)")
+                let nsErr = error as NSError
+                if nsErr.code == 401 || error.localizedDescription.contains("401") || error.localizedDescription.localizedCaseInsensitiveContains("unauthorized") {
+                    the5ersErrorMsg = "The5ers session token expired or invalid (401). Please re-login in Settings."
+                } else {
+                    the5ersErrorMsg = "The5ers: \(error.localizedDescription)"
+                }
+            }
+        }
+        
+        // 2. Synchronize with Supabase Cloud PostgreSQL database
+        var supabaseErrorMsg: String? = nil
+        var supabaseSuccess = false
+        if hasSupabase {
+            await MainActor.run {
+                self.lastSyncSummary = "Synchronizing with Supabase Cloud Database..."
+            }
+            await syncWithSupabase()
+            if let supErr = self.lastSyncError {
+                supabaseErrorMsg = supErr
+            } else {
+                supabaseSuccess = true
+            }
+        }
+        
+        // 3. Final summary state update
+        await MainActor.run {
+            if let tErr = the5ersErrorMsg, let sErr = supabaseErrorMsg {
+                self.lastSyncError = "\(tErr)\n\(sErr)"
+                self.lastSyncSummary = nil
+            } else if let tErr = the5ersErrorMsg {
+                self.lastSyncError = tErr
+                if supabaseSuccess {
+                    self.lastSyncSummary = "Supabase updated, but The5ers sync failed."
+                }
+            } else if let sErr = supabaseErrorMsg {
+                self.lastSyncError = "Supabase warning: \(sErr)"
+                if the5ersSuccess {
+                    self.lastSyncSummary = "The5ers synced \(the5ersCount) accounts, but Supabase had warnings."
+                }
+            } else {
+                var details: [String] = []
+                if hasThe5ers {
+                    let the5ersTradesCount = self.trades.filter { $0.tags.contains("the5ers") }.count
+                    details.append("The5ers: \(the5ersCount) accounts (\(the5ersTradesCount) trades)")
+                }
+                if hasSupabase {
+                    details.append("Supabase Cloud backed up")
+                }
+                self.lastSyncSummary = "Sync completed: \(details.joined(separator: " - "))"
+                self.lastSyncError = nil
+            }
+        }
     }
     
     // Internal implementation note
