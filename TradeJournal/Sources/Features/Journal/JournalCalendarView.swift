@@ -532,7 +532,7 @@ public struct JournalCalendarView: View {
                     .font(AppTypography.subheadline)
                     .foregroundColor(AppColors.primaryText)
                 
-                Text("Visible month × active filters · Closed trades, after fees · \(env.currentTimeZone.identifier)")
+                Text("Visible month × active filters · Closed trades, after fees")
                     .font(AppTypography.caption)
                     .foregroundColor(AppColors.secondaryText)
             }
@@ -1292,20 +1292,92 @@ public struct DayDetailSheet: View {
                     }
                 }
                 
+                // Formatting toolbar
+                HStack(spacing: 8) {
+                    Button {
+                        applyFormat(marker: "**")
+                    } label: {
+                        Text("B")
+                            .font(.system(size: 13, weight: .black))
+                            .frame(width: 30, height: 26)
+                            .background(AppColors.secondaryBackground)
+                            .foregroundColor(AppColors.primaryText)
+                            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    }
+                    .buttonStyle(ApplePressableButtonStyle())
+                    
+                    Button {
+                        applyFormat(marker: "*")
+                    } label: {
+                        Text("I")
+                            .font(.system(size: 13, weight: .bold, design: .serif))
+                            .italic()
+                            .frame(width: 30, height: 26)
+                            .background(AppColors.secondaryBackground)
+                            .foregroundColor(AppColors.primaryText)
+                            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    }
+                    .buttonStyle(ApplePressableButtonStyle())
+                    
+                    Button {
+                        insertNumberedList()
+                    } label: {
+                        Image(systemName: "list.number")
+                            .font(.system(size: 11, weight: .bold))
+                            .frame(width: 30, height: 26)
+                            .background(AppColors.secondaryBackground)
+                            .foregroundColor(AppColors.primaryText)
+                            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    }
+                    .buttonStyle(ApplePressableButtonStyle())
+                    
+                    Button {
+                        insertBullet()
+                    } label: {
+                        Image(systemName: "list.bullet")
+                            .font(.system(size: 11, weight: .bold))
+                            .frame(width: 30, height: 26)
+                            .background(AppColors.secondaryBackground)
+                            .foregroundColor(AppColors.primaryText)
+                            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    }
+                    .buttonStyle(ApplePressableButtonStyle())
+                    
+                    Spacer()
+                }
+                
                 TextField("Write thoughts or notes for this day...", text: $noteContent, axis: .vertical)
                     .lineLimit(3...6)
                     .font(AppTypography.inputText)
                     .foregroundColor(AppColors.primaryText)
                     .padding(10)
                     .background(AppColors.secondaryBackground)
-                    .cornerRadius(6)
+                    .cornerRadius(8)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 6)
-                            .stroke(AppColors.border, lineWidth: 1)
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(AppColors.border.opacity(0.6), lineWidth: 0.5)
                     )
                     .onChange(of: noteContent) { _ in
                         save()
                     }
+                
+                if noteContent.contains("*") || noteContent.contains("- ") || noteContent.contains("1. ") || noteContent.contains("#") {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("FORMATTED PREVIEW")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(AppColors.secondaryText)
+                            .tracking(0.5)
+                        
+                        Text(LocalizedStringKey(noteContent))
+                            .font(AppTypography.body)
+                            .foregroundColor(AppColors.primaryText)
+                            .padding(10)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(AppColors.secondaryBackground.opacity(0.4))
+                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    }
+                    .padding(.top, 2)
+                }
             }
         }
     }
@@ -1395,6 +1467,44 @@ public struct DayDetailSheet: View {
         }
     }
     
+    private func applyFormat(marker: String) {
+        #if canImport(UIKit)
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        #endif
+        let res = NoteFormattingEngine.formatInlineSelection(
+            value: noteContent,
+            start: (noteContent as NSString).length,
+            end: (noteContent as NSString).length,
+            marker: marker
+        )
+        noteContent = res.value
+        save()
+    }
+    
+    private func insertBullet() {
+        #if canImport(UIKit)
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        #endif
+        if noteContent.isEmpty || noteContent.hasSuffix("\n") {
+            noteContent += "- "
+        } else {
+            noteContent += "\n- "
+        }
+        save()
+    }
+    
+    private func insertNumberedList() {
+        #if canImport(UIKit)
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        #endif
+        if noteContent.isEmpty || noteContent.hasSuffix("\n") {
+            noteContent += "1. "
+        } else {
+            noteContent += "\n1. "
+        }
+        save()
+    }
+
     private func save() {
         var updated = note
         updated.content = noteContent

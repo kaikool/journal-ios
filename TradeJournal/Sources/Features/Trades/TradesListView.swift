@@ -203,7 +203,7 @@ public struct TradesListView: View {
                     .font(.system(size: 13))
                     .foregroundColor(AppColors.secondaryText)
                 TextField("Search symbol, tag, notes...", text: $searchText)
-                    .font(AppTypography.body)
+                    .font(.system(size: 13, weight: .regular))
                     .foregroundColor(AppColors.primaryText)
                 if !searchText.isEmpty {
                     Button {
@@ -215,8 +215,8 @@ public struct TradesListView: View {
                     }
                 }
             }
+            .frame(height: 40)
             .padding(.horizontal, 12)
-            .padding(.vertical, 9)
             .background(AppColors.cardBackground)
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             .overlay(
@@ -236,14 +236,15 @@ public struct TradesListView: View {
             } label: {
                 HStack(spacing: 6) {
                     Text(statusFilter.rawValue)
-                        .font(AppTypography.captionBold)
+                        .font(.system(size: 13, weight: .semibold))
                         .foregroundColor(AppColors.primaryText)
+                        .lineLimit(1)
                     Image(systemName: "chevron.up.chevron.down")
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundColor(AppColors.secondaryText)
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 9)
+                .frame(height: 40)
+                .padding(.horizontal, 14)
                 .background(AppColors.cardBackground)
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 .overlay(

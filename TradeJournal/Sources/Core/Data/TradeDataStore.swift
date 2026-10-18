@@ -639,7 +639,7 @@ public final class TradeDataStore: ObservableObject {
         do {
             let remotePlaybooks = try await SupabaseService.shared.fetchPlaybooks()
             for rPb in remotePlaybooks {
-                if deletedPlaybookIds.contains(rPb.id) {
+                if deletedPlaybookIds.contains(rPb.id) || (rPb.name.lowercased().contains("test playbook") && deletedPlaybookIds.contains(rPb.id)) {
                     Task { try? await SupabaseService.shared.deletePlaybook(id: rPb.id) }
                     continue
                 }
@@ -663,6 +663,33 @@ public final class TradeDataStore: ObservableObject {
         } catch {
             if Self.isCancellation(error) { return }
             AppLogger.warning("Supabase playbooks sync warning: \(error.localizedDescription)")
+        }
+
+        if Task.isCancelled { return }
+
+        // Supabase journal_days (calendar notes) sync
+        do {
+            let remoteNotes = try await SupabaseService.shared.fetchJournalDays()
+            for rNote in remoteNotes {
+                if let local = calendarNotes[rNote.date] {
+                    if rNote.updatedAt >= local.updatedAt {
+                        calendarNotes[rNote.date] = rNote
+                        journalDays[rNote.date] = rNote.content
+                    }
+                } else {
+                    calendarNotes[rNote.date] = rNote
+                    journalDays[rNote.date] = rNote.content
+                }
+            }
+            let localNotesToUpload = calendarNotes.values.filter { local in
+                !remoteNotes.contains(where: { $0.date == local.date && $0.updatedAt >= local.updatedAt })
+            }
+            if !localNotesToUpload.isEmpty {
+                try? await SupabaseService.shared.upsertJournalDays(Array(localNotesToUpload))
+            }
+        } catch {
+            if Self.isCancellation(error) { return }
+            AppLogger.warning("Supabase journal_days sync warning: \(error.localizedDescription)")
         }
 
         if Task.isCancelled { return }
@@ -1064,7 +1091,12 @@ public final class TradeDataStore: ObservableObject {
     
     public func saveJournalDayNote(date: String, note: String) {
         self.journalDays[date] = note
+        let jNote = JournalNote(date: date, content: note, updatedAt: Date())
+        self.calendarNotes[date] = jNote
         saveToDisk()
+        Task {
+            try? await SupabaseService.shared.upsertJournalDay(jNote)
+        }
     }
     
     public func getJournalDayNote(date: String) -> String {
@@ -1597,7 +1629,8 @@ public final class TradeDataStore: ObservableObject {
         rating: Int? = nil,
         stopLoss: Decimal? = nil,
         profitTarget: Decimal? = nil,
-        playbookId: String? = nil
+        playbookId: String? = nil,
+        ruleAssessments: [String: Bool] = [:]
     ) {
         let cleanSymbol = symbol.uppercased().trimmingCharacters(in: .whitespaces)
         let entrySide: ExecutionSide = (direction == .long) ? .buy : .sell
@@ -1652,10 +1685,33 @@ public final class TradeDataStore: ObservableObject {
             trades[idx].stopLoss = stopLoss
             trades[idx].profitTarget = profitTarget
             trades[idx].playbookId = playbookId
+            
+            if let pbId = playbookId, !ruleAssessments.isEmpty {
+                let tradeKey = trades[idx].key
+                for (rule, followed) in ruleAssessments {
+                    let assessment = PlaybookRuleAssessment(
+                        tradeKey: tradeKey,
+                        playbookId: pbId,
+                        rule: rule,
+                        followed: followed
+                    )
+                    if let aIdx = playbookAssessments.firstIndex(where: { $0.id == assessment.id }) {
+                        playbookAssessments[aIdx] = assessment
+                    } else {
+                        playbookAssessments.append(assessment)
+                    }
+                }
+            }
         }
         
         saveToDisk()
         AppLogger.info("Added manual trade for \(cleanSymbol). Total trades now: \(trades.count)")
+        Task {
+            try? await SupabaseService.shared.upsertExecutions(newExecutions)
+            if let t = self.trades.first(where: { $0.accountId == accountId && $0.symbol == cleanSymbol && abs($0.openedAt.timeIntervalSince(openedAt)) < 2 }) {
+                try? await SupabaseService.shared.upsertTrades([t])
+            }
+        }
     }
     
     public func deleteTrade(key: String) {
@@ -1687,10 +1743,19 @@ public final class TradeDataStore: ObservableObject {
     public func deletePlaybook(id: String) {
         playbooks.removeAll { $0.id == id }
         playbookAssessments.removeAll { $0.playbookId == id }
+        for i in 0..<trades.count {
+            if trades[i].playbookId == id {
+                trades[i].playbookId = nil
+            }
+        }
         deletedPlaybookIds.insert(id)
         saveToDisk()
         Task {
-            try? await SupabaseService.shared.deletePlaybook(id: id)
+            do {
+                try await SupabaseService.shared.deletePlaybook(id: id)
+            } catch {
+                AppLogger.warning("Supabase deletePlaybook notice: \(error.localizedDescription)")
+            }
         }
     }
     
@@ -1708,12 +1773,20 @@ public final class TradeDataStore: ObservableObject {
     
     public func saveCalendarNote(_ note: JournalNote) {
         calendarNotes[note.date] = note
+        journalDays[note.date] = note.content
         saveToDisk()
+        Task {
+            try? await SupabaseService.shared.upsertJournalDay(note)
+        }
     }
     
     public func deleteCalendarNote(for date: String) {
         calendarNotes.removeValue(forKey: date)
+        journalDays.removeValue(forKey: date)
         saveToDisk()
+        Task {
+            try? await SupabaseService.shared.deleteJournalDay(date: date)
+        }
     }
     
     // MARK: - Data Reset

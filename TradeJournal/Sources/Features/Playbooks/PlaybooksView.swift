@@ -180,9 +180,17 @@ public struct PlaybooksView: View {
                         Image(systemName: "trash")
                             .font(.system(size: 13))
                             .foregroundColor(AppColors.secondaryText.opacity(0.6))
+                            .padding(6)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .padding(.leading, 4)
+                    .highPriorityGesture(TapGesture().onEnded {
+                        #if canImport(UIKit)
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        #endif
+                        playbookToDelete = summary.playbook
+                        showDeleteConfirmation = true
+                    })
                 }
                 
                 if !summary.playbook.description.isEmpty {

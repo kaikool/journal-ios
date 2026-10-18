@@ -650,6 +650,60 @@ public struct DailyJournalDetailView: View {
                     .font(AppTypography.caption)
                     .foregroundColor(AppColors.secondaryText)
                 
+                // Formatting toolbar
+                HStack(spacing: 8) {
+                    Button {
+                        applyFormat(marker: "**")
+                    } label: {
+                        Text("B")
+                            .font(.system(size: 13, weight: .black))
+                            .frame(width: 30, height: 26)
+                            .background(AppColors.secondaryBackground)
+                            .foregroundColor(AppColors.primaryText)
+                            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    }
+                    .buttonStyle(ApplePressableButtonStyle())
+                    
+                    Button {
+                        applyFormat(marker: "*")
+                    } label: {
+                        Text("I")
+                            .font(.system(size: 13, weight: .bold, design: .serif))
+                            .italic()
+                            .frame(width: 30, height: 26)
+                            .background(AppColors.secondaryBackground)
+                            .foregroundColor(AppColors.primaryText)
+                            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    }
+                    .buttonStyle(ApplePressableButtonStyle())
+                    
+                    Button {
+                        insertNumberedList()
+                    } label: {
+                        Image(systemName: "list.number")
+                            .font(.system(size: 11, weight: .bold))
+                            .frame(width: 30, height: 26)
+                            .background(AppColors.secondaryBackground)
+                            .foregroundColor(AppColors.primaryText)
+                            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    }
+                    .buttonStyle(ApplePressableButtonStyle())
+                    
+                    Button {
+                        insertBullet()
+                    } label: {
+                        Image(systemName: "list.bullet")
+                            .font(.system(size: 11, weight: .bold))
+                            .frame(width: 30, height: 26)
+                            .background(AppColors.secondaryBackground)
+                            .foregroundColor(AppColors.primaryText)
+                            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    }
+                    .buttonStyle(ApplePressableButtonStyle())
+                    
+                    Spacer()
+                }
+                
                 // Note text editor
                 ZStack(alignment: .topLeading) {
                     if noteText.isEmpty {
@@ -669,6 +723,24 @@ public struct DailyJournalDetailView: View {
                         .onChange(of: noteText) { newValue in
                             scheduleSaveNote(newValue)
                         }
+                }
+                
+                if noteText.contains("*") || noteText.contains("- ") || noteText.contains("1. ") || noteText.contains("#") {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("FORMATTED PREVIEW")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(AppColors.secondaryText)
+                            .tracking(0.5)
+                        
+                        Text(LocalizedStringKey(noteText))
+                            .font(AppTypography.body)
+                            .foregroundColor(AppColors.primaryText)
+                            .padding(10)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(AppColors.secondaryBackground.opacity(0.4))
+                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    }
+                    .padding(.top, 2)
                 }
                 
                 HStack {
@@ -721,6 +793,44 @@ public struct DailyJournalDetailView: View {
         calNote.updatedAt = Date()
         dataStore.saveCalendarNote(calNote)
         saveStatusMessage = "Saved"
+    }
+    
+    private func applyFormat(marker: String) {
+        #if canImport(UIKit)
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        #endif
+        let res = NoteFormattingEngine.formatInlineSelection(
+            value: noteText,
+            start: (noteText as NSString).length,
+            end: (noteText as NSString).length,
+            marker: marker
+        )
+        noteText = res.value
+        scheduleSaveNote(noteText)
+    }
+    
+    private func insertBullet() {
+        #if canImport(UIKit)
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        #endif
+        if noteText.isEmpty || noteText.hasSuffix("\n") {
+            noteText += "- "
+        } else {
+            noteText += "\n- "
+        }
+        scheduleSaveNote(noteText)
+    }
+    
+    private func insertNumberedList() {
+        #if canImport(UIKit)
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        #endif
+        if noteText.isEmpty || noteText.hasSuffix("\n") {
+            noteText += "1. "
+        } else {
+            noteText += "\n1. "
+        }
+        scheduleSaveNote(noteText)
     }
     
     private func generateAiRecap() {

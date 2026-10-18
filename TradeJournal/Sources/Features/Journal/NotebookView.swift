@@ -532,6 +532,21 @@ public struct NotebookEditorSheet: View {
                             }
                             .buttonStyle(ApplePressableButtonStyle())
                             
+                            Button {
+                                #if canImport(UIKit)
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                #endif
+                                insertNumberedList()
+                            } label: {
+                                Image(systemName: "list.number")
+                                    .font(.system(size: 13, weight: .bold))
+                                    .frame(width: 34, height: 30)
+                                    .background(AppColors.secondaryBackground)
+                                    .foregroundColor(AppColors.primaryText)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            }
+                            .buttonStyle(ApplePressableButtonStyle())
+                            
                             Spacer()
                         }
                         .padding(.horizontal, 16)
@@ -556,7 +571,7 @@ public struct NotebookEditorSheet: View {
                                             .foregroundColor(AppColors.primaryText)
                                             .padding(.bottom, 4)
                                     }
-                                    Text(content)
+                                    Text(LocalizedStringKey(content))
                                         .font(AppTypography.body)
                                         .foregroundColor(AppColors.primaryText)
                                 }
@@ -569,6 +584,24 @@ public struct NotebookEditorSheet: View {
                                 .scrollContentBackground(.hidden)
                                 .frame(minHeight: 180)
                                 .onChange(of: content) { _ in autoSave() }
+                            
+                            if content.contains("*") || content.contains("#") || content.contains("- ") || content.contains("1. ") {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("FORMATTED PREVIEW")
+                                        .font(.system(size: 10, weight: .semibold))
+                                        .foregroundColor(AppColors.secondaryText)
+                                        .tracking(0.5)
+                                    
+                                    Text(LocalizedStringKey(content))
+                                        .font(AppTypography.body)
+                                        .foregroundColor(AppColors.primaryText)
+                                        .padding(10)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .background(AppColors.secondaryBackground.opacity(0.4))
+                                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                }
+                                .padding(.top, 4)
+                            }
                         }
                         
                         Divider().background(AppColors.border.opacity(0.5))
@@ -643,6 +676,15 @@ public struct NotebookEditorSheet: View {
             content += "- "
         } else {
             content += "\n- "
+        }
+        autoSave()
+    }
+    
+    private func insertNumberedList() {
+        if content.isEmpty || content.hasSuffix("\n") {
+            content += "1. "
+        } else {
+            content += "\n1. "
         }
         autoSave()
     }

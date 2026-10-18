@@ -881,7 +881,50 @@ public final class SupabaseService {
 
     public func deletePlaybook(id: String) async throws {
         guard isConfigured else { return }
+        // 1. Delete associated trade rule checks first to prevent foreign key errors
+        let rkEndpoint = "trade_rule_checks?playbook_id=eq.\(id)"
+        if let req = try? makeRequest(endpoint: rkEndpoint, method: "DELETE") {
+            _ = try? await session.data(for: req)
+        }
+        // 2. Clear playbook_id in trades so foreign key constraint is satisfied
+        let trEndpoint = "trades?playbook_id=eq.\(id)"
+        if let req = try? makeRequest(endpoint: trEndpoint, method: "PATCH", body: ["playbook_id": nil as String?]) {
+            _ = try? await session.data(for: req)
+        }
+        // 3. Delete playbook record
         let endpoint = "playbooks?id=eq.\(id)"
+        let request = try makeRequest(endpoint: endpoint, method: "DELETE")
+        let (data, response) = try await session.data(for: request)
+        try validateResponse(response, data: data, endpoint: endpoint)
+    }
+    
+    // MARK: - Journal Days (Calendar Notes) Sync
+    
+    public func fetchJournalDays() async throws -> [JournalNote] {
+        guard isConfigured else { return [] }
+        let endpoint = "journal_days?select=*"
+        let request = try makeRequest(endpoint: endpoint)
+        let (data, response) = try await session.data(for: request)
+        try validateResponse(response, data: data, endpoint: endpoint)
+        let records = decodeArray(SupabaseJournalDayRecord.self, from: data)
+        return records.map { $0.toJournalNote() }
+    }
+
+    public func upsertJournalDays(_ items: [JournalNote]) async throws {
+        guard isConfigured, !items.isEmpty else { return }
+        let dtos = items.map { SupabaseJournalDayRecord(journalNote: $0) }
+        try await upsertBatches(endpoint: "journal_days", items: dtos)
+    }
+
+    public func upsertJournalDay(_ item: JournalNote) async throws {
+        guard isConfigured else { return }
+        let dto = SupabaseJournalDayRecord(journalNote: item)
+        try await upsertBatches(endpoint: "journal_days", items: [dto])
+    }
+
+    public func deleteJournalDay(date: String) async throws {
+        guard isConfigured else { return }
+        let endpoint = "journal_days?date=eq.\(date)"
         let request = try makeRequest(endpoint: endpoint, method: "DELETE")
         let (data, response) = try await session.data(for: request)
         try validateResponse(response, data: data, endpoint: endpoint)
@@ -1417,6 +1460,42 @@ public struct SupabasePlaybookRecord: Codable {
             description: description,
             rules: parsedRules,
             createdAt: FlexibleDateParser.parse(createdAt) ?? Date()
+        )
+    }
+}
+
+public struct SupabaseJournalDayRecord: Codable {
+    public let date: String
+    public let note: String
+    public let updatedAt: String
+    
+    private enum CodingKeys: String, CodingKey {
+        case date
+        case note
+        case updatedAt = "updated_at"
+    }
+    
+    public init(journalNote: JournalNote) {
+        let fmt = ISO8601DateFormatter()
+        self.date = journalNote.date
+        self.note = journalNote.content
+        self.updatedAt = fmt.string(from: journalNote.updatedAt)
+    }
+    
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: AnyCodingKey.self)
+        self.date = c.decodeString(forKeys: ["date"]) ?? ""
+        self.note = c.decodeString(forKeys: ["note", "content"]) ?? ""
+        self.updatedAt = c.decodeString(forKeys: ["updated_at", "updatedAt"]) ?? JournalIds.nowIso()
+    }
+    
+    public func toJournalNote() -> JournalNote {
+        let parsedDate = FlexibleDateParser.parse(updatedAt) ?? Date()
+        return JournalNote(
+            date: date,
+            content: note,
+            createdAt: parsedDate,
+            updatedAt: parsedDate
         )
     }
 }
