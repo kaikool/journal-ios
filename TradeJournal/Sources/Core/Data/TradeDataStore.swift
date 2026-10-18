@@ -1232,6 +1232,9 @@ public final class TradeDataStore: ObservableObject {
             )
             propAudits.append(audit)
         }
+        saveToDisk()
+    }
+    
     public func deletePropAccount(id: String) {
         propAccounts.removeAll { $0.id == id }
         propEntries.removeAll { $0.accountId == id }
