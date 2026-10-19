@@ -427,22 +427,35 @@ public struct TradeReplayView: View {
     
     private var excursionMetricsCard: some View {
         cardContainer {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("EXCURSION ESTIMATES (MAE & MFE)")
-                    .font(AppTypography.cardTitle)
-                    .foregroundColor(AppColors.secondaryText)
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Text("EXCURSION ESTIMATES (MAE & MFE)")
+                        .font(AppTypography.cardTitle)
+                        .foregroundColor(AppColors.secondaryText)
+                    Spacer()
+                    Text("holding period extremes")
+                        .font(.system(size: 10))
+                        .foregroundColor(AppColors.secondaryText.opacity(0.7))
+                }
                 
                 HStack(spacing: 12) {
-                    // MAE
-                    VStack(alignment: .leading, spacing: 4) {
+                    // MAE (Drawdown)
+                    VStack(alignment: .leading, spacing: 3) {
                         Text("Estimated MAE · adverse")
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText)
                         
                         if let mae = excursionEstimate?.mae {
-                            Text(Formatters.formatCurrency(mae, currency: env.currentCurrency))
-                                .font(AppTypography.financialNumber(size: 16, weight: .bold))
+                            Text(Formatters.formatPnL(mae, currency: env.currentCurrency))
+                                .font(AppTypography.financialNumber(size: 17, weight: .bold))
                                 .foregroundColor(AppColors.loss)
+                            
+                            if let p = excursionEstimate?.maePrice {
+                                let ptsText = excursionEstimate?.maePoints.map { " (\(Formatters.formatNumber($0)) pts)" } ?? ""
+                                Text("Low: \(Formatters.price(p))\(ptsText)")
+                                    .font(.system(size: 10, weight: .regular, design: .monospaced))
+                                    .foregroundColor(AppColors.secondaryText)
+                            }
                         } else {
                             Text("Unavailable")
                                 .font(AppTypography.captionBold)
@@ -451,18 +464,25 @@ public struct TradeReplayView: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     
-                    Divider().frame(height: 36)
+                    Divider().frame(height: 48)
                     
-                    // MFE
-                    VStack(alignment: .leading, spacing: 4) {
+                    // MFE (Runup)
+                    VStack(alignment: .leading, spacing: 3) {
                         Text("Estimated MFE · favorable")
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText)
                         
                         if let mfe = excursionEstimate?.mfe {
-                            Text(Formatters.formatCurrency(mfe, currency: env.currentCurrency))
-                                .font(AppTypography.financialNumber(size: 16, weight: .bold))
+                            Text(Formatters.formatPnL(mfe, currency: env.currentCurrency))
+                                .font(AppTypography.financialNumber(size: 17, weight: .bold))
                                 .foregroundColor(AppColors.profit)
+                            
+                            if let p = excursionEstimate?.mfePrice {
+                                let ptsText = excursionEstimate?.mfePoints.map { " (+\(Formatters.formatNumber($0)) pts)" } ?? ""
+                                Text("High: \(Formatters.price(p))\(ptsText)")
+                                    .font(.system(size: 10, weight: .regular, design: .monospaced))
+                                    .foregroundColor(AppColors.secondaryText)
+                            }
                         } else {
                             Text("Unavailable")
                                 .font(AppTypography.captionBold)
@@ -504,7 +524,7 @@ public struct TradeReplayView: View {
                 self.excursionEstimate = TradeReplayEngine.estimateExcursions(
                     trade: trade,
                     fills: executions,
-                    bars: resampled,
+                    bars: rawSourceBars,
                     resolution: selectedResolution
                 )
                 return
@@ -536,7 +556,7 @@ public struct TradeReplayView: View {
                 self.excursionEstimate = TradeReplayEngine.estimateExcursions(
                     trade: trade,
                     fills: executions,
-                    bars: resampled,
+                    bars: fetchedBars,
                     resolution: selectedResolution
                 )
             } else {

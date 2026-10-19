@@ -54,6 +54,10 @@ public struct ExcursionEstimate: Codable, Sendable, Equatable {
     public let excludedBars: Int
     public let warnings: [String]
     public let priceBasisMismatch: Bool
+    public let maePrice: Decimal?
+    public let mfePrice: Decimal?
+    public let maePoints: Decimal?
+    public let mfePoints: Decimal?
     
     public init(
         mae: Decimal? = nil,
@@ -61,7 +65,11 @@ public struct ExcursionEstimate: Codable, Sendable, Equatable {
         sampledBars: Int = 0,
         excludedBars: Int = 0,
         warnings: [String] = [],
-        priceBasisMismatch: Bool = false
+        priceBasisMismatch: Bool = false,
+        maePrice: Decimal? = nil,
+        mfePrice: Decimal? = nil,
+        maePoints: Decimal? = nil,
+        mfePoints: Decimal? = nil
     ) {
         self.mae = mae
         self.mfe = mfe
@@ -69,6 +77,10 @@ public struct ExcursionEstimate: Codable, Sendable, Equatable {
         self.excludedBars = excludedBars
         self.warnings = warnings
         self.priceBasisMismatch = priceBasisMismatch
+        self.maePrice = maePrice
+        self.mfePrice = mfePrice
+        self.maePoints = maePoints
+        self.mfePoints = mfePoints
     }
 }
 
@@ -188,58 +200,89 @@ public enum TradeReplayEngine {
     }
     
     /// Computes MAE (Maximum Adverse Excursion) and MFE (Maximum Favorable Excursion)
-    /// Ported 1:1 from `excursions.ts` in source-repo
+    /// Accurately accounts for asset multipliers, empirical dollar-per-point, and true holding period extremes.
     public static func estimateExcursions(
         trade: Trade,
         fills: [Execution],
         bars: [MarketBar],
         resolution: MarketResolution = .m15
     ) -> ExcursionEstimate {
-        guard !bars.isEmpty else {
-            return ExcursionEstimate(warnings: ["No candle data available to calculate MAE/MFE."])
-        }
-        
-        let qty = trade.quantity
-        guard qty > 0, trade.avgEntry > 0 else {
-            return ExcursionEstimate(warnings: ["Missing valid quantity or entry price."])
+        guard trade.avgEntry > 0 else {
+            return ExcursionEstimate(warnings: ["Missing valid entry price."])
         }
         
         let openMs = Int64(trade.openedAt.timeIntervalSince1970 * 1000)
         let closeMs = Int64((trade.closedAt ?? Date()).timeIntervalSince1970 * 1000)
         let step = resolution.durationMs
         
-        // Filter candles within trade holding window
-        let tradeBars = bars.filter { $0.timestamp + step >= openMs && $0.timestamp <= closeMs }
-        guard !tradeBars.isEmpty else {
-            return ExcursionEstimate(warnings: ["Candle range does not cover trade holding duration."])
+        // Filter candles that overlap with trade holding window [openMs, closeMs]
+        // A candle [t, t + step] overlaps if t <= closeMs and t + step >= openMs
+        let tradeBars = bars.filter { bar in
+            bar.timestamp <= closeMs && (bar.timestamp + step) >= openMs
         }
         
-        var minAdverse: Decimal = 0
-        var maxFavorable: Decimal = 0
+        var candidateLows: [Decimal] = [trade.avgEntry]
+        var candidateHighs: [Decimal] = [trade.avgEntry]
         
-        for bar in tradeBars {
-            if trade.direction == .long {
-                let adverse = (bar.low - trade.avgEntry) * qty
-                let favorable = (bar.high - trade.avgEntry) * qty
-                if adverse < minAdverse { minAdverse = adverse }
-                if favorable > maxFavorable { maxFavorable = favorable }
-            } else {
-                let adverse = (trade.avgEntry - bar.high) * qty
-                let favorable = (trade.avgEntry - bar.low) * qty
-                if adverse < minAdverse { minAdverse = adverse }
-                if favorable > maxFavorable { maxFavorable = favorable }
+        if let exit = trade.avgExit, exit > 0 {
+            candidateLows.append(exit)
+            candidateHighs.append(exit)
+        }
+        
+        for fill in fills {
+            if fill.price > 0 {
+                candidateLows.append(fill.price)
+                candidateHighs.append(fill.price)
             }
         }
         
+        for bar in tradeBars {
+            if bar.low > 0 { candidateLows.append(bar.low) }
+            if bar.high > 0 { candidateHighs.append(bar.high) }
+        }
+        
+        let minPrice = candidateLows.min() ?? trade.avgEntry
+        let maxPrice = candidateHighs.max() ?? trade.avgEntry
+        
+        let isLong = trade.direction == .long
+        let maePrice = isLong ? minPrice : maxPrice
+        let mfePrice = isLong ? maxPrice : minPrice
+        
+        let maePoints = isLong ? (minPrice - trade.avgEntry) : (trade.avgEntry - maxPrice)
+        let mfePoints = isLong ? (maxPrice - trade.avgEntry) : (trade.avgEntry - minPrice)
+        
+        // Mark-to-market dollar conversion using asset contract specifications & empirical dollarPerPoint
+        var maeDollar = computeUnrealizedPnl(trade: trade, currentPrice: maePrice, isLastBar: false)
+        var mfeDollar = computeUnrealizedPnl(trade: trade, currentPrice: mfePrice, isLastBar: false)
+        
+        // MAE is maximum adverse excursion (drawdown), so it must be <= 0
+        if maeDollar > 0 { maeDollar = 0 }
+        // If the closed trade finished with a net loss, MAE must be at least as severe as net loss
+        if trade.status != .open && trade.netPnl < 0 {
+            maeDollar = min(maeDollar, trade.netPnl)
+        }
+        
+        // MFE is maximum favorable excursion (runup), so it must be >= 0
+        if mfeDollar < 0 { mfeDollar = 0 }
+        // If the closed trade finished with a net profit, MFE must be at least as high as net profit
+        if trade.status != .open && trade.netPnl > 0 {
+            mfeDollar = max(mfeDollar, trade.netPnl)
+        }
+        
         return ExcursionEstimate(
-            mae: minAdverse,
-            mfe: maxFavorable,
+            mae: maeDollar,
+            mfe: mfeDollar,
             sampledBars: tradeBars.count,
             excludedBars: max(0, bars.count - tradeBars.count),
             warnings: [
-                "MAE/MFE estimates based on completed candle High/Low during trade holding period.",
-                "Excludes commissions, fees, and overnight swap."
-            ]
+                "MAE/MFE estimates based on candles & fills during trade holding period.",
+                "Computed using contract multiplier & broker trade delta."
+            ],
+            priceBasisMismatch: false,
+            maePrice: maePrice,
+            mfePrice: mfePrice,
+            maePoints: min(0, maePoints),
+            mfePoints: max(0, mfePoints)
         )
     }
     
