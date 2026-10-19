@@ -39,4 +39,20 @@ final class JournalIdsTests: XCTestCase {
         XCTAssertEqual(JournalIds.toPrecision12(Decimal(string: "0.00123")!), "0.00123000000000")
         XCTAssertEqual(JournalIds.toPrecision12(Decimal(string: "5012.25")!), "5012.25000000")
     }
+    
+    func testAccountIdNormalization() {
+        let prefixed = "the5ers_12345"
+        let raw = "12345"
+        
+        XCTAssertEqual(prefixed.cleanAccountId, "12345")
+        XCTAssertEqual(raw.cleanAccountId, "12345")
+        
+        XCTAssertEqual(prefixed.the5ersCanonicalId, "the5ers_12345")
+        XCTAssertEqual(raw.the5ersCanonicalId, "the5ers_12345")
+        
+        XCTAssertTrue(prefixed.isEquivalentAccountId(to: raw))
+        XCTAssertTrue(raw.isEquivalentAccountId(to: prefixed))
+        XCTAssertFalse(prefixed.isEquivalentAccountId(to: "99999"))
+    }
 }
+

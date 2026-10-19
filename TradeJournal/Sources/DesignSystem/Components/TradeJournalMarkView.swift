@@ -86,6 +86,9 @@ public struct TradeJournalBrandMark: View {
             context.fill(Path(ellipseIn: dotRect), with: .color(.white))
         }
         .frame(width: size, height: size)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Trade Journal logo")
+        .accessibilityAddTraits(.isImage)
     }
 }
 
@@ -101,5 +104,8 @@ public struct TradeJournalMarkView: View {
     
     public var body: some View {
         TradeJournalBrandMark(size: size, primaryColor: color)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Trade Journal icon")
+            .accessibilityAddTraits(.isImage)
     }
 }

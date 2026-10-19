@@ -47,11 +47,14 @@ public struct ReportsView: View {
     
     public init() {}
     
+    @State private var cache = ReportsCache()
+    
+    @MainActor
     private final class ReportsCache {
-        static var lastKey: String = ""
-        static var lastMetrics: TradeMetrics? = nil
-        static var lastGroupKey: String = ""
-        static var lastGroupResults: [GroupAnalysisResult] = []
+        var lastKey: String = ""
+        var lastMetrics: TradeMetrics? = nil
+        var lastGroupKey: String = ""
+        var lastGroupResults: [GroupAnalysisResult] = []
     }
     
     private var trades: [Trade] {
@@ -60,20 +63,20 @@ public struct ReportsView: View {
     
     private var metrics: TradeMetrics {
         let key = "\(selectedRange.rawValue)_\(dataStore.selectedAccountId)_\(dataStore.filteredTrades.count)_\(dataStore.cacheVersion)"
-        if ReportsCache.lastKey == key, let m = ReportsCache.lastMetrics {
+        if cache.lastKey == key, let m = cache.lastMetrics {
             return m
         }
         let fresh = FinancialMetricsEngine.computeMetrics(trades: trades)
-        ReportsCache.lastKey = key
-        ReportsCache.lastMetrics = fresh
+        cache.lastKey = key
+        cache.lastMetrics = fresh
         return fresh
     }
     
     private var groupResults: [GroupAnalysisResult] {
         let sec: Dimension? = selectedMode == .cross ? secondaryDimension : nil
         let groupKey = "\(selectedRange.rawValue)_\(selectedMode.rawValue)_\(primaryDimension.rawValue)_\(secondaryDimension.rawValue)_\(dataStore.selectedAccountId)_\(dataStore.filteredTrades.count)_\(dataStore.cacheVersion)"
-        if ReportsCache.lastGroupKey == groupKey {
-            return ReportsCache.lastGroupResults
+        if cache.lastGroupKey == groupKey {
+            return cache.lastGroupResults
         }
         let fresh = TradeAnalysisEngine.analyzeGroups(
             trades: trades,
@@ -81,8 +84,8 @@ public struct ReportsView: View {
             secondary: sec,
             timeZone: env.currentTimeZone.identifier
         )
-        ReportsCache.lastGroupKey = groupKey
-        ReportsCache.lastGroupResults = fresh
+        cache.lastGroupKey = groupKey
+        cache.lastGroupResults = fresh
         return fresh
     }
     

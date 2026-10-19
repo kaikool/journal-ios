@@ -153,13 +153,37 @@ public enum Formatters {
         return formatDuration(ms: Int64(ms))
     }
     
-    /// Formats date and time according to designated timezone
-    public static func dateTime(_ date: Date, timeZone: TimeZone = .current) -> String {
+    private static let mediumDateTimeFormatter: DateFormatter = {
         let f = DateFormatter()
         f.dateStyle = .medium
         f.timeStyle = .short
-        f.timeZone = timeZone
-        return f.string(from: date)
+        return f
+    }()
+    
+    private static let shortTimeFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateStyle = .none
+        f.timeStyle = .short
+        return f
+    }()
+    
+    private static let mediumDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateStyle = .medium
+        f.timeStyle = .none
+        return f
+    }()
+    
+    private static let isoDayFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        return f
+    }()
+    
+    /// Formats date and time according to designated timezone using cached formatter
+    public static func dateTime(_ date: Date, timeZone: TimeZone = .current) -> String {
+        mediumDateTimeFormatter.timeZone = timeZone
+        return mediumDateTimeFormatter.string(from: date)
     }
     
     public static func formatDateTime(_ date: Date, timeZone: TimeZone = .current) -> String {
@@ -167,23 +191,29 @@ public enum Formatters {
     }
     
     public static func formatTime(_ date: Date, timeZone: TimeZone = .current) -> String {
-        let f = DateFormatter()
-        f.dateStyle = .none
-        f.timeStyle = .short
-        f.timeZone = timeZone
-        return f.string(from: date)
+        shortTimeFormatter.timeZone = timeZone
+        return shortTimeFormatter.string(from: date)
     }
     
     public static func dateOnly(_ date: Date, timeZone: TimeZone = .current) -> String {
-        let f = DateFormatter()
-        f.dateStyle = .medium
-        f.timeStyle = .none
-        f.timeZone = timeZone
-        return f.string(from: date)
+        mediumDateFormatter.timeZone = timeZone
+        return mediumDateFormatter.string(from: date)
     }
     
     public static func formatDate(_ date: Date, timeZone: TimeZone = .current) -> String {
         dateOnly(date, timeZone: timeZone)
+    }
+    
+    /// Formats Date into standard YYYY-MM-DD day key
+    public static func isoDayString(from date: Date, timeZone: TimeZone = .current) -> String {
+        isoDayFormatter.timeZone = timeZone
+        return isoDayFormatter.string(from: date)
+    }
+    
+    /// Parses Date from standard YYYY-MM-DD day key
+    public static func date(fromIsoDay string: String, timeZone: TimeZone = .current) -> Date? {
+        isoDayFormatter.timeZone = timeZone
+        return isoDayFormatter.date(from: string)
     }
     
     // MARK: - Account & Reference Clean Formatters

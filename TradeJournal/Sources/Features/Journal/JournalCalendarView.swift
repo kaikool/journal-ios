@@ -79,9 +79,12 @@ public struct JournalCalendarView: View {
         let peakWeekdayAbsPnl: Double
     }
     
+    @State private var cache = CalendarCache()
+    
+    @MainActor
     private final class CalendarCache {
-        static var lastKey: String = ""
-        static var lastSnapshot: CalendarSnapshot? = nil
+        var lastKey: String = ""
+        var lastSnapshot: CalendarSnapshot? = nil
     }
     
     private static let isoDateFormatter: DateFormatter = {
@@ -140,12 +143,12 @@ public struct JournalCalendarView: View {
     
     private var snapshot: CalendarSnapshot {
         let key = "\(year)_\(month)_\(dataStore.selectedAccountId)_\(dataStore.filteredTrades.count)_\(dataStore.cacheVersion)_\(env.currentTimeZone.identifier)"
-        if CalendarCache.lastKey == key, let cached = CalendarCache.lastSnapshot {
+        if cache.lastKey == key, let cached = cache.lastSnapshot {
             return cached
         }
         let fresh = computeSnapshot()
-        CalendarCache.lastKey = key
-        CalendarCache.lastSnapshot = fresh
+        cache.lastKey = key
+        cache.lastSnapshot = fresh
         return fresh
     }
     

@@ -11,8 +11,8 @@ let package = Package(
     ],
     products: [
         .library(
-            name: "TradeJournalKit",
-            targets: ["TradeJournalKit"]
+            name: "TradeJournal",
+            targets: ["TradeJournal"]
         ),
     ],
     dependencies: [
@@ -21,14 +21,14 @@ let package = Package(
     ],
     targets: [
         .target(
-            name: "TradeJournalKit",
+            name: "TradeJournal",
             dependencies: [],
             path: "TradeJournal/Sources",
             exclude: ["App/AppMain.swift"]
         ),
         .testTarget(
-            name: "TradeJournalKitTests",
-            dependencies: ["TradeJournalKit"],
+            name: "TradeJournalTests",
+            dependencies: ["TradeJournal"],
             path: "TradeJournal/Tests"
         ),
     ]

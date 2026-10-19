@@ -25,6 +25,32 @@ public struct AppCard<Content: View>: View {
 
 public typealias AppleCard = AppCard
 
+public struct AppCardModifier: ViewModifier {
+    public var cornerRadius: CGFloat
+    public init(cornerRadius: CGFloat = 16) {
+        self.cornerRadius = cornerRadius
+    }
+    
+    public func body(content: Content) -> some View {
+        content
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(AppColors.cardBackground)
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .stroke(AppColors.border.opacity(0.5), lineWidth: 0.5)
+            )
+            .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 2)
+    }
+}
+
+extension View {
+    public func appCardStyle(cornerRadius: CGFloat = 16) -> some View {
+        modifier(AppCardModifier(cornerRadius: cornerRadius))
+    }
+}
+
 /// Stat card header component
 public struct AppCardHeader: View {
     private let title: String

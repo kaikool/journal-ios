@@ -41,8 +41,21 @@ targets:
         ENABLE_BITCODE: "NO"
         ASSETCATALOG_COMPILER_APPICON_NAME: "AppIcon"
 
+  TradeJournalTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: TradeJournal/Tests
+    dependencies:
+      - target: TradeJournal
+
 schemes:
   TradeJournal:
     build:
       targets:
         TradeJournal: all
+        TradeJournalTests: [test]
+    test:
+      targets:
+        - TradeJournalTests

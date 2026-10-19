@@ -68,4 +68,28 @@ final class FoundationTests: XCTestCase {
         let dateTimeStr = Formatters.formatDateTime(testDate)
         XCTAssertFalse(dateTimeStr.isEmpty)
     }
+    
+    func testIsoDayFormatting() {
+        let utc = TimeZone(identifier: "UTC")!
+        let testDate = Date(timeIntervalSince1970: 1700000000) // 2023-11-14 22:13:20 UTC
+        let isoDay = Formatters.isoDayString(from: testDate, timeZone: utc)
+        XCTAssertEqual(isoDay, "2023-11-14")
+        
+        let parsedDate = Formatters.date(fromIsoDay: "2023-11-14", timeZone: utc)
+        XCTAssertNotNil(parsedDate)
+        let roundTrip = Formatters.isoDayString(from: parsedDate!, timeZone: utc)
+        XCTAssertEqual(roundTrip, "2023-11-14")
+    }
+    
+    func testCleanAccountName() {
+        let raw1 = "meta-trader-5 · …7657"
+        XCTAssertEqual(Formatters.cleanAccountName(raw1), "MT5 7657")
+        
+        let raw2 = "Meta-Trade-4-......1234"
+        XCTAssertEqual(Formatters.cleanAccountName(raw2), "MT4 1234")
+        
+        let customName = "My Swing Trading Account"
+        XCTAssertEqual(Formatters.cleanAccountName(customName), customName)
+    }
 }
+

@@ -97,17 +97,6 @@ public struct DashboardView: View {
     
     // MARK: - Memoized Single-Pass Snapshot
     
-    private final class DashboardCache {
-        static var lastKey: String = ""
-        static var lastSnapshot: DashboardSnapshot? = nil
-    }
-    
-    private static let monthPrefixFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM"
-        return f
-    }()
-    
     private struct DashboardSnapshot {
         let metrics: TradeMetrics
         let curve: [EquityPoint]
@@ -122,14 +111,28 @@ public struct DashboardView: View {
         let currentMonthStats: (tradingDays: Int, winningDays: Int, monthPnl: Decimal)
     }
     
+    @State private var cache = DashboardCache()
+    
+    @MainActor
+    private final class DashboardCache {
+        var lastKey: String = ""
+        var lastSnapshot: DashboardSnapshot? = nil
+    }
+    
+    private static let monthPrefixFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM"
+        return f
+    }()
+    
     private var snapshot: DashboardSnapshot {
         let key = "\(selectedRange.rawValue)_\(dataStore.selectedAccountId)_\(dataStore.filteredTrades.count)_\(dataStore.visibleAccounts.count)_\(dataStore.cacheVersion)_\(env.currentTimeZone.identifier)"
-        if DashboardCache.lastKey == key, let cached = DashboardCache.lastSnapshot {
+        if cache.lastKey == key, let cached = cache.lastSnapshot {
             return cached
         }
         let fresh = computeSnapshot()
-        DashboardCache.lastKey = key
-        DashboardCache.lastSnapshot = fresh
+        cache.lastKey = key
+        cache.lastSnapshot = fresh
         return fresh
     }
     

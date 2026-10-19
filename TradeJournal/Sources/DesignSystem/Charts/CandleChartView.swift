@@ -67,6 +67,9 @@ public struct CandleChartView: View {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .stroke(AppColors.border.opacity(0.6), lineWidth: 1)
             )
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Candlestick chart for \(trade.symbol), \(visibleBars.count) bars visible. Entry price \(Formatters.price(trade.avgEntry)).")
+            .accessibilityValue(activeHoveredBar != nil ? "Bar at \(formatBarTime(activeHoveredBar!.timestamp)): Open \(Formatters.price(activeHoveredBar!.open)), High \(Formatters.price(activeHoveredBar!.high)), Low \(Formatters.price(activeHoveredBar!.low)), Close \(Formatters.price(activeHoveredBar!.close))" : "")
         }
     }
     
@@ -411,16 +414,36 @@ public struct CandleChartView: View {
     
     private func formatBarTime(_ timestamp: Int64) -> String {
         let date = Date(timeIntervalSince1970: Double(timestamp) / 1000.0)
-        let f = DateFormatter()
-        f.timeZone = timeZone
         let spanMs = (visibleBars.last?.timestamp ?? timestamp) - (visibleBars.first?.timestamp ?? timestamp)
+        let f: DateFormatter
         if spanMs > 86_400_000 * 2 {
-            f.dateFormat = "MM/dd"
+            f = ChartDateFormatters.dayFormatter
         } else if spanMs > 86_400_000 {
-            f.dateFormat = "MM/dd HH:mm"
+            f = ChartDateFormatters.dayTimeFormatter
         } else {
-            f.dateFormat = "HH:mm"
+            f = ChartDateFormatters.timeFormatter
+        }
+        if f.timeZone != timeZone {
+            f.timeZone = timeZone
         }
         return f.string(from: date)
     }
+}
+
+private enum ChartDateFormatters {
+    static let dayFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "MM/dd"
+        return f
+    }()
+    static let dayTimeFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "MM/dd HH:mm"
+        return f
+    }()
+    static let timeFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "HH:mm"
+        return f
+    }()
 }

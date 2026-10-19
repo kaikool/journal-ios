@@ -27,9 +27,12 @@ public struct DailyJournalListView: View {
     
     public init() {}
     
+    @State private var cache = DailyJournalCache()
+    
+    @MainActor
     private final class DailyJournalCache {
-        static var lastKey: String = ""
-        static var lastList: [JournalDaySummary] = []
+        var lastKey: String = ""
+        var lastList: [JournalDaySummary] = []
     }
     
     private static let isoFormatter: DateFormatter = {
@@ -52,12 +55,12 @@ public struct DailyJournalListView: View {
     
     private var daysList: [JournalDaySummary] {
         let key = "\(dataStore.selectedAccountId)_\(dataStore.filteredTrades.count)_\(dataStore.journalDays.count)_\(dataStore.calendarNotes.count)_\(dataStore.cacheVersion)_\(searchText)_\(env.currentTimeZone.identifier)"
-        if DailyJournalCache.lastKey == key {
-            return DailyJournalCache.lastList
+        if cache.lastKey == key {
+            return cache.lastList
         }
         let fresh = computeDaysList()
-        DailyJournalCache.lastKey = key
-        DailyJournalCache.lastList = fresh
+        cache.lastKey = key
+        cache.lastList = fresh
         return fresh
     }
     

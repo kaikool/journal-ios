@@ -108,3 +108,17 @@ public enum JournalIds {
         return "the5ers_" + sha256Hex([sourceAccountId, positionIdentity])
     }
 }
+
+extension String {
+    public var cleanAccountId: String {
+        hasPrefix("the5ers_") ? String(dropFirst(8)) : self
+    }
+    
+    public var the5ersCanonicalId: String {
+        hasPrefix("the5ers_") ? self : "the5ers_\(self)"
+    }
+    
+    public func isEquivalentAccountId(to other: String) -> Bool {
+        self.cleanAccountId == other.cleanAccountId
+    }
+}

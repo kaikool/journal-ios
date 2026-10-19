@@ -20,11 +20,14 @@ public struct TradesListView: View {
     
     public init() {}
     
+    @State private var cache = TradesListCache()
+    
+    @MainActor
     private final class TradesListCache {
-        static var lastMetricsKey: String = ""
-        static var lastMetrics: TradeMetrics? = nil
-        static var lastFilterKey: String = ""
-        static var lastFilteredTrades: [Trade] = []
+        var lastMetricsKey: String = ""
+        var lastMetrics: TradeMetrics? = nil
+        var lastFilterKey: String = ""
+        var lastFilteredTrades: [Trade] = []
     }
     
     private var scopedTrades: [Trade] {
@@ -33,8 +36,8 @@ public struct TradesListView: View {
     
     private var filteredTrades: [Trade] {
         let key = "\(selectedRange.rawValue)_\(statusFilter.rawValue)_\(searchText)_\(dataStore.selectedAccountId)_\(dataStore.filteredTrades.count)_\(dataStore.cacheVersion)"
-        if TradesListCache.lastFilterKey == key {
-            return TradesListCache.lastFilteredTrades
+        if cache.lastFilterKey == key {
+            return cache.lastFilteredTrades
         }
         var list = scopedTrades
         
@@ -59,22 +62,22 @@ public struct TradesListView: View {
         }
         
         let sorted = list.sorted { $0.openedAt > $1.openedAt }
-        TradesListCache.lastFilterKey = key
-        TradesListCache.lastFilteredTrades = sorted
+        cache.lastFilterKey = key
+        cache.lastFilteredTrades = sorted
         return sorted
     }
     
     private var overviewMetrics: TradeMetrics {
         let key = "\(selectedRange.rawValue)_\(dataStore.selectedAccountId)_\(dataStore.filteredTrades.count)_\(dataStore.cacheVersion)"
-        if TradesListCache.lastMetricsKey == key, let m = TradesListCache.lastMetrics {
+        if cache.lastMetricsKey == key, let m = cache.lastMetrics {
             return m
         }
         let fresh = FinancialMetricsEngine.computeMetrics(
             trades: scopedTrades,
             timeZone: env.currentTimeZone
         )
-        TradesListCache.lastMetricsKey = key
-        TradesListCache.lastMetrics = fresh
+        cache.lastMetricsKey = key
+        cache.lastMetrics = fresh
         return fresh
     }
     

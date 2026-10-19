@@ -169,6 +169,8 @@ public struct RootTabView: View {
                 )
             }
             .buttonStyle(ApplePressableButtonStyle())
+            .accessibilityLabel(env.isDrawerOpen ? "Close navigation menu" : "Open navigation menu")
+            .accessibilityHint("Opens side drawer with all 13 application routes")
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 5)
@@ -279,6 +281,8 @@ public struct RootTabView: View {
             )
         }
         .buttonStyle(ApplePressableButtonStyle())
+        .accessibilityLabel("\(label) tab")
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
     }
 }
 

@@ -13,7 +13,7 @@ public struct TradeReplayView: View {
     @State private var rawSourceBars: [MarketBar] = []
     @State private var currentStep: Int = 0
     @State private var isPlaying: Bool = false
-    @State private var timer: Timer? = nil
+    @State private var playbackTask: Task<Void, Never>? = nil
     @State private var isLoadingCandles: Bool = true
     @State private var candleErrorMessage: String = ""
     @State private var selectedResolution: MarketResolution = .m15
@@ -664,13 +664,17 @@ public struct TradeReplayView: View {
     
     private func startTimer() {
         stopTimer()
-        let interval = 0.5 / replaySpeed
-        timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { _ in
-            Task { @MainActor in
+        playbackTask = Task { @MainActor in
+            while !Task.isCancelled && isPlaying {
+                let intervalSeconds = 0.5 / replaySpeed
+                let nanoseconds = UInt64(intervalSeconds * 1_000_000_000)
+                try? await Task.sleep(nanoseconds: nanoseconds)
+                guard !Task.isCancelled && isPlaying else { break }
                 if self.currentStep < self.bars.count {
                     self.currentStep += 1
                 } else {
                     self.pauseReplay()
+                    break
                 }
             }
         }
@@ -683,8 +687,8 @@ public struct TradeReplayView: View {
     }
     
     private func stopTimer() {
-        timer?.invalidate()
-        timer = nil
+        playbackTask?.cancel()
+        playbackTask = nil
     }
     
     private func step(by delta: Int) {
