@@ -11,11 +11,10 @@ public struct TradeReplayView: View {
     
     @State private var bars: [MarketBar] = []
     @State private var rawSourceBars: [MarketBar] = []
-    @State private var currentStep: Int = 1
+    @State private var currentStep: Int = 0
     @State private var isPlaying: Bool = false
     @State private var timer: Timer? = nil
-    @State private var dataSourceName: String = ""
-    @State private var isLoadingCandles: Bool = false
+    @State private var isLoadingCandles: Bool = true
     @State private var candleErrorMessage: String = ""
     @State private var selectedResolution: MarketResolution = .m15
     @State private var replaySpeed: Double = 2.0
@@ -34,21 +33,11 @@ public struct TradeReplayView: View {
             return .d1
         }()
         self._selectedResolution = State(initialValue: res)
-        
-        let initialBars = TradeReplayEngine.generateBarsFromTrade(
-            trade: trade,
-            fills: executions,
-            resolution: res
-        )
-        self._bars = State(initialValue: initialBars)
-        self._currentStep = State(initialValue: initialBars.count)
-        self._dataSourceName = State(initialValue: "Candle Stream")
-        self._excursionEstimate = State(initialValue: TradeReplayEngine.estimateExcursions(
-            trade: trade,
-            fills: executions,
-            bars: initialBars,
-            resolution: res
-        ))
+        self._bars = State(initialValue: [])
+        self._rawSourceBars = State(initialValue: [])
+        self._currentStep = State(initialValue: 0)
+        self._isLoadingCandles = State(initialValue: true)
+        self._excursionEstimate = State(initialValue: nil)
     }
     
     private var frame: ReplayFrame {
@@ -134,21 +123,17 @@ public struct TradeReplayView: View {
                             text: trade.direction.rawValue.uppercased(),
                             color: trade.direction == .long ? AppColors.profit : AppColors.loss
                         )
-                        
-                        if !dataSourceName.isEmpty {
-                            AppBadge(text: dataSourceName, color: AppColors.accent)
-                        }
                     }
                     
                     Spacer()
                     
                     VStack(alignment: .trailing, spacing: 2) {
-                        let isEnd = currentStep >= bars.count && trade.status != .open
+                        let isEnd = (bars.isEmpty || currentStep >= bars.count) && trade.status != .open
                         Text(isEnd ? "NET P&L" : "UNREALIZED P&L")
                             .font(AppTypography.cardTitle)
                             .foregroundColor(AppColors.secondaryText)
                         
-                        let displayPnl = isEnd ? trade.netPnl : frame.unrealizedPnl
+                        let displayPnl = (isEnd || bars.isEmpty) ? trade.netPnl : frame.unrealizedPnl
                         Text(Formatters.formatPnL(displayPnl, currency: env.currentCurrency))
                             .font(AppTypography.financialNumber(size: 18, weight: .bold))
                             .foregroundColor(Formatters.pnlColor(displayPnl))
@@ -179,6 +164,10 @@ public struct TradeReplayView: View {
                                     .foregroundColor(Formatters.pnlColor(pnlVal))
                             }
                         }
+                    } else if isLoadingCandles {
+                        Text("Loading candles…")
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.secondaryText)
                     }
                 }
             }
@@ -241,17 +230,59 @@ public struct TradeReplayView: View {
                 .cornerRadius(6)
             }
             
-            CandleChartView(
-                visibleBars: frame.visibleBars,
-                allBars: bars,
-                totalBarsCount: bars.count,
-                trade: trade,
-                executions: executions,
-                throughTimestamp: frame.throughTimestamp,
-                unrealizedPnl: frame.unrealizedPnl,
-                timeZone: env.currentTimeZone,
-                currency: env.currentCurrency
-            )
+            if isLoadingCandles && bars.isEmpty {
+                VStack(spacing: 12) {
+                    ProgressView()
+                        .scaleEffect(1.2)
+                        .tint(AppColors.brand)
+                    Text("Loading Market Data…")
+                        .font(AppTypography.headline)
+                        .foregroundColor(AppColors.primaryText)
+                    Text("Fetching candles for \(trade.symbol) (\(selectedResolution.rawValue))")
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.secondaryText)
+                }
+                .frame(height: 270)
+                .frame(maxWidth: .infinity)
+                .background(AppColors.cardBackground)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(AppColors.border.opacity(0.6), lineWidth: 1)
+                )
+            } else if bars.isEmpty {
+                VStack(spacing: 10) {
+                    Image(systemName: "chart.xyaxis.line")
+                        .font(.system(size: 32))
+                        .foregroundColor(AppColors.secondaryText.opacity(0.6))
+                    Text("No Candle Data Available")
+                        .font(AppTypography.headline)
+                        .foregroundColor(AppColors.primaryText)
+                    Text("Market data could not be retrieved for \(trade.symbol)")
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.secondaryText)
+                }
+                .frame(height: 270)
+                .frame(maxWidth: .infinity)
+                .background(AppColors.cardBackground)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(AppColors.border.opacity(0.6), lineWidth: 1)
+                )
+            } else {
+                CandleChartView(
+                    visibleBars: frame.visibleBars,
+                    allBars: bars,
+                    totalBarsCount: bars.count,
+                    trade: trade,
+                    executions: executions,
+                    throughTimestamp: frame.throughTimestamp,
+                    unrealizedPnl: frame.unrealizedPnl,
+                    timeZone: env.currentTimeZone,
+                    currency: env.currentCurrency
+                )
+            }
         }
     }
     
@@ -418,6 +449,13 @@ public struct TradeReplayView: View {
                             .foregroundColor(AppColors.secondaryText)
                         Spacer()
                     }
+                } else if isLoadingCandles && bars.isEmpty {
+                    HStack {
+                        Text("Awaiting market data to enable playback…")
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.secondaryText.opacity(0.7))
+                        Spacer()
+                    }
                 }
             }
         }
@@ -456,6 +494,14 @@ public struct TradeReplayView: View {
                                     .font(.system(size: 10, weight: .regular, design: .monospaced))
                                     .foregroundColor(AppColors.secondaryText)
                             }
+                        } else if isLoadingCandles && bars.isEmpty {
+                            HStack(spacing: 4) {
+                                ProgressView().scaleEffect(0.7)
+                                Text("Calculating…")
+                                    .font(AppTypography.caption)
+                                    .foregroundColor(AppColors.secondaryText)
+                            }
+                            .frame(height: 24)
                         } else {
                             Text("Unavailable")
                                 .font(AppTypography.captionBold)
@@ -483,6 +529,14 @@ public struct TradeReplayView: View {
                                     .font(.system(size: 10, weight: .regular, design: .monospaced))
                                     .foregroundColor(AppColors.secondaryText)
                             }
+                        } else if isLoadingCandles && bars.isEmpty {
+                            HStack(spacing: 4) {
+                                ProgressView().scaleEffect(0.7)
+                                Text("Calculating…")
+                                    .font(AppTypography.caption)
+                                    .foregroundColor(AppColors.secondaryText)
+                            }
+                            .frame(height: 24)
                         } else {
                             Text("Unavailable")
                                 .font(AppTypography.captionBold)
@@ -538,7 +592,7 @@ public struct TradeReplayView: View {
         let fetchResolution: MarketResolution = selectedResolution == .m1 ? .m1 : .m5
         
         do {
-            let (provider, fetchedBars) = try await MarketDataService.shared.fetchBarsForTrade(
+            let (_, fetchedBars) = try await MarketDataService.shared.fetchBarsForTrade(
                 trade: trade,
                 config: TradeDataStore.shared.marketConnections,
                 resolution: fetchResolution.rawValue
@@ -551,7 +605,6 @@ public struct TradeReplayView: View {
                     ? TradeReplayEngine.resampleBars(fetchedBars, to: selectedResolution)
                     : fetchedBars
                 self.bars = resampled
-                self.dataSourceName = provider
                 self.currentStep = resampled.count
                 self.excursionEstimate = TradeReplayEngine.estimateExcursions(
                     trade: trade,
@@ -560,9 +613,11 @@ public struct TradeReplayView: View {
                     resolution: selectedResolution
                 )
             } else {
+                candleErrorMessage = "Real market data unavailable for \(trade.symbol). Displaying simulated estimate."
                 applySimulatedBars()
             }
         } catch {
+            candleErrorMessage = "Unable to fetch market data: \(error.localizedDescription). Displaying simulated estimate."
             applySimulatedBars()
         }
         isLoadingCandles = false
@@ -576,7 +631,6 @@ public struct TradeReplayView: View {
             resolution: selectedResolution
         )
         self.bars = simulated
-        self.dataSourceName = "Simulated"
         self.currentStep = simulated.count
         self.excursionEstimate = TradeReplayEngine.estimateExcursions(
             trade: trade,
