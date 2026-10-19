@@ -216,6 +216,15 @@ public enum Formatters {
         return isoDayFormatter.date(from: string)
     }
     
+    /// Returns human-readable weekday name (e.g. "Monday", "Tuesday")
+    public static func weekdayName(from date: Date, timeZone: TimeZone = .current, locale: Locale = Locale(identifier: "en_US")) -> String {
+        let f = DateFormatter()
+        f.locale = locale
+        f.timeZone = timeZone
+        f.dateFormat = "EEEE"
+        return f.string(from: date)
+    }
+    
     // MARK: - Account & Reference Clean Formatters
     
     /// Cleans raw broker/prop labels (such as "meta-trader-5 · …7657" or "Meta-Trade-5-......7657")
