@@ -91,5 +91,13 @@ final class FoundationTests: XCTestCase {
         let customName = "My Swing Trading Account"
         XCTAssertEqual(Formatters.cleanAccountName(customName), customName)
     }
+    
+    func testSyncOptionsDefaultsForPullToRefresh() {
+        let def = SyncOptions.default
+        XCTAssertFalse(def.backupToCloud, "Pull-to-refresh quick sync must never block on Cloud backup by default")
+        XCTAssertTrue(def.enabledProviderIds.contains("ctrader"))
+        XCTAssertTrue(def.enabledProviderIds.contains("the5ers"))
+        XCTAssertEqual(def.dateRangeMode, .last30Days)
+    }
 }
 

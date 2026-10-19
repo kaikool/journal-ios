@@ -31,7 +31,7 @@ public struct GlobalSyncBannerView: View {
                     alignment: .bottom
                 )
                 .transition(.move(edge: .top).combined(with: .opacity))
-            } else if let error = dataStore.lastSyncError, !isDismissed {
+            } else if let error = dataStore.lastSyncError, !isDismissed, !error.lowercased().contains("cancel") {
                 HStack(spacing: 8) {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .font(.system(size: 13, weight: .semibold))

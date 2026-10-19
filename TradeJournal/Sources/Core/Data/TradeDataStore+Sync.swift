@@ -19,15 +19,17 @@ extension TradeDataStore {
     
     // MARK: - Supabase Synchronization
     
-    public func syncWithSupabase() async {
+    public func syncWithSupabase(isBackground: Bool = false) async {
         guard SupabaseService.shared.isConfigured else {
             AppLogger.info("Supabase credentials not configured in settings, running in local-first mode.")
             return
         }
         
-        await MainActor.run {
-            self.isSyncing = true
-            self.lastSyncError = nil
+        if !isBackground {
+            await MainActor.run {
+                self.isSyncing = true
+                self.lastSyncError = nil
+            }
         }
         
         var fetchedAccountsCount = 0
@@ -397,7 +399,9 @@ extension TradeDataStore {
         }
 
         if Task.isCancelled {
-            await MainActor.run { self.isSyncing = false }
+            if !isBackground {
+                await MainActor.run { self.isSyncing = false }
+            }
             return
         }
 
@@ -405,23 +409,25 @@ extension TradeDataStore {
         saveToDisk(immediate: true)
 
         let totalRecords = fetchedAccountsCount + fetchedTradesCount + fetchedExecutionsCount + fetchedPropCount
-        await MainActor.run {
-            if totalRecords > 0 {
-                var summary = "Supabase sync successful: Downloaded \(fetchedAccountsCount) accounts, \(fetchedTradesCount) trades, \(fetchedExecutionsCount) executions, \(fetchedPropCount) prop accounts."
-                if !syncWarnings.isEmpty {
-                    summary += " (Warnings: \(syncWarnings.joined(separator: "; ")))"
+        if !isBackground {
+            await MainActor.run {
+                if totalRecords > 0 {
+                    var summary = "Supabase sync successful: Downloaded \(fetchedAccountsCount) accounts, \(fetchedTradesCount) trades, \(fetchedExecutionsCount) executions, \(fetchedPropCount) prop accounts."
+                    if !syncWarnings.isEmpty {
+                        summary += " (Warnings: \(syncWarnings.joined(separator: "; ")))"
+                    }
+                    self.lastSyncSummary = summary
+                    self.lastSyncError = nil
+                } else if !syncWarnings.isEmpty {
+                    self.lastSyncError = syncWarnings.joined(separator: "\n")
+                } else {
+                    self.lastSyncSummary = "Supabase connection successful. Local and cloud data are synchronized (0 new records)."
+                    self.lastSyncError = nil
                 }
-                self.lastSyncSummary = summary
-                self.lastSyncError = nil
-            } else if !syncWarnings.isEmpty {
-                self.lastSyncError = syncWarnings.joined(separator: "\n")
-            } else {
-                self.lastSyncSummary = "Supabase connection successful. Local and cloud data are synchronized (0 new records)."
-                self.lastSyncError = nil
+                self.isSyncing = false
             }
-            self.isSyncing = false
         }
-        AppLogger.info("Supabase sync completed: Accounts=\(fetchedAccountsCount), Trades=\(fetchedTradesCount), Executions=\(fetchedExecutionsCount)")
+        AppLogger.info("Supabase sync completed (isBackground=\(isBackground)): Accounts=\(fetchedAccountsCount), Trades=\(fetchedTradesCount), Executions=\(fetchedExecutionsCount)")
     }
     
     // MARK: - The5ers MCP Synchronization

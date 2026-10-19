@@ -81,7 +81,7 @@ public struct SyncOptions: Codable, Equatable {
         selectedAccountIds: Set<String>? = nil,
         includeOpenPositions: Bool = true,
         includeHistoricalDeals: Bool = true,
-        backupToCloud: Bool = true
+        backupToCloud: Bool = false
     ) {
         self.enabledProviderIds = enabledProviderIds
         self.dateRangeMode = dateRangeMode
@@ -99,7 +99,7 @@ public struct SyncOptions: Codable, Equatable {
             dateRangeMode: .last30Days,
             includeOpenPositions: true,
             includeHistoricalDeals: true,
-            backupToCloud: true
+            backupToCloud: false
         )
     }
 }

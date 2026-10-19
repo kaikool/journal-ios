@@ -55,10 +55,42 @@ public final class SyncManager: ObservableObject {
         }
     }
     
-    /// Executes the saved Quick Sync strategy (typically last 30 days for active accounts)
+    private var backgroundBackupTask: Task<Void, Never>? = nil
+    
+    /// Schedules an asynchronous, debounced cloud backup to Supabase.
+    /// Runs quietly in the background without blocking the UI or pull-to-refresh spinner.
+    public func scheduleBackgroundCloudBackup(delaySeconds: Double = 15) {
+        guard let supabaseProvider = provider(for: "supabase"), supabaseProvider.isConfigured else {
+            return
+        }
+        backgroundBackupTask?.cancel()
+        backgroundBackupTask = Task.detached(priority: .background) {
+            do {
+                try await Task.sleep(nanoseconds: UInt64(delaySeconds * 1_000_000_000))
+            } catch {
+                return
+            }
+            guard !Task.isCancelled else { return }
+            AppLogger.info("Initiating debounced background Supabase backup...")
+            await TradeDataStore.shared.syncWithSupabase(isBackground: true)
+            AppLogger.info("Debounced background Supabase backup completed.")
+        }
+    }
+    
+    /// Executes the saved Quick Sync strategy (typically last 30 days for active accounts).
+    /// Used for foreground swipe-to-refresh: strictly fetches fresh broker data and triggers
+    /// background cloud backup if updates are found.
     @discardableResult
     public func performQuickSync() async -> [SyncResult] {
-        await performSync(with: savedQuickSyncOptions)
+        var options = savedQuickSyncOptions
+        options.backupToCloud = false // Guarantee Quick Sync never blocks on Cloud backup
+        let results = await performSync(with: options)
+        
+        let importedCount = results.reduce(0) { $0 + $1.importedExecutionsCount }
+        if importedCount > 0 {
+            scheduleBackgroundCloudBackup(delaySeconds: 10)
+        }
+        return results
     }
     
     /// Executes a custom synchronization run with specified options
@@ -87,14 +119,20 @@ public final class SyncManager: ObservableObject {
             $0.id != "supabase" && options.enabledProviderIds.contains($0.id) && $0.isConfigured
         }
         
-        // 2. Synchronize market data sources concurrently or sequentially
+        // 2. Synchronize market data sources sequentially
         for provider in brokerProviders {
+            if Task.isCancelled {
+                TradeDataStore.shared.lastSyncError = nil
+                return results
+            }
+            
             self.currentProgress = "Syncing with \(provider.displayName)..."
             TradeDataStore.shared.lastSyncSummary = self.currentProgress
             
             do {
                 let res = try await provider.performSync(options: options) { [weak self] update in
                     Task { @MainActor in
+                        guard !Task.isCancelled else { return }
                         self?.currentProgress = "\(update.providerName): \(update.message)"
                         TradeDataStore.shared.lastSyncSummary = self?.currentProgress
                     }
@@ -102,6 +140,11 @@ public final class SyncManager: ObservableObject {
                 results.append(res)
                 lastSyncResults[provider.id] = res
             } catch {
+                if TradeDataStore.isCancellation(error) {
+                    AppLogger.info("Sync cancelled for \(provider.displayName)")
+                    TradeDataStore.shared.lastSyncError = nil
+                    return results
+                }
                 let errResult = SyncResult(
                     providerId: provider.id,
                     providerName: provider.displayName,
@@ -114,17 +157,28 @@ public final class SyncManager: ObservableObject {
             }
         }
         
+        if Task.isCancelled {
+            TradeDataStore.shared.lastSyncError = nil
+            return results
+        }
+        
         // 3. Persist local store
         TradeDataStore.shared.saveToDisk()
         
         // 4. If Cloud Backup is requested and Supabase provider is configured, backup fresh data
         if options.backupToCloud, let supabaseProvider = provider(for: "supabase"), supabaseProvider.isConfigured {
+            if Task.isCancelled {
+                TradeDataStore.shared.lastSyncError = nil
+                return results
+            }
+            
             self.currentProgress = "Backing up to Supabase Cloud Database..."
             TradeDataStore.shared.lastSyncSummary = self.currentProgress
             
             do {
                 let cloudRes = try await supabaseProvider.performSync(options: options) { [weak self] update in
                     Task { @MainActor in
+                        guard !Task.isCancelled else { return }
                         self?.currentProgress = update.message
                         TradeDataStore.shared.lastSyncSummary = self?.currentProgress
                     }
@@ -132,6 +186,11 @@ public final class SyncManager: ObservableObject {
                 results.append(cloudRes)
                 lastSyncResults["supabase"] = cloudRes
             } catch {
+                if TradeDataStore.isCancellation(error) {
+                    AppLogger.info("Supabase sync cancelled.")
+                    TradeDataStore.shared.lastSyncError = nil
+                    return results
+                }
                 let cloudErr = SyncResult(
                     providerId: "supabase",
                     providerName: "Supabase Cloud",
@@ -147,19 +206,24 @@ public final class SyncManager: ObservableObject {
         let now = Date()
         self.lastSyncDate = now
         
+        if Task.isCancelled {
+            TradeDataStore.shared.lastSyncError = nil
+            return results
+        }
+        
         // Construct user-facing summary report
         let successCount = results.filter { $0.success }.count
-        let failCount = results.filter { !$0.success }.count
+        let actualErrors = results.filter { !$0.success && !($0.error?.lowercased().contains("cancel") ?? false) }
         let totalExecs = results.reduce(0) { $0 + $1.importedExecutionsCount }
         
-        if failCount == 0 {
+        if actualErrors.isEmpty {
             let summary = "Sync completed: \(successCount) source(s) updated, \(totalExecs) executions imported."
             TradeDataStore.shared.lastSyncSummary = summary
             TradeDataStore.shared.lastSyncError = nil
         } else {
-            let errs = results.compactMap { $0.error }.joined(separator: " · ")
+            let errs = actualErrors.compactMap { $0.error }.joined(separator: " · ")
             TradeDataStore.shared.lastSyncError = errs
-            TradeDataStore.shared.lastSyncSummary = "Sync finished with \(failCount) warning(s)."
+            TradeDataStore.shared.lastSyncSummary = "Sync finished with \(actualErrors.count) warning(s)."
         }
         
         return results

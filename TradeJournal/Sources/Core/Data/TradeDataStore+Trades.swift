@@ -237,12 +237,7 @@ extension TradeDataStore {
         
         saveToDisk(immediate: true)
         AppLogger.info("Added manual trade for \(cleanSymbol). Total trades now: \(trades.count)")
-        Task {
-            try? await SupabaseService.shared.upsertExecutions(newExecutions)
-            if let t = self.trades.first(where: { $0.accountId == accountId && $0.symbol == cleanSymbol && abs($0.openedAt.timeIntervalSince(openedAt)) < 2 }) {
-                try? await SupabaseService.shared.upsertTrades([t])
-            }
-        }
+        SyncManager.shared.scheduleBackgroundCloudBackup(delaySeconds: 5)
     }
     
     public func deleteTrade(key: String) {
@@ -345,13 +340,11 @@ extension TradeDataStore {
         }
         
         saveToDisk(immediate: true)
+        AppLogger.info("Updated manual trade for \(cleanSymbol). Total trades now: \(trades.count)")
         Task {
             try? await SupabaseService.shared.deleteTrade(key: key)
-            try? await SupabaseService.shared.upsertExecutions(newExecutions)
-            if let t = self.trades.first(where: { $0.accountId == accId && $0.symbol == cleanSymbol && abs($0.openedAt.timeIntervalSince(openedAt)) < 2 }) {
-                try? await SupabaseService.shared.upsertTrades([t])
-            }
         }
+        SyncManager.shared.scheduleBackgroundCloudBackup(delaySeconds: 5)
     }
     
     public func resetAllData() {
