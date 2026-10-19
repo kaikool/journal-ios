@@ -177,21 +177,7 @@ public enum TradeReplayEngine {
             if let cm = trade.contractMultiplier, cm > 0 {
                 return cm
             }
-            let sym = trade.symbol.uppercased()
-            if sym.hasPrefix("XAU") || sym.contains("GOLD") {
-                return 100 // 100 oz per standard lot
-            } else if sym.hasPrefix("XAG") || sym.contains("SILVER") {
-                return 5000 // 5000 oz per standard lot
-            } else if sym.contains("OIL") || sym.contains("WTI") || sym.contains("BRENT") {
-                return 1000 // 1000 barrels per contract
-            } else if sym.contains("US30") || sym.contains("NAS100") || sym.contains("SPX") || sym.contains("GER") || sym.contains("DAX") {
-                return 1 // Index CFD contract
-            } else if sym.contains("BTC") || sym.contains("ETH") || sym.contains("SOL") {
-                return 1 // Crypto
-            } else if sym.count == 6 || sym.contains("_") || sym.contains("/") {
-                return 100_000 // Standard Forex lot
-            }
-            return 1
+            return AssetContractEngine.contractMultiplier(for: trade.symbol)
         }()
         
         let grossAtBar = priceDelta * trade.quantity * multiplier

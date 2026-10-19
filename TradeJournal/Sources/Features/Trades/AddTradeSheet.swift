@@ -73,10 +73,32 @@ public struct AddTradeSheet: View {
         return Decimal(string: profitTargetText.replacingOccurrences(of: ",", with: "."))
     }
     
+    private var symbolSpec: AssetContractEngine.SymbolSpec {
+        AssetContractEngine.spec(for: symbol)
+    }
+    
     private var estimatedPnl: Decimal? {
         guard let exit = exitPrice, entryPrice > 0, quantity > 0 else { return nil }
-        let diff = (direction == .long) ? (exit - entryPrice) : (entryPrice - exit)
-        return (diff * quantity) - fee
+        let gross = AssetContractEngine.calculateGrossPnl(
+            symbol: symbol,
+            direction: direction,
+            quantity: quantity,
+            entryPrice: entryPrice,
+            exitPrice: exit,
+            customMultiplier: dataStore.multipliers[symbol.uppercased().trimmingCharacters(in: .whitespaces)],
+            conversionRates: dataStore.currencyConversion.rates
+        )
+        return gross - fee
+    }
+    
+    private var estimatedDeltaText: String? {
+        guard let exit = exitPrice, entryPrice > 0 else { return nil }
+        return AssetContractEngine.formatDeltaText(
+            symbol: symbol,
+            entryPrice: entryPrice,
+            exitPrice: exit,
+            direction: direction
+        )
     }
     
     private var selectedPlaybook: Playbook? {
@@ -361,30 +383,64 @@ public struct AddTradeSheet: View {
                 
                 // Numeric Fields Grid
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                    numericInputBlock(title: "Quantity / Lots", text: $quantityText, placeholder: "1")
-                    numericInputBlock(title: "Entry Price", text: $entryPriceText, placeholder: "0.00")
+                    numericInputBlock(
+                        title: "Quantity / Lots",
+                        subtitle: symbolSpec.lotDescription,
+                        text: $quantityText,
+                        placeholder: "0.25"
+                    )
+                    numericInputBlock(
+                        title: "Entry Price",
+                        subtitle: "\(symbolSpec.defaultDecimals) decimals",
+                        text: $entryPriceText,
+                        placeholder: symbolSpec.pricePlaceholder
+                    )
                     if isClosed {
-                        numericInputBlock(title: "Exit Price", text: $exitPriceText, placeholder: "0.00")
+                        numericInputBlock(
+                            title: "Exit Price",
+                            subtitle: "\(symbolSpec.defaultDecimals) decimals",
+                            text: $exitPriceText,
+                            placeholder: symbolSpec.pricePlaceholder
+                        )
                     }
-                    numericInputBlock(title: "Fees & Commission", text: $feeText, placeholder: "0.00")
+                    numericInputBlock(
+                        title: "Fees & Commission",
+                        subtitle: "Total fees",
+                        text: $feeText,
+                        placeholder: "0.00"
+                    )
                 }
                 
                 // Live Estimated P&L Banner
                 if let pnl = estimatedPnl {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("ESTIMATED NET P&L")
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundColor(AppColors.secondaryText)
-                                .tracking(0.5)
+                    HStack(alignment: .center) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            HStack(spacing: 6) {
+                                Text("ESTIMATED NET P&L")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundColor(AppColors.secondaryText)
+                                    .tracking(0.5)
+                                
+                                if let deltaStr = estimatedDeltaText {
+                                    Text("· \(deltaStr)")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundColor(Formatters.pnlColor(pnl))
+                                }
+                            }
+                            
                             Text(Formatters.formatPnL(pnl, currency: env.currentCurrency))
                                 .font(.system(size: 20, weight: .bold, design: .rounded))
                                 .monospacedDigit()
                                 .foregroundColor(Formatters.pnlColor(pnl))
+                            
+                            // Detailed specification formula breakdown
+                            Text("\(symbolSpec.cleanSymbol): \(quantity) lot · \(symbolSpec.lotDescription)")
+                                .font(.system(size: 10))
+                                .foregroundColor(AppColors.secondaryText)
                         }
                         Spacer()
                         Image(systemName: pnl >= 0 ? "arrow.up.circle.fill" : "arrow.down.circle.fill")
-                            .font(.system(size: 24))
+                            .font(.system(size: 26))
                             .foregroundColor(pnl >= 0 ? AppColors.profit : AppColors.loss)
                     }
                     .padding(12)
@@ -395,11 +451,20 @@ public struct AddTradeSheet: View {
         }
     }
     
-    private func numericInputBlock(title: String, text: Binding<String>, placeholder: String) -> some View {
+    private func numericInputBlock(title: String, subtitle: String? = nil, text: Binding<String>, placeholder: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(title)
-                .font(AppTypography.caption)
-                .foregroundColor(AppColors.secondaryText)
+            HStack {
+                Text(title)
+                    .font(AppTypography.caption)
+                    .foregroundColor(AppColors.secondaryText)
+                Spacer()
+                if let sub = subtitle {
+                    Text(sub)
+                        .font(.system(size: 9))
+                        .foregroundColor(AppColors.mutedText)
+                        .lineLimit(1)
+                }
+            }
             
             TextField(placeholder, text: text)
                 .keyboardType(.decimalPad)
@@ -495,8 +560,8 @@ public struct AddTradeSheet: View {
                 
                 // Stop Loss & Profit Target
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                    numericInputBlock(title: "Stop Loss (Price)", text: $stopLossText, placeholder: "Optional")
-                    numericInputBlock(title: "Profit Target (Price)", text: $profitTargetText, placeholder: "Optional")
+                    numericInputBlock(title: "Stop Loss (Price)", subtitle: "\(symbolSpec.defaultDecimals) decimals", text: $stopLossText, placeholder: "Optional")
+                    numericInputBlock(title: "Profit Target (Price)", subtitle: "\(symbolSpec.defaultDecimals) decimals", text: $profitTargetText, placeholder: "Optional")
                 }
                 
                 // Playbook Dropdown

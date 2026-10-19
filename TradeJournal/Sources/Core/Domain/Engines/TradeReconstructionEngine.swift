@@ -191,7 +191,7 @@ public enum TradeReconstructionEngine {
             guard let first = group.first else { continue }
             let accountId = first.accountId
             let symbol = first.symbol
-            let multiplier = options.multipliers[symbol] ?? 1
+            let multiplier = AssetContractEngine.contractMultiplier(for: symbol, customMultipliers: options.multipliers)
             let assetClass = group.first(where: { $0.assetClass != nil })?.assetClass
             
             var cycle: OpenCycle? = nil
@@ -234,14 +234,17 @@ public enum TradeReconstructionEngine {
                         let openQty = activeCycle.openQuantity
                         let exitQty = min(abs(signedQty), openQty)
                         let matchedNotional = consumeLots(cycle: activeCycle, quantity: exitQty, method: options.method)
+                        let avgMatchedEntry = exitQty > 0 ? (matchedNotional / exitQty) : 0
                         let exitNotional = exitQty * execution.price
                         
-                        let chunkGross: Decimal
-                        if activeCycle.direction == .long {
-                            chunkGross = (exitNotional - matchedNotional) * multiplier
-                        } else {
-                            chunkGross = (matchedNotional - exitNotional) * multiplier
-                        }
+                        let chunkGross = AssetContractEngine.calculateGrossPnl(
+                            symbol: symbol,
+                            direction: activeCycle.direction,
+                            quantity: exitQty,
+                            entryPrice: avgMatchedEntry,
+                            exitPrice: execution.price,
+                            customMultiplier: options.multipliers[symbol]
+                        )
                         
                         let feeShare: Decimal
                         if abs(signedQty) > 0 {

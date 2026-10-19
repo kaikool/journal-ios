@@ -84,10 +84,32 @@ public struct EditManualTradeSheet: View {
         return Decimal(string: profitTargetText.replacingOccurrences(of: ",", with: "."))
     }
     
+    private var symbolSpec: AssetContractEngine.SymbolSpec {
+        AssetContractEngine.spec(for: symbol)
+    }
+    
     private var estimatedPnl: Decimal? {
         guard let exit = exitPrice, entryPrice > 0, quantity > 0 else { return nil }
-        let diff = (direction == .long) ? (exit - entryPrice) : (entryPrice - exit)
-        return (diff * quantity) - fee
+        let gross = AssetContractEngine.calculateGrossPnl(
+            symbol: symbol,
+            direction: direction,
+            quantity: quantity,
+            entryPrice: entryPrice,
+            exitPrice: exit,
+            customMultiplier: dataStore.multipliers[symbol.uppercased().trimmingCharacters(in: .whitespaces)],
+            conversionRates: dataStore.currencyConversion.rates
+        )
+        return gross - fee
+    }
+    
+    private var estimatedDeltaText: String? {
+        guard let exit = exitPrice, entryPrice > 0 else { return nil }
+        return AssetContractEngine.formatDeltaText(
+            symbol: symbol,
+            entryPrice: entryPrice,
+            exitPrice: exit,
+            direction: direction
+        )
     }
     
     private var selectedPlaybook: Playbook? {
@@ -296,11 +318,17 @@ public struct EditManualTradeSheet: View {
                 
                 // Entry Price
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Entry Price")
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.secondaryText)
+                    HStack {
+                        Text("Entry Price")
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.secondaryText)
+                        Spacer()
+                        Text("\(symbolSpec.defaultDecimals) decimals")
+                            .font(.system(size: 9))
+                            .foregroundColor(AppColors.mutedText)
+                    }
                     
-                    TextField("e.g. 2350.50", text: $entryPriceText)
+                    TextField(symbolSpec.pricePlaceholder, text: $entryPriceText)
                         .keyboardType(.decimalPad)
                         .font(AppTypography.inputText)
                         .padding(10)
@@ -328,11 +356,17 @@ public struct EditManualTradeSheet: View {
                 // Exit Price (if closed)
                 if isClosed {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("Exit Price")
-                            .font(AppTypography.caption)
-                            .foregroundColor(AppColors.secondaryText)
+                        HStack {
+                            Text("Exit Price")
+                                .font(AppTypography.caption)
+                                .foregroundColor(AppColors.secondaryText)
+                            Spacer()
+                            Text("\(symbolSpec.defaultDecimals) decimals")
+                                .font(.system(size: 9))
+                                .foregroundColor(AppColors.mutedText)
+                        }
                         
-                        TextField("e.g. 2365.00", text: $exitPriceText)
+                        TextField(symbolSpec.pricePlaceholder, text: $exitPriceText)
                             .keyboardType(.decimalPad)
                             .font(AppTypography.inputText)
                             .padding(10)
@@ -366,14 +400,28 @@ public struct EditManualTradeSheet: View {
                 // Live Estimated PnL Banner
                 if let estPnl = estimatedPnl {
                     Divider().background(AppColors.border.opacity(0.5))
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Estimated Net P&L")
-                                .font(AppTypography.caption)
-                                .foregroundColor(AppColors.secondaryText)
+                    HStack(alignment: .center) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            HStack(spacing: 6) {
+                                Text("Estimated Net P&L")
+                                    .font(AppTypography.caption)
+                                    .foregroundColor(AppColors.secondaryText)
+                                
+                                if let deltaStr = estimatedDeltaText {
+                                    Text("· \(deltaStr)")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundColor(Formatters.pnlColor(estPnl))
+                                }
+                            }
+                            
                             Text(Formatters.formatPnL(estPnl, currency: env.currentCurrency))
-                                .font(.system(size: 16, weight: .bold, design: .rounded))
-                                .foregroundColor(estPnl >= 0 ? AppColors.profit : AppColors.loss)
+                                .font(.system(size: 18, weight: .bold, design: .rounded))
+                                .monospacedDigit()
+                                .foregroundColor(Formatters.pnlColor(estPnl))
+                            
+                            Text("\(symbolSpec.cleanSymbol): \(quantity) lot · \(symbolSpec.lotDescription)")
+                                .font(.system(size: 10))
+                                .foregroundColor(AppColors.secondaryText)
                         }
                         Spacer()
                         AppBadge(
