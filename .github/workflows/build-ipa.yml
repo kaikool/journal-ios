@@ -123,11 +123,12 @@ jobs:
             echo "::error::TradeJournal.app not found in build/DerivedData"
             exit 1
           fi
-          echo "==> Normalizing permissions & stripping extended attributes..."
+          echo "==> Stripping extended attributes..."
           xattr -cr "$APP_PATH" || true
-          chmod -R 755 "$APP_PATH" || true
-          echo "==> Applying clean ad-hoc codesign signature to .app bundle..."
-          codesign --force --deep --sign - --timestamp=none "$APP_PATH" || true
+          echo "==> Removing existing code signature (ESign will re-sign from scratch)..."
+          rm -rf "$APP_PATH/_CodeSignature" || true
+          codesign --remove-signature "$APP_PATH" 2>/dev/null || true
+          echo "==> Copying clean unsigned bundle..."
           cp -R "$APP_PATH" build/Payload/
           cd build
           zip -qry -9 -X TradeJournal.ipa Payload
