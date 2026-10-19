@@ -513,16 +513,7 @@ public struct JournalCalendarView: View {
     // MARK: - Helpers
     
     private func compactMoney(_ value: Decimal) -> String {
-        let doubleVal = (value as NSDecimalNumber).doubleValue
-        let prefix = value > 0 ? "+" : (value < 0 ? "-" : "")
-        let absVal = abs(doubleVal)
-        if absVal >= 1_000_000 {
-            return String(format: "%@$%.1fM", prefix, absVal / 1_000_000)
-        } else if absVal >= 1_000 {
-            return String(format: "%@$%.1fk", prefix, absVal / 1_000)
-        } else {
-            return String(format: "%@$%.0f", prefix, absVal)
-        }
+        Formatters.compactCurrency(value, currency: env.currentCurrency)
     }
     
     private func isDateToday(_ dateString: String) -> Bool {

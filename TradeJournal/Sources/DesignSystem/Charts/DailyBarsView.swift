@@ -43,6 +43,49 @@ public struct DailyBarsView: View {
         return data.first { $0.date == d }
     }
     
+    /// Evenly spaced date marks (at most 5 labels across the timeline to prevent overlapping text)
+    private var visibleDateMarks: [String] {
+        guard !data.isEmpty else { return [] }
+        let count = data.count
+        if count <= 5 {
+            return data.map { $0.date }
+        }
+        let target = 5
+        let step = Double(count - 1) / Double(target - 1)
+        var indices = [Int]()
+        for i in 0..<target {
+            let idx = min(count - 1, max(0, Int(round(Double(i) * step))))
+            if !indices.contains(idx) {
+                indices.append(idx)
+            }
+        }
+        return indices.map { data[$0].date }
+    }
+    
+    private static let isoDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        f.timeZone = TimeZone(identifier: "UTC")
+        return f
+    }()
+    
+    private static let axisDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "MMM d"
+        f.locale = Locale(identifier: "en_US")
+        f.timeZone = TimeZone(identifier: "UTC")
+        return f
+    }()
+    
+    private static let hudDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateStyle = .medium
+        f.timeStyle = .none
+        f.locale = Locale(identifier: "en_US")
+        f.timeZone = TimeZone(identifier: "UTC")
+        return f
+    }()
+    
     public var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             // Scrub Readout Header
@@ -95,7 +138,7 @@ public struct DailyBarsView: View {
                                 endPoint: .bottom
                             )
                         )
-                        .cornerRadius(3.5)
+                        .cornerRadius(2.5)
                         .opacity(selectedDate == nil || selectedDate == entry.date ? 1.0 : 0.45)
                     }
                     
@@ -121,11 +164,15 @@ public struct DailyBarsView: View {
                     }
                 }
                 .chartXAxis {
-                    AxisMarks(values: .automatic(desiredCount: 5)) { value in
+                    AxisMarks(values: visibleDateMarks) { value in
+                        AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
+                            .foregroundStyle(AppColors.border.opacity(0.25))
+                        AxisTick(stroke: StrokeStyle(lineWidth: 0.5))
+                            .foregroundStyle(AppColors.border)
                         AxisValueLabel {
                             if let dateStr = value.as(String.self) {
-                                Text(String(dateStr.suffix(5)))
-                                    .font(.system(size: 9, weight: .medium))
+                                Text(formatAxisDate(dateStr))
+                                    .font(.system(size: 9.5, weight: .medium))
                                     .foregroundStyle(AppColors.secondaryText)
                             }
                         }
@@ -144,7 +191,17 @@ public struct DailyBarsView: View {
         }
     }
     
+    private func formatAxisDate(_ dateStr: String) -> String {
+        if let d = Self.isoDateFormatter.date(from: dateStr) {
+            return Self.axisDateFormatter.string(from: d)
+        }
+        return String(dateStr.suffix(5))
+    }
+    
     private func formatDate(_ dateStr: String) -> String {
+        if let d = Self.isoDateFormatter.date(from: dateStr) {
+            return Self.hudDateFormatter.string(from: d)
+        }
         return dateStr
     }
     

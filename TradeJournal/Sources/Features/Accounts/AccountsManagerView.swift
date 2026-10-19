@@ -212,71 +212,78 @@ public struct AccountsManagerView: View {
     }
     
     private var bulkVisibilityBar: some View {
-        HStack(spacing: 8) {
-            Text("Quick display:")
-                .font(.system(size: 11))
-                .foregroundColor(AppColors.secondaryText)
-            
-            Button {
-                #if canImport(UIKit)
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                #endif
-                dataStore.setBulkAccountVisibility(action: "select-active")
-            } label: {
-                Text("Active only")
-                    .font(.system(size: 11, weight: .semibold))
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(AppColors.cardBackground)
-                    .foregroundColor(AppColors.primaryText)
-                    .clipShape(Capsule())
-                    .overlay(
-                        Capsule().stroke(AppColors.border.opacity(0.5), lineWidth: 0.5)
-                    )
-            }
-            .buttonStyle(ApplePressableButtonStyle())
-            
-            Button {
-                #if canImport(UIKit)
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                #endif
-                dataStore.setBulkAccountVisibility(action: "select-all")
-            } label: {
-                Text("Show all")
-                    .font(.system(size: 11, weight: .semibold))
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(AppColors.cardBackground)
-                    .foregroundColor(AppColors.primaryText)
-                    .clipShape(Capsule())
-                    .overlay(
-                        Capsule().stroke(AppColors.border.opacity(0.5), lineWidth: 0.5)
-                    )
-            }
-            .buttonStyle(ApplePressableButtonStyle())
-            
-            Button {
-                #if canImport(UIKit)
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                #endif
-                dataStore.setBulkAccountVisibility(action: "deselect-all")
-            } label: {
-                Text("Hide all")
-                    .font(.system(size: 11, weight: .semibold))
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(AppColors.cardBackground)
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                Text("Quick display:")
+                    .font(.system(size: 11))
                     .foregroundColor(AppColors.secondaryText)
-                    .clipShape(Capsule())
-                    .overlay(
-                        Capsule().stroke(AppColors.border.opacity(0.5), lineWidth: 0.5)
-                    )
+                    .lineLimit(1)
+                
+                Button {
+                    #if canImport(UIKit)
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    #endif
+                    dataStore.setBulkAccountVisibility(action: "select-active")
+                } label: {
+                    Text("Active only")
+                        .font(.system(size: 11, weight: .semibold))
+                        .lineLimit(1)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(AppColors.cardBackground)
+                        .foregroundColor(AppColors.primaryText)
+                        .clipShape(Capsule())
+                        .overlay(
+                            Capsule().stroke(AppColors.border.opacity(0.5), lineWidth: 0.5)
+                        )
+                }
+                .buttonStyle(ApplePressableButtonStyle())
+                .fixedSize()
+                
+                Button {
+                    #if canImport(UIKit)
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    #endif
+                    dataStore.setBulkAccountVisibility(action: "select-all")
+                } label: {
+                    Text("Show all")
+                        .font(.system(size: 11, weight: .semibold))
+                        .lineLimit(1)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(AppColors.cardBackground)
+                        .foregroundColor(AppColors.primaryText)
+                        .clipShape(Capsule())
+                        .overlay(
+                            Capsule().stroke(AppColors.border.opacity(0.5), lineWidth: 0.5)
+                        )
+                }
+                .buttonStyle(ApplePressableButtonStyle())
+                .fixedSize()
+                
+                Button {
+                    #if canImport(UIKit)
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    #endif
+                    dataStore.setBulkAccountVisibility(action: "deselect-all")
+                } label: {
+                    Text("Hide all")
+                        .font(.system(size: 11, weight: .semibold))
+                        .lineLimit(1)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(AppColors.cardBackground)
+                        .foregroundColor(AppColors.secondaryText)
+                        .clipShape(Capsule())
+                        .overlay(
+                            Capsule().stroke(AppColors.border.opacity(0.5), lineWidth: 0.5)
+                        )
+                }
+                .buttonStyle(ApplePressableButtonStyle())
+                .fixedSize()
             }
-            .buttonStyle(ApplePressableButtonStyle())
-            
-            Spacer()
+            .padding(.horizontal, 16)
         }
-        .padding(.horizontal, 16)
     }
     
     private var allAccountsScopeCard: some View {
@@ -404,8 +411,10 @@ public struct AccountsManagerView: View {
                     VStack(alignment: .leading, spacing: 3) {
                         HStack(spacing: 6) {
                             Text(Formatters.cleanAccountName(acc.name, balance: acc.initialBalance))
-                                .font(AppTypography.headline)
+                                .font(AppTypography.bodyBold)
                                 .foregroundColor(AppColors.primaryText)
+                                .lineLimit(1)
+                                .truncationMode(.tail)
                             
                             if isSelected {
                                 Image(systemName: "checkmark.seal.fill")
@@ -417,6 +426,7 @@ public struct AccountsManagerView: View {
                         Text("\(acc.broker.isEmpty ? "Standard" : acc.broker) · \(acc.currency)")
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText)
+                            .lineLimit(1)
                     }
                     
                     Spacer()
@@ -431,6 +441,7 @@ public struct AccountsManagerView: View {
                         } label: {
                             Text("Select")
                                 .font(.system(size: 11, weight: .semibold))
+                                .lineLimit(1)
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 5)
                                 .background(AppColors.brand.opacity(0.12))
@@ -438,34 +449,39 @@ public struct AccountsManagerView: View {
                                 .clipShape(Capsule())
                         }
                         .buttonStyle(ApplePressableButtonStyle())
+                        .fixedSize()
                     } else {
                         Text("Viewing")
                             .font(.system(size: 11, weight: .semibold))
+                            .lineLimit(1)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 5)
                             .background(AppColors.profit.opacity(0.15))
                             .foregroundColor(AppColors.profit)
                             .clipShape(Capsule())
+                            .fixedSize()
                     }
                 }
                 
                 // Badges
-                HStack(spacing: 6) {
-                    if isArchived {
-                        badgeView("Archived", color: AppColors.secondaryText)
-                    } else {
-                        badgeView("Active", color: AppColors.profit)
-                    }
-                    
-                    if !acc.broker.isEmpty {
-                        badgeView(acc.broker, color: AppColors.brand)
-                    }
-                    
-                    badgeView(acc.kind.rawValue.uppercased(), color: AppColors.secondaryText)
-                    badgeView(acc.profitCalcMethod.rawValue.uppercased(), color: AppColors.secondaryText)
-                    
-                    if acc.autoSync {
-                        badgeView("Auto-sync", color: AppColors.profit)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        if isArchived {
+                            badgeView("Archived", color: AppColors.secondaryText)
+                        } else {
+                            badgeView("Active", color: AppColors.profit)
+                        }
+                        
+                        if !acc.broker.isEmpty {
+                            badgeView(acc.broker, color: AppColors.brand)
+                        }
+                        
+                        badgeView(acc.kind.rawValue.uppercased(), color: AppColors.secondaryText)
+                        badgeView(acc.profitCalcMethod.rawValue.uppercased(), color: AppColors.secondaryText)
+                        
+                        if acc.autoSync {
+                            badgeView("Auto-sync", color: AppColors.profit)
+                        }
                     }
                 }
                 
@@ -477,9 +493,12 @@ public struct AccountsManagerView: View {
                         Text("Initial Balance")
                             .font(.system(size: 10))
                             .foregroundColor(AppColors.secondaryText)
+                            .lineLimit(1)
                         Text(Formatters.formatCurrency(acc.initialBalance, currency: acc.currency))
                             .font(AppTypography.bodyBold)
                             .monospacedDigit()
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.85)
                             .foregroundColor(AppColors.primaryText)
                     }
                     
@@ -489,9 +508,12 @@ public struct AccountsManagerView: View {
                         Text("Total Trades")
                             .font(.system(size: 10))
                             .foregroundColor(AppColors.secondaryText)
+                            .lineLimit(1)
                         Text("\(tradeCount) trades")
                             .font(AppTypography.bodyBold)
                             .monospacedDigit()
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.85)
                             .foregroundColor(AppColors.primaryText)
                     }
                 }

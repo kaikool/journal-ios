@@ -29,6 +29,7 @@ public struct PlaybookCardView: View {
                             .font(AppTypography.headline)
                             .foregroundColor(AppColors.primaryText)
                             .lineLimit(1)
+                            .truncationMode(.tail)
                     }
                     
                     Spacer()
@@ -37,6 +38,7 @@ public struct PlaybookCardView: View {
                         .font(AppTypography.caption)
                         .monospacedDigit()
                         .foregroundColor(AppColors.secondaryText)
+                        .lineLimit(1)
                     
                     Button {
                         #if canImport(UIKit)
@@ -126,6 +128,8 @@ public struct PlaybookCardView: View {
                                 HStack(spacing: 5) {
                                     Text(isExpanded ? "Show less" : "+ \(rules.count - 3) more rules")
                                         .font(.system(size: 11, weight: .semibold))
+                                        .lineLimit(1)
+                                        .fixedSize()
                                     Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
                                         .font(.system(size: 9, weight: .bold))
                                 }
@@ -153,10 +157,13 @@ public struct PlaybookCardView: View {
                         Text("When followed")
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText)
+                            .lineLimit(1)
                         Text(Formatters.formatPnL(summary.netPnlWhenFollowed, currency: currency))
                             .font(AppTypography.bodyBold)
                             .monospacedDigit()
                             .foregroundColor(Formatters.pnlColor(summary.netPnlWhenFollowed))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.85)
                     }
                     
                     Spacer()
@@ -165,10 +172,13 @@ public struct PlaybookCardView: View {
                         Text("When broken")
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText)
+                            .lineLimit(1)
                         Text(Formatters.formatPnL(summary.netPnlWhenBroken, currency: currency))
                             .font(AppTypography.bodyBold)
                             .monospacedDigit()
                             .foregroundColor(Formatters.pnlColor(summary.netPnlWhenBroken))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.85)
                     }
                 }
             }

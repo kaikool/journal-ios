@@ -59,6 +59,27 @@ public enum Formatters {
         return Formatters.pnl(a, currencyCode: currency, isPrivate: isPrivate)
     }
     
+    /// Returns symbol for given ISO currency code (e.g. "USD" -> "$", "EUR" -> "€", "GBP" -> "£", "VND" -> "₫")
+    public static func currencySymbol(for code: String) -> String {
+        let locale = Locale(identifier: Locale.identifier(fromComponents: [NSLocale.Key.currencyCode.rawValue: code]))
+        return locale.currencySymbol ?? "$"
+    }
+    
+    /// Formats compact monetary values (e.g. +$1.2k, -€450, +£2.5M)
+    public static func compactCurrency(_ value: Decimal, currency: String = "USD") -> String {
+        let sym = currencySymbol(for: currency)
+        let doubleVal = (value as NSDecimalNumber).doubleValue
+        let prefix = value > 0 ? "+" : (value < 0 ? "-" : "")
+        let absVal = abs(doubleVal)
+        if absVal >= 1_000_000 {
+            return String(format: "%@%@%.1fM", prefix, sym, absVal / 1_000_000)
+        } else if absVal >= 1_000 {
+            return String(format: "%@%@%.1fk", prefix, sym, absVal / 1_000)
+        } else {
+            return String(format: "%@%@%.0f", prefix, sym, absVal)
+        }
+    }
+    
     /// Formats percentage value (e.g. 0.542 -> "54.2%")
     public static func percentage(_ value: Double?) -> String {
         guard let value = value, value.isFinite else { return "n/a" }

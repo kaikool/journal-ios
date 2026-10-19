@@ -221,6 +221,22 @@ extension JournalCalendarView {
                 
                 if insights.tradingDays >= 2 {
                     let activeTrend = insights.trend.first { dateLabel(for: $0.date) == selectedTrendDate }
+                    let trendLabels = insights.trend.map { dateLabel(for: $0.date) }
+                    let visibleTrendMarks: [String] = {
+                        guard !trendLabels.isEmpty else { return [] }
+                        let count = trendLabels.count
+                        if count <= 5 { return trendLabels }
+                        let target = 5
+                        let step = Double(count - 1) / Double(target - 1)
+                        var indices = [Int]()
+                        for i in 0..<target {
+                            let idx = min(count - 1, max(0, Int(round(Double(i) * step))))
+                            if !indices.contains(idx) {
+                                indices.append(idx)
+                            }
+                        }
+                        return indices.map { trendLabels[$0] }
+                    }()
                     
                     if let active = activeTrend {
                         HStack {
@@ -298,7 +314,9 @@ extension JournalCalendarView {
                         }
                     }
                     .chartXAxis {
-                        AxisMarks { _ in
+                        AxisMarks(values: visibleTrendMarks) { _ in
+                            AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
+                                .foregroundStyle(AppColors.border.opacity(0.25))
                             AxisValueLabel()
                                 .font(.system(size: 9, weight: .medium))
                                 .foregroundStyle(AppColors.secondaryText)

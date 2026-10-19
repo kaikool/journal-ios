@@ -143,6 +143,8 @@ public struct SettingsView: View {
                                 .font(.system(size: 11))
                             Text(section.label)
                                 .font(AppTypography.captionBold)
+                                .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
                         }
                         .foregroundColor(isSelected ? AppColors.brand : AppColors.secondaryText)
                         .padding(.horizontal, 12)

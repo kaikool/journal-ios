@@ -62,6 +62,8 @@ extension PropFirmLedgerView {
                             .font(AppTypography.financialNumber(size: 32, weight: .bold))
                             .monospacedDigit()
                             .foregroundColor(Formatters.pnlColor(netDecimal))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.75)
                         Spacer()
                     }
                     
@@ -237,10 +239,13 @@ extension PropFirmLedgerView {
                 .font(.system(size: 10, weight: .semibold))
                 .foregroundColor(AppColors.secondaryText)
                 .tracking(0.5)
+                .lineLimit(1)
             Text(value)
                 .font(AppTypography.bodyBold)
                 .monospacedDigit()
                 .foregroundColor(color)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
         }
     }
     
@@ -280,6 +285,7 @@ extension PropFirmLedgerView {
                                     Text(acc.firm)
                                         .font(AppTypography.captionBold)
                                         .foregroundColor(AppColors.primaryText)
+                                        .lineLimit(1)
                                 }
                                 
                                 if acc.archived {
@@ -290,6 +296,7 @@ extension PropFirmLedgerView {
                                         .padding(.vertical, 2)
                                         .background(AppColors.secondaryBackground)
                                         .clipShape(Capsule())
+                                        .lineLimit(1)
                                 }
                                 
                                 Spacer()
@@ -303,6 +310,8 @@ extension PropFirmLedgerView {
                             Text(Formatters.cleanAccountName(acc.name, balance: acc.sizeMinor.map { Decimal($0) / 100 }))
                                 .font(AppTypography.headline)
                                 .foregroundColor(AppColors.primaryText)
+                                .lineLimit(1)
+                                .truncationMode(.tail)
                             
                             if let parentId = acc.parentId, let parentAcc = dataStore.propAccounts.first(where: { $0.id == parentId }) {
                                 HStack(spacing: 4) {
@@ -312,6 +321,8 @@ extension PropFirmLedgerView {
                                     Text("Next phase of: \(Formatters.cleanAccountName(parentAcc.name))")
                                         .font(.system(size: 11, weight: .medium))
                                         .foregroundColor(AppColors.brand)
+                                        .lineLimit(1)
+                                        .truncationMode(.tail)
                                 }
                             }
                             
@@ -321,11 +332,13 @@ extension PropFirmLedgerView {
                                         .font(AppTypography.caption)
                                         .monospacedDigit()
                                         .foregroundColor(AppColors.secondaryText)
+                                        .lineLimit(1)
                                 }
                                 Spacer()
                                 Text(acc.program.label)
                                     .font(AppTypography.caption)
                                     .foregroundColor(AppColors.secondaryText)
+                                    .lineLimit(1)
                             }
                             
                             // 3-Column Account Economics matching web prop-firm-tracker.tsx:900-913
@@ -335,31 +348,40 @@ extension PropFirmLedgerView {
                                     Text("Net spend")
                                         .font(AppTypography.caption)
                                         .foregroundColor(AppColors.secondaryText)
+                                        .lineLimit(1)
                                     Text(Formatters.formatCurrency(Decimal(accSummary.netSpendMinor) / 100, currency: acc.currency))
                                         .font(AppTypography.captionBold)
                                         .monospacedDigit()
                                         .foregroundColor(AppColors.primaryText)
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.8)
                                 }
                                 Spacer()
                                 VStack(alignment: .center, spacing: 2) {
                                     Text("Payout cash")
                                         .font(AppTypography.caption)
                                         .foregroundColor(AppColors.secondaryText)
+                                        .lineLimit(1)
                                     Text(Formatters.formatCurrency(Decimal(accSummary.receivedMinor) / 100, currency: acc.currency))
                                         .font(AppTypography.captionBold)
                                         .monospacedDigit()
                                         .foregroundColor(AppColors.profit)
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.8)
                                 }
                                 Spacer()
                                 VStack(alignment: .trailing, spacing: 2) {
                                     Text("Net return")
                                         .font(AppTypography.caption)
                                         .foregroundColor(AppColors.secondaryText)
+                                        .lineLimit(1)
                                     let isNetPos = accSummary.netMinor >= 0
                                     Text("\(isNetPos ? "+" : "")\(Formatters.formatCurrency(Decimal(accSummary.netMinor) / 100, currency: acc.currency))")
                                         .font(AppTypography.captionBold)
                                         .monospacedDigit()
                                         .foregroundColor(isNetPos ? AppColors.profit : AppColors.loss)
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.8)
                                 }
                             }
                             .padding(.vertical, 6)
@@ -369,57 +391,84 @@ extension PropFirmLedgerView {
                             
                             Divider().background(AppColors.border.opacity(0.5))
                             
-                            HStack(spacing: 12) {
-                                Text("Opened: \(acc.openedOn)")
-                                    .font(.system(size: 11))
-                                    .foregroundColor(AppColors.secondaryText)
-                                if let closed = acc.closedOn {
-                                    Text("• Closed: \(closed)")
+                            // 2-row footer layout: prevents button text wrapping on small screens
+                            VStack(spacing: 8) {
+                                HStack(spacing: 6) {
+                                    Text("Opened: \(acc.openedOn)")
                                         .font(.system(size: 11))
                                         .foregroundColor(AppColors.secondaryText)
+                                        .lineLimit(1)
+                                    if let closed = acc.closedOn {
+                                        Text("• Closed: \(closed)")
+                                            .font(.system(size: 11))
+                                            .foregroundColor(AppColors.secondaryText)
+                                            .lineLimit(1)
+                                    }
+                                    Spacer()
                                 }
-                                Spacer()
                                 
-                                if acc.status == .passed || acc.status == .breached || acc.status == .closed {
+                                HStack(spacing: 8) {
+                                    Spacer()
+                                    
+                                    if acc.status == .passed || acc.status == .breached || acc.status == .closed {
+                                        Button {
+                                            #if canImport(UIKit)
+                                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                            #endif
+                                            selectedAccountForNextPhase = acc
+                                        } label: {
+                                            HStack(spacing: 4) {
+                                                Image(systemName: "arrow.right.circle")
+                                                Text("Next phase")
+                                            }
+                                            .font(.system(size: 11.5, weight: .semibold))
+                                            .foregroundColor(AppColors.brand)
+                                            .padding(.horizontal, 9)
+                                            .padding(.vertical, 4)
+                                            .background(AppColors.brand.opacity(0.12))
+                                            .clipShape(Capsule())
+                                            .lineLimit(1)
+                                            .fixedSize()
+                                        }
+                                        .buttonStyle(ApplePressableButtonStyle())
+                                    }
+                                    
                                     Button {
                                         #if canImport(UIKit)
                                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                                         #endif
-                                        selectedAccountForNextPhase = acc
+                                        selectedAccountForEdit = acc
                                     } label: {
-                                        HStack(spacing: 4) {
-                                            Image(systemName: "arrow.right.circle")
-                                            Text("Next phase")
+                                        Text("Edit")
+                                            .font(.system(size: 11.5, weight: .semibold))
+                                            .foregroundColor(AppColors.brand)
+                                            .padding(.horizontal, 9)
+                                            .padding(.vertical, 4)
+                                            .background(AppColors.secondaryBackground)
+                                            .clipShape(Capsule())
+                                            .lineLimit(1)
+                                            .fixedSize()
                                         }
-                                        .font(.system(size: 11, weight: .semibold))
-                                        .foregroundColor(AppColors.brand)
+                                    .buttonStyle(ApplePressableButtonStyle())
+                                    
+                                    Button {
+                                        #if canImport(UIKit)
+                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                        #endif
+                                        dataStore.archivePropAccount(id: acc.id, archived: !acc.archived, reason: "User toggle archive")
+                                    } label: {
+                                        Text(acc.archived ? "Restore" : "Archive")
+                                            .font(.system(size: 11.5, weight: .semibold))
+                                            .foregroundColor(AppColors.secondaryText)
+                                            .padding(.horizontal, 9)
+                                            .padding(.vertical, 4)
+                                            .background(AppColors.secondaryBackground)
+                                            .clipShape(Capsule())
+                                            .lineLimit(1)
+                                            .fixedSize()
                                     }
                                     .buttonStyle(ApplePressableButtonStyle())
                                 }
-                                
-                                Button {
-                                    #if canImport(UIKit)
-                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                    #endif
-                                    selectedAccountForEdit = acc
-                                } label: {
-                                    Text("Edit")
-                                        .font(.system(size: 11, weight: .semibold))
-                                        .foregroundColor(AppColors.brand)
-                                }
-                                .buttonStyle(ApplePressableButtonStyle())
-                                
-                                Button {
-                                    #if canImport(UIKit)
-                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                    #endif
-                                    dataStore.archivePropAccount(id: acc.id, archived: !acc.archived, reason: "User toggle archive")
-                                } label: {
-                                    Text(acc.archived ? "Restore" : "Archive")
-                                        .font(.system(size: 11, weight: .semibold))
-                                        .foregroundColor(AppColors.secondaryText)
-                                }
-                                .buttonStyle(ApplePressableButtonStyle())
                             }
                         }
                     }
@@ -450,6 +499,8 @@ extension PropFirmLedgerView {
                                     Text("\(p.entry.firm) Payout")
                                         .font(AppTypography.subheadlineBold)
                                         .foregroundColor(AppColors.primaryText)
+                                        .lineLimit(1)
+                                        .truncationMode(.tail)
                                 }
                                 Spacer()
                                 if p.isOverdue {
@@ -467,6 +518,8 @@ extension PropFirmLedgerView {
                             Text("Requested \(p.entry.occurredOn) • Trader split \(p.entry.splitBps / 100)% • Gross \(Formatters.formatCurrency(Decimal(p.entry.amountMinor) / 100, currency: p.entry.currency))\(p.entry.dueOn.map { " • Expected \($0)" } ?? "")")
                                 .font(AppTypography.caption)
                                 .foregroundColor(AppColors.secondaryText)
+                                .lineLimit(1)
+                                .truncationMode(.tail)
                             
                             // Primary Headline Amount (Received if receipts exist, or Expected Net)
                             let hasReceipt = p.actualMinor > 0
@@ -474,14 +527,19 @@ extension PropFirmLedgerView {
                                 Text(hasReceipt ? "Received:" : "Expected net:")
                                     .font(AppTypography.caption)
                                     .foregroundColor(AppColors.secondaryText)
+                                    .lineLimit(1)
                                 Text(Formatters.formatCurrency(Decimal(hasReceipt ? p.actualMinor : p.expectedMinor) / 100, currency: p.entry.currency))
                                     .font(AppTypography.financialNumber(size: 20, weight: .bold))
                                     .foregroundColor(hasReceipt ? AppColors.profit : AppColors.primaryText)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.85)
                                 Spacer()
                                 if hasReceipt && p.remainingMinor > 0 {
                                     Text("Remaining \(Formatters.formatCurrency(Decimal(p.remainingMinor) / 100, currency: p.entry.currency))")
                                         .font(AppTypography.captionBold)
                                         .foregroundColor(AppColors.loss)
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.85)
                                 }
                             }
                             
@@ -491,40 +549,51 @@ extension PropFirmLedgerView {
                                     Text("Gross profit")
                                         .font(AppTypography.caption)
                                         .foregroundColor(AppColors.secondaryText)
+                                        .lineLimit(1)
                                     Text(Formatters.formatCurrency(Decimal(p.entry.amountMinor) / 100, currency: p.entry.currency))
                                         .font(AppTypography.captionBold)
                                         .monospacedDigit()
                                         .foregroundColor(AppColors.primaryText)
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.75)
                                 }
                                 Spacer()
                                 VStack(alignment: .center, spacing: 2) {
                                     Text("Trader split")
                                         .font(AppTypography.caption)
                                         .foregroundColor(AppColors.secondaryText)
+                                        .lineLimit(1)
                                     Text("\(p.entry.splitBps / 100)%")
                                         .font(AppTypography.captionBold)
                                         .monospacedDigit()
                                         .foregroundColor(AppColors.primaryText)
+                                        .lineLimit(1)
                                 }
                                 Spacer()
                                 VStack(alignment: .center, spacing: 2) {
                                     Text("Expected net")
                                         .font(AppTypography.caption)
                                         .foregroundColor(AppColors.secondaryText)
+                                        .lineLimit(1)
                                     Text(Formatters.formatCurrency(Decimal(p.expectedMinor) / 100, currency: p.entry.currency))
                                         .font(AppTypography.captionBold)
                                         .monospacedDigit()
                                         .foregroundColor(AppColors.primaryText)
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.75)
                                 }
                                 Spacer()
                                 VStack(alignment: .trailing, spacing: 2) {
                                     Text("Actual received")
                                         .font(AppTypography.caption)
                                         .foregroundColor(AppColors.secondaryText)
+                                        .lineLimit(1)
                                     Text(Formatters.formatCurrency(Decimal(p.actualMinor) / 100, currency: p.entry.currency))
                                         .font(AppTypography.captionBold)
                                         .monospacedDigit()
                                         .foregroundColor(AppColors.profit)
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.75)
                                 }
                             }
                             .padding(.vertical, 6)
@@ -537,11 +606,14 @@ extension PropFirmLedgerView {
                                     Text("Settlement variance:")
                                         .font(AppTypography.caption)
                                         .foregroundColor(AppColors.secondaryText)
+                                        .lineLimit(1)
                                     Spacer()
                                     Text(Formatters.formatCurrency(Decimal(p.varianceMinor) / 100, currency: p.entry.currency))
                                         .font(AppTypography.captionBold)
                                         .monospacedDigit()
                                         .foregroundColor(p.varianceMinor >= 0 ? AppColors.profit : AppColors.loss)
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.85)
                                 }
                             }
                             
@@ -551,6 +623,7 @@ extension PropFirmLedgerView {
                                 Text("Requested: \(p.entry.occurredOn)")
                                     .font(.system(size: 11))
                                     .foregroundColor(AppColors.secondaryText)
+                                    .lineLimit(1)
                                 Spacer()
                                 Button {
                                     #if canImport(UIKit)
@@ -562,8 +635,14 @@ extension PropFirmLedgerView {
                                         Image(systemName: "plus.circle")
                                         Text("Record receipt")
                                     }
-                                    .font(.system(size: 12, weight: .semibold))
+                                    .font(.system(size: 11.5, weight: .semibold))
                                     .foregroundColor(AppColors.brand)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 5)
+                                    .background(AppColors.brand.opacity(0.12))
+                                    .clipShape(Capsule())
+                                    .lineLimit(1)
+                                    .fixedSize()
                                 }
                                 .buttonStyle(ApplePressableButtonStyle())
                             }
@@ -593,6 +672,8 @@ extension PropFirmLedgerView {
                                     Text(m.firm)
                                         .font(AppTypography.subheadlineBold)
                                         .foregroundColor(AppColors.primaryText)
+                                        .lineLimit(1)
+                                        .truncationMode(.tail)
                                     
                                     let badgeLabel: String = {
                                         if m.kind == "refund" { return "Fee refund" }
@@ -611,21 +692,25 @@ extension PropFirmLedgerView {
                                     Text("Refund of evaluation fee from prop firm")
                                         .font(AppTypography.caption)
                                         .foregroundColor(AppColors.secondaryText)
+                                        .lineLimit(1)
                                 }
                                 
                                 if let entry = dataStore.propEntries.first(where: { $0.id == m.entryId }), !entry.notes.isEmpty {
                                     Text(entry.notes.components(separatedBy: "\n").first ?? entry.notes)
                                         .font(AppTypography.caption)
                                         .foregroundColor(AppColors.primaryText)
+                                        .lineLimit(2)
                                 }
                                 
                                 Text(m.date ?? "Pending settlement")
                                     .font(AppTypography.caption)
                                     .foregroundColor(AppColors.secondaryText)
+                                    .lineLimit(1)
                                 if !m.reference.isEmpty {
                                     Text(Formatters.formatReference(m.reference))
                                         .font(.system(size: 10, design: .monospaced))
                                         .foregroundColor(AppColors.secondaryText.opacity(0.8))
+                                        .lineLimit(1)
                                 }
                             }
                             
@@ -638,8 +723,10 @@ extension PropFirmLedgerView {
                                     .font(AppTypography.subheadlineBold)
                                     .monospacedDigit()
                                     .foregroundColor(isIncoming ? AppColors.profit : AppColors.loss)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.8)
                                 
-                                HStack(spacing: 12) {
+                                HStack(spacing: 8) {
                                     if m.kind == "expense" {
                                         Button {
                                             #if canImport(UIKit)
@@ -656,6 +743,12 @@ extension PropFirmLedgerView {
                                             }
                                             .font(.system(size: 11, weight: .semibold))
                                             .foregroundColor(AppColors.brand)
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 3)
+                                            .background(AppColors.brand.opacity(0.12))
+                                            .clipShape(Capsule())
+                                            .lineLimit(1)
+                                            .fixedSize()
                                         }
                                         .buttonStyle(ApplePressableButtonStyle())
                                     }
@@ -670,6 +763,9 @@ extension PropFirmLedgerView {
                                         Image(systemName: "trash")
                                             .font(.system(size: 12))
                                             .foregroundColor(AppColors.loss.opacity(0.8))
+                                            .padding(6)
+                                            .background(AppColors.secondaryBackground)
+                                            .clipShape(Circle())
                                     }
                                     .buttonStyle(ApplePressableButtonStyle())
                                 }

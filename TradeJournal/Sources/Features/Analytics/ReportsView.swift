@@ -162,6 +162,8 @@ public struct ReportsView: View {
                                             .font(.system(size: 11))
                                         Text(mode.rawValue)
                                             .font(AppTypography.captionBold)
+                                            .lineLimit(1)
+                                            .fixedSize(horizontal: true, vertical: false)
                                     }
                                     .foregroundColor(isSelected ? AppColors.brand : AppColors.secondaryText)
                                     .padding(.horizontal, 12)
@@ -241,10 +243,13 @@ public struct ReportsView: View {
                                     .font(.system(size: 10, weight: .semibold))
                                     .foregroundColor(AppColors.secondaryText)
                                     .tracking(0.5)
+                                    .lineLimit(1)
                                 Text(kpi.value)
                                     .font(.system(size: 17, weight: .bold, design: .rounded))
                                     .monospacedDigit()
                                     .foregroundColor(kpi.isNet ? (metrics.netPnl >= 0 ? AppColors.profit : AppColors.loss) : AppColors.primaryText)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.75)
                             }
                             .padding(12)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -363,6 +368,7 @@ public struct ReportsView: View {
                                     Text(t.symbol)
                                         .font(AppTypography.bodyBold)
                                         .foregroundColor(AppColors.primaryText)
+                                        .lineLimit(1)
                                     
                                     Spacer()
                                     
@@ -370,6 +376,8 @@ public struct ReportsView: View {
                                         .font(AppTypography.bodyBold)
                                         .monospacedDigit()
                                         .foregroundColor(t.netPnl >= 0 ? AppColors.profit : AppColors.loss)
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.85)
                                 }
                                 .padding(.vertical, 4)
                                 
@@ -469,18 +477,22 @@ public struct ReportsView: View {
                                         Text(g.column.isEmpty ? g.row : "\(g.row) / \(g.column)")
                                             .font(AppTypography.bodyBold)
                                             .foregroundColor(AppColors.primaryText)
+                                            .lineLimit(1)
+                                            .truncationMode(.tail)
                                         
                                         HStack(spacing: 6) {
                                             Text("\(g.summary.trades) trades")
                                                 .font(.system(size: 11))
                                                 .monospacedDigit()
                                                 .foregroundColor(AppColors.secondaryText)
+                                                .lineLimit(1)
                                             
                                             if let wr = g.summary.winRate {
                                                 Text("• Win \(Int(wr * 100))%")
                                                     .font(.system(size: 11, weight: .semibold))
                                                     .monospacedDigit()
                                                     .foregroundColor(AppColors.primaryText)
+                                                    .lineLimit(1)
                                             }
                                             
                                             if let r = g.summary.avgRealizedR {
@@ -488,6 +500,7 @@ public struct ReportsView: View {
                                                     .font(.system(size: 11))
                                                     .monospacedDigit()
                                                     .foregroundColor(AppColors.secondaryText)
+                                                    .lineLimit(1)
                                             }
                                         }
                                     }
@@ -498,6 +511,8 @@ public struct ReportsView: View {
                                         .font(AppTypography.bodyBold)
                                         .monospacedDigit()
                                         .foregroundColor(g.summary.netPnl >= 0 ? AppColors.profit : AppColors.loss)
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.85)
                                 }
                                 
                                 if g.row != groupResults.last?.row {
@@ -536,11 +551,15 @@ public struct ReportsView: View {
                                 Text(item.row.isEmpty ? "No playbook" : item.row)
                                     .font(AppTypography.bodyBold)
                                     .foregroundColor(AppColors.primaryText)
+                                    .lineLimit(1)
+                                    .truncationMode(.tail)
                                 Spacer()
                                 Text(item.summary.netPnl >= 0 ? "+\(Formatters.currency(item.summary.netPnl))" : Formatters.currency(item.summary.netPnl))
                                     .font(AppTypography.bodyBold)
                                     .monospacedDigit()
                                     .foregroundColor(item.summary.netPnl >= 0 ? AppColors.profit : AppColors.loss)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.85)
                             }
                             
                             if item.row != pResults.last?.row {

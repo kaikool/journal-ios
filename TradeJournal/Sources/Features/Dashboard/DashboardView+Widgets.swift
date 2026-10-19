@@ -149,11 +149,16 @@ extension DashboardView {
                         .clipShape(Capsule())
                     }
                     
-                    Text("\(metrics.closedTrades) closed · Gross: \(Formatters.formatPnL(metrics.grossPnl ?? metrics.netPnl, currency: env.currentCurrency)) · Fees: \(Formatters.formatCurrency(metrics.fees ?? 0, currency: env.currentCurrency))")
-                        .font(.system(size: 10))
-                        .monospacedDigit()
-                        .foregroundColor(AppColors.secondaryText)
-                        .lineLimit(1)
+                    HStack(spacing: 4) {
+                        Text("\(metrics.closedTrades) closed")
+                        Text("·")
+                        Text("Fees \(Formatters.formatCurrency(metrics.fees ?? 0, currency: env.currentCurrency))")
+                    }
+                    .font(.system(size: 10))
+                    .monospacedDigit()
+                    .foregroundColor(AppColors.secondaryText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
                 } else {
                     HStack(alignment: .firstTextBaseline) {
                         AppMonetaryText(
@@ -329,6 +334,7 @@ extension DashboardView {
                 }
                 .font(AppTypography.caption)
                 .lineLimit(1)
+                .minimumScaleFactor(0.75)
             }
             .frame(maxWidth: .infinity, minHeight: isCompact ? 98 : nil, alignment: .topLeading)
         }
@@ -903,6 +909,8 @@ extension DashboardView {
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundColor(AppColors.secondaryText)
                 .tracking(0.5)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
             Spacer()
             Button {
                 #if canImport(UIKit)

@@ -64,9 +64,11 @@ public struct AppCardHeader: View {
     public var body: some View {
         HStack {
             Text(title.uppercased())
-                .font(AppTypography.cardTitle)
-                .tracking(0.88)
+                .font(AppTypography.cardHeader)
+                .tracking(0.5)
                 .foregroundColor(AppColors.secondaryText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
             
             Spacer()
             
@@ -151,6 +153,7 @@ public struct AppBadge: View {
     public var body: some View {
         Text(text)
             .font(.system(size: 10, weight: .bold, design: .rounded))
+            .lineLimit(1)
             .padding(.horizontal, 7)
             .padding(.vertical, 3)
             .background(backgroundColor)
@@ -471,6 +474,7 @@ public struct AppActionPill: View {
                 Text(title)
                     .font(AppTypography.actionPill)
                     .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
@@ -580,6 +584,7 @@ public struct AppActionPillLink<Destination: View>: View {
                 Text(title)
                     .font(AppTypography.actionPill)
                     .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
@@ -706,6 +711,8 @@ public struct AppleMenuChip<Content: View>: View {
                 Text(selectionText)
                     .font(AppTypography.menuChip)
                     .foregroundColor(AppColors.primaryText)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
                 
                 Image(systemName: "chevron.up.chevron.down")
                     .font(.system(size: 9, weight: .semibold))
@@ -759,19 +766,22 @@ public struct AppleSlidingSegmentedBar<T: Hashable & Identifiable>: View {
                         selection = item
                     }
                 } label: {
-                    HStack(spacing: 5) {
+                    HStack(spacing: 4) {
                         if let icon = iconFor?(item) {
                             Image(systemName: icon)
                                 .font(.system(size: 11, weight: .semibold))
                         }
                         Text(titleFor(item))
-                            .font(.system(size: 12, weight: isSelected ? .bold : .medium))
+                            .font(.system(size: 11.5, weight: isSelected ? .bold : .medium))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
                         
                         if let count = badgeCountFor?(item), count > 0 {
                             Text("\(count)")
-                                .font(.system(size: 10, weight: .bold))
+                                .font(.system(size: 9.5, weight: .bold))
                                 .monospacedDigit()
-                                .padding(.horizontal, 5)
+                                .lineLimit(1)
+                                .padding(.horizontal, 4.5)
                                 .padding(.vertical, 1)
                                 .background(isSelected ? AppColors.brand : AppColors.cardBackground)
                                 .foregroundColor(isSelected ? .white : AppColors.secondaryText)
@@ -859,6 +869,7 @@ public struct AppDropdownField<T: Hashable>: View {
                         .font(AppTypography.subheadline)
                         .foregroundColor(AppColors.primaryText)
                         .lineLimit(1)
+                        .truncationMode(.tail)
                     
                     Spacer()
                     

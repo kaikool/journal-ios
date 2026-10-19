@@ -146,6 +146,7 @@ public struct TradesListView: View {
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(AppColors.secondaryText)
                         .tracking(0.5)
+                        .lineLimit(1)
                     
                     AppMonetaryText(
                         Formatters.formatPnL(overviewMetrics.netPnl, currency: env.currentCurrency),
@@ -153,6 +154,8 @@ public struct TradesListView: View {
                         font: AppTypography.financialNumber(size: 19, weight: .bold),
                         color: pnlColor
                     )
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
                     
                     HStack(spacing: 4) {
                         Text("\(overviewMetrics.closedTrades) closed")
@@ -172,15 +175,19 @@ public struct TradesListView: View {
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(AppColors.secondaryText)
                         .tracking(0.5)
+                        .lineLimit(1)
                     
                     Text(pfStr)
                         .font(AppTypography.financialNumber(size: 19, weight: .bold))
                         .monospacedDigit()
                         .foregroundColor(AppColors.primaryText)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
                     
                     Text("Payoff efficiency")
                         .font(.system(size: 10))
                         .foregroundColor(AppColors.secondaryText)
+                        .lineLimit(1)
                 }
             }
             
@@ -190,16 +197,20 @@ public struct TradesListView: View {
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(AppColors.secondaryText)
                         .tracking(0.5)
+                        .lineLimit(1)
                     
                     Text(winRateStr)
                         .font(AppTypography.financialNumber(size: 19, weight: .bold))
                         .monospacedDigit()
                         .foregroundColor(AppColors.primaryText)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
                     
                     Text("\(overviewMetrics.winningTrades)W · \(overviewMetrics.losingTrades)L")
                         .font(.system(size: 10))
                         .monospacedDigit()
                         .foregroundColor(AppColors.secondaryText)
+                        .lineLimit(1)
                 }
             }
             
@@ -209,15 +220,19 @@ public struct TradesListView: View {
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(AppColors.secondaryText)
                         .tracking(0.5)
+                        .lineLimit(1)
                     
                     Text(avgWlStr)
                         .font(AppTypography.financialNumber(size: 19, weight: .bold))
                         .monospacedDigit()
                         .foregroundColor(AppColors.primaryText)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
                     
                     Text("Expectancy multiple")
                         .font(.system(size: 10))
                         .foregroundColor(AppColors.secondaryText)
+                        .lineLimit(1)
                 }
             }
         }
@@ -354,6 +369,8 @@ private struct TradeTerminalRow: View {
                 Text(trade.symbol)
                     .font(AppTypography.bodyBold)
                     .foregroundColor(AppColors.primaryText)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
                 
                 HStack(spacing: 4) {
                     Text(trade.closedAt.map { Formatters.dateOnly($0, timeZone: env.currentTimeZone) } ?? "Open")
@@ -363,6 +380,7 @@ private struct TradeTerminalRow: View {
                 }
                 .font(AppTypography.caption)
                 .foregroundColor(AppColors.secondaryText)
+                .lineLimit(1)
             }
             
             Spacer()
@@ -375,6 +393,8 @@ private struct TradeTerminalRow: View {
                     font: AppTypography.financialNumber(size: 15, weight: .bold),
                     color: trade.netPnl >= 0 ? AppColors.profit : AppColors.loss
                 )
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
                 
                 HStack(spacing: 3) {
                     if trade.fees > 0 {
@@ -388,6 +408,8 @@ private struct TradeTerminalRow: View {
                 }
                 .font(AppTypography.caption)
                 .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
             }
             
             Image(systemName: "chevron.right")
