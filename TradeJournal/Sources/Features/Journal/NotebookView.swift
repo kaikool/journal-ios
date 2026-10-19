@@ -482,7 +482,7 @@ public struct NotebookView: View {
 
 public struct NotebookEditorSheet: View {
     @Environment(\.dismiss) private var dismiss
-    @ObservedObject private var dataStore = TradeDataStore.shared
+    private let dataStore = TradeDataStore.shared
     
     let noteId: String
     let activeFolders: [NotebookFolder]
@@ -492,6 +492,8 @@ public struct NotebookEditorSheet: View {
     @State private var selectedFolderId: String
     @State private var isPreviewMode: Bool = false
     @State private var showDeleteConfirmation: Bool = false
+    @State private var autoSaveTask: Task<Void, Never>? = nil
+    @State private var hasPendingChanges: Bool = false
     
     public init(
         noteId: String,
@@ -517,7 +519,7 @@ public struct NotebookEditorSheet: View {
                         .foregroundColor(AppColors.primaryText)
                         .padding(.horizontal, 16)
                         .padding(.top, 14)
-                        .onChange(of: title) { _ in autoSave() }
+                        .onChange(of: title) { _ in scheduleAutoSave() }
                     
                     HStack {
                         // Folder selector
@@ -530,7 +532,10 @@ public struct NotebookEditorSheet: View {
                             },
                             iconFor: { _ in "folder" }
                         )
-                        .onChange(of: selectedFolderId) { _ in autoSave() }
+                        .onChange(of: selectedFolderId) { _ in
+                            hasPendingChanges = true
+                            flushSave()
+                        }
                         
                         Spacer()
                         
@@ -541,6 +546,9 @@ public struct NotebookEditorSheet: View {
                         }
                         .pickerStyle(.segmented)
                         .frame(width: 170)
+                        .onChange(of: isPreviewMode) { _ in
+                            flushSave()
+                        }
                     }
                     .padding(.horizontal, 16)
                     
@@ -646,25 +654,7 @@ public struct NotebookEditorSheet: View {
                                 .foregroundColor(AppColors.primaryText)
                                 .scrollContentBackground(.hidden)
                                 .frame(minHeight: 180)
-                                .onChange(of: content) { _ in autoSave() }
-                            
-                            if content.contains("*") || content.contains("#") || content.contains("- ") || content.contains("1. ") {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text("FORMATTED PREVIEW")
-                                        .font(.system(size: 10, weight: .semibold))
-                                        .foregroundColor(AppColors.secondaryText)
-                                        .tracking(0.5)
-                                    
-                                    Text(LocalizedStringKey(content))
-                                        .font(AppTypography.body)
-                                        .foregroundColor(AppColors.primaryText)
-                                        .padding(10)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                        .background(AppColors.secondaryBackground.opacity(0.4))
-                                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                                }
-                                .padding(.top, 4)
-                            }
+                                .onChange(of: content) { _ in scheduleAutoSave() }
                         }
                         
                         Divider().background(AppColors.border.opacity(0.5))
@@ -696,7 +686,7 @@ public struct NotebookEditorSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") {
-                        autoSave()
+                        flushSave()
                         dismiss()
                     }
                     .font(AppTypography.captionBold)
@@ -712,10 +702,27 @@ public struct NotebookEditorSheet: View {
             } message: {
                 Text("This note will be permanently removed.")
             }
+            .onDisappear {
+                flushSave()
+            }
         }
     }
     
-    private func autoSave() {
+    private func scheduleAutoSave() {
+        hasPendingChanges = true
+        autoSaveTask?.cancel()
+        autoSaveTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 700_000_000)
+            guard !Task.isCancelled else { return }
+            flushSave()
+        }
+    }
+    
+    private func flushSave() {
+        autoSaveTask?.cancel()
+        autoSaveTask = nil
+        guard hasPendingChanges else { return }
+        hasPendingChanges = false
         try? dataStore.patchNote(
             id: noteId,
             title: title,
@@ -732,7 +739,7 @@ public struct NotebookEditorSheet: View {
             marker: marker
         )
         content = res.value
-        autoSave()
+        scheduleAutoSave()
     }
     
     private func insertBullet() {
@@ -741,7 +748,7 @@ public struct NotebookEditorSheet: View {
         } else {
             content += "\n- "
         }
-        autoSave()
+        scheduleAutoSave()
     }
     
     private func insertNumberedList() {
@@ -750,6 +757,6 @@ public struct NotebookEditorSheet: View {
         } else {
             content += "\n1. "
         }
-        autoSave()
+        scheduleAutoSave()
     }
 }

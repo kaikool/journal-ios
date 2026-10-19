@@ -53,18 +53,29 @@ public struct DailyJournalListView: View {
         return Self.isoFormatter.string(from: Date())
     }
     
-    private var daysList: [JournalDaySummary] {
-        let key = "\(dataStore.selectedAccountId)_\(dataStore.filteredTrades.count)_\(dataStore.journalDays.count)_\(dataStore.calendarNotes.count)_\(dataStore.cacheVersion)_\(searchText)_\(env.currentTimeZone.identifier)"
+    private var baseDaysList: [JournalDaySummary] {
+        let key = "\(dataStore.selectedAccountId)_\(dataStore.filteredTrades.count)_\(dataStore.journalDays.count)_\(dataStore.calendarNotes.count)_\(dataStore.cacheVersion)_\(env.currentTimeZone.identifier)"
         if cache.lastKey == key {
             return cache.lastList
         }
-        let fresh = computeDaysList()
+        let fresh = computeBaseDaysList()
         cache.lastKey = key
         cache.lastList = fresh
         return fresh
     }
     
-    private func computeDaysList() -> [JournalDaySummary] {
+    private var daysList: [JournalDaySummary] {
+        let base = baseDaysList
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return base }
+        return base.filter { item in
+            item.date.localizedCaseInsensitiveContains(query) ||
+            item.weekday.localizedCaseInsensitiveContains(query) ||
+            item.notePreview.localizedCaseInsensitiveContains(query)
+        }
+    }
+    
+    private func computeBaseDaysList() -> [JournalDaySummary] {
         let trades = dataStore.filteredTrades
         Self.isoFormatter.timeZone = env.currentTimeZone
         let isoFormatter = Self.isoFormatter
@@ -113,11 +124,6 @@ public struct DailyJournalListView: View {
             let calNote = dataStore.calendarNotes[dKey]?.content ?? ""
             let combinedNote = !noteContent.isEmpty ? noteContent : calNote
             let hasNote = !combinedNote.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            
-            if !searchText.isEmpty {
-                let matches = dKey.contains(searchText) || weekday.localizedCaseInsensitiveContains(searchText) || combinedNote.localizedCaseInsensitiveContains(searchText)
-                if !matches { return nil }
-            }
             
             return JournalDaySummary(
                 date: dKey,
@@ -301,6 +307,8 @@ public struct DailyJournalDetailView: View {
     @State private var showExportSheet: Bool = false
     @State private var exportText: String = ""
     @State private var selectedTime: String? = nil
+    @State private var autoSaveTask: Task<Void, Never>? = nil
+    @State private var hasPendingChanges: Bool = false
     
     public init(date: String) {
         self.date = date
@@ -399,6 +407,9 @@ public struct DailyJournalDetailView: View {
         }
         .onAppear {
             loadNote()
+        }
+        .onDisappear {
+            saveNoteImmediately()
         }
     }
     
@@ -779,24 +790,6 @@ public struct DailyJournalDetailView: View {
                         }
                 }
                 
-                if noteText.contains("*") || noteText.contains("- ") || noteText.contains("1. ") || noteText.contains("#") {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("FORMATTED PREVIEW")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundColor(AppColors.secondaryText)
-                            .tracking(0.5)
-                        
-                        Text(LocalizedStringKey(noteText))
-                            .font(AppTypography.body)
-                            .foregroundColor(AppColors.primaryText)
-                            .padding(10)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(AppColors.secondaryBackground.opacity(0.4))
-                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    }
-                    .padding(.top, 2)
-                }
-                
                 HStack(spacing: 12) {
                     if !saveStatusMessage.isEmpty {
                         Text(saveStatusMessage)
@@ -839,30 +832,30 @@ public struct DailyJournalDetailView: View {
     }
     
     private func scheduleSaveNote(_ text: String) {
-        saveStatusMessage = "Saving..."
-        dataStore.saveJournalDayNote(date: date, note: text)
-        var calNote = dataStore.calendarNotes[date] ?? JournalNote(date: date, content: text)
-        calNote.content = text
-        calNote.updatedAt = Date()
-        dataStore.saveCalendarNote(calNote)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-            self.saveStatusMessage = "Auto-saved"
+        hasPendingChanges = true
+        saveStatusMessage = "Editing..."
+        autoSaveTask?.cancel()
+        autoSaveTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 750_000_000)
+            guard !Task.isCancelled else { return }
+            saveNoteImmediately()
         }
     }
     
     private func saveNoteImmediately() {
+        autoSaveTask?.cancel()
+        autoSaveTask = nil
+        guard hasPendingChanges else { return }
+        hasPendingChanges = false
+        
         let trimmed = noteText.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty {
             dataStore.deleteCalendarNote(for: date)
-            saveStatusMessage = "Deleted"
+            saveStatusMessage = "Cleared"
             return
         }
         dataStore.saveJournalDayNote(date: date, note: noteText)
-        var calNote = dataStore.calendarNotes[date] ?? JournalNote(date: date, content: noteText)
-        calNote.content = noteText
-        calNote.updatedAt = Date()
-        dataStore.saveCalendarNote(calNote)
-        saveStatusMessage = "Saved"
+        saveStatusMessage = "Auto-saved"
     }
     
     private func applyFormat(marker: String) {

@@ -110,6 +110,9 @@ public struct DayDetailSheet: View {
             } message: {
                 Text("This note will be permanently removed from your calendar and Supabase.")
             }
+            .onDisappear {
+                save()
+            }
         }
     }
     
@@ -268,24 +271,6 @@ public struct DayDetailSheet: View {
                         .font(AppTypography.captionBold)
                         .foregroundColor(AppColors.brand)
                     }
-                }
-                
-                if noteContent.contains("*") || noteContent.contains("- ") || noteContent.contains("1. ") || noteContent.contains("#") {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("FORMATTED PREVIEW")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundColor(AppColors.secondaryText)
-                            .tracking(0.5)
-                        
-                        Text(LocalizedStringKey(noteContent))
-                            .font(AppTypography.body)
-                            .foregroundColor(AppColors.primaryText)
-                            .padding(10)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(AppColors.secondaryBackground.opacity(0.4))
-                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    }
-                    .padding(.top, 2)
                 }
             }
         }
