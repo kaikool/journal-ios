@@ -326,6 +326,7 @@ public struct DashboardView: View {
         let snap = snapshot
         let metrics = snap.metrics
         
+        VStack(spacing: 0) {
             // Compact secondary toolbar sitting flush under ShellHeaderView
             FilterBarView(
                 title: "",
@@ -553,10 +554,6 @@ public struct DashboardView: View {
             .buttonStyle(ApplePressableButtonStyle())
             .fixedSize()
         }
-    }
-        .padding(.horizontal, 14)
-        .padding(.top, 6)
-        .padding(.bottom, 10)
     }
     
     // MARK: - Presets & Reorder Actions

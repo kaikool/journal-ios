@@ -79,6 +79,7 @@ public enum AppColors {
     
     // Brand & Interactive Accents (LuxAlgo cyan blue)
     public static let brand = adaptiveColor(dark: "#1197e2", light: "#0b7cbd")
+    public static let brandPrimary = brand
     public static let accent = adaptiveColor(dark: "#1197e2", light: "#0b7cbd")
     public static let ring = adaptiveColor(dark: "#1197e2", light: "#0b7cbd")
     
