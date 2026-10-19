@@ -251,6 +251,10 @@ public enum TradeReplayEngine {
     ) -> [MarketBar] {
         let openMs = Int64(trade.openedAt.timeIntervalSince1970 * 1000)
         let closeMs: Int64 = {
+            if trade.status == .open {
+                // For open trades, extend candles to current time
+                return Int64(Date().timeIntervalSince1970 * 1000)
+            }
             if let c = trade.closedAt {
                 return max(openMs + resolution.durationMs * 3, Int64(c.timeIntervalSince1970 * 1000))
             } else if let dur = trade.durationMs, dur > 0 {
@@ -262,15 +266,22 @@ public enum TradeReplayEngine {
         
         let step = resolution.durationMs
         let preBars = 4
-        let postBars = 2
+        let postBars = trade.status == .open ? 0 : 2
         let startTimestamp = openMs - Int64(preBars) * step
         let endTimestamp = closeMs + Int64(postBars) * step
         
-        let totalSteps = max(8, min(120, Int((endTimestamp - startTimestamp) / step)))
+        let exactSteps = Int((endTimestamp - startTimestamp) / step) + 1
+        let totalSteps = max(4, min(300, exactSteps))
         var bars: [MarketBar] = []
         
         let entryPrice = (trade.avgEntry as NSDecimalNumber).doubleValue
-        let exitPrice = trade.avgExit.map { ($0 as NSDecimalNumber).doubleValue } ?? (entryPrice + (trade.netPnl > 0 ? 0.005 : -0.005) * entryPrice)
+        let exitPrice: Double
+        if trade.status == .open {
+            // For open trades, estimate current price from unrealized PnL direction
+            exitPrice = entryPrice + (trade.netPnl > 0 ? 0.003 : -0.003) * entryPrice
+        } else {
+            exitPrice = trade.avgExit.map { ($0 as NSDecimalNumber).doubleValue } ?? (entryPrice + (trade.netPnl > 0 ? 0.005 : -0.005) * entryPrice)
+        }
         let priceSpan = exitPrice - entryPrice
         
         for i in 0..<totalSteps {
@@ -297,5 +308,46 @@ public enum TradeReplayEngine {
         }
         
         return bars
+    }
+    
+    /// Resamples lower-timeframe candles into higher-timeframe candles using standard OHLCV bucket aggregation.
+    /// For example, 12 x 5m candles → 1 x 1h candle. Timestamps are aligned to resolution boundaries.
+    public static func resampleBars(_ bars: [MarketBar], to resolution: MarketResolution) -> [MarketBar] {
+        guard !bars.isEmpty else { return [] }
+        let step = resolution.durationMs
+        
+        // Group bars into buckets by flooring timestamp to resolution boundary
+        var buckets: [Int64: [MarketBar]] = [:]
+        var bucketOrder: [Int64] = []
+        
+        for bar in bars {
+            let bucketTs = bar.timestamp - (bar.timestamp % step)
+            if buckets[bucketTs] == nil {
+                bucketOrder.append(bucketTs)
+            }
+            buckets[bucketTs, default: []].append(bar)
+        }
+        
+        return bucketOrder.compactMap { ts -> MarketBar? in
+            guard let group = buckets[ts], let first = group.first else { return nil }
+            let open = first.open
+            let close = group.last!.close
+            var high = first.high
+            var low = first.low
+            var volume: Decimal = 0
+            for bar in group {
+                if bar.high > high { high = bar.high }
+                if bar.low < low { low = bar.low }
+                volume += bar.volume
+            }
+            return MarketBar(
+                timestamp: ts,
+                open: open,
+                high: high,
+                low: low,
+                close: close,
+                volume: volume
+            )
+        }
     }
 }

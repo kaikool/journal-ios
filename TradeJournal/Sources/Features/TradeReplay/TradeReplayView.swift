@@ -10,6 +10,7 @@ public struct TradeReplayView: View {
     let executions: [Execution]
     
     @State private var bars: [MarketBar] = []
+    @State private var rawSourceBars: [MarketBar] = []
     @State private var currentStep: Int = 1
     @State private var isPlaying: Bool = false
     @State private var timer: Timer? = nil
@@ -492,60 +493,77 @@ public struct TradeReplayView: View {
     // MARK: - Replay Actions & Data Loading
     
     private func loadMarketCandles() async {
+        stopTimer()
+        
+        // If raw fine-grained bars are already in memory, resample instantly without network latency
+        if !rawSourceBars.isEmpty {
+            let resampled = TradeReplayEngine.resampleBars(rawSourceBars, to: selectedResolution)
+            if !resampled.isEmpty {
+                self.bars = resampled
+                self.currentStep = resampled.count
+                self.excursionEstimate = TradeReplayEngine.estimateExcursions(
+                    trade: trade,
+                    fills: executions,
+                    bars: resampled,
+                    resolution: selectedResolution
+                )
+                return
+            }
+        }
+        
         isLoadingCandles = true
         candleErrorMessage = ""
-        stopTimer()
+        
+        // Determine the finest fetch resolution (use 1m or 5m from the API, then resample client-side)
+        let fetchResolution: MarketResolution = selectedResolution == .m1 ? .m1 : .m5
         
         do {
             let (provider, fetchedBars) = try await MarketDataService.shared.fetchBarsForTrade(
                 trade: trade,
                 config: TradeDataStore.shared.marketConnections,
-                resolution: selectedResolution.rawValue
+                resolution: fetchResolution.rawValue
             )
             
             if !fetchedBars.isEmpty {
-                self.bars = fetchedBars
+                self.rawSourceBars = fetchedBars
+                // Resample fetched bars to the user-selected resolution
+                let resampled = selectedResolution.durationMs > fetchResolution.durationMs
+                    ? TradeReplayEngine.resampleBars(fetchedBars, to: selectedResolution)
+                    : fetchedBars
+                self.bars = resampled
                 self.dataSourceName = provider
-                self.currentStep = fetchedBars.count
+                self.currentStep = resampled.count
                 self.excursionEstimate = TradeReplayEngine.estimateExcursions(
                     trade: trade,
                     fills: executions,
-                    bars: fetchedBars,
+                    bars: resampled,
                     resolution: selectedResolution
                 )
             } else {
-                let simulated = TradeReplayEngine.generateBarsFromTrade(
-                    trade: trade,
-                    fills: executions,
-                    resolution: selectedResolution
-                )
-                self.bars = simulated
-                self.dataSourceName = "Candle Stream"
-                self.currentStep = simulated.count
-                self.excursionEstimate = TradeReplayEngine.estimateExcursions(
-                    trade: trade,
-                    fills: executions,
-                    bars: simulated,
-                    resolution: selectedResolution
-                )
+                applySimulatedBars()
             }
         } catch {
-            let simulated = TradeReplayEngine.generateBarsFromTrade(
-                trade: trade,
-                fills: executions,
-                resolution: selectedResolution
-            )
-            self.bars = simulated
-            self.dataSourceName = "Candle Stream"
-            self.currentStep = simulated.count
-            self.excursionEstimate = TradeReplayEngine.estimateExcursions(
-                trade: trade,
-                fills: executions,
-                bars: simulated,
-                resolution: selectedResolution
-            )
+            applySimulatedBars()
         }
         isLoadingCandles = false
+    }
+    
+    /// Generates synthetic candle bars when external market data is unavailable
+    private func applySimulatedBars() {
+        let simulated = TradeReplayEngine.generateBarsFromTrade(
+            trade: trade,
+            fills: executions,
+            resolution: selectedResolution
+        )
+        self.bars = simulated
+        self.dataSourceName = "Simulated"
+        self.currentStep = simulated.count
+        self.excursionEstimate = TradeReplayEngine.estimateExcursions(
+            trade: trade,
+            fills: executions,
+            bars: simulated,
+            resolution: selectedResolution
+        )
     }
     
     private func togglePlay() {

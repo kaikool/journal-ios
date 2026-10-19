@@ -339,7 +339,13 @@ public final class MarketDataService: Sendable {
         let afterPadding = Double(max(1_800_000, resMs * 2)) / 1000.0
         
         let openTime = trade.openedAt.addingTimeInterval(-beforePadding)
-        let closeTime = (trade.closedAt ?? Date()).addingTimeInterval(afterPadding)
+        let closeTime: Date = {
+            if trade.status == .open || trade.closedAt == nil {
+                return Date()
+            } else {
+                return min(Date(), trade.closedAt!.addingTimeInterval(afterPadding))
+            }
+        }()
         
         if provider == "binance" {
             let startMs = Int64(openTime.timeIntervalSince1970 * 1000)

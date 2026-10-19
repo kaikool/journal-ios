@@ -149,9 +149,6 @@ public struct CandleChartView: View {
 // Core implementation detail
             volumeHistogram(plotWidth: plotWidth, plotHeight: plotHeight, stepX: stepX, candleWidth: candleWidth)
             
-// Reference Entry & Exit lines
-            referencePriceLines(plotWidth: plotWidth, plotHeight: plotHeight, minP: minP, span: priceSpan)
-            
 // Render candlesticks (wick + body) (Wick + Body)
             Canvas { context, _ in
                 for (i, bar) in visibleBars.enumerated() {
@@ -189,8 +186,8 @@ public struct CandleChartView: View {
             }
             .frame(width: plotWidth, height: plotHeight)
             
-// Core implementation detail
-            fillsOverlay(plotWidth: plotWidth, plotHeight: plotHeight, stepX: stepX, minP: minP, span: priceSpan)
+// Unified trade overlay (entry/exit lines, arrows, connecting line)
+            tradeOverlay(plotWidth: plotWidth, plotHeight: plotHeight, stepX: stepX, minP: minP, span: priceSpan)
             
 // Core implementation detail
             if let hIdx = hoveredBarIndex, hIdx < visibleBars.count {
@@ -265,77 +262,109 @@ public struct CandleChartView: View {
         }
     }
     
-    // MARK: - 5. Reference Price Lines (Entry & Exit)
+    // MARK: - 5. Unified Trade Overlay (Entry/Exit Lines, Fill Markers, Connecting Line)
     
-    private func referencePriceLines(plotWidth: CGFloat, plotHeight: CGFloat, minP: Double, span: Double) -> some View {
+    private func tradeOverlay(plotWidth: CGFloat, plotHeight: CGFloat, stepX: CGFloat, minP: Double, span: Double) -> some View {
         let entryD = (trade.avgEntry as NSDecimalNumber).doubleValue
         let yEntry = plotHeight - CGFloat((entryD - minP) / span) * plotHeight
+        let openMs = Int64(trade.openedAt.timeIntervalSince1970 * 1000)
+        let closeMs = Int64((trade.closedAt ?? Date()).timeIntervalSince1970 * 1000)
+        
+        let entryBarIdx = visibleBars.firstIndex { $0.timestamp >= openMs }
+        let hasReachedOpen = entryBarIdx != nil
+        let entryX = CGFloat(entryBarIdx ?? 0) * stepX + (stepX / 2.0)
+        
+        let hasReachedExit = (trade.status != .open) && ((visibleBars.last?.timestamp ?? 0) >= closeMs || visibleBars.count >= totalBarsCount)
         
         return ZStack {
-            // Entry Line
+            // 1. Entry horizontal dashed reference line (always visible)
             Path { path in
                 path.move(to: CGPoint(x: 0, y: yEntry))
                 path.addLine(to: CGPoint(x: plotWidth, y: yEntry))
             }
-            .stroke(AppColors.accent, style: StrokeStyle(lineWidth: 1.5, dash: [4, 4]))
+            .stroke(AppColors.accent, style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
             
-            Text("ENTRY: \(Formatters.price(trade.avgEntry))")
-                .font(.system(size: 8, weight: .bold))
-                .padding(.horizontal, 4)
-                .padding(.vertical, 1)
-                .background(AppColors.accent)
-                .foregroundColor(.white)
-                .cornerRadius(4)
-                .position(x: 45, y: max(10, yEntry - 10))
+            // 2. Entry marker & label (shown once replay reaches open time)
+            if hasReachedOpen {
+                Text("ENTRY \(Formatters.price(trade.avgEntry))")
+                    .font(.system(size: 8, weight: .bold))
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 1)
+                    .background(AppColors.accent)
+                    .foregroundColor(.white)
+                    .cornerRadius(4)
+                    .position(x: min(plotWidth - 40, max(40, entryX)), y: max(10, yEntry - 12))
+                
+                Image(systemName: trade.direction == .long ? "arrowtriangle.up.fill" : "arrowtriangle.down.fill")
+                    .font(.system(size: 10))
+                    .foregroundColor(AppColors.accent)
+                    .position(x: entryX, y: trade.direction == .long ? yEntry + 10 : yEntry - 10)
+            }
             
-// Core implementation detail
-            if let avgExit = trade.avgExit {
+            // 3. Exit line + label + final connecting line (shown once replay reaches exit time)
+            if let avgExit = trade.avgExit, hasReachedExit {
                 let exitD = (avgExit as NSDecimalNumber).doubleValue
                 let yExit = plotHeight - CGFloat((exitD - minP) / span) * plotHeight
+                let exitBarIdx = visibleBars.firstIndex { $0.timestamp >= closeMs } ?? (visibleBars.count - 1)
+                let exitX = CGFloat(exitBarIdx) * stepX + (stepX / 2.0)
                 let pnlColor = Formatters.pnlColor(trade.netPnl)
                 
+                // Exit horizontal dashed line
                 Path { path in
                     path.move(to: CGPoint(x: 0, y: yExit))
                     path.addLine(to: CGPoint(x: plotWidth, y: yExit))
                 }
-                .stroke(pnlColor, style: StrokeStyle(lineWidth: 1.5, dash: [4, 4]))
+                .stroke(pnlColor, style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
                 
-                Text("EXIT: \(Formatters.price(avgExit)) (\(Formatters.formatPnL(trade.netPnl, currency: currency)))")
+                // Connecting line from Entry to Exit
+                if hasReachedOpen {
+                    Path { path in
+                        path.move(to: CGPoint(x: entryX, y: yEntry))
+                        path.addLine(to: CGPoint(x: exitX, y: yExit))
+                    }
+                    .stroke(pnlColor.opacity(0.6), style: StrokeStyle(lineWidth: 1.5, dash: [5, 3]))
+                }
+                
+                // Exit label
+                Text("EXIT \(Formatters.price(avgExit)) (\(Formatters.formatPnL(trade.netPnl, currency: currency)))")
                     .font(.system(size: 8, weight: .bold))
                     .padding(.horizontal, 4)
                     .padding(.vertical, 1)
                     .background(pnlColor)
                     .foregroundColor(.white)
                     .cornerRadius(4)
-                    .position(x: plotWidth - 65, y: max(10, yExit - 10))
+                    .position(x: min(plotWidth - 55, max(55, exitX)), y: max(10, yExit - 12))
+                
+                // Exit arrow marker
+                Image(systemName: trade.direction == .long ? "arrowtriangle.down.fill" : "arrowtriangle.up.fill")
+                    .font(.system(size: 10))
+                    .foregroundColor(pnlColor)
+                    .position(x: exitX, y: trade.direction == .long ? yExit - 10 : yExit + 10)
+            } else if hasReachedOpen, let curBar = visibleBars.last {
+                // 4. In-progress trade tracking line: tracks current bar during replay or for open trades
+                let curPrice = (curBar.close as NSDecimalNumber).doubleValue
+                let yCur = plotHeight - CGFloat((curPrice - minP) / span) * plotHeight
+                let curX = CGFloat(visibleBars.count - 1) * stepX + (stepX / 2.0)
+                let curPnl = TradeReplayEngine.computeUnrealizedPnl(trade: trade, currentPrice: curBar.close, isLastBar: false)
+                let curColor = Formatters.pnlColor(curPnl)
+                
+                Path { path in
+                    path.move(to: CGPoint(x: entryX, y: yEntry))
+                    path.addLine(to: CGPoint(x: curX, y: yCur))
+                }
+                .stroke(curColor.opacity(0.5), style: StrokeStyle(lineWidth: 1.5, dash: [5, 3]))
+                
+                if trade.status == .open {
+                    Text("LIVE \(Formatters.price(curBar.close))")
+                        .font(.system(size: 8, weight: .bold))
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 1)
+                        .background(curColor)
+                        .foregroundColor(.white)
+                        .cornerRadius(4)
+                        .position(x: min(plotWidth - 40, max(40, curX)), y: max(10, yCur - 12))
+                }
             }
-        }
-    }
-    
-    /// Fills overlay displaying execution arrows and lots on the candle timeline
-    private func fillsOverlay(plotWidth: CGFloat, plotHeight: CGFloat, stepX: CGFloat, minP: Double, span: Double) -> some View {
-        ForEach(activeFills) { fill in
-            let fillMs = Int64(fill.executedAt.timeIntervalSince1970 * 1000)
-            let barIndex = visibleBars.firstIndex { $0.timestamp >= fillMs } ?? (visibleBars.count - 1)
-            let x = CGFloat(barIndex) * stepX + (stepX / 2.0)
-            let fillPriceD = (fill.price as NSDecimalNumber).doubleValue
-            let y = plotHeight - CGFloat((fillPriceD - minP) / span) * plotHeight
-            
-            let isBuy = fill.side == .buy
-            
-            HStack(spacing: 2) {
-                Image(systemName: isBuy ? "triangle.fill" : "arrowtriangle.down.fill")
-                    .font(.system(size: 7))
-                Text("\(isBuy ? "BUY" : "SELL") \(fill.quantity)")
-                    .font(.system(size: 8, weight: .bold))
-            }
-            .padding(.horizontal, 4)
-            .padding(.vertical, 2)
-            .background(isBuy ? AppColors.profit : AppColors.loss)
-            .foregroundColor(.white)
-            .cornerRadius(4)
-            .shadow(radius: 2)
-            .position(x: x, y: isBuy ? y + 16 : y - 16)
         }
     }
     
