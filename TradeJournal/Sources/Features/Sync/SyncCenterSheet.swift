@@ -99,8 +99,8 @@ public struct SyncCenterSheet: View {
                 // cTrader Source Card
                 sourceRow(
                     id: "ctrader",
-                    title: "cTrader Open API",
-                    subtitle: ctrader.isConfigured ? "Token active · \(ctrader.discoveredAccounts.count) discovered account(s)" : "Not configured",
+                    title: "cTrader",
+                    subtitle: ctrader.isConfigured ? "Connected · \(ctrader.discoveredAccounts.count) linked account(s)" : "Not configured",
                     icon: "chart.xyaxis.line",
                     isConfigured: ctrader.isConfigured
                 )
@@ -108,8 +108,8 @@ public struct SyncCenterSheet: View {
                 // The5ers Source Card
                 sourceRow(
                     id: "the5ers",
-                    title: "The5ers MCP Hub",
-                    subtitle: the5ers.isConfigured ? "MCP Hub Connected · Prop Accounts & Payouts" : "Not configured",
+                    title: "The5ers",
+                    subtitle: the5ers.isConfigured ? "Connected · Prop accounts & payouts" : "Not configured",
                     icon: "building.columns",
                     isConfigured: the5ers.isConfigured
                 )
@@ -237,10 +237,10 @@ public struct SyncCenterSheet: View {
             VStack(spacing: 10) {
                 Toggle(isOn: $options.includeHistoricalDeals) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Completed Deals & Executions")
+                        Text("Closed Trades & Orders")
                             .font(AppTypography.body)
                             .foregroundColor(AppColors.primaryText)
-                        Text("Rebuilds flat-to-flat positions with FIFO while preserving notes and tags.")
+                        Text("Imports completed trades while preserving your personal notes, setups, and tags.")
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText)
                     }
@@ -251,10 +251,10 @@ public struct SyncCenterSheet: View {
                 
                 Toggle(isOn: $options.includeOpenPositions) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Active Open Positions")
+                        Text("Live Open Positions")
                             .font(AppTypography.body)
                             .foregroundColor(AppColors.primaryText)
-                        Text("Syncs live floating positions to monitor current trade risk.")
+                        Text("Syncs current open positions and floating P&L to monitor active risk.")
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText)
                     }
@@ -268,10 +268,10 @@ public struct SyncCenterSheet: View {
                         Image(systemName: "cylinder.split.1x2")
                             .foregroundColor(supabase.isConfigured ? AppColors.brand : AppColors.secondaryText)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Auto-backup to Supabase Cloud")
+                            Text("Cloud Backup (Supabase)")
                                 .font(AppTypography.body)
                                 .foregroundColor(AppColors.primaryText)
-                            Text(supabase.isConfigured ? "Pushes new executions and trades to your private PostgreSQL cloud database." : "Configure in Settings -> Data & backups")
+                            Text(supabase.isConfigured ? "Uploads new trades and journal updates to your private cloud storage." : "Configure in Settings → Data & backups")
                                 .font(AppTypography.caption)
                                 .foregroundColor(AppColors.secondaryText)
                         }

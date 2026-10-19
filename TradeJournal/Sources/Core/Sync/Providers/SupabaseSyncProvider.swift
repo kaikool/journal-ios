@@ -4,7 +4,7 @@ import Foundation
 @MainActor
 public final class SupabaseSyncProvider: SyncProvider {
     public let id: String = "supabase"
-    public let displayName: String = "Supabase Cloud"
+    public let displayName: String = "Cloud Backup"
     public let iconName: String = "cylinder.split.1x2"
     
     public var isConfigured: Bool {

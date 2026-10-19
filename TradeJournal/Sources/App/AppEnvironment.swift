@@ -18,6 +18,7 @@ public final class AppEnvironment: ObservableObject {
     @Published public var isDrawerOpen: Bool = false
     @Published public var currentCurrency: String = "USD"
     @Published public var currentTimeZone: TimeZone = .current
+    @Published public var showSyncCenter: Bool = false
     @Published public var appTheme: AppTheme {
         didSet {
             UserDefaults.standard.set(appTheme.rawValue, forKey: "journal_theme_preference")

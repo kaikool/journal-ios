@@ -738,7 +738,7 @@ public struct MarketDataSettingsView: View {
                                 .foregroundColor(binanceEnabled ? AppColors.profit : AppColors.secondaryText)
                         }
                         
-                        Text("Public Binance spot candles. No API key required. Availability depends on your region and the listed pair.")
+                        Text("Provides cryptocurrency price candles for trade replay. No account or API key required.")
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText)
                         
@@ -748,7 +748,7 @@ public struct MarketDataSettingsView: View {
                                     binanceEnabled = true
                                     dataStore.marketConnections.binanceEnabled = true
                                     dataStore.saveToDisk()
-                                    binanceStatus = "Public market data enabled."
+                                    binanceStatus = "Market data enabled."
                                 }
                             } else {
                                 AppButton("Test Connection", icon: "network", style: .secondary, size: .compact) {
@@ -780,16 +780,12 @@ public struct MarketDataSettingsView: View {
                             Text("OANDA")
                                 .font(AppTypography.headline)
                             Spacer()
-                            Text(!dataStore.marketConnections.oandaApiKey.isEmpty ? "Credentials saved" : "Not connected")
-                                .font(AppTypography.caption)
+                            Text(!dataStore.marketConnections.oandaApiKey.isEmpty ? "Connected · Active" : "Not connected")
+                                .font(AppTypography.captionBold)
                                 .foregroundColor(!dataStore.marketConnections.oandaApiKey.isEmpty ? AppColors.profit : AppColors.secondaryText)
                         }
                         
-                        Text("Forex and CFD candles from your v20 account. Midpoint prices, UTC-aligned bars and tick-count volume; no spread or FX conversion is included.")
-                            .font(AppTypography.caption)
-                            .foregroundColor(AppColors.secondaryText)
-                        
-                        Text("Credentials are encrypted locally and used only for market data. Saved secrets are never included in journal exports.")
+                        Text("Provides Forex and CFD market candles for trade replay and chart analysis. Credentials are encrypted locally.")
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText)
                         
@@ -875,8 +871,8 @@ public struct MarketDataSettingsView: View {
 }
 
 // MARK: - 5. Connections Settings View
-// Ported 1:1 from `The5ersConnection` (Model Context Protocol JSON-RPC) & Supabase Cloud
 public struct ConnectionsSettingsView: View {
+    @EnvironmentObject private var env: AppEnvironment
     @ObservedObject private var dataStore = TradeDataStore.shared
     @ObservedObject private var the5ers = The5ersService.shared
     @ObservedObject private var ctrader = CTraderService.shared
@@ -896,49 +892,70 @@ public struct ConnectionsSettingsView: View {
     
     public var body: some View {
         VStack(spacing: 20) {
-            // Card 1: The5ers MCP Connection
-            SettingsCard(title: "The5ers MCP connection") {
+            // Card 1: Sync Center Hub
+            SettingsCard(title: "Sync Center") {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Select time horizons, filter specific accounts, and manage multi-source synchronization.")
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.secondaryText)
+                    
+                    HStack(spacing: 8) {
+                        AppButton(
+                            "Open Sync Center",
+                            icon: "slider.horizontal.3",
+                            style: .primary,
+                            size: .compact,
+                            fullWidth: true
+                        ) {
+                            env.showSyncCenter = true
+                        }
+                        
+                        AppButton(
+                            "Quick Sync",
+                            icon: "arrow.triangle.2.circlepath",
+                            style: .secondary,
+                            size: .compact,
+                            fullWidth: true,
+                            isLoading: SyncManager.shared.isSyncing
+                        ) {
+                            Task {
+                                await SyncManager.shared.performQuickSync()
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Card 2: The5ers Prop Firm Connection
+            SettingsCard(title: "The5ers") {
                 VStack(alignment: .leading, spacing: 14) {
                     HStack {
-                        Text("Model Context Protocol (MCP)")
+                        Text("The5ers Account Sync")
                             .font(AppTypography.headline)
                         Spacer()
-                        Text(the5ers.isConnected ? "MCP Connected · Active" : "Not connected")
+                        Text(the5ers.isConnected ? "Connected · Active" : "Not connected")
                             .font(AppTypography.captionBold)
                             .foregroundColor(the5ers.isConnected ? AppColors.profit : AppColors.secondaryText)
                     }
                     
-                    Text("Official The5ers MCP Service at `https://mcp.the5ers.com/mcp` (2025-03-26 Protocol). Authenticates via The5ers Hub OAuth 2.0 PKCE to sync prop accounts, positions, and payout history.")
+                    Text("Connect your The5ers account to automatically sync challenges, funded accounts, trades, and payout history.")
                         .font(AppTypography.caption)
                         .foregroundColor(AppColors.secondaryText)
                     
-                    // Main Action: OAuth Login vs Connected Actions
                     if !the5ers.isConnected {
-                        HStack(spacing: 8) {
-                            AppButton("Log in with The5ers", icon: "person.badge.key.fill", style: .primary, size: .compact, fullWidth: true, isLoading: isConnectingThe5ers) {
-                                loginThe5ersOAuth()
-                            }
-                            
-                            if !mcpToken.trimmingCharacters(in: .whitespaces).isEmpty {
-                                AppButton("Test Connection", icon: "network", style: .secondary, size: .compact, fullWidth: true) {
-                                    pingMcp()
-                                }
-                            }
+                        AppButton("Connect The5ers", icon: "person.badge.key.fill", style: .primary, size: .compact, fullWidth: true, isLoading: isConnectingThe5ers) {
+                            loginThe5ersOAuth()
                         }
                     } else {
                         HStack(spacing: 8) {
-                            AppButton("Sync all data", icon: "arrow.triangle.2.circlepath", style: .primary, size: .compact, fullWidth: true, isLoading: the5ers.isSyncing || dataStore.isSyncing) {
+                            AppButton("Sync Now", icon: "arrow.triangle.2.circlepath", style: .primary, size: .compact, fullWidth: true, isLoading: the5ers.isSyncing || dataStore.isSyncing) {
                                 syncThe5ers()
-                            }
-                            
-                            AppButton("Test Connection", icon: "network", style: .secondary, size: .compact, fullWidth: true) {
-                                pingMcp()
                             }
                             
                             AppButton("Disconnect", icon: "xmark.circle", style: .destructive, size: .compact, fullWidth: true) {
                                 the5ers.disconnect()
                                 mcpToken = ""
-                                the5ersStatus = "Disconnected from The5ers MCP."
+                                the5ersStatus = "Disconnected from The5ers."
                             }
                         }
                     }
@@ -949,17 +966,14 @@ public struct ConnectionsSettingsView: View {
                             .foregroundColor(the5ersStatus.contains("Error") || the5ersStatus.contains("failed") ? AppColors.loss : AppColors.profit)
                     }
                     
-                    // Sync Info Box
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text("The5ers accounts: \(dataStore.propAccounts.filter { $0.firm.contains("The5ers") }.count)")
-                                .font(AppTypography.caption)
-                                .foregroundColor(AppColors.secondaryText)
-                            Spacer()
-                            Text("Synced trades: \(dataStore.trades.filter { $0.tags.contains("the5ers") }.count)")
-                                .font(AppTypography.caption)
-                                .foregroundColor(AppColors.secondaryText)
-                        }
+                    HStack {
+                        Text("The5ers accounts: \(dataStore.propAccounts.filter { $0.firm.contains("The5ers") }.count)")
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.secondaryText)
+                        Spacer()
+                        Text("Synced trades: \(dataStore.trades.filter { $0.tags.contains("the5ers") }.count)")
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.secondaryText)
                     }
                     .padding(12)
                     .background(AppColors.secondaryBackground)
@@ -967,31 +981,31 @@ public struct ConnectionsSettingsView: View {
                 }
             }
             
-            // Card 2: cTrader Open API Connection
-            SettingsCard(title: "cTrader Open API") {
+            // Card 3: cTrader Connection
+            SettingsCard(title: "cTrader") {
                 VStack(alignment: .leading, spacing: 14) {
                     HStack {
-                        Text("cTrader Cloud Sync")
+                        Text("cTrader Account Sync")
                             .font(AppTypography.headline)
                         Spacer()
-                        Text(ctrader.isConfigured ? (ctrader.isConnected ? "Active · Connected" : "Configured") : "Not configured")
+                        Text(ctrader.isConfigured ? (ctrader.isConnected ? "Connected · Active" : "Configured") : "Not configured")
                             .font(AppTypography.captionBold)
                             .foregroundColor(ctrader.isConfigured ? AppColors.profit : AppColors.secondaryText)
                     }
                     
-                    Text("Direct high-speed synchronization with cTrader Open API via JSON WebSocket on port 5036. Imports accounts, historical deals, execution fills, and open positions.")
+                    Text("Sync trading accounts, historical orders, and open positions directly from cTrader.")
                         .font(AppTypography.caption)
                         .foregroundColor(AppColors.secondaryText)
                     
-                    // Environment Picker (Live vs Demo)
+                    // Account Type (Live vs Demo)
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("Gateway Environment:")
+                        Text("Account Type:")
                             .font(AppTypography.captionBold)
                             .foregroundColor(AppColors.secondaryText)
                         
                         Picker("Environment", selection: $ctraderIsLive) {
-                            Text("Live Accounts (wss://live.ctraderapi.com:5036)").tag(true)
-                            Text("Demo Accounts (wss://demo.ctraderapi.com:5036)").tag(false)
+                            Text("Live Accounts").tag(true)
+                            Text("Demo Accounts").tag(false)
                         }
                         .pickerStyle(.segmented)
                     }
@@ -999,7 +1013,7 @@ public struct ConnectionsSettingsView: View {
                     // Access Token Field
                     VStack(alignment: .leading, spacing: 6) {
                         HStack {
-                            Text("cTrader Access Token:")
+                            Text("Access Token:")
                                 .font(AppTypography.captionBold)
                                 .foregroundColor(AppColors.secondaryText)
                             Spacer()
@@ -1020,19 +1034,19 @@ public struct ConnectionsSettingsView: View {
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled(true)
                         
-                        Text("Obtain your Access Token from openapi.ctrader.com → Applications → Playground or OAuth.")
+                        Text("Obtain your Access Token from openapi.ctrader.com → Applications.")
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText)
                     }
                     
-                    // Advanced App Credentials (Client ID & Secret)
+                    // Optional Advanced App Credentials
                     DisclosureGroup(isExpanded: $showAdvancedCTrader) {
                         VStack(alignment: .leading, spacing: 10) {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("Client ID:")
                                     .font(AppTypography.captionBold)
                                     .foregroundColor(AppColors.secondaryText)
-                                TextField("Enter cTrader App Client ID", text: $ctraderClientId)
+                                TextField("Enter Client ID", text: $ctraderClientId)
                                     .font(AppTypography.inputText)
                                     .textFieldStyle(.roundedBorder)
                                     .textInputAutocapitalization(.never)
@@ -1043,7 +1057,7 @@ public struct ConnectionsSettingsView: View {
                                 Text("Client Secret:")
                                     .font(AppTypography.captionBold)
                                     .foregroundColor(AppColors.secondaryText)
-                                SecureField("Enter cTrader App Client Secret", text: $ctraderClientSecret)
+                                SecureField("Enter Client Secret", text: $ctraderClientSecret)
                                     .font(AppTypography.inputText)
                                     .textFieldStyle(.roundedBorder)
                                     .textInputAutocapitalization(.never)
@@ -1052,7 +1066,7 @@ public struct ConnectionsSettingsView: View {
                         }
                         .padding(.top, 6)
                     } label: {
-                        Text("Application Credentials (Client ID & Secret)")
+                        Text("Custom App Credentials (Optional)")
                             .font(AppTypography.captionBold)
                             .foregroundColor(AppColors.brand)
                     }
@@ -1122,7 +1136,7 @@ public struct ConnectionsSettingsView: View {
                         .disabled(ctraderToken.trimmingCharacters(in: .whitespaces).isEmpty || isTestingCTrader)
                         
                         if !ctraderToken.isEmpty {
-                            AppButton("Clear", icon: "xmark.circle", style: .destructive, size: .compact, fullWidth: true) {
+                            AppButton("Disconnect", icon: "xmark.circle", style: .destructive, size: .compact, fullWidth: true) {
                                 ctraderToken = ""
                                 ctraderClientId = ""
                                 ctraderClientSecret = ""
@@ -1130,7 +1144,7 @@ public struct ConnectionsSettingsView: View {
                                 ctrader.clientId = ""
                                 ctrader.clientSecret = ""
                                 ctrader.disconnect()
-                                ctraderStatus = "cTrader credentials cleared."
+                                ctraderStatus = "cTrader disconnected."
                             }
                         }
                     }
@@ -1148,7 +1162,6 @@ public struct ConnectionsSettingsView: View {
                     }
                 }
             }
-            
         }
         .onAppear {
             mcpToken = the5ers.mcpToken
@@ -1408,6 +1421,7 @@ public struct AiSettingsView: View {
 // MARK: - 7. Your Data & Backups Settings View
 // Ported 1:1 from `your-data` in `settings/page.tsx` & `api/export/route.ts`
 public struct YourDataSettingsView: View {
+    @EnvironmentObject private var env: AppEnvironment
     @ObservedObject private var dataStore = TradeDataStore.shared
     
     @State private var showExportSheet: Bool = false
@@ -1424,10 +1438,10 @@ public struct YourDataSettingsView: View {
     
     public var body: some View {
         VStack(spacing: 20) {
-            // Card 1: Supabase Cloud Database & Storage
-            SettingsCard(title: "Supabase Cloud Database & Storage") {
+            // Card 1: Cloud Backup (Supabase)
+            SettingsCard(title: "Cloud Backup (Supabase)") {
                 VStack(alignment: .leading, spacing: 14) {
-                    Text("Secure remote PostgreSQL cloud backup and multi-device synchronization via Supabase PostgREST API.")
+                    Text("Back up your trades, journals, and accounts to your private cloud database to keep your data safe and sync across devices.")
                         .font(AppTypography.caption)
                         .foregroundColor(AppColors.secondaryText)
                     
@@ -1435,7 +1449,7 @@ public struct YourDataSettingsView: View {
                         Text("Project URL:")
                             .font(AppTypography.captionBold)
                             .foregroundColor(AppColors.secondaryText)
-                        TextField("https://xyz.supabase.co", text: $supabaseUrl)
+                        TextField("https://your-project.supabase.co", text: $supabaseUrl)
                             .font(AppTypography.inputText)
                             .textFieldStyle(.roundedBorder)
                             .textInputAutocapitalization(.never)
@@ -1443,32 +1457,36 @@ public struct YourDataSettingsView: View {
                     }
                     
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("Supabase API Key:")
+                        Text("API Key:")
                             .font(AppTypography.captionBold)
                             .foregroundColor(AppColors.secondaryText)
-                        SecureField("Paste API key (service_role or anon)...", text: $supabaseAnonKey)
+                        SecureField("Paste API key (anon or service role)...", text: $supabaseAnonKey)
                             .font(AppTypography.inputText)
                             .textFieldStyle(.roundedBorder)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled(true)
                         
-                        Text("Obtain your Project URL and API Key from Supabase Dashboard → Project Settings → API.")
+                        Text("Found in your Supabase Dashboard → Project Settings → API.")
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText)
                     }
                     
                     HStack(spacing: 8) {
-                        AppButton("Sync Supabase", icon: "arrow.triangle.2.circlepath", style: .primary, size: .compact, fullWidth: true, isLoading: dataStore.isSyncing) {
+                        AppButton("Backup Now", icon: "arrow.triangle.2.circlepath", style: .primary, size: .compact, fullWidth: true, isLoading: dataStore.isSyncing) {
                             syncSupabase()
                         }
                         .disabled(supabaseUrl.trimmingCharacters(in: .whitespaces).isEmpty || supabaseAnonKey.trimmingCharacters(in: .whitespaces).isEmpty)
                         
-                        AppButton("Test Connection", icon: "network", style: .secondary, size: .compact, fullWidth: true) {
+                        AppButton("Sync Center", icon: "slider.horizontal.3", style: .secondary, size: .compact, fullWidth: true) {
+                            env.showSyncCenter = true
+                        }
+                        
+                        AppButton("Test", icon: "network", style: .secondary, size: .compact, fullWidth: true) {
                             checkSupabaseConnection()
                         }
                         .disabled(supabaseUrl.trimmingCharacters(in: .whitespaces).isEmpty || supabaseAnonKey.trimmingCharacters(in: .whitespaces).isEmpty)
                         
-                        AppButton("Wipe Data", icon: "trash", style: .destructive, size: .compact, fullWidth: true, isLoading: isWipingSupabase) {
+                        AppButton("Wipe", icon: "trash", style: .destructive, size: .compact, fullWidth: true, isLoading: isWipingSupabase) {
                             showWipeConfirmation = true
                         }
                         .disabled(supabaseUrl.trimmingCharacters(in: .whitespaces).isEmpty || supabaseAnonKey.trimmingCharacters(in: .whitespaces).isEmpty || isWipingSupabase)

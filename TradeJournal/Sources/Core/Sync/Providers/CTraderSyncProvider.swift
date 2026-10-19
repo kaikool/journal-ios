@@ -4,7 +4,7 @@ import Foundation
 @MainActor
 public final class CTraderSyncProvider: SyncProvider {
     public let id: String = "ctrader"
-    public let displayName: String = "cTrader Open API"
+    public let displayName: String = "cTrader"
     public let iconName: String = "chart.xyaxis.line"
     
     public var isConfigured: Bool {

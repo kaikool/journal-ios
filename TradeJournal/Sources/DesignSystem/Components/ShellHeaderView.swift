@@ -9,7 +9,6 @@ import SwiftUI
 public struct ShellHeaderView: View {
     @EnvironmentObject private var env: AppEnvironment
     @ObservedObject private var dataStore = TradeDataStore.shared
-    @State private var showSyncCenter: Bool = false
     
     public init() {}
     
@@ -58,14 +57,12 @@ public struct ShellHeaderView: View {
             
             Spacer()
             
-            // Global Sync Button (icon-only in mobile header)
+            // Global Sync Button (icon-only in mobile header, opens Sync Center)
             Button {
                 #if os(iOS)
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 #endif
-                Task {
-                    await dataStore.performGlobalSync()
-                }
+                env.showSyncCenter = true
             } label: {
                 Image(systemName: "arrow.triangle.2.circlepath")
                     .font(.system(size: 13, weight: .semibold))
@@ -81,7 +78,7 @@ public struct ShellHeaderView: View {
                     )
             }
             .buttonStyle(ApplePressableButtonStyle())
-            .accessibilityLabel("Sync accounts")
+            .accessibilityLabel("Open Sync Center")
             .contextMenu {
                 Button {
                     #if os(iOS)
@@ -95,7 +92,7 @@ public struct ShellHeaderView: View {
                 }
                 
                 Button {
-                    showSyncCenter = true
+                    env.showSyncCenter = true
                 } label: {
                     Label("Sync Center & Options...", systemImage: "slider.horizontal.3")
                 }
@@ -150,9 +147,6 @@ public struct ShellHeaderView: View {
             Divider().background(AppColors.border.opacity(0.4)),
             alignment: .bottom
         )
-        .sheet(isPresented: $showSyncCenter) {
-            SyncCenterSheet()
-        }
     }
 }
 

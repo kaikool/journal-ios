@@ -4,7 +4,7 @@ import Foundation
 @MainActor
 public final class The5ersSyncProvider: SyncProvider {
     public let id: String = "the5ers"
-    public let displayName: String = "The5ers MCP Hub"
+    public let displayName: String = "The5ers"
     public let iconName: String = "building.columns"
     
     public var isConfigured: Bool {

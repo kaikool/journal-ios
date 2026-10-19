@@ -252,12 +252,13 @@ public struct NavigationDrawerView: View {
             Divider().background(AppColors.border.opacity(0.4))
             
             VStack(spacing: 8) {
-                // Global Cloud Sync Row
+                // Global Sync Center Row
                 Button {
                     triggerHaptic()
-                    Task {
-                        await dataStore.performGlobalSync()
+                    withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
+                        env.isDrawerOpen = false
                     }
+                    env.showSyncCenter = true
                 } label: {
                     HStack(spacing: 10) {
                         Image(systemName: "arrow.triangle.2.circlepath")
@@ -267,11 +268,11 @@ public struct NavigationDrawerView: View {
                             .animation(dataStore.isSyncing ? Animation.linear(duration: 1).repeatForever(autoreverses: false) : .default, value: dataStore.isSyncing)
                         
                         VStack(alignment: .leading, spacing: 1) {
-                            Text("Sync Accounts")
+                            Text("Sync Center")
                                 .font(.system(size: 13, weight: .semibold))
                                 .foregroundColor(AppColors.primaryText)
                             
-                            Text(dataStore.isSyncing ? "Syncing with cloud..." : (The5ersService.shared.isConfigured ? "The5ers Connected" : "Supabase Cloud"))
+                            Text(dataStore.isSyncing ? "Synchronizing..." : "Multi-source sync & filters")
                                 .font(.system(size: 10))
                                 .foregroundColor(AppColors.secondaryText)
                         }

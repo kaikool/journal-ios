@@ -762,12 +762,16 @@ public struct DashboardView: View {
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 16)
                 
-                HStack(spacing: 10) {
-                    AppButton("Import your first trades", icon: "square.and.arrow.down", style: .primary) {
+                HStack(spacing: 8) {
+                    AppButton("Sync Center", icon: "arrow.triangle.2.circlepath", style: .primary) {
+                        env.showSyncCenter = true
+                    }
+                    
+                    AppButton("Import file", icon: "square.and.arrow.down", style: .secondary) {
                         env.selectedTab = .importTrades
                     }
                     
-                    AppButton("Load demo data", icon: "sparkles", style: .secondary) {
+                    AppButton("Demo data", icon: "sparkles", style: .secondary) {
                         dataStore.loadDemoData()
                     }
                 }

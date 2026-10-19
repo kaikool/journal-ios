@@ -124,6 +124,9 @@ public struct RootTabView: View {
             InteractiveDrawerOverlay()
         }
         .preferredColorScheme(env.colorScheme)
+        .sheet(isPresented: $env.showSyncCenter) {
+            SyncCenterSheet()
+        }
     }
     
     private var bottomNavigationBar: some View {
