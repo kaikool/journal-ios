@@ -122,7 +122,7 @@ public struct AccountsManagerView: View {
                         .padding(.horizontal, 16)
                     }
                 }
-                .padding(.bottom, 24)
+                .padding(.bottom, 88)
             }
             .background(AppColors.background)
         }

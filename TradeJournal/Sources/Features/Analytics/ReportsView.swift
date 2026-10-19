@@ -130,10 +130,11 @@ public struct ReportsView: View {
     
     public var body: some View {
         VStack(spacing: 0) {
-            // FilterBar matching reports/page.tsx
+            // Compact filter strip sitting flush under ShellHeaderView with Ask AI action
             FilterBarView(
-                title: "Reports",
+                title: "",
                 selectedRange: $selectedRange,
+                showAccountSelector: false,
                 showFilters: true
             ) {
                 AppActionPill("Ask AI", icon: "sparkles") {
@@ -198,7 +199,7 @@ public struct ReportsView: View {
                         compareSection
                     }
                 }
-                .padding(.bottom, 32)
+                .padding(.bottom, 88)
             }
             .background(AppColors.background)
         }

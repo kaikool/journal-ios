@@ -1,20 +1,31 @@
 import SwiftUI
 
-/// Mobile navigation header matching 100% of `source-repo/apps/web/src/components/shell.tsx`:
-/// - Drawer hamburger button opening all 13 application routes
-/// - Trade Journal vector mark + "Trade Journal" title
-/// - GlobalSyncButton (continuous rotation spinner during synchronization)
-/// - PrivacyToggle (hide / unhide financial balances)
-/// - ThemeToggle (toggle between dark and light appearance)
+/// Unified Modern Top Navigation Bar:
+/// - Drawer hamburger trigger button with micro-spring animation
+/// - Brand logo mark & title
+/// - Interactive Account Selector Capsule Chip with direct switching menu
+/// - Quick Add Trade button (+) with primary brand styling
 public struct ShellHeaderView: View {
     @EnvironmentObject private var env: AppEnvironment
     @ObservedObject private var dataStore = TradeDataStore.shared
+    @State private var showAddTradeSheet: Bool = false
     
     public init() {}
     
+    private var currentAccountName: String {
+        if dataStore.selectedAccountId == "all" {
+            let count = dataStore.visibleAccounts.count
+            return count > 0 ? "All (\(count))" : "All Accounts"
+        }
+        if let acc = dataStore.accounts.first(where: { $0.id == dataStore.selectedAccountId }) {
+            return Formatters.cleanAccountName(acc.name)
+        }
+        return "Select Account"
+    }
+    
     public var body: some View {
-        HStack(spacing: 8) {
-            // Hamburger button
+        HStack(spacing: 10) {
+            // Leading: Hamburger Drawer Menu Trigger
             Button {
                 #if os(iOS)
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -28,27 +39,27 @@ public struct ShellHeaderView: View {
                     .foregroundColor(AppColors.primaryText)
                     .frame(width: 36, height: 36)
                     .background(AppColors.cardBackground.opacity(0.85))
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        RoundedRectangle(cornerRadius: 11, style: .continuous)
                             .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
                     )
             }
             .buttonStyle(ApplePressableButtonStyle())
             .accessibilityLabel("Toggle navigation drawer")
             
-            // Brand Logo & Title (matching web Link href="/")
+            // Brand Logo & Title Link
             Button {
                 #if os(iOS)
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 #endif
                 env.selectedTab = .dashboard
             } label: {
-                HStack(spacing: 8) {
+                HStack(spacing: 7) {
                     TradeJournalMarkView(size: 20, color: AppColors.brand)
                     
                     Text("Trade Journal")
-                        .font(AppTypography.pageTitle)
+                        .font(.system(size: 15, weight: .bold, design: .rounded))
                         .tracking(-0.3)
                         .foregroundColor(AppColors.primaryText)
                 }
@@ -57,88 +68,96 @@ public struct ShellHeaderView: View {
             
             Spacer()
             
-            // Global Sync Button (icon-only in mobile header, opens Sync Center)
-            Button {
-                #if os(iOS)
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                #endif
-                env.showSyncCenter = true
-            } label: {
-                Image(systemName: "arrow.triangle.2.circlepath")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(dataStore.isSyncing ? AppColors.brand : AppColors.secondaryText)
-                    .rotationEffect(dataStore.isSyncing ? .degrees(360) : .zero)
-                    .animation(dataStore.isSyncing ? Animation.linear(duration: 1).repeatForever(autoreverses: false) : .default, value: dataStore.isSyncing)
-                    .frame(width: 36, height: 36)
-                    .background(AppColors.cardBackground.opacity(0.85))
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
-                    )
-            }
-            .buttonStyle(ApplePressableButtonStyle())
-            .accessibilityLabel("Open Sync Center")
-            .contextMenu {
+            // Center-Right: Interactive Account Selector Capsule Chip
+            Menu {
                 Button {
                     #if os(iOS)
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    UISelectionFeedbackGenerator().selectionChanged()
                     #endif
-                    Task {
-                        await SyncManager.shared.performQuickSync()
-                    }
+                    dataStore.selectAccount(id: "all")
                 } label: {
-                    Label("Quick Sync Now", systemImage: "arrow.triangle.2.circlepath")
+                    HStack {
+                        Text("All Accounts (\(dataStore.visibleAccounts.count))")
+                        if dataStore.selectedAccountId == "all" {
+                            Image(systemName: "checkmark")
+                        }
+                    }
                 }
                 
-                Button {
-                    env.showSyncCenter = true
-                } label: {
-                    Label("Sync Center & Options...", systemImage: "slider.horizontal.3")
+                Divider()
+                
+                ForEach(dataStore.visibleAccounts) { acc in
+                    Button {
+                        #if os(iOS)
+                        UISelectionFeedbackGenerator().selectionChanged()
+                        #endif
+                        dataStore.selectAccount(id: acc.id)
+                    } label: {
+                        HStack {
+                            Text(Formatters.cleanAccountName(acc.name, balance: acc.initialBalance))
+                            if dataStore.selectedAccountId == acc.id {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
                 }
-            }
-            
-            // Privacy Toggle Button
-            Button {
-                #if os(iOS)
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                #endif
-                env.togglePrivacyMode()
+                
+                Divider()
+                
+                Button {
+                    env.selectedTab = .accounts
+                } label: {
+                    Label("Manage Accounts...", systemImage: "creditcard")
+                }
             } label: {
-                Image(systemName: env.isPrivacyModeEnabled ? "eye.slash.fill" : "eye")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(env.isPrivacyModeEnabled ? AppColors.brand : AppColors.secondaryText)
-                    .frame(width: 36, height: 36)
-                    .background(AppColors.cardBackground.opacity(0.85))
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
-                    )
+                HStack(spacing: 5) {
+                    Circle()
+                        .fill(dataStore.selectedAccountId == "all" ? AppColors.brand : AppColors.profit)
+                        .frame(width: 6, height: 6)
+                    
+                    Text(currentAccountName)
+                        .font(.system(size: 11.5, weight: .semibold, design: .rounded))
+                        .foregroundColor(AppColors.primaryText)
+                        .lineLimit(1)
+                    
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundColor(AppColors.secondaryText.opacity(0.8))
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(AppColors.cardBackground.opacity(0.85))
+                .clipShape(Capsule())
+                .overlay(
+                    Capsule()
+                        .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
+                )
             }
             .buttonStyle(ApplePressableButtonStyle())
-            .accessibilityLabel("Toggle privacy mode")
+            .accessibilityLabel("Select Trading Account")
             
-            // Theme Toggle Button (Light / Dark mode)
+            // Trailing: Quick Add Trade Pill Button
             Button {
                 #if os(iOS)
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 #endif
-                env.toggleTheme()
+                showAddTradeSheet = true
             } label: {
-                Image(systemName: env.appTheme == .dark ? "sun.max.fill" : "moon.fill")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(AppColors.secondaryText)
-                    .frame(width: 36, height: 36)
-                    .background(AppColors.cardBackground.opacity(0.85))
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
-                    )
+                HStack(spacing: 3) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 11, weight: .bold))
+                    Text("Add")
+                        .font(.system(size: 11.5, weight: .bold, design: .rounded))
+                }
+                .foregroundColor(AppColors.buttonText)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(AppColors.brand)
+                .clipShape(Capsule())
+                .shadow(color: AppColors.brand.opacity(0.24), radius: 4, x: 0, y: 1.5)
             }
             .buttonStyle(ApplePressableButtonStyle())
-            .accessibilityLabel("Toggle theme")
+            .accessibilityLabel("Quick Add Trade")
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
@@ -147,6 +166,11 @@ public struct ShellHeaderView: View {
             Divider().background(AppColors.border.opacity(0.4)),
             alignment: .bottom
         )
+        .sheet(isPresented: $showAddTradeSheet) {
+            AddTradeSheet()
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(28)
+        }
     }
 }
-

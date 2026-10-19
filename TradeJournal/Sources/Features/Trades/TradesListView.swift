@@ -84,16 +84,13 @@ public struct TradesListView: View {
     public var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                // FilterBar matching web filter-bar.tsx
+                // Compact time-range filter strip sitting flush under ShellHeaderView
                 FilterBarView(
-                    title: "Trades",
+                    title: "",
                     selectedRange: $selectedRange,
+                    showAccountSelector: false,
                     showFilters: true
-                ) {
-                    AppActionPill("Add trade", icon: "plus") {
-                        showAddTradeSheet = true
-                    }
-                }
+                )
                 
                 ScrollView {
                     VStack(spacing: 14) {
@@ -101,7 +98,9 @@ public struct TradesListView: View {
                         searchAndStatusFilter
                         tradesListContent
                     }
-                    .padding(16)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 16)
+                    .padding(.bottom, 88)
                 }
                 .refreshable {
                     await dataStore.performGlobalSync()

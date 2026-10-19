@@ -176,7 +176,9 @@ public struct PropFirmLedgerView: View {
                         transactionsListView
                     }
                 }
-                .padding(14)
+                .padding(.horizontal, 14)
+                .padding(.top, 14)
+                .padding(.bottom, 88)
             }
         }
         .background(AppColors.background)

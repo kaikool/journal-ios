@@ -44,7 +44,9 @@ public struct PlaybooksView: View {
                         playbooksList
                     }
                 }
-                .padding(16)
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
+                .padding(.bottom, 88)
             }
             .background(AppColors.background)
         }

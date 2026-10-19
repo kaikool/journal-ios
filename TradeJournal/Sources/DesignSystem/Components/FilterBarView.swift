@@ -86,6 +86,7 @@ public struct FilterBarView<Actions: View>: View {
     @ObservedObject private var dataStore = TradeDataStore.shared
     @Binding private var selectedRange: JournalTimeRange
     private let title: String
+    private let showAccountSelector: Bool
     private let showFilters: Bool
     private let activeFilterCount: Int
     private let onOpenFilterDialog: (() -> Void)?
@@ -93,8 +94,9 @@ public struct FilterBarView<Actions: View>: View {
     private let actions: Actions
     
     public init(
-        title: String,
+        title: String = "",
         selectedRange: Binding<JournalTimeRange>? = nil,
+        showAccountSelector: Bool = true,
         showFilters: Bool = true,
         activeFilterCount: Int = 0,
         onOpenFilterDialog: (() -> Void)? = nil,
@@ -103,6 +105,7 @@ public struct FilterBarView<Actions: View>: View {
     ) {
         self.title = title
         self._selectedRange = selectedRange ?? .constant(.all)
+        self.showAccountSelector = showAccountSelector
         self.showFilters = showFilters
         self.activeFilterCount = activeFilterCount
         self.onOpenFilterDialog = onOpenFilterDialog
@@ -110,17 +113,23 @@ public struct FilterBarView<Actions: View>: View {
         self.actions = actions()
     }
     
+    private var hasHeader: Bool {
+        !title.isEmpty || onBack != nil
+    }
+    
     public var body: some View {
         VStack(spacing: 8) {
-            headerRow
+            if hasHeader {
+                headerRow
+            }
             
             if showFilters {
                 filterRow
             }
         }
         .padding(.horizontal, 14)
-        .padding(.top, 8)
-        .padding(.bottom, 10)
+        .padding(.top, hasHeader ? 8 : 6)
+        .padding(.bottom, 8)
         .background(.ultraThinMaterial)
         .overlay(topSpecularHighlight, alignment: .top)
         .overlay(bottomBorder, alignment: .bottom)
@@ -147,11 +156,16 @@ public struct FilterBarView<Actions: View>: View {
     
     private var filterRow: some View {
         HStack(spacing: 8) {
-            accountSelectorMenu
+            if showAccountSelector {
+                accountSelectorMenu
+            }
             timeRangeSelector
             Spacer()
             if let onFilter = onOpenFilterDialog {
                 filterDialogButton(onFilter: onFilter)
+            }
+            if !hasHeader {
+                actions
             }
         }
     }

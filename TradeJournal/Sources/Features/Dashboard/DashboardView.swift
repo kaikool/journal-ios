@@ -329,14 +329,11 @@ public struct DashboardView: View {
         VStack(spacing: 0) {
             // FilterBar matching web filter-bar.tsx
             FilterBarView(
-                title: "Dashboard",
+                title: "",
                 selectedRange: $selectedRange,
+                showAccountSelector: false,
                 showFilters: true
-            ) {
-                AppActionPill("Add trade", icon: "plus") {
-                    showAddTradeSheet = true
-                }
-            }
+            )
             
             // Top Toolbar: Saved Layout & Customize trigger matching dashboard-layout.tsx
             layoutBar
@@ -372,7 +369,9 @@ public struct DashboardView: View {
                         }
                     }
                 }
-                .padding(14)
+                .padding(.horizontal, 14)
+                .padding(.top, 14)
+                .padding(.bottom, 88)
             }
             .refreshable {
                 await dataStore.performGlobalSync()

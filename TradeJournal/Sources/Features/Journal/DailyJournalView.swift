@@ -201,7 +201,7 @@ public struct DailyJournalListView: View {
                             .padding(.horizontal, 14)
                         }
                     }
-                    .padding(.bottom, 32)
+                    .padding(.bottom, 88)
                 }
                 .background(AppColors.background)
             }
@@ -375,7 +375,8 @@ public struct DailyJournalDetailView: View {
                     AttachmentsSectionView(ownerType: "day", ownerId: date, title: "Attachments")
                         .padding(.horizontal, 14)
                 }
-                .padding(.vertical, 12)
+                .padding(.top, 12)
+                .padding(.bottom, 88)
             }
             .background(AppColors.background)
         }

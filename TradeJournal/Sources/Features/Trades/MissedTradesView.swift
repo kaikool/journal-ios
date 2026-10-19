@@ -100,6 +100,7 @@ public struct MissedTradesView: View {
                     }
                 }
                 .listStyle(.plain)
+                .padding(.bottom, 88)
             }
         }
         .background(AppColors.background)

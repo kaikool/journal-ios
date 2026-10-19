@@ -81,7 +81,7 @@ public struct ProgressRoutinesView: View {
                     // Card 3: 13-week heatmap streak (Last 91 days)
                     heatmapCard
                 }
-                .padding(.bottom, 32)
+                .padding(.bottom, 88)
             }
             .background(AppColors.background)
         }

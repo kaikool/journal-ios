@@ -342,7 +342,9 @@ public struct NotebookView: View {
                     .buttonStyle(ApplePressableButtonStyle())
                 }
             }
-            .padding(16)
+            .padding(.horizontal, 16)
+            .padding(.top, 16)
+            .padding(.bottom, 88)
         }
     }
     

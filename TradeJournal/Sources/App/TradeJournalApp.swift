@@ -9,74 +9,78 @@ public struct RootTabView: View {
     public var body: some View {
         ZStack(alignment: .leading) {
             // Main Application Content Canvas with Layered Parallax Scale
-            VStack(spacing: 0) {
-                // Shell Header Bar matching Shell.tsx mobile header
-                ShellHeaderView()
-                
-                // Real-time synchronization notification banner
-                GlobalSyncBannerView()
-                
-                // Screen body based on active route
-                ZStack {
-                    switch env.selectedTab {
-                    case .dashboard:
-                        DashboardView()
-                    case .calendar:
-                        JournalCalendarView()
-                    case .journal:
-                        DailyJournalListView()
-                    case .trades:
-                        TradesListView()
-                    case .reports:
-                        ReportsView()
-                    case .propFirms:
-                        PropFirmTrackerView()
-                    case .notebook:
-                        NotebookView()
-                    case .playbooks:
-                        PlaybooksView()
-                    case .progress:
-                        ProgressRoutinesView()
-                    case .missed:
-                        MissedTradesView()
-                    case .importTrades:
-                        ImportStatementView()
-                    case .accounts:
-                        AccountsManagerView()
-                    case .settings:
-                        SettingsView()
+            ZStack(alignment: .bottom) {
+                // Layer 1: Edge-to-edge Content Canvas
+                VStack(spacing: 0) {
+                    // Shell Header Bar matching Shell.tsx mobile header
+                    ShellHeaderView()
+                    
+                    // Real-time synchronization notification banner
+                    GlobalSyncBannerView()
+                    
+                    // Screen body based on active route
+                    ZStack {
+                        switch env.selectedTab {
+                        case .dashboard:
+                            DashboardView()
+                        case .calendar:
+                            JournalCalendarView()
+                        case .journal:
+                            DailyJournalListView()
+                        case .trades:
+                            TradesListView()
+                        case .reports:
+                            ReportsView()
+                        case .propFirms:
+                            PropFirmTrackerView()
+                        case .notebook:
+                            NotebookView()
+                        case .playbooks:
+                            PlaybooksView()
+                        case .progress:
+                            ProgressRoutinesView()
+                        case .missed:
+                            MissedTradesView()
+                        case .importTrades:
+                            ImportStatementView()
+                        case .accounts:
+                            AccountsManagerView()
+                        case .settings:
+                            SettingsView()
+                        }
                     }
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .simultaneousGesture(
-                    // Horizontal swipe across primary tabs with strict horizontal dominance
-                    DragGesture(minimumDistance: 35, coordinateSpace: .local)
-                        .onEnded { value in
-                            guard env.selectedTab.isPrimaryTab, !env.isDrawerOpen else { return }
-                            let h = value.translation.width
-                            let v = value.translation.height
-                            // Must be predominantly horizontal to avoid conflicting with vertical scroll
-                            guard abs(h) > 55 && abs(h) > abs(v) * 2.2 else { return }
-                            let velocity = value.predictedEndTranslation.width - value.translation.width
-                            
-                            if h < -50 || velocity < -140 {
-                                env.navigateToNextTab()
-                            } else if h > 50 || velocity > 140 {
-                                if env.selectedTab == .dashboard {
-                                    #if canImport(UIKit)
-                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                    #endif
-                                    withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
-                                        env.isDrawerOpen = true
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .simultaneousGesture(
+                        // Horizontal swipe across primary tabs with strict horizontal dominance
+                        DragGesture(minimumDistance: 35, coordinateSpace: .local)
+                            .onEnded { value in
+                                guard env.selectedTab.isPrimaryTab, !env.isDrawerOpen else { return }
+                                let h = value.translation.width
+                                let v = value.translation.height
+                                // Must be predominantly horizontal to avoid conflicting with vertical scroll
+                                guard abs(h) > 55 && abs(h) > abs(v) * 2.2 else { return }
+                                let velocity = value.predictedEndTranslation.width - value.translation.width
+                                
+                                if h < -50 || velocity < -140 {
+                                    env.navigateToNextTab()
+                                } else if h > 50 || velocity > 140 {
+                                    if env.selectedTab == .dashboard {
+                                        #if canImport(UIKit)
+                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                        #endif
+                                        withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
+                                            env.isDrawerOpen = true
+                                        }
+                                    } else {
+                                        env.navigateToPreviousTab()
                                     }
-                                } else {
-                                    env.navigateToPreviousTab()
                                 }
                             }
-                        }
-                )
+                    )
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 
-                // Quick Bottom Bar for thumb navigation matching Apple HIG
+                // Layer 2: Quick Bottom Bar floating with translucent glassmorphism (content glides underneath)
                 bottomNavigationBar
             }
             .background(AppColors.background.ignoresSafeArea())
