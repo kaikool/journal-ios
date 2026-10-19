@@ -113,4 +113,38 @@ final class ImportTests: XCTestCase {
             XCTAssertEqual(trade.netPnl, 498) // (110 - 100)*50 - 2 fee = 500 - 2 = 498
         }
     }
+    
+    func testExportTradesCsv() async {
+        await MainActor.run {
+            let store = TradeDataStore.shared
+            let accountId = "test-export-acc-\(UUID().uuidString)"
+            store.addAccount(Account(id: accountId, name: "Export Test Account", currency: "USD", initialBalance: 10000))
+            
+            let csvInput = """
+            symbol,side,quantity,price,fee,date
+            AAPL,buy,10,150.00,1.00,2026-04-10 14:30:00
+            AAPL,sell,10,160.00,1.00,2026-04-10 15:30:00
+            """
+            let preview = StandardCSVImporter.preview(csvText: csvInput, accountId: accountId)
+            store.importExecutions(accountId: accountId, newExecutions: preview.usableExecutions)
+            
+            let exportedCsv = store.exportTradesCsv()
+            XCTAssertFalse(exportedCsv.isEmpty)
+            
+            let rows = CSVParser.parse(exportedCsv)
+            XCTAssertGreaterThanOrEqual(rows.count, 2)
+            XCTAssertEqual(rows[0][0], "Key")
+            XCTAssertEqual(rows[0][1], "Account")
+            XCTAssertEqual(rows[0][2], "Symbol")
+            
+            let exportedRow = rows.first(where: { $0.count > 2 && $0[2] == "AAPL" })
+            XCTAssertNotNil(exportedRow)
+            if let row = exportedRow {
+                XCTAssertEqual(row[1], accountId)
+                XCTAssertEqual(row[2], "AAPL")
+                XCTAssertEqual(row[3], "long")
+                XCTAssertEqual(row[4], "win")
+            }
+        }
+    }
 }

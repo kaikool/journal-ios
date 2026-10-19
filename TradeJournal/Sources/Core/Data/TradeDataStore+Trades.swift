@@ -536,4 +536,42 @@ extension TradeDataStore {
         saveToDisk(immediate: true)
         AppLogger.info("Loaded demo data: \(fills.count) executions for demo account \(demoAccountId)")
     }
+    
+    // MARK: - CSV Export
+    
+    /// Exports all trades to standard CSV format
+    public func exportTradesCsv() -> String {
+        var lines = ["Key,Account,Symbol,Direction,Status,OpenedAt,ClosedAt,Quantity,AvgEntry,AvgExit,GrossPnL,Fees,NetPnL,Notes,Tags"]
+        let f = ISO8601DateFormatter()
+        
+        let escapeCsv: (String) -> String = { text in
+            if text.contains(",") || text.contains("\"") || text.contains("\n") || text.contains("\r") {
+                let escaped = text.replacingOccurrences(of: "\"", with: "\"\"")
+                return "\"\(escaped)\""
+            }
+            return text
+        }
+        
+        for t in trades {
+            let row = [
+                escapeCsv(t.key),
+                escapeCsv(t.accountId),
+                escapeCsv(t.symbol),
+                escapeCsv(t.direction.rawValue),
+                escapeCsv(t.status.rawValue),
+                escapeCsv(f.string(from: t.openedAt)),
+                escapeCsv(t.closedAt.map { f.string(from: $0) } ?? ""),
+                "\(t.quantity)",
+                "\(t.avgEntry)",
+                t.avgExit.map { "\($0)" } ?? "",
+                "\(t.grossPnl)",
+                "\(t.fees)",
+                "\(t.netPnl)",
+                escapeCsv(t.notes ?? ""),
+                escapeCsv(t.tags.joined(separator: ";"))
+            ].joined(separator: ",")
+            lines.append(row)
+        }
+        return lines.joined(separator: "\n")
+    }
 }
