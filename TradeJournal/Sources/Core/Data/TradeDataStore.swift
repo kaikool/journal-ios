@@ -51,8 +51,10 @@ public final class TradeDataStore: ObservableObject {
     @Published public var isSyncing: Bool = false
     @Published public var lastSyncError: String? = nil
     @Published public var lastSyncSummary: String? = nil
+    @Published public private(set) var isLoaded: Bool = false
     
     private var executionHashes: Set<String> = []
+    private var hydrationTask: Task<Void, Never>? = nil
     
     // MARK: - Performance Caching
     private var _cachedFilteredTrades: [Trade]? = nil
@@ -82,20 +84,24 @@ public final class TradeDataStore: ObservableObject {
         return paths[0].appendingPathComponent("trade_journal_store_v1.json")
     }
     
-    public init() {
-        loadFromDisk()
-        if accounts.isEmpty {
-            createInitialDefaultAccount()
-        } else if accounts.contains(where: { $0.id != "default-acc" }) {
-            accounts.removeAll(where: { $0.id == "default-acc" })
+    public init(loadSynchronously: Bool = false) {
+        self.folders = NotebookEngine.defaultSystemFolders
+        if loadSynchronously {
+            loadFromDiskSync()
+        } else {
+            loadFromDiskAsync()
         }
-        if folders.isEmpty {
-            folders = NotebookEngine.defaultSystemFolders
+    }
+    
+    /// Asynchronously awaits completion of the background disk hydration
+    public func ensureHydrated() async {
+        if isLoaded { return }
+        if let task = hydrationTask {
+            _ = await task.value
+        } else {
+            loadFromDiskAsync()
+            _ = await hydrationTask?.value
         }
-        if selectedAccountId == "default-acc" || (!accounts.contains(where: { $0.id == selectedAccountId }) && selectedAccountId != "all") {
-            selectedAccountId = mostRecentActiveAccount?.id ?? "all"
-        }
-        rebuildAllAccounts()
     }
     
     public var availableCurrencies: [String] {
@@ -1655,7 +1661,7 @@ public final class TradeDataStore: ObservableObject {
 
     // MARK: - Local Persistence
     
-    private struct PersistedStore: Codable {
+    private struct PersistedStore: Codable, Sendable {
         let accounts: [Account]
         let executions: [Execution]
         let trades: [Trade]
@@ -1684,6 +1690,10 @@ public final class TradeDataStore: ObservableObject {
     }
     
     public func saveToDisk() {
+        guard isLoaded else {
+            AppLogger.warning("Skipping saveToDisk because store is not yet loaded.")
+            return
+        }
         let store = PersistedStore(
             accounts: accounts,
             executions: executions,
@@ -1719,43 +1729,104 @@ public final class TradeDataStore: ObservableObject {
         }
     }
     
-    private func loadFromDisk() {
-        guard FileManager.default.fileExists(atPath: persistenceUrl.path) else { return }
+    /// Asynchronously hydrates the store from disk on a background thread without freezing the main runloop
+    public func loadFromDiskAsync() {
+        guard !isLoaded, hydrationTask == nil else { return }
+        
+        let url = persistenceUrl
+        hydrationTask = Task { @MainActor [weak self] in
+            guard let self = self else { return }
+            
+            let decoded: (store: PersistedStore, hashes: Set<String>)? = await Task.detached(priority: .userInitiated) { () -> (PersistedStore, Set<String>)? in
+                guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+                do {
+                    let data = try Data(contentsOf: url)
+                    let store = try JSONDecoder().decode(PersistedStore.self, from: data)
+                    let hashes = Set(store.executions.map { $0.contentHash })
+                    return (store, hashes)
+                } catch {
+                    AppLogger.error("Failed to load store from disk: \(error.localizedDescription)")
+                    return nil
+                }
+            }.value
+            
+            if let result = decoded {
+                self.applyLoadedStore(result.store, executionHashes: result.hashes)
+            }
+            self.isLoaded = true
+            self.postHydrationSetup()
+        }
+    }
+    
+    public func loadFromDisk() {
+        loadFromDiskSync()
+    }
+    
+    public func loadFromDiskSync() {
+        guard FileManager.default.fileExists(atPath: persistenceUrl.path) else {
+            isLoaded = true
+            postHydrationSetup()
+            return
+        }
         do {
             let data = try Data(contentsOf: persistenceUrl)
             let store = try JSONDecoder().decode(PersistedStore.self, from: data)
-            self.accounts = store.accounts
-            self.executions = store.executions
-            self.trades = store.trades
-            self.selectedAccountId = store.selectedAccountId
-            self.defaults = store.defaults
-            self.multipliers = store.multipliers ?? [:]
-            self.folders = store.folders ?? NotebookEngine.defaultSystemFolders
-            self.notebookNotes = store.notebookNotes ?? []
-            self.journalDays = store.journalDays ?? [:]
-            self.propAccounts = store.propAccounts ?? []
-            self.propEntries = store.propEntries ?? []
-            self.propReceipts = store.propReceipts ?? []
-            self.propAudits = store.propAudits ?? []
-            self.attachments = store.attachments ?? []
-            self.playbooks = store.playbooks ?? []
-            self.playbookAssessments = store.playbookAssessments ?? []
-            self.deletedPlaybookIds = Set(store.deletedPlaybookIds ?? [])
-            self.calendarNotes = store.calendarNotes ?? [:]
-            self.missedTrades = store.missedTrades ?? []
-            self.progressRules = store.progressRules ?? Self.defaultProgressRules
-            self.progressChecks = store.progressChecks ?? []
-            self.generalSettings = store.generalSettings ?? .default
-            self.currencyConversion = store.currencyConversion ?? .default
-            self.marketConnections = store.marketConnections ?? .default
-            self.aiSettings = store.aiSettings ?? .default
-            self.executionHashes = Set(store.executions.map { $0.contentHash })
-            invalidatePerformanceCaches()
-            
-            AppLogger.info("Loaded \(store.accounts.count) accounts, \(store.executions.count) executions, \(self.notebookNotes.count) notes, \(self.propAccounts.count) prop accounts, \(self.attachments.count) attachments from persistent disk.")
+            let hashes = Set(store.executions.map { $0.contentHash })
+            applyLoadedStore(store, executionHashes: hashes)
+            isLoaded = true
+            postHydrationSetup()
         } catch {
             AppLogger.error("Failed to load store from disk: \(error.localizedDescription)")
+            isLoaded = true
+            postHydrationSetup()
         }
+    }
+    
+    private func applyLoadedStore(_ store: PersistedStore, executionHashes: Set<String>) {
+        self.accounts = store.accounts
+        self.executions = store.executions
+        self.trades = store.trades
+        self.selectedAccountId = store.selectedAccountId
+        self.defaults = store.defaults
+        self.multipliers = store.multipliers ?? [:]
+        self.folders = store.folders ?? NotebookEngine.defaultSystemFolders
+        self.notebookNotes = store.notebookNotes ?? []
+        self.journalDays = store.journalDays ?? [:]
+        self.propAccounts = store.propAccounts ?? []
+        self.propEntries = store.propEntries ?? []
+        self.propReceipts = store.propReceipts ?? []
+        self.propAudits = store.propAudits ?? []
+        self.attachments = store.attachments ?? []
+        self.playbooks = store.playbooks ?? []
+        self.playbookAssessments = store.playbookAssessments ?? []
+        self.deletedPlaybookIds = Set(store.deletedPlaybookIds ?? [])
+        self.calendarNotes = store.calendarNotes ?? [:]
+        self.missedTrades = store.missedTrades ?? []
+        self.progressRules = store.progressRules ?? Self.defaultProgressRules
+        self.progressChecks = store.progressChecks ?? []
+        self.generalSettings = store.generalSettings ?? .default
+        self.currencyConversion = store.currencyConversion ?? .default
+        self.marketConnections = store.marketConnections ?? .default
+        self.aiSettings = store.aiSettings ?? .default
+        self.executionHashes = executionHashes
+        invalidatePerformanceCaches()
+        
+        AppLogger.info("Loaded \(store.accounts.count) accounts, \(store.executions.count) executions, \(self.notebookNotes.count) notes, \(self.propAccounts.count) prop accounts, \(self.attachments.count) attachments from persistent disk.")
+    }
+    
+    private func postHydrationSetup() {
+        if accounts.isEmpty {
+            createInitialDefaultAccount()
+        } else if accounts.contains(where: { $0.id != "default-acc" }) {
+            accounts.removeAll(where: { $0.id == "default-acc" })
+        }
+        if folders.isEmpty {
+            folders = NotebookEngine.defaultSystemFolders
+        }
+        if selectedAccountId == "default-acc" || (!accounts.contains(where: { $0.id == selectedAccountId }) && selectedAccountId != "all") {
+            selectedAccountId = mostRecentActiveAccount?.id ?? "all"
+        }
+        rebuildAllAccounts()
     }
     
     // MARK: - Missed Trades & Progress Management
