@@ -6,8 +6,8 @@ Tài liệu này hướng dẫn cách sử dụng workflow tự động hóa đ�
 
 ## 1. CẤU TRÚC WORKFLOW VỪA THIẾT LẬP
 
-1. **File cấu hình:** [`.github/workflows/build-ipa.yml`](file:///c:/Users/TCTH/Desktop/Trade%20Journal/.github/workflows/build-ipa.yml)
-2. **File khởi tạo dự án Xcode:** [`project.yml`](file:///c:/Users/TCTH/Desktop/Trade%20Journal/project.yml) (dùng `xcodegen` tự động tạo `TradeJournal.xcodeproj` chuẩn native)
+1. **File cấu hình workflow:** [`.github/workflows/build-ipa.yml`](../../.github/workflows/build-ipa.yml)
+2. **File khởi tạo dự án Xcode:** [`project.yml`](../../project.yml) (dùng `xcodegen` tự động tạo `TradeJournal.xcodeproj` chuẩn native)
 3. **Môi trường chạy:** `macos-14` (Apple Silicon M1/M2) được trang bị Xcode 15/16 và Swift 5.10+.
 4. **Quy trình thực thi:**
    - Kiểm tra mã nguồn (Checkout).
