@@ -1,6 +1,7 @@
 import Foundation
 
 /// Synchronization provider for The5ers Model Context Protocol (MCP) Hub
+@MainActor
 public final class The5ersSyncProvider: SyncProvider {
     public let id: String = "the5ers"
     public let displayName: String = "The5ers MCP Hub"

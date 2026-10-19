@@ -1,6 +1,7 @@
 import Foundation
 
 /// Synchronization provider for Supabase Cloud Database & Storage
+@MainActor
 public final class SupabaseSyncProvider: SyncProvider {
     public let id: String = "supabase"
     public let displayName: String = "Supabase Cloud"
@@ -36,7 +37,7 @@ public final class SupabaseSyncProvider: SyncProvider {
         
         await TradeDataStore.shared.syncWithSupabase()
         
-        if let err = await MainActor.run(body: { TradeDataStore.shared.lastSyncError }) {
+        if let err = TradeDataStore.shared.lastSyncError {
             return SyncResult(
                 providerId: id,
                 providerName: displayName,
@@ -46,7 +47,7 @@ public final class SupabaseSyncProvider: SyncProvider {
             )
         }
         
-        let summary = await MainActor.run(body: { TradeDataStore.shared.lastSyncSummary }) ?? "Supabase Cloud database synchronization completed."
+        let summary = TradeDataStore.shared.lastSyncSummary ?? "Supabase Cloud database synchronization completed."
         progressHandler(SyncProgressUpdate(providerId: id, providerName: displayName, message: summary, isCompleted: true))
         
         return SyncResult(

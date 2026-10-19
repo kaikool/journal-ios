@@ -1,6 +1,7 @@
 import Foundation
 
 /// Synchronization provider for Spotware cTrader Open API v2
+@MainActor
 public final class CTraderSyncProvider: SyncProvider {
     public let id: String = "ctrader"
     public let displayName: String = "cTrader Open API"

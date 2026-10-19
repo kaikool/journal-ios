@@ -166,6 +166,14 @@ public enum Formatters {
         dateTime(date, timeZone: timeZone)
     }
     
+    public static func formatTime(_ date: Date, timeZone: TimeZone = .current) -> String {
+        let f = DateFormatter()
+        f.dateStyle = .none
+        f.timeStyle = .short
+        f.timeZone = timeZone
+        return f.string(from: date)
+    }
+    
     public static func dateOnly(_ date: Date, timeZone: TimeZone = .current) -> String {
         let f = DateFormatter()
         f.dateStyle = .medium

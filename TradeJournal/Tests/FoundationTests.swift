@@ -60,4 +60,12 @@ final class FoundationTests: XCTestCase {
         XCTAssertEqual(fill.quantity, 100)
         XCTAssertFalse(fill.contentHash.isEmpty, "Execution must carry a deterministic contentHash")
     }
+    
+    func testDateFormatting() {
+        let testDate = Date(timeIntervalSince1970: 1700000000) // 2023-11-14
+        let timeStr = Formatters.formatTime(testDate)
+        XCTAssertFalse(timeStr.isEmpty)
+        let dateTimeStr = Formatters.formatDateTime(testDate)
+        XCTAssertFalse(dateTimeStr.isEmpty)
+    }
 }

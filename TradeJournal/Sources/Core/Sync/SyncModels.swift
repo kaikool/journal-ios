@@ -156,6 +156,7 @@ public struct SyncResult: Identifiable, Codable, Equatable {
 }
 
 /// Protocol that every broker, exchange, or cloud service must implement
+@MainActor
 public protocol SyncProvider: AnyObject {
     var id: String { get }
     var displayName: String { get }

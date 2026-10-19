@@ -8,7 +8,7 @@ public struct SyncCenterSheet: View {
     @ObservedObject private var dataStore = TradeDataStore.shared
     @ObservedObject private var ctrader = CTraderService.shared
     @ObservedObject private var the5ers = The5ersService.shared
-    @ObservedObject private var supabase = SupabaseService.shared
+    private let supabase = SupabaseService.shared
     
     @State private var options: SyncOptions = SyncManager.shared.savedQuickSyncOptions
     @State private var showCustomDatePicker: Bool = false
@@ -299,45 +299,16 @@ public struct SyncCenterSheet: View {
             
             VStack(alignment: .leading, spacing: 8) {
                 if syncManager.isSyncing {
-                    HStack(spacing: 8) {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: AppColors.brand))
-                            .scaleEffect(0.8)
-                        Text(syncManager.currentProgress ?? "Synchronizing data...")
-                            .font(AppTypography.captionBold)
-                            .foregroundColor(AppColors.brand)
-                    }
-                    .padding(12)
+                    syncInProgressView
                 } else if syncManager.lastSyncResults.isEmpty {
                     Text("No recent synchronization activity in this session.")
                         .font(AppTypography.caption)
                         .foregroundColor(AppColors.secondaryText)
                         .padding(12)
                 } else {
-                    ForEach(Array(syncManager.lastSyncResults.values)) { res in
-                        HStack(spacing: 8) {
-                            Image(systemName: res.success ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                                .foregroundColor(res.success ? AppColors.profit : AppColors.loss)
-                                .font(.system(size: 14))
-                            
-                            VStack(alignment: .leading, spacing: 2) {
-                                HStack {
-                                    Text(res.providerName)
-                                        .font(AppTypography.captionBold)
-                                        .foregroundColor(AppColors.primaryText)
-                                    Spacer()
-                                    Text(Formatters.formatTime(res.timestamp))
-                                        .font(AppTypography.caption)
-                                        .foregroundColor(AppColors.secondaryText)
-                                }
-                                Text(res.message)
-                                    .font(AppTypography.caption)
-                                    .foregroundColor(res.success ? AppColors.secondaryText : AppColors.loss)
-                            }
-                        }
-                        .padding(10)
-                        .background(res.success ? AppColors.surface : AppColors.loss.opacity(0.08))
-                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    let results = Array(syncManager.lastSyncResults.values)
+                    ForEach(results) { res in
+                        syncResultRow(res)
                     }
                 }
             }
@@ -350,6 +321,50 @@ public struct SyncCenterSheet: View {
                     .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
             )
         }
+    }
+    
+    private var syncInProgressView: some View {
+        HStack(spacing: 8) {
+            ProgressView()
+                .progressViewStyle(CircularProgressViewStyle(tint: AppColors.brand))
+                .scaleEffect(0.8)
+            Text(syncManager.currentProgress ?? "Synchronizing data...")
+                .font(AppTypography.captionBold)
+                .foregroundColor(AppColors.brand)
+        }
+        .padding(12)
+    }
+    
+    private func syncResultRow(_ res: SyncResult) -> some View {
+        let isSuccess = res.success
+        let statusIcon = isSuccess ? "checkmark.circle.fill" : "exclamationmark.triangle.fill"
+        let statusColor = isSuccess ? AppColors.profit : AppColors.loss
+        let rowBackground = isSuccess ? AppColors.surface : AppColors.loss.opacity(0.08)
+        let messageColor = isSuccess ? AppColors.secondaryText : AppColors.loss
+        
+        return HStack(spacing: 8) {
+            Image(systemName: statusIcon)
+                .foregroundColor(statusColor)
+                .font(.system(size: 14))
+            
+            VStack(alignment: .leading, spacing: 2) {
+                HStack {
+                    Text(res.providerName)
+                        .font(AppTypography.captionBold)
+                        .foregroundColor(AppColors.primaryText)
+                    Spacer()
+                    Text(Formatters.formatTime(res.timestamp))
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.secondaryText)
+                }
+                Text(res.message)
+                    .font(AppTypography.caption)
+                    .foregroundColor(messageColor)
+            }
+        }
+        .padding(10)
+        .background(rowBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
     
     // MARK: - Bottom Action Bar
