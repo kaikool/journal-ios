@@ -179,60 +179,55 @@ public struct JournalCalendarView: View {
     public var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                // Header FilterBar matching calendar/page.tsx
-                FilterBarView(
-                    title: "Calendar",
-                    showFilters: false
-                ) {
-                    HStack(spacing: 6) {
-                        Button(action: {
-                            #if os(iOS)
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            #endif
-                            changeMonth(by: -1)
-                        }) {
-                            Image(systemName: "chevron.left")
-                                .font(.system(size: 11, weight: .bold))
-                                .foregroundColor(AppColors.primaryText)
-                                .frame(width: 30, height: 30)
-                                .background(AppColors.cardBackground)
-                                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                        .stroke(AppColors.border.opacity(0.6), lineWidth: 0.5)
-                                    )
-                                .shadow(color: Color.black.opacity(0.04), radius: 2, x: 0, y: 1)
-                        }
-                        .buttonStyle(ApplePressableButtonStyle())
-                        .accessibilityLabel("Previous month")
-                        
-                        Text(monthTitle(for: currentMonth))
-                            .font(AppTypography.captionBold)
+                // Sleek Month Navigator Bar flush under ShellHeaderView
+                HStack {
+                    Button(action: {
+                        #if os(iOS)
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        #endif
+                        changeMonth(by: -1)
+                    }) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 12, weight: .semibold))
                             .foregroundColor(AppColors.primaryText)
-                            .frame(minWidth: 124, alignment: .center)
-                        
-                        Button(action: {
-                            #if os(iOS)
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            #endif
-                            changeMonth(by: 1)
-                        }) {
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 11, weight: .bold))
-                                .foregroundColor(AppColors.primaryText)
-                                .frame(width: 30, height: 30)
-                                .background(AppColors.cardBackground)
-                                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                        .stroke(AppColors.border.opacity(0.6), lineWidth: 0.5)
-                                    )
-                                .shadow(color: Color.black.opacity(0.04), radius: 2, x: 0, y: 1)
-                        }
-                        .buttonStyle(ApplePressableButtonStyle())
-                        .accessibilityLabel("Next month")
+                            .frame(width: 32, height: 32)
+                            .background(AppColors.cardBackground)
+                            .clipShape(Circle())
+                            .overlay(Circle().stroke(AppColors.border.opacity(0.6), lineWidth: 0.5))
                     }
+                    .buttonStyle(ApplePressableButtonStyle())
+                    .accessibilityLabel("Previous month")
+                    
+                    Spacer()
+                    
+                    Text(monthTitle(for: currentMonth))
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundColor(AppColors.primaryText)
+                    
+                    Spacer()
+                    
+                    Button(action: {
+                        #if os(iOS)
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        #endif
+                        changeMonth(by: 1)
+                    }) {
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(AppColors.primaryText)
+                            .frame(width: 32, height: 32)
+                            .background(AppColors.cardBackground)
+                            .clipShape(Circle())
+                            .overlay(Circle().stroke(AppColors.border.opacity(0.6), lineWidth: 0.5))
+                    }
+                    .buttonStyle(ApplePressableButtonStyle())
+                    .accessibilityLabel("Next month")
                 }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(AppColors.cardBackground)
+                
+                Divider().background(AppColors.border.opacity(0.5))
                 
                 ScrollView {
                     VStack(spacing: 14) {

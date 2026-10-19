@@ -63,15 +63,6 @@ public struct NotebookView: View {
     
     public var body: some View {
         VStack(spacing: 0) {
-            FilterBarView(
-                title: "Notebook",
-                showFilters: false
-            ) {
-                AppActionPill("New note", icon: "plus") {
-                    createNewNote()
-                }
-            }
-            
             // Folder selector bar
             folderChipsBar
                 .padding(.vertical, 8)
@@ -149,33 +140,54 @@ public struct NotebookView: View {
     // MARK: - Search Bar
     
     private var searchBar: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass")
-                .foregroundColor(AppColors.secondaryText)
-                .font(.system(size: 13))
-            
-            TextField("Search notes", text: $searchQuery)
-                .font(AppTypography.body)
-                .foregroundColor(AppColors.primaryText)
-            
-            if !searchQuery.isEmpty {
-                Button {
-                    searchQuery = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundColor(AppColors.secondaryText)
-                        .font(.system(size: 13))
+        HStack(spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundColor(AppColors.secondaryText)
+                    .font(.system(size: 13))
+                
+                TextField("Search notes", text: $searchQuery)
+                    .font(AppTypography.body)
+                    .foregroundColor(AppColors.primaryText)
+                
+                if !searchQuery.isEmpty {
+                    Button {
+                        searchQuery = ""
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(AppColors.secondaryText)
+                            .font(.system(size: 13))
+                    }
                 }
             }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(AppColors.secondaryBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(AppColors.border.opacity(0.5), lineWidth: 0.5)
+            )
+            
+            Button {
+                #if canImport(UIKit)
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                #endif
+                createNewNote()
+            } label: {
+                HStack(spacing: 5) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 11, weight: .bold))
+                    Text("New")
+                        .font(.system(size: 12, weight: .semibold))
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(AppColors.brandPrimary)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(AppColors.secondaryBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(AppColors.border.opacity(0.5), lineWidth: 0.5)
-        )
     }
     
     // MARK: - Folder Chips Horizontal Bar

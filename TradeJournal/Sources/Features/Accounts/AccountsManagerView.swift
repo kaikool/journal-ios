@@ -90,19 +90,11 @@ public struct AccountsManagerView: View {
     
     public var body: some View {
         VStack(spacing: 0) {
-            FilterBarView(
-                title: "Accounts",
-                showFilters: false
-            ) {
-                AppActionPill("New account", icon: "plus") {
-                    showNewAccountSheet = true
-                }
-            }
-            
             ScrollView {
                 VStack(spacing: 14) {
                     // Filter & Search Controls
                     filterAndSearchHeader
+                        .padding(.top, 8)
                     
                     // Bulk Visibility Actions
                     bulkVisibilityBar
@@ -168,32 +160,53 @@ public struct AccountsManagerView: View {
             )
             .padding(.horizontal, 16)
             
-            // Search Input
-            HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass")
-                    .foregroundColor(AppColors.secondaryText)
-                    .font(.system(size: 13))
-                TextField("Search by name, broker, ID...", text: $searchText)
-                    .font(AppTypography.body)
-                    .foregroundColor(AppColors.primaryText)
-                if !searchText.isEmpty {
-                    Button {
-                        searchText = ""
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(AppColors.secondaryText)
-                            .font(.system(size: 13))
+            // Search Input & New Account Button
+            HStack(spacing: 10) {
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundColor(AppColors.secondaryText)
+                        .font(.system(size: 13))
+                    TextField("Search by name, broker, ID...", text: $searchText)
+                        .font(AppTypography.body)
+                        .foregroundColor(AppColors.primaryText)
+                    if !searchText.isEmpty {
+                        Button {
+                            searchText = ""
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(AppColors.secondaryText)
+                                .font(.system(size: 13))
+                        }
                     }
                 }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 9)
+                .background(AppColors.cardBackground)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(AppColors.border.opacity(0.5), lineWidth: 0.5)
+                )
+                
+                Button {
+                    #if canImport(UIKit)
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    #endif
+                    showNewAccountSheet = true
+                } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 11, weight: .bold))
+                        Text("New")
+                            .font(.system(size: 12, weight: .semibold))
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 9)
+                    .background(AppColors.brandPrimary)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                }
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 9)
-            .background(AppColors.cardBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(AppColors.border.opacity(0.5), lineWidth: 0.5)
-            )
             .padding(.horizontal, 16)
         }
     }

@@ -27,25 +27,42 @@ public struct PlaybooksView: View {
     
     public var body: some View {
         VStack(spacing: 0) {
-            FilterBarView(
-                title: "Playbooks",
-                showFilters: false
-            ) {
-                AppActionPill("New playbook", icon: "plus") {
-                    showNewPlaybookSheet = true
-                }
-            }
-            
             ScrollView {
                 VStack(spacing: 14) {
                     if dataStore.playbooks.isEmpty {
                         emptyState
                     } else {
+                        HStack {
+                            Text("\(adherenceSummaries.count) Playbooks")
+                                .font(AppTypography.caption)
+                                .foregroundColor(AppColors.secondaryText)
+                            Spacer()
+                            Button {
+                                #if canImport(UIKit)
+                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                #endif
+                                showNewPlaybookSheet = true
+                            } label: {
+                                HStack(spacing: 5) {
+                                    Image(systemName: "plus")
+                                        .font(.system(size: 11, weight: .bold))
+                                    Text("New Playbook")
+                                        .font(.system(size: 12, weight: .semibold))
+                                }
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 7)
+                                .background(AppColors.brandPrimary)
+                                .clipShape(Capsule())
+                            }
+                        }
+                        .padding(.top, 4)
+                        
                         playbooksList
                     }
                 }
                 .padding(.horizontal, 16)
-                .padding(.top, 16)
+                .padding(.top, 12)
                 .padding(.bottom, 88)
             }
             .background(AppColors.background)

@@ -26,20 +26,35 @@ public struct MissedTradesView: View {
     
     public var body: some View {
         VStack(spacing: 0) {
-            FilterBarView(
-                title: "Missed trades",
-                showFilters: false
-            ) {
-                AppActionPill("Log opportunity", icon: "plus") {
-                    editingTrade = nil
-                    showAddSheet = true
-                }
-            }
-            
             VStack(alignment: .leading, spacing: 10) {
-                Text("Record setups you watched but did not take. These observations never enter your trade count, P&L, or win rate.")
-                    .font(AppTypography.caption)
-                    .foregroundColor(AppColors.secondaryText)
+                HStack {
+                    Text("Record setups you watched but did not take.")
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.secondaryText)
+                    
+                    Spacer()
+                    
+                    Button {
+                        #if canImport(UIKit)
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        #endif
+                        editingTrade = nil
+                        showAddSheet = true
+                    } label: {
+                        HStack(spacing: 5) {
+                            Image(systemName: "plus")
+                                .font(.system(size: 11, weight: .bold))
+                            Text("Log Setup")
+                                .font(.system(size: 12, weight: .semibold))
+                        }
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 7)
+                        .background(AppColors.brandPrimary)
+                        .clipShape(Capsule())
+                    }
+                }
+                .padding(.top, 8)
                 
                 HStack(spacing: 12) {
                     // Search bar

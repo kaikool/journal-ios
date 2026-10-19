@@ -326,17 +326,15 @@ public struct DashboardView: View {
         let snap = snapshot
         let metrics = snap.metrics
         
-        VStack(spacing: 0) {
-            // FilterBar matching web filter-bar.tsx
+            // Compact secondary toolbar sitting flush under ShellHeaderView
             FilterBarView(
                 title: "",
                 selectedRange: $selectedRange,
                 showAccountSelector: false,
                 showFilters: true
-            )
-            
-            // Top Toolbar: Saved Layout & Customize trigger matching dashboard-layout.tsx
-            layoutBar
+            ) {
+                dashboardActions
+            }
             
             ScrollView {
                 LazyVStack(spacing: 12) {
@@ -470,10 +468,10 @@ public struct DashboardView: View {
         .transition(.move(edge: .top).combined(with: .opacity))
     }
     
-    // MARK: - Top Layout Bar (Apple HIG Presets Menu & Customize)
+    // MARK: - Secondary Dashboard Actions (Integrated into FilterBarView)
     
-    private var layoutBar: some View {
-        HStack(spacing: 8) {
+    private var dashboardActions: some View {
+        HStack(spacing: 6) {
             // Presets Menu
             Menu {
                 Section("Presets") {
@@ -505,25 +503,20 @@ public struct DashboardView: View {
                     }
                 }
             } label: {
-                HStack(spacing: 5) {
+                HStack(spacing: 4) {
                     Image(systemName: activePreset.icon)
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.system(size: 10, weight: .semibold))
                         .foregroundColor(AppColors.brand)
                     Text(activePreset.name)
-                        .font(AppTypography.captionBold)
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
                         .foregroundColor(AppColors.primaryText)
                         .lineLimit(1)
-                    Text("(\(visibleCardCount))")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(AppColors.secondaryText)
-                        .lineLimit(1)
                     Image(systemName: "chevron.down")
-                        .font(.system(size: 8, weight: .bold))
+                        .font(.system(size: 7, weight: .bold))
                         .foregroundColor(AppColors.secondaryText)
                 }
-                .padding(.horizontal, 9)
-                .padding(.vertical, 5)
-                .frame(height: 28)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4.5)
                 .background(AppColors.cardBackground)
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 .overlay(
@@ -533,68 +526,34 @@ public struct DashboardView: View {
             }
             .fixedSize()
             
-            Spacer(minLength: 8)
-            
-            HStack(spacing: 6) {
-                // Reorder / Edit Layout Mode Button
-                Button {
-                    #if canImport(UIKit)
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    #endif
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                        isEditingLayout.toggle()
-                    }
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: isEditingLayout ? "checkmark" : "arrow.up.arrow.down")
-                            .font(.system(size: 10, weight: .semibold))
-                        Text(isEditingLayout ? "Done" : "Reorder")
-                            .font(AppTypography.captionBold)
-                            .lineLimit(1)
-                    }
-                    .foregroundColor(isEditingLayout ? .white : AppColors.primaryText)
-                    .padding(.horizontal, 9)
-                    .padding(.vertical, 5)
-                    .frame(height: 28)
-                    .background(isEditingLayout ? AppColors.brand : AppColors.cardBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .stroke(isEditingLayout ? Color.clear : AppColors.border.opacity(0.6), lineWidth: 0.5)
-                    )
+            // Customize button (Sheet)
+            Button {
+                #if canImport(UIKit)
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                #endif
+                showCustomizerSheet = true
+            } label: {
+                HStack(spacing: 3) {
+                    Image(systemName: "slider.horizontal.3")
+                        .font(.system(size: 10, weight: .semibold))
+                    Text("Customize")
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .lineLimit(1)
                 }
-                .buttonStyle(ApplePressableButtonStyle())
-                .fixedSize()
-                
-                // Customize button (Sheet)
-                Button {
-                    #if canImport(UIKit)
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    #endif
-                    showCustomizerSheet = true
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "slider.horizontal.3")
-                            .font(.system(size: 10, weight: .semibold))
-                        Text("Customize")
-                            .font(AppTypography.captionBold)
-                            .lineLimit(1)
-                    }
-                    .foregroundColor(AppColors.primaryText)
-                    .padding(.horizontal, 9)
-                    .padding(.vertical, 5)
-                    .frame(height: 28)
-                    .background(AppColors.cardBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .stroke(AppColors.border.opacity(0.6), lineWidth: 0.5)
-                    )
-                }
-                .buttonStyle(ApplePressableButtonStyle())
-                .fixedSize()
+                .foregroundColor(AppColors.primaryText)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4.5)
+                .background(AppColors.cardBackground)
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(AppColors.border.opacity(0.6), lineWidth: 0.5)
+                )
             }
+            .buttonStyle(ApplePressableButtonStyle())
+            .fixedSize()
         }
+    }
         .padding(.horizontal, 14)
         .padding(.top, 6)
         .padding(.bottom, 10)

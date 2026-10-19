@@ -87,30 +87,6 @@ public struct PropFirmLedgerView: View {
     
     public var body: some View {
         VStack(spacing: 0) {
-            // FilterBar matching web
-            FilterBarView(
-                title: "Prop firms",
-                showFilters: false
-            ) {
-                AppActionMenu("New", icon: "plus") {
-                    Button {
-                        showNewAccountSheet = true
-                    } label: {
-                        Label("Track Account", systemImage: "briefcase.fill")
-                    }
-                    Button {
-                        showNewEntrySheet = true
-                    } label: {
-                        Label("Add Expense", systemImage: "arrow.up.right")
-                    }
-                    Button {
-                        showAddReceiptSheet = true
-                    } label: {
-                        Label("Track Payout", systemImage: "arrow.down.left")
-                    }
-                }
-            }
-            
             // Universal Apple HIG Sliding Segmented Bar
             AppleSlidingSegmentedBar(
                 selection: $selectedTab,
@@ -120,8 +96,8 @@ public struct PropFirmLedgerView: View {
             .padding(.horizontal, 14)
             .padding(.vertical, 6)
             
-            // Sub-Toolbar: Currency Pill & Archived Toggle
-            HStack {
+            // Sub-Toolbar: Currency Pill, Archived Toggle & New Action Menu
+            HStack(spacing: 8) {
                 AppleMenuChip(title: "Currency", selectionText: selectedCurrency, icon: "dollarsign.circle") {
                     ForEach(availableCurrencies, id: \.self) { c in
                         Button(c) {
@@ -157,9 +133,27 @@ public struct PropFirmLedgerView: View {
                     }
                     .buttonStyle(ApplePressableButtonStyle())
                 }
+                
+                AppActionMenu("New", icon: "plus") {
+                    Button {
+                        showNewAccountSheet = true
+                    } label: {
+                        Label("Track Account", systemImage: "briefcase.fill")
+                    }
+                    Button {
+                        showNewEntrySheet = true
+                    } label: {
+                        Label("Add Expense", systemImage: "arrow.up.right")
+                    }
+                    Button {
+                        showAddReceiptSheet = true
+                    } label: {
+                        Label("Track Payout", systemImage: "arrow.down.left")
+                    }
+                }
             }
             .padding(.horizontal, 14)
-            .padding(.top, 6)
+            .padding(.top, 4)
             .padding(.bottom, 2)
             
             // Content Switcher

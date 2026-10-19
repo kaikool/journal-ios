@@ -54,23 +54,36 @@ public struct ProgressRoutinesView: View {
     
     public var body: some View {
         VStack(spacing: 0) {
-            FilterBarView(
-                title: "Progress",
-                showFilters: false
-            ) {
-                AppActionPill("Add routine", icon: "plus") {
-                    showAddRoutineSheet = true
-                }
-            }
-            
             ScrollView {
                 VStack(spacing: 12) {
-                    Text("Build a repeatable trading day. Routines are tracked independently of trade filters and profit.")
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.secondaryText)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 14)
-                        .padding(.top, 10)
+                    HStack {
+                        Text("Build a repeatable trading day.")
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.secondaryText)
+                        
+                        Spacer()
+                        
+                        Button {
+                            #if canImport(UIKit)
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            #endif
+                            showAddRoutineSheet = true
+                        } label: {
+                            HStack(spacing: 5) {
+                                Image(systemName: "plus")
+                                    .font(.system(size: 11, weight: .bold))
+                                Text("Routine")
+                                    .font(.system(size: 12, weight: .semibold))
+                            }
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 7)
+                            .background(AppColors.brandPrimary)
+                            .clipShape(Capsule())
+                        }
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.top, 10)
                     
                     // Card 1: Daily completion & Date selector
                     completionScoreCard

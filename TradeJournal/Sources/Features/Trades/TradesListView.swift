@@ -154,10 +154,15 @@ public struct TradesListView: View {
                         color: pnlColor
                     )
                     
-                    Text("\(overviewMetrics.closedTrades) closed · Gross \(Formatters.formatPnL(overviewMetrics.grossPnl ?? overviewMetrics.netPnl, currency: env.currentCurrency)) · Fees \(Formatters.formatCurrency(overviewMetrics.fees ?? 0, currency: env.currentCurrency))")
-                        .font(.system(size: 9))
-                        .monospacedDigit()
-                        .foregroundColor(AppColors.secondaryText)
+                    HStack(spacing: 4) {
+                        Text("\(overviewMetrics.closedTrades) closed")
+                        Text("·")
+                        Text("Fees \(Formatters.formatCurrency(overviewMetrics.fees ?? 0, currency: env.currentCurrency))")
+                    }
+                    .font(.system(size: 10))
+                    .monospacedDigit()
+                    .foregroundColor(AppColors.secondaryText)
+                    .lineLimit(1)
                 }
             }
             

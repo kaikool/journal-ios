@@ -70,11 +70,6 @@ public struct SettingsView: View {
     
     public var body: some View {
         VStack(spacing: 0) {
-            FilterBarView(
-                title: "Settings",
-                showFilters: false
-            )
-            
             // Section Selector Tabs (Apple HIG Sliding Bar)
             sectionSelectorBar
                 .padding(.vertical, 8)

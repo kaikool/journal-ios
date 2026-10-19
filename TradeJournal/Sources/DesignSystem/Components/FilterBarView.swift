@@ -156,11 +156,8 @@ public struct FilterBarView<Actions: View>: View {
     
     private var filterRow: some View {
         HStack(spacing: 8) {
-            if showAccountSelector {
-                accountSelectorMenu
-            }
             timeRangeSelector
-            Spacer()
+            Spacer(minLength: 6)
             if let onFilter = onOpenFilterDialog {
                 filterDialogButton(onFilter: onFilter)
             }
@@ -261,6 +258,8 @@ public struct FilterBarView<Actions: View>: View {
                 } label: {
                     Text(range.rawValue)
                         .font(.system(size: 10.5, weight: selectedRange == range ? .bold : .medium, design: .rounded))
+                        .lineLimit(1)
+                        .fixedSize()
                         .padding(.horizontal, 7)
                         .padding(.vertical, 4.5)
                         .background(
@@ -276,6 +275,7 @@ public struct FilterBarView<Actions: View>: View {
         .padding(2.5)
         .background(AppColors.secondaryBackground.opacity(colorScheme == .dark ? 0.5 : 0.7))
         .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
+        .fixedSize(horizontal: true, vertical: false)
         .overlay(
             RoundedRectangle(cornerRadius: 11, style: .continuous)
                 .stroke(

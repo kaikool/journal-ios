@@ -32,11 +32,6 @@ public struct ImportStatementView: View {
     
     public var body: some View {
         VStack(spacing: 0) {
-            FilterBarView(
-                title: "Import trades",
-                showFilters: false
-            )
-            
             ScrollView {
                 VStack(spacing: 14) {
                     // Target Account Selector

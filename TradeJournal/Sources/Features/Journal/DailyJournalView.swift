@@ -142,39 +142,48 @@ public struct DailyJournalListView: View {
     public var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                FilterBarView(
-                    title: "Daily journal",
-                    showFilters: false
-                ) {
-                    AppActionPillLink("View my day", icon: "sun.max", destination: DailyJournalDetailView(date: todayKey))
-                }
-                
                 ScrollView {
                     VStack(spacing: 10) {
-                        // Search bar
-                        HStack {
-                            Image(systemName: "magnifyingglass")
-                                .foregroundColor(AppColors.secondaryText)
-                                .font(.system(size: 13))
-                            TextField("Search date (YYYY-MM-DD), note...", text: $searchText)
-                                .font(AppTypography.body)
-                            if !searchText.isEmpty {
-                                Button {
-                                    searchText = ""
-                                } label: {
-                                    Image(systemName: "xmark.circle.fill")
-                                        .foregroundColor(AppColors.secondaryText)
+                        // Search bar & Today shortcut
+                        HStack(spacing: 10) {
+                            HStack {
+                                Image(systemName: "magnifyingglass")
+                                    .foregroundColor(AppColors.secondaryText)
+                                    .font(.system(size: 13))
+                                TextField("Search date, note...", text: $searchText)
+                                    .font(AppTypography.body)
+                                if !searchText.isEmpty {
+                                    Button {
+                                        searchText = ""
+                                    } label: {
+                                        Image(systemName: "xmark.circle.fill")
+                                            .foregroundColor(AppColors.secondaryText)
+                                    }
                                 }
                             }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 8)
+                            .background(AppColors.cardBackground)
+                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
+                            )
+                            
+                            NavigationLink(destination: DailyJournalDetailView(date: todayKey)) {
+                                HStack(spacing: 5) {
+                                    Image(systemName: "sun.max.fill")
+                                        .font(.system(size: 12))
+                                    Text("Today")
+                                        .font(.system(size: 12, weight: .semibold))
+                                }
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .background(AppColors.brandPrimary)
+                                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            }
                         }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 7)
-                        .background(AppColors.cardBackground)
-                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
-                        )
                         .padding(.horizontal, 14)
                         .padding(.top, 10)
                         
