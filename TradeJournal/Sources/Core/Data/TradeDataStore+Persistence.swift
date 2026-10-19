@@ -97,7 +97,7 @@ extension TradeDataStore {
         }
     }
     
-    internal static func decodeStoreFromDisk(primaryUrl: URL, backupUrl: URL) -> (store: PersistedStore, hashes: Set<String>)? {
+    nonisolated internal static func decodeStoreFromDisk(primaryUrl: URL, backupUrl: URL) -> (store: PersistedStore, hashes: Set<String>)? {
         // 1. Try decoding primary file
         if FileManager.default.fileExists(atPath: primaryUrl.path) {
             do {

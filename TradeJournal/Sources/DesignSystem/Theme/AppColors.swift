@@ -97,4 +97,5 @@ public enum AppColors {
     public static let mutedForeground = adaptiveColor(dark: "#9c9ca6", light: "#52514e")
     public static let mutedText = adaptiveColor(dark: "#9c9ca6", light: "#52514e")
     public static let brandTextOnDark = Color(hex: "#ffffff")
+    public static let buttonText = Color.white
 }

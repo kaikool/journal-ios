@@ -168,7 +168,7 @@ public struct JournalCalendarView: View {
         snapshot.maxAbsPnl
     }
     
-    private var peakWeekdayAbsPnl: Double {
+    internal var peakWeekdayAbsPnl: Double {
         snapshot.peakWeekdayAbsPnl
     }
     
@@ -287,7 +287,7 @@ public struct JournalCalendarView: View {
     
     // MARK: - Instant Day Selection Handler
     
-    private func openDayDetail(for dateKey: String) {
+    internal func openDayDetail(for dateKey: String) {
         #if os(iOS)
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         #endif

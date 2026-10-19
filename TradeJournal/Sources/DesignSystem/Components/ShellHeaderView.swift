@@ -149,7 +149,7 @@ public struct ShellHeaderView: View {
                     Text("Add")
                         .font(.system(size: 11.5, weight: .bold, design: .rounded))
                 }
-                .foregroundColor(AppColors.buttonText)
+                .foregroundColor(.white)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
                 .background(AppColors.brand)
