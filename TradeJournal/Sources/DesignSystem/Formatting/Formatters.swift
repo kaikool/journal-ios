@@ -14,15 +14,15 @@ public enum Formatters {
     private static let percentFormatter: NumberFormatter = {
         let f = NumberFormatter()
         f.numberStyle = .percent
-        f.maximumFractionDigits = 1
-        f.minimumFractionDigits = 1
+        f.maximumFractionDigits = 2
+        f.minimumFractionDigits = 2
         return f
     }()
     
     private static let priceFormatter: NumberFormatter = {
         let f = NumberFormatter()
         f.numberStyle = .decimal
-        f.maximumFractionDigits = 5
+        f.maximumFractionDigits = 2
         f.minimumFractionDigits = 2
         return f
     }()

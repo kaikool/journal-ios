@@ -5,6 +5,7 @@ import SwiftUI
 /// Ensures distinct horizontal coordinates for each bar without timestamp crowding.
 public struct CandleChartView: View {
     let visibleBars: [MarketBar]
+    let allBars: [MarketBar]
     let totalBarsCount: Int
     let trade: Trade
     let executions: [Execution]
@@ -17,6 +18,7 @@ public struct CandleChartView: View {
     
     public init(
         visibleBars: [MarketBar],
+        allBars: [MarketBar] = [],
         totalBarsCount: Int,
         trade: Trade,
         executions: [Execution],
@@ -26,6 +28,7 @@ public struct CandleChartView: View {
         currency: String = "USD"
     ) {
         self.visibleBars = visibleBars
+        self.allBars = allBars.isEmpty ? visibleBars : allBars
         self.totalBarsCount = max(visibleBars.count, totalBarsCount)
         self.trade = trade
         self.executions = executions
@@ -46,20 +49,16 @@ public struct CandleChartView: View {
             
             // Candlestick Canvas drawing
             GeometryReader { geo in
-                if visibleBars.isEmpty {
-                    executionPathFallbackView(size: geo.size)
-                } else {
-                    candlestickPlotView(size: geo.size)
-                        .gesture(
-                            DragGesture(minimumDistance: 0)
-                                .onChanged { value in
-                                    updateHoveredBar(at: value.location.x, totalWidth: geo.size.width - 55)
-                                }
-                                .onEnded { _ in
-                                    hoveredBarIndex = nil
-                                }
-                        )
-                }
+                candlestickPlotView(size: geo.size)
+                    .gesture(
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { value in
+                                updateHoveredBar(at: value.location.x, totalWidth: geo.size.width - 55)
+                            }
+                            .onEnded { _ in
+                                hoveredBarIndex = nil
+                            }
+                    )
             }
             .frame(height: 240)
             .background(AppColors.cardBackground)
@@ -212,6 +211,7 @@ public struct CandleChartView: View {
             let ratio = Double(i) / Double(levels)
             let price = minP + ratio * (maxP - minP)
             let y = height - CGFloat(ratio) * height
+            let clampedY = max(8, min(height - 8, y))
             
             Path { path in
                 path.move(to: CGPoint(x: 0, y: y))
@@ -219,11 +219,11 @@ public struct CandleChartView: View {
             }
             .stroke(AppColors.border.opacity(0.6), style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
             
-            Text(Formatters.formatNumber(price))
+            Text(Formatters.price(Decimal(price)))
                 .font(.system(size: 9, weight: .regular, design: .monospaced))
                 .foregroundColor(AppColors.secondaryText)
                 .frame(width: 50, alignment: .leading)
-                .position(x: width + 28, y: y)
+                .position(x: width + 28, y: clampedY)
         }
     }
     
@@ -339,98 +339,12 @@ public struct CandleChartView: View {
         }
     }
     
-    /// Fallback trajectory view when external candle feeds are not available
-    private func executionPathFallbackView(size: CGSize) -> some View {
-        let entryD = (trade.avgEntry as NSDecimalNumber).doubleValue
-        let exitD = trade.avgExit.map { ($0 as NSDecimalNumber).doubleValue } ?? entryD
-        
-        let minP = min(entryD, exitD) * 0.998
-        let maxP = max(entryD, exitD) * 1.002
-        let span = max(0.0001, maxP - minP)
-        
-        let w = size.width - 24
-        let h = size.height - 40
-        let pnlColor = Formatters.pnlColor(trade.netPnl)
-        
-        let yEntry = h - CGFloat((entryD - minP) / span) * h + 20
-        let yExit = h - CGFloat((exitD - minP) / span) * h + 20
-        
-        return ZStack {
-            // Trajectory Line
-            Path { path in
-                path.move(to: CGPoint(x: 20, y: yEntry))
-                path.addLine(to: CGPoint(x: w, y: yExit))
-            }
-            .stroke(pnlColor, style: StrokeStyle(lineWidth: 2, dash: [5, 4]))
-            
-            // Entry Marker
-            VStack(spacing: 2) {
-                HStack(spacing: 2) {
-                    Image(systemName: trade.direction == .long ? "triangle.fill" : "arrowtriangle.down.fill")
-                        .font(.system(size: 8))
-                    Text("ENTRY: \(Formatters.price(trade.avgEntry))")
-                        .font(.system(size: 9, weight: .bold))
-                }
-                .padding(.horizontal, 6)
-                .padding(.vertical, 3)
-                .background(AppColors.accent)
-                .foregroundColor(.white)
-                .cornerRadius(4)
-                
-                Text(Formatters.formatDateTime(trade.openedAt, timeZone: timeZone))
-                    .font(.system(size: 8))
-                    .foregroundColor(AppColors.secondaryText)
-            }
-            .position(x: 65, y: max(25, yEntry - 20))
-            
-            // Exit Marker (if closed)
-            if let closedAt = trade.closedAt, let avgExit = trade.avgExit {
-                VStack(spacing: 2) {
-                    HStack(spacing: 2) {
-                        Image(systemName: trade.direction == .long ? "arrowtriangle.down.fill" : "triangle.fill")
-                            .font(.system(size: 8))
-                        Text("EXIT: \(Formatters.price(avgExit))")
-                            .font(.system(size: 9, weight: .bold))
-                    }
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 3)
-                    .background(pnlColor)
-                    .foregroundColor(.white)
-                    .cornerRadius(4)
-                    
-                    Text(Formatters.formatDateTime(closedAt, timeZone: timeZone))
-                        .font(.system(size: 8))
-                        .foregroundColor(AppColors.secondaryText)
-                }
-                .position(x: w - 45, y: max(25, yExit - 20))
-            }
-            
-            // Floating Net P&L Center Pill
-            Text(Formatters.formatPnL(trade.netPnl, currency: currency))
-                .font(AppTypography.captionBold)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 4)
-                .background(pnlColor.opacity(0.18))
-                .foregroundColor(pnlColor)
-                .cornerRadius(12)
-                .position(x: size.width / 2.0, y: (yEntry + yExit) / 2.0)
-            
-            // Footer notice
-            VStack {
-                Spacer()
-                Text("Showing execution price path. Connect market data in Settings to load candles.")
-                    .font(.system(size: 10))
-                    .foregroundColor(AppColors.secondaryText)
-                    .padding(.bottom, 6)
-            }
-        }
-    }
-    
     // MARK: - Helpers
     
     private func calculatePriceBounds() -> (minPrice: Double, maxPrice: Double) {
-        var lows = visibleBars.map { ($0.low as NSDecimalNumber).doubleValue }
-        var highs = visibleBars.map { ($0.high as NSDecimalNumber).doubleValue }
+        let referenceBars = allBars.isEmpty ? visibleBars : allBars
+        var lows = referenceBars.map { ($0.low as NSDecimalNumber).doubleValue }
+        var highs = referenceBars.map { ($0.high as NSDecimalNumber).doubleValue }
         
         let entryD = (trade.avgEntry as NSDecimalNumber).doubleValue
         if entryD > 0 {
@@ -439,14 +353,16 @@ public struct CandleChartView: View {
         }
         if let exit = trade.avgExit {
             let exitD = (exit as NSDecimalNumber).doubleValue
-            lows.append(exitD)
-            highs.append(exitD)
+            if exitD > 0 {
+                lows.append(exitD)
+                highs.append(exitD)
+            }
         }
         
         let minVal = lows.min() ?? 1.0
         let maxVal = highs.max() ?? 1.0
         let span = max(0.0001, maxVal - minVal)
-        let margin = span * 0.06
+        let margin = span * 0.08
         
         return (minPrice: minVal - margin, maxPrice: maxVal + margin)
     }

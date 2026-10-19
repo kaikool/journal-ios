@@ -119,25 +119,12 @@ public enum TradeReplayEngine {
         let through = lastBar.timestamp + resolution.durationMs
         let currentFills = fills.filter { Int64($0.executedAt.timeIntervalSince1970 * 1000) <= through }
         
-        // Calculate unrealized P&L at current bar close
-        var unrealized: Decimal = 0
-        if trade.status != .open && clampedIndex >= bars.count {
-            unrealized = trade.netPnl
-        } else if let exit = trade.avgExit, abs(exit - trade.avgEntry) > 0 {
-            // Proportional progress based on actual realized trade PnL
-            let totalMove = (trade.direction == .long) ? (exit - trade.avgEntry) : (trade.avgEntry - exit)
-            let currentMove = (trade.direction == .long) ? (lastBar.close - trade.avgEntry) : (trade.avgEntry - lastBar.close)
-            unrealized = (currentMove / totalMove) * trade.netPnl
-        } else {
-            // Default calculation with asset multiplier support (forex standard lot = 100,000)
-            let isForex = trade.symbol.uppercased().contains("USD") && !trade.symbol.uppercased().contains("BTC") && !trade.symbol.uppercased().contains("ETH")
-            let mult: Decimal = isForex ? 100_000 : 1
-            if trade.direction == .long {
-                unrealized = (lastBar.close - trade.avgEntry) * trade.quantity * mult
-            } else {
-                unrealized = (trade.avgEntry - lastBar.close) * trade.quantity * mult
-            }
-        }
+        let isLast = clampedIndex >= bars.count
+        let unrealized = computeUnrealizedPnl(
+            trade: trade,
+            currentPrice: lastBar.close,
+            isLastBar: isLast
+        )
         
         return ReplayFrame(
             visibleBars: visible,
@@ -146,6 +133,58 @@ public enum TradeReplayEngine {
             unrealizedPnl: unrealized,
             currentBar: lastBar
         )
+    }
+    
+    /// Accurately computes mark-to-market Unrealized P&L at any candlestick bar close
+    public static func computeUnrealizedPnl(
+        trade: Trade,
+        currentPrice: Decimal,
+        isLastBar: Bool
+    ) -> Decimal {
+        if trade.status != .open && isLastBar {
+            return trade.netPnl
+        }
+        
+        let priceDelta: Decimal = (trade.direction == .long)
+            ? (currentPrice - trade.avgEntry)
+            : (trade.avgEntry - currentPrice)
+        
+        // Method 1: If closed trade has an exit price, compute empirical dollar value per price unit
+        if let exit = trade.avgExit {
+            let totalExitDelta = (trade.direction == .long) ? (exit - trade.avgEntry) : (trade.avgEntry - exit)
+            if abs(totalExitDelta) > 0.00001 && abs(trade.grossPnl) > 0 {
+                let dollarPerPoint = trade.grossPnl / totalExitDelta
+                let grossAtBar = priceDelta * dollarPerPoint
+                let feeShare = isLastBar ? trade.fees : (trade.fees * 0.5)
+                return grossAtBar - feeShare
+            }
+        }
+        
+        // Method 2: Contract multiplier fallback with accurate commodity, index, and forex specifications
+        let multiplier: Decimal = {
+            if let cm = trade.contractMultiplier, cm > 0 {
+                return cm
+            }
+            let sym = trade.symbol.uppercased()
+            if sym.hasPrefix("XAU") || sym.contains("GOLD") {
+                return 100 // 100 oz per standard lot
+            } else if sym.hasPrefix("XAG") || sym.contains("SILVER") {
+                return 5000 // 5000 oz per standard lot
+            } else if sym.contains("OIL") || sym.contains("WTI") || sym.contains("BRENT") {
+                return 1000 // 1000 barrels per contract
+            } else if sym.contains("US30") || sym.contains("NAS100") || sym.contains("SPX") || sym.contains("GER") || sym.contains("DAX") {
+                return 1 // Index CFD contract
+            } else if sym.contains("BTC") || sym.contains("ETH") || sym.contains("SOL") {
+                return 1 // Crypto
+            } else if sym.count == 6 || sym.contains("_") || sym.contains("/") {
+                return 100_000 // Standard Forex lot
+            }
+            return 1
+        }()
+        
+        let grossAtBar = priceDelta * trade.quantity * multiplier
+        let feeShare = isLastBar ? trade.fees : (trade.fees * 0.5)
+        return grossAtBar - feeShare
     }
     
     /// Computes MAE (Maximum Adverse Excursion) and MFE (Maximum Favorable Excursion)

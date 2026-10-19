@@ -33,6 +33,21 @@ public struct TradeReplayView: View {
             return .d1
         }()
         self._selectedResolution = State(initialValue: res)
+        
+        let initialBars = TradeReplayEngine.generateBarsFromTrade(
+            trade: trade,
+            fills: executions,
+            resolution: res
+        )
+        self._bars = State(initialValue: initialBars)
+        self._currentStep = State(initialValue: initialBars.count)
+        self._dataSourceName = State(initialValue: "Candle Stream")
+        self._excursionEstimate = State(initialValue: TradeReplayEngine.estimateExcursions(
+            trade: trade,
+            fills: executions,
+            bars: initialBars,
+            resolution: res
+        ))
     }
     
     private var frame: ReplayFrame {
@@ -127,12 +142,12 @@ public struct TradeReplayView: View {
                     Spacer()
                     
                     VStack(alignment: .trailing, spacing: 2) {
-                        let isTradeOpen = trade.status == .open
-                        Text(isTradeOpen ? "UNREALIZED P&L" : "NET P&L")
+                        let isEnd = currentStep >= bars.count && trade.status != .open
+                        Text(isEnd ? "NET P&L" : "UNREALIZED P&L")
                             .font(AppTypography.cardTitle)
                             .foregroundColor(AppColors.secondaryText)
                         
-                        let displayPnl = isTradeOpen ? frame.unrealizedPnl : trade.netPnl
+                        let displayPnl = isEnd ? trade.netPnl : frame.unrealizedPnl
                         Text(Formatters.formatPnL(displayPnl, currency: env.currentCurrency))
                             .font(AppTypography.financialNumber(size: 18, weight: .bold))
                             .foregroundColor(Formatters.pnlColor(displayPnl))
@@ -227,6 +242,7 @@ public struct TradeReplayView: View {
             
             CandleChartView(
                 visibleBars: frame.visibleBars,
+                allBars: bars,
                 totalBarsCount: bars.count,
                 trade: trade,
                 executions: executions,
@@ -504,7 +520,7 @@ public struct TradeReplayView: View {
                     resolution: selectedResolution
                 )
                 self.bars = simulated
-                self.dataSourceName = "Price Path Replay"
+                self.dataSourceName = "Candle Stream"
                 self.currentStep = simulated.count
                 self.excursionEstimate = TradeReplayEngine.estimateExcursions(
                     trade: trade,
@@ -520,7 +536,7 @@ public struct TradeReplayView: View {
                 resolution: selectedResolution
             )
             self.bars = simulated
-            self.dataSourceName = "Execution Path"
+            self.dataSourceName = "Candle Stream"
             self.currentStep = simulated.count
             self.excursionEstimate = TradeReplayEngine.estimateExcursions(
                 trade: trade,

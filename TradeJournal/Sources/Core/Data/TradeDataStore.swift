@@ -84,7 +84,7 @@ public final class TradeDataStore: ObservableObject {
         return paths[0].appendingPathComponent("trade_journal_store_v1.json")
     }
     
-    public init(loadSynchronously: Bool = false) {
+    public init(loadSynchronously: Bool = true) {
         self.folders = NotebookEngine.defaultSystemFolders
         if loadSynchronously {
             loadFromDiskSync()
@@ -1826,7 +1826,8 @@ public final class TradeDataStore: ObservableObject {
         if selectedAccountId == "default-acc" || (!accounts.contains(where: { $0.id == selectedAccountId }) && selectedAccountId != "all") {
             selectedAccountId = mostRecentActiveAccount?.id ?? "all"
         }
-        rebuildAllAccounts()
+        refreshActiveAccountCache()
+        invalidatePerformanceCaches()
     }
     
     // MARK: - Missed Trades & Progress Management
