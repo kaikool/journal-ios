@@ -84,6 +84,7 @@ public struct SyncCenterSheet: View {
                 Text("MARKET CONNECTIONS")
                     .font(AppTypography.subheadlineBold)
                     .foregroundColor(AppColors.secondaryText)
+                    .lineLimit(1)
                 Spacer()
                 Button {
                     dismiss()
@@ -92,6 +93,7 @@ public struct SyncCenterSheet: View {
                     Text("+ Manage Connections")
                         .font(AppTypography.captionBold)
                         .foregroundColor(AppColors.brand)
+                        .lineLimit(1)
                 }
             }
             
@@ -132,9 +134,12 @@ public struct SyncCenterSheet: View {
                 Text(title)
                     .font(AppTypography.bodyBold)
                     .foregroundColor(AppColors.primaryText)
+                    .lineLimit(1)
                 Text(subtitle)
                     .font(AppTypography.caption)
                     .foregroundColor(AppColors.secondaryText)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
             }
             
             Spacer()
@@ -177,19 +182,30 @@ public struct SyncCenterSheet: View {
             Text("TIME HORIZON (DATE FILTER)")
                 .font(AppTypography.subheadlineBold)
                 .foregroundColor(AppColors.secondaryText)
+                .lineLimit(1)
             
             VStack(spacing: 12) {
-                // Segmented picker for pre-set horizons
+                // Segmented picker for pre-set horizons with clean Apple style labels
                 HStack(spacing: 6) {
                     ForEach(SyncDateRangeMode.allCases) { mode in
+                        let label: String = {
+                            switch mode {
+                            case .last7Days: return "7D"
+                            case .last30Days: return "30D"
+                            case .last90Days: return "90D"
+                            case .allTime: return "ALL"
+                            case .custom: return "Custom"
+                            }
+                        }()
                         Button {
                             withAnimation(.spring(response: 0.25, dampingFraction: 0.75)) {
                                 options.dateRangeMode = mode
                                 showCustomDatePicker = (mode == .custom)
                             }
                         } label: {
-                            Text(mode.label)
-                                .font(AppTypography.captionBold)
+                            Text(label)
+                                .font(.system(size: 12, weight: .semibold))
+                                .lineLimit(1)
                                 .padding(.vertical, 8)
                                 .frame(maxWidth: .infinity)
                                 .background(

@@ -611,7 +611,12 @@ extension DashboardView {
                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 
                 if activityTab == "recent" {
-                    let recent = Array(scopedTrades.filter { $0.status != .open }.prefix(5))
+                    let recent = Array(
+                        scopedTrades
+                            .filter { $0.status != .open }
+                            .sorted { ($0.closedAt ?? $0.openedAt) > ($1.closedAt ?? $1.openedAt) }
+                            .prefix(5)
+                    )
                     if recent.isEmpty {
                         Text("No closed trades yet")
                             .font(AppTypography.caption)
@@ -621,20 +626,35 @@ extension DashboardView {
                     } else {
                         VStack(spacing: 6) {
                             ForEach(recent) { t in
-                                HStack {
+                                HStack(spacing: 8) {
                                     AppBadge(t.status.rawValue.uppercased(), color: Formatters.statusColor(t.status))
                                     
+                                    Text(t.direction == .long ? "BUY" : "SELL")
+                                        .font(.system(size: 9, weight: .bold))
+                                        .foregroundColor(t.direction == .long ? AppColors.brand : AppColors.warning)
+                                        .padding(.horizontal, 5)
+                                        .padding(.vertical, 2)
+                                        .background((t.direction == .long ? AppColors.brand : AppColors.warning).opacity(0.12))
+                                        .clipShape(Capsule())
+                                    
                                     Text(t.symbol)
-                                        .font(AppTypography.bodyBold)
+                                        .font(.system(size: 13, weight: .bold, design: .monospaced))
                                         .foregroundColor(AppColors.primaryText)
+                                        .lineLimit(1)
                                     
                                     Spacer()
                                     
-                                    if let closed = t.closedAt {
-                                        Text(Formatters.formatDate(closed))
-                                            .font(AppTypography.caption)
-                                            .foregroundColor(AppColors.secondaryText)
-                                    }
+                                    let timeDateText: String = {
+                                        let date = t.closedAt ?? t.openedAt
+                                        let timeStr = Formatters.formatTime(date)
+                                        let dateStr = Formatters.formatDate(date)
+                                        return "\(timeStr) · \(dateStr)"
+                                    }()
+                                    
+                                    Text(timeDateText)
+                                        .font(.system(size: 11, weight: .regular))
+                                        .foregroundColor(AppColors.secondaryText)
+                                        .lineLimit(1)
                                     
                                     AppMonetaryText(
                                         Formatters.formatPnL(t.netPnl, currency: env.currentCurrency),
@@ -652,7 +672,9 @@ extension DashboardView {
                         }
                     }
                 } else {
-                    let openPos = dataStore.trades.filter { $0.status == .open }
+                    let openPos = dataStore.trades
+                        .filter { $0.status == .open }
+                        .sorted { $0.openedAt > $1.openedAt }
                     if openPos.isEmpty {
                         Text("Flat -- no open positions")
                             .font(AppTypography.caption)
@@ -662,12 +684,13 @@ extension DashboardView {
                     } else {
                         VStack(spacing: 6) {
                             ForEach(openPos) { p in
-                                HStack {
+                                HStack(spacing: 8) {
                                     AppBadge(p.direction.rawValue.uppercased(), color: p.direction == .long ? AppColors.profit : AppColors.loss)
                                     
                                     Text(p.symbol)
-                                        .font(AppTypography.bodyBold)
+                                        .font(.system(size: 13, weight: .bold, design: .monospaced))
                                         .foregroundColor(AppColors.primaryText)
+                                        .lineLimit(1)
                                     
                                     Spacer()
                                     

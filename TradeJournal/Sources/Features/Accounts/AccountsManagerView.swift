@@ -291,64 +291,62 @@ public struct AccountsManagerView: View {
         let visibleCount = dataStore.visibleAccounts.count
         let totalCount = dataStore.accounts.count
         
-        return cardContainer {
-            HStack(spacing: 12) {
-                ZStack {
-                    Circle()
-                        .fill(isAllSelected ? AppColors.brand.opacity(0.15) : AppColors.secondaryText.opacity(0.08))
-                        .frame(width: 36, height: 36)
-                    Image(systemName: "square.stack.3d.up.fill")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(isAllSelected ? AppColors.brand : AppColors.secondaryText)
-                }
+        return Button {
+            #if canImport(UIKit)
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            #endif
+            dataStore.selectAccount(id: "all")
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "square.stack.3d.up.fill")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(isAllSelected ? AppColors.brand : AppColors.secondaryText)
                 
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 6) {
-                        Text("All Accounts (Combined View)")
-                            .font(AppTypography.headline)
-                            .foregroundColor(AppColors.primaryText)
-                        
-                        if isAllSelected {
-                            Image(systemName: "checkmark.seal.fill")
-                                .foregroundColor(AppColors.profit)
-                                .font(.system(size: 13))
-                        }
-                    }
-                    
-                    Text("\(visibleCount) of \(totalCount) accounts visible in Journal & Dashboard")
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.secondaryText)
-                }
+                Text("All Accounts Combined")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(AppColors.primaryText)
+                
+                Text("·")
+                    .foregroundColor(AppColors.secondaryText.opacity(0.4))
+                
+                Text("\(visibleCount)/\(totalCount) active")
+                    .font(.system(size: 11, weight: .regular))
+                    .foregroundColor(AppColors.secondaryText)
                 
                 Spacer()
                 
-                if !isAllSelected {
-                    Button {
-                        #if canImport(UIKit)
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        #endif
-                        dataStore.selectAccount(id: "all")
-                    } label: {
-                        Text("View All")
+                if isAllSelected {
+                    HStack(spacing: 4) {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 9, weight: .bold))
+                        Text("Active View")
                             .font(.system(size: 11, weight: .semibold))
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 5)
-                            .background(AppColors.brand.opacity(0.12))
-                            .foregroundColor(AppColors.brand)
-                            .clipShape(Capsule())
                     }
-                    .buttonStyle(ApplePressableButtonStyle())
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 4)
+                    .background(AppColors.profit.opacity(0.12))
+                    .foregroundColor(AppColors.profit)
+                    .clipShape(Capsule())
                 } else {
-                    Text("Viewing All")
-                        .font(.system(size: 11, weight: .semibold))
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 5)
-                        .background(AppColors.profit.opacity(0.15))
-                        .foregroundColor(AppColors.profit)
+                    Text("Select All")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(AppColors.brand)
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 4)
+                        .background(AppColors.brand.opacity(0.10))
                         .clipShape(Capsule())
                 }
             }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(AppColors.cardBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(isAllSelected ? AppColors.brand.opacity(0.4) : AppColors.border.opacity(0.5), lineWidth: 0.8)
+            )
         }
+        .buttonStyle(ApplePressableButtonStyle())
         .padding(.horizontal, 16)
     }
 

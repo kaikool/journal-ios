@@ -6,6 +6,7 @@ public enum Formatters {
         let f = NumberFormatter()
         f.numberStyle = .currency
         f.locale = Locale(identifier: "en_US")
+        f.currencySymbol = "$"
         f.maximumFractionDigits = 2
         f.minimumFractionDigits = 2
         return f
@@ -31,7 +32,9 @@ public enum Formatters {
     public static func currency(_ amount: Decimal, currencyCode: String = "USD", isPrivate: Bool = false) -> String {
         if isPrivate { return "••••••" }
         currencyFormatter.currencyCode = currencyCode
-        return currencyFormatter.string(from: amount as NSDecimalNumber) ?? "$\(amount)"
+        currencyFormatter.currencySymbol = currencySymbol(for: currencyCode)
+        let formatted = currencyFormatter.string(from: amount as NSDecimalNumber) ?? "$\(amount)"
+        return formatted.replacingOccurrences(of: "US$", with: "$")
     }
     
     public static func formatCurrency(_ amount: Decimal, currency: String = "USD", isPrivate: Bool = false) -> String {
@@ -61,8 +64,17 @@ public enum Formatters {
     
     /// Returns symbol for given ISO currency code (e.g. "USD" -> "$", "EUR" -> "€", "GBP" -> "£", "VND" -> "₫")
     public static func currencySymbol(for code: String) -> String {
-        let locale = Locale(identifier: Locale.identifier(fromComponents: [NSLocale.Key.currencyCode.rawValue: code]))
-        return locale.currencySymbol ?? "$"
+        switch code.uppercased() {
+        case "USD": return "$"
+        case "EUR": return "€"
+        case "GBP": return "£"
+        case "JPY": return "¥"
+        case "VND": return "₫"
+        default:
+            let locale = Locale(identifier: Locale.identifier(fromComponents: [NSLocale.Key.currencyCode.rawValue: code]))
+            let sym = locale.currencySymbol ?? "$"
+            return sym.replacingOccurrences(of: "US$", with: "$")
+        }
     }
     
     /// Formats compact monetary values (e.g. +$1.2k, -€450, +£2.5M)

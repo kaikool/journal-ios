@@ -44,7 +44,7 @@ public struct MissedTradesView: View {
                         HStack(spacing: 5) {
                             Image(systemName: "plus")
                                 .font(.system(size: 11, weight: .bold))
-                            Text("Log Setup")
+                            Text("Log Opportunity")
                                 .font(.system(size: 12, weight: .semibold))
                         }
                         .foregroundColor(.white)
@@ -153,15 +153,16 @@ public struct MissedTradesView: View {
                     showAddSheet = true
                 } label: {
                     HStack(spacing: 6) {
-                        Image(systemName: "plus.circle")
-                        Text("Log Missed Opportunity")
+                        Image(systemName: "plus")
+                            .font(.system(size: 11, weight: .bold))
+                        Text("Log Opportunity")
+                            .font(.system(size: 13, weight: .semibold))
                     }
-                    .font(AppTypography.subheadlineBold)
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 11)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
                     .background(AppColors.brand)
                     .foregroundColor(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .clipShape(Capsule())
                 }
                 .buttonStyle(ApplePressableButtonStyle())
             }

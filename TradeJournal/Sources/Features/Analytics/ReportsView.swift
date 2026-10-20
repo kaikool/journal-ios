@@ -129,22 +129,9 @@ public struct ReportsView: View {
     }
     
     public var body: some View {
-        VStack(spacing: 0) {
-            // Compact filter strip sitting flush under ShellHeaderView with Ask AI action
-            FilterBarView(
-                title: "",
-                selectedRange: $selectedRange,
-                showAccountSelector: false,
-                showFilters: true
-            ) {
-                AppActionPill("Ask AI", icon: "sparkles") {
-                    showAiReflectionSheet = true
-                }
-            }
-            
-            ScrollView {
-                VStack(spacing: 14) {
-                    // Apple HIG Mode Sliding Bar
+        ScrollView {
+            VStack(spacing: 14) {
+                // Apple HIG Mode Sliding Bar
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 6) {
                             ForEach(ReportMode.allCases) { mode in
@@ -203,8 +190,19 @@ public struct ReportsView: View {
                 }
                 .padding(.bottom, 88)
             }
+            .safeAreaInset(edge: .top, spacing: 0) {
+                FilterBarView(
+                    title: "",
+                    selectedRange: $selectedRange,
+                    showAccountSelector: false,
+                    showFilters: true
+                ) {
+                    AppActionPill("Ask AI", icon: "sparkles") {
+                        showAiReflectionSheet = true
+                    }
+                }
+            }
             .background(AppColors.background)
-        }
         .sheet(isPresented: $showAiReflectionSheet) {
             AIReflectionView()
                 .presentationDetents([.large])

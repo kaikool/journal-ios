@@ -176,78 +176,82 @@ public struct JournalCalendarView: View {
         dataStore.availableCurrencies
     }
     
+    private var monthNavigatorBar: some View {
+        HStack {
+            Button(action: {
+                #if os(iOS)
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                #endif
+                changeMonth(by: -1)
+            }) {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(AppColors.primaryText)
+                    .frame(width: 32, height: 32)
+                    .background(AppColors.cardBackground)
+                    .clipShape(Circle())
+                    .overlay(Circle().stroke(AppColors.border.opacity(0.6), lineWidth: 0.5))
+            }
+            .buttonStyle(ApplePressableButtonStyle())
+            .accessibilityLabel("Previous month")
+            
+            Spacer()
+            
+            Text(monthTitle(for: currentMonth))
+                .font(.system(size: 16, weight: .bold))
+                .foregroundColor(AppColors.primaryText)
+            
+            Spacer()
+            
+            Button(action: {
+                #if os(iOS)
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                #endif
+                changeMonth(by: 1)
+            }) {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(AppColors.primaryText)
+                    .frame(width: 32, height: 32)
+                    .background(AppColors.cardBackground)
+                    .clipShape(Circle())
+                    .overlay(Circle().stroke(AppColors.border.opacity(0.6), lineWidth: 0.5))
+            }
+            .buttonStyle(ApplePressableButtonStyle())
+            .accessibilityLabel("Next month")
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .background(.ultraThinMaterial)
+        .overlay(
+            Divider().background(AppColors.border.opacity(0.4)),
+            alignment: .bottom
+        )
+    }
+    
     public var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                // Sleek Month Navigator Bar flush under ShellHeaderView
-                HStack {
-                    Button(action: {
-                        #if os(iOS)
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        #endif
-                        changeMonth(by: -1)
-                    }) {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundColor(AppColors.primaryText)
-                            .frame(width: 32, height: 32)
-                            .background(AppColors.cardBackground)
-                            .clipShape(Circle())
-                            .overlay(Circle().stroke(AppColors.border.opacity(0.6), lineWidth: 0.5))
+            ScrollView {
+                VStack(spacing: 14) {
+                    // Multi-currency notice matching calendar/page.tsx line 74
+                    if availableCurrencies.count > 1 {
+                        currencyNoticeBanner
                     }
-                    .buttonStyle(ApplePressableButtonStyle())
-                    .accessibilityLabel("Previous month")
                     
-                    Spacer()
+                    // Monthly Calendar Card with 8 columns matching calendar-pnl.tsx
+                    calendarCard
                     
-                    Text(monthTitle(for: currentMonth))
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundColor(AppColors.primaryText)
-                    
-                    Spacer()
-                    
-                    Button(action: {
-                        #if os(iOS)
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        #endif
-                        changeMonth(by: 1)
-                    }) {
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundColor(AppColors.primaryText)
-                            .frame(width: 32, height: 32)
-                            .background(AppColors.cardBackground)
-                            .clipShape(Circle())
-                            .overlay(Circle().stroke(AppColors.border.opacity(0.6), lineWidth: 0.5))
-                    }
-                    .buttonStyle(ApplePressableButtonStyle())
-                    .accessibilityLabel("Next month")
+                    // Performance Insights Section matching calendar-insights.tsx
+                    performanceInsightsSection
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(AppColors.cardBackground)
-                
-                Divider().background(AppColors.border.opacity(0.5))
-                
-                ScrollView {
-                    VStack(spacing: 14) {
-                        // Multi-currency notice matching calendar/page.tsx line 74
-                        if availableCurrencies.count > 1 {
-                            currencyNoticeBanner
-                        }
-                        
-                        // Monthly Calendar Card with 8 columns matching calendar-pnl.tsx
-                        calendarCard
-                        
-                        // Performance Insights Section matching calendar-insights.tsx
-                        performanceInsightsSection
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.top, 14)
-                    .padding(.bottom, 88)
-                }
-                .background(AppColors.background)
+                .padding(.horizontal, 14)
+                .padding(.top, 10)
+                .padding(.bottom, 88)
             }
+            .safeAreaInset(edge: .top, spacing: 0) {
+                monthNavigatorBar
+            }
+            .background(AppColors.background)
             // Dedicated item-based presentation eliminates white screens and guarantees instant loading
             .sheet(item: $selectedDayContext) { ctx in
                 DayDetailSheet(

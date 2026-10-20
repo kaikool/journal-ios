@@ -234,11 +234,14 @@ public struct DailyJournalListView: View {
                     Text(day.date)
                         .font(AppTypography.bodyBold)
                         .foregroundColor(day.date == todayKey ? AppColors.accent : AppColors.primaryText)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
                     Text(day.weekday)
                         .font(AppTypography.caption)
                         .foregroundColor(AppColors.secondaryText)
+                        .lineLimit(1)
                 }
-                .frame(width: 95, alignment: .leading)
+                .frame(minWidth: 95, maxWidth: 110, alignment: .leading)
                 
                 Divider()
                     .frame(height: 36)
@@ -359,7 +362,32 @@ public struct DailyJournalDetailView: View {
     }
     
     public var body: some View {
-        VStack(spacing: 0) {
+        ScrollView {
+            VStack(spacing: 12) {
+                // Card 1: Day stats KPI grid (port 1:1 from web Day stats)
+                dayStatsCard
+                
+                // Card 2: Intraday cumulative net P&L chart
+                if !intradayPoints.isEmpty {
+                    intradayChartCard
+                }
+                
+                // Card 3: Closed and open trades list
+                if !dayTrades.isEmpty {
+                    dayTradesCard
+                }
+                
+                // Card 4: Day note editor & AI Recap
+                dayNoteCard
+                
+                // Card 5: Attachments & chart screenshots
+                AttachmentsSectionView(ownerType: "day", ownerId: date, title: "Attachments")
+                    .padding(.horizontal, 14)
+            }
+            .padding(.top, 12)
+            .padding(.bottom, 88)
+        }
+        .safeAreaInset(edge: .top, spacing: 0) {
             FilterBarView(
                 title: "Journal · \(date)",
                 showFilters: false,
@@ -369,34 +397,8 @@ public struct DailyJournalDetailView: View {
                     prepareExport()
                 }
             }
-            
-            ScrollView {
-                VStack(spacing: 12) {
-                    // Card 1: Day stats KPI grid (port 1:1 from web Day stats)
-                    dayStatsCard
-                    
-                    // Card 2: Intraday cumulative net P&L chart
-                    if !intradayPoints.isEmpty {
-                        intradayChartCard
-                    }
-                    
-                    // Card 3: Closed and open trades list
-                    if !dayTrades.isEmpty {
-                        dayTradesCard
-                    }
-                    
-                    // Card 4: Day note editor & AI Recap
-                    dayNoteCard
-                    
-                    // Card 5: Attachments & chart screenshots
-                    AttachmentsSectionView(ownerType: "day", ownerId: date, title: "Attachments")
-                        .padding(.horizontal, 14)
-                }
-                .padding(.top, 12)
-                .padding(.bottom, 88)
-            }
-            .background(AppColors.background)
         }
+        .background(AppColors.background)
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
         .interactiveEdgeBack(onBack: { dismiss() })
@@ -540,29 +542,43 @@ public struct DailyJournalDetailView: View {
                     ForEach(Array(intradayPoints.enumerated()), id: \.offset) { _, point in
                         let val = NSDecimalNumber(decimal: point.cumPnl).doubleValue
                         
+                        // Positive profit area: fills from 0 UP to max(0.0, val) in green
+                        AreaMark(
+                            x: .value("Time", point.timeStr),
+                            yStart: .value("Baseline", 0.0),
+                            yEnd: .value("Profit", max(0.0, val))
+                        )
+                        .interpolationMethod(.catmullRom)
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [AppColors.profit.opacity(0.28), AppColors.profit.opacity(0.02)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                        
+                        // Negative loss area: fills from 0 DOWN to min(0.0, val) in red
+                        AreaMark(
+                            x: .value("Time", point.timeStr),
+                            yStart: .value("Baseline", 0.0),
+                            yEnd: .value("Loss", min(0.0, val))
+                        )
+                        .interpolationMethod(.catmullRom)
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [AppColors.loss.opacity(0.02), AppColors.loss.opacity(0.28)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                        
                         LineMark(
                             x: .value("Time", point.timeStr),
                             y: .value("P&L", val)
                         )
                         .interpolationMethod(.catmullRom)
-                        .foregroundStyle(chartColor)
+                        .foregroundStyle(AppColors.brand)
                         .lineStyle(StrokeStyle(lineWidth: 2.2, lineCap: .round, lineJoin: .round))
-                        
-                        AreaMark(
-                            x: .value("Time", point.timeStr),
-                            y: .value("P&L", val)
-                        )
-                        .interpolationMethod(.catmullRom)
-                        .foregroundStyle(
-                            LinearGradient(
-                                stops: [
-                                    .init(color: chartColor.opacity(0.3), location: 0.0),
-                                    .init(color: chartColor.opacity(0.0), location: 1.0)
-                                ],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
                     }
                     
                     if let time = selectedTime, let p = activePoint {
@@ -576,8 +592,8 @@ public struct DailyJournalDetailView: View {
                             x: .value("Time", time),
                             y: .value("P&L", activeVal)
                         )
-                        .foregroundStyle(chartColor)
-                        .symbolSize(32)
+                        .foregroundStyle(activeVal >= 0 ? AppColors.profit : AppColors.loss)
+                        .symbolSize(36)
                     }
                 }
                 .chartXSelection(value: $selectedTime)

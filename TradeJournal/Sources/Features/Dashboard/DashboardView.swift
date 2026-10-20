@@ -326,8 +326,42 @@ public struct DashboardView: View {
         let snap = snapshot
         let metrics = snap.metrics
         
-        VStack(spacing: 0) {
-            // Compact secondary toolbar sitting flush under ShellHeaderView
+        ScrollView {
+            LazyVStack(spacing: 12) {
+                syncNotificationSection
+                
+                if isEditingLayout {
+                    reorderBanner
+                }
+                
+                if isMultiCurrencyNoticeActive {
+                    // Multi-currency notice & account breakdown matching page.tsx lines 153-188
+                    multiCurrencySection
+                } else if metrics.totalTrades == 0 {
+                    if selectedRange != .all {
+                        filteredEmptyState
+                    } else {
+                        emptyStateCard
+                    }
+                } else {
+                    // Dynamic Grid Conforming 1:1 to balancedDashboardSpans
+                    ForEach(dashboardRows) { row in
+                        if row.items.count == 2 {
+                            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                                renderWidget(id: row.items[0], snap: snap, isCompact: true)
+                                renderWidget(id: row.items[1], snap: snap, isCompact: true)
+                            }
+                        } else if let id = row.items.first {
+                            renderWidget(id: id, snap: snap, isCompact: false)
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.top, 10)
+            .padding(.bottom, 88)
+        }
+        .safeAreaInset(edge: .top, spacing: 0) {
             FilterBarView(
                 title: "",
                 selectedRange: $selectedRange,
@@ -336,47 +370,11 @@ public struct DashboardView: View {
             ) {
                 dashboardActions
             }
-            
-            ScrollView {
-                LazyVStack(spacing: 12) {
-                    syncNotificationSection
-                    
-                    if isEditingLayout {
-                        reorderBanner
-                    }
-                    
-                    if isMultiCurrencyNoticeActive {
-                        // Multi-currency notice & account breakdown matching page.tsx lines 153-188
-                        multiCurrencySection
-                    } else if metrics.totalTrades == 0 {
-                        if selectedRange != .all {
-                            filteredEmptyState
-                        } else {
-                            emptyStateCard
-                        }
-                    } else {
-                        // Dynamic Grid Conforming 1:1 to balancedDashboardSpans
-                        ForEach(dashboardRows) { row in
-                            if row.items.count == 2 {
-                                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                                    renderWidget(id: row.items[0], snap: snap, isCompact: true)
-                                    renderWidget(id: row.items[1], snap: snap, isCompact: true)
-                                }
-                            } else if let id = row.items.first {
-                                renderWidget(id: id, snap: snap, isCompact: false)
-                            }
-                        }
-                    }
-                }
-                .padding(.horizontal, 14)
-                .padding(.top, 14)
-                .padding(.bottom, 88)
-            }
-            .refreshable {
-                await dataStore.performGlobalSync()
-            }
-            .background(AppColors.background)
         }
+        .refreshable {
+            await dataStore.performGlobalSync()
+        }
+        .background(AppColors.background)
         .sheet(isPresented: $showCustomizerSheet) {
             DashboardCustomizerSheet(
                 hiddenCardIds: hiddenCardIdsBinding,

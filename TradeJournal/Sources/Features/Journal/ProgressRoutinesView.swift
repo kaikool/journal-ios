@@ -134,22 +134,23 @@ public struct ProgressRoutinesView: View {
                     Spacer()
                     
                     // Review date selector
-                    VStack(alignment: .trailing, spacing: 4) {
+                    VStack(alignment: .trailing, spacing: 3) {
                         Text("Review date")
-                            .font(AppTypography.caption)
+                            .font(.system(size: 10, weight: .regular))
                             .foregroundColor(AppColors.secondaryText)
                         
-                        HStack(spacing: 6) {
+                        HStack(spacing: 5) {
                             Image(systemName: "calendar")
+                                .font(.system(size: 11))
                                 .foregroundColor(AppColors.brand)
-                            Text(activeDate == todayKey ? "Today (\(activeDate))" : activeDate)
-                                .font(AppTypography.bodyBold)
+                            Text(activeDate == todayKey ? "Today" : activeDate)
+                                .font(.system(size: 12, weight: .semibold))
                                 .foregroundColor(AppColors.primaryText)
                         }
                         .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
+                        .padding(.vertical, 5)
                         .background(AppColors.secondaryBackground)
-                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .clipShape(Capsule())
                     }
                 }
                 
