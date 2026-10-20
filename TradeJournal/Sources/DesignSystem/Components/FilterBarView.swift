@@ -150,7 +150,11 @@ public struct FilterBarView<Actions: View>: View {
         .padding(.top, hasHeader ? 8 : 6)
         #endif
         .padding(.bottom, 8)
-        .background(.ultraThinMaterial.ignoresSafeArea(edges: .top))
+        .background {
+            Rectangle()
+                .fill(.ultraThinMaterial)
+                .ignoresSafeArea(edges: .top)
+        }
         .overlay(topSpecularHighlight, alignment: .top)
         .overlay(bottomBorder, alignment: .bottom)
         .enableNativePopGesture()
