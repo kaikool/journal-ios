@@ -130,7 +130,7 @@ public struct EditManualTradeSheet: View {
     }
     
     public var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack {
                 AppColors.background.ignoresSafeArea()
                 
@@ -165,7 +165,7 @@ public struct EditManualTradeSheet: View {
             .navigationTitle("Edit Trade")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
+                ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
                         dismiss()
                     }
@@ -173,7 +173,7 @@ public struct EditManualTradeSheet: View {
                     .foregroundColor(AppColors.secondaryText)
                 }
                 
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
                         saveChanges()
                     }

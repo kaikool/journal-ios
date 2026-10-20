@@ -228,30 +228,6 @@ public struct NotebookView: View {
                                 .background(isSelected ? Color.white.opacity(0.22) : AppColors.secondaryText.opacity(0.12))
                                 .clipShape(Capsule())
                             
-                            // Rename and Delete buttons for custom user folders
-                            if folder.id != NotebookEngine.systemFolderAll && folder.id != NotebookEngine.systemFolderMyNotes && isSelected {
-                                Button {
-                                    folderToRename = folder
-                                    renameFolderName = folder.name
-                                    folderError = nil
-                                    showRenameFolderSheet = true
-                                } label: {
-                                    Image(systemName: "pencil")
-                                        .font(.system(size: 10))
-                                        .foregroundColor(Color.white.opacity(0.9))
-                                }
-                                .padding(.leading, 2)
-                                
-                                Button {
-                                    folderToDelete = folder
-                                    showDeleteFolderAlert = true
-                                } label: {
-                                    Image(systemName: "trash")
-                                        .font(.system(size: 10))
-                                        .foregroundColor(Color.red.opacity(0.9))
-                                }
-                                .padding(.leading, 2)
-                            }
                         }
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
@@ -261,6 +237,25 @@ public struct NotebookView: View {
                         .shadow(color: isSelected ? AppColors.brand.opacity(0.2) : Color.clear, radius: 4, x: 0, y: 1.5)
                     }
                     .buttonStyle(ApplePressableButtonStyle())
+                    .contextMenu {
+                        if folder.id != NotebookEngine.systemFolderAll && folder.id != NotebookEngine.systemFolderMyNotes {
+                            Button {
+                                folderToRename = folder
+                                renameFolderName = folder.name
+                                folderError = nil
+                                showRenameFolderSheet = true
+                            } label: {
+                                Label("Rename Folder", systemImage: "pencil")
+                            }
+                            
+                            Button(role: .destructive) {
+                                folderToDelete = folder
+                                showDeleteFolderAlert = true
+                            } label: {
+                                Label("Delete Folder", systemImage: "trash")
+                            }
+                        }
+                    }
                 }
                 
                 // Add new folder button

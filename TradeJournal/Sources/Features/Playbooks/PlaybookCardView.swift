@@ -48,17 +48,11 @@ public struct PlaybookCardView: View {
                     } label: {
                         Image(systemName: "pencil")
                             .font(.system(size: 13))
-                            .foregroundColor(AppColors.secondaryText.opacity(0.7))
-                            .padding(6)
+                            .foregroundColor(AppColors.secondaryText.opacity(0.8))
+                            .frame(width: 32, height: 32)
                             .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
-                    .highPriorityGesture(TapGesture().onEnded {
-                        #if canImport(UIKit)
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        #endif
-                        onEdit()
-                    })
+                    .buttonStyle(.borderless)
                     
                     Button {
                         #if canImport(UIKit)
@@ -68,17 +62,11 @@ public struct PlaybookCardView: View {
                     } label: {
                         Image(systemName: "trash")
                             .font(.system(size: 13))
-                            .foregroundColor(AppColors.secondaryText.opacity(0.6))
-                            .padding(6)
+                            .foregroundColor(AppColors.loss.opacity(0.8))
+                            .frame(width: 32, height: 32)
                             .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
-                    .highPriorityGesture(TapGesture().onEnded {
-                        #if canImport(UIKit)
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        #endif
-                        onDelete()
-                    })
+                    .buttonStyle(.borderless)
                 }
                 
                 if !summary.playbook.description.isEmpty {
@@ -142,7 +130,7 @@ public struct PlaybookCardView: View {
                                     Capsule().stroke(AppColors.brand.opacity(0.2), lineWidth: 0.5)
                                 )
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(.borderless)
                             .padding(.top, 2)
                         }
                     }

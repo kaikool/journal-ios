@@ -19,7 +19,18 @@ public struct PlaybookDetailView: View {
     }
     
     public var body: some View {
-        VStack(spacing: 0) {
+        ScrollView {
+            VStack(spacing: 14) {
+                infoCard
+                rulesCard
+                tradesSection
+                deleteButton
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+            .padding(.bottom, 32)
+        }
+        .safeAreaInset(edge: .top, spacing: 0) {
             FilterBarView(
                 title: currentPlaybook.title,
                 showFilters: false,
@@ -29,17 +40,8 @@ public struct PlaybookDetailView: View {
                     showEditSheet = true
                 }
             }
-            
-            ScrollView {
-                VStack(spacing: 14) {
-                    infoCard
-                    rulesCard
-                    tradesSection
-                    deleteButton
-                }
-                .padding(16)
-            }
         }
+        .background(AppColors.background.ignoresSafeArea())
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
         .interactiveEdgeBack(onBack: { dismiss() })

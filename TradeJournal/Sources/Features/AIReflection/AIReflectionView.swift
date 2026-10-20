@@ -1,6 +1,7 @@
 import SwiftUI
 
 public struct AIReflectionView: View {
+    @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var env: AppEnvironment
     @ObservedObject private var dataStore = TradeDataStore.shared
     
@@ -20,14 +21,9 @@ public struct AIReflectionView: View {
     }
     
     public var body: some View {
-        VStack(spacing: 0) {
-            FilterBarView(
-                title: "AI Trader Reflection",
-                showFilters: false
-            )
-            
+        NavigationStack {
             ScrollView {
-                VStack(spacing: 12) {
+                VStack(spacing: 14) {
                     // Header Card
                     AppCard {
                         VStack(alignment: .leading, spacing: 8) {
@@ -102,11 +98,22 @@ public struct AIReflectionView: View {
                         }
                     }
                 }
-                .padding(14)
+                .padding(16)
+                .padding(.bottom, 24)
             }
             .background(AppColors.background)
+            .navigationTitle("AI Trader Reflection")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                    .font(AppTypography.bodyBold)
+                    .foregroundColor(AppColors.brand)
+                }
+            }
         }
-        .background(AppColors.background)
         .onAppear {
             if reflectionResult.isEmpty {
                 executeReflection()
