@@ -450,9 +450,6 @@ public struct TradeReplayView: View {
                     }
                     .fixedSize()
                 }
-                        .cornerRadius(6)
-                    }
-                }
                 
                 // Timestamp and count caption
                 if let curBar = frame.currentBar {
