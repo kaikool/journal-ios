@@ -361,10 +361,6 @@ public struct DailyJournalDetailView: View {
     @State private var autoSaveTask: Task<Void, Never>? = nil
     @State private var hasPendingChanges: Bool = false
     
-    public init(date: String) {
-        self.date = date
-    }
-    
     private var dayTrades: [Trade] {
         let isoFormatter = DateFormatter()
         isoFormatter.dateFormat = "yyyy-MM-dd"
