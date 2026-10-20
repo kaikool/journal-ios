@@ -51,36 +51,36 @@ public struct TradeReplayView: View {
     }
     
     public var body: some View {
-        VStack(spacing: 0) {
+        ScrollView {
+            VStack(spacing: 12) {
+                // Header: Trade info and dynamic replay P&L
+                headerCard
+                
+                // Timeframe Selector: 1m, 5m, 15m, 1h, 1d
+                resolutionSelectorBar
+                
+                // Professional Candlestick Chart
+                chartCard
+                
+                // Replay Playback Controls (Play/Pause, Step, Speed)
+                playbackControlsCard
+                
+                // MAE & MFE Excursion Statistics
+                excursionMetricsCard
+                
+                // Broker Data Notes
+                dataCoverageNote
+            }
+            .padding(.horizontal, 14)
+            .padding(.top, 10)
+            .padding(.bottom, 32)
+        }
+        .safeAreaInset(edge: .top, spacing: 0) {
             FilterBarView(
                 title: "Trade Replay · \(trade.symbol)",
                 showFilters: false,
                 onBack: { dismiss() }
             )
-            
-            ScrollView {
-                VStack(spacing: 12) {
-                    // Header: Trade info and dynamic replay P&L
-                    headerCard
-                    
-                    // Timeframe Selector: 1m, 5m, 15m, 1h, 1d
-                    resolutionSelectorBar
-                    
-                    // Professional Candlestick Chart
-                    chartCard
-                    
-                    // Replay Playback Controls (Play/Pause, Step, Speed)
-                    playbackControlsCard
-                    
-                    // MAE & MFE Excursion Statistics
-                    excursionMetricsCard
-                    
-                    // Broker Data Notes
-                    dataCoverageNote
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 12)
-            }
         }
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)

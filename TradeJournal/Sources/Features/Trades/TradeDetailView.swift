@@ -73,23 +73,9 @@ public struct TradeDetailView: View {
     }
     
     public var body: some View {
-        VStack(spacing: 0) {
-            FilterBarView(
-                title: "\(trade.symbol) · \(trade.direction.rawValue.uppercased())",
-                showFilters: false,
-                onBack: { dismiss() }
-            ) {
-                AppActionPill("Edit", icon: "pencil") {
-                    showEditTradeSheet = true
-                }
-                AppActionPill("Replay", icon: "play.fill") {
-                    showReplayView = true
-                }
-            }
-            
-            ScrollView {
-                VStack(spacing: 14) {
-                    // Header PnL Card
+        ScrollView {
+            VStack(spacing: 14) {
+                // Header PnL Card
                     cardContainer {
                         VStack(alignment: .leading, spacing: 12) {
                             HStack {
@@ -751,11 +737,27 @@ public struct TradeDetailView: View {
                     .buttonStyle(ApplePressableButtonStyle())
                     .padding(.top, 4)
                 }
-                .padding(16)
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+                .padding(.bottom, 32)
             }
             .background(AppColors.background)
         }
-        .background(AppColors.background)
+        .safeAreaInset(edge: .top, spacing: 0) {
+            FilterBarView(
+                title: "\(trade.symbol) · \(trade.direction.rawValue.uppercased())",
+                showFilters: false,
+                onBack: { dismiss() }
+            ) {
+                AppActionPill("Edit", icon: "pencil") {
+                    showEditTradeSheet = true
+                }
+                AppActionPill("Replay", icon: "play.fill") {
+                    showReplayView = true
+                }
+            }
+        }
+        .background(AppColors.background.ignoresSafeArea())
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
         .interactiveEdgeBack(onBack: { dismiss() })
