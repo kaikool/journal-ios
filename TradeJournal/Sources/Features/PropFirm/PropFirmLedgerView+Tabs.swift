@@ -143,6 +143,80 @@ extension PropFirmLedgerView {
                             return (id: pt.date, date: d, val: Double(pt.netMinor) / 100.0)
                         }
                         
+                        let doubleVals = parsedTimeline.map { $0.val }
+                        let maxData = doubleVals.max() ?? 0.0
+                        let minData = doubleVals.min() ?? 0.0
+                        
+                        let yDomainMax: Double = {
+                            if maxData <= 0 && minData < 0 {
+                                return 0.0
+                            }
+                            let top = max(0.0, maxData)
+                            let span = max(1.0, top - min(0.0, minData))
+                            return top + (span * 0.06)
+                        }()
+                        
+                        let yDomainMin: Double = {
+                            if minData >= 0 && maxData > 0 {
+                                return 0.0
+                            }
+                            let bottom = min(0.0, minData)
+                            let span = max(1.0, max(0.0, maxData) - bottom)
+                            return bottom - (span * 0.06)
+                        }()
+                        
+                        let areaFillGradient: LinearGradient = {
+                            let top = yDomainMax
+                            let bottom = yDomainMin
+                            if bottom >= 0 {
+                                return LinearGradient(
+                                    colors: [AppColors.brand.opacity(0.28), AppColors.brand.opacity(0.02)],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            } else if top <= 0 {
+                                return LinearGradient(
+                                    colors: [AppColors.loss.opacity(0.02), AppColors.loss.opacity(0.28)],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            } else {
+                                let zeroFraction = CGFloat(top / (top - bottom))
+                                return LinearGradient(
+                                    stops: [
+                                        .init(color: AppColors.brand.opacity(0.28), location: 0.0),
+                                        .init(color: AppColors.brand.opacity(0.02), location: max(0.0, zeroFraction - 0.001)),
+                                        .init(color: AppColors.loss.opacity(0.02), location: min(1.0, zeroFraction + 0.001)),
+                                        .init(color: AppColors.loss.opacity(0.28), location: 1.0)
+                                    ],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            }
+                        }()
+                        
+                        let lineStrokeGradient: LinearGradient = {
+                            let top = yDomainMax
+                            let bottom = yDomainMin
+                            if bottom >= 0 {
+                                return LinearGradient(colors: [AppColors.brand, AppColors.brand], startPoint: .top, endPoint: .bottom)
+                            } else if top <= 0 {
+                                return LinearGradient(colors: [AppColors.loss, AppColors.loss], startPoint: .top, endPoint: .bottom)
+                            } else {
+                                let zeroFraction = CGFloat(top / (top - bottom))
+                                return LinearGradient(
+                                    stops: [
+                                        .init(color: AppColors.brand, location: 0.0),
+                                        .init(color: AppColors.brand, location: max(0.0, zeroFraction - 0.002)),
+                                        .init(color: AppColors.loss, location: min(1.0, zeroFraction + 0.002)),
+                                        .init(color: AppColors.loss, location: 1.0)
+                                    ],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            }
+                        }()
+                        
                         Chart {
                             RuleMark(y: .value("Zero", 0))
                                 .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
@@ -151,41 +225,23 @@ extension PropFirmLedgerView {
                             ForEach(parsedTimeline, id: \.id) { pt in
                                 AreaMark(
                                     x: .value("Date", pt.date),
-                                    yStart: .value("Baseline", 0.0),
-                                    yEnd: .value("Net cash", max(0.0, pt.val))
+                                    y: .value("Net cash", pt.val)
                                 )
                                 .interpolationMethod(.stepEnd)
-                                .foregroundStyle(
-                                    LinearGradient(
-                                        colors: [AppColors.brand.opacity(0.28), AppColors.brand.opacity(0.03)],
-                                        startPoint: .top,
-                                        endPoint: .bottom
-                                    )
-                                )
-                                
-                                AreaMark(
-                                    x: .value("Date", pt.date),
-                                    yStart: .value("Baseline", 0.0),
-                                    yEnd: .value("Loss", min(0.0, pt.val))
-                                )
-                                .interpolationMethod(.stepEnd)
-                                .foregroundStyle(
-                                    LinearGradient(
-                                        colors: [AppColors.loss.opacity(0.03), AppColors.loss.opacity(0.28)],
-                                        startPoint: .top,
-                                        endPoint: .bottom
-                                    )
-                                )
+                                .foregroundStyle(areaFillGradient)
+                                .alignsMarkStylesWithPlotArea()
                                 
                                 LineMark(
                                     x: .value("Date", pt.date),
                                     y: .value("Net cash", pt.val)
                                 )
                                 .interpolationMethod(.stepEnd)
-                                .foregroundStyle(AppColors.brand)
+                                .foregroundStyle(lineStrokeGradient)
                                 .lineStyle(StrokeStyle(lineWidth: 2.2, lineCap: .round, lineJoin: .round))
+                                .alignsMarkStylesWithPlotArea()
                             }
                         }
+                        .chartYScale(domain: yDomainMin...yDomainMax)
                         .chartYAxis {
                             AxisMarks(position: .trailing, values: .automatic(desiredCount: 4)) { value in
                                 AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))

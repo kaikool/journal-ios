@@ -196,7 +196,8 @@ public enum FinancialMetricsEngine {
         formatter.timeZone = TimeZone(identifier: "UTC")
         return days.map { day in
             cum += day.netPnl
-            let parsedDate = formatter.date(from: day.date) ?? Date()
+            // Anchor at noon UTC (12:00:00) so date rendering remains strictly on the same calendar day across all western and eastern time zones
+            let parsedDate = (formatter.date(from: day.date) ?? Date()).addingTimeInterval(43200)
             return EquityPoint(timestamp: parsedDate, dateString: day.date, cumNetPnl: cum)
         }
     }

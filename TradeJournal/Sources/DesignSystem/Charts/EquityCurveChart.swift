@@ -60,34 +60,87 @@ public struct EquityCurveChart: View {
         points.map { ($0.cumulativePnl as NSDecimalNumber).doubleValue }
     }
     
-    private var maxVal: Double {
-        max(0.0, doubleVals.max() ?? 0.0)
+    private var yDomainMax: Double {
+        let maxData = doubleVals.max() ?? 0.0
+        let minData = doubleVals.min() ?? 0.0
+        if maxData <= 0 && minData < 0 {
+            return 0.0 // Anchor strictly at 0 baseline when entire curve is in loss
+        }
+        let top = max(0.0, maxData)
+        let span = max(1.0, top - min(0.0, minData))
+        return top + (span * 0.06)
     }
     
-    private var minVal: Double {
-        min(0.0, doubleVals.min() ?? 0.0)
+    private var yDomainMin: Double {
+        let maxData = doubleVals.max() ?? 0.0
+        let minData = doubleVals.min() ?? 0.0
+        if minData >= 0 && maxData > 0 {
+            return 0.0 // Anchor strictly at 0 baseline when entire curve is in profit
+        }
+        let bottom = min(0.0, minData)
+        let span = max(1.0, max(0.0, maxData) - bottom)
+        return bottom - (span * 0.06)
     }
     
-    private var profitAreaGradient: LinearGradient {
-        LinearGradient(
-            colors: [
-                AppColors.profit.opacity(0.25),
-                AppColors.profit.opacity(0.02)
-            ],
-            startPoint: .top,
-            endPoint: .bottom
-        )
+    private var areaFillGradient: LinearGradient {
+        let top = yDomainMax
+        let bottom = yDomainMin
+        if bottom >= 0 {
+            // Entire domain is non-negative: pure brand blue fill, absolutely zero red
+            return LinearGradient(
+                colors: [
+                    AppColors.brand.opacity(0.28),
+                    AppColors.brand.opacity(0.02)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        } else if top <= 0 {
+            // Entire domain is non-positive: pure loss crimson fill, absolutely zero brand
+            return LinearGradient(
+                colors: [
+                    AppColors.loss.opacity(0.02),
+                    AppColors.loss.opacity(0.28)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        } else {
+            // Bipolar curve crossing 0: mathematically aligned zeroStop with chart Y-scale domain
+            let zeroFraction = CGFloat(top / (top - bottom))
+            return LinearGradient(
+                stops: [
+                    .init(color: AppColors.brand.opacity(0.28), location: 0.0),
+                    .init(color: AppColors.brand.opacity(0.02), location: max(0.0, zeroFraction - 0.001)),
+                    .init(color: AppColors.loss.opacity(0.02), location: min(1.0, zeroFraction + 0.001)),
+                    .init(color: AppColors.loss.opacity(0.28), location: 1.0)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        }
     }
     
-    private var lossAreaGradient: LinearGradient {
-        LinearGradient(
-            colors: [
-                AppColors.loss.opacity(0.02),
-                AppColors.loss.opacity(0.25)
-            ],
-            startPoint: .top,
-            endPoint: .bottom
-        )
+    private var lineStrokeGradient: LinearGradient {
+        let top = yDomainMax
+        let bottom = yDomainMin
+        if bottom >= 0 {
+            return LinearGradient(colors: [AppColors.brand, AppColors.brand], startPoint: .top, endPoint: .bottom)
+        } else if top <= 0 {
+            return LinearGradient(colors: [AppColors.loss, AppColors.loss], startPoint: .top, endPoint: .bottom)
+        } else {
+            let zeroFraction = CGFloat(top / (top - bottom))
+            return LinearGradient(
+                stops: [
+                    .init(color: AppColors.brand, location: 0.0),
+                    .init(color: AppColors.brand, location: max(0.0, zeroFraction - 0.002)),
+                    .init(color: AppColors.loss, location: min(1.0, zeroFraction + 0.002)),
+                    .init(color: AppColors.loss, location: 1.0)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        }
     }
     
     public var body: some View {
@@ -113,23 +166,14 @@ public struct EquityCurveChart: View {
                         let val = (point.cumulativePnl as NSDecimalNumber).doubleValue
                         
                         if showArea {
-                            // Positive profit area: fills from 0 UP to max(0.0, val) in green
+                            // Single area fill anchored strictly to 0.0 baseline with locked sub-pixel gradient
                             AreaMark(
                                 x: .value("Date", point.date),
-                                yStart: .value("Baseline", 0.0),
-                                yEnd: .value("Profit", max(0.0, val))
+                                y: .value("Equity", val)
                             )
                             .interpolationMethod(.monotone)
-                            .foregroundStyle(profitAreaGradient)
-                            
-                            // Negative loss area: fills from 0 DOWN to min(0.0, val) in red
-                            AreaMark(
-                                x: .value("Date", point.date),
-                                yStart: .value("Baseline", 0.0),
-                                yEnd: .value("Loss", min(0.0, val))
-                            )
-                            .interpolationMethod(.monotone)
-                            .foregroundStyle(lossAreaGradient)
+                            .foregroundStyle(areaFillGradient)
+                            .alignsMarkStylesWithPlotArea()
                         }
                         
                         // Cumulative P&L Curve Stroke
@@ -138,8 +182,9 @@ public struct EquityCurveChart: View {
                             y: .value("Equity", val)
                         )
                         .interpolationMethod(.monotone)
-                        .foregroundStyle(AppColors.brand)
+                        .foregroundStyle(lineStrokeGradient)
                         .lineStyle(StrokeStyle(lineWidth: 2.2, lineCap: .round, lineJoin: .round))
+                        .alignsMarkStylesWithPlotArea()
                     }
                     
                     // Single-point dot fallback
@@ -149,14 +194,14 @@ public struct EquityCurveChart: View {
                             x: .value("Date", single.date),
                             y: .value("Equity", sVal)
                         )
-                        .foregroundStyle(sVal >= 0 ? AppColors.profit : AppColors.loss)
+                        .foregroundStyle(sVal >= 0 ? AppColors.brand : AppColors.loss)
                         .symbolSize(42)
                     }
                     
                     // Interactive Touch Crosshair & Cursor Node
                     if let active = activePoint {
                         let activeVal = (active.cumulativePnl as NSDecimalNumber).doubleValue
-                        let cursorColor = activeVal >= 0 ? AppColors.profit : AppColors.loss
+                        let cursorColor = activeVal >= 0 ? AppColors.brand : AppColors.loss
                         
                         RuleMark(x: .value("Cursor", active.date))
                             .lineStyle(StrokeStyle(lineWidth: 1.2, dash: [3, 3]))
@@ -197,6 +242,7 @@ public struct EquityCurveChart: View {
                             .foregroundStyle(AppColors.secondaryText)
                     }
                 }
+                .chartYScale(domain: yDomainMin...yDomainMax)
                 .chartYAxis {
                     AxisMarks(position: .trailing, values: .automatic(desiredCount: 4)) { value in
                         AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
@@ -237,10 +283,10 @@ public struct EquityCurveChart: View {
                 
                 Spacer()
                 
-                Text(Formatters.formatCurrency(active.cumulativePnl, currency: currency))
+                Text(Formatters.formatPnL(active.cumulativePnl, currency: currency))
                     .font(.system(size: 13, weight: .bold, design: .rounded))
                     .monospacedDigit()
-                    .foregroundColor(active.cumulativePnl >= 0 ? AppColors.profit : AppColors.loss)
+                    .foregroundColor(active.cumulativePnl >= 0 ? AppColors.brand : AppColors.loss)
                 
                 if active.netPnl != 0 {
                     HStack(spacing: 2) {
@@ -266,10 +312,10 @@ public struct EquityCurveChart: View {
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(AppColors.secondaryText)
                 
-                Text(Formatters.formatCurrency(last.cumulativePnl, currency: currency))
+                Text(Formatters.formatPnL(last.cumulativePnl, currency: currency))
                     .font(.system(size: 12, weight: .bold, design: .rounded))
                     .monospacedDigit()
-                    .foregroundColor(last.cumulativePnl >= 0 ? AppColors.profit : AppColors.loss)
+                    .foregroundColor(last.cumulativePnl >= 0 ? AppColors.brand : AppColors.loss)
                 
                 Spacer()
                 

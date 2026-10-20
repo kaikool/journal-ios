@@ -241,7 +241,7 @@ public struct DailyJournalListView: View {
                         .foregroundColor(AppColors.secondaryText)
                         .lineLimit(1)
                 }
-                .frame(minWidth: 95, maxWidth: 110, alignment: .leading)
+                .fixedSize(horizontal: true, vertical: false)
                 
                 Divider()
                     .frame(height: 36)
@@ -359,6 +359,84 @@ public struct DailyJournalDetailView: View {
             points.append((timeStr: tStr, cumPnl: running))
         }
         return points
+    }
+    
+    private var intradayDoubleVals: [Double] {
+        intradayPoints.map { NSDecimalNumber(decimal: $0.cumPnl).doubleValue }
+    }
+    
+    private var intradayYDomainMax: Double {
+        let maxData = intradayDoubleVals.max() ?? 0.0
+        let minData = intradayDoubleVals.min() ?? 0.0
+        if maxData <= 0 && minData < 0 {
+            return 0.0
+        }
+        let top = max(0.0, maxData)
+        let span = max(1.0, top - min(0.0, minData))
+        return top + (span * 0.06)
+    }
+    
+    private var intradayYDomainMin: Double {
+        let maxData = intradayDoubleVals.max() ?? 0.0
+        let minData = intradayDoubleVals.min() ?? 0.0
+        if minData >= 0 && maxData > 0 {
+            return 0.0
+        }
+        let bottom = min(0.0, minData)
+        let span = max(1.0, max(0.0, maxData) - bottom)
+        return bottom - (span * 0.06)
+    }
+    
+    private var intradayAreaGradient: LinearGradient {
+        let top = intradayYDomainMax
+        let bottom = intradayYDomainMin
+        if bottom >= 0 {
+            return LinearGradient(
+                colors: [AppColors.brand.opacity(0.28), AppColors.brand.opacity(0.02)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        } else if top <= 0 {
+            return LinearGradient(
+                colors: [AppColors.loss.opacity(0.02), AppColors.loss.opacity(0.28)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        } else {
+            let zeroFraction = CGFloat(top / (top - bottom))
+            return LinearGradient(
+                stops: [
+                    .init(color: AppColors.brand.opacity(0.28), location: 0.0),
+                    .init(color: AppColors.brand.opacity(0.02), location: max(0.0, zeroFraction - 0.001)),
+                    .init(color: AppColors.loss.opacity(0.02), location: min(1.0, zeroFraction + 0.001)),
+                    .init(color: AppColors.loss.opacity(0.28), location: 1.0)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        }
+    }
+    
+    private var intradayLineGradient: LinearGradient {
+        let top = intradayYDomainMax
+        let bottom = intradayYDomainMin
+        if bottom >= 0 {
+            return LinearGradient(colors: [AppColors.brand, AppColors.brand], startPoint: .top, endPoint: .bottom)
+        } else if top <= 0 {
+            return LinearGradient(colors: [AppColors.loss, AppColors.loss], startPoint: .top, endPoint: .bottom)
+        } else {
+            let zeroFraction = CGFloat(top / (top - bottom))
+            return LinearGradient(
+                stops: [
+                    .init(color: AppColors.brand, location: 0.0),
+                    .init(color: AppColors.brand, location: max(0.0, zeroFraction - 0.002)),
+                    .init(color: AppColors.loss, location: min(1.0, zeroFraction + 0.002)),
+                    .init(color: AppColors.loss, location: 1.0)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        }
     }
     
     public var body: some View {
@@ -513,7 +591,7 @@ public struct DailyJournalDetailView: View {
     private var intradayChartCard: some View {
         let activePoint = intradayPoints.first { $0.timeStr == selectedTime } ?? intradayPoints.last
         let isPositive = (activePoint?.cumPnl ?? metrics.netPnl) >= 0
-        let chartColor = isPositive ? AppColors.profit : AppColors.loss
+        let chartColor = isPositive ? AppColors.brand : AppColors.loss
         
         return AppCard {
             VStack(alignment: .leading, spacing: 12) {
@@ -535,50 +613,30 @@ public struct DailyJournalDetailView: View {
                 }
                 
                 Chart {
-                    RuleMark(y: .value("Zero", 0))
+                    RuleMark(y: .value("Zero", 0.0))
                         .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
-                        .foregroundStyle(AppColors.border.opacity(0.8))
+                        .foregroundStyle(AppColors.border.opacity(0.85))
                     
                     ForEach(Array(intradayPoints.enumerated()), id: \.offset) { _, point in
                         let val = NSDecimalNumber(decimal: point.cumPnl).doubleValue
                         
-                        // Positive profit area: fills from 0 UP to max(0.0, val) in green
+                        // Single area fill anchored strictly to 0.0 baseline with locked sub-pixel gradient
                         AreaMark(
                             x: .value("Time", point.timeStr),
-                            yStart: .value("Baseline", 0.0),
-                            yEnd: .value("Profit", max(0.0, val))
+                            y: .value("P&L", val)
                         )
                         .interpolationMethod(.catmullRom)
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [AppColors.profit.opacity(0.28), AppColors.profit.opacity(0.02)],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-                        
-                        // Negative loss area: fills from 0 DOWN to min(0.0, val) in red
-                        AreaMark(
-                            x: .value("Time", point.timeStr),
-                            yStart: .value("Baseline", 0.0),
-                            yEnd: .value("Loss", min(0.0, val))
-                        )
-                        .interpolationMethod(.catmullRom)
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [AppColors.loss.opacity(0.02), AppColors.loss.opacity(0.28)],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
+                        .foregroundStyle(intradayAreaGradient)
+                        .alignsMarkStylesWithPlotArea()
                         
                         LineMark(
                             x: .value("Time", point.timeStr),
                             y: .value("P&L", val)
                         )
                         .interpolationMethod(.catmullRom)
-                        .foregroundStyle(AppColors.brand)
+                        .foregroundStyle(intradayLineGradient)
                         .lineStyle(StrokeStyle(lineWidth: 2.2, lineCap: .round, lineJoin: .round))
+                        .alignsMarkStylesWithPlotArea()
                     }
                     
                     if let time = selectedTime, let p = activePoint {
@@ -586,17 +644,18 @@ public struct DailyJournalDetailView: View {
                         
                         RuleMark(x: .value("Cursor", time))
                             .lineStyle(StrokeStyle(lineWidth: 1.2, dash: [3, 3]))
-                            .foregroundStyle(AppColors.primaryText.opacity(0.4))
+                            .foregroundStyle(AppColors.primaryText.opacity(0.45))
                         
                         PointMark(
                             x: .value("Time", time),
                             y: .value("P&L", activeVal)
                         )
-                        .foregroundStyle(activeVal >= 0 ? AppColors.profit : AppColors.loss)
+                        .foregroundStyle(activeVal >= 0 ? AppColors.brand : AppColors.loss)
                         .symbolSize(36)
                     }
                 }
                 .chartXSelection(value: $selectedTime)
+                .chartYScale(domain: intradayYDomainMin...intradayYDomainMax)
                 .chartYAxis {
                     AxisMarks(position: .leading, values: .automatic(desiredCount: 4)) { value in
                         AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
