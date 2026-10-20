@@ -26,7 +26,7 @@ public struct PlaybookCardView: View {
                         }
                         
                         Text(summary.playbook.title)
-                            .font(AppTypography.headline)
+                            .font(AppTypography.subheadlineBold)
                             .foregroundColor(AppColors.primaryText)
                             .lineLimit(1)
                             .truncationMode(.tail)
@@ -147,7 +147,7 @@ public struct PlaybookCardView: View {
                             .foregroundColor(AppColors.secondaryText)
                             .lineLimit(1)
                         Text(Formatters.formatPnL(summary.netPnlWhenFollowed, currency: currency))
-                            .font(AppTypography.bodyBold)
+                            .font(AppTypography.subheadlineBold)
                             .monospacedDigit()
                             .foregroundColor(Formatters.pnlColor(summary.netPnlWhenFollowed))
                             .lineLimit(1)
@@ -162,7 +162,7 @@ public struct PlaybookCardView: View {
                             .foregroundColor(AppColors.secondaryText)
                             .lineLimit(1)
                         Text(Formatters.formatPnL(summary.netPnlWhenBroken, currency: currency))
-                            .font(AppTypography.bodyBold)
+                            .font(AppTypography.subheadlineBold)
                             .monospacedDigit()
                             .foregroundColor(Formatters.pnlColor(summary.netPnlWhenBroken))
                             .lineLimit(1)

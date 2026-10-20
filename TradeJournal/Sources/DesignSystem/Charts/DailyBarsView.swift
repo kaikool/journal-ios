@@ -5,10 +5,15 @@ public struct DailyBarDatum: Identifiable, Sendable {
     public var id: String { date }
     public let date: String
     public let netPnl: Decimal
+    public let dateObj: Date
     
     public init(date: String, netPnl: Decimal) {
         self.date = date
         self.netPnl = netPnl
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        f.timeZone = TimeZone(identifier: "UTC")
+        self.dateObj = f.date(from: date) ?? Date()
     }
 }
 
@@ -23,7 +28,7 @@ public struct DailyBarsView: View {
     public let isPrivate: Bool
     public let height: CGFloat
     
-    @State private var selectedDate: String? = nil
+    @State private var selectedDateObj: Date? = nil
     @State private var lastHapticDate: String? = nil
     
     public init(
@@ -39,8 +44,8 @@ public struct DailyBarsView: View {
     }
     
     private var activeDatum: DailyBarDatum? {
-        guard let d = selectedDate else { return nil }
-        return data.first { $0.date == d }
+        guard let target = selectedDateObj else { return nil }
+        return data.min(by: { abs($0.dateObj.timeIntervalSince(target)) < abs($1.dateObj.timeIntervalSince(target)) })
     }
     
     /// Evenly spaced date marks (at most 5 labels across the timeline to prevent overlapping text)
@@ -122,7 +127,7 @@ public struct DailyBarsView: View {
                         let val = isPrivate ? 0 : (entry.netPnl as NSDecimalNumber).doubleValue
                         
                         BarMark(
-                            x: .value("Date", entry.date),
+                            x: .value("Date", entry.dateObj, unit: .day),
                             y: .value("Net P&L", val)
                         )
                         .foregroundStyle(
@@ -139,16 +144,16 @@ public struct DailyBarsView: View {
                             )
                         )
                         .cornerRadius(2.5)
-                        .opacity(selectedDate == nil || selectedDate == entry.date ? 1.0 : 0.45)
+                        .opacity(activeDatum == nil || activeDatum?.id == entry.id ? 1.0 : 0.45)
                     }
                     
-                    if let activeKey = selectedDate {
-                        RuleMark(x: .value("Cursor", activeKey))
+                    if let active = activeDatum {
+                        RuleMark(x: .value("Cursor", active.dateObj, unit: .day))
                             .lineStyle(StrokeStyle(lineWidth: 1.2, dash: [3, 3]))
                             .foregroundStyle(AppColors.primaryText.opacity(0.4))
                     }
                 }
-                .chartXSelection(value: $selectedDate)
+                .chartXSelection(value: $selectedDateObj)
                 .chartYAxis {
                     AxisMarks(position: .leading, values: .automatic(desiredCount: 4)) { value in
                         AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
@@ -164,23 +169,19 @@ public struct DailyBarsView: View {
                     }
                 }
                 .chartXAxis {
-                    AxisMarks(values: visibleDateMarks) { value in
+                    AxisMarks(values: .automatic(desiredCount: 5)) { _ in
                         AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
                             .foregroundStyle(AppColors.border.opacity(0.25))
                         AxisTick(stroke: StrokeStyle(lineWidth: 0.5))
                             .foregroundStyle(AppColors.border)
-                        AxisValueLabel {
-                            if let dateStr = value.as(String.self) {
-                                Text(formatAxisDate(dateStr))
-                                    .font(.system(size: 9.5, weight: .medium))
-                                    .foregroundStyle(AppColors.secondaryText)
-                            }
-                        }
+                        AxisValueLabel(format: .dateTime.month(.abbreviated).day())
+                            .font(.system(size: 9.5, weight: .medium))
+                            .foregroundStyle(AppColors.secondaryText)
                     }
                 }
                 .frame(height: height)
-                .onChange(of: selectedDate) { newDate in
-                    if let d = newDate, d != lastHapticDate {
+                .onChange(of: selectedDateObj) { newDate in
+                    if let d = activeDatum?.date, d != lastHapticDate {
                         lastHapticDate = d
                         triggerHapticFeedback()
                     } else if newDate == nil {

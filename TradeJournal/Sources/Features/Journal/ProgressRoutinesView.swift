@@ -123,7 +123,8 @@ public struct ProgressRoutinesView: View {
                             .foregroundColor(AppColors.secondaryText)
                         
                         Text("\(Int(score.percent * 100))%")
-                            .font(.system(size: 36, weight: .bold, design: .rounded))
+                            .font(.system(size: 26, weight: .bold, design: .rounded))
+                            .monospacedDigit()
                             .foregroundColor(score.percent >= 0.8 ? AppColors.profit : (score.percent >= 0.5 ? AppColors.brand : AppColors.secondaryText))
                         
                         Text("\(score.completed) of \(score.total) scheduled routines")
@@ -198,7 +199,7 @@ public struct ProgressRoutinesView: View {
                     Image(systemName: stageIcon(stage))
                         .foregroundColor(AppColors.brand)
                     Text(stage)
-                        .font(AppTypography.headline)
+                        .font(AppTypography.subheadlineBold)
                         .foregroundColor(AppColors.primaryText)
                     Spacer()
                     Text("\(rulesForStage.filter { isRuleChecked($0.id) }.count)/\(rulesForStage.count)")
@@ -221,13 +222,13 @@ public struct ProgressRoutinesView: View {
                                     dataStore.toggleProgressCheck(ruleId: rule.id, date: activeDate)
                                 } label: {
                                     Image(systemName: isRuleChecked(rule.id) ? "checkmark.square.fill" : "square")
-                                        .font(.system(size: 20))
+                                        .font(.system(size: 17))
                                         .foregroundColor(isRuleChecked(rule.id) ? AppColors.brand : AppColors.secondaryText)
                                 }
                                 .buttonStyle(.plain)
                                 
                                 Text(rule.title)
-                                    .font(AppTypography.body)
+                                    .font(AppTypography.subheadline)
                                     .foregroundColor(isRuleChecked(rule.id) ? AppColors.secondaryText : AppColors.primaryText)
                                     .strikethrough(isRuleChecked(rule.id))
                                 
@@ -272,7 +273,7 @@ public struct ProgressRoutinesView: View {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     Text("Last 13 weeks")
-                        .font(AppTypography.headline)
+                        .font(AppTypography.subheadlineBold)
                         .foregroundColor(AppColors.primaryText)
                     Spacer()
                 }

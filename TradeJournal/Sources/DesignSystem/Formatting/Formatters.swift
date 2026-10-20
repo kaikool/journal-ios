@@ -28,6 +28,23 @@ public enum Formatters {
         return f
     }()
     
+    private static let inputNumberFormatter: NumberFormatter = {
+        let f = NumberFormatter()
+        f.numberStyle = .decimal
+        f.usesGroupingSeparator = false
+        f.locale = Locale(identifier: "en_US")
+        f.minimumFractionDigits = 0
+        f.maximumFractionDigits = 5
+        return f
+    }()
+    
+    /// Formats decimal numbers for text input fields, stripping floating point precision artifacts and trailing zeros.
+    public static func formatDecimalInput(_ value: Decimal?, maxDecimals: Int = 5) -> String {
+        guard let v = value else { return "" }
+        inputNumberFormatter.maximumFractionDigits = maxDecimals
+        return inputNumberFormatter.string(from: v as NSDecimalNumber) ?? "\(v)"
+    }
+    
     /// Formats currency with optional Privacy Mode masking
     public static func currency(_ amount: Decimal, currencyCode: String = "USD", isPrivate: Bool = false) -> String {
         if isPrivate { return "••••••" }

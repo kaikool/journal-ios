@@ -109,7 +109,7 @@ public struct PlaybooksView: View {
                 .padding(.top, 8)
                 
                 Text("Build Trading Playbooks")
-                    .font(AppTypography.headline)
+                    .font(AppTypography.subheadlineBold)
                     .foregroundColor(AppColors.primaryText)
                 
                 Text("A playbook is a setup you trade on purpose — name it, write its checklist rules, then tag trades with it and let Reports reveal its true edge.")

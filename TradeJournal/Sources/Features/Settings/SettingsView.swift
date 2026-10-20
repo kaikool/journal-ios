@@ -64,7 +64,6 @@ public struct SettingsView: View {
     @ObservedObject private var dataStore = TradeDataStore.shared
     
     @State private var activeSection: SettingsSection = .general
-    @Namespace private var settingsSectionNamespace
     
     public init() {}
     
@@ -124,47 +123,13 @@ public struct SettingsView: View {
     }
     
     private var sectionSelectorBar: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 6) {
-                ForEach(SettingsSection.allCases) { section in
-                    let isSelected = activeSection == section
-                    Button {
-                        if activeSection != section {
-                            #if canImport(UIKit)
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            #endif
-                            withAnimation(.spring(response: 0.28, dampingFraction: 0.76)) {
-                                activeSection = section
-                            }
-                        }
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: section.iconName)
-                                .font(.system(size: 11))
-                            Text(section.label)
-                                .font(AppTypography.captionBold)
-                                .lineLimit(1)
-                                .fixedSize(horizontal: true, vertical: false)
-                        }
-                        .foregroundColor(isSelected ? AppColors.brand : AppColors.secondaryText)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 7)
-                        .background {
-                            if isSelected {
-                                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                    .fill(AppColors.cardBackground)
-                                    .shadow(color: Color.black.opacity(0.08), radius: 4, x: 0, y: 1.5)
-                                    .matchedGeometryEffect(id: "SettingsSectionPill", in: settingsSectionNamespace)
-                            }
-                        }
-                    }
-                    .buttonStyle(ApplePressableButtonStyle())
-                }
-            }
-            .padding(4)
-            .background(AppColors.secondaryBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .padding(.horizontal, 16)
-        }
+        AppleSlidingSegmentedBar(
+            selection: $activeSection,
+            items: SettingsSection.allCases,
+            titleFor: { $0.label },
+            iconFor: { $0.iconName },
+            isScrollable: true
+        )
+        .padding(.horizontal, 14)
     }
 }

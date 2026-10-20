@@ -86,7 +86,7 @@ public struct TradeReplayView: View {
         .toolbar(.hidden, for: .navigationBar)
         .interactiveEdgeBack(onBack: { dismiss() })
         .enableNativePopGesture()
-        .background(AppColors.background.ignoresSafeArea())
+        .background(AppColors.background)
         .task(id: "\(trade.id)_\(selectedResolution.rawValue)") {
             await loadMarketCandles()
         }
@@ -800,6 +800,6 @@ public struct TradeReplayHubView: View {
                 }
             }
         }
-        .background(AppColors.background.ignoresSafeArea())
+        .background(AppColors.background)
     }
 }

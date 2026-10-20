@@ -96,7 +96,7 @@ public struct CurrencyConversionSettingsView: View {
             let config = dataStore.currencyConversion
             enabled = config.enabled
             reportingCurrency = config.reportingCurrency
-            rates = config.rates.mapValues { "\($0)" }
+            rates = config.rates.mapValues { Formatters.formatDecimalInput($0, maxDecimals: 5) }
         }
     }
     

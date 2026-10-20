@@ -42,7 +42,6 @@ public struct ReportsView: View {
     @State private var showAiReflectionSheet: Bool = false
     @State private var showExportSheet: Bool = false
     @State private var exportText: String = ""
-    @Namespace private var reportModeNamespace
     
     public init() {}
     
@@ -132,45 +131,13 @@ public struct ReportsView: View {
             VStack(spacing: 14) {
                 // Apple HIG Mode Sliding Bar + Ask AI Action
                 HStack(spacing: 8) {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 6) {
-                            ForEach(ReportMode.allCases) { mode in
-                                let isSelected = selectedMode == mode
-                                Button {
-                                    #if canImport(UIKit)
-                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                    #endif
-                                    withAnimation(.spring(response: 0.28, dampingFraction: 0.76)) {
-                                        selectedMode = mode
-                                    }
-                                } label: {
-                                    HStack(spacing: 5) {
-                                        Image(systemName: mode.iconName)
-                                            .font(.system(size: 11))
-                                        Text(mode.rawValue)
-                                            .font(AppTypography.captionBold)
-                                            .lineLimit(1)
-                                            .fixedSize(horizontal: true, vertical: false)
-                                    }
-                                    .foregroundColor(isSelected ? AppColors.brand : AppColors.secondaryText)
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 7)
-                                    .background {
-                                        if isSelected {
-                                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                                .fill(AppColors.cardBackground)
-                                                .shadow(color: Color.black.opacity(0.08), radius: 4, x: 0, y: 1.5)
-                                                .matchedGeometryEffect(id: "ReportModePill", in: reportModeNamespace)
-                                        }
-                                    }
-                                }
-                                .buttonStyle(ApplePressableButtonStyle())
-                            }
-                        }
-                        .padding(4)
-                        .background(AppColors.secondaryBackground)
-                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    }
+                    AppleSlidingSegmentedBar(
+                        selection: $selectedMode,
+                        items: ReportMode.allCases,
+                        titleFor: { $0.rawValue },
+                        iconFor: { $0.iconName },
+                        isScrollable: true
+                    )
                     
                     AppActionPill("Ask AI", icon: "sparkles") {
                         showAiReflectionSheet = true
@@ -223,7 +190,7 @@ public struct ReportsView: View {
                             .font(.system(size: 13))
                             .foregroundColor(AppColors.brand)
                         Text("Performance Summary")
-                            .font(AppTypography.headline)
+                            .font(AppTypography.subheadlineBold)
                             .foregroundColor(AppColors.primaryText)
                         Spacer()
                     }
@@ -336,7 +303,7 @@ public struct ReportsView: View {
                             .font(.system(size: 13))
                             .foregroundColor(AppColors.brand)
                         Text("Trade explorer (\(trades.count))")
-                            .font(AppTypography.headline)
+                            .font(AppTypography.subheadlineBold)
                             .foregroundColor(AppColors.primaryText)
                         Spacer()
                     }
@@ -395,7 +362,7 @@ public struct ReportsView: View {
                             .font(.system(size: 13))
                             .foregroundColor(AppColors.brand)
                         Text("Analysis Dimensions")
-                            .font(AppTypography.headline)
+                            .font(AppTypography.subheadlineBold)
                             .foregroundColor(AppColors.primaryText)
                     }
                     
@@ -451,7 +418,7 @@ public struct ReportsView: View {
                             .font(.system(size: 13))
                             .foregroundColor(AppColors.brand)
                         Text(selectedMode == .cross ? "\(primaryDimension.label) × \(secondaryDimension.label)" : "\(primaryDimension.label) Performance")
-                            .font(AppTypography.headline)
+                            .font(AppTypography.subheadlineBold)
                             .foregroundColor(AppColors.primaryText)
                         Spacer()
                     }
@@ -528,7 +495,7 @@ public struct ReportsView: View {
                             .font(.system(size: 13))
                             .foregroundColor(AppColors.brand)
                         Text("Playbooks Comparison")
-                            .font(AppTypography.headline)
+                            .font(AppTypography.subheadlineBold)
                             .foregroundColor(AppColors.primaryText)
                     }
                     

@@ -142,51 +142,18 @@ public struct DailyJournalListView: View {
     public var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
+                // Fixed pinned Search & Today bar - never hidden, always accessible
+                searchAndTodayBar
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(.ultraThinMaterial)
+                    .overlay(
+                        Divider().background(AppColors.border.opacity(0.35)),
+                        alignment: .bottom
+                    )
+                
                 ScrollView {
                     VStack(spacing: 10) {
-                        // Search bar & Today shortcut
-                        HStack(spacing: 10) {
-                            HStack {
-                                Image(systemName: "magnifyingglass")
-                                    .foregroundColor(AppColors.secondaryText)
-                                    .font(.system(size: 13))
-                                TextField("Search date, note...", text: $searchText)
-                                    .font(AppTypography.body)
-                                if !searchText.isEmpty {
-                                    Button {
-                                        searchText = ""
-                                    } label: {
-                                        Image(systemName: "xmark.circle.fill")
-                                            .foregroundColor(AppColors.secondaryText)
-                                    }
-                                }
-                            }
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 8)
-                            .background(AppColors.cardBackground)
-                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                    .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
-                            )
-                            
-                            NavigationLink(destination: DailyJournalDetailView(date: todayKey)) {
-                                HStack(spacing: 5) {
-                                    Image(systemName: "sun.max.fill")
-                                        .font(.system(size: 12))
-                                    Text("Today")
-                                        .font(.system(size: 12, weight: .semibold))
-                                }
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
-                                .background(AppColors.brandPrimary)
-                                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                            }
-                        }
-                        .padding(.horizontal, 14)
-                        .padding(.top, 10)
-                        
                         // Day cards list
                         if daysList.isEmpty {
                             VStack(spacing: 12) {
@@ -216,12 +183,56 @@ public struct DailyJournalListView: View {
                             .padding(.horizontal, 14)
                         }
                     }
+                    .padding(.top, 10)
                     .padding(.bottom, 88)
                 }
                 .background(AppColors.background)
             }
-            .navigationTitle("Daily journal")
-            .navigationBarHidden(true)
+            .background(AppColors.background)
+            .toolbar(.hidden, for: .navigationBar)
+        }
+    }
+    
+    private var searchAndTodayBar: some View {
+        HStack(spacing: 10) {
+            HStack {
+                Image(systemName: "magnifyingglass")
+                    .foregroundColor(AppColors.secondaryText)
+                    .font(.system(size: 13))
+                TextField("Search date, note...", text: $searchText)
+                    .font(AppTypography.body)
+                if !searchText.isEmpty {
+                    Button {
+                        searchText = ""
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(AppColors.secondaryText)
+                    }
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(AppColors.cardBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
+            )
+            
+            NavigationLink(destination: DailyJournalDetailView(date: todayKey)) {
+                HStack(spacing: 5) {
+                    Image(systemName: "sun.max.fill")
+                        .font(.system(size: 12))
+                    Text("Today")
+                        .font(.system(size: 12, weight: .semibold))
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(AppColors.brandPrimary)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            }
+            .fixedSize()
         }
     }
     
@@ -623,7 +634,8 @@ public struct DailyJournalDetailView: View {
                         // Single area fill anchored strictly to 0.0 baseline with locked sub-pixel gradient
                         AreaMark(
                             x: .value("Time", point.timeStr),
-                            y: .value("P&L", val)
+                            yStart: .value("Baseline", 0.0),
+                            yEnd: .value("P&L", val)
                         )
                         .interpolationMethod(.catmullRom)
                         .foregroundStyle(intradayAreaGradient)
@@ -637,6 +649,16 @@ public struct DailyJournalDetailView: View {
                         .foregroundStyle(intradayLineGradient)
                         .lineStyle(StrokeStyle(lineWidth: 2.2, lineCap: .round, lineJoin: .round))
                         .alignsMarkStylesWithPlotArea()
+                    }
+                    
+                    if intradayPoints.count == 1, let single = intradayPoints.first {
+                        let singleVal = NSDecimalNumber(decimal: single.cumPnl).doubleValue
+                        PointMark(
+                            x: .value("Time", single.timeStr),
+                            y: .value("P&L", singleVal)
+                        )
+                        .foregroundStyle(singleVal >= 0 ? AppColors.brand : AppColors.loss)
+                        .symbolSize(36)
                     }
                     
                     if let time = selectedTime, let p = activePoint {

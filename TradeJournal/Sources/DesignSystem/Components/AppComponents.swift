@@ -738,6 +738,7 @@ public struct AppleSlidingSegmentedBar<T: Hashable & Identifiable>: View {
     private let titleFor: (T) -> String
     private let iconFor: ((T) -> String?)?
     private let badgeCountFor: ((T) -> Int?)?
+    private let isScrollable: Bool
     @Namespace private var segmentNamespace
     
     public init(
@@ -745,68 +746,89 @@ public struct AppleSlidingSegmentedBar<T: Hashable & Identifiable>: View {
         items: [T],
         titleFor: @escaping (T) -> String,
         iconFor: ((T) -> String?)? = nil,
-        badgeCountFor: ((T) -> Int?)? = nil
+        badgeCountFor: ((T) -> Int?)? = nil,
+        isScrollable: Bool = false
     ) {
         self._selection = selection
         self.items = items
         self.titleFor = titleFor
         self.iconFor = iconFor
         self.badgeCountFor = badgeCountFor
+        self.isScrollable = isScrollable
     }
     
     public var body: some View {
-        HStack(spacing: 2) {
-            ForEach(items) { item in
-                let isSelected = selection == item
-                Button {
-                    #if os(iOS)
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    #endif
-                    withAnimation(.spring(response: 0.32, dampingFraction: 0.78)) {
-                        selection = item
+        if isScrollable {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 4) {
+                    ForEach(items) { item in
+                        segmentButton(for: item, isScrollable: true)
                     }
-                } label: {
-                    HStack(spacing: 4) {
-                        if let icon = iconFor?(item) {
-                            Image(systemName: icon)
-                                .font(.system(size: 11, weight: .semibold))
-                        }
-                        Text(titleFor(item))
-                            .font(.system(size: 11.5, weight: isSelected ? .bold : .medium))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.8)
-                        
-                        if let count = badgeCountFor?(item), count > 0 {
-                            Text("\(count)")
-                                .font(.system(size: 9.5, weight: .bold))
-                                .monospacedDigit()
-                                .lineLimit(1)
-                                .padding(.horizontal, 4.5)
-                                .padding(.vertical, 1)
-                                .background(isSelected ? AppColors.brand : AppColors.cardBackground)
-                                .foregroundColor(isSelected ? .white : AppColors.secondaryText)
-                                .clipShape(Capsule())
-                        }
-                    }
-                    .foregroundColor(isSelected ? AppColors.primaryText : AppColors.secondaryText)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 7)
-                    .background {
-                        if isSelected {
-                            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .fill(AppColors.cardBackground)
-                                .matchedGeometryEffect(id: "ACTIVE_SEGMENT", in: segmentNamespace)
-                                .shadow(color: Color.black.opacity(0.08), radius: 3, x: 0, y: 1.5)
-                        }
-                    }
-                    .contentShape(Rectangle())
                 }
-                .buttonStyle(ApplePressableButtonStyle())
+                .padding(3)
             }
+            .background(AppColors.secondaryBackground.opacity(0.7))
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        } else {
+            HStack(spacing: 2) {
+                ForEach(items) { item in
+                    segmentButton(for: item, isScrollable: false)
+                }
+            }
+            .padding(3)
+            .background(AppColors.secondaryBackground.opacity(0.7))
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
-        .padding(3)
-        .background(AppColors.secondaryBackground.opacity(0.7))
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+    
+    @ViewBuilder
+    private func segmentButton(for item: T, isScrollable: Bool) -> some View {
+        let isSelected = selection == item
+        Button {
+            #if os(iOS)
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            #endif
+            withAnimation(.spring(response: 0.32, dampingFraction: 0.78)) {
+                selection = item
+            }
+        } label: {
+            HStack(spacing: 4) {
+                if let icon = iconFor?(item) {
+                    Image(systemName: icon)
+                        .font(.system(size: 11, weight: .semibold))
+                }
+                Text(titleFor(item))
+                    .font(.system(size: 11.5, weight: isSelected ? .bold : .medium))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                
+                if let count = badgeCountFor?(item), count > 0 {
+                    Text("\(count)")
+                        .font(.system(size: 9.5, weight: .bold))
+                        .monospacedDigit()
+                        .lineLimit(1)
+                        .padding(.horizontal, 4.5)
+                        .padding(.vertical, 1)
+                        .background(isSelected ? AppColors.brand : AppColors.cardBackground)
+                        .foregroundColor(isSelected ? .white : AppColors.secondaryText)
+                        .clipShape(Capsule())
+                }
+            }
+            .foregroundColor(isSelected ? AppColors.primaryText : AppColors.secondaryText)
+            .frame(maxWidth: isScrollable ? nil : .infinity)
+            .padding(.horizontal, isScrollable ? 10 : 0)
+            .padding(.vertical, 7)
+            .background {
+                if isSelected {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(AppColors.cardBackground)
+                        .matchedGeometryEffect(id: "ACTIVE_SEGMENT", in: segmentNamespace)
+                        .shadow(color: Color.black.opacity(0.08), radius: 3, x: 0, y: 1.5)
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(ApplePressableButtonStyle())
     }
 }
 

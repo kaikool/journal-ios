@@ -143,14 +143,17 @@ public struct FilterBarView<Actions: View>: View {
             }
             
             Text(title)
-                .font(.system(size: 18, weight: .bold, design: .rounded))
+                .font(.system(size: 16, weight: .bold, design: .rounded))
                 .foregroundColor(AppColors.primaryText)
                 .tracking(-0.2)
                 .lineLimit(1)
+                .truncationMode(.tail)
+                .minimumScaleFactor(0.85)
             
-            Spacer()
+            Spacer(minLength: 4)
             
             actions
+                .fixedSize(horizontal: true, vertical: false)
         }
     }
     

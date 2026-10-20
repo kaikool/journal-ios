@@ -30,7 +30,7 @@ public struct JournalNote: Identifiable, Codable, Equatable, Sendable {
 }
 
 /// 1:1 port from table `folders` in `schema.pg.ts`
-public struct NotebookFolder: Identifiable, Codable, Equatable, Sendable {
+public struct NotebookFolder: Identifiable, Codable, Equatable, Hashable, Sendable {
     public let id: String
     public var name: String
     public var kind: String // "system" | "user"

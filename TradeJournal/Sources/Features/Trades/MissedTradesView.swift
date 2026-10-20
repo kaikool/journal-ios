@@ -25,8 +25,9 @@ public struct MissedTradesView: View {
     }
     
     public var body: some View {
-        VStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 10) {
+        ScrollView {
+            VStack(spacing: 12) {
+                // Header row with description and Log Opportunity action pill
                 HStack {
                     Text("Record setups you watched but did not take.")
                         .font(AppTypography.caption)
@@ -34,31 +35,16 @@ public struct MissedTradesView: View {
                     
                     Spacer()
                     
-                    Button {
-                        #if canImport(UIKit)
-                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                        #endif
+                    AppActionPill("Log Opportunity", icon: "plus") {
                         editingTrade = nil
                         showAddSheet = true
-                    } label: {
-                        HStack(spacing: 5) {
-                            Image(systemName: "plus")
-                                .font(.system(size: 11, weight: .bold))
-                            Text("Log Opportunity")
-                                .font(.system(size: 12, weight: .semibold))
-                        }
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 7)
-                        .background(AppColors.brandPrimary)
-                        .clipShape(Capsule())
                     }
                 }
-                .padding(.top, 8)
+                .padding(.top, 4)
                 
-                HStack(spacing: 12) {
-                    // Search bar
-                    HStack {
+                // Search bar & Status filter chip
+                HStack(spacing: 10) {
+                    HStack(spacing: 8) {
                         Image(systemName: "magnifyingglass")
                             .foregroundColor(AppColors.secondaryText)
                             .font(.system(size: 13))
@@ -70,53 +56,46 @@ public struct MissedTradesView: View {
                             } label: {
                                 Image(systemName: "xmark.circle.fill")
                                     .foregroundColor(AppColors.secondaryText)
+                                    .font(.system(size: 13))
                             }
                         }
                     }
                     .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
+                    .frame(height: 38)
                     .background(AppColors.cardBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
                             .stroke(AppColors.border.opacity(0.5), lineWidth: 0.5)
                     )
                     
-                    // Show archived toggle
-                    Button {
-                        showArchived.toggle()
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: showArchived ? "checkmark.square.fill" : "square")
-                                .foregroundColor(showArchived ? AppColors.brand : AppColors.secondaryText)
-                                .font(.system(size: 14))
-                            Text("Show archived")
-                                .font(AppTypography.caption)
-                                .foregroundColor(AppColors.primaryText)
+                    AppleMenuChip(
+                        title: "Status",
+                        selectionText: showArchived ? "Archived" : "Active",
+                        icon: showArchived ? "archivebox.fill" : "tray.fill"
+                    ) {
+                        Button("Active") {
+                            showArchived = false
+                        }
+                        Button("Archived") {
+                            showArchived = true
                         }
                     }
-                    .buttonStyle(.plain)
                 }
-            }
-            .padding(14)
-            
-            Divider()
-                .overlay(AppColors.border)
-            
-            if filteredTrades.isEmpty {
-                emptyStateView
-            } else {
-                List {
-                    ForEach(filteredTrades) { trade in
-                        missedTradeRow(trade)
-                            .listRowInsets(EdgeInsets(top: 6, leading: 14, bottom: 6, trailing: 14))
-                            .listRowBackground(Color.clear)
-                            .listRowSeparator(.hidden)
+                
+                if filteredTrades.isEmpty {
+                    emptyStateView
+                } else {
+                    LazyVStack(spacing: 10) {
+                        ForEach(filteredTrades) { trade in
+                            missedTradeRow(trade)
+                        }
                     }
                 }
-                .listStyle(.plain)
-                .padding(.bottom, 88)
             }
+            .padding(.horizontal, 14)
+            .padding(.top, 8)
+            .padding(.bottom, 88)
         }
         .background(AppColors.background)
         .sheet(isPresented: $showAddSheet) {
@@ -314,9 +293,9 @@ public struct AddMissedTradeSheet: View {
         if let t = tradeToEdit {
             _symbol = State(initialValue: t.symbol)
             _direction = State(initialValue: t.direction)
-            _entryText = State(initialValue: t.entry.map { "\($0)" } ?? "")
-            _stopText = State(initialValue: t.stop.map { "\($0)" } ?? "")
-            _targetText = State(initialValue: t.target.map { "\($0)" } ?? "")
+            _entryText = State(initialValue: Formatters.formatDecimalInput(t.entry, maxDecimals: 5))
+            _stopText = State(initialValue: Formatters.formatDecimalInput(t.stop, maxDecimals: 5))
+            _targetText = State(initialValue: Formatters.formatDecimalInput(t.target, maxDecimals: 5))
             _selectedPlaybookId = State(initialValue: t.playbookId ?? "")
             _notes = State(initialValue: t.notes)
             _observedDate = State(initialValue: FlexibleDateParser.parse(t.observedAt) ?? Date())

@@ -82,7 +82,8 @@ public struct SyncCenterSheet: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text("MARKET CONNECTIONS")
-                    .font(AppTypography.subheadlineBold)
+                    .font(AppTypography.cardHeader)
+                    .tracking(0.5)
                     .foregroundColor(AppColors.secondaryText)
                     .lineLimit(1)
                 Spacer()
@@ -132,7 +133,7 @@ public struct SyncCenterSheet: View {
             
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(AppTypography.bodyBold)
+                    .font(AppTypography.subheadlineBold)
                     .foregroundColor(AppColors.primaryText)
                     .lineLimit(1)
                 Text(subtitle)
@@ -180,7 +181,8 @@ public struct SyncCenterSheet: View {
     private var timeHorizonSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("TIME HORIZON (DATE FILTER)")
-                .font(AppTypography.subheadlineBold)
+                .font(AppTypography.cardHeader)
+                .tracking(0.5)
                 .foregroundColor(AppColors.secondaryText)
                 .lineLimit(1)
             
@@ -225,9 +227,9 @@ public struct SyncCenterSheet: View {
                 if options.dateRangeMode == .custom {
                     VStack(spacing: 8) {
                         DatePicker("From:", selection: $customStart, displayedComponents: .date)
-                            .font(AppTypography.body)
+                            .font(AppTypography.subheadline)
                         DatePicker("To:", selection: $customEnd, displayedComponents: .date)
-                            .font(AppTypography.body)
+                            .font(AppTypography.subheadline)
                     }
                     .padding(12)
                     .background(AppColors.cardBackground)
@@ -247,14 +249,15 @@ public struct SyncCenterSheet: View {
     private var dataElementsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("DATA SCOPE & CLOUD BACKUP")
-                .font(AppTypography.subheadlineBold)
+                .font(AppTypography.cardHeader)
+                .tracking(0.5)
                 .foregroundColor(AppColors.secondaryText)
             
             VStack(spacing: 10) {
                 Toggle(isOn: $options.includeHistoricalDeals) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Closed Trades & Orders")
-                            .font(AppTypography.body)
+                            .font(AppTypography.subheadlineBold)
                             .foregroundColor(AppColors.primaryText)
                         Text("Imports completed trades while preserving your personal notes, setups, and tags.")
                             .font(AppTypography.caption)
@@ -268,7 +271,7 @@ public struct SyncCenterSheet: View {
                 Toggle(isOn: $options.includeOpenPositions) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Live Open Positions")
-                            .font(AppTypography.body)
+                            .font(AppTypography.subheadlineBold)
                             .foregroundColor(AppColors.primaryText)
                         Text("Syncs current open positions and floating P&L to monitor active risk.")
                             .font(AppTypography.caption)
@@ -285,7 +288,7 @@ public struct SyncCenterSheet: View {
                             .foregroundColor(supabase.isConfigured ? AppColors.brand : AppColors.secondaryText)
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Cloud Backup (Supabase)")
-                                .font(AppTypography.body)
+                                .font(AppTypography.subheadlineBold)
                                 .foregroundColor(AppColors.primaryText)
                             Text(supabase.isConfigured ? "Uploads new trades and journal updates to your private cloud storage." : "Configure in Settings → Data & backups")
                                 .font(AppTypography.caption)
@@ -310,7 +313,8 @@ public struct SyncCenterSheet: View {
     private var syncResultsLogSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("SYNC ACTIVITY LOG")
-                .font(AppTypography.subheadlineBold)
+                .font(AppTypography.cardHeader)
+                .tracking(0.5)
                 .foregroundColor(AppColors.secondaryText)
             
             VStack(alignment: .leading, spacing: 8) {

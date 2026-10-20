@@ -230,57 +230,55 @@ public struct JournalCalendarView: View {
     }
     
     public var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 14) {
-                    // Multi-currency notice matching calendar/page.tsx line 74
-                    if availableCurrencies.count > 1 {
-                        currencyNoticeBanner
-                    }
-                    
-                    // Monthly Calendar Card with 8 columns matching calendar-pnl.tsx
-                    calendarCard
-                    
-                    // Performance Insights Section matching calendar-insights.tsx
-                    performanceInsightsSection
+        ScrollView {
+            VStack(spacing: 14) {
+                // Multi-currency notice matching calendar/page.tsx line 74
+                if availableCurrencies.count > 1 {
+                    currencyNoticeBanner
                 }
-                .padding(.horizontal, 14)
-                .padding(.top, 10)
-                .padding(.bottom, 88)
+                
+                // Monthly Calendar Card with 8 columns matching calendar-pnl.tsx
+                calendarCard
+                
+                // Performance Insights Section matching calendar-insights.tsx
+                performanceInsightsSection
             }
-            .safeAreaInset(edge: .top, spacing: 0) {
-                monthNavigatorBar
-            }
-            .background(AppColors.background)
-            // Dedicated item-based presentation eliminates white screens and guarantees instant loading
-            .sheet(item: $selectedDayContext) { ctx in
-                DayDetailSheet(
-                    dateKey: ctx.dateKey,
-                    stats: ctx.stats,
-                    trades: ctx.trades,
-                    note: ctx.note,
-                    onSaveNote: { updatedNote in
-                        dataStore.saveCalendarNote(updatedNote)
-                    },
-                    onAddTrade: {
-                        let targetDate = parseDate(from: ctx.dateKey)
-                        selectedDayContext = nil
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                            addTradeDate = targetDate
-                            showAddTradeSheet = true
-                        }
+            .padding(.horizontal, 14)
+            .padding(.top, 10)
+            .padding(.bottom, 88)
+        }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            monthNavigatorBar
+        }
+        .background(AppColors.background)
+        // Dedicated item-based presentation eliminates white screens and guarantees instant loading
+        .sheet(item: $selectedDayContext) { ctx in
+            DayDetailSheet(
+                dateKey: ctx.dateKey,
+                stats: ctx.stats,
+                trades: ctx.trades,
+                note: ctx.note,
+                onSaveNote: { updatedNote in
+                    dataStore.saveCalendarNote(updatedNote)
+                },
+                onAddTrade: {
+                    let targetDate = parseDate(from: ctx.dateKey)
+                    selectedDayContext = nil
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                        addTradeDate = targetDate
+                        showAddTradeSheet = true
                     }
-                )
-                .presentationDetents([.medium, .large])
+                }
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+            .presentationCornerRadius(28)
+        }
+        .sheet(isPresented: $showAddTradeSheet) {
+            AddTradeSheet(initialDate: addTradeDate ?? Date())
+                .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(28)
-            }
-            .sheet(isPresented: $showAddTradeSheet) {
-                AddTradeSheet(initialDate: addTradeDate ?? Date())
-                    .presentationDetents([.large])
-                    .presentationDragIndicator(.visible)
-                    .presentationCornerRadius(28)
-            }
         }
     }
     

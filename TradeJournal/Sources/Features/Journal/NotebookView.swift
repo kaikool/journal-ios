@@ -192,103 +192,51 @@ public struct NotebookView: View {
     
     // MARK: - Folder Chips Horizontal Bar
     
+    private var selectedFolderBinding: Binding<NotebookFolder> {
+        Binding(
+            get: {
+                activeFolders.first(where: { $0.id == selectedFolderId }) ?? activeFolders.first ?? NotebookFolder(id: NotebookEngine.systemFolderAll, name: "All notes")
+            },
+            set: { newFolder in
+                selectedFolderId = newFolder.id
+            }
+        )
+    }
+    
     private var folderChipsBar: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(activeFolders) { folder in
-                    let isSelected = selectedFolderId == folder.id
-                    let count = dataStore.notebookNotes.filter {
+        HStack(spacing: 8) {
+            AppleSlidingSegmentedBar(
+                selection: selectedFolderBinding,
+                items: activeFolders,
+                titleFor: { $0.name },
+                iconFor: { folderIcon(for: $0) },
+                badgeCountFor: { folder in
+                    dataStore.notebookNotes.filter {
                         folder.id == NotebookEngine.systemFolderAll ? true : $0.folderId == folder.id
                     }.count
-                    
-                    Button {
-                        if selectedFolderId != folder.id {
-                            #if canImport(UIKit)
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            #endif
-                            withAnimation(.spring(response: 0.28, dampingFraction: 0.72)) {
-                                selectedFolderId = folder.id
-                            }
-                        }
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: folderIcon(for: folder))
-                                .font(.system(size: 12))
-                            Text(folder.name)
-                                .font(AppTypography.captionBold)
-                                .lineLimit(1)
-                                .truncationMode(.tail)
-                                .frame(maxWidth: 160)
-                            Text("\(count)")
-                                .font(.system(size: 10, weight: .bold))
-                                .monospacedDigit()
-                                .lineLimit(1)
-                                .padding(.horizontal, 5)
-                                .padding(.vertical, 1)
-                                .background(isSelected ? Color.white.opacity(0.22) : AppColors.secondaryText.opacity(0.12))
-                                .clipShape(Capsule())
-                            
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(isSelected ? AppColors.brand : AppColors.secondaryBackground)
-                        .foregroundColor(isSelected ? AppColors.brandTextOnDark : AppColors.primaryText)
-                        .clipShape(Capsule())
-                        .shadow(color: isSelected ? AppColors.brand.opacity(0.2) : Color.clear, radius: 4, x: 0, y: 1.5)
-                    }
-                    .buttonStyle(ApplePressableButtonStyle())
-                    .contextMenu {
-                        if folder.id != NotebookEngine.systemFolderAll && folder.id != NotebookEngine.systemFolderMyNotes {
-                            Button {
-                                folderToRename = folder
-                                renameFolderName = folder.name
-                                folderError = nil
-                                showRenameFolderSheet = true
-                            } label: {
-                                Label("Rename Folder", systemImage: "pencil")
-                            }
-                            
-                            Button(role: .destructive) {
-                                folderToDelete = folder
-                                showDeleteFolderAlert = true
-                            } label: {
-                                Label("Delete Folder", systemImage: "trash")
-                            }
-                        }
-                    }
-                }
-                
-                // Add new folder button
-                Button {
-                    #if canImport(UIKit)
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    #endif
-                    newFolderName = ""
-                    folderError = nil
-                    showNewFolderSheet = true
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "plus")
-                            .font(.system(size: 11, weight: .bold))
-                        Text("New folder")
-                            .font(AppTypography.captionBold)
-                            .lineLimit(1)
-                            .fixedSize()
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(AppColors.secondaryBackground)
+                },
+                isScrollable: true
+            )
+            
+            Button {
+                #if canImport(UIKit)
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                #endif
+                newFolderName = ""
+                folderError = nil
+                showNewFolderSheet = true
+            } label: {
+                Image(systemName: "folder.badge.plus")
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(AppColors.brand)
-                    .clipShape(Capsule())
-                    .overlay(
-                        Capsule()
-                            .stroke(AppColors.brand.opacity(0.4), lineWidth: 0.8)
-                    )
-                }
-                .buttonStyle(ApplePressableButtonStyle())
+                    .frame(width: 32, height: 32)
+                    .background(AppColors.secondaryBackground)
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             }
-            .padding(.horizontal, 16)
+            .buttonStyle(ApplePressableButtonStyle())
+            .accessibilityLabel("New folder")
         }
+        .padding(.horizontal, 14)
     }
     
     // MARK: - Notes Scroll View
