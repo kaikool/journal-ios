@@ -10,7 +10,6 @@ public struct DashboardView: View {
     @AppStorage("dashboard_active_preset") private var activePresetRaw: String = "Overview"
     
     @State var isEditingLayout: Bool = false
-    @State private var selectedRange: JournalTimeRange = .all
     @State var showEdgeScoreBreakdown: Bool = false
     @State private var showCustomizerSheet: Bool = false
     @State private var showAIReflection: Bool = false
@@ -92,7 +91,7 @@ public struct DashboardView: View {
     // MARK: - Filtered Trades by Range
     
     var scopedTrades: [Trade] {
-        selectedRange.filterTrades(dataStore.filteredTrades, timeZone: env.currentTimeZone)
+        dataStore.selectedTimeRange.filterTrades(dataStore.filteredTrades, timeZone: env.currentTimeZone)
     }
     
     // MARK: - Memoized Single-Pass Snapshot
@@ -126,7 +125,7 @@ public struct DashboardView: View {
     }()
     
     private var snapshot: DashboardSnapshot {
-        let key = "\(selectedRange.rawValue)_\(dataStore.selectedAccountId)_\(dataStore.filteredTrades.count)_\(dataStore.visibleAccounts.count)_\(dataStore.cacheVersion)_\(env.currentTimeZone.identifier)"
+        let key = "\(dataStore.selectedTimeRange.rawValue)_\(dataStore.selectedAccountId)_\(dataStore.filteredTrades.count)_\(dataStore.visibleAccounts.count)_\(dataStore.cacheVersion)_\(env.currentTimeZone.identifier)"
         if cache.lastKey == key, let cached = cache.lastSnapshot {
             return cached
         }
@@ -328,6 +327,14 @@ public struct DashboardView: View {
         
         ScrollView {
             LazyVStack(spacing: 12) {
+                // Inline dashboard controls (Presets & Customize)
+                HStack(spacing: 8) {
+                    dashboardActions
+                    Spacer()
+                }
+                .padding(.horizontal, 2)
+                .padding(.top, 4)
+                
                 syncNotificationSection
                 
                 if isEditingLayout {
@@ -338,7 +345,7 @@ public struct DashboardView: View {
                     // Multi-currency notice & account breakdown matching page.tsx lines 153-188
                     multiCurrencySection
                 } else if metrics.totalTrades == 0 {
-                    if selectedRange != .all {
+                    if dataStore.selectedTimeRange != .all {
                         filteredEmptyState
                     } else {
                         emptyStateCard
@@ -358,18 +365,8 @@ public struct DashboardView: View {
                 }
             }
             .padding(.horizontal, 14)
-            .padding(.top, 10)
+            .padding(.top, 8)
             .padding(.bottom, 88)
-        }
-        .safeAreaInset(edge: .top, spacing: 0) {
-            FilterBarView(
-                title: "",
-                selectedRange: $selectedRange,
-                showAccountSelector: false,
-                showFilters: true
-            ) {
-                dashboardActions
-            }
         }
         .refreshable {
             await dataStore.performGlobalSync()
@@ -689,7 +686,7 @@ public struct DashboardView: View {
                 
                 Button("Reset to All") {
                     withAnimation {
-                        selectedRange = .all
+                        dataStore.selectedTimeRange = .all
                     }
                 }
                 .font(AppTypography.captionBold)

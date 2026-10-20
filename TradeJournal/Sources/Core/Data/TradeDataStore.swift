@@ -25,6 +25,9 @@ public final class TradeDataStore: ObservableObject {
     @Published public var selectedAccountId: String = "default-acc" {
         didSet { invalidatePerformanceCaches() }
     }
+    @Published public var selectedTimeRange: JournalTimeRange = .all {
+        didSet { invalidatePerformanceCaches() }
+    }
     @Published public private(set) var cacheVersion: Int = 0
     @Published public var defaults: JournalDefaults = .empty
     @Published public var multipliers: [String: Decimal] = [:]
@@ -88,7 +91,7 @@ public final class TradeDataStore: ObservableObject {
         return paths[0].appendingPathComponent("trade_journal_store_v1.json.bak")
     }
     
-    public init(loadSynchronously: Bool = true) {
+    public init(loadSynchronously: Bool = false) {
         self.folders = NotebookEngine.defaultSystemFolders
         if loadSynchronously {
             loadFromDiskSync()

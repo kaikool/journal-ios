@@ -36,7 +36,6 @@ public struct ReportsView: View {
     @ObservedObject private var dataStore = TradeDataStore.shared
     @EnvironmentObject private var env: AppEnvironment
     
-    @State private var selectedRange: JournalTimeRange = .all
     @State private var selectedMode: ReportMode = .overview
     @State private var primaryDimension: Dimension = .symbol
     @State private var secondaryDimension: Dimension = .weekday
@@ -58,11 +57,11 @@ public struct ReportsView: View {
     }
     
     private var trades: [Trade] {
-        selectedRange.filterTrades(dataStore.filteredTrades, timeZone: env.currentTimeZone)
+        dataStore.selectedTimeRange.filterTrades(dataStore.filteredTrades, timeZone: env.currentTimeZone)
     }
     
     private var metrics: TradeMetrics {
-        let key = "\(selectedRange.rawValue)_\(dataStore.selectedAccountId)_\(dataStore.filteredTrades.count)_\(dataStore.cacheVersion)"
+        let key = "\(dataStore.selectedTimeRange.rawValue)_\(dataStore.selectedAccountId)_\(dataStore.filteredTrades.count)_\(dataStore.cacheVersion)"
         if cache.lastKey == key, let m = cache.lastMetrics {
             return m
         }
@@ -74,7 +73,7 @@ public struct ReportsView: View {
     
     private var groupResults: [GroupAnalysisResult] {
         let sec: Dimension? = selectedMode == .cross ? secondaryDimension : nil
-        let groupKey = "\(selectedRange.rawValue)_\(selectedMode.rawValue)_\(primaryDimension.rawValue)_\(secondaryDimension.rawValue)_\(dataStore.selectedAccountId)_\(dataStore.filteredTrades.count)_\(dataStore.cacheVersion)"
+        let groupKey = "\(dataStore.selectedTimeRange.rawValue)_\(selectedMode.rawValue)_\(primaryDimension.rawValue)_\(secondaryDimension.rawValue)_\(dataStore.selectedAccountId)_\(dataStore.filteredTrades.count)_\(dataStore.cacheVersion)"
         if cache.lastGroupKey == groupKey {
             return cache.lastGroupResults
         }
@@ -131,7 +130,8 @@ public struct ReportsView: View {
     public var body: some View {
         ScrollView {
             VStack(spacing: 14) {
-                // Apple HIG Mode Sliding Bar
+                // Apple HIG Mode Sliding Bar + Ask AI Action
+                HStack(spacing: 8) {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 6) {
                             ForEach(ReportMode.allCases) { mode in
@@ -170,39 +170,33 @@ public struct ReportsView: View {
                         .padding(4)
                         .background(AppColors.secondaryBackground)
                         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                        .padding(.horizontal, 16)
-                        .padding(.top, 10)
                     }
                     
-                    // Selected Mode Content
-                    switch selectedMode {
-                    case .overview:
-                        overviewSection
-                    case .trends:
-                        trendsSection
-                    case .explorer:
-                        explorerSection
-                    case .breakdown, .cross:
-                        breakdownAndCrossSection
-                    case .compare:
-                        compareSection
-                    }
-                }
-                .padding(.bottom, 88)
-            }
-            .safeAreaInset(edge: .top, spacing: 0) {
-                FilterBarView(
-                    title: "",
-                    selectedRange: $selectedRange,
-                    showAccountSelector: false,
-                    showFilters: true
-                ) {
                     AppActionPill("Ask AI", icon: "sparkles") {
                         showAiReflectionSheet = true
                     }
+                    .fixedSize()
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 10)
+                
+                // Selected Mode Content
+                switch selectedMode {
+                case .overview:
+                    overviewSection
+                case .trends:
+                    trendsSection
+                case .explorer:
+                    explorerSection
+                case .breakdown, .cross:
+                    breakdownAndCrossSection
+                case .compare:
+                    compareSection
                 }
             }
-            .background(AppColors.background)
+            .padding(.bottom, 88)
+        }
+        .background(AppColors.background)
         .sheet(isPresented: $showAiReflectionSheet) {
             AIReflectionView()
                 .presentationDetents([.large])

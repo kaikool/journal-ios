@@ -50,6 +50,15 @@ public struct ShellHeaderView: View {
         }
     }
     
+    private var shouldShowTimeRangeSelector: Bool {
+        switch env.selectedTab {
+        case .dashboard, .trades, .reports:
+            return true
+        default:
+            return false
+        }
+    }
+    
     private var shouldShowQuickAdd: Bool {
         switch env.selectedTab {
         case .dashboard, .calendar, .journal, .trades:
@@ -60,7 +69,7 @@ public struct ShellHeaderView: View {
     }
     
     public var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             // Leading: Hamburger Drawer Menu Trigger
             Button {
                 #if os(iOS)
@@ -85,24 +94,30 @@ public struct ShellHeaderView: View {
             .accessibilityLabel("Toggle navigation drawer")
             
             // Current Page Title & Brand Mark (Always prominent and unambiguous)
-            HStack(spacing: 6) {
-                TradeJournalMarkView(size: 16, color: AppColors.brand)
+            HStack(spacing: 5) {
+                TradeJournalMarkView(size: 15, color: AppColors.brand)
                 
                 Text(currentTabTitle)
-                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                    .font(.system(size: 16, weight: .bold, design: .rounded))
                     .foregroundColor(AppColors.primaryText)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.85)
             }
             .layoutPriority(1)
             
-            Spacer(minLength: 6)
+            Spacer(minLength: 4)
             
             // Trailing 1: Compact Account Selector Chip (financial tabs only)
             if shouldShowAccountSelector {
                 accountSelectorMenu
             }
             
-            // Trailing 2: Refined Circular Quick Add (+) Button
+            // Trailing 2: Compact Time Range Selector Chip (Dashboard, Trades, Reports)
+            if shouldShowTimeRangeSelector {
+                timeRangeSelectorMenu
+            }
+            
+            // Trailing 3: Refined Circular Quick Add (+) Button
             if shouldShowQuickAdd {
                 Button {
                     #if os(iOS)
@@ -122,7 +137,7 @@ public struct ShellHeaderView: View {
                 .accessibilityLabel("Quick Add Trade")
             }
         }
-        .padding(.horizontal, 14)
+        .padding(.horizontal, 12)
         .padding(.vertical, 7)
         .background(.ultraThinMaterial)
         .overlay(
@@ -135,6 +150,49 @@ public struct ShellHeaderView: View {
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(28)
         }
+    }
+    
+    private var timeRangeSelectorMenu: some View {
+        Menu {
+            ForEach(JournalTimeRange.allCases) { range in
+                Button {
+                    #if os(iOS)
+                    UISelectionFeedbackGenerator().selectionChanged()
+                    #endif
+                    dataStore.selectedTimeRange = range
+                } label: {
+                    HStack {
+                        Text(range.rawValue)
+                        if dataStore.selectedTimeRange == range {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 3) {
+                Image(systemName: "calendar")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(AppColors.brand)
+                
+                Text(dataStore.selectedTimeRange.rawValue)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(AppColors.primaryText)
+                    .lineLimit(1)
+                
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundColor(AppColors.secondaryText)
+            }
+            .padding(.horizontal, 7)
+            .padding(.vertical, 5)
+            .background(AppColors.cardBackground.opacity(0.9))
+            .clipShape(Capsule())
+            .overlay(
+                Capsule().stroke(AppColors.border.opacity(0.6), lineWidth: 0.6)
+            )
+        }
+        .accessibilityLabel("Select Time Range")
     }
     
     private var accountSelectorMenu: some View {

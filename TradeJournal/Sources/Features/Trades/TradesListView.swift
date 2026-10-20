@@ -13,7 +13,6 @@ public struct TradesListView: View {
     @EnvironmentObject private var env: AppEnvironment
     @ObservedObject private var dataStore = TradeDataStore.shared
     
-    @State private var selectedRange: JournalTimeRange = .all
     @State private var showAddTradeSheet: Bool = false
     @State private var searchText: String = ""
     @State private var statusFilter: TradeStatusFilter = .all
@@ -31,11 +30,11 @@ public struct TradesListView: View {
     }
     
     private var scopedTrades: [Trade] {
-        selectedRange.filterTrades(dataStore.filteredTrades, timeZone: env.currentTimeZone)
+        dataStore.selectedTimeRange.filterTrades(dataStore.filteredTrades, timeZone: env.currentTimeZone)
     }
     
     private var filteredTrades: [Trade] {
-        let key = "\(selectedRange.rawValue)_\(statusFilter.rawValue)_\(searchText)_\(dataStore.selectedAccountId)_\(dataStore.filteredTrades.count)_\(dataStore.cacheVersion)"
+        let key = "\(dataStore.selectedTimeRange.rawValue)_\(statusFilter.rawValue)_\(searchText)_\(dataStore.selectedAccountId)_\(dataStore.filteredTrades.count)_\(dataStore.cacheVersion)"
         if cache.lastFilterKey == key {
             return cache.lastFilteredTrades
         }
@@ -68,7 +67,7 @@ public struct TradesListView: View {
     }
     
     private var overviewMetrics: TradeMetrics {
-        let key = "\(selectedRange.rawValue)_\(dataStore.selectedAccountId)_\(dataStore.filteredTrades.count)_\(dataStore.cacheVersion)"
+        let key = "\(dataStore.selectedTimeRange.rawValue)_\(dataStore.selectedAccountId)_\(dataStore.filteredTrades.count)_\(dataStore.cacheVersion)"
         if cache.lastMetricsKey == key, let m = cache.lastMetrics {
             return m
         }
@@ -92,14 +91,6 @@ public struct TradesListView: View {
                 .padding(.horizontal, 16)
                 .padding(.top, 10)
                 .padding(.bottom, 88)
-            }
-            .safeAreaInset(edge: .top, spacing: 0) {
-                FilterBarView(
-                    title: "",
-                    selectedRange: $selectedRange,
-                    showAccountSelector: false,
-                    showFilters: true
-                )
             }
             .refreshable {
                 await dataStore.performGlobalSync()
