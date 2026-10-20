@@ -354,143 +354,20 @@ private struct TradeTerminalRow: View {
         return trade.status == .open ? "Holding" : nil
     }
     
+    private var dateDisplay: String {
+        let d = trade.closedAt ?? trade.openedAt
+        let time = Formatters.formatTime(d)
+        let date = Formatters.dateOnly(d, timeZone: env.currentTimeZone)
+        return "\(time) · \(date)"
+    }
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // Row 1: Top Line - Symbol, Direction, Status, PnL & R:R
-            HStack(alignment: .center, spacing: 8) {
-                // Symbol + Direction pill
-                HStack(spacing: 6) {
-                    Text(trade.symbol)
-                        .font(.system(size: 15, weight: .bold, design: .monospaced))
-                        .foregroundColor(AppColors.primaryText)
-                    
-                    Text(trade.direction == .long ? "LONG" : "SHORT")
-                        .font(.system(size: 9, weight: .heavy))
-                        .foregroundColor(trade.direction == .long ? AppColors.brand : AppColors.warning)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background((trade.direction == .long ? AppColors.brand : AppColors.warning).opacity(0.12))
-                        .clipShape(Capsule())
-                    
-                    AppBadge(
-                        trade.status.rawValue.uppercased(),
-                        color: Formatters.statusColor(trade.status)
-                    )
-                }
-                
-                Spacer()
-                
-                // Net PnL (prominent)
-                VStack(alignment: .trailing, spacing: 1) {
-                    AppMonetaryText(
-                        Formatters.formatPnL(trade.netPnl, currency: env.currentCurrency),
-                        isPrivate: env.isPrivacyModeEnabled,
-                        font: AppTypography.financialNumber(size: 16, weight: .bold),
-                        color: trade.netPnl >= 0 ? AppColors.profit : AppColors.loss
-                    )
-                    
-                    if let r = trade.rMultiple {
-                        Text("\(r >= 0 ? "+" : "")\(Formatters.formatNumber(r))R")
-                            .font(.system(size: 11, weight: .semibold, design: .rounded))
-                            .foregroundColor(r >= 0 ? AppColors.profit : AppColors.loss)
-                    }
-                }
-            }
-            
+            topLineView
             Divider().background(AppColors.border.opacity(0.35))
-            
-            // Row 2: Middle Line - Price Progression, Quantity & Timestamps
-            HStack(alignment: .center, spacing: 8) {
-                // Entry -> Exit price path
-                HStack(spacing: 4) {
-                    Text(Formatters.price(trade.avgEntry))
-                        .font(.system(size: 12, weight: .medium, design: .monospaced))
-                        .foregroundColor(AppColors.primaryText)
-                    
-                    Image(systemName: "arrow.right")
-                        .font(.system(size: 8, weight: .bold))
-                        .foregroundColor(AppColors.secondaryText.opacity(0.6))
-                    
-                    if let exit = trade.avgExit {
-                        Text(Formatters.price(exit))
-                            .font(.system(size: 12, weight: .medium, design: .monospaced))
-                            .foregroundColor(AppColors.primaryText)
-                    } else {
-                        Text("Active")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundColor(AppColors.brand)
-                    }
-                }
-                
-                Text("•")
-                    .foregroundColor(AppColors.secondaryText.opacity(0.4))
-                
-                // Volume
-                Text("Vol \(Formatters.formatNumber(trade.quantity))")
-                    .font(.system(size: 11, weight: .regular))
-                    .foregroundColor(AppColors.secondaryText)
-                
-                if let dur = durationText {
-                    Text("•")
-                        .foregroundColor(AppColors.secondaryText.opacity(0.4))
-                    HStack(spacing: 2) {
-                        Image(systemName: "clock")
-                            .font(.system(size: 8))
-                        Text(dur)
-                    }
-                    .font(.system(size: 11, weight: .regular))
-                    .foregroundColor(AppColors.secondaryText)
-                }
-                
-                Spacer()
-                
-                // Closed or Opened Time
-                let dateDisplay: String = {
-                    let d = trade.closedAt ?? trade.openedAt
-                    let time = Formatters.formatTime(d)
-                    let date = Formatters.dateOnly(d, timeZone: env.currentTimeZone)
-                    return "\(time) · \(date)"
-                }()
-                Text(dateDisplay)
-                    .font(.system(size: 11, weight: .regular))
-                    .foregroundColor(AppColors.secondaryText)
-            }
-            
-            // Row 3: Tags / Setup / Fees (if present)
+            middleLineView
             if !trade.tags.isEmpty || trade.setup != nil || trade.fees > 0 {
-                HStack(spacing: 6) {
-                    if let setup = trade.setup, !setup.isEmpty {
-                        HStack(spacing: 3) {
-                            Image(systemName: "bookmark.fill")
-                                .font(.system(size: 8))
-                            Text(setup)
-                        }
-                        .font(.system(size: 10, weight: .medium))
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(AppColors.brand.opacity(0.10))
-                        .foregroundColor(AppColors.brand)
-                        .clipShape(Capsule())
-                    }
-                    
-                    ForEach(trade.tags.prefix(3), id: \.self) { tag in
-                        Text("#\(tag)")
-                            .font(.system(size: 10, weight: .medium))
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(AppColors.secondaryBackground)
-                            .foregroundColor(AppColors.secondaryText)
-                            .clipShape(Capsule())
-                    }
-                    
-                    Spacer()
-                    
-                    if trade.fees > 0 {
-                        Text("Fee: \(Formatters.formatCurrency(trade.fees, currency: env.currentCurrency))")
-                            .font(.system(size: 10, weight: .regular))
-                            .foregroundColor(AppColors.secondaryText.opacity(0.7))
-                    }
-                }
+                bottomLineView
             }
         }
         .padding(14)
@@ -502,5 +379,137 @@ private struct TradeTerminalRow: View {
                 .stroke(AppColors.border.opacity(0.5), lineWidth: 0.5)
         )
         .shadow(color: Color.black.opacity(0.03), radius: 6, x: 0, y: 1.5)
+    }
+    
+    @ViewBuilder
+    private var topLineView: some View {
+        HStack(alignment: .center, spacing: 8) {
+            // Symbol + Direction pill
+            HStack(spacing: 6) {
+                Text(trade.symbol)
+                    .font(.system(size: 15, weight: .bold, design: .monospaced))
+                    .foregroundColor(AppColors.primaryText)
+                
+                Text(trade.direction == .long ? "LONG" : "SHORT")
+                    .font(.system(size: 9, weight: .heavy))
+                    .foregroundColor(trade.direction == .long ? AppColors.brand : AppColors.warning)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background((trade.direction == .long ? AppColors.brand : AppColors.warning).opacity(0.12))
+                    .clipShape(Capsule())
+                
+                AppBadge(
+                    trade.status.rawValue.uppercased(),
+                    color: Formatters.statusColor(trade.status)
+                )
+            }
+            
+            Spacer()
+            
+            // Net PnL (prominent)
+            VStack(alignment: .trailing, spacing: 1) {
+                AppMonetaryText(
+                    Formatters.formatPnL(trade.netPnl, currency: env.currentCurrency),
+                    isPrivate: env.isPrivacyModeEnabled,
+                    font: AppTypography.financialNumber(size: 16, weight: .bold),
+                    color: trade.netPnl >= 0 ? AppColors.profit : AppColors.loss
+                )
+                
+                if let r = trade.rMultiple {
+                    Text("\(r >= 0 ? "+" : "")\(Formatters.formatNumber(r))R")
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .foregroundColor(r >= 0 ? AppColors.profit : AppColors.loss)
+                }
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var middleLineView: some View {
+        HStack(alignment: .center, spacing: 8) {
+            // Entry -> Exit price path
+            HStack(spacing: 4) {
+                Text(Formatters.price(trade.avgEntry))
+                    .font(.system(size: 12, weight: .medium, design: .monospaced))
+                    .foregroundColor(AppColors.primaryText)
+                
+                Image(systemName: "arrow.right")
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundColor(AppColors.secondaryText.opacity(0.6))
+                
+                if let exit = trade.avgExit {
+                    Text(Formatters.price(exit))
+                        .font(.system(size: 12, weight: .medium, design: .monospaced))
+                        .foregroundColor(AppColors.primaryText)
+                } else {
+                    Text("Active")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(AppColors.brand)
+                }
+            }
+            
+            Text("•")
+                .foregroundColor(AppColors.secondaryText.opacity(0.4))
+            
+            // Volume
+            Text("Vol \(Formatters.formatNumber(trade.quantity))")
+                .font(.system(size: 11, weight: .regular))
+                .foregroundColor(AppColors.secondaryText)
+            
+            if let dur = durationText {
+                Text("•")
+                    .foregroundColor(AppColors.secondaryText.opacity(0.4))
+                HStack(spacing: 2) {
+                    Image(systemName: "clock")
+                        .font(.system(size: 8))
+                    Text(dur)
+                }
+                .font(.system(size: 11, weight: .regular))
+                .foregroundColor(AppColors.secondaryText)
+            }
+            
+            Spacer()
+            
+            Text(dateDisplay)
+                .font(.system(size: 11, weight: .regular))
+                .foregroundColor(AppColors.secondaryText)
+        }
+    }
+    
+    @ViewBuilder
+    private var bottomLineView: some View {
+        HStack(spacing: 6) {
+            if let setup = trade.setup, !setup.isEmpty {
+                HStack(spacing: 3) {
+                    Image(systemName: "bookmark.fill")
+                        .font(.system(size: 8))
+                    Text(setup)
+                }
+                .font(.system(size: 10, weight: .medium))
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(AppColors.brand.opacity(0.10))
+                .foregroundColor(AppColors.brand)
+                .clipShape(Capsule())
+            }
+            
+            ForEach(trade.tags.prefix(3), id: \.self) { tag in
+                Text("#\(tag)")
+                    .font(.system(size: 10, weight: .medium))
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(AppColors.secondaryBackground)
+                    .foregroundColor(AppColors.secondaryText)
+                    .clipShape(Capsule())
+            }
+            
+            Spacer()
+            
+            if trade.fees > 0 {
+                Text("Fee: \(Formatters.formatCurrency(trade.fees, currency: env.currentCurrency))")
+                    .font(.system(size: 10, weight: .regular))
+                    .foregroundColor(AppColors.secondaryText.opacity(0.7))
+            }
+        }
     }
 }
