@@ -736,12 +736,10 @@ public struct TradeDetailView: View {
                     }
                     .buttonStyle(ApplePressableButtonStyle())
                     .padding(.top, 4)
-                }
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
-                .padding(.bottom, 32)
             }
-            .background(AppColors.background)
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+            .padding(.bottom, 32)
         }
         .safeAreaInset(edge: .top, spacing: 0) {
             FilterBarView(
