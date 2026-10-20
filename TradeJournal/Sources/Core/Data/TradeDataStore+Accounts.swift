@@ -79,6 +79,7 @@ extension TradeDataStore {
             let clean = acc.id.cleanAccountId
             ids.insert(clean)
             ids.insert(acc.id.the5ersCanonicalId)
+            ids.insert(acc.id.ctraderCanonicalId)
         }
         for prop in propAccounts {
             if isPropAccountVisible(prop) {
@@ -86,11 +87,13 @@ extension TradeDataStore {
                 let clean = prop.id.cleanAccountId
                 ids.insert(clean)
                 ids.insert(prop.id.the5ersCanonicalId)
+                ids.insert(prop.id.ctraderCanonicalId)
                 if let jId = prop.journalAccountId, !jId.isEmpty {
                     ids.insert(jId)
                     let cleanJ = jId.cleanAccountId
                     ids.insert(cleanJ)
                     ids.insert(jId.the5ersCanonicalId)
+                    ids.insert(jId.ctraderCanonicalId)
                 }
             }
         }
@@ -302,6 +305,7 @@ extension TradeDataStore {
             let clean = acc.id.cleanAccountId
             canonicalMap[clean] = acc.id
             canonicalMap["the5ers_\(clean)"] = acc.id
+            canonicalMap["ctrader_\(clean)"] = acc.id
             canonicalMap[acc.id] = acc.id
         }
         for i in 0..<trades.count {
@@ -324,7 +328,7 @@ extension TradeDataStore {
         for acc in accounts {
             let clean = acc.id.cleanAccountId
             if seenCleanAccIds.contains(clean) {
-                if acc.id.hasPrefix("the5ers_"), let idx = cleanedAccounts.firstIndex(where: { $0.id.isEquivalentAccountId(to: acc.id) }) {
+                if (acc.id.hasPrefix("the5ers_") || acc.id.hasPrefix("ctrader_")), let idx = cleanedAccounts.firstIndex(where: { $0.id.isEquivalentAccountId(to: acc.id) }) {
                     cleanedAccounts[idx] = acc
                 }
                 continue

@@ -202,6 +202,12 @@ extension TradeDataStore {
         } else if accounts.contains(where: { $0.id != "default-acc" }) {
             accounts.removeAll(where: { $0.id == "default-acc" })
         }
+        
+        // Ensure discovered cTrader accounts are registered in TradeDataStore if configured
+        if CTraderService.shared.isConfigured && !CTraderService.shared.discoveredAccounts.isEmpty {
+            CTraderService.shared.registerDiscoveredAccounts(into: self)
+        }
+        
         if folders.isEmpty {
             folders = NotebookEngine.defaultSystemFolders
         }

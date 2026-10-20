@@ -100,10 +100,21 @@ public struct SyncCenterSheet: View {
             
             VStack(spacing: 8) {
                 // cTrader Source Card
+                let ctraderAccountCount = ctrader.discoveredAccounts.count > 0 ? ctrader.discoveredAccounts.count : dataStore.accounts.filter { $0.id.hasPrefix("ctrader_") || $0.broker.lowercased() == "ctrader" }.count
+                let ctraderSubtitle: String = {
+                    if !ctrader.isConfigured {
+                        return "Not configured"
+                    }
+                    if ctraderAccountCount > 0 {
+                        return "Connected · \(ctraderAccountCount) linked account(s)"
+                    }
+                    return "Connected · Ready to fetch accounts"
+                }()
+                
                 sourceRow(
                     id: "ctrader",
                     title: "cTrader",
-                    subtitle: ctrader.isConfigured ? "Connected · \(ctrader.discoveredAccounts.count) linked account(s)" : "Not configured",
+                    subtitle: ctraderSubtitle,
                     icon: "chart.xyaxis.line",
                     isConfigured: ctrader.isConfigured
                 )

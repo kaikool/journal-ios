@@ -111,11 +111,20 @@ public enum JournalIds {
 
 extension String {
     public var cleanAccountId: String {
-        hasPrefix("the5ers_") ? String(dropFirst(8)) : self
+        if hasPrefix("the5ers_") {
+            return String(dropFirst(8))
+        } else if hasPrefix("ctrader_") {
+            return String(dropFirst(8))
+        }
+        return self
     }
     
     public var the5ersCanonicalId: String {
         hasPrefix("the5ers_") ? self : "the5ers_\(self)"
+    }
+    
+    public var ctraderCanonicalId: String {
+        hasPrefix("ctrader_") ? self : "ctrader_\(self)"
     }
     
     public func isEquivalentAccountId(to other: String) -> Bool {

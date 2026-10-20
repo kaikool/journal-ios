@@ -103,6 +103,7 @@ public final class CTraderService: ObservableObject {
     private static let keyIsLive = "cTrader_isLive"
     private static let keySelectedAccounts = "cTrader_selectedAccountIds"
     private static let keyLastSyncDate = "cTrader_lastSyncDate"
+    private static let keyDiscoveredAccounts = "cTrader_discoveredAccounts"
     
     // MARK: - Published Properties
     @Published public var accessToken: String {
@@ -129,7 +130,13 @@ public final class CTraderService: ObservableObject {
         didSet { UserDefaults.standard.set(lastSyncDate, forKey: Self.keyLastSyncDate) }
     }
     
-    @Published public private(set) var discoveredAccounts: [CTraderAccount] = []
+    @Published public private(set) var discoveredAccounts: [CTraderAccount] = [] {
+        didSet {
+            if let data = try? JSONEncoder().encode(discoveredAccounts) {
+                UserDefaults.standard.set(data, forKey: Self.keyDiscoveredAccounts)
+            }
+        }
+    }
     @Published public private(set) var isConnected: Bool = false
     @Published public private(set) var isSyncing: Bool = false
     @Published public private(set) var lastStatus: String = ""
@@ -158,6 +165,13 @@ public final class CTraderService: ObservableObject {
             self.selectedAccountIds = Set(array)
         } else {
             self.selectedAccountIds = []
+        }
+        
+        if let data = UserDefaults.standard.data(forKey: Self.keyDiscoveredAccounts),
+           let array = try? JSONDecoder().decode([CTraderAccount].self, from: data) {
+            self.discoveredAccounts = array
+        } else {
+            self.discoveredAccounts = []
         }
     }
     
@@ -404,7 +418,80 @@ public final class CTraderService: ObservableObject {
         
         self.discoveredAccounts = accounts
         self.lastStatus = "Found \(accounts.count) trading account(s)."
+        registerDiscoveredAccounts(into: TradeDataStore.shared)
         return accounts
+    }
+    
+    // MARK: - Auto-Registration into TradeDataStore
+    
+    /// Registers discovered cTrader accounts directly into TradeDataStore so they immediately appear
+    /// in the ShellHeaderView account dropdown, AccountsManagerView, and all journal filtering views.
+    @discardableResult
+    public func registerDiscoveredAccounts(into dataStore: TradeDataStore) -> [Account] {
+        guard !discoveredAccounts.isEmpty else { return [] }
+        
+        var registered: [Account] = []
+        var hasChanges = false
+        
+        for account in discoveredAccounts {
+            let journalAccId = "ctrader_\(account.ctidTraderAccountId)"
+            let brokerName = account.brokerTitleShort.trimmingCharacters(in: .whitespacesAndNewlines)
+            let safeBroker = brokerName.isEmpty ? "cTrader" : brokerName
+            let accountName = "cTrader \(account.traderLogin) (\(safeBroker))"
+            
+            if let existingIdx = dataStore.accounts.firstIndex(where: {
+                $0.id == journalAccId ||
+                $0.id.isEquivalentAccountId(to: journalAccId) ||
+                $0.id.cleanAccountId == String(account.ctidTraderAccountId) ||
+                $0.id.cleanAccountId == String(account.traderLogin) ||
+                $0.name.contains("\(account.traderLogin)")
+            }) {
+                var acc = dataStore.accounts[existingIdx]
+                acc.currency = account.currency
+                acc.kind = .sync
+                acc.broker = safeBroker
+                acc.autoSync = true
+                if acc.initialBalance == 0 && account.balance > 0 {
+                    acc.initialBalance = account.balance
+                }
+                dataStore.accounts[existingIdx] = acc
+                registered.append(acc)
+                hasChanges = true
+            } else {
+                let newAcc = Account(
+                    id: journalAccId,
+                    name: accountName,
+                    broker: safeBroker,
+                    kind: .sync,
+                    currency: account.currency,
+                    initialBalance: account.balance,
+                    profitCalcMethod: .fifo,
+                    autoSync: true,
+                    visibleInJournal: true
+                )
+                dataStore.accounts.append(newAcc)
+                registered.append(newAcc)
+                hasChanges = true
+            }
+        }
+        
+        // Remove default placeholder account if real accounts are registered
+        if dataStore.accounts.contains(where: { $0.id.hasPrefix("ctrader_") || $0.id.hasPrefix("the5ers_") }) {
+            dataStore.accounts.removeAll(where: { $0.id == "default-acc" && dataStore.accounts.count > 1 })
+        }
+        
+        // Auto-select this cTrader account if current selection is default-acc
+        if dataStore.selectedAccountId == "default-acc", let firstRegistered = registered.first {
+            dataStore.selectedAccountId = firstRegistered.id
+        }
+        
+        if hasChanges {
+            dataStore.deduplicateAndCleanAccounts()
+            dataStore.saveToDisk(immediate: true)
+            dataStore.objectWillChange.send()
+        }
+        
+        return registered
     }
     
     /// Tests connection and retrieves linked accounts without modifying journal data.
@@ -418,7 +505,8 @@ public final class CTraderService: ObservableObject {
         
         do {
             let accs = try await fetchAccounts()
-            return (true, "cTrader connection verified successfully! \(accs.count) account(s) ready.", accs)
+            let registered = registerDiscoveredAccounts(into: TradeDataStore.shared)
+            return (true, "cTrader connection verified! \(accs.count) account(s) registered in Journal.", accs)
         } catch {
             self.lastError = error.localizedDescription
             return (false, "Connection error: \(error.localizedDescription)", [])
@@ -634,11 +722,21 @@ public final class CTraderService: ObservableObject {
             totalRebuiltTrades += dataStore.trades.filter { $0.accountId == journalAccId }.count
         }
         
-        dataStore.saveToDisk()
+        dataStore.deduplicateAndCleanAccounts()
+        dataStore.saveToDisk(immediate: true)
+        dataStore.objectWillChange.send()
+        
         let now = Date()
         self.lastSyncDate = now
         let summaryMsg = "cTrader synchronized: \(activeAccounts.count) account(s), \(totalDeals) executions imported, \(totalRebuiltTrades) trades updated."
         self.lastStatus = summaryMsg
+        
+        // Background push to Supabase if Supabase is configured
+        if SupabaseService.shared.isConfigured {
+            Task {
+                await dataStore.syncWithSupabase(isBackground: true)
+            }
+        }
         
         return CTraderSyncSummary(
             accountsSynced: activeAccounts.count,

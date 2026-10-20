@@ -392,6 +392,7 @@ public struct ConnectionsSettingsView: View {
                     if self.ctrader.selectedAccountIds.isEmpty {
                         self.ctrader.selectedAccountIds = Set(res.accounts.map { $0.ctidTraderAccountId })
                     }
+                    self.dataStore.objectWillChange.send()
                 }
             } catch {
                 await MainActor.run {
