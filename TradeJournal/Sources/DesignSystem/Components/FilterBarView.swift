@@ -107,6 +107,7 @@ public struct FilterBarView<Actions: View>: View {
     private let activeFilterCount: Int
     private let onOpenFilterDialog: (() -> Void)?
     private let onBack: (() -> Void)?
+    private let isModal: Bool
     private let actions: Actions
     
     public init(
@@ -117,6 +118,7 @@ public struct FilterBarView<Actions: View>: View {
         activeFilterCount: Int = 0,
         onOpenFilterDialog: (() -> Void)? = nil,
         onBack: (() -> Void)? = nil,
+        isModal: Bool = false,
         @ViewBuilder actions: () -> Actions = { EmptyView() }
     ) {
         self.title = title
@@ -126,6 +128,7 @@ public struct FilterBarView<Actions: View>: View {
         self.activeFilterCount = activeFilterCount
         self.onOpenFilterDialog = onOpenFilterDialog
         self.onBack = onBack
+        self.isModal = isModal
         self.actions = actions()
     }
     
@@ -145,9 +148,9 @@ public struct FilterBarView<Actions: View>: View {
         }
         .padding(.horizontal, 14)
         #if canImport(UIKit)
-        .padding(.top, hasHeader ? AppSafeArea.topInset + 6 : 6)
+        .padding(.top, isModal ? 10 : (hasHeader ? AppSafeArea.topInset + 6 : 6))
         #else
-        .padding(.top, hasHeader ? 8 : 6)
+        .padding(.top, isModal ? 10 : (hasHeader ? 8 : 6))
         #endif
         .padding(.bottom, 8)
         .background {

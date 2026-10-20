@@ -200,11 +200,14 @@ public struct DailyJournalListView: View {
             .background(AppColors.background)
         }
         .background(AppColors.background)
-        .fullScreenCover(item: Binding<IdentifiableDateItem?>(
+        .sheet(item: Binding<IdentifiableDateItem?>(
             get: { selectedDateForDetail.map { IdentifiableDateItem(date: $0) } },
             set: { selectedDateForDetail = $0?.date }
         )) { item in
-            DailyJournalDetailView(date: item.date)
+            DailyJournalDetailView(date: item.date, isModal: true)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(28)
         }
     }
     
@@ -334,6 +337,12 @@ public struct DailyJournalListView: View {
 /// Port 1:1 from `source-repo/apps/web/src/app/journal/[date]/page.tsx`
 public struct DailyJournalDetailView: View {
     public let date: String
+    public let isModal: Bool
+    
+    public init(date: String, isModal: Bool = false) {
+        self.date = date
+        self.isModal = isModal
+    }
     
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var dataStore = TradeDataStore.shared
@@ -389,6 +398,33 @@ public struct DailyJournalDetailView: View {
             points.append((timeStr: tStr, cumPnl: running))
         }
         return points
+    }
+    
+    private var strideTimeStrings: [String] {
+        guard !intradayPoints.isEmpty else { return [] }
+        if intradayPoints.count <= 4 {
+            var unique: [String] = []
+            var seen = Set<String>()
+            for p in intradayPoints {
+                if !seen.contains(p.timeStr) {
+                    seen.insert(p.timeStr)
+                    unique.append(p.timeStr)
+                }
+            }
+            return unique
+        }
+        let count = intradayPoints.count
+        let indices = [0, count / 3, (count * 2) / 3, count - 1]
+        var seen = Set<String>()
+        var result: [String] = []
+        for idx in indices {
+            let t = intradayPoints[idx].timeStr
+            if !seen.contains(t) {
+                seen.insert(t)
+                result.append(t)
+            }
+        }
+        return result
     }
     
     private var intradayDoubleVals: [Double] {
@@ -499,7 +535,8 @@ public struct DailyJournalDetailView: View {
             FilterBarView(
                 title: "Journal · \(date)",
                 showFilters: false,
-                onBack: { dismiss() }
+                onBack: { dismiss() },
+                isModal: isModal
             ) {
                 AppActionPill("Export", icon: "square.and.arrow.up", isPrimary: false) {
                     prepareExport()
@@ -514,8 +551,11 @@ public struct DailyJournalDetailView: View {
         .sheet(isPresented: $showExportSheet) {
             ReviewExportModal(title: "Journal · \(date)", exportText: exportText)
         }
-        .fullScreenCover(item: $selectedTradeForDetail) { trade in
-            TradeDetailView(trade: trade)
+        .sheet(item: $selectedTradeForDetail) { trade in
+            TradeDetailView(trade: trade, isModal: true)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(28)
         }
         .alert("Delete note for \(date)?", isPresented: $showDeleteNoteAlert) {
             Button("Cancel", role: .cancel) {}
@@ -715,10 +755,17 @@ public struct DailyJournalDetailView: View {
                     }
                 }
                 .chartXAxis {
-                    AxisMarks(values: .automatic(desiredCount: 5)) { _ in
-                        AxisValueLabel()
-                            .font(.system(size: 9, weight: .medium))
-                            .foregroundStyle(AppColors.secondaryText)
+                    AxisMarks(values: strideTimeStrings) { value in
+                        AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
+                            .foregroundStyle(AppColors.border.opacity(0.3))
+                        AxisValueLabel {
+                            if let str = value.as(String.self) {
+                                Text(str)
+                                    .font(.system(size: 9, weight: .medium))
+                                    .foregroundStyle(AppColors.secondaryText)
+                                    .lineLimit(1)
+                            }
+                        }
                     }
                 }
                 .frame(height: 160)

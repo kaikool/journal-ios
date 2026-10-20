@@ -146,28 +146,35 @@ public struct TradeReplayView: View {
                     Text("Entry: \(Formatters.price(trade.avgEntry)) • Qty: \(Formatters.formatNumber(trade.quantity))")
                         .font(AppTypography.caption)
                         .foregroundColor(AppColors.secondaryText)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
                     
                     Spacer()
                     
                     if let curBar = frame.currentBar {
                         HStack(spacing: 4) {
-                            Text("Bar Close: \(Formatters.price(curBar.close))")
+                            Text("Bar: \(Formatters.price(curBar.close))")
                                 .font(AppTypography.captionBold)
                                 .foregroundColor(curBar.isUp ? AppColors.profit : AppColors.loss)
+                                .lineLimit(1)
                             
                             if trade.status != .open {
                                 let isEnd = currentStep >= bars.count
-                                let label = isEnd ? "Final Net P&L" : "Frame P&L"
+                                let label = isEnd ? "Net" : "P&L"
                                 let pnlVal = isEnd ? trade.netPnl : frame.unrealizedPnl
-                                Text("• \(label): \(Formatters.formatPnL(pnlVal, currency: env.currentCurrency))")
+                                Text("(\(label): \(Formatters.formatPnL(pnlVal, currency: env.currentCurrency)))")
                                     .font(AppTypography.caption)
                                     .foregroundColor(Formatters.pnlColor(pnlVal))
+                                    .lineLimit(1)
                             }
                         }
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
                     } else if isLoadingCandles {
                         Text("Loading candles…")
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText)
+                            .lineLimit(1)
                     }
                 }
             }
@@ -310,7 +317,7 @@ public struct TradeReplayView: View {
                 }
                 
                 // Playback controls row
-                HStack(spacing: 16) {
+                HStack(spacing: 8) {
                     // Restart
                     Button {
                         #if os(iOS)
@@ -319,13 +326,13 @@ public struct TradeReplayView: View {
                         resetReplay()
                     } label: {
                         Image(systemName: "backward.end.fill")
-                            .font(.system(size: 15))
+                            .font(.system(size: 13, weight: .semibold))
                             .foregroundColor(AppColors.primaryText)
-                            .frame(width: 36, height: 36)
+                            .frame(width: 34, height: 34)
                             .background(AppColors.cardBackground.opacity(0.85))
-                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                             .overlay(
-                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
                                     .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
                             )
                     }
@@ -340,13 +347,13 @@ public struct TradeReplayView: View {
                         step(by: -1)
                     } label: {
                         Image(systemName: "chevron.left")
-                            .font(.system(size: 14, weight: .bold))
+                            .font(.system(size: 13, weight: .bold))
                             .foregroundColor(currentStep <= 1 ? AppColors.secondaryText.opacity(0.3) : AppColors.primaryText)
-                            .frame(width: 36, height: 36)
+                            .frame(width: 34, height: 34)
                             .background(AppColors.cardBackground.opacity(0.85))
-                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                             .overlay(
-                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
                                     .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
                             )
                     }
@@ -360,21 +367,23 @@ public struct TradeReplayView: View {
                         #endif
                         togglePlay()
                     } label: {
-                        HStack(spacing: 6) {
+                        HStack(spacing: 5) {
                             Image(systemName: isPlaying ? "pause.fill" : "play.fill")
-                                .font(.system(size: 14))
+                                .font(.system(size: 12, weight: .bold))
                             Text(isPlaying ? "Pause" : "Play")
-                                .font(AppTypography.captionBold)
+                                .font(.system(size: 12, weight: .bold))
+                                .lineLimit(1)
                         }
-                        .padding(.horizontal, 18)
-                        .padding(.vertical, 9)
+                        .frame(height: 34)
+                        .padding(.horizontal, 14)
                         .background(AppColors.brand)
                         .foregroundColor(.white)
-                        .clipShape(Capsule())
-                        .shadow(color: AppColors.brand.opacity(0.3), radius: 4, x: 0, y: 2)
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .shadow(color: AppColors.brand.opacity(0.25), radius: 3, x: 0, y: 1.5)
                     }
                     .buttonStyle(ApplePressableButtonStyle())
                     .disabled(bars.isEmpty)
+                    .fixedSize()
                     
                     // Step forward
                     Button {
@@ -384,13 +393,13 @@ public struct TradeReplayView: View {
                         step(by: 1)
                     } label: {
                         Image(systemName: "chevron.right")
-                            .font(.system(size: 14, weight: .bold))
+                            .font(.system(size: 13, weight: .bold))
                             .foregroundColor(currentStep >= bars.count ? AppColors.secondaryText.opacity(0.3) : AppColors.primaryText)
-                            .frame(width: 36, height: 36)
+                            .frame(width: 34, height: 34)
                             .background(AppColors.cardBackground.opacity(0.85))
-                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                             .overlay(
-                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
                                     .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
                             )
                     }
@@ -405,20 +414,20 @@ public struct TradeReplayView: View {
                         forwardToEnd()
                     } label: {
                         Image(systemName: "forward.end.fill")
-                            .font(.system(size: 15))
+                            .font(.system(size: 13, weight: .semibold))
                             .foregroundColor(AppColors.primaryText)
-                            .frame(width: 36, height: 36)
+                            .frame(width: 34, height: 34)
                             .background(AppColors.cardBackground.opacity(0.85))
-                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                             .overlay(
-                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
                                     .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
                             )
                     }
                     .buttonStyle(ApplePressableButtonStyle())
                     .disabled(bars.isEmpty)
                     
-                    Spacer()
+                    Spacer(minLength: 4)
                     
                     // Replay Speed menu
                     Menu {
@@ -426,16 +435,21 @@ public struct TradeReplayView: View {
                         Button("2×") { replaySpeed = 2.0; restartTimerIfPlaying() }
                         Button("4×") { replaySpeed = 4.0; restartTimerIfPlaying() }
                     } label: {
-                        HStack(spacing: 2) {
+                        HStack(spacing: 3) {
                             Text("\(Int(replaySpeed))×")
-                                .font(AppTypography.captionBold)
+                                .font(.system(size: 11, weight: .bold))
+                                .lineLimit(1)
                             Image(systemName: "chevron.up.chevron.down")
-                                .font(.system(size: 8))
+                                .font(.system(size: 8, weight: .bold))
                         }
+                        .frame(height: 34)
                         .padding(.horizontal, 8)
-                        .padding(.vertical, 6)
                         .background(AppColors.secondaryBackground)
                         .foregroundColor(AppColors.primaryText)
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    }
+                    .fixedSize()
+                }
                         .cornerRadius(6)
                     }
                 }
@@ -470,29 +484,36 @@ public struct TradeReplayView: View {
                     Text("EXCURSION ESTIMATES (MAE & MFE)")
                         .font(AppTypography.cardTitle)
                         .foregroundColor(AppColors.secondaryText)
+                        .lineLimit(1)
                     Spacer()
-                    Text("holding period extremes")
-                        .font(.system(size: 10))
+                    Text("Extremes")
+                        .font(.system(size: 10, weight: .medium))
                         .foregroundColor(AppColors.secondaryText.opacity(0.7))
+                        .lineLimit(1)
                 }
                 
                 HStack(spacing: 12) {
                     // MAE (Drawdown)
                     VStack(alignment: .leading, spacing: 3) {
-                        Text("Estimated MAE · adverse")
-                            .font(AppTypography.caption)
+                        Text("MAE (Drawdown)")
+                            .font(AppTypography.captionBold)
                             .foregroundColor(AppColors.secondaryText)
+                            .lineLimit(1)
                         
                         if let mae = excursionEstimate?.mae {
                             Text(Formatters.formatPnL(mae, currency: env.currentCurrency))
                                 .font(AppTypography.financialNumber(size: 17, weight: .bold))
                                 .foregroundColor(AppColors.loss)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.85)
                             
                             if let p = excursionEstimate?.maePrice {
-                                let ptsText = excursionEstimate?.maePoints.map { " (\(Formatters.formatNumber($0)) pts)" } ?? ""
+                                let ptsText = excursionEstimate?.maePoints.map { " (-\(Formatters.formatNumber($0)) pts)" } ?? ""
                                 Text("Low: \(Formatters.price(p))\(ptsText)")
                                     .font(.system(size: 10, weight: .regular, design: .monospaced))
                                     .foregroundColor(AppColors.secondaryText)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.85)
                             }
                         } else if isLoadingCandles && bars.isEmpty {
                             HStack(spacing: 4) {
@@ -506,6 +527,7 @@ public struct TradeReplayView: View {
                             Text("Unavailable")
                                 .font(AppTypography.captionBold)
                                 .foregroundColor(AppColors.secondaryText)
+                                .lineLimit(1)
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -514,20 +536,25 @@ public struct TradeReplayView: View {
                     
                     // MFE (Runup)
                     VStack(alignment: .leading, spacing: 3) {
-                        Text("Estimated MFE · favorable")
-                            .font(AppTypography.caption)
+                        Text("MFE (Runup)")
+                            .font(AppTypography.captionBold)
                             .foregroundColor(AppColors.secondaryText)
+                            .lineLimit(1)
                         
                         if let mfe = excursionEstimate?.mfe {
                             Text(Formatters.formatPnL(mfe, currency: env.currentCurrency))
                                 .font(AppTypography.financialNumber(size: 17, weight: .bold))
                                 .foregroundColor(AppColors.profit)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.85)
                             
                             if let p = excursionEstimate?.mfePrice {
                                 let ptsText = excursionEstimate?.mfePoints.map { " (+\(Formatters.formatNumber($0)) pts)" } ?? ""
                                 Text("High: \(Formatters.price(p))\(ptsText)")
                                     .font(.system(size: 10, weight: .regular, design: .monospaced))
                                     .foregroundColor(AppColors.secondaryText)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.85)
                             }
                         } else if isLoadingCandles && bars.isEmpty {
                             HStack(spacing: 4) {
@@ -541,6 +568,7 @@ public struct TradeReplayView: View {
                             Text("Unavailable")
                                 .font(AppTypography.captionBold)
                                 .foregroundColor(AppColors.secondaryText)
+                                .lineLimit(1)
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)

@@ -6,6 +6,7 @@ public struct TradeDetailView: View {
     @EnvironmentObject private var env: AppEnvironment
     @ObservedObject private var dataStore = TradeDataStore.shared
     
+    let isModal: Bool
     @State var trade: Trade
     @State private var showReplayView: Bool = false
     @State private var showEditTradeSheet: Bool = false
@@ -17,7 +18,8 @@ public struct TradeDetailView: View {
     @State private var profitTargetText: String = ""
     @State private var selectedPlaybookId: String = ""
     
-    public init(trade: Trade) {
+    public init(trade: Trade, isModal: Bool = false) {
+        self.isModal = isModal
         self._trade = State(initialValue: trade)
         self._noteContent = State(initialValue: trade.notes ?? "")
         self._stopLossText = State(initialValue: Formatters.formatDecimalInput(trade.stopLoss, maxDecimals: 5))
@@ -333,7 +335,7 @@ public struct TradeDetailView: View {
                                     .foregroundColor(AppColors.primaryText)
                             }
                             
-                            HStack(spacing: 12) {
+                            HStack(alignment: .bottom, spacing: 10) {
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text("Stop Loss")
                                         .font(AppTypography.caption)
@@ -342,7 +344,7 @@ public struct TradeDetailView: View {
                                         .font(AppTypography.body)
                                         .monospacedDigit()
                                         .padding(.horizontal, 10)
-                                        .padding(.vertical, 7)
+                                        .frame(height: 38)
                                         .background(AppColors.secondaryBackground)
                                         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                                         .keyboardType(.decimalPad)
@@ -356,36 +358,34 @@ public struct TradeDetailView: View {
                                         .font(AppTypography.body)
                                         .monospacedDigit()
                                         .padding(.horizontal, 10)
-                                        .padding(.vertical, 7)
+                                        .frame(height: 38)
                                         .background(AppColors.secondaryBackground)
                                         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                                         .keyboardType(.decimalPad)
                                 }
                                 
-                                VStack {
-                                    Text(" ")
-                                        .font(AppTypography.caption)
-                                    Button {
-                                        #if canImport(UIKit)
-                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                        #endif
-                                        persistTradeUpdates()
-                                    } label: {
-                                        HStack(spacing: 4) {
-                                            Image(systemName: "checkmark")
-                                                .font(.system(size: 11, weight: .semibold))
-                                            Text("Save")
-                                                .font(AppTypography.captionBold)
-                                        }
-                                        .padding(.horizontal, 12)
-                                        .padding(.vertical, 6)
-                                        .background(AppColors.brand)
-                                        .foregroundColor(AppColors.brandTextOnDark)
-                                        .clipShape(Capsule())
-                                        .shadow(color: AppColors.brand.opacity(0.25), radius: 3, x: 0, y: 1.5)
+                                Button {
+                                    #if canImport(UIKit)
+                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                    #endif
+                                    persistTradeUpdates()
+                                } label: {
+                                    HStack(spacing: 5) {
+                                        Image(systemName: "checkmark")
+                                            .font(.system(size: 11, weight: .bold))
+                                        Text("Save")
+                                            .font(AppTypography.captionBold)
+                                            .lineLimit(1)
                                     }
-                                    .buttonStyle(ApplePressableButtonStyle())
+                                    .padding(.horizontal, 14)
+                                    .frame(height: 38)
+                                    .background(AppColors.brand)
+                                    .foregroundColor(AppColors.brandTextOnDark)
+                                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                    .shadow(color: AppColors.brand.opacity(0.25), radius: 3, x: 0, y: 1.5)
                                 }
+                                .buttonStyle(ApplePressableButtonStyle())
+                                .fixedSize()
                             }
                             
                             Divider().background(AppColors.border.opacity(0.5))
@@ -739,7 +739,8 @@ public struct TradeDetailView: View {
             FilterBarView(
                 title: "\(trade.symbol) · \(trade.direction.rawValue.uppercased())",
                 showFilters: false,
-                onBack: { dismiss() }
+                onBack: { dismiss() },
+                isModal: isModal
             ) {
                 AppActionPill("Edit", icon: "pencil") {
                     showEditTradeSheet = true

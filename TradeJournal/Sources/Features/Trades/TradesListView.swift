@@ -102,8 +102,11 @@ public struct TradesListView: View {
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(28)
         }
-        .fullScreenCover(item: $selectedTrade) { trade in
-            TradeDetailView(trade: trade)
+        .sheet(item: $selectedTrade) { trade in
+            TradeDetailView(trade: trade, isModal: true)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(28)
         }
     }
     
