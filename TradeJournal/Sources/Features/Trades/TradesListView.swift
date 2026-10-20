@@ -331,6 +331,7 @@ public struct TradesListView: View {
 
 private struct TradeTerminalRow: View {
     @EnvironmentObject private var env: AppEnvironment
+    @EnvironmentObject private var dataStore: TradeDataStore
     let trade: Trade
     
     private var durationText: String? {
@@ -361,12 +362,21 @@ private struct TradeTerminalRow: View {
         return "\(time) · \(date)"
     }
     
+    private var rMultiple: Double? {
+        TradeAnalysisEngine.tradeR(trade: trade)
+    }
+    
+    private var playbookName: String? {
+        guard let id = trade.playbookId, !id.isEmpty else { return nil }
+        return dataStore.playbooks.first(where: { $0.id == id })?.name ?? id
+    }
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             topLineView
             Divider().background(AppColors.border.opacity(0.35))
             middleLineView
-            if !trade.tags.isEmpty || trade.setup != nil || trade.fees > 0 {
+            if !trade.tags.isEmpty || trade.playbookId != nil || trade.fees > 0 {
                 bottomLineView
             }
         }
@@ -415,7 +425,7 @@ private struct TradeTerminalRow: View {
                     color: trade.netPnl >= 0 ? AppColors.profit : AppColors.loss
                 )
                 
-                if let r = trade.rMultiple {
+                if let r = rMultiple {
                     Text("\(r >= 0 ? "+" : "")\(Formatters.formatNumber(r))R")
                         .font(.system(size: 11, weight: .semibold, design: .rounded))
                         .foregroundColor(r >= 0 ? AppColors.profit : AppColors.loss)
@@ -479,7 +489,7 @@ private struct TradeTerminalRow: View {
     @ViewBuilder
     private var bottomLineView: some View {
         HStack(spacing: 6) {
-            if let setup = trade.setup, !setup.isEmpty {
+            if let setup = playbookName {
                 HStack(spacing: 3) {
                     Image(systemName: "bookmark.fill")
                         .font(.system(size: 8))
