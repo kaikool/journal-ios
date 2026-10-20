@@ -137,56 +137,50 @@ public struct TradeDetailView: View {
                                         .foregroundColor(AppColors.secondaryText.opacity(0.8))
                                 }
                                 
-                                HStack(spacing: 6) {
-                                    // Gross P&L
-                                    VStack(alignment: .leading, spacing: 2) {
+                                VStack(spacing: 6) {
+                                    HStack {
                                         Text("Gross P&L")
-                                            .font(.system(size: 10, weight: .medium))
+                                            .font(AppTypography.caption)
                                             .foregroundColor(AppColors.secondaryText)
+                                        Spacer()
                                         AppMonetaryText(
                                             Formatters.formatPnL(trade.grossPnl, currency: env.currentCurrency),
                                             isPrivate: env.isPrivacyModeEnabled,
                                             font: AppTypography.subheadlineBold,
                                             color: Formatters.pnlColor(trade.grossPnl)
                                         )
+                                        .lineLimit(1)
                                     }
-                                    .frame(maxWidth: .infinity, alignment: .leading)
                                     
-                                    Image(systemName: "minus")
-                                        .font(.system(size: 10, weight: .bold))
-                                        .foregroundColor(AppColors.secondaryText.opacity(0.6))
-                                    
-                                    // Fees & Commission
-                                    VStack(alignment: .leading, spacing: 2) {
+                                    HStack {
                                         Text("Fees & Costs")
-                                            .font(.system(size: 10, weight: .medium))
+                                            .font(AppTypography.caption)
                                             .foregroundColor(AppColors.secondaryText)
+                                        Spacer()
                                         Text(Formatters.formatCurrency(trade.fees, currency: env.currentCurrency))
                                             .font(AppTypography.subheadlineBold)
                                             .monospacedDigit()
                                             .foregroundColor(trade.fees > 0 ? AppColors.warning : AppColors.primaryText)
+                                            .lineLimit(1)
                                     }
-                                    .frame(maxWidth: .infinity, alignment: .leading)
                                     
-                                    Image(systemName: "equal")
-                                        .font(.system(size: 10, weight: .bold))
-                                        .foregroundColor(AppColors.secondaryText.opacity(0.6))
+                                    Divider().background(AppColors.border.opacity(0.4))
                                     
-                                    // Net P&L
-                                    VStack(alignment: .trailing, spacing: 2) {
-                                        Text("Net P&L")
-                                            .font(.system(size: 10, weight: .bold))
-                                            .foregroundColor(AppColors.secondaryText)
+                                    HStack {
+                                        Text("Net Realized P&L")
+                                            .font(AppTypography.captionBold)
+                                            .foregroundColor(AppColors.primaryText)
+                                        Spacer()
                                         AppMonetaryText(
                                             Formatters.formatPnL(trade.netPnl, currency: env.currentCurrency),
                                             isPrivate: env.isPrivacyModeEnabled,
                                             font: AppTypography.subheadlineBold,
                                             color: Formatters.pnlColor(trade.netPnl)
                                         )
+                                        .lineLimit(1)
                                     }
-                                    .frame(maxWidth: .infinity, alignment: .trailing)
                                 }
-                                .padding(10)
+                                .padding(12)
                                 .background(AppColors.secondaryBackground.opacity(0.6))
                                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                                 .overlay(
@@ -760,7 +754,7 @@ public struct TradeDetailView: View {
         .toolbar(.hidden, for: .navigationBar)
         .interactiveEdgeBack(onBack: { dismiss() })
         .enableNativePopGesture()
-        .navigationDestination(isPresented: $showReplayView) {
+        .fullScreenCover(isPresented: $showReplayView) {
             TradeReplayView(trade: trade, executions: fills)
         }
         .alert("Delete trade \(trade.symbol)?", isPresented: $showDeleteAlert) {

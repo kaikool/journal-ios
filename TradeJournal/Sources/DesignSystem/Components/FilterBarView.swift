@@ -1,4 +1,20 @@
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+
+public enum AppSafeArea {
+    /// Safe area top inset dynamically detected from active UIWindowScene, guaranteeing notch / Dynamic Island clearance.
+    public static var topInset: CGFloat {
+        let scenes = UIApplication.shared.connectedScenes
+        let windowScene = scenes.first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene
+            ?? scenes.first as? UIWindowScene
+        let window = windowScene?.windows.first(where: { $0.isKeyWindow })
+            ?? windowScene?.windows.first
+        let top = window?.safeAreaInsets.top ?? 0
+        return top > 0 ? top : 47
+    }
+}
+#endif
 
 public enum JournalTimeRange: String, CaseIterable, Identifiable {
     case d7 = "7D"
@@ -128,9 +144,13 @@ public struct FilterBarView<Actions: View>: View {
             }
         }
         .padding(.horizontal, 14)
+        #if canImport(UIKit)
+        .padding(.top, hasHeader ? AppSafeArea.topInset + 6 : 6)
+        #else
         .padding(.top, hasHeader ? 8 : 6)
+        #endif
         .padding(.bottom, 8)
-        .background(.ultraThinMaterial)
+        .background(.ultraThinMaterial.ignoresSafeArea(edges: .top))
         .overlay(topSpecularHighlight, alignment: .top)
         .overlay(bottomBorder, alignment: .bottom)
         .enableNativePopGesture()

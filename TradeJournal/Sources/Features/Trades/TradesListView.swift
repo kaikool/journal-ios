@@ -16,6 +16,7 @@ public struct TradesListView: View {
     @State private var showAddTradeSheet: Bool = false
     @State private var searchText: String = ""
     @State private var statusFilter: TradeStatusFilter = .all
+    @State private var selectedTrade: Trade? = nil
     
     public init() {}
     
@@ -81,27 +82,28 @@ public struct TradesListView: View {
     }
     
     public var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 14) {
-                    summaryCardsGrid
-                    searchAndStatusFilter
-                    tradesListContent
-                }
-                .padding(.horizontal, 16)
-                .padding(.top, 10)
-                .padding(.bottom, 88)
+        ScrollView {
+            VStack(spacing: 14) {
+                summaryCardsGrid
+                searchAndStatusFilter
+                tradesListContent
             }
-            .refreshable {
-                await dataStore.performGlobalSync()
-            }
-            .background(AppColors.background)
-            .sheet(isPresented: $showAddTradeSheet) {
-                AddTradeSheet()
-                    .presentationDetents([.large])
-                    .presentationDragIndicator(.visible)
-                    .presentationCornerRadius(28)
-            }
+            .padding(.horizontal, 16)
+            .padding(.top, 10)
+            .padding(.bottom, 88)
+        }
+        .refreshable {
+            await dataStore.performGlobalSync()
+        }
+        .background(AppColors.background)
+        .sheet(isPresented: $showAddTradeSheet) {
+            AddTradeSheet()
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(28)
+        }
+        .fullScreenCover(item: $selectedTrade) { trade in
+            TradeDetailView(trade: trade)
         }
     }
     
@@ -309,7 +311,9 @@ public struct TradesListView: View {
         } else {
             LazyVStack(spacing: 10) {
                 ForEach(filteredTrades) { trade in
-                    NavigationLink(value: trade) {
+                    Button {
+                        selectedTrade = trade
+                    } label: {
                         TradeTerminalRow(trade: trade)
                     }
                     .buttonStyle(ApplePressableButtonStyle())
@@ -321,9 +325,6 @@ public struct TradesListView: View {
                         }
                     }
                 }
-            }
-            .navigationDestination(for: Trade.self) { trade in
-                TradeDetailView(trade: trade)
             }
         }
     }
@@ -376,9 +377,7 @@ private struct TradeTerminalRow: View {
             topLineView
             Divider().background(AppColors.border.opacity(0.35))
             middleLineView
-            if !trade.tags.isEmpty || trade.playbookId != nil || trade.fees > 0 {
-                bottomLineView
-            }
+            bottomLineView
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -399,6 +398,7 @@ private struct TradeTerminalRow: View {
                 Text(trade.symbol)
                     .font(.system(size: 15, weight: .bold, design: .monospaced))
                     .foregroundColor(AppColors.primaryText)
+                    .lineLimit(1)
                 
                 Text(trade.direction == .long ? "LONG" : "SHORT")
                     .font(.system(size: 9, weight: .heavy))
@@ -407,6 +407,7 @@ private struct TradeTerminalRow: View {
                     .padding(.vertical, 2)
                     .background((trade.direction == .long ? AppColors.brand : AppColors.warning).opacity(0.12))
                     .clipShape(Capsule())
+                    .lineLimit(1)
                 
                 AppBadge(
                     trade.status.rawValue.uppercased(),
@@ -414,7 +415,7 @@ private struct TradeTerminalRow: View {
                 )
             }
             
-            Spacer()
+            Spacer(minLength: 4)
             
             // Net PnL (prominent)
             VStack(alignment: .trailing, spacing: 1) {
@@ -424,11 +425,14 @@ private struct TradeTerminalRow: View {
                     font: AppTypography.financialNumber(size: 16, weight: .bold),
                     color: trade.netPnl >= 0 ? AppColors.profit : AppColors.loss
                 )
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
                 
                 if let r = rMultiple {
                     Text("\(r >= 0 ? "+" : "")\(Formatters.formatNumber(r))R")
                         .font(.system(size: 11, weight: .semibold, design: .rounded))
                         .foregroundColor(r >= 0 ? AppColors.profit : AppColors.loss)
+                        .lineLimit(1)
                 }
             }
         }
@@ -436,7 +440,7 @@ private struct TradeTerminalRow: View {
     
     @ViewBuilder
     private var middleLineView: some View {
-        HStack(alignment: .center, spacing: 8) {
+        HStack(alignment: .center) {
             // Entry -> Exit price path
             HStack(spacing: 4) {
                 Text(Formatters.price(trade.avgEntry))
@@ -457,69 +461,69 @@ private struct TradeTerminalRow: View {
                         .foregroundColor(AppColors.brand)
                 }
             }
+            .lineLimit(1)
             
-            Text("•")
-                .foregroundColor(AppColors.secondaryText.opacity(0.4))
+            Spacer(minLength: 8)
             
-            // Volume
-            Text("Vol \(Formatters.formatNumber(trade.quantity))")
-                .font(.system(size: 11, weight: .regular))
-                .foregroundColor(AppColors.secondaryText)
-            
-            if let dur = durationText {
-                Text("•")
-                    .foregroundColor(AppColors.secondaryText.opacity(0.4))
-                HStack(spacing: 2) {
-                    Image(systemName: "clock")
-                        .font(.system(size: 8))
-                    Text(dur)
+            // Volume and Duration
+            HStack(spacing: 6) {
+                Text("\(Formatters.formatNumber(trade.quantity)) lots")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(AppColors.secondaryText)
+                
+                if let dur = durationText {
+                    Text("·")
+                        .foregroundColor(AppColors.secondaryText.opacity(0.5))
+                    HStack(spacing: 2) {
+                        Image(systemName: "clock")
+                            .font(.system(size: 8))
+                        Text(dur)
+                    }
+                    .font(.system(size: 11, weight: .regular))
+                    .foregroundColor(AppColors.secondaryText)
                 }
-                .font(.system(size: 11, weight: .regular))
-                .foregroundColor(AppColors.secondaryText)
             }
-            
-            Spacer()
-            
-            Text(dateDisplay)
-                .font(.system(size: 11, weight: .regular))
-                .foregroundColor(AppColors.secondaryText)
+            .lineLimit(1)
         }
     }
     
     @ViewBuilder
     private var bottomLineView: some View {
-        HStack(spacing: 6) {
-            if let setup = playbookName {
-                HStack(spacing: 3) {
-                    Image(systemName: "bookmark.fill")
-                        .font(.system(size: 8))
-                    Text(setup)
-                }
-                .font(.system(size: 10, weight: .medium))
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(AppColors.brand.opacity(0.10))
-                .foregroundColor(AppColors.brand)
-                .clipShape(Capsule())
-            }
-            
-            ForEach(trade.tags.prefix(3), id: \.self) { tag in
-                Text("#\(tag)")
+        HStack(alignment: .center, spacing: 6) {
+            HStack(spacing: 4) {
+                if let setup = playbookName {
+                    HStack(spacing: 3) {
+                        Image(systemName: "bookmark.fill")
+                            .font(.system(size: 8))
+                        Text(setup)
+                    }
                     .font(.system(size: 10, weight: .medium))
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
-                    .background(AppColors.secondaryBackground)
-                    .foregroundColor(AppColors.secondaryText)
+                    .background(AppColors.brand.opacity(0.10))
+                    .foregroundColor(AppColors.brand)
                     .clipShape(Capsule())
+                    .lineLimit(1)
+                }
+                
+                ForEach(trade.tags.prefix(2), id: \.self) { tag in
+                    Text("#\(tag)")
+                        .font(.system(size: 10, weight: .medium))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(AppColors.secondaryBackground)
+                        .foregroundColor(AppColors.secondaryText)
+                        .clipShape(Capsule())
+                        .lineLimit(1)
+                }
             }
             
-            Spacer()
+            Spacer(minLength: 6)
             
-            if trade.fees > 0 {
-                Text("Fee: \(Formatters.formatCurrency(trade.fees, currency: env.currentCurrency))")
-                    .font(.system(size: 10, weight: .regular))
-                    .foregroundColor(AppColors.secondaryText.opacity(0.7))
-            }
+            Text(dateDisplay)
+                .font(.system(size: 10.5, weight: .regular))
+                .foregroundColor(AppColors.secondaryText)
+                .lineLimit(1)
         }
     }
 }

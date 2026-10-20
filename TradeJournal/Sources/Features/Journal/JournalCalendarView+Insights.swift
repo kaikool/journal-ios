@@ -349,12 +349,21 @@ extension JournalCalendarView {
                     content: {
                         VStack(spacing: 6) {
                             HStack {
-                                Text("Closing day").font(.system(size: 10, weight: .medium)).foregroundColor(AppColors.secondaryText)
+                                Text("Closing day")
+                                    .font(AppTypography.cardHeader)
+                                    .foregroundColor(AppColors.secondaryText)
+                                    .lineLimit(1)
                                 Spacer()
-                                Text("Trades").font(.system(size: 10, weight: .medium)).foregroundColor(AppColors.secondaryText)
-                                    .frame(width: 50, alignment: .trailing)
-                                Text("Net P&L").font(.system(size: 10, weight: .medium)).foregroundColor(AppColors.secondaryText)
-                                    .frame(width: 80, alignment: .trailing)
+                                Text("Trades")
+                                    .font(AppTypography.cardHeader)
+                                    .foregroundColor(AppColors.secondaryText)
+                                    .frame(width: 44, alignment: .trailing)
+                                    .lineLimit(1)
+                                Text("Net P&L")
+                                    .font(AppTypography.cardHeader)
+                                    .foregroundColor(AppColors.secondaryText)
+                                    .frame(width: 108, alignment: .trailing)
+                                    .lineLimit(1)
                             }
                             .padding(.top, 4)
                             
@@ -368,20 +377,25 @@ extension JournalCalendarView {
                                         Text(dateLabel(for: day.date))
                                             .font(AppTypography.caption)
                                             .foregroundColor(AppColors.brand)
+                                            .lineLimit(1)
                                         Spacer()
                                         Text("\(day.trades)")
                                             .font(AppTypography.caption)
+                                            .monospacedDigit()
                                             .foregroundColor(AppColors.primaryText)
-                                            .frame(width: 50, alignment: .trailing)
+                                            .frame(width: 44, alignment: .trailing)
+                                            .lineLimit(1)
                                         AppMonetaryText(
                                             Formatters.formatPnL(day.netPnl, currency: env.currentCurrency),
                                             isPrivate: env.isPrivacyModeEnabled,
                                             font: AppTypography.captionBold,
                                             color: day.netPnl >= 0 ? AppColors.profit : AppColors.loss
                                         )
-                                        .frame(width: 80, alignment: .trailing)
+                                        .frame(width: 108, alignment: .trailing)
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.85)
                                     }
-                                    .padding(.vertical, 2)
+                                    .padding(.vertical, 3)
                                 }
                             }
                         }

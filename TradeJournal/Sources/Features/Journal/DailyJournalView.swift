@@ -16,6 +16,15 @@ public struct JournalDaySummary: Identifiable {
     public let notePreview: String
 }
 
+public struct IdentifiableDateItem: Identifiable {
+    public var id: String { date }
+    public let date: String
+    
+    public init(date: String) {
+        self.date = date
+    }
+}
+
 /// Daily journal list screen
 /// Port 1:1 from `source-repo/apps/web/src/app/journal/page.tsx`
 public struct DailyJournalListView: View {
@@ -24,6 +33,7 @@ public struct DailyJournalListView: View {
     
     @State private var searchText: String = ""
     @State private var navigateToToday: Bool = false
+    @State private var selectedDateForDetail: String? = nil
     
     public init() {}
     
@@ -140,56 +150,61 @@ public struct DailyJournalListView: View {
     }
     
     public var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                // Fixed pinned Search & Today bar - never hidden, always accessible
-                searchAndTodayBar
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-                    .background(.ultraThinMaterial)
-                    .overlay(
-                        Divider().background(AppColors.border.opacity(0.35)),
-                        alignment: .bottom
-                    )
-                
-                ScrollView {
-                    VStack(spacing: 10) {
-                        // Day cards list
-                        if daysList.isEmpty {
-                            VStack(spacing: 12) {
-                                Image(systemName: "calendar.badge.exclamationmark")
-                                    .font(.system(size: 36))
-                                    .foregroundColor(AppColors.secondaryText.opacity(0.6))
-                                Text("No trading days yet")
-                                    .font(AppTypography.cardTitle)
-                                    .foregroundColor(AppColors.primaryText)
-                                Text("No trading days yet — import trades or write your first day note.")
-                                    .font(AppTypography.caption)
-                                    .foregroundColor(AppColors.secondaryText)
-                                    .multilineTextAlignment(.center)
-                                    .padding(.horizontal, 32)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 60)
-                        } else {
-                            LazyVStack(spacing: 8) {
-                                ForEach(daysList) { day in
-                                    NavigationLink(destination: DailyJournalDetailView(date: day.date)) {
-                                        dayRowCard(day)
-                                    }
-                                    .buttonStyle(ApplePressableButtonStyle())
-                                }
-                            }
-                            .padding(.horizontal, 14)
+        VStack(spacing: 0) {
+            // Fixed pinned Search & Today bar - sits cleanly below ShellHeaderView
+            searchAndTodayBar
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(.ultraThinMaterial)
+                .overlay(
+                    Divider().background(AppColors.border.opacity(0.35)),
+                    alignment: .bottom
+                )
+            
+            ScrollView {
+                VStack(spacing: 10) {
+                    // Day cards list
+                    if daysList.isEmpty {
+                        VStack(spacing: 12) {
+                            Image(systemName: "calendar.badge.exclamationmark")
+                                .font(.system(size: 36))
+                                .foregroundColor(AppColors.secondaryText.opacity(0.6))
+                            Text("No trading days yet")
+                                .font(AppTypography.cardTitle)
+                                .foregroundColor(AppColors.primaryText)
+                            Text("No trading days yet — import trades or write your first day note.")
+                                .font(AppTypography.caption)
+                                .foregroundColor(AppColors.secondaryText)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 32)
                         }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 60)
+                    } else {
+                        LazyVStack(spacing: 8) {
+                            ForEach(daysList) { day in
+                                Button {
+                                    selectedDateForDetail = day.date
+                                } label: {
+                                    dayRowCard(day)
+                                }
+                                .buttonStyle(ApplePressableButtonStyle())
+                            }
+                        }
+                        .padding(.horizontal, 14)
                     }
-                    .padding(.top, 10)
-                    .padding(.bottom, 88)
                 }
-                .background(AppColors.background)
+                .padding(.top, 10)
+                .padding(.bottom, 88)
             }
             .background(AppColors.background)
-            .toolbar(.hidden, for: .navigationBar)
+        }
+        .background(AppColors.background)
+        .fullScreenCover(item: Binding<IdentifiableDateItem?>(
+            get: { selectedDateForDetail.map { IdentifiableDateItem(date: $0) } },
+            set: { selectedDateForDetail = $0?.date }
+        )) { item in
+            DailyJournalDetailView(date: item.date)
         }
     }
     
@@ -219,7 +234,9 @@ public struct DailyJournalListView: View {
                     .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
             )
             
-            NavigationLink(destination: DailyJournalDetailView(date: todayKey)) {
+            Button {
+                selectedDateForDetail = todayKey
+            } label: {
                 HStack(spacing: 5) {
                     Image(systemName: "sun.max.fill")
                         .font(.system(size: 12))
@@ -232,6 +249,7 @@ public struct DailyJournalListView: View {
                 .background(AppColors.brandPrimary)
                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             }
+            .buttonStyle(ApplePressableButtonStyle())
             .fixedSize()
         }
     }
@@ -330,6 +348,7 @@ public struct DailyJournalDetailView: View {
     @State private var showExportSheet: Bool = false
     @State private var exportText: String = ""
     @State private var selectedTime: String? = nil
+    @State private var selectedTradeForDetail: Trade? = nil
     @State private var autoSaveTask: Task<Void, Never>? = nil
     @State private var hasPendingChanges: Bool = false
     
@@ -494,6 +513,9 @@ public struct DailyJournalDetailView: View {
         .enableNativePopGesture()
         .sheet(isPresented: $showExportSheet) {
             ReviewExportModal(title: "Journal · \(date)", exportText: exportText)
+        }
+        .fullScreenCover(item: $selectedTradeForDetail) { trade in
+            TradeDetailView(trade: trade)
         }
         .alert("Delete note for \(date)?", isPresented: $showDeleteNoteAlert) {
             Button("Cancel", role: .cancel) {}
@@ -717,7 +739,9 @@ public struct DailyJournalDetailView: View {
                 
                 VStack(spacing: 8) {
                     ForEach(dayTrades) { trade in
-                        NavigationLink(destination: TradeDetailView(trade: trade)) {
+                        Button {
+                            selectedTradeForDetail = trade
+                        } label: {
                             HStack(spacing: 8) {
                                 // Status badge WIN / LOSS / BE
                                 Text(trade.status.rawValue.uppercased())
@@ -733,34 +757,39 @@ public struct DailyJournalDetailView: View {
                                         (trade.netPnl < 0 ? AppColors.loss : AppColors.secondaryText)
                                     )
                                     .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                                    .lineLimit(1)
                                 
                                 Text(trade.symbol)
-                                    .font(AppTypography.bodyBold)
+                                    .font(AppTypography.subheadlineBold)
                                     .foregroundColor(AppColors.primaryText)
+                                    .lineLimit(1)
                                 
                                 Text(trade.direction.rawValue.uppercased())
-                                    .font(.system(size: 11, weight: .medium))
-                                    .foregroundColor(trade.direction == .long ? AppColors.profit : AppColors.loss)
+                                    .font(.system(size: 10, weight: .heavy))
+                                    .foregroundColor(trade.direction == .long ? AppColors.brand : AppColors.warning)
+                                    .lineLimit(1)
                                 
-                                Spacer()
+                                Spacer(minLength: 4)
                                 
                                 VStack(alignment: .trailing, spacing: 2) {
                                     Text(trade.netPnl >= 0 ? "+\(Formatters.currency(trade.netPnl))" : Formatters.currency(trade.netPnl))
-                                        .font(AppTypography.bodyBold)
+                                        .font(AppTypography.subheadlineBold)
                                         .foregroundColor(trade.netPnl >= 0 ? AppColors.profit : AppColors.loss)
+                                        .lineLimit(1)
                                     
-                                    Text("\(trade.quantity.formatted()) @ \(trade.avgEntry.formatted())")
-                                        .font(.system(size: 11))
+                                    Text("\(Formatters.formatNumber(trade.quantity)) lots @ \(Formatters.price(trade.avgEntry))")
+                                        .font(.system(size: 11, weight: .regular))
                                         .foregroundColor(AppColors.secondaryText)
+                                        .lineLimit(1)
                                 }
                                 
                                 Image(systemName: "chevron.right")
-                                    .font(.system(size: 10))
+                                    .font(.system(size: 10, weight: .semibold))
                                     .foregroundColor(AppColors.secondaryText.opacity(0.4))
                             }
                             .padding(.vertical, 6)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(ApplePressableButtonStyle())
                         
                         if trade.id != dayTrades.last?.id {
                             Divider()
