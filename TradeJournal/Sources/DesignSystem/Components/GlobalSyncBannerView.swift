@@ -12,26 +12,7 @@ public struct GlobalSyncBannerView: View {
     
     public var body: some View {
         Group {
-            if dataStore.isSyncing {
-                HStack(spacing: 8) {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: AppColors.brand))
-                        .scaleEffect(0.7)
-                    Text(dataStore.lastSyncSummary ?? "Synchronizing data...")
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.primaryText)
-                        .lineLimit(1)
-                    Spacer()
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-                .background(AppColors.brand.opacity(0.12))
-                .overlay(
-                    Divider().background(AppColors.brand.opacity(0.3)),
-                    alignment: .bottom
-                )
-                .transition(.move(edge: .top).combined(with: .opacity))
-            } else if let error = dataStore.lastSyncError, !isDismissed, !error.lowercased().contains("cancel") {
+            if let error = dataStore.lastSyncError, !isDismissed, !error.lowercased().contains("cancel") {
                 HStack(spacing: 8) {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .font(.system(size: 13, weight: .semibold))
