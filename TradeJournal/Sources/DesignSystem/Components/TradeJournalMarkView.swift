@@ -7,6 +7,7 @@ import UIKit
 /// Crisp, dynamic financial emblem featuring ascending candlestick bars with a breakout trendline spline and glowing apex.
 /// Standalone vector mark without artificial bounding boxes or double background wrappers.
 public struct TradeJournalBrandMark: View {
+    @Environment(\.colorScheme) private var colorScheme
     private let size: CGFloat
     private let primaryColor: Color
     private let accentColor: Color
@@ -22,6 +23,24 @@ public struct TradeJournalBrandMark: View {
     }
     
     public var body: some View {
+        #if canImport(UIKit)
+        if UIImage(named: "HeaderLogo") != nil {
+            Image("HeaderLogo")
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: size, height: size)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Trade Journal logo")
+                .accessibilityAddTraits(.isImage)
+        } else {
+            fallbackCanvas
+        }
+        #else
+        fallbackCanvas
+        #endif
+    }
+    
+    private var fallbackCanvas: some View {
         Canvas { context, canvasSize in
             let w = canvasSize.width
             let h = canvasSize.height
@@ -94,18 +113,36 @@ public struct TradeJournalBrandMark: View {
 
 /// Standalone vector mark for headers, sidebars, and branded touchpoints.
 public struct TradeJournalMarkView: View {
+    @Environment(\.colorScheme) private var colorScheme
     private let size: CGFloat
-    private let color: Color
+    private let color: Color?
     
-    public init(size: CGFloat = 20, color: Color = AppColors.brand) {
+    public init(size: CGFloat = 20, color: Color? = nil) {
         self.size = size
         self.color = color
     }
     
     public var body: some View {
-        TradeJournalBrandMark(size: size, primaryColor: color)
+        #if canImport(UIKit)
+        if UIImage(named: "HeaderLogo") != nil {
+            Image("HeaderLogo")
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: size, height: size)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Trade Journal logo")
+                .accessibilityAddTraits(.isImage)
+        } else {
+            TradeJournalBrandMark(size: size, primaryColor: color ?? AppColors.brand)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Trade Journal icon")
+                .accessibilityAddTraits(.isImage)
+        }
+        #else
+        TradeJournalBrandMark(size: size, primaryColor: color ?? AppColors.brand)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("Trade Journal icon")
             .accessibilityAddTraits(.isImage)
+        #endif
     }
 }

@@ -1,7 +1,17 @@
 {
   "images" : [
     {
-      "filename" : "logo.png",
+      "filename" : "AppLogo.png",
+      "idiom" : "universal"
+    },
+    {
+      "appearances" : [
+        {
+          "appearance" : "luminosity",
+          "value" : "dark"
+        }
+      ],
+      "filename" : "AppLogo_dark.png",
       "idiom" : "universal"
     }
   ],

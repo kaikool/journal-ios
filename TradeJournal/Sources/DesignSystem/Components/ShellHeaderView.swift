@@ -94,8 +94,8 @@ public struct ShellHeaderView: View {
             .accessibilityLabel("Toggle navigation drawer")
             
             // Current Page Title & Brand Mark (Always prominent and unambiguous)
-            HStack(spacing: 5) {
-                TradeJournalMarkView(size: 15, color: AppColors.brand)
+            HStack(spacing: 6) {
+                TradeJournalMarkView(size: 20)
                 
                 Text(currentTabTitle)
                     .font(.system(size: 16, weight: .bold, design: .rounded))
