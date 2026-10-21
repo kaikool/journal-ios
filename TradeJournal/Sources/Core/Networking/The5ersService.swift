@@ -1987,17 +1987,29 @@ public final class The5ersService: ObservableObject {
                 (!deterministicKey.isEmpty && ($0.id.contains(deterministicKey) || $0.reference.contains(deterministicKey))) ||
                 ($0.firm == "The5ers" && $0.kind == "payout" && $0.occurredOn == dateStr && ($0.amountMinor == grossMinor || $0.amountMinor == netReceivedMinor))
             }) {
-                var existing = dataStore.propEntries[existingIdx]
-                existing.id = payoutEntryId
-                existing.amountMinor = grossMinor
-                existing.splitBps = splitBps
-                existing.feeMinor = feeMinor
-                existing.status = isCompleted ? .completed : .requested
-                existing.occurredOn = dateStr
-                if existing.accountId == nil || existing.accountId?.isEmpty == true {
-                    existing.accountId = primaryAccId
-                }
-                dataStore.propEntries[existingIdx] = existing
+                let existing = dataStore.propEntries[existingIdx]
+                let updatedEntry = PropEntryItem(
+                    id: payoutEntryId,
+                    accountId: primaryAccId ?? existing.accountId,
+                    firm: existing.firm,
+                    kind: existing.kind,
+                    category: existing.category,
+                    currency: currency,
+                    amountMinor: grossMinor,
+                    splitBps: splitBps,
+                    feeMinor: feeMinor,
+                    occurredOn: dateStr,
+                    dueOn: existing.dueOn,
+                    status: isCompleted ? .completed : .requested,
+                    parentId: existing.parentId,
+                    reference: existing.reference.isEmpty ? shortRef : existing.reference,
+                    notes: existing.notes.isEmpty ? "The5ers Official Withdrawal" : existing.notes,
+                    voided: existing.voided,
+                    revision: existing.revision + 1,
+                    createdAt: existing.createdAt,
+                    updatedAt: JournalIds.nowIso()
+                )
+                dataStore.propEntries[existingIdx] = updatedEntry
             } else {
                 let payoutEntry = PropEntryItem(
                     id: payoutEntryId,
@@ -2027,12 +2039,19 @@ public final class The5ersService: ObservableObject {
                     (!deterministicKey.isEmpty && ($0.id.contains(deterministicKey) || $0.reference.contains(deterministicKey))) ||
                     ($0.occurredOn == dateStr && $0.amountMinor == netReceivedMinor)
                 }) {
-                    var existingRcpt = dataStore.propReceipts[rIdx]
-                    existingRcpt.id = rcptId
-                    existingRcpt.payoutId = payoutEntryId
-                    existingRcpt.amountMinor = netReceivedMinor
-                    existingRcpt.occurredOn = dateStr
-                    dataStore.propReceipts[rIdx] = existingRcpt
+                    let existingRcpt = dataStore.propReceipts[rIdx]
+                    let updatedRcpt = PropReceiptItem(
+                        id: rcptId,
+                        payoutId: payoutEntryId,
+                        kind: existingRcpt.kind,
+                        amountMinor: netReceivedMinor,
+                        occurredOn: dateStr,
+                        reference: existingRcpt.reference.isEmpty ? "Receipt #\(deterministicKey.prefix(8))" : existingRcpt.reference,
+                        notes: existingRcpt.notes.isEmpty ? "The5ers Settlement Receipt" : existingRcpt.notes,
+                        voided: existingRcpt.voided,
+                        createdAt: existingRcpt.createdAt
+                    )
+                    dataStore.propReceipts[rIdx] = updatedRcpt
                 } else {
                     let rcpt = PropReceiptItem(
                         id: rcptId,

@@ -145,7 +145,7 @@ public struct PropAccountItem: Identifiable, Codable, Equatable, Sendable {
 }
 
 public struct PropEntryItem: Identifiable, Codable, Equatable, Sendable {
-    public let id: String
+    public var id: String
     public var accountId: String?
     public var firm: String
     public var kind: String // "expense" | "refund" | "payout"
@@ -209,7 +209,7 @@ public struct PropEntryItem: Identifiable, Codable, Equatable, Sendable {
 }
 
 public struct PropReceiptItem: Identifiable, Codable, Equatable, Sendable {
-    public let id: String
+    public var id: String
     public var payoutId: String
     public var kind: String // "receipt" | "reversal"
     public var amountMinor: Int64
