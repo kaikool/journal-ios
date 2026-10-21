@@ -46,8 +46,7 @@ public struct PropFirmLedgerView: View {
     var filteredAccounts: [PropAccountItem] {
         dataStore.propAccounts.filter { prop in
             (showArchivedAccounts || !prop.archived) &&
-            (prop.currency.uppercased() == selectedCurrency.uppercased() || (prop.currency.isEmpty && selectedCurrency.uppercased() == "USD")) &&
-            dataStore.isPropAccountVisible(prop)
+            (prop.currency.uppercased() == selectedCurrency.uppercased() || (prop.currency.isEmpty && selectedCurrency.uppercased() == "USD"))
         }
     }
     

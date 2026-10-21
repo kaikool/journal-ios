@@ -491,6 +491,7 @@ public final class The5ersService: ObservableObject {
                     "operation": "list",
                     "page": page,
                     "limit": 50,
+                    "view": "all",
                     "contract_version": "1.0",
                     "request_context": ["timezone": "UTC", "locale": "en"]
                 ]
@@ -634,7 +635,7 @@ public final class The5ersService: ObservableObject {
                         journalAccountId: journalAccId,
                         openedOn: acc.createdAt ?? DateFormatter.localizedString(from: Date(), dateStyle: .short, timeStyle: .none),
                         notes: "Synced from The5ers MCP Hub (Protocol 2025-03-26)",
-                        archived: !isActive
+                        archived: false
                     )
                     dataStore.propAccounts.append(newPropAccount)
                 }
@@ -651,8 +652,8 @@ public final class The5ersService: ObservableObject {
                         profitCalcMethod: old.profitCalcMethod,
                         autoSync: isActive,
                         lastSyncAt: Date(),
-                        archivedAt: old.archivedAt ?? (isActive ? nil : Date()),
-                        visibleInJournal: old.visibleInJournal ?? isActive,
+                        archivedAt: old.archivedAt,
+                        visibleInJournal: old.visibleInJournal ?? true,
                         createdAt: old.createdAt
                     )
                 } else {
@@ -664,26 +665,64 @@ public final class The5ersService: ObservableObject {
                         currency: acc.currency,
                         initialBalance: acc.startingBalance ?? acc.balance,
                         autoSync: isActive,
-                        archivedAt: isActive ? nil : Date(),
-                        visibleInJournal: isActive
+                        archivedAt: nil,
+                        visibleInJournal: true
                     )
                     dataStore.accounts.append(newAcc)
                 }
             }
             
-            // Target all available accounts from The5ers
-            var targetAccounts: [The5ersMcpAccount] = []
-            var seenTargetIds = Set<String>()
+            // Target all available accounts from The5ers (both freshly discovered and existing historical accounts)
+            var allTargetAccounts: [The5ersMcpAccount] = []
+            var seenTargetRefs = Set<String>()
             
             for acc in accountsList {
-                if !seenTargetIds.contains(acc.id) {
-                    seenTargetIds.insert(acc.id)
-                    targetAccounts.append(acc)
+                if !seenTargetRefs.contains(acc.ref) {
+                    seenTargetRefs.insert(acc.ref)
+                    allTargetAccounts.append(acc)
+                }
+            }
+            
+            for prop in dataStore.propAccounts where prop.firm.lowercased() == "the5ers" || prop.id.hasPrefix("the5ers_") {
+                let ref = prop.id.cleanAccountId
+                if !ref.isEmpty && !seenTargetRefs.contains(ref) {
+                    seenTargetRefs.insert(ref)
+                    allTargetAccounts.append(The5ersMcpAccount(
+                        id: prop.id,
+                        ref: ref,
+                        label: prop.name,
+                        platform: "cTrader",
+                        balance: Decimal(prop.sizeMinor ?? 0) / 100,
+                        equity: Decimal(prop.sizeMinor ?? 0) / 100,
+                        currency: prop.currency,
+                        status: prop.status.rawValue,
+                        program: prop.program.rawValue,
+                        startingBalance: Decimal(prop.sizeMinor ?? 0) / 100
+                    ))
+                }
+            }
+            
+            for acc in dataStore.accounts where acc.broker.lowercased() == "the5ers" || acc.id.hasPrefix("the5ers_") {
+                let ref = acc.id.cleanAccountId
+                if !ref.isEmpty && !seenTargetRefs.contains(ref) {
+                    seenTargetRefs.insert(ref)
+                    allTargetAccounts.append(The5ersMcpAccount(
+                        id: acc.id,
+                        ref: ref,
+                        label: acc.name,
+                        platform: "cTrader",
+                        balance: acc.initialBalance,
+                        equity: acc.initialBalance,
+                        currency: acc.currency,
+                        status: "active",
+                        program: "funded",
+                        startingBalance: acc.initialBalance
+                    ))
                 }
             }
             
             // Incremental sync optimization: only query positions for active accounts or accounts with 0 trades
-            let accountsToSyncPositions = targetAccounts.filter { acc in
+            let accountsToSyncPositions = allTargetAccounts.filter { acc in
                 let isActive = (acc.status.lowercased() == "active" || acc.status.lowercased() == "available")
                 let hasTrades = dataStore.trades.contains(where: { TradeDataStore.isSameAccountId($0.accountId, acc.id) })
                 return isActive || !hasTrades
@@ -737,37 +776,85 @@ public final class The5ersService: ObservableObject {
                 }
             }
             
-            // 4. Sync purchases / challenges & evaluation fees across all pages
+            // 4. Sync purchases / challenges & evaluation fees across all pages and accounts
             lastStatus = "Loading purchases and evaluation fees from the5ers_purchase..."
             var allPurchases: [[String: Any]] = []
+            var seenPurchaseIds = Set<String>()
             
-            var purchaseRes: [String: Any]? = try? await callMcpTool(name: "the5ers_purchase", arguments: ["operation": "list"])
-            if purchaseRes == nil {
-                purchaseRes = try? await callMcpTool(name: "the5ers_purchase", arguments: ["operation": "history"])
-            }
-            if purchaseRes == nil {
-                purchaseRes = try? await callMcpTool(name: "the5ers_purchase", arguments: [:])
-            }
-            if purchaseRes == nil {
-                purchaseRes = try? await callMcpTool(name: "the5ers_purchase", arguments: [
+            for page in 1...10 {
+                if Task.isCancelled { break }
+                let purchaseArgs: [String: Any] = [
                     "operation": "list",
+                    "page": page,
+                    "limit": 50,
+                    "view": "all",
                     "contract_version": "1.0",
                     "request_context": ["timezone": "UTC", "locale": "en"]
-                ])
+                ]
+                guard let purchaseResult = try? await callMcpTool(name: "the5ers_purchase", arguments: purchaseArgs) else { break }
+                let unwrapped = unwrapMcpToolResult(purchaseResult)
+                let rows = extractAnyPurchaseCollection(from: unwrapped)
+                if rows.isEmpty { break }
+                for r in rows {
+                    let pId = String(describing: r["id"] ?? r["orderid"] ?? r["order_id"] ?? r["purchaseid"] ?? UUID().uuidString)
+                    if !seenPurchaseIds.contains(pId) {
+                        seenPurchaseIds.insert(pId)
+                        allPurchases.append(r)
+                    }
+                }
+                if rows.count < 50 { break }
             }
             
-            if let res = purchaseRes {
-                let unwrapped = unwrapMcpToolResult(res)
-                let rows = extractAnyPurchaseCollection(from: unwrapped)
-                allPurchases.append(contentsOf: rows)
+            if allPurchases.isEmpty {
+                for page in 1...5 {
+                    if Task.isCancelled { break }
+                    let histArgs: [String: Any] = [
+                        "operation": "history",
+                        "page": page,
+                        "limit": 50,
+                        "view": "all"
+                    ]
+                    guard let histResult = try? await callMcpTool(name: "the5ers_purchase", arguments: histArgs) else { break }
+                    let unwrapped = unwrapMcpToolResult(histResult)
+                    let rows = extractAnyPurchaseCollection(from: unwrapped)
+                    if rows.isEmpty { break }
+                    for r in rows {
+                        let pId = String(describing: r["id"] ?? r["orderid"] ?? r["order_id"] ?? r["purchaseid"] ?? UUID().uuidString)
+                        if !seenPurchaseIds.contains(pId) {
+                            seenPurchaseIds.insert(pId)
+                            allPurchases.append(r)
+                        }
+                    }
+                    if rows.count < 50 { break }
+                }
+            }
+            
+            // Query per-account purchases across all accounts
+            for acc in allTargetAccounts {
+                if Task.isCancelled { break }
+                if let perAccRes = try? await callMcpTool(name: "the5ers_purchase", arguments: [
+                    "operation": "list",
+                    "account_ref": acc.ref
+                ]) {
+                    let unwrapped = unwrapMcpToolResult(perAccRes)
+                    let rows = extractAnyPurchaseCollection(from: unwrapped)
+                    for var r in rows {
+                        if r["account_ref"] == nil { r["account_ref"] = acc.ref }
+                        let pId = String(describing: r["id"] ?? r["orderid"] ?? r["order_id"] ?? r["purchaseid"] ?? UUID().uuidString)
+                        if !seenPurchaseIds.contains(pId) {
+                            seenPurchaseIds.insert(pId)
+                            allPurchases.append(r)
+                        }
+                    }
+                }
             }
             
             if !allPurchases.isEmpty {
-                mergePurchases(allPurchases, into: dataStore, targetAccounts: accountsList)
+                mergePurchases(allPurchases, into: dataStore, targetAccounts: allTargetAccounts)
             }
             
-            // 5. Sync payouts & withdrawal settlements
-            await syncPayouts(into: dataStore, targetAccounts: targetAccounts)
+            // 5. Sync payouts & withdrawal settlements across ALL accounts
+            await syncPayouts(into: dataStore, targetAccounts: allTargetAccounts)
             
             lastSyncTime = Date()
             dataStore.rebuildAllAccounts()
@@ -1381,30 +1468,65 @@ public final class The5ersService: ObservableObject {
         var allRawPayouts: [[String: Any]] = []
         var seenPayoutIds = Set<String>()
         
-        // 1. Try global queries first (most effective on The5ers MCP Hub)
-        var globalResult = try? await callMcpTool(name: "the5ers_payout", arguments: ["operation": "history"])
-        if globalResult == nil {
-            globalResult = try? await callMcpTool(name: "the5ers_payout", arguments: ["operation": "list"])
-        }
-        if globalResult == nil {
-            globalResult = try? await callMcpTool(name: "the5ers_payout", arguments: [:])
-        }
-        if globalResult == nil {
-            globalResult = try? await callMcpTool(name: "the5ers_payout", arguments: [
+        // 1. Try global queries with pagination across pages
+        for page in 1...10 {
+            if Task.isCancelled { break }
+            let payArgs: [String: Any] = [
                 "operation": "history",
+                "page": page,
+                "limit": 50,
+                "view": "all",
                 "contract_version": "1.0",
                 "request_context": ["timezone": "UTC", "locale": "en"]
-            ])
-        }
-        
-        if let res = globalResult {
-            let unwrapped = unwrapMcpToolResult(res)
+            ]
+            guard let globalResult = try? await callMcpTool(name: "the5ers_payout", arguments: payArgs) else { break }
+            let unwrapped = unwrapMcpToolResult(globalResult)
             let rows = extractAnyPayoutCollection(from: unwrapped)
+            if rows.isEmpty { break }
             for r in rows {
                 let pId = String(describing: r["id"] ?? r["payout_id"] ?? r["withdrawalid"] ?? UUID().uuidString)
                 if !seenPayoutIds.contains(pId) {
                     seenPayoutIds.insert(pId)
                     allRawPayouts.append(r)
+                }
+            }
+            if rows.count < 50 { break }
+        }
+        
+        if allRawPayouts.isEmpty {
+            for page in 1...5 {
+                if Task.isCancelled { break }
+                let listArgs: [String: Any] = [
+                    "operation": "list",
+                    "page": page,
+                    "limit": 50,
+                    "view": "all"
+                ]
+                guard let listResult = try? await callMcpTool(name: "the5ers_payout", arguments: listArgs) else { break }
+                let unwrapped = unwrapMcpToolResult(listResult)
+                let rows = extractAnyPayoutCollection(from: unwrapped)
+                if rows.isEmpty { break }
+                for r in rows {
+                    let pId = String(describing: r["id"] ?? r["payout_id"] ?? r["withdrawalid"] ?? UUID().uuidString)
+                    if !seenPayoutIds.contains(pId) {
+                        seenPayoutIds.insert(pId)
+                        allRawPayouts.append(r)
+                    }
+                }
+                if rows.count < 50 { break }
+            }
+        }
+        
+        if allRawPayouts.isEmpty {
+            if let bareResult = try? await callMcpTool(name: "the5ers_payout", arguments: [:]) {
+                let unwrapped = unwrapMcpToolResult(bareResult)
+                let rows = extractAnyPayoutCollection(from: unwrapped)
+                for r in rows {
+                    let pId = String(describing: r["id"] ?? r["payout_id"] ?? r["withdrawalid"] ?? UUID().uuidString)
+                    if !seenPayoutIds.contains(pId) {
+                        seenPayoutIds.insert(pId)
+                        allRawPayouts.append(r)
+                    }
                 }
             }
         }
@@ -1552,16 +1674,16 @@ public final class The5ersService: ObservableObject {
             
             let payAccRef = String(describing: fields["accountref"] ?? fields["accountid"] ?? fields["ref"] ?? "")
             let matchedAcc = targetAccounts.first(where: {
-                $0.id == payAccRef || $0.ref == payAccRef || "the5ers_\($0.id)" == payAccRef
+                $0.id == payAccRef || $0.ref == payAccRef || "the5ers_\($0.id)" == payAccRef || $0.id.cleanAccountId == payAccRef.cleanAccountId || $0.ref.cleanAccountId == payAccRef.cleanAccountId
             })
             let primaryAccId: String? = {
                 if let m = matchedAcc {
                     return m.id.hasPrefix("the5ers_") ? m.id : "the5ers_\(m.id)"
                 }
-                if let f = targetAccounts.first {
-                    return f.id.hasPrefix("the5ers_") ? f.id : "the5ers_\(f.id)"
+                if !payAccRef.isEmpty {
+                    return payAccRef.hasPrefix("the5ers_") ? payAccRef : "the5ers_\(payAccRef)"
                 }
-                return dataStore.propAccounts.first?.id
+                return targetAccounts.first?.id
             }()
             let currency = String(describing: fields["currency"] ?? matchedAcc?.currency ?? "USD").uppercased()
             

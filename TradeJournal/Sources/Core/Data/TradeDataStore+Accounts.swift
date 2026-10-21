@@ -101,30 +101,11 @@ extension TradeDataStore {
     }
 
     public func isPropAccountVisible(_ prop: PropAccountItem) -> Bool {
-        if let acc = accounts.first(where: {
-            $0.id == prop.journalAccountId ||
-            $0.id == prop.id ||
-            $0.id.isEquivalentAccountId(to: prop.id)
-        }) {
-            return isAccountVisible(acc)
-        }
         return !prop.archived
     }
 
     public func isPropEntryVisible(_ entry: PropEntryItem) -> Bool {
-        guard let entryAccId = entry.accountId, !entryAccId.isEmpty else {
-            return true
-        }
-        if let prop = propAccounts.first(where: { $0.id == entryAccId }) {
-            return isPropAccountVisible(prop)
-        }
-        if let acc = accounts.first(where: {
-            $0.id == entryAccId ||
-            $0.id.isEquivalentAccountId(to: entryAccId)
-        }) {
-            return isAccountVisible(acc)
-        }
-        return true
+        return !entry.voided
     }
 
     public var activeAccounts: [Account] {
@@ -385,7 +366,11 @@ extension TradeDataStore {
             let cleanAcc = (entry.accountId ?? "").cleanAccountId
             let semantic = "\(entry.firm)|\(entry.kind)|\(entry.currency.uppercased())|\(entry.amountMinor)|\(entry.occurredOn)|\(cleanAcc)"
             
-            if seenIds.contains(entry.id) || seenSemantics.contains(semantic) {
+            if seenIds.contains(entry.id) {
+                continue
+            }
+            let isAuthoritative = !entry.reference.isEmpty && (entry.id.contains("order_") || entry.id.contains("purchase_") || entry.id.contains("payout_"))
+            if !isAuthoritative && seenSemantics.contains(semantic) {
                 continue
             }
             seenIds.insert(entry.id)
@@ -406,10 +391,12 @@ extension TradeDataStore {
         var cleaned: [PropReceiptItem] = []
         
         for rcpt in propReceipts {
-            let cleanPayoutId = rcpt.payoutId.cleanAccountId
-            let semantic = "\(cleanPayoutId)|\(rcpt.amountMinor)|\(rcpt.occurredOn)"
-            
-            if seenIds.contains(rcpt.id) || seenSemantics.contains(semantic) {
+            if seenIds.contains(rcpt.id) {
+                continue
+            }
+            let isAuthoritative = !rcpt.reference.isEmpty && rcpt.id.contains("rcpt_")
+            let semantic = "\(rcpt.payoutId.cleanAccountId)|\(rcpt.amountMinor)|\(rcpt.occurredOn)"
+            if !isAuthoritative && seenSemantics.contains(semantic) {
                 continue
             }
             seenIds.insert(rcpt.id)
