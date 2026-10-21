@@ -467,7 +467,7 @@ public enum PropFirmEngine {
     /// Constructs unified cash movement timeline combining expenses, payouts, and refunds
     public static func cashMovements(entries: [PropEntryItem], receipts: [PropReceiptItem]) -> [CashMovementItem] {
         let activeEntries = entries.filter { !$0.voided }
-        let entryMap = Dictionary(uniqueKeysWithValues: activeEntries.map { ($0.id, $0) })
+        let entryMap = Dictionary(activeEntries.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         
         let direct: [CashMovementItem] = activeEntries
             .filter { $0.kind != "payout" }
@@ -487,7 +487,14 @@ public enum PropFirmEngine {
             }
         
         let receiptMovements: [CashMovementItem] = receipts.compactMap { r in
-            guard let entry = entryMap[r.payoutId], !r.voided else { return nil }
+            guard !r.voided else { return nil }
+            let matchedEntry = entryMap[r.payoutId] ?? activeEntries.first(where: {
+                $0.id == r.payoutId ||
+                $0.id.hasSuffix(r.payoutId) ||
+                r.payoutId.hasSuffix($0.id) ||
+                $0.id.cleanAccountId == r.payoutId.cleanAccountId
+            })
+            guard let entry = matchedEntry else { return nil }
             return CashMovementItem(
                 id: r.id,
                 entryId: entry.id,
@@ -575,12 +582,16 @@ public enum PropFirmEngine {
         for row in receipts where !row.voided {
             let signed = row.kind == "reversal" ? -row.amountMinor : row.amountMinor
             receivedMap[row.payoutId, default: 0] += signed
+            let cleanPId = row.payoutId.cleanAccountId
+            if cleanPId != row.payoutId {
+                receivedMap[cleanPId, default: 0] += signed
+            }
         }
         
         return entries
-            .filter { $0.kind == "payout" && !$0.voided }
+            .filter { ($0.kind == "payout" || $0.category.lowercased() == "payout") && !$0.voided }
             .map { entry in
-                let actual = receivedMap[entry.id] ?? 0
+                let actual = receivedMap[entry.id] ?? receivedMap[entry.id.cleanAccountId] ?? 0
                 let expected = expectedPayout(entry: entry)
                 let isOpen = entry.status == .requested || entry.status == .approved
                 let remaining = isOpen ? max(0, expected - actual) : 0

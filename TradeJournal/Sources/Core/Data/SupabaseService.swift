@@ -1784,8 +1784,15 @@ public struct SupabasePropEntryRecord: Codable {
         self.id = c.decodeString(forKeys: ["id"]) ?? UUID().uuidString
         self.accountId = c.decodeString(forKeys: ["account_id", "accountId"])
         self.firm = c.decodeString(forKeys: ["firm"]) ?? "The5ers"
-        self.kind = c.decodeString(forKeys: ["kind"]) ?? "fee"
-        self.category = c.decodeString(forKeys: ["category"]) ?? "eval_fee"
+        let rawKind = (c.decodeString(forKeys: ["kind", "type"]) ?? "expense").lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        if rawKind == "withdrawal" || rawKind == "withdraw" || rawKind == "payout" {
+            self.kind = "payout"
+        } else if rawKind == "refund" {
+            self.kind = "refund"
+        } else {
+            self.kind = "expense"
+        }
+        self.category = c.decodeString(forKeys: ["category"]) ?? (self.kind == "payout" ? "payout" : "challenge_fee")
         self.currency = c.decodeString(forKeys: ["currency"]) ?? "USD"
         self.amountMinor = c.decodeInt64(forKeys: ["amount_minor", "amountMinor"]) ?? 0
         self.splitBps = c.decodeInt(forKeys: ["split_bps", "splitBps"]) ?? 8000
@@ -1889,7 +1896,8 @@ public struct SupabasePropReceiptRecord: Codable {
         let c = try decoder.container(keyedBy: AnyCodingKey.self)
         self.id = c.decodeString(forKeys: ["id"]) ?? UUID().uuidString
         self.payoutId = c.decodeString(forKeys: ["payout_id", "payoutId", "account_id", "accountId"]) ?? ""
-        self.kind = c.decodeString(forKeys: ["kind"]) ?? "payout"
+        let rawKind = (c.decodeString(forKeys: ["kind", "type"]) ?? "receipt").lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        self.kind = (rawKind == "reversal") ? "reversal" : "receipt"
         self.amountMinor = c.decodeInt64(forKeys: ["amount_minor", "amountMinor", "net_amount_minor", "netAmountMinor"]) ?? 0
         let occ = c.decodeString(forKeys: ["occurred_on", "occurredOn", "received_on", "receivedOn"])
         self.occurredOn = occ ?? JournalIds.nowIso()

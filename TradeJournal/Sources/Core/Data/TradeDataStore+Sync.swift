@@ -425,6 +425,7 @@ extension TradeDataStore {
                     self.lastSyncError = nil
                 }
                 self.isSyncing = false
+                self.objectWillChange.send()
             }
         }
         AppLogger.info("Supabase sync completed (isBackground=\(isBackground)): Accounts=\(fetchedAccountsCount), Trades=\(fetchedTradesCount), Executions=\(fetchedExecutionsCount)")
@@ -447,6 +448,7 @@ extension TradeDataStore {
             } else {
                 self.lastSyncSummary = The5ersService.shared.lastStatus
             }
+            self.objectWillChange.send()
         }
         return count
     }

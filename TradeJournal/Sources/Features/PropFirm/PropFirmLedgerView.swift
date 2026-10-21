@@ -36,14 +36,17 @@ public struct PropFirmLedgerView: View {
     public init() {}
     
     var availableCurrencies: [String] {
-        let set = Set(dataStore.propAccounts.map { $0.currency } + dataStore.propEntries.map { $0.currency })
+        let raw = (dataStore.propAccounts.map { $0.currency.uppercased() } + dataStore.propEntries.map { $0.currency.uppercased() })
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        let set = Set(raw)
         return set.isEmpty ? ["USD"] : Array(set).sorted()
     }
     
     var filteredAccounts: [PropAccountItem] {
         dataStore.propAccounts.filter { prop in
             (showArchivedAccounts || !prop.archived) &&
-            (prop.currency == selectedCurrency) &&
+            (prop.currency.uppercased() == selectedCurrency.uppercased() || (prop.currency.isEmpty && selectedCurrency.uppercased() == "USD")) &&
             dataStore.isPropAccountVisible(prop)
         }
     }
@@ -51,13 +54,13 @@ public struct PropFirmLedgerView: View {
     var filteredEntries: [PropEntryItem] {
         dataStore.propEntries.filter { entry in
             !entry.voided &&
-            entry.currency == selectedCurrency
+            (entry.currency.uppercased() == selectedCurrency.uppercased() || (entry.currency.isEmpty && selectedCurrency.uppercased() == "USD"))
         }
     }
     
     var movements: [CashMovementItem] {
         PropFirmEngine.cashMovements(entries: filteredEntries, receipts: dataStore.propReceipts)
-            .filter { $0.currency == selectedCurrency }
+            .filter { $0.currency.uppercased() == selectedCurrency.uppercased() || ($0.currency.isEmpty && selectedCurrency.uppercased() == "USD") }
     }
     
     var summary: CashSummaryResult {
@@ -265,6 +268,16 @@ public struct PropFirmLedgerView: View {
             }
         } message: {
             Text("You can void this transaction to keep it in audit history, or delete it permanently from your journal and Supabase.")
+        }
+        .onAppear {
+            if !availableCurrencies.contains(selectedCurrency), let first = availableCurrencies.first {
+                selectedCurrency = first
+            }
+        }
+        .onChange(of: availableCurrencies) { newCurrs in
+            if !newCurrs.contains(selectedCurrency), let first = newCurrs.first {
+                selectedCurrency = first
+            }
         }
     }
 }

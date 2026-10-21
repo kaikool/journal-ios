@@ -778,7 +778,8 @@ public final class The5ersService: ObservableObject {
                 }
             }
             
-            dataStore.saveToDisk()
+            dataStore.saveToDisk(immediate: true)
+            dataStore.objectWillChange.send()
             let activeCount = accountsList.filter { $0.status.lowercased() == "active" || $0.status.lowercased() == "available" }.count
             lastStatus = "Successfully synced \(accountsList.count) accounts (\(activeCount) active) and \(importedPositionsCount) positions from The5ers MCP."
             

@@ -361,14 +361,17 @@ public struct ConnectionsSettingsView: View {
         the5ers.configure(token: mcpToken)
         the5ersStatus = "Starting synchronization with The5ers MCP Hub..."
         Task {
-            await dataStore.performGlobalSync()
-            await MainActor.run {
-                if let err = dataStore.lastSyncError {
-                    self.the5ersStatus = "Sync failed: \(err)"
-                } else if let summary = dataStore.lastSyncSummary {
-                    self.the5ersStatus = summary
-                } else {
-                    self.the5ersStatus = "Successfully synchronized with The5ers!"
+            do {
+                let count = try await dataStore.syncWithThe5ers()
+                await MainActor.run {
+                    self.the5ersStatus = "Successfully synced \(count) accounts, expenses & payouts from The5ers!"
+                }
+                if SupabaseService.shared.isConfigured {
+                    await dataStore.syncWithSupabase(isBackground: true)
+                }
+            } catch {
+                await MainActor.run {
+                    self.the5ersStatus = "Sync failed: \(error.localizedDescription)"
                 }
             }
         }
