@@ -404,21 +404,19 @@ public final class The5ersService: ObservableObject {
     
     /// Filters arguments to conform strictly to the tool's published inputSchema properties
     private func filterArgsForTool(_ args: [String: Any], toolName: String) -> [String: Any] {
-        var cleaned = args
-        // Never send "view" key which violates strict FastMCP schema validation
-        cleaned.removeValue(forKey: "view")
-        
         guard let schema = cachedToolSchemas[toolName],
               let props = schema["properties"] as? [String: Any],
               !props.isEmpty else {
-            return cleaned
+            return args
         }
-        return cleaned.filter { props.keys.contains($0.key) }
+        return args.filter { props.keys.contains($0.key) }
     }
     
     /// Builds resilient per-account arguments matching the exact parameter name expected by the tool
     private func buildAccountArgs(toolName: String, accountRef: String, op: String? = nil) -> [String: Any] {
-        var base: [String: Any] = [:]
+        var base: [String: Any] = [
+            "contract_version": "1.0"
+        ]
         if let op = op {
             base["operation"] = op
         }
@@ -1466,7 +1464,7 @@ public final class The5ersService: ObservableObject {
             let embedded = extractAnyPurchaseCollection(from: rawAcc)
             for var p in embedded {
                 if p["account_ref"] == nil && !accRef.isEmpty { p["account_ref"] = accRef }
-                let pId = String(describing: p["id"] ?? p["orderid"] ?? p["order_id"] ?? p["purchaseid"] ?? UUID().uuidString)
+                let pId = String(describing: p["id"] ?? p["orderid"] ?? p["order_id"] ?? p["purchaseid"] ?? p["ref"] ?? UUID().uuidString)
                 if !seenPurchaseIds.contains(pId) {
                     seenPurchaseIds.insert(pId)
                     allPurchases.append(p)
@@ -1474,54 +1472,21 @@ public final class The5ersService: ObservableObject {
             }
         }
         
-        // 2. Discover tool names for purchases
-        var candidateTools: [String] = []
-        let primaryTool = "the5ers_purchase"
-        if discoveredToolNames.contains(primaryTool) {
-            candidateTools.append(primaryTool)
-        }
-        for dName in discoveredToolNames {
-            let lower = dName.lowercased()
-            if (lower.contains("purchase") || lower.contains("order") || lower.contains("fee") || lower.contains("challenge") || lower.contains("invoice")) && !candidateTools.contains(dName) {
-                candidateTools.append(dName)
-            }
-        }
-        if candidateTools.isEmpty {
-            candidateTools = ["the5ers_purchase", "the5ers_purchases", "the5ers_orders"]
-        }
-        
-        let argSets: [[String: Any]] = [
-            [
-                "operation": "list",
-                "contract_version": "1.0",
-                "request_context": ["timezone": "UTC", "locale": "en"]
-            ],
-            ["operation": "list"],
-            [
-                "operation": "history",
-                "contract_version": "1.0",
-                "request_context": ["timezone": "UTC", "locale": "en"]
-            ],
-            ["operation": "history"],
-            [:]
+        // 2. Query official the5ers_purchase operation 'list'
+        let purchaseArgsList: [[String: Any]] = [
+            ["operation": "list", "contract_version": "1.0", "limit": 50],
+            ["operation": "list"]
         ]
         
-        var workingToolName: String? = nil
-        for tool in candidateTools {
-            if !allPurchases.isEmpty {
-                workingToolName = tool
-                break
-            }
-            for args in argSets {
-                if Task.isCancelled { break }
-                guard let res = try? await callMcpTool(name: tool, arguments: args) else { continue }
-                if let isErr = res["isError"] as? Bool, isErr { continue }
+        for pArgs in purchaseArgsList {
+            if Task.isCancelled { break }
+            if let res = try? await callMcpTool(name: "the5ers_purchase", arguments: pArgs),
+               !(res["isError"] as? Bool ?? false) {
                 let unwrapped = unwrapMcpToolResult(res)
                 let rows = extractAnyPurchaseCollection(from: unwrapped)
                 if !rows.isEmpty {
-                    workingToolName = tool
                     for r in rows {
-                        let pId = String(describing: r["id"] ?? r["orderid"] ?? r["order_id"] ?? r["purchaseid"] ?? UUID().uuidString)
+                        let pId = String(describing: r["id"] ?? r["orderid"] ?? r["order_id"] ?? r["purchaseid"] ?? r["ref"] ?? UUID().uuidString)
                         if !seenPurchaseIds.contains(pId) {
                             seenPurchaseIds.insert(pId)
                             allPurchases.append(r)
@@ -1532,25 +1497,20 @@ public final class The5ersService: ObservableObject {
             }
         }
         
-        // 3. Query per-account purchases across accounts ONLY if global query returned nothing
-        if allPurchases.isEmpty, let toolToQuery = workingToolName ?? candidateTools.first {
-            for acc in targetAccounts {
-                if Task.isCancelled { break }
-                for op in ["list", "history"] {
-                    let perAccArgs = buildAccountArgs(toolName: toolToQuery, accountRef: acc.ref, op: op)
-                    if let perAccRes = try? await callMcpTool(name: toolToQuery, arguments: perAccArgs) {
-                        if let isErr = perAccRes["isError"] as? Bool, isErr { continue }
-                        let unwrapped = unwrapMcpToolResult(perAccRes)
-                        let rows = extractAnyPurchaseCollection(from: unwrapped)
-                        for var r in rows {
-                            if r["account_ref"] == nil { r["account_ref"] = acc.ref }
-                            let pId = String(describing: r["id"] ?? r["orderid"] ?? r["order_id"] ?? r["purchaseid"] ?? UUID().uuidString)
-                            if !seenPurchaseIds.contains(pId) {
-                                seenPurchaseIds.insert(pId)
-                                allPurchases.append(r)
-                            }
-                        }
-                        if !rows.isEmpty { break }
+        // 3. For orders that have a 'ref', query 'accounts' to map directly to created accounts
+        for i in allPurchases.indices {
+            if Task.isCancelled { break }
+            let pRef = String(describing: allPurchases[i]["ref"] ?? allPurchases[i]["purchase_ref"] ?? allPurchases[i]["id"] ?? "")
+            if !pRef.isEmpty && (allPurchases[i]["account_ref"] == nil || String(describing: allPurchases[i]["account_ref"] ?? "").isEmpty) {
+                if let accRes = try? await callMcpTool(name: "the5ers_purchase", arguments: [
+                    "operation": "accounts",
+                    "purchase_ref": pRef,
+                    "contract_version": "1.0"
+                ]), !(accRes["isError"] as? Bool ?? false) {
+                    let unwrappedAcc = unwrapMcpToolResult(accRes)
+                    let accRows = extractMcpCollection(unwrappedAcc, collectionKey: "accounts")
+                    if let firstAcc = accRows.first, let createdRef = firstAcc["account_ref"] ?? firstAcc["ref"] {
+                        allPurchases[i]["account_ref"] = String(describing: createdRef)
                     }
                 }
             }
@@ -1757,84 +1717,62 @@ public final class The5ersService: ObservableObject {
             }
         }
         
-        // 2. Discover tool names for payouts
-        var candidateTools: [String] = []
-        let primaryTool = "the5ers_payout"
-        if discoveredToolNames.contains(primaryTool) {
-            candidateTools.append(primaryTool)
-        }
-        for dName in discoveredToolNames {
-            let lower = dName.lowercased()
-            if (lower.contains("payout") || lower.contains("withdraw") || lower.contains("reward") || lower.contains("settle") || lower.contains("wallet")) && !candidateTools.contains(dName) {
-                candidateTools.append(dName)
-            }
-        }
-        if candidateTools.isEmpty {
-            candidateTools = ["the5ers_payout", "the5ers_payouts", "the5ers_withdrawals"]
-        }
+        // 2. Query official the5ers_payout operations for target accounts
+        var accountSplitMap: [String: Double] = [:]
         
-        let argSets: [[String: Any]] = [
-            [
-                "operation": "history",
-                "contract_version": "1.0",
-                "request_context": ["timezone": "UTC", "locale": "en"]
-            ],
-            ["operation": "history"],
-            [
-                "operation": "list",
-                "contract_version": "1.0",
-                "request_context": ["timezone": "UTC", "locale": "en"]
-            ],
-            ["operation": "list"],
-            [:]
-        ]
-        
-        var workingToolName: String? = nil
-        for tool in candidateTools {
-            if !allRawPayouts.isEmpty {
-                workingToolName = tool
-                break
-            }
-            for args in argSets {
-                if Task.isCancelled { break }
-                guard let res = try? await callMcpTool(name: tool, arguments: args) else { continue }
-                if let isErr = res["isError"] as? Bool, isErr { continue }
-                let unwrapped = unwrapMcpToolResult(res)
-                let rows = extractAnyPayoutCollection(from: unwrapped)
-                if !rows.isEmpty {
-                    workingToolName = tool
-                    for r in rows {
-                        let pId = String(describing: r["id"] ?? r["payout_id"] ?? r["withdrawalid"] ?? UUID().uuidString)
+        for acc in targetAccounts {
+            if Task.isCancelled { break }
+            
+            // A. Query 'explain' for exact recorded split breakdown and userPayoutPercentage
+            let explainArgs: [String: Any] = [
+                "operation": "explain",
+                "account_ref": acc.ref,
+                "contract_version": "1.0"
+            ]
+            if let explainRes = try? await callMcpTool(name: "the5ers_payout", arguments: explainArgs),
+               !(explainRes["isError"] as? Bool ?? false) {
+                let unwrappedExplain = unwrapMcpToolResult(explainRes)
+                if let explainDict = unwrappedExplain as? [String: Any] {
+                    if let avail = explainDict["available"] as? [String: Any],
+                       let split = avail["userPayoutPercentage"] as? NSNumber {
+                        accountSplitMap[acc.ref] = split.doubleValue
+                    }
+                    if let latest = explainDict["latestPayout"] as? [String: Any] {
+                        var p = latest
+                        if p["account_ref"] == nil { p["account_ref"] = acc.ref }
+                        if p["currency"] == nil { p["currency"] = acc.currency }
+                        if let b = latest["breakdown"] as? [String: Any] {
+                            for (k, v) in b { p[k] = v }
+                        }
+                        let pId = String(describing: p["id"] ?? p["payout_id"] ?? p["withdrawalid"] ?? UUID().uuidString)
                         if !seenPayoutIds.contains(pId) {
                             seenPayoutIds.insert(pId)
-                            allRawPayouts.append(r)
+                            allRawPayouts.append(p)
                         }
                     }
-                    break
                 }
             }
-        }
-        
-        // 3. Query per-account history across accounts ONLY if global query returned nothing
-        if allRawPayouts.isEmpty, let toolToQuery = workingToolName ?? candidateTools.first {
-            for acc in targetAccounts {
-                if Task.isCancelled { break }
-                for op in ["history", "list"] {
-                    let perAccArgs = buildAccountArgs(toolName: toolToQuery, accountRef: acc.ref, op: op)
-                    if let perAccResult = try? await callMcpTool(name: toolToQuery, arguments: perAccArgs) {
-                        if let isErr = perAccResult["isError"] as? Bool, isErr { continue }
-                        let unwrapped = unwrapMcpToolResult(perAccResult)
-                        let rows = extractAnyPayoutCollection(from: unwrapped)
-                        for var r in rows {
-                            if r["account_ref"] == nil { r["account_ref"] = acc.ref }
-                            if r["currency"] == nil { r["currency"] = acc.currency }
-                            let pId = String(describing: r["id"] ?? r["payout_id"] ?? r["withdrawalid"] ?? UUID().uuidString)
-                            if !seenPayoutIds.contains(pId) {
-                                seenPayoutIds.insert(pId)
-                                allRawPayouts.append(r)
-                            }
-                        }
-                        if !rows.isEmpty { break }
+            
+            // B. Query 'history' for past completed/processed payouts
+            let histArgs: [String: Any] = [
+                "operation": "history",
+                "account_ref": acc.ref,
+                "contract_version": "1.0"
+            ]
+            if let histRes = try? await callMcpTool(name: "the5ers_payout", arguments: histArgs),
+               !(histRes["isError"] as? Bool ?? false) {
+                let unwrappedHist = unwrapMcpToolResult(histRes)
+                let rows = extractAnyPayoutCollection(from: unwrappedHist)
+                for var r in rows {
+                    if r["account_ref"] == nil { r["account_ref"] = acc.ref }
+                    if r["currency"] == nil { r["currency"] = acc.currency }
+                    if let s = accountSplitMap[acc.ref], r["split_percent"] == nil {
+                        r["split_percent"] = s
+                    }
+                    let pId = String(describing: r["id"] ?? r["payout_id"] ?? r["withdrawalid"] ?? UUID().uuidString)
+                    if !seenPayoutIds.contains(pId) {
+                        seenPayoutIds.insert(pId)
+                        allRawPayouts.append(r)
                     }
                 }
             }
@@ -1863,6 +1801,10 @@ public final class The5ersService: ObservableObject {
                             if let d = Double(clean) { return d }
                         }
                     }
+                }
+                let payAccRef = String(describing: fields["accountref"] ?? fields["accountid"] ?? fields["ref"] ?? "")
+                if let known = accountSplitMap[payAccRef] ?? accountSplitMap[payAccRef.cleanAccountId] {
+                    return known
                 }
                 return nil
             }()
