@@ -35,12 +35,11 @@ public struct SplashScreenView: View {
                         .scaleEffect(isAnimating ? 1.02 : 0.98)
                     
                     #if canImport(UIKit)
-                    if let uiImg = UIImage(named: "AppLogo") {
-                        Image(uiImage: uiImg)
+                    if UIImage(named: "AppLogo") != nil {
+                        Image("AppLogo")
                             .resizable()
                             .aspectRatio(contentMode: .fit)
                             .frame(width: 58, height: 58)
-                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                     } else {
                         defaultLogoContent
                     }
