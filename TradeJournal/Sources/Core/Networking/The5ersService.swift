@@ -740,24 +740,28 @@ public final class The5ersService: ObservableObject {
             // 4. Sync purchases / challenges & evaluation fees across all pages
             lastStatus = "Loading purchases and evaluation fees from the5ers_purchase..."
             var allPurchases: [[String: Any]] = []
-            var purchasePage = 1
-            while purchasePage <= 10 {
-                if Task.isCancelled { break }
-                let purchaseArgs: [String: Any] = [
+            
+            var purchaseRes: [String: Any]? = try? await callMcpTool(name: "the5ers_purchase", arguments: ["operation": "list"])
+            if purchaseRes == nil {
+                purchaseRes = try? await callMcpTool(name: "the5ers_purchase", arguments: ["operation": "history"])
+            }
+            if purchaseRes == nil {
+                purchaseRes = try? await callMcpTool(name: "the5ers_purchase", arguments: [:])
+            }
+            if purchaseRes == nil {
+                purchaseRes = try? await callMcpTool(name: "the5ers_purchase", arguments: [
                     "operation": "list",
-                    "page": purchasePage,
-                    "limit": 50,
                     "contract_version": "1.0",
                     "request_context": ["timezone": "UTC", "locale": "en"]
-                ]
-                guard let purchaseResult = try? await callMcpTool(name: "the5ers_purchase", arguments: purchaseArgs) else { break }
-                let unwrappedPurchases = unwrapMcpToolResult(purchaseResult)
-                let rawPurchases = extractMcpCollection(unwrappedPurchases, collectionKey: "purchases")
-                if rawPurchases.isEmpty { break }
-                allPurchases.append(contentsOf: rawPurchases)
-                if rawPurchases.count < 50 { break }
-                purchasePage += 1
+                ])
             }
+            
+            if let res = purchaseRes {
+                let unwrapped = unwrapMcpToolResult(res)
+                let rows = extractAnyPurchaseCollection(from: unwrapped)
+                allPurchases.append(contentsOf: rows)
+            }
+            
             if !allPurchases.isEmpty {
                 mergePurchases(allPurchases, into: dataStore, targetAccounts: accountsList)
             }
@@ -1209,6 +1213,33 @@ public final class The5ersService: ObservableObject {
         return parts.joined(separator: " · ")
     }
     
+    private func extractAnyPurchaseCollection(from unwrapped: Any?) -> [[String: Any]] {
+        guard let unwrapped = unwrapped else { return [] }
+        if let s = unwrapped as? String,
+           let d = s.data(using: .utf8),
+           let parsed = try? JSONSerialization.jsonObject(with: d) {
+            return extractAnyPurchaseCollection(from: parsed)
+        }
+        if let dict = unwrapped as? [String: Any] {
+            let possibleKeys = ["purchases", "orders", "items", "transactions", "history", "data", "lineitems", "rows"]
+            for k in possibleKeys {
+                if let arr = dict[k] as? [[String: Any]], !arr.isEmpty {
+                    return arr
+                }
+            }
+            if let dataDict = dict["data"] as? [String: Any] {
+                for k in possibleKeys {
+                    if let arr = dataDict[k] as? [[String: Any]], !arr.isEmpty {
+                        return arr
+                    }
+                }
+            }
+        } else if let arr = unwrapped as? [[String: Any]] {
+            return arr
+        }
+        return []
+    }
+    
     @MainActor
     private func mergePurchases(
         _ rawPurchases: [[String: Any]],
@@ -1216,21 +1247,15 @@ public final class The5ersService: ObservableObject {
         targetAccounts: [The5ersMcpAccount]
     ) {
         for purchase in rawPurchases {
-            var fields: [String: Any] = [:]
-            for (k, v) in purchase {
-                let clean = k.replacingOccurrences(of: " ", with: "")
-                    .replacingOccurrences(of: "_", with: "")
-                    .replacingOccurrences(of: "-", with: "")
-                    .lowercased()
-                fields[clean] = v
-            }
+            var fields = sourceFields(purchase)
             
-            let status = String(describing: fields["status"] ?? "completed").lowercased()
+            let status = String(describing: fields["status"] ?? "completed").lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
             let isRefunded = (fields["refunded"] as? Bool) ?? (fields["isrefunded"] as? Bool) ?? false
-            guard (status == "completed" || status == "paid" || status == "approved") && !isRefunded else { continue }
+            let validStatuses = ["completed", "paid", "approved", "success", "successful", "settled", "active", "done"]
+            guard (validStatuses.contains(status) || status.isEmpty) && !isRefunded else { continue }
             
-            let rawDate = String(describing: fields["placedat"] ?? fields["date"] ?? fields["createdat"] ?? "")
-            guard let date = FlexibleDateParser.parse(rawDate) else { continue }
+            let rawDate = String(describing: fields["placedat"] ?? fields["date"] ?? fields["createdat"] ?? fields["purchasedat"] ?? fields["timestamp"] ?? "")
+            let date = FlexibleDateParser.parse(rawDate) ?? Date()
             let fmt = DateFormatter()
             fmt.dateFormat = "yyyy-MM-dd"
             fmt.locale = Locale(identifier: "en_US_POSIX")
@@ -1241,12 +1266,12 @@ public final class The5ersService: ObservableObject {
             var itemNames: [String] = []
             var productType = "challenge_fee"
             var itemsTotal: Double = 0
-            if let items = fields["items"] as? [[String: Any]] {
+            if let items = (fields["items"] ?? fields["purchases"] ?? fields["lineitems"]) as? [[String: Any]] {
                 for it in items {
-                    if let n = (it["name"] ?? it["productName"]) as? String, !n.isEmpty {
+                    if let n = (it["name"] ?? it["productName"] ?? it["title"] ?? it["description"]) as? String, !n.isEmpty {
                         itemNames.append(n)
                     }
-                    if let pt = (it["producttype"] ?? it["product_type"] ?? it["category"]) as? String, !pt.isEmpty {
+                    if let pt = (it["producttype"] ?? it["product_type"] ?? it["category"] ?? it["type"]) as? String, !pt.isEmpty {
                         productType = pt.lowercased()
                     }
                     if let np = it["netpaid"] as? NSNumber {
@@ -1257,14 +1282,32 @@ public final class The5ersService: ObservableObject {
                 }
             }
             
-            let priceNum = Double(String(describing: fields["price"] ?? fields["amount"] ?? "\(itemsTotal)")) ?? itemsTotal
+            var priceNum: Double = 0
+            for k in ["price", "amount", "total", "netpaid", "net_paid", "cost", "value"] {
+                if let val = fields[k] {
+                    if let n = val as? NSNumber, n.doubleValue > 0 { priceNum = n.doubleValue; break }
+                    if let s = val as? String {
+                        let clean = s.replacingOccurrences(of: "$", with: "").replacingOccurrences(of: ",", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
+                        if let d = Double(clean), d > 0 { priceNum = d; break }
+                    }
+                }
+            }
+            if priceNum == 0 && itemsTotal > 0 {
+                priceNum = itemsTotal
+            }
             guard priceNum > 0 else { continue }
             let amountMinor = Int64(round(priceNum * 100))
             
-            let title = itemNames.isEmpty ? "The5ers Program Evaluation" : itemNames.joined(separator: ", ")
-            let purchaseHash = JournalIds.sha256("\(dateStr)_\(currency)_\(amountMinor)_\(title)")
-            let entryId = "the5ers_purchase_\(purchaseHash.prefix(16))"
-            let shortRef = "Order #\(purchaseHash.prefix(8))"
+            let orderId = String(describing: fields["id"] ?? fields["orderid"] ?? fields["order_id"] ?? fields["purchaseid"] ?? fields["purchase_id"] ?? fields["ref"] ?? "")
+            let title = itemNames.isEmpty ? (fields["name"] as? String ?? "The5ers Program Evaluation") : itemNames.joined(separator: ", ")
+            let entryId: String = {
+                if !orderId.isEmpty {
+                    return "the5ers_purchase_\(orderId)"
+                }
+                let purchaseHash = JournalIds.sha256("\(dateStr)_\(currency)_\(amountMinor)_\(title)")
+                return "the5ers_purchase_\(purchaseHash.prefix(16))"
+            }()
+            let shortRef = !orderId.isEmpty ? "Order #\(orderId.prefix(8))" : "Order #\(entryId.suffix(8))"
             
             let matchingAccId = targetAccounts.first(where: {
                 title.contains("\($0.startingBalance ?? 0)") || $0.currency == currency
@@ -1276,6 +1319,9 @@ public final class The5ersService: ObservableObject {
                 existing.amountMinor = amountMinor
                 existing.currency = currency
                 existing.occurredOn = dateStr
+                if existing.accountId == nil || existing.accountId?.isEmpty == true {
+                    existing.accountId = journalAccId
+                }
                 dataStore.propEntries[existingIdx] = existing
             } else {
                 let entry = PropEntryItem(
@@ -1298,9 +1344,15 @@ public final class The5ersService: ObservableObject {
     
     // MARK: - Payouts & Settlement Receipts Synchronization
     
-    private func extractAnyPayoutCollection(from unwrapped: Any) -> [[String: Any]] {
+    private func extractAnyPayoutCollection(from unwrapped: Any?) -> [[String: Any]] {
+        guard let unwrapped = unwrapped else { return [] }
+        if let s = unwrapped as? String,
+           let d = s.data(using: .utf8),
+           let parsed = try? JSONSerialization.jsonObject(with: d) {
+            return extractAnyPayoutCollection(from: parsed)
+        }
         if let dict = unwrapped as? [String: Any] {
-            let possibleKeys = ["payouts", "withdrawals", "items", "history", "notifications", "data"]
+            let possibleKeys = ["payouts", "withdrawals", "items", "history", "notifications", "data", "rows"]
             for k in possibleKeys {
                 if let arr = dict[k] as? [[String: Any]], !arr.isEmpty {
                     return arr
@@ -1329,24 +1381,52 @@ public final class The5ersService: ObservableObject {
         var allRawPayouts: [[String: Any]] = []
         var seenPayoutIds = Set<String>()
         
-        // 1. Query per-account history (The5ers official contract requires account_ref)
-        for acc in targetAccounts {
-            let perAccArgs: [String: Any] = [
+        // 1. Try global queries first (most effective on The5ers MCP Hub)
+        var globalResult = try? await callMcpTool(name: "the5ers_payout", arguments: ["operation": "history"])
+        if globalResult == nil {
+            globalResult = try? await callMcpTool(name: "the5ers_payout", arguments: ["operation": "list"])
+        }
+        if globalResult == nil {
+            globalResult = try? await callMcpTool(name: "the5ers_payout", arguments: [:])
+        }
+        if globalResult == nil {
+            globalResult = try? await callMcpTool(name: "the5ers_payout", arguments: [
                 "operation": "history",
-                "account_ref": acc.ref,
                 "contract_version": "1.0",
                 "request_context": ["timezone": "UTC", "locale": "en"]
-            ]
-            var payoutResult = try? await callMcpTool(name: "the5ers_payout", arguments: perAccArgs)
-            if payoutResult == nil {
-                payoutResult = try? await callMcpTool(name: "the5ers_payout", arguments: [
+            ])
+        }
+        
+        if let res = globalResult {
+            let unwrapped = unwrapMcpToolResult(res)
+            let rows = extractAnyPayoutCollection(from: unwrapped)
+            for r in rows {
+                let pId = String(describing: r["id"] ?? r["payout_id"] ?? r["withdrawalid"] ?? UUID().uuidString)
+                if !seenPayoutIds.contains(pId) {
+                    seenPayoutIds.insert(pId)
+                    allRawPayouts.append(r)
+                }
+            }
+        }
+        
+        // 2. Query per-account history if targetAccounts available
+        for acc in targetAccounts {
+            var perAccResult = try? await callMcpTool(name: "the5ers_payout", arguments: [
+                "operation": "history",
+                "account_ref": acc.ref
+            ])
+            if perAccResult == nil {
+                perAccResult = try? await callMcpTool(name: "the5ers_payout", arguments: [
                     "operation": "list",
-                    "account_ref": acc.ref,
-                    "contract_version": "1.0",
-                    "request_context": ["timezone": "UTC", "locale": "en"]
+                    "account_ref": acc.ref
                 ])
             }
-            if let res = payoutResult {
+            if perAccResult == nil {
+                perAccResult = try? await callMcpTool(name: "the5ers_payout", arguments: [
+                    "account_ref": acc.ref
+                ])
+            }
+            if let res = perAccResult {
                 let unwrapped = unwrapMcpToolResult(res)
                 let rows = extractAnyPayoutCollection(from: unwrapped)
                 for var r in rows {
@@ -1361,32 +1441,6 @@ public final class The5ersService: ObservableObject {
             }
         }
         
-        // 2. Also query global payout history fallback
-        let globalArgs: [String: Any] = [
-            "operation": "history",
-            "contract_version": "1.0",
-            "request_context": ["timezone": "UTC", "locale": "en"]
-        ]
-        var globalResult = try? await callMcpTool(name: "the5ers_payout", arguments: globalArgs)
-        if globalResult == nil {
-            globalResult = try? await callMcpTool(name: "the5ers_payout", arguments: [
-                "operation": "list",
-                "contract_version": "1.0",
-                "request_context": ["timezone": "UTC", "locale": "en"]
-            ])
-        }
-        if let res = globalResult {
-            let unwrapped = unwrapMcpToolResult(res)
-            let rows = extractAnyPayoutCollection(from: unwrapped)
-            for r in rows {
-                let pId = String(describing: r["id"] ?? r["payout_id"] ?? r["withdrawalid"] ?? UUID().uuidString)
-                if !seenPayoutIds.contains(pId) {
-                    seenPayoutIds.insert(pId)
-                    allRawPayouts.append(r)
-                }
-            }
-        }
-        
         for pay in allRawPayouts {
             let fields = sourceFields(pay)
             let id = String(describing: fields["id"] ?? fields["payoutid"] ?? fields["withdrawalid"] ?? fields["requestid"] ?? UUID().uuidString)
@@ -1397,28 +1451,43 @@ public final class The5ersService: ObservableObject {
             
             // Extract Gross, Net, and Split information matching web source specification
             let splitPercentVal: Double? = {
-                if let sp = fields["splitpercent"] ?? fields["split_percent"] ?? fields["profitshare"] ?? fields["split"] {
-                    if let n = sp as? NSNumber { return n.doubleValue }
-                    if let s = sp as? String, let d = Double(s.trimmingCharacters(in: .whitespaces)) { return d }
+                for key in [
+                    "splitpercent", "split_percent", "profitsplit", "profit_split",
+                    "tradersplit", "trader_split", "profitshare", "profit_share",
+                    "split", "splitrate", "split_rate", "percentage", "rate", "share"
+                ] {
+                    if let sp = fields[key] {
+                        if let n = sp as? NSNumber { return n.doubleValue }
+                        if let s = sp as? String {
+                            let clean = s.replacingOccurrences(of: "%", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
+                            if let d = Double(clean) { return d }
+                        }
+                    }
                 }
                 return nil
             }()
             
             let grossAmountVal: Double? = {
-                for k in ["grossamount", "gross_amount", "profit", "amount", "total", "price", "value"] {
+                for k in ["grossamount", "gross_amount", "grossprofit", "gross_profit", "profit", "tradingprofit", "trading_profit", "amount", "total", "price", "value"] {
                     if let val = fields[k] {
                         if let n = val as? NSNumber, n.doubleValue > 0 { return n.doubleValue }
-                        if let s = val as? String, let d = Double(s.trimmingCharacters(in: .whitespaces)), d > 0 { return d }
+                        if let s = val as? String {
+                            let clean = s.replacingOccurrences(of: "$", with: "").replacingOccurrences(of: ",", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
+                            if let d = Double(clean), d > 0 { return d }
+                        }
                     }
                 }
                 return nil
             }()
             
             let netAmountVal: Double? = {
-                for k in ["receivedamount", "received_amount", "netamount", "net_amount", "paidamount", "paid_amount", "netpaid", "usershare", "user_share", "net"] {
+                for k in ["receivedamount", "received_amount", "netamount", "net_amount", "paidamount", "paid_amount", "netpaid", "traderprofit", "trader_profit", "tradershare", "trader_share", "payoutamount", "payout_amount", "withdrawalamount", "withdrawal_amount", "usershare", "user_share", "net"] {
                     if let val = fields[k] {
                         if let n = val as? NSNumber, n.doubleValue > 0 { return n.doubleValue }
-                        if let s = val as? String, let d = Double(s.trimmingCharacters(in: .whitespaces)), d > 0 { return d }
+                        if let s = val as? String {
+                            let clean = s.replacingOccurrences(of: "$", with: "").replacingOccurrences(of: ",", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
+                            if let d = Double(clean), d > 0 { return d }
+                        }
                     }
                 }
                 return nil
@@ -1433,16 +1502,20 @@ public final class The5ersService: ObservableObject {
             }()
             let feeMinor = Int64(round(feeVal * 100))
             
-            // Determine split bps (default 80% / 8000 or from ratio)
+            // Determine split bps (basis points): 80% = 8000 bps, 100% = 10000 bps
             let splitBps: Int = {
                 if let sp = splitPercentVal, sp > 0 {
-                    return Int(round(sp > 1.0 ? sp * 100 : sp * 10000))
+                    if sp > 1.0 {
+                        return Int(round(sp * 100))
+                    } else {
+                        return Int(round(sp * 10000))
+                    }
                 }
                 if let net = netAmountVal, let gross = grossAmountVal, gross > 0, net < gross {
                     return Int(round((net / gross) * 10000))
                 }
                 if netAmountVal != nil && grossAmountVal == nil {
-                    return 10000
+                    return 8000 // Standard The5ers trader split when net received is reported
                 }
                 return 8000 // Standard The5ers trader split
             }()
@@ -1499,6 +1572,9 @@ public final class The5ersService: ObservableObject {
                 existing.feeMinor = feeMinor
                 existing.status = isCompleted ? .completed : .requested
                 existing.occurredOn = dateStr
+                if existing.accountId == nil || existing.accountId?.isEmpty == true {
+                    existing.accountId = primaryAccId
+                }
                 dataStore.propEntries[existingIdx] = existing
             } else {
                 let payoutEntry = PropEntryItem(

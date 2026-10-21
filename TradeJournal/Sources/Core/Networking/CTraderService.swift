@@ -7,7 +7,7 @@ public struct CTraderAccount: Identifiable, Codable, Equatable, Hashable, Sendab
     public var id: Int64 { ctidTraderAccountId }
     public let traderLogin: Int64
     public let isLive: Bool
-    public let brokerTitleShort: String
+    public var brokerTitleShort: String
     public var balance: Decimal
     public var currency: String
     public var leverage: Int
@@ -361,18 +361,18 @@ public final class CTraderService: ObservableObject {
             payload: ["accessToken": cleanToken]
         )
         
-        guard let rawAccounts = res["ctidTraderAccount"] as? [[String: Any]] else {
+        guard let rawAccounts = (res["ctidTraderAccount"] as? [[String: Any]]) ?? (res["ctidTraderAccounts"] as? [[String: Any]]) ?? (res["accounts"] as? [[String: Any]]) else {
             self.discoveredAccounts = []
             return []
         }
         
         var accounts: [CTraderAccount] = []
         for raw in rawAccounts {
-            let accId = (raw["ctidTraderAccountId"] as? NSNumber)?.int64Value ?? 0
+            let accId = safeInt64(raw["ctidTraderAccountId"]) ?? 0
             guard accId > 0 else { continue }
-            let login = (raw["traderLogin"] as? NSNumber)?.int64Value ?? accId
-            let isLive = raw["isLive"] as? Bool ?? true
-            let broker = raw["brokerTitleShort"] as? String ?? (isLive ? "cTrader Live" : "cTrader Demo")
+            let login = safeInt64(raw["traderLogin"]) ?? accId
+            let isLive = (raw["isLive"] as? Bool) ?? ((raw["isLive"] as? NSNumber)?.boolValue) ?? true
+            let broker = (raw["brokerTitleShort"] as? String) ?? (raw["brokerName"] as? String) ?? (raw["broker"] as? String) ?? (isLive ? "cTrader Live" : "cTrader Demo")
             
             let isSelected = selectedAccountIds.isEmpty || selectedAccountIds.contains(accId)
             
@@ -392,21 +392,24 @@ public final class CTraderService: ObservableObject {
                 _ = try await sendRequest(payloadType: 2102, payload: ["ctidTraderAccountId": accId, "accessToken": cleanToken])
                 let traderRes = try await sendRequest(payloadType: 2121, payload: ["ctidTraderAccountId": accId])
                 
-                if let trader = traderRes["trader"] as? [String: Any] {
-                    let balanceRaw = (trader["balance"] as? NSNumber)?.int64Value ?? 0
-                    let moneyDigits = trader["moneyDigits"] as? Int ?? 2
+                if let trader = (traderRes["trader"] as? [String: Any]) ?? (traderRes["traderData"] as? [String: Any]) {
+                    if let broker = trader["brokerName"] as? String, !broker.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        accounts[idx].brokerTitleShort = broker.trimmingCharacters(in: .whitespacesAndNewlines)
+                    }
+                    let balanceRaw = safeInt64(trader["balance"]) ?? 0
+                    let moneyDigits = (safeInt64(trader["moneyDigits"]) != nil) ? Int(safeInt64(trader["moneyDigits"])!) : 2
                     let divisor = pow(10.0, Double(moneyDigits))
                     let balDecimal = Decimal(Double(balanceRaw) / divisor)
-                    let leverage = (trader["leverageInCents"] as? Int).map { $0 / 100 } ?? 100
+                    let leverage = (safeInt64(trader["leverageInCents"]) != nil) ? Int(safeInt64(trader["leverageInCents"])! / 100) : 100
                     
                     accounts[idx].balance = balDecimal
                     accounts[idx].leverage = leverage
                     
                     // Lookup deposit currency from asset list
                     if let assetListRes = try? await sendRequest(payloadType: 2112, payload: ["ctidTraderAccountId": accId]),
-                       let assets = assetListRes["asset"] as? [[String: Any]],
-                       let depId = (trader["depositAssetId"] as? NSNumber)?.int64Value,
-                       let matched = assets.first(where: { ((($0["assetId"] as? NSNumber)?.int64Value) ?? 0) == depId }),
+                       let assets = (assetListRes["asset"] as? [[String: Any]]) ?? (assetListRes["assets"] as? [[String: Any]]),
+                       let depId = safeInt64(trader["depositAssetId"]),
+                       let matched = assets.first(where: { (safeInt64($0["assetId"]) ?? 0) == depId }),
                        let ccy = matched["name"] as? String {
                         accounts[idx].currency = ccy
                     }
@@ -567,21 +570,19 @@ public final class CTraderService: ObservableObject {
             // 2. Fetch Symbol Dictionary (including archived symbols to handle closed trades on delisted/renamed symbols)
             var symbolMap: [Int64: String] = [:]
             if let symbolsRes = try? await sendRequest(payloadType: 2114, payload: ["ctidTraderAccountId": accId, "includeArchivedSymbols": true]) {
-                if let symbolArray = symbolsRes["symbol"] as? [[String: Any]] {
-                    for s in symbolArray {
-                        if let sId = (s["symbolId"] as? NSNumber)?.int64Value ?? (s["symbolId"] as? Int64),
-                           let sName = s["symbolName"] as? String {
-                            symbolMap[sId] = sName
-                        }
+                let symbolArray = (symbolsRes["symbol"] as? [[String: Any]]) ?? (symbolsRes["symbols"] as? [[String: Any]]) ?? []
+                for s in symbolArray {
+                    if let sId = safeInt64(s["symbolId"]),
+                       let sName = s["symbolName"] as? String {
+                        symbolMap[sId] = sName
                     }
                 }
-                if let archivedArray = symbolsRes["archivedSymbol"] as? [[String: Any]] {
-                    for s in archivedArray {
-                        if let sId = (s["symbolId"] as? NSNumber)?.int64Value ?? (s["symbolId"] as? Int64),
-                           let sName = s["symbolName"] as? String {
-                            if symbolMap[sId] == nil {
-                                symbolMap[sId] = sName
-                            }
+                let archivedArray = (symbolsRes["archivedSymbol"] as? [[String: Any]]) ?? (symbolsRes["archivedSymbols"] as? [[String: Any]]) ?? []
+                for s in archivedArray {
+                    if let sId = safeInt64(s["symbolId"]),
+                       let sName = s["symbolName"] as? String {
+                        if symbolMap[sId] == nil {
+                            symbolMap[sId] = sName
                         }
                     }
                 }
@@ -628,14 +629,14 @@ public final class CTraderService: ObservableObject {
                 dataStore.saveToDisk()
             }
             
-            // 4. Fetch Historical Deals in 7-day chunks
-            // cTrader Open API enforces a strict maximum 7-day window (604,800,000 ms) per ProtoOADealListReq.
-            // Sending larger intervals triggers ProtoOAErrorRes (2142) INCORRECT_BOUNDS.
+            // 4. Fetch Historical Deals in 6-day chunks
+            // cTrader Open API enforces a strict maximum 7-day window (604,800,000 ms) and maxRows <= 1000 per ProtoOADealListReq.
+            // Sending larger intervals or maxRows > 1000 triggers ProtoOAErrorRes (2142) INCORRECT_BOUNDS.
             let nowMs = Int64(Date().timeIntervalSince1970 * 1000)
-            let maxChunkMs: Int64 = 7 * 24 * 60 * 60 * 1000 - 1000 // 604,799,000 ms (~6.99 days)
+            let maxChunkMs: Int64 = 6 * 24 * 60 * 60 * 1000 // 518,400,000 ms (6 days safe margin)
             let dealsTo = toTimestamp ?? nowMs
             
-            let defaultLookbackDays: Int64 = 180 // Initial lookback window of 6 months
+            let defaultLookbackDays: Int64 = 730 // Lookback window of 2 years to catch full trading history
             let fallbackStart = max(nowMs - (defaultLookbackDays * 86_400 * 1000), 0)
             
             let existingAccountExecs = dataStore.executions.filter { $0.accountId == journalAccId }
@@ -663,26 +664,41 @@ public final class CTraderService: ObservableObject {
                 guard chunkEnd > chunkStart else { break }
                 
                 self.lastStatus = "Fetching cTrader deals (\(chunkIndex)/\(estimatedChunks))..."
-                let payload: [String: Any] = [
-                    "ctidTraderAccountId": accId,
-                    "fromTimestamp": chunkStart,
-                    "toTimestamp": chunkEnd,
-                    "maxRows": 2000
-                ]
                 
-                do {
-                    let dealsRes = try await sendRequest(payloadType: 2133, payload: payload)
-                    if let deals = dealsRes["deal"] as? [[String: Any]] {
-                        for d in deals {
-                            if let dealId = (d["dealId"] as? NSNumber)?.int64Value ?? (d["dealId"] as? Int64) {
+                var chunkFrom = chunkStart
+                while chunkFrom < chunkEnd {
+                    let payload: [String: Any] = [
+                        "ctidTraderAccountId": accId,
+                        "fromTimestamp": chunkFrom,
+                        "toTimestamp": chunkEnd,
+                        "maxRows": 1000
+                    ]
+                    
+                    do {
+                        let dealsRes = try await sendRequest(payloadType: 2133, payload: payload)
+                        let dealsList = (dealsRes["deal"] as? [[String: Any]]) ?? (dealsRes["deals"] as? [[String: Any]]) ?? []
+                        var latestDealTs: Int64 = 0
+                        for d in dealsList {
+                            if let dealId = safeInt64(d["dealId"]) {
                                 if seenDealIds.insert(dealId).inserted {
                                     rawDeals.append(d)
                                 }
                             }
+                            if let ts = safeInt64(d["executionTimestamp"]) {
+                                latestDealTs = max(latestDealTs, ts)
+                            }
                         }
+                        
+                        let hasMore = (dealsRes["hasMore"] as? Bool) ?? false
+                        if hasMore && latestDealTs > chunkFrom && latestDealTs < chunkEnd {
+                            chunkFrom = latestDealTs + 1
+                        } else {
+                            break
+                        }
+                    } catch {
+                        AppLogger.warn("cTrader deal chunk [\(chunkFrom)-\(chunkEnd)] returned error: \(error.localizedDescription)")
+                        break
                     }
-                } catch {
-                    AppLogger.warn("cTrader deal chunk [\(chunkStart)-\(chunkEnd)] returned error: \(error.localizedDescription)")
                 }
                 
                 chunkStart = chunkEnd
@@ -694,28 +710,30 @@ public final class CTraderService: ObservableObject {
             // 5. Convert Deals to Atomic Executions
             var newExecutions: [Execution] = []
             for raw in rawDeals {
-                guard let dealId = (raw["dealId"] as? NSNumber)?.int64Value ?? (raw["dealId"] as? Int64),
-                      let symbolId = (raw["symbolId"] as? NSNumber)?.int64Value ?? (raw["symbolId"] as? Int64),
-                      let execTimestamp = (raw["executionTimestamp"] as? NSNumber)?.int64Value ?? (raw["executionTimestamp"] as? Int64) else {
+                guard let dealId = safeInt64(raw["dealId"]),
+                      let symbolId = safeInt64(raw["symbolId"]),
+                      let execTimestamp = safeInt64(raw["executionTimestamp"]) else {
                     continue
                 }
                 
                 // Validate deal status if present (FILLED = 1, PARTIALLY_FILLED = 2)
-                if let statusVal = (raw["dealStatus"] as? NSNumber)?.intValue {
-                    if statusVal != 1 && statusVal != 2 { continue }
+                if let statusVal = safeInt64(raw["dealStatus"]) {
+                    if statusVal >= 3 { continue } // Skip 3: REJECTED, 4: INTERNALLY_REJECTED, 5: ERROR, 6: MISSED
                 } else if let statusStr = raw["dealStatus"] as? String {
-                    let upper = statusStr.uppercased()
-                    if upper != "FILLED" && upper != "PARTIALLY_FILLED" { continue }
+                    let upper = statusStr.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
+                    if upper == "REJECTED" || upper == "INTERNALLY_REJECTED" || upper == "ERROR" || upper == "MISSED" || upper == "CANCELLED" {
+                        continue
+                    }
                 }
                 
-                let volRaw = (raw["filledVolume"] as? NSNumber)?.int64Value ?? (raw["volume"] as? NSNumber)?.int64Value ?? 0
+                let volRaw = safeInt64(raw["filledVolume"]) ?? safeInt64(raw["volume"]) ?? 0
                 guard volRaw > 0 else { continue }
                 
-                let priceRaw = (raw["executionPrice"] as? NSNumber)?.doubleValue ?? (raw["executionPrice"] as? Double) ?? 0.0
+                let priceRaw = safeDouble(raw["executionPrice"]) ?? safeDouble(raw["price"]) ?? safeDouble(raw["closePrice"]) ?? 0.0
                 guard priceRaw > 0 else { continue }
                 
                 let symbolName = symbolMap[symbolId] ?? "Symbol_\(symbolId)"
-                let sideStr = String(describing: raw["tradeSide"] ?? "BUY").uppercased()
+                let sideStr = String(describing: raw["tradeSide"] ?? "BUY").uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
                 let side: ExecutionSide = (sideStr == "SELL" || sideStr == "2") ? .sell : .buy
                 
                 // Volume conversion:
@@ -737,9 +755,9 @@ public final class CTraderService: ObservableObject {
                 }
                 let quantity = max(Decimal(0.01), Decimal(volRaw) / lotDivisor)
                 
-                let moneyDigits = (raw["moneyDigits"] as? NSNumber)?.intValue ?? (raw["moneyDigits"] as? Int) ?? 2
+                let moneyDigits = (safeInt64(raw["moneyDigits"]) != nil) ? Int(safeInt64(raw["moneyDigits"])!) : 2
                 let moneyDivisor = pow(10.0, Double(moneyDigits))
-                let commRaw = (raw["commission"] as? NSNumber)?.doubleValue ?? 0
+                let commRaw = safeDouble(raw["commission"]) ?? 0.0
                 let fee = Decimal(abs(commRaw) / moneyDivisor)
                 
                 let execDate = Date(timeIntervalSince1970: Double(execTimestamp) / 1000.0)
@@ -774,16 +792,16 @@ public final class CTraderService: ObservableObject {
             
             // 7. Check for open positions via Reconcile (payloadType 2124)
             if let reconcileRes = try? await sendRequest(payloadType: 2124, payload: ["ctidTraderAccountId": accId]),
-               let positions = reconcileRes["position"] as? [[String: Any]] {
+               let positions = (reconcileRes["position"] as? [[String: Any]]) ?? (reconcileRes["positions"] as? [[String: Any]]) {
                 
                 var activePosKeys = Set<String>()
                 
                 for pos in positions {
                     let tradeData = (pos["tradeData"] as? [String: Any]) ?? pos
-                    guard let posId = (pos["positionId"] as? NSNumber)?.int64Value ?? (tradeData["positionId"] as? NSNumber)?.int64Value,
-                          let sId = (tradeData["symbolId"] as? NSNumber)?.int64Value ?? (pos["symbolId"] as? NSNumber)?.int64Value,
-                          let vol = (tradeData["volume"] as? NSNumber)?.int64Value ?? (pos["volume"] as? NSNumber)?.int64Value,
-                          let price = (pos["price"] as? NSNumber)?.doubleValue ?? (tradeData["price"] as? NSNumber)?.doubleValue else {
+                    guard let posId = safeInt64(pos["positionId"]) ?? safeInt64(tradeData["positionId"]),
+                          let sId = safeInt64(tradeData["symbolId"]) ?? safeInt64(pos["symbolId"]),
+                          let vol = safeInt64(tradeData["volume"]) ?? safeInt64(pos["volume"]),
+                          let price = safeDouble(pos["price"]) ?? safeDouble(tradeData["price"]) else {
                         continue
                     }
                     
@@ -791,9 +809,9 @@ public final class CTraderService: ObservableObject {
                     activePosKeys.insert(openTradeKey)
                     
                     let sName = symbolMap[sId] ?? "Symbol_\(sId)"
-                    let sideStr = String(describing: tradeData["tradeSide"] ?? pos["tradeSide"] ?? "BUY").uppercased()
+                    let sideStr = String(describing: tradeData["tradeSide"] ?? pos["tradeSide"] ?? "BUY").uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
                     let dir: TradeDirection = (sideStr == "SELL" || sideStr == "2") ? .short : .long
-                    let openTs = (tradeData["openTimestamp"] as? NSNumber)?.int64Value ?? (pos["openTimestamp"] as? NSNumber)?.int64Value ?? nowMs
+                    let openTs = safeInt64(tradeData["openTimestamp"]) ?? safeInt64(pos["openTimestamp"]) ?? nowMs
                     let openDate = Date(timeIntervalSince1970: Double(openTs) / 1000.0)
                     
                     let isMetals = sName.contains("XAU") || sName.contains("XAG")
@@ -801,8 +819,8 @@ public final class CTraderService: ObservableObject {
                     let lotDivisor: Decimal = isMetals ? 1_000_000 : (isForex ? 10_000_000 : 100)
                     let qty = max(Decimal(0.01), Decimal(vol) / lotDivisor)
                     
-                    let stopLossVal = (pos["stopLoss"] as? NSNumber)?.doubleValue ?? (tradeData["stopLoss"] as? NSNumber)?.doubleValue
-                    let takeProfitVal = (pos["takeProfit"] as? NSNumber)?.doubleValue ?? (tradeData["takeProfit"] as? NSNumber)?.doubleValue
+                    let stopLossVal = safeDouble(pos["stopLoss"]) ?? safeDouble(tradeData["stopLoss"])
+                    let takeProfitVal = safeDouble(pos["takeProfit"]) ?? safeDouble(tradeData["takeProfit"])
                     
                     if let existingIdx = dataStore.trades.firstIndex(where: { $0.key == openTradeKey }) {
                         var existing = dataStore.trades[existingIdx]
@@ -888,5 +906,34 @@ public final class CTraderService: ObservableObject {
             tradesRebuilt: totalRebuiltTrades,
             message: summaryMsg
         )
+    }
+    
+    // MARK: - Safe Parsing Helpers
+    
+    private func safeInt64(_ val: Any?) -> Int64? {
+        guard let v = val else { return nil }
+        if let n = v as? NSNumber { return n.int64Value }
+        if let i = v as? Int64 { return i }
+        if let i = v as? Int { return Int64(i) }
+        if let s = v as? String {
+            let clean = s.trimmingCharacters(in: .whitespacesAndNewlines)
+            if let parsed = Int64(clean) { return parsed }
+            if let d = Double(clean) { return Int64(d) }
+        }
+        return nil
+    }
+    
+    private func safeDouble(_ val: Any?) -> Double? {
+        guard let v = val else { return nil }
+        if let n = v as? NSNumber { return n.doubleValue }
+        if let d = v as? Double { return d }
+        if let f = v as? Float { return Double(f) }
+        if let i = v as? Int64 { return Double(i) }
+        if let i = v as? Int { return Double(i) }
+        if let s = v as? String {
+            let clean = s.replacingOccurrences(of: "$", with: "").replacingOccurrences(of: ",", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
+            return Double(clean)
+        }
+        return nil
     }
 }
