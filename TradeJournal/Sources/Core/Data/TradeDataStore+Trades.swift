@@ -207,6 +207,7 @@ extension TradeDataStore {
         deduplicateAndCleanAccounts()
         deduplicateExecutions()
         deduplicateTrades()
+        reconcileReceiptsToEntries()
         deduplicatePropEntries()
         deduplicatePropReceipts()
         for i in 0..<accounts.count {

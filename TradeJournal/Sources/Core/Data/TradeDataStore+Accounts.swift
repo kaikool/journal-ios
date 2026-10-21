@@ -426,6 +426,37 @@ extension TradeDataStore {
         }
     }
     
+    /// Reconciles orphan prop receipts to ensure a corresponding payout entry exists in propEntries
+    public func reconcileReceiptsToEntries() {
+        for rcpt in propReceipts where !rcpt.voided {
+            let canonPayout = PropFirmEngine.canonicalPayoutId(rcpt.payoutId)
+            let hasEntry = propEntries.contains(where: {
+                $0.id == rcpt.payoutId ||
+                PropFirmEngine.canonicalPayoutId($0.id) == canonPayout ||
+                (!canonPayout.isEmpty && $0.id.contains(canonPayout))
+            })
+            if !hasEntry {
+                let payoutEntryId = rcpt.payoutId.isEmpty ? "the5ers_payout_\(rcpt.id)" : rcpt.payoutId
+                let newEntry = PropEntryItem(
+                    id: payoutEntryId,
+                    accountId: nil,
+                    firm: "The5ers",
+                    kind: "payout",
+                    category: "payout",
+                    currency: "USD",
+                    amountMinor: rcpt.amountMinor,
+                    splitBps: 8000,
+                    feeMinor: 0,
+                    occurredOn: rcpt.occurredOn,
+                    status: .completed,
+                    reference: rcpt.reference.isEmpty ? "Settlement Receipt" : rcpt.reference,
+                    notes: rcpt.notes
+                )
+                propEntries.append(newEntry)
+            }
+        }
+    }
+    
     public func createInitialDefaultAccount() {
         let defaultAcc = Account(
             id: "default-acc",

@@ -63,6 +63,8 @@ public final class The5ersService: ObservableObject {
     private var rpcIdCounter: Int = 0
     private var mcpSessionId: String? = nil
     private var isSessionInitialized: Bool = false
+    private var cachedToolSchemas: [String: [String: Any]] = [:]
+    private var discoveredToolNames: Set<String> = []
     
     public var isConfigured: Bool {
         !mcpToken.trimmingCharacters(in: .whitespaces).isEmpty
@@ -78,6 +80,8 @@ public final class The5ersService: ObservableObject {
         if clean != self.mcpToken {
             self.isSessionInitialized = false
             self.mcpSessionId = nil
+            self.cachedToolSchemas.removeAll()
+            self.discoveredToolNames.removeAll()
         }
         self.mcpToken = clean
         self.isConnected = !self.mcpToken.isEmpty
@@ -89,6 +93,8 @@ public final class The5ersService: ObservableObject {
         self.isConnected = false
         self.mcpSessionId = nil
         self.isSessionInitialized = false
+        self.cachedToolSchemas.removeAll()
+        self.discoveredToolNames.removeAll()
         UserDefaults.standard.removeObject(forKey: "the5ers_mcp_token")
         UserDefaults.standard.removeObject(forKey: "the5ers_mcp_refresh_token")
     }
@@ -378,11 +384,77 @@ public final class The5ersService: ObservableObject {
         return try await sendRawMcpRpc(method: method, params: params)
     }
     
-    /// Invokes an MCP tool by name with arguments
+    /// Queries and caches available MCP tools and their input schemas
+    public func refreshAvailableTools() async {
+        guard let res = try? await sendMcpRpc(method: "tools/list", params: [:]) else { return }
+        let toolsList: [[String: Any]] = {
+            if let tools = res["tools"] as? [[String: Any]] { return tools }
+            if let r = res["result"] as? [String: Any], let tools = r["tools"] as? [[String: Any]] { return tools }
+            return []
+        }()
+        for t in toolsList {
+            if let name = t["name"] as? String {
+                discoveredToolNames.insert(name)
+                if let schema = t["inputSchema"] as? [String: Any] {
+                    cachedToolSchemas[name] = schema
+                }
+            }
+        }
+    }
+    
+    /// Filters arguments to conform strictly to the tool's published inputSchema properties
+    private func filterArgsForTool(_ args: [String: Any], toolName: String) -> [String: Any] {
+        var cleaned = args
+        // Never send "view" key which violates strict FastMCP schema validation
+        cleaned.removeValue(forKey: "view")
+        
+        guard let schema = cachedToolSchemas[toolName],
+              let props = schema["properties"] as? [String: Any],
+              !props.isEmpty else {
+            return cleaned
+        }
+        return cleaned.filter { props.keys.contains($0.key) }
+    }
+    
+    /// Builds resilient per-account arguments matching the exact parameter name expected by the tool
+    private func buildAccountArgs(toolName: String, accountRef: String, op: String? = nil) -> [String: Any] {
+        var base: [String: Any] = [:]
+        if let op = op {
+            base["operation"] = op
+        }
+        
+        if let schema = cachedToolSchemas[toolName],
+           let props = schema["properties"] as? [String: Any],
+           !props.isEmpty {
+            if props.keys.contains("account_ref") {
+                base["account_ref"] = accountRef
+            } else if props.keys.contains("account_id") {
+                base["account_id"] = accountRef
+            } else if props.keys.contains("account") {
+                base["account"] = accountRef
+            } else if props.keys.contains("ref") {
+                base["ref"] = accountRef
+            } else if props.keys.contains("id") {
+                base["id"] = accountRef
+            } else {
+                base["account_ref"] = accountRef
+            }
+            return filterArgsForTool(base, toolName: toolName)
+        }
+        
+        base["account_ref"] = accountRef
+        return base
+    }
+    
+    /// Invokes an MCP tool by name with arguments, automatically filtered against tool schema
     public func callMcpTool(name: String, arguments: [String: Any] = [:]) async throws -> [String: Any] {
+        if cachedToolSchemas.isEmpty {
+            await refreshAvailableTools()
+        }
+        let filtered = filterArgsForTool(arguments, toolName: name)
         return try await sendMcpRpc(method: "tools/call", params: [
             "name": name,
-            "arguments": arguments
+            "arguments": filtered
         ])
     }
     
@@ -396,10 +468,71 @@ public final class The5ersService: ObservableObject {
             let res = try await sendMcpRpc(method: "tools/list", params: [:])
             self.isConnected = true
             let tools = res["tools"] as? [[String: Any]] ?? []
+            for t in tools {
+                if let name = t["name"] as? String {
+                    discoveredToolNames.insert(name)
+                    if let schema = t["inputSchema"] as? [String: Any] {
+                        cachedToolSchemas[name] = schema
+                    }
+                }
+            }
             return (true, "Connected to The5ers MCP Server! Protocol 2025-03-26 active (\(tools.count) tools ready).")
         } catch {
             return (false, "The5ers MCP connection error: \(error.localizedDescription)")
         }
+    }
+    
+    /// Extracts JSON objects or arrays from arbitrary text, markdown fences, or bracket boundaries
+    private func extractJsonFromText(_ text: String) -> Any? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty { return nil }
+        
+        // 1. Direct JSON parse
+        if let data = trimmed.data(using: .utf8),
+           let obj = try? JSONSerialization.jsonObject(with: data) {
+            return obj
+        }
+        
+        // 2. Markdown fence ```json ... ``` or ``` ... ```
+        if let startFence = trimmed.range(of: "```") {
+            let afterFence = trimmed[startFence.upperBound...]
+            let contentPart: Substring
+            if afterFence.lowercased().hasPrefix("json") {
+                contentPart = afterFence.dropFirst(4)
+            } else {
+                contentPart = afterFence
+            }
+            if let endFence = contentPart.range(of: "```") {
+                let inside = contentPart[..<endFence.lowerBound].trimmingCharacters(in: .whitespacesAndNewlines)
+                if let data = inside.data(using: .utf8),
+                   let obj = try? JSONSerialization.jsonObject(with: data) {
+                    return obj
+                }
+            }
+        }
+        
+        // 3. Substring matching outermost [ ... ] or { ... }
+        if let firstBracket = trimmed.firstIndex(of: "["),
+           let lastBracket = trimmed.lastIndex(of: "]"),
+           firstBracket < lastBracket {
+            let sub = String(trimmed[firstBracket...lastBracket])
+            if let data = sub.data(using: .utf8),
+               let obj = try? JSONSerialization.jsonObject(with: data) {
+                return obj
+            }
+        }
+        
+        if let firstBrace = trimmed.firstIndex(of: "{"),
+           let lastBrace = trimmed.lastIndex(of: "}"),
+           firstBrace < lastBrace {
+            let sub = String(trimmed[firstBrace...lastBrace])
+            if let data = sub.data(using: .utf8),
+               let obj = try? JSONSerialization.jsonObject(with: data) {
+                return obj
+            }
+        }
+        
+        return nil
     }
     
     /// Unwraps JSON string, markdown fences, or structured dictionary from MCP tool responses
@@ -408,35 +541,23 @@ public final class The5ersService: ObservableObject {
             return structured
         }
         if let content = result["content"] as? [[String: Any]] {
+            // First pass: look for valid JSON in any block
             for block in content {
-                if let type = block["type"] as? String, type == "text", let text = block["text"] as? String {
-                    let cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
-                    var jsonStr = cleaned
-                    if cleaned.hasPrefix("```json") {
-                        jsonStr = cleaned.replacingOccurrences(of: "```json", with: "").replacingOccurrences(of: "```", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
-                    } else if cleaned.hasPrefix("```") {
-                        jsonStr = cleaned.replacingOccurrences(of: "```", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
-                    }
-                    if let d = jsonStr.data(using: .utf8),
-                       let obj = try? JSONSerialization.jsonObject(with: d) {
-                        return obj
-                    }
-                    return text
-                }
-            }
-            if let first = content.first, let text = first["text"] as? String {
-                let cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
-                var jsonStr = cleaned
-                if cleaned.hasPrefix("```json") {
-                    jsonStr = cleaned.replacingOccurrences(of: "```json", with: "").replacingOccurrences(of: "```", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
-                } else if cleaned.hasPrefix("```") {
-                    jsonStr = cleaned.replacingOccurrences(of: "```", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
-                }
-                if let d = jsonStr.data(using: .utf8),
-                   let obj = try? JSONSerialization.jsonObject(with: d) {
+                if let text = block["text"] as? String,
+                   let obj = extractJsonFromText(text) {
                     return obj
                 }
             }
+            // Second pass: return non-empty text if no JSON was found
+            for block in content {
+                if let text = block["text"] as? String {
+                    let cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !cleaned.isEmpty { return cleaned }
+                }
+            }
+        }
+        if let data = result["data"] {
+            return data
         }
         if let res = result["result"] as? [String: Any] {
             return unwrapMcpToolResult(res)
@@ -481,39 +602,54 @@ public final class The5ersService: ObservableObject {
         
         do {
             try await ensureInitialized()
+            await refreshAvailableTools()
             
             var rawAccountsList: [[String: Any]] = []
             var seenAccountRefs = Set<String>()
             
             for page in 1...20 {
                 lastStatus = "Loading The5ers accounts (Page \(page))..."
-                let accountToolArgs: [String: Any] = [
-                    "operation": "list",
-                    "page": page,
-                    "limit": 50,
-                    "view": "all",
-                    "contract_version": "1.0",
-                    "request_context": ["timezone": "UTC", "locale": "en"]
+                let candidateArgsList: [[String: Any]] = [
+                    [
+                        "operation": "list",
+                        "page": page,
+                        "limit": 50,
+                        "contract_version": "1.0",
+                        "request_context": ["timezone": "UTC", "locale": "en"]
+                    ],
+                    [
+                        "operation": "list",
+                        "page": page,
+                        "limit": 50
+                    ],
+                    ["operation": "list"],
+                    [:]
                 ]
                 
-                let accountResult: [String: Any]
-                if page == 1 {
-                    accountResult = try await callMcpTool(name: "the5ers_account", arguments: accountToolArgs)
-                } else {
-                    guard let res = try? await callMcpTool(name: "the5ers_account", arguments: accountToolArgs) else { break }
-                    accountResult = res
-                }
+                var accountResult: [String: Any]? = nil
+                var lastErr: String = ""
                 
-                if let isErr = accountResult["isError"] as? Bool, isErr {
-                    let errMsg = (accountResult["content"] as? [[String: Any]])?.compactMap { $0["text"] as? String }.joined(separator: " ") ?? "The5ers MCP returned an error"
-                    if page == 1 {
-                        throw NSError(domain: "The5ersMCP", code: 500, userInfo: [NSLocalizedDescriptionKey: errMsg])
-                    } else {
-                        break
+                for candidateArgs in candidateArgsList {
+                    if let res = try? await callMcpTool(name: "the5ers_account", arguments: candidateArgs) {
+                        let isErr = (res["isError"] as? Bool) ?? false
+                        if !isErr {
+                            accountResult = res
+                            break
+                        } else {
+                            lastErr = (res["content"] as? [[String: Any]])?.compactMap { $0["text"] as? String }.joined(separator: " ") ?? ""
+                        }
                     }
                 }
                 
-                let unwrappedAccounts = unwrapMcpToolResult(accountResult)
+                guard let finalAccountResult = accountResult else {
+                    if page == 1 {
+                        let msg = lastErr.isEmpty ? "The5ers MCP returned an error when fetching accounts" : lastErr
+                        throw NSError(domain: "The5ersMCP", code: 500, userInfo: [NSLocalizedDescriptionKey: msg])
+                    }
+                    break
+                }
+                
+                let unwrappedAccounts = unwrapMcpToolResult(finalAccountResult)
                 let pageRows = extractMcpCollection(unwrappedAccounts, collectionKey: "accounts")
                 if pageRows.isEmpty { break }
                 
@@ -737,7 +873,6 @@ public final class The5ersService: ObservableObject {
                 let posArgs: [String: Any] = [
                     "operation": "list",
                     "account_ref": acc.ref,
-                    "view": "all",
                     "page": 1,
                     "limit": 50,
                     "contract_version": "1.0",
@@ -777,10 +912,10 @@ public final class The5ersService: ObservableObject {
             }
             
             // 4. Sync purchases / challenges & evaluation fees across all tools and accounts
-            await syncPurchases(into: dataStore, targetAccounts: allTargetAccounts)
+            await syncPurchases(into: dataStore, targetAccounts: allTargetAccounts, rawAccounts: rawAccountsList)
             
             // 5. Sync payouts & withdrawal settlements across ALL accounts
-            await syncPayouts(into: dataStore, targetAccounts: allTargetAccounts)
+            await syncPayouts(into: dataStore, targetAccounts: allTargetAccounts, rawAccounts: rawAccountsList)
             
             lastSyncTime = Date()
             dataStore.rebuildAllAccounts()
@@ -1226,29 +1361,54 @@ public final class The5ersService: ObservableObject {
         return parts.joined(separator: " · ")
     }
     
+    private func isLikelyPurchaseDictionary(_ dict: [String: Any]) -> Bool {
+        let keys = Set(dict.keys.map { $0.lowercased().replacingOccurrences(of: "_", with: "") })
+        let hasCost = keys.contains("netpaid") || keys.contains("price") || keys.contains("cost") ||
+                      keys.contains("fee") || keys.contains("amount") || keys.contains("total")
+        let hasIdentity = keys.contains("id") || keys.contains("orderid") || keys.contains("purchaseid") ||
+                          keys.contains("reference") || keys.contains("items") || keys.contains("placedat")
+        return hasCost && hasIdentity
+    }
+    
     private func extractAnyPurchaseCollection(from unwrapped: Any?) -> [[String: Any]] {
         guard let unwrapped = unwrapped else { return [] }
-        if let s = unwrapped as? String,
-           let d = s.data(using: .utf8),
-           let parsed = try? JSONSerialization.jsonObject(with: d) {
-            return extractAnyPurchaseCollection(from: parsed)
+        if let s = unwrapped as? String {
+            if let parsed = extractJsonFromText(s) {
+                return extractAnyPurchaseCollection(from: parsed)
+            }
+            return []
+        }
+        if let arr = unwrapped as? [[String: Any]] {
+            var results: [[String: Any]] = []
+            for item in arr {
+                let sub = extractAnyPurchaseCollection(from: item)
+                if !sub.isEmpty {
+                    results.append(contentsOf: sub)
+                } else if isLikelyPurchaseDictionary(item) {
+                    results.append(item)
+                }
+            }
+            if !results.isEmpty { return results }
+            return arr.filter { isLikelyPurchaseDictionary($0) }
         }
         if let dict = unwrapped as? [String: Any] {
-            let possibleKeys = ["purchases", "orders", "items", "transactions", "history", "data", "lineitems", "rows"]
+            if isLikelyPurchaseDictionary(dict) {
+                return [dict]
+            }
+            let possibleKeys = ["purchases", "orders", "items", "transactions", "history", "data", "lineitems", "rows", "records", "challenges", "invoices"]
             for k in possibleKeys {
                 if let arr = dict[k] as? [[String: Any]], !arr.isEmpty {
                     return arr
                 }
-            }
-            if let dataDict = dict["data"] as? [String: Any] {
-                for k in possibleKeys {
-                    if let arr = dataDict[k] as? [[String: Any]], !arr.isEmpty {
-                        return arr
-                    }
+                if let subDict = dict[k] as? [String: Any] {
+                    let sub = extractAnyPurchaseCollection(from: subDict)
+                    if !sub.isEmpty { return sub }
                 }
             }
-        } else if let arr = unwrapped as? [[String: Any]] {
-            return arr
+            if let res = dict["result"] {
+                let sub = extractAnyPurchaseCollection(from: res)
+                if !sub.isEmpty { return sub }
+            }
         }
         return []
     }
@@ -1256,13 +1416,35 @@ public final class The5ersService: ObservableObject {
     @MainActor
     private func syncPurchases(
         into dataStore: TradeDataStore,
-        targetAccounts: [The5ersMcpAccount]
+        targetAccounts: [The5ersMcpAccount],
+        rawAccounts: [[String: Any]] = []
     ) async {
         lastStatus = "Loading purchases and evaluation fees from the5ers_purchase..."
         var allPurchases: [[String: Any]] = []
         var seenPurchaseIds = Set<String>()
         
-        let toolNames = ["the5ers_purchase", "the5ers_purchases", "the5ers_orders"]
+        // 1. Extract any purchases embedded inside raw account records
+        for rawAcc in rawAccounts {
+            let accRef = String(describing: rawAcc["ref"] ?? rawAcc["account_ref"] ?? rawAcc["id"] ?? "")
+            let embedded = extractAnyPurchaseCollection(from: rawAcc)
+            for var p in embedded {
+                if p["account_ref"] == nil && !accRef.isEmpty { p["account_ref"] = accRef }
+                let pId = String(describing: p["id"] ?? p["orderid"] ?? p["order_id"] ?? p["purchaseid"] ?? UUID().uuidString)
+                if !seenPurchaseIds.contains(pId) {
+                    seenPurchaseIds.insert(pId)
+                    allPurchases.append(p)
+                }
+            }
+        }
+        
+        // 2. Discover tool names for purchases
+        var toolNames = ["the5ers_purchase", "the5ers_purchases", "the5ers_orders", "the5ers_order", "the5ers_challenges"]
+        for dName in discoveredToolNames {
+            let lower = dName.lowercased()
+            if (lower.contains("purchase") || lower.contains("order") || lower.contains("fee") || lower.contains("challenge") || lower.contains("invoice")) && !toolNames.contains(dName) {
+                toolNames.append(dName)
+            }
+        }
         
         let argSets: [[String: Any]] = [
             [
@@ -1306,10 +1488,8 @@ public final class The5ersService: ObservableObject {
             if Task.isCancelled { break }
             for tool in toolNames {
                 for op in ["list", "history"] {
-                    if let perAccRes = try? await callMcpTool(name: tool, arguments: [
-                        "operation": op,
-                        "account_ref": acc.ref
-                    ]) {
+                    let perAccArgs = buildAccountArgs(toolName: tool, accountRef: acc.ref, op: op)
+                    if let perAccRes = try? await callMcpTool(name: tool, arguments: perAccArgs) {
                         if let isErr = perAccRes["isError"] as? Bool, isErr { continue }
                         let unwrapped = unwrapMcpToolResult(perAccRes)
                         let rows = extractAnyPurchaseCollection(from: unwrapped)
@@ -1440,29 +1620,63 @@ public final class The5ersService: ObservableObject {
     
     // MARK: - Payouts & Settlement Receipts Synchronization
     
+    private func isLikelyPayoutDictionary(_ dict: [String: Any]) -> Bool {
+        let keys = Set(dict.keys.map { $0.lowercased().replacingOccurrences(of: "_", with: "") })
+        let hasAmount = keys.contains("amount") || keys.contains("payoutamount") || keys.contains("netamount") ||
+                        keys.contains("grossamount") || keys.contains("grossprofit") || keys.contains("receivedamount") ||
+                        keys.contains("withdrawalamount") || keys.contains("paidamount") || keys.contains("netpaid") ||
+                        keys.contains("tradershare") || keys.contains("profit") || keys.contains("split") ||
+                        keys.contains("profitsplit") || keys.contains("tradersplit")
+        let hasIdentity = keys.contains("id") || keys.contains("payoutid") || keys.contains("withdrawalid") ||
+                          keys.contains("requestid") || keys.contains("reference") || keys.contains("ref") ||
+                          keys.contains("status") || keys.contains("date") || keys.contains("createdat") ||
+                          keys.contains("processedat") || keys.contains("placedat")
+        return hasAmount && hasIdentity
+    }
+    
     private func extractAnyPayoutCollection(from unwrapped: Any?) -> [[String: Any]] {
         guard let unwrapped = unwrapped else { return [] }
-        if let s = unwrapped as? String,
-           let d = s.data(using: .utf8),
-           let parsed = try? JSONSerialization.jsonObject(with: d) {
-            return extractAnyPayoutCollection(from: parsed)
+        if let s = unwrapped as? String {
+            if let parsed = extractJsonFromText(s) {
+                return extractAnyPayoutCollection(from: parsed)
+            }
+            return []
+        }
+        if let arr = unwrapped as? [[String: Any]] {
+            var results: [[String: Any]] = []
+            for item in arr {
+                let sub = extractAnyPayoutCollection(from: item)
+                if !sub.isEmpty {
+                    results.append(contentsOf: sub)
+                } else if isLikelyPayoutDictionary(item) {
+                    results.append(item)
+                }
+            }
+            if !results.isEmpty { return results }
+            return arr.filter { isLikelyPayoutDictionary($0) }
         }
         if let dict = unwrapped as? [String: Any] {
-            let possibleKeys = ["payouts", "withdrawals", "items", "history", "notifications", "data", "rows"]
+            if isLikelyPayoutDictionary(dict) {
+                return [dict]
+            }
+            let possibleKeys = [
+                "payouts", "withdrawals", "items", "history", "notifications",
+                "data", "rows", "records", "payout_history", "list", "results",
+                "transfers", "payments", "transactions", "payoutRequests", "requests", "settlements"
+            ]
             for k in possibleKeys {
                 if let arr = dict[k] as? [[String: Any]], !arr.isEmpty {
                     return arr
                 }
-            }
-            if let dataDict = dict["data"] as? [String: Any] {
-                for k in possibleKeys {
-                    if let arr = dataDict[k] as? [[String: Any]], !arr.isEmpty {
-                        return arr
-                    }
+                if let subDict = dict[k] as? [String: Any] {
+                    let sub = extractAnyPayoutCollection(from: subDict)
+                    if !sub.isEmpty { return sub }
                 }
             }
-        } else if let arr = unwrapped as? [[String: Any]] {
-            return arr
+            if let res = dict["result"] {
+                let sub = extractAnyPayoutCollection(from: res)
+                if !sub.isEmpty { return sub }
+            }
         }
         return []
     }
@@ -1470,14 +1684,38 @@ public final class The5ersService: ObservableObject {
     @MainActor
     private func syncPayouts(
         into dataStore: TradeDataStore,
-        targetAccounts: [The5ersMcpAccount]
+        targetAccounts: [The5ersMcpAccount],
+        rawAccounts: [[String: Any]] = []
     ) async {
         lastStatus = "Loading withdrawal and payout history from the5ers_payout..."
         
         var allRawPayouts: [[String: Any]] = []
         var seenPayoutIds = Set<String>()
         
-        let toolNames = ["the5ers_payout", "the5ers_payouts", "the5ers_withdrawals"]
+        // 1. Extract any payouts embedded inside raw account objects
+        for rawAcc in rawAccounts {
+            let accRef = String(describing: rawAcc["ref"] ?? rawAcc["account_ref"] ?? rawAcc["id"] ?? "")
+            let accCurr = String(describing: rawAcc["currency"] ?? "USD")
+            let embedded = extractAnyPayoutCollection(from: rawAcc)
+            for var p in embedded {
+                if p["account_ref"] == nil && !accRef.isEmpty { p["account_ref"] = accRef }
+                if p["currency"] == nil { p["currency"] = accCurr }
+                let pId = String(describing: p["id"] ?? p["payout_id"] ?? p["withdrawalid"] ?? UUID().uuidString)
+                if !seenPayoutIds.contains(pId) {
+                    seenPayoutIds.insert(pId)
+                    allRawPayouts.append(p)
+                }
+            }
+        }
+        
+        // 2. Discover tool names for payouts
+        var toolNames = ["the5ers_payout", "the5ers_payouts", "the5ers_withdrawals", "the5ers_withdrawal", "the5ers_transactions"]
+        for dName in discoveredToolNames {
+            let lower = dName.lowercased()
+            if (lower.contains("payout") || lower.contains("withdraw") || lower.contains("reward") || lower.contains("settle") || lower.contains("wallet")) && !toolNames.contains(dName) {
+                toolNames.append(dName)
+            }
+        }
         
         let argSets: [[String: Any]] = [
             [
@@ -1521,10 +1759,8 @@ public final class The5ersService: ObservableObject {
             if Task.isCancelled { break }
             for tool in toolNames {
                 for op in ["history", "list"] {
-                    if let perAccResult = try? await callMcpTool(name: tool, arguments: [
-                        "operation": op,
-                        "account_ref": acc.ref
-                    ]) {
+                    let perAccArgs = buildAccountArgs(toolName: tool, accountRef: acc.ref, op: op)
+                    if let perAccResult = try? await callMcpTool(name: tool, arguments: perAccArgs) {
                         if let isErr = perAccResult["isError"] as? Bool, isErr { continue }
                         let unwrapped = unwrapMcpToolResult(perAccResult)
                         let rows = extractAnyPayoutCollection(from: unwrapped)

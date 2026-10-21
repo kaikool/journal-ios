@@ -657,7 +657,7 @@ public enum PropFirmEngine {
             }
         }
         
-        return entries
+        var mapped = entries
             .filter { ($0.kind == "payout" || $0.category.lowercased() == "payout") && !$0.voided }
             .map { entry in
                 let cleanEId = canonicalPayoutId(entry.id)
@@ -681,6 +681,51 @@ public enum PropFirmEngine {
                     isOverdue: isOverdue
                 )
             }
+        
+        // Include standalone receipts that have no matching payout entry
+        var seenCanonEntryIds = Set<String>()
+        for e in entries where (e.kind == "payout" || e.category.lowercased() == "payout") && !e.voided {
+            seenCanonEntryIds.insert(canonicalPayoutId(e.id))
+            seenCanonEntryIds.insert(e.id)
+            seenCanonEntryIds.insert(e.id.cleanAccountId)
+        }
+        
+        for rcpt in receipts where !rcpt.voided {
+            let canonPayout = canonicalPayoutId(rcpt.payoutId)
+            let canonRcpt = canonicalPayoutId(rcpt.id)
+            if !seenCanonEntryIds.contains(canonPayout) && !seenCanonEntryIds.contains(rcpt.payoutId) && !seenCanonEntryIds.contains(canonRcpt) {
+                let synId = rcpt.payoutId.isEmpty ? rcpt.id : rcpt.payoutId
+                seenCanonEntryIds.insert(canonPayout)
+                seenCanonEntryIds.insert(canonRcpt)
+                seenCanonEntryIds.insert(synId)
+                let syntheticEntry = PropEntryItem(
+                    id: synId,
+                    accountId: nil,
+                    firm: "The5ers",
+                    kind: "payout",
+                    category: "payout",
+                    currency: "USD",
+                    amountMinor: rcpt.amountMinor,
+                    splitBps: 8000,
+                    feeMinor: 0,
+                    occurredOn: rcpt.occurredOn,
+                    status: .completed,
+                    reference: rcpt.reference.isEmpty ? "Payout #\(rcpt.id.prefix(8))" : rcpt.reference,
+                    notes: rcpt.notes
+                )
+                mapped.append(PayoutProgressResult(
+                    entry: syntheticEntry,
+                    actualMinor: rcpt.amountMinor,
+                    expectedMinor: rcpt.amountMinor,
+                    remainingMinor: 0,
+                    varianceMinor: 0,
+                    isPartial: false,
+                    isOverdue: false
+                ))
+            }
+        }
+        
+        return mapped
     }
     
     /// Computes percentage of challenge phases successfully passed
