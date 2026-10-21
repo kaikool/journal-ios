@@ -1,0 +1,7 @@
+# Exclude non-Swift auxiliary and backend function files from GitHub Linguist language stats
+supabase/** linguist-vendored=true
+scripts/** linguist-vendored=true
+*.ts linguist-vendored=true
+*.tsx linguist-vendored=true
+*.js linguist-vendored=true
+*.mjs linguist-vendored=true

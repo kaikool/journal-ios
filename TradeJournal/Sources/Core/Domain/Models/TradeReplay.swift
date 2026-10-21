@@ -1,0 +1,382 @@
+import Foundation
+
+public enum MarketResolution: String, CaseIterable, Identifiable, Sendable {
+    case m1 = "1m"
+    case m5 = "5m"
+    case m15 = "15m"
+    case h1 = "1h"
+    case d1 = "1d"
+    
+    public var id: String { rawValue }
+    
+    public var durationMs: Int64 {
+        switch self {
+        case .m1: return 60_000
+        case .m5: return 300_000
+        case .m15: return 900_000
+        case .h1: return 3_600_000
+        case .d1: return 86_400_000
+        }
+    }
+}
+
+public struct MarketBar: Identifiable, Codable, Equatable, Sendable {
+    public var id: Int64 { timestamp }
+    public let timestamp: Int64 // ms epoch (UTC bar-open timestamp)
+    public let open: Decimal
+    public let high: Decimal
+    public let low: Decimal
+    public let close: Decimal
+    public let volume: Decimal
+    
+    public var date: Date {
+        Date(timeIntervalSince1970: Double(timestamp) / 1000.0)
+    }
+    
+    public var isUp: Bool {
+        close >= open
+    }
+    
+    public init(timestamp: Int64, open: Decimal, high: Decimal, low: Decimal, close: Decimal, volume: Decimal) {
+        self.timestamp = timestamp
+        self.open = open
+        self.high = high
+        self.low = low
+        self.close = close
+        self.volume = volume
+    }
+}
+
+public struct ExcursionEstimate: Codable, Sendable, Equatable {
+    public let mae: Decimal?
+    public let mfe: Decimal?
+    public let sampledBars: Int
+    public let excludedBars: Int
+    public let warnings: [String]
+    public let priceBasisMismatch: Bool
+    public let maePrice: Decimal?
+    public let mfePrice: Decimal?
+    public let maePoints: Decimal?
+    public let mfePoints: Decimal?
+    
+    public init(
+        mae: Decimal? = nil,
+        mfe: Decimal? = nil,
+        sampledBars: Int = 0,
+        excludedBars: Int = 0,
+        warnings: [String] = [],
+        priceBasisMismatch: Bool = false,
+        maePrice: Decimal? = nil,
+        mfePrice: Decimal? = nil,
+        maePoints: Decimal? = nil,
+        mfePoints: Decimal? = nil
+    ) {
+        self.mae = mae
+        self.mfe = mfe
+        self.sampledBars = sampledBars
+        self.excludedBars = excludedBars
+        self.warnings = warnings
+        self.priceBasisMismatch = priceBasisMismatch
+        self.maePrice = maePrice
+        self.mfePrice = mfePrice
+        self.maePoints = maePoints
+        self.mfePoints = mfePoints
+    }
+}
+
+public struct ReplayFrame: Sendable {
+    public let visibleBars: [MarketBar]
+    public let throughTimestamp: Int64
+    public let activeFills: [Execution]
+    public let unrealizedPnl: Decimal
+    public let currentBar: MarketBar?
+    
+    public init(
+        visibleBars: [MarketBar],
+        throughTimestamp: Int64,
+        activeFills: [Execution],
+        unrealizedPnl: Decimal,
+        currentBar: MarketBar? = nil
+    ) {
+        self.visibleBars = visibleBars
+        self.throughTimestamp = throughTimestamp
+        self.activeFills = activeFills
+        self.unrealizedPnl = unrealizedPnl
+        self.currentBar = currentBar ?? visibleBars.last
+    }
+}
+
+public enum TradeReplayEngine {
+    
+    public static func frame(
+        bars: [MarketBar],
+        fills: [Execution],
+        trade: Trade,
+        barIndex: Int,
+        resolution: MarketResolution = .m15
+    ) -> ReplayFrame {
+        let clampedIndex = max(0, min(bars.count, barIndex))
+        let visible = Array(bars.prefix(clampedIndex))
+        
+        guard let lastBar = visible.last else {
+            return ReplayFrame(
+                visibleBars: [],
+                throughTimestamp: 0,
+                activeFills: [],
+                unrealizedPnl: 0,
+                currentBar: nil
+            )
+        }
+        
+        let through = lastBar.timestamp + resolution.durationMs
+        let currentFills = fills.filter { Int64($0.executedAt.timeIntervalSince1970 * 1000) <= through }
+        
+        let isLast = clampedIndex >= bars.count
+        let unrealized = computeUnrealizedPnl(
+            trade: trade,
+            currentPrice: lastBar.close,
+            isLastBar: isLast
+        )
+        
+        return ReplayFrame(
+            visibleBars: visible,
+            throughTimestamp: through,
+            activeFills: currentFills,
+            unrealizedPnl: unrealized,
+            currentBar: lastBar
+        )
+    }
+    
+    /// Accurately computes mark-to-market Unrealized P&L at any candlestick bar close
+    public static func computeUnrealizedPnl(
+        trade: Trade,
+        currentPrice: Decimal,
+        isLastBar: Bool
+    ) -> Decimal {
+        if trade.status != .open && isLastBar {
+            return trade.netPnl
+        }
+        
+        let priceDelta: Decimal = (trade.direction == .long)
+            ? (currentPrice - trade.avgEntry)
+            : (trade.avgEntry - currentPrice)
+        
+        // Method 1: If closed trade has an exit price, compute empirical dollar value per price unit
+        if let exit = trade.avgExit {
+            let totalExitDelta = (trade.direction == .long) ? (exit - trade.avgEntry) : (trade.avgEntry - exit)
+            if abs(totalExitDelta) > 0.00001 && abs(trade.grossPnl) > 0 {
+                let dollarPerPoint = trade.grossPnl / totalExitDelta
+                let grossAtBar = priceDelta * dollarPerPoint
+                let feeShare = isLastBar ? trade.fees : (trade.fees * 0.5)
+                return grossAtBar - feeShare
+            }
+        }
+        
+        // Method 2: Contract multiplier fallback with accurate commodity, index, and forex specifications
+        let multiplier: Decimal = {
+            if let cm = trade.contractMultiplier, cm > 0 {
+                return cm
+            }
+            return AssetContractEngine.contractMultiplier(for: trade.symbol)
+        }()
+        
+        let grossAtBar = priceDelta * trade.quantity * multiplier
+        let feeShare = isLastBar ? trade.fees : (trade.fees * 0.5)
+        return grossAtBar - feeShare
+    }
+    
+    /// Computes MAE (Maximum Adverse Excursion) and MFE (Maximum Favorable Excursion)
+    /// Accurately accounts for asset multipliers, empirical dollar-per-point, and true holding period extremes.
+    public static func estimateExcursions(
+        trade: Trade,
+        fills: [Execution],
+        bars: [MarketBar],
+        resolution: MarketResolution = .m15
+    ) -> ExcursionEstimate {
+        guard trade.avgEntry > 0 else {
+            return ExcursionEstimate(warnings: ["Missing valid entry price."])
+        }
+        
+        let openMs = Int64(trade.openedAt.timeIntervalSince1970 * 1000)
+        let closeMs = Int64((trade.closedAt ?? Date()).timeIntervalSince1970 * 1000)
+        let step = resolution.durationMs
+        
+        // Filter candles that overlap with trade holding window [openMs, closeMs]
+        // A candle [t, t + step] overlaps if t <= closeMs and t + step >= openMs
+        let tradeBars = bars.filter { bar in
+            bar.timestamp <= closeMs && (bar.timestamp + step) >= openMs
+        }
+        
+        var candidateLows: [Decimal] = [trade.avgEntry]
+        var candidateHighs: [Decimal] = [trade.avgEntry]
+        
+        if let exit = trade.avgExit, exit > 0 {
+            candidateLows.append(exit)
+            candidateHighs.append(exit)
+        }
+        
+        for fill in fills {
+            if fill.price > 0 {
+                candidateLows.append(fill.price)
+                candidateHighs.append(fill.price)
+            }
+        }
+        
+        for bar in tradeBars {
+            if bar.low > 0 { candidateLows.append(bar.low) }
+            if bar.high > 0 { candidateHighs.append(bar.high) }
+        }
+        
+        let minPrice = candidateLows.min() ?? trade.avgEntry
+        let maxPrice = candidateHighs.max() ?? trade.avgEntry
+        
+        let isLong = trade.direction == .long
+        let maePrice = isLong ? minPrice : maxPrice
+        let mfePrice = isLong ? maxPrice : minPrice
+        
+        let maePoints = isLong ? (minPrice - trade.avgEntry) : (trade.avgEntry - maxPrice)
+        let mfePoints = isLong ? (maxPrice - trade.avgEntry) : (trade.avgEntry - minPrice)
+        
+        // Mark-to-market dollar conversion using asset contract specifications & empirical dollarPerPoint
+        var maeDollar = computeUnrealizedPnl(trade: trade, currentPrice: maePrice, isLastBar: false)
+        var mfeDollar = computeUnrealizedPnl(trade: trade, currentPrice: mfePrice, isLastBar: false)
+        
+        // MAE is maximum adverse excursion (drawdown), so it must be <= 0
+        if maeDollar > 0 { maeDollar = 0 }
+        // If the closed trade finished with a net loss, MAE must be at least as severe as net loss
+        if trade.status != .open && trade.netPnl < 0 {
+            maeDollar = min(maeDollar, trade.netPnl)
+        }
+        
+        // MFE is maximum favorable excursion (runup), so it must be >= 0
+        if mfeDollar < 0 { mfeDollar = 0 }
+        // If the closed trade finished with a net profit, MFE must be at least as high as net profit
+        if trade.status != .open && trade.netPnl > 0 {
+            mfeDollar = max(mfeDollar, trade.netPnl)
+        }
+        
+        return ExcursionEstimate(
+            mae: maeDollar,
+            mfe: mfeDollar,
+            sampledBars: tradeBars.count,
+            excludedBars: max(0, bars.count - tradeBars.count),
+            warnings: [
+                "MAE/MFE estimates based on candles & fills during trade holding period.",
+                "Computed using contract multiplier & broker trade delta."
+            ],
+            priceBasisMismatch: false,
+            maePrice: maePrice,
+            mfePrice: mfePrice,
+            maePoints: min(0, maePoints),
+            mfePoints: max(0, mfePoints)
+        )
+    }
+    
+    /// Generates distinct, time-stepped candlesticks representing trade progress when external candle feeds are offline
+    public static func generateBarsFromTrade(
+        trade: Trade,
+        fills: [Execution],
+        resolution: MarketResolution = .m15
+    ) -> [MarketBar] {
+        let openMs = Int64(trade.openedAt.timeIntervalSince1970 * 1000)
+        let closeMs: Int64 = {
+            if trade.status == .open {
+                // For open trades, extend candles to current time
+                return Int64(Date().timeIntervalSince1970 * 1000)
+            }
+            if let c = trade.closedAt {
+                return max(openMs + resolution.durationMs * 3, Int64(c.timeIntervalSince1970 * 1000))
+            } else if let dur = trade.durationMs, dur > 0 {
+                return openMs + dur
+            } else {
+                return openMs + resolution.durationMs * 12
+            }
+        }()
+        
+        let step = resolution.durationMs
+        let preBars = 4
+        let postBars = trade.status == .open ? 0 : 2
+        let startTimestamp = openMs - Int64(preBars) * step
+        let endTimestamp = closeMs + Int64(postBars) * step
+        
+        let exactSteps = Int((endTimestamp - startTimestamp) / step) + 1
+        let totalSteps = max(4, min(300, exactSteps))
+        var bars: [MarketBar] = []
+        
+        let entryPrice = (trade.avgEntry as NSDecimalNumber).doubleValue
+        let exitPrice: Double
+        if trade.status == .open {
+            // For open trades, estimate current price from unrealized PnL direction
+            exitPrice = entryPrice + (trade.netPnl > 0 ? 0.003 : -0.003) * entryPrice
+        } else {
+            exitPrice = trade.avgExit.map { ($0 as NSDecimalNumber).doubleValue } ?? (entryPrice + (trade.netPnl > 0 ? 0.005 : -0.005) * entryPrice)
+        }
+        let priceSpan = exitPrice - entryPrice
+        
+        for i in 0..<totalSteps {
+            let t = startTimestamp + Int64(i) * step
+            let progress = min(1.0, max(0.0, Double(t - openMs) / Double(max(1, closeMs - openMs))))
+            
+            let basePrice = entryPrice + progress * priceSpan
+            let variance = abs(entryPrice) * 0.0015 * sin(Double(i) * 0.8)
+            let currentClose = basePrice + variance
+            let previousClose = i > 0 ? (bars[i - 1].close as NSDecimalNumber).doubleValue : (basePrice - variance)
+            
+            let high = max(previousClose, currentClose) + abs(entryPrice) * 0.0012
+            let low = min(previousClose, currentClose) - abs(entryPrice) * 0.0012
+            let vol = (trade.quantity as NSDecimalNumber).doubleValue * (0.8 + 0.4 * abs(sin(Double(i))))
+            
+            bars.append(MarketBar(
+                timestamp: t,
+                open: Decimal(previousClose),
+                high: Decimal(high),
+                low: Decimal(low),
+                close: Decimal(currentClose),
+                volume: Decimal(vol)
+            ))
+        }
+        
+        return bars
+    }
+    
+    /// Resamples lower-timeframe candles into higher-timeframe candles using standard OHLCV bucket aggregation.
+    /// For example, 12 x 5m candles → 1 x 1h candle. Timestamps are aligned to resolution boundaries.
+    public static func resampleBars(_ bars: [MarketBar], to resolution: MarketResolution) -> [MarketBar] {
+        guard !bars.isEmpty else { return [] }
+        let step = resolution.durationMs
+        
+        // Group bars into buckets by flooring timestamp to resolution boundary
+        var buckets: [Int64: [MarketBar]] = [:]
+        var bucketOrder: [Int64] = []
+        
+        for bar in bars {
+            let bucketTs = bar.timestamp - (bar.timestamp % step)
+            if buckets[bucketTs] == nil {
+                bucketOrder.append(bucketTs)
+            }
+            buckets[bucketTs, default: []].append(bar)
+        }
+        
+        return bucketOrder.compactMap { ts -> MarketBar? in
+            guard let group = buckets[ts], let first = group.first else { return nil }
+            let open = first.open
+            let close = group.last!.close
+            var high = first.high
+            var low = first.low
+            var volume: Decimal = 0
+            for bar in group {
+                if bar.high > high { high = bar.high }
+                if bar.low < low { low = bar.low }
+                volume += bar.volume
+            }
+            return MarketBar(
+                timestamp: ts,
+                open: open,
+                high: high,
+                low: low,
+                close: close,
+                volume: volume
+            )
+        }
+    }
+}
