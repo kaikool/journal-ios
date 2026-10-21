@@ -69,41 +69,49 @@ public struct InteractiveEdgeBackSwipeModifier: ViewModifier {
                 .background(NativeInteractivePopGestureEnabler().frame(width: 0, height: 0))
                 #endif
             
-            // 32pt active edge swipe sensor along the left screen bezel
-            Color.clear
-                .frame(width: 32)
-                .contentShape(Rectangle())
-                .gesture(
-                    DragGesture(minimumDistance: 10, coordinateSpace: .local)
-                        .onChanged { value in
-                            if value.translation.width > 6 && abs(value.translation.width) > abs(value.translation.height) * 1.2 {
-                                isDragging = true
-                                dragOffset = value.translation.width * 0.4
-                            }
-                        }
-                        .onEnded { value in
-                            guard isDragging else { return }
-                            isDragging = false
-                            let velocity = value.predictedEndTranslation.width - value.translation.width
-                            if value.translation.width > 70 || velocity > 150 {
-                                #if canImport(UIKit)
-                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                                #endif
-                                withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
-                                    dragOffset = 220
-                                }
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
-                                    onBack()
-                                    dragOffset = 0
-                                }
-                            } else {
-                                withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
-                                    dragOffset = 0
+            // Edge swipe sensor below header (top 88pt left unobstructed for header buttons)
+            VStack(spacing: 0) {
+                Color.clear
+                    .frame(height: 88)
+                    .allowsHitTesting(false)
+                
+                Color.clear
+                    .frame(width: 20)
+                    .contentShape(Rectangle())
+                    .gesture(
+                        DragGesture(minimumDistance: 15, coordinateSpace: .local)
+                            .onChanged { value in
+                                if value.translation.width > 8 && abs(value.translation.width) > abs(value.translation.height) * 1.2 {
+                                    isDragging = true
+                                    dragOffset = value.translation.width * 0.4
                                 }
                             }
-                        }
-                )
-                .ignoresSafeArea(.container, edges: .vertical)
+                            .onEnded { value in
+                                guard isDragging else { return }
+                                isDragging = false
+                                let velocity = value.predictedEndTranslation.width - value.translation.width
+                                if value.translation.width > 70 || velocity > 150 {
+                                    #if canImport(UIKit)
+                                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                    #endif
+                                    withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
+                                        dragOffset = 220
+                                    }
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+                                        onBack()
+                                        dragOffset = 0
+                                    }
+                                } else {
+                                    withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
+                                        dragOffset = 0
+                                    }
+                                }
+                            }
+                    )
+                
+                Spacer()
+            }
+            .ignoresSafeArea(.container, edges: .vertical)
         }
     }
 }

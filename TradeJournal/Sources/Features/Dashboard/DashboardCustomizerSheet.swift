@@ -195,6 +195,16 @@ public struct DashboardCustomizerSheet: View {
             .presentationDragIndicator(.visible)
             .presentationCornerRadius(28)
             .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") {
+                        #if canImport(UIKit)
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        #endif
+                        dismiss()
+                    }
+                    .font(AppTypography.body)
+                    .foregroundColor(AppColors.secondaryText)
+                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") {
                         #if canImport(UIKit)

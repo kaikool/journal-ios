@@ -19,9 +19,20 @@ public struct TimeHeatmapView: View {
         self.isPrivate = isPrivate
     }
     
+    private var displayHours: [BucketStats] {
+        let existingMap = Dictionary(uniqueKeysWithValues: hours.map { ($0.key, $0) })
+        return (0..<24).map { h in
+            let key = String(format: "%02d", h)
+            if let stat = existingMap[key] {
+                return stat
+            }
+            return BucketStats(key: key, trades: 0, netPnl: 0, winRate: nil, profitFactor: nil, volume: 0)
+        }
+    }
+    
     private var activeBucket: BucketStats? {
         guard let key = selectedHourKey else { return nil }
-        return hours.first { "\($0.key):00" == key }
+        return displayHours.first { "\($0.key):00" == key }
     }
     
     public var body: some View {
@@ -70,7 +81,7 @@ public struct TimeHeatmapView: View {
                         .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
                         .foregroundStyle(AppColors.border.opacity(0.8))
                     
-                    ForEach(hours) { h in
+                    ForEach(displayHours) { h in
                         let hourLabel = "\(h.key):00"
                         let pnlVal = isPrivate ? 0 : (h.netPnl as NSDecimalNumber).doubleValue
                         
@@ -120,7 +131,7 @@ public struct TimeHeatmapView: View {
                 .frame(height: 120)
             }
             
-            // Lower Pane: Trade Volume
+            // Lower Pane: Trade Volume (Line chart with points & area fill)
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
                     Text("Trades")
@@ -132,22 +143,36 @@ public struct TimeHeatmapView: View {
                 }
                 
                 Chart {
-                    ForEach(hours) { h in
+                    ForEach(displayHours) { h in
                         let hourLabel = "\(h.key):00"
                         
-                        BarMark(
+                        LineMark(
                             x: .value("Hour", hourLabel),
                             y: .value("Trades", h.trades)
                         )
-                        .foregroundStyle(AppColors.secondaryText.opacity(0.35))
-                        .cornerRadius(2.5)
+                        .foregroundStyle(AppColors.brand)
+                        .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+                        .interpolationMethod(.monotone)
+                        
+                        AreaMark(
+                            x: .value("Hour", hourLabel),
+                            y: .value("Trades", h.trades)
+                        )
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [AppColors.brand.opacity(0.20), AppColors.brand.opacity(0.01)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                        .interpolationMethod(.monotone)
                         
                         PointMark(
                             x: .value("Hour", hourLabel),
                             y: .value("Trades", h.trades)
                         )
                         .foregroundStyle(AppColors.brand)
-                        .symbolSize(selectedHourKey == hourLabel ? 30 : 12)
+                        .symbolSize(selectedHourKey == hourLabel ? 36 : (h.trades > 0 ? 16 : 8))
                     }
                     
                     if let activeKey = selectedHourKey {
@@ -170,23 +195,21 @@ public struct TimeHeatmapView: View {
                     }
                 }
                 .chartXAxis {
-                    AxisMarks(position: .bottom) { value in
-                        if let label = value.as(String.self),
-                           let hourNum = Int(label.prefix(2)),
-                           hourNum % 4 == 0 {
-                            AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
-                                .foregroundStyle(AppColors.border.opacity(0.3))
-                            AxisTick(stroke: StrokeStyle(lineWidth: 0.5))
-                                .foregroundStyle(AppColors.border)
-                            AxisValueLabel {
+                    AxisMarks(position: .bottom, values: ["00:00", "04:00", "08:00", "12:00", "16:00", "20:00", "23:00"]) { value in
+                        AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
+                            .foregroundStyle(AppColors.border.opacity(0.3))
+                        AxisTick(stroke: StrokeStyle(lineWidth: 0.5))
+                            .foregroundStyle(AppColors.border)
+                        AxisValueLabel {
+                            if let label = value.as(String.self) {
                                 Text(label)
-                                    .font(.system(size: 9, weight: .medium, design: .rounded))
+                                    .font(.system(size: 8.5, weight: .medium, design: .rounded))
                                     .foregroundStyle(AppColors.secondaryText)
                             }
                         }
                     }
                 }
-                .frame(height: 65)
+                .frame(height: 75)
                 .onChange(of: selectedHourKey) { newHour in
                     if let h = newHour, h != lastHapticHour {
                         lastHapticHour = h

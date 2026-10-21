@@ -327,14 +327,6 @@ public struct DashboardView: View {
         
         ScrollView {
             LazyVStack(spacing: 12) {
-                // Inline dashboard controls (Presets & Customize)
-                HStack(spacing: 8) {
-                    dashboardActions
-                    Spacer()
-                }
-                .padding(.horizontal, 2)
-                .padding(.top, 4)
-                
                 syncNotificationSection
                 
                 if isEditingLayout {
@@ -363,6 +355,11 @@ public struct DashboardView: View {
                         }
                     }
                 }
+                
+                // Bottom dashboard controls (Overview Presets & Customize)
+                dashboardActions
+                    .padding(.top, 8)
+                    .padding(.bottom, 12)
             }
             .padding(.horizontal, 14)
             .padding(.top, 8)
@@ -467,7 +464,7 @@ public struct DashboardView: View {
     // MARK: - Secondary Dashboard Actions (Integrated into FilterBarView)
     
     private var dashboardActions: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 10) {
             // Presets Menu
             Menu {
                 Section("Presets") {
@@ -499,28 +496,29 @@ public struct DashboardView: View {
                     }
                 }
             } label: {
-                HStack(spacing: 4) {
+                HStack(spacing: 6) {
                     Image(systemName: activePreset.icon)
-                        .font(.system(size: 10, weight: .semibold))
+                        .font(.system(size: 13, weight: .semibold))
                         .foregroundColor(AppColors.brand)
                     Text(activePreset.name)
-                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .font(.system(size: 13, weight: .semibold))
                         .foregroundColor(AppColors.primaryText)
                         .lineLimit(1)
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 7, weight: .bold))
+                    Spacer()
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.system(size: 10, weight: .semibold))
                         .foregroundColor(AppColors.secondaryText)
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4.5)
+                .padding(.horizontal, 14)
+                .frame(maxWidth: .infinity)
+                .frame(height: 38)
                 .background(AppColors.cardBackground)
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(AppColors.border.opacity(0.6), lineWidth: 0.5)
+                        .stroke(AppColors.border, lineWidth: 1)
                 )
             }
-            .fixedSize()
             
             // Customize button (Sheet)
             Button {
@@ -529,25 +527,25 @@ public struct DashboardView: View {
                 #endif
                 showCustomizerSheet = true
             } label: {
-                HStack(spacing: 3) {
+                HStack(spacing: 6) {
                     Image(systemName: "slider.horizontal.3")
-                        .font(.system(size: 10, weight: .semibold))
+                        .font(.system(size: 13, weight: .semibold))
                     Text("Customize")
-                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .font(.system(size: 13, weight: .semibold))
                         .lineLimit(1)
                 }
                 .foregroundColor(AppColors.primaryText)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4.5)
+                .padding(.horizontal, 14)
+                .frame(maxWidth: .infinity)
+                .frame(height: 38)
                 .background(AppColors.cardBackground)
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(AppColors.border.opacity(0.6), lineWidth: 0.5)
+                        .stroke(AppColors.border, lineWidth: 1)
                 )
             }
             .buttonStyle(ApplePressableButtonStyle())
-            .fixedSize()
         }
     }
     

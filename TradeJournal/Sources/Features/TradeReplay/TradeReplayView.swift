@@ -87,7 +87,7 @@ public struct TradeReplayView: View {
         }
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
-        .interactiveEdgeBack(onBack: { dismiss() })
+        .interactiveEdgeBack(onBack: isModal ? nil : { dismiss() })
         .enableNativePopGesture()
         .background(AppColors.background)
         .task(id: "\(trade.id)_\(selectedResolution.rawValue)") {

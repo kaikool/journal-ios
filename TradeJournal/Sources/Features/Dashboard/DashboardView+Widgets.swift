@@ -542,10 +542,22 @@ extension DashboardView {
                             }
                             
                             // Week total column
-                            Text(weekPnl != 0 ? Formatters.formatPnL(weekPnl, currency: env.currentCurrency) : "–")
-                                .font(.system(size: 9, weight: .semibold, design: .rounded))
+                            let weekPnlText: String = {
+                                if weekPnl == 0 { return "–" }
+                                if abs(weekPnl) >= 1000 {
+                                    return Formatters.compactCurrency(weekPnl, currency: env.currentCurrency)
+                                } else {
+                                    return Formatters.formatPnL(weekPnl, currency: env.currentCurrency)
+                                }
+                            }()
+                            
+                            Text(weekPnlText)
+                                .font(.system(size: 8.5, weight: .semibold, design: .rounded))
                                 .monospacedDigit()
                                 .foregroundColor(weekPnl > 0 ? AppColors.profit : (weekPnl < 0 ? AppColors.loss : AppColors.secondaryText))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.65)
+                                .allowsTightening(true)
                                 .frame(maxWidth: .infinity, alignment: .trailing)
                         }
                     }

@@ -80,23 +80,36 @@ public struct DayDetailSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    if !noteContent.isEmpty || rating > 0 {
-                        Button {
-                            showDeleteNoteAlert = true
-                        } label: {
-                            Image(systemName: "trash")
-                                .font(.system(size: 13, weight: .regular))
-                                .foregroundColor(AppColors.loss.opacity(0.85))
-                        }
+                    Button {
+                        #if canImport(UIKit)
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        #endif
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(AppColors.secondaryText)
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") {
-                        save()
-                        dismiss()
+                    HStack(spacing: 12) {
+                        if !noteContent.isEmpty || rating > 0 {
+                            Button {
+                                showDeleteNoteAlert = true
+                            } label: {
+                                Image(systemName: "trash")
+                                    .font(.system(size: 13, weight: .regular))
+                                    .foregroundColor(AppColors.loss.opacity(0.85))
+                            }
+                        }
+                        
+                        Button("Done") {
+                            save()
+                            dismiss()
+                        }
+                        .font(AppTypography.captionBold)
+                        .foregroundColor(AppColors.brand)
                     }
-                    .font(AppTypography.captionBold)
-                    .foregroundColor(AppColors.brand)
                 }
             }
             .alert("Delete note for this day?", isPresented: $showDeleteNoteAlert) {

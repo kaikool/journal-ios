@@ -516,23 +516,23 @@ public struct AppBackButton: View {
     public var body: some View {
         Button {
             #if os(iOS)
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             #endif
             action()
         } label: {
             HStack(spacing: 4) {
                 Image(systemName: "chevron.left")
-                    .font(.system(size: 11, weight: .bold))
+                    .font(.system(size: 12, weight: .bold))
                 if let title = title, !title.isEmpty {
                     Text(title)
                         .font(AppTypography.actionPill)
                 }
             }
             .foregroundColor(AppColors.primaryText)
-            .padding(.horizontal, title != nil ? 9 : 8)
-            .padding(.vertical, 6)
-            .frame(height: 30)
-            .background(AppColors.cardBackground.opacity(0.85))
+            .padding(.horizontal, title != nil ? 10 : 9)
+            .padding(.vertical, 7)
+            .frame(minWidth: 36, minHeight: 32)
+            .background(AppColors.cardBackground.opacity(0.95))
             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
@@ -549,9 +549,12 @@ public struct AppBackButton: View {
                     )
             )
             .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 1.5)
+            .contentShape(Rectangle())
         }
         .buttonStyle(ApplePressableButtonStyle())
-        .fixedSize()
+        .contentShape(Rectangle())
+        .frame(minWidth: 44, minHeight: 44)
+        .zIndex(999)
     }
 }
 
