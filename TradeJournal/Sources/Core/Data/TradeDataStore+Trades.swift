@@ -62,6 +62,13 @@ extension TradeDataStore {
         
         guard !uniqueNew.isEmpty else {
             AppLogger.info("No new unique executions to import.")
+            if trades.filter({ $0.accountId == accountId }).isEmpty && !executions.filter({ $0.accountId == accountId }).isEmpty {
+                rebuildAccount(accountId: accountId)
+                deduplicateTrades()
+                invalidatePerformanceCaches()
+                saveToDisk(immediate: true)
+                objectWillChange.send()
+            }
             return
         }
         
@@ -147,12 +154,14 @@ extension TradeDataStore {
     public func rebuildAccount(accountId: String) {
         guard let account = accounts.first(where: { $0.id == accountId }) else { return }
         
-        // The5ers accounts store reported positions directly as round trips and do not use atomic execution reconstruction
-        if accountId.hasPrefix("the5ers_") || (account.broker.lowercased() == "the5ers") {
+        let accountFills = executions.filter { $0.accountId == accountId }
+        
+        // Native The5ers MCP accounts store reported positions directly as round trips and do not use atomic execution reconstruction.
+        // Accounts with atomic executions (such as cTrader accounts even under The5ers broker) MUST rebuild round trips!
+        if accountId.hasPrefix("the5ers_") && !accountId.hasPrefix("ctrader_") && accountFills.isEmpty {
             return
         }
         
-        let accountFills = executions.filter { $0.accountId == accountId }
         let reconstructed = TradeReconstructionEngine.buildRoundTrips(
             executions: accountFills,
             options: .init(method: account.profitCalcMethod, multipliers: multipliers)
@@ -191,6 +200,7 @@ extension TradeDataStore {
         
         let otherTrades = trades.filter { $0.accountId != accountId }
         trades = otherTrades + mergedTrades
+        invalidatePerformanceCaches()
     }
     
     public func rebuildAllAccounts(forceRebuildTrades: Bool = false) {
@@ -206,11 +216,17 @@ extension TradeDataStore {
             let sizeBal = propAccounts[i].sizeMinor.map { Decimal($0) / 100 }
             propAccounts[i].name = Formatters.cleanAccountName(propAccounts[i].name, balance: sizeBal)
         }
-        if forceRebuildTrades || (trades.isEmpty && !executions.isEmpty) {
+        let needsTradeRebuild = forceRebuildTrades || (trades.isEmpty && !executions.isEmpty) || accounts.contains(where: { acc in
+            trades.filter({ $0.accountId == acc.id }).isEmpty && !executions.filter({ $0.accountId == acc.id }).isEmpty
+        })
+        if needsTradeRebuild {
             for acc in accounts {
                 rebuildAccount(accountId: acc.id)
             }
             deduplicateTrades()
+            invalidatePerformanceCaches()
+            saveToDisk(immediate: true)
+            objectWillChange.send()
         }
     }
     

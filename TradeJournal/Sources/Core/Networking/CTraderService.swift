@@ -254,9 +254,16 @@ public final class CTraderService: ObservableObject {
             return
         }
         
-        let clientMsgId = json["clientMsgId"] as? String ?? ""
+        let clientMsgId: String = {
+            if let s = json["clientMsgId"] as? String { return s }
+            if let p = json["payload"] as? [String: Any], let s = p["clientMsgId"] as? String { return s }
+            return ""
+        }()
         let payloadType = json["payloadType"] as? Int ?? 0
-        let payload = json["payload"] as? [String: Any] ?? [:]
+        var payload = json["payload"] as? [String: Any] ?? [:]
+        if payload.isEmpty {
+            payload = json
+        }
         
         // Handle error responses (2142: ProtoOAErrorRes)
         if payloadType == 2142 {
@@ -266,11 +273,15 @@ public final class CTraderService: ObservableObject {
             
             if let cont = pendingContinuations.removeValue(forKey: clientMsgId) {
                 cont.resume(throwing: error)
+            } else if pendingContinuations.count == 1, let firstKey = pendingContinuations.keys.first, let cont = pendingContinuations.removeValue(forKey: firstKey) {
+                cont.resume(throwing: error)
             }
             return
         }
         
         if let cont = pendingContinuations.removeValue(forKey: clientMsgId) {
+            cont.resume(returning: payload)
+        } else if pendingContinuations.count == 1, let firstKey = pendingContinuations.keys.first, let cont = pendingContinuations.removeValue(forKey: firstKey) {
             cont.resume(returning: payload)
         }
     }
@@ -573,14 +584,14 @@ public final class CTraderService: ObservableObject {
                 let symbolArray = (symbolsRes["symbol"] as? [[String: Any]]) ?? (symbolsRes["symbols"] as? [[String: Any]]) ?? []
                 for s in symbolArray {
                     if let sId = safeInt64(s["symbolId"]),
-                       let sName = s["symbolName"] as? String {
+                       let sName = (s["symbolName"] as? String) ?? (s["name"] as? String) {
                         symbolMap[sId] = sName
                     }
                 }
                 let archivedArray = (symbolsRes["archivedSymbol"] as? [[String: Any]]) ?? (symbolsRes["archivedSymbols"] as? [[String: Any]]) ?? []
                 for s in archivedArray {
                     if let sId = safeInt64(s["symbolId"]),
-                       let sName = s["symbolName"] as? String {
+                       let sName = (s["symbolName"] as? String) ?? (s["name"] as? String) {
                         if symbolMap[sId] == nil {
                             symbolMap[sId] = sName
                         }
@@ -653,56 +664,58 @@ public final class CTraderService: ObservableObject {
             
             var rawDeals: [[String: Any]] = []
             var seenDealIds = Set<Int64>()
-            var chunkStart = dealsFrom
             let totalSpanMs = max(dealsTo - dealsFrom, 1)
             let estimatedChunks = max(1, Int((totalSpanMs + maxChunkMs - 1) / maxChunkMs))
             var chunkIndex = 0
             
-            while chunkStart < dealsTo {
+            // Query backwards from dealsTo -> dealsFrom (Recent -> Past)
+            // Ensures latest trades are fetched immediately on the very first chunk
+            var currentChunkEnd = dealsTo
+            while currentChunkEnd > dealsFrom {
                 chunkIndex += 1
-                let chunkEnd = min(chunkStart + maxChunkMs, dealsTo)
-                guard chunkEnd > chunkStart else { break }
+                let currentChunkStart = max(currentChunkEnd - maxChunkMs, dealsFrom)
+                guard currentChunkEnd > currentChunkStart else { break }
                 
                 self.lastStatus = "Fetching cTrader deals (\(chunkIndex)/\(estimatedChunks))..."
                 
-                var chunkFrom = chunkStart
-                while chunkFrom < chunkEnd {
+                var chunkFrom = currentChunkStart
+                while chunkFrom < currentChunkEnd {
                     let payload: [String: Any] = [
                         "ctidTraderAccountId": accId,
                         "fromTimestamp": chunkFrom,
-                        "toTimestamp": chunkEnd,
+                        "toTimestamp": currentChunkEnd,
                         "maxRows": 1000
                     ]
                     
                     do {
                         let dealsRes = try await sendRequest(payloadType: 2133, payload: payload)
-                        let dealsList = (dealsRes["deal"] as? [[String: Any]]) ?? (dealsRes["deals"] as? [[String: Any]]) ?? []
+                        let dealsList = (dealsRes["deal"] as? [[String: Any]]) ?? (dealsRes["deals"] as? [[String: Any]]) ?? (dealsRes["items"] as? [[String: Any]]) ?? []
                         var latestDealTs: Int64 = 0
                         for d in dealsList {
-                            if let dealId = safeInt64(d["dealId"]) {
+                            if let dealId = safeInt64(d["dealId"]) ?? safeInt64(d["id"]) {
                                 if seenDealIds.insert(dealId).inserted {
                                     rawDeals.append(d)
                                 }
                             }
-                            if let ts = safeInt64(d["executionTimestamp"]) {
+                            if let ts = safeInt64(d["executionTimestamp"]) ?? safeInt64(d["createTimestamp"]) ?? safeInt64(d["timestamp"]) {
                                 latestDealTs = max(latestDealTs, ts)
                             }
                         }
                         
                         let hasMore = (dealsRes["hasMore"] as? Bool) ?? false
-                        if hasMore && latestDealTs > chunkFrom && latestDealTs < chunkEnd {
+                        if hasMore && latestDealTs > chunkFrom && latestDealTs < currentChunkEnd {
                             chunkFrom = latestDealTs + 1
                         } else {
                             break
                         }
                     } catch {
-                        AppLogger.warn("cTrader deal chunk [\(chunkFrom)-\(chunkEnd)] returned error: \(error.localizedDescription)")
+                        AppLogger.warn("cTrader deal chunk [\(chunkFrom)-\(currentChunkEnd)] returned error: \(error.localizedDescription)")
                         break
                     }
                 }
                 
-                chunkStart = chunkEnd
-                if chunkStart < dealsTo {
+                currentChunkEnd = currentChunkStart
+                if currentChunkEnd > dealsFrom {
                     try? await Task.sleep(nanoseconds: 60_000_000) // 60ms throttle between chunk requests
                 }
             }
@@ -710,9 +723,9 @@ public final class CTraderService: ObservableObject {
             // 5. Convert Deals to Atomic Executions
             var newExecutions: [Execution] = []
             for raw in rawDeals {
-                guard let dealId = safeInt64(raw["dealId"]),
+                guard let dealId = safeInt64(raw["dealId"]) ?? safeInt64(raw["id"]),
                       let symbolId = safeInt64(raw["symbolId"]),
-                      let execTimestamp = safeInt64(raw["executionTimestamp"]) else {
+                      let execTimestamp = safeInt64(raw["executionTimestamp"]) ?? safeInt64(raw["createTimestamp"]) ?? safeInt64(raw["timestamp"]) else {
                     continue
                 }
                 
@@ -729,10 +742,10 @@ public final class CTraderService: ObservableObject {
                 let volRaw = safeInt64(raw["filledVolume"]) ?? safeInt64(raw["volume"]) ?? 0
                 guard volRaw > 0 else { continue }
                 
-                let priceRaw = safeDouble(raw["executionPrice"]) ?? safeDouble(raw["price"]) ?? safeDouble(raw["closePrice"]) ?? 0.0
+                let priceRaw = safeDouble(raw["executionPrice"]) ?? safeDouble(raw["rate"]) ?? safeDouble(raw["price"]) ?? safeDouble(raw["closePrice"]) ?? safeDouble(raw["bid"]) ?? safeDouble(raw["ask"]) ?? 0.0
                 guard priceRaw > 0 else { continue }
                 
-                let symbolName = symbolMap[symbolId] ?? "Symbol_\(symbolId)"
+                let symbolName = symbolMap[symbolId] ?? (raw["symbolName"] as? String) ?? (raw["symbol"] as? String) ?? "Symbol_\(symbolId)"
                 let sideStr = String(describing: raw["tradeSide"] ?? "BUY").uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
                 let side: ExecutionSide = (sideStr == "SELL" || sideStr == "2") ? .sell : .buy
                 
@@ -877,6 +890,7 @@ public final class CTraderService: ObservableObject {
                 }
             }
             
+            dataStore.rebuildAccount(accountId: journalAccId)
             totalRebuiltTrades += dataStore.trades.filter { $0.accountId == journalAccId }.count
             
             if dataStore.selectedAccountId == "default-acc" || dataStore.selectedAccountId.isEmpty {
@@ -885,7 +899,9 @@ public final class CTraderService: ObservableObject {
         }
         
         dataStore.deduplicateAndCleanAccounts()
+        dataStore.rebuildAllAccounts()
         dataStore.saveToDisk(immediate: true)
+        dataStore.invalidatePerformanceCaches()
         dataStore.objectWillChange.send()
         
         let now = Date()

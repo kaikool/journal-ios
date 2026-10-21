@@ -214,6 +214,14 @@ extension TradeDataStore {
         if selectedAccountId == "default-acc" || (!accounts.contains(where: { $0.id == selectedAccountId }) && selectedAccountId != "all") {
             selectedAccountId = mostRecentActiveAccount?.id ?? "all"
         }
+        
+        // Rebuild trades for any accounts that have imported executions but no reconstructed trades
+        for acc in accounts {
+            if trades.filter({ $0.accountId == acc.id }).isEmpty && !executions.filter({ $0.accountId == acc.id }).isEmpty {
+                rebuildAccount(accountId: acc.id)
+            }
+        }
+        
         refreshActiveAccountCache()
         invalidatePerformanceCaches()
     }

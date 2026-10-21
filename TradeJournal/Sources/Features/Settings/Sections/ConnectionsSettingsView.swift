@@ -397,6 +397,11 @@ public struct ConnectionsSettingsView: View {
                     }
                     self.dataStore.objectWillChange.send()
                 }
+                if res.success && !res.accounts.isEmpty {
+                    await MainActor.run {
+                        self.syncCTrader()
+                    }
+                }
             } catch {
                 await MainActor.run {
                     self.isTestingCTrader = false

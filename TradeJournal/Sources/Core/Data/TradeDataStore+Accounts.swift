@@ -197,6 +197,10 @@ extension TradeDataStore {
         guard selectedAccountId != id else { return }
         selectedAccountId = id
         invalidatePerformanceCaches()
+        if trades.filter({ $0.accountId == id }).isEmpty && !executions.filter({ $0.accountId == id }).isEmpty {
+            rebuildAccount(accountId: id)
+            invalidatePerformanceCaches()
+        }
         saveToDisk()
         objectWillChange.send()
     }
