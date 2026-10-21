@@ -1337,13 +1337,15 @@ public final class The5ersService: ObservableObject {
                 "contract_version": "1.0",
                 "request_context": ["timezone": "UTC", "locale": "en"]
             ]
-            let payoutResult = (try? await callMcpTool(name: "the5ers_payout", arguments: perAccArgs)) ??
-                                  (try? await callMcpTool(name: "the5ers_payout", arguments: [
-                                      "operation": "list",
-                                      "account_ref": acc.ref,
-                                      "contract_version": "1.0",
-                                      "request_context": ["timezone": "UTC", "locale": "en"]
-                                  ]))
+            var payoutResult = try? await callMcpTool(name: "the5ers_payout", arguments: perAccArgs)
+            if payoutResult == nil {
+                payoutResult = try? await callMcpTool(name: "the5ers_payout", arguments: [
+                    "operation": "list",
+                    "account_ref": acc.ref,
+                    "contract_version": "1.0",
+                    "request_context": ["timezone": "UTC", "locale": "en"]
+                ])
+            }
             if let res = payoutResult {
                 let unwrapped = unwrapMcpToolResult(res)
                 let rows = extractAnyPayoutCollection(from: unwrapped)
@@ -1365,12 +1367,14 @@ public final class The5ersService: ObservableObject {
             "contract_version": "1.0",
             "request_context": ["timezone": "UTC", "locale": "en"]
         ]
-        let globalResult = (try? await callMcpTool(name: "the5ers_payout", arguments: globalArgs)) ??
-                           (try? await callMcpTool(name: "the5ers_payout", arguments: [
-                               "operation": "list",
-                               "contract_version": "1.0",
-                               "request_context": ["timezone": "UTC", "locale": "en"]
-                           ]))
+        var globalResult = try? await callMcpTool(name: "the5ers_payout", arguments: globalArgs)
+        if globalResult == nil {
+            globalResult = try? await callMcpTool(name: "the5ers_payout", arguments: [
+                "operation": "list",
+                "contract_version": "1.0",
+                "request_context": ["timezone": "UTC", "locale": "en"]
+            ])
+        }
         if let res = globalResult {
             let unwrapped = unwrapMcpToolResult(res)
             let rows = extractAnyPayoutCollection(from: unwrapped)
