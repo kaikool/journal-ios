@@ -53,7 +53,7 @@ public struct PlaybooksView: View {
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 7)
                                 .background(AppColors.brandPrimary)
-                                .clipShape(Capsule())
+                                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                             }
                         }
                         .padding(.top, 4)

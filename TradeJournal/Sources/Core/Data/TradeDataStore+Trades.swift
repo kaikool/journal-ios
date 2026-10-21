@@ -39,7 +39,27 @@ extension TradeDataStore {
     
     /// Imports new fills for an account and triggers reconstruction
     public func importExecutions(accountId: String, newExecutions: [Execution]) {
-        let uniqueNew = newExecutions.filter { !executionHashes.contains($0.contentHash) }
+        let existingIds = Set(executions.map { $0.id })
+        let existingHashes = executionHashes.union(executions.map { $0.contentHash })
+        
+        let uniqueNew = newExecutions.filter { fill in
+            if existingIds.contains(fill.id) || existingHashes.contains(fill.contentHash) {
+                return false
+            }
+            // Check semantic duplicate in existing executions
+            let fillCleanAcc = fill.accountId.cleanAccountId
+            let fillSec = Int64(fill.executedAt.timeIntervalSince1970)
+            let isDuplicate = executions.contains { existing in
+                existing.accountId.cleanAccountId == fillCleanAcc &&
+                existing.symbol.uppercased() == fill.symbol.uppercased() &&
+                existing.side == fill.side &&
+                abs(Int64(existing.executedAt.timeIntervalSince1970) - fillSec) <= 1 &&
+                existing.quantity == fill.quantity &&
+                existing.price == fill.price
+            }
+            return !isDuplicate
+        }
+        
         guard !uniqueNew.isEmpty else {
             AppLogger.info("No new unique executions to import.")
             return
@@ -50,9 +70,77 @@ extension TradeDataStore {
             executions.append(fill)
         }
         
+        deduplicateExecutions()
         rebuildAccount(accountId: accountId)
+        deduplicateTrades()
         saveToDisk(immediate: true)
         AppLogger.info("Imported \(uniqueNew.count) executions for account \(accountId). Rebuilt \(trades.count) trades.")
+    }
+    
+    /// Deduplicates executions by ID, contentHash, and semantic execution attributes
+    public func deduplicateExecutions() {
+        var seenIds = Set<String>()
+        var seenHashes = Set<String>()
+        var seenSemantics = Set<String>()
+        var cleaned: [Execution] = []
+        
+        for fill in executions {
+            let cleanAcc = fill.accountId.cleanAccountId
+            let fillSec = Int64(fill.executedAt.timeIntervalSince1970)
+            let semantic = "\(cleanAcc)|\(fill.symbol.uppercased())|\(fill.side.rawValue)|\(fill.quantity)|\(fill.price)|\(fillSec)"
+            
+            if seenIds.contains(fill.id) || seenHashes.contains(fill.contentHash) || seenSemantics.contains(semantic) {
+                continue
+            }
+            seenIds.insert(fill.id)
+            seenHashes.insert(fill.contentHash)
+            seenSemantics.insert(semantic)
+            cleaned.append(fill)
+        }
+        
+        if cleaned.count != executions.count {
+            AppLogger.info("Deduplicated executions from \(executions.count) down to \(cleaned.count)")
+            self.executions = cleaned
+            self.executionHashes = Set(cleaned.map { $0.contentHash })
+        }
+    }
+    
+    /// Deduplicates trades by key, and by semantic signature (account, symbol, direction, open time, quantity)
+    public func deduplicateTrades() {
+        var seenKeys = Set<String>()
+        var seenSemantics = Set<String>()
+        var cleaned: [Trade] = []
+        
+        // Prioritize trades that contain notes, tags, executionIds, or non-zero P&L
+        let sorted = trades.sorted { a, b in
+            let aScore = (a.notes != nil ? 1 : 0) + (!a.tags.isEmpty ? 1 : 0) + (a.netPnl != 0 ? 2 : 0) + a.executionCount
+            let bScore = (b.notes != nil ? 1 : 0) + (!b.tags.isEmpty ? 1 : 0) + (b.netPnl != 0 ? 2 : 0) + b.executionCount
+            return aScore > bScore
+        }
+        
+        for trade in sorted {
+            let cleanAcc = trade.accountId.cleanAccountId
+            let openSec = Int64(trade.openedAt.timeIntervalSince1970)
+            let qtyStr = NSDecimalNumber(decimal: trade.quantity).stringValue
+            // Window of 5 seconds to catch slight timestamp variations across syncs
+            let semantic = "\(cleanAcc)|\(trade.symbol.uppercased())|\(trade.direction.rawValue)|\(openSec / 5)|\(qtyStr)"
+            
+            if seenKeys.contains(trade.key) || seenSemantics.contains(semantic) {
+                continue
+            }
+            
+            seenKeys.insert(trade.key)
+            seenSemantics.insert(semantic)
+            cleaned.append(trade)
+        }
+        
+        cleaned.sort { $0.openedAt < $1.openedAt }
+        
+        if cleaned.count != trades.count {
+            AppLogger.info("Deduplicated trades from \(trades.count) down to \(cleaned.count)")
+            self.trades = cleaned
+            invalidatePerformanceCaches()
+        }
     }
     
     /// Reconstructs round trips from raw executions using account profit calculation method
@@ -107,6 +195,10 @@ extension TradeDataStore {
     
     public func rebuildAllAccounts(forceRebuildTrades: Bool = false) {
         deduplicateAndCleanAccounts()
+        deduplicateExecutions()
+        deduplicateTrades()
+        deduplicatePropEntries()
+        deduplicatePropReceipts()
         for i in 0..<accounts.count {
             accounts[i].name = Formatters.cleanAccountName(accounts[i].name, balance: accounts[i].initialBalance)
         }
@@ -118,6 +210,7 @@ extension TradeDataStore {
             for acc in accounts {
                 rebuildAccount(accountId: acc.id)
             }
+            deduplicateTrades()
         }
     }
     

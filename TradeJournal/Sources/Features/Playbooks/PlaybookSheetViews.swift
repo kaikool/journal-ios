@@ -63,7 +63,7 @@ public struct NewPlaybookSheet: View {
                     .padding(.vertical, 6)
                     .background(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? AppColors.brand.opacity(0.4) : AppColors.brand)
                     .foregroundColor(AppColors.brandTextOnDark)
-                    .clipShape(Capsule())
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             }
             .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
@@ -346,7 +346,7 @@ public struct EditPlaybookSheet: View {
                     .padding(.vertical, 6)
                     .background(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? AppColors.brand.opacity(0.4) : AppColors.brand)
                     .foregroundColor(AppColors.brandTextOnDark)
-                    .clipShape(Capsule())
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             }
             .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }

@@ -1038,7 +1038,18 @@ public final class The5ersService: ObservableObject {
                 return Int64(closedDate.timeIntervalSince(position.openedAtDate) * 1000)
             }()
             
-            if let tIdx = dataStore.trades.firstIndex(where: { $0.key == tradeKey }) {
+            let cleanAcc = journalAccId.cleanAccountId
+            let openSec = Int64(position.openedAtDate.timeIntervalSince1970)
+            let existingIdx = dataStore.trades.firstIndex(where: {
+                $0.key == tradeKey ||
+                ($0.accountId.cleanAccountId == cleanAcc &&
+                 $0.symbol.uppercased() == position.symbol.uppercased() &&
+                 $0.direction == position.direction &&
+                 abs(Int64($0.openedAt.timeIntervalSince1970) - openSec) <= 2 &&
+                 abs($0.quantity - position.quantity) < 0.001)
+            })
+            
+            if let tIdx = existingIdx {
                 var existing = dataStore.trades[tIdx]
                 existing.accountId = journalAccId
                 existing.status = status
@@ -1260,7 +1271,13 @@ public final class The5ersService: ObservableObject {
             })?.id
             let journalAccId = matchingAccId.map { $0.hasPrefix("the5ers_") ? $0 : "the5ers_\($0)" }
             
-            if !dataStore.propEntries.contains(where: { $0.id == entryId }) {
+            if let existingIdx = dataStore.propEntries.firstIndex(where: { $0.id == entryId }) {
+                var existing = dataStore.propEntries[existingIdx]
+                existing.amountMinor = amountMinor
+                existing.currency = currency
+                existing.occurredOn = dateStr
+                dataStore.propEntries[existingIdx] = existing
+            } else {
                 let entry = PropEntryItem(
                     id: entryId,
                     accountId: journalAccId,
@@ -1320,8 +1337,15 @@ public final class The5ersService: ObservableObject {
                 "contract_version": "1.0",
                 "request_context": ["timezone": "UTC", "locale": "en"]
             ]
-            if let payoutResult = try? await callMcpTool(name: "the5ers_payout", arguments: perAccArgs) {
-                let unwrapped = unwrapMcpToolResult(payoutResult)
+            let payoutResult = (try? await callMcpTool(name: "the5ers_payout", arguments: perAccArgs)) ??
+                                  (try? await callMcpTool(name: "the5ers_payout", arguments: [
+                                      "operation": "list",
+                                      "account_ref": acc.ref,
+                                      "contract_version": "1.0",
+                                      "request_context": ["timezone": "UTC", "locale": "en"]
+                                  ]))
+            if let res = payoutResult {
+                let unwrapped = unwrapMcpToolResult(res)
                 let rows = extractAnyPayoutCollection(from: unwrapped)
                 for var r in rows {
                     if r["account_ref"] == nil { r["account_ref"] = acc.ref }
@@ -1341,8 +1365,14 @@ public final class The5ersService: ObservableObject {
             "contract_version": "1.0",
             "request_context": ["timezone": "UTC", "locale": "en"]
         ]
-        if let globalResult = try? await callMcpTool(name: "the5ers_payout", arguments: globalArgs) {
-            let unwrapped = unwrapMcpToolResult(globalResult)
+        let globalResult = (try? await callMcpTool(name: "the5ers_payout", arguments: globalArgs)) ??
+                           (try? await callMcpTool(name: "the5ers_payout", arguments: [
+                               "operation": "list",
+                               "contract_version": "1.0",
+                               "request_context": ["timezone": "UTC", "locale": "en"]
+                           ]))
+        if let res = globalResult {
+            let unwrapped = unwrapMcpToolResult(res)
             let rows = extractAnyPayoutCollection(from: unwrapped)
             for r in rows {
                 let pId = String(describing: r["id"] ?? r["payout_id"] ?? r["withdrawalid"] ?? UUID().uuidString)
@@ -1359,7 +1389,7 @@ public final class The5ersService: ObservableObject {
             
             let status = String(describing: fields["status"] ?? "completed").lowercased().trimmingCharacters(in: .whitespaces)
             let isReversed = (fields["reversed"] as? Bool) == true
-            let isCompleted = ["completed", "paid", "received", "settled"].contains(status)
+            let isCompleted = ["completed", "paid", "received", "settled", "approved", "processed", "successful", "done", "transferred"].contains(status) || status.isEmpty
             
             // Extract Gross, Net, and Split information matching web source specification
             let splitPercentVal: Double? = {
@@ -1371,7 +1401,7 @@ public final class The5ersService: ObservableObject {
             }()
             
             let grossAmountVal: Double? = {
-                for k in ["grossamount", "gross_amount", "profit", "amount", "total"] {
+                for k in ["grossamount", "gross_amount", "profit", "amount", "total", "price", "value"] {
                     if let val = fields[k] {
                         if let n = val as? NSNumber, n.doubleValue > 0 { return n.doubleValue }
                         if let s = val as? String, let d = Double(s.trimmingCharacters(in: .whitespaces)), d > 0 { return d }
@@ -1381,7 +1411,7 @@ public final class The5ersService: ObservableObject {
             }()
             
             let netAmountVal: Double? = {
-                for k in ["receivedamount", "received_amount", "netamount", "net_amount", "paidamount", "paid_amount", "netpaid", "usershare", "user_share"] {
+                for k in ["receivedamount", "received_amount", "netamount", "net_amount", "paidamount", "paid_amount", "netpaid", "usershare", "user_share", "net"] {
                     if let val = fields[k] {
                         if let n = val as? NSNumber, n.doubleValue > 0 { return n.doubleValue }
                         if let s = val as? String, let d = Double(s.trimmingCharacters(in: .whitespaces)), d > 0 { return d }

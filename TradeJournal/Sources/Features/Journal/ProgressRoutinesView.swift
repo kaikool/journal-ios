@@ -69,17 +69,17 @@ public struct ProgressRoutinesView: View {
                             #endif
                             showAddRoutineSheet = true
                         } label: {
-                            HStack(spacing: 5) {
-                                Image(systemName: "plus")
-                                    .font(.system(size: 11, weight: .bold))
-                                Text("Routine")
-                                    .font(.system(size: 12, weight: .semibold))
-                            }
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 7)
-                            .background(AppColors.brandPrimary)
-                            .clipShape(Capsule())
+                                HStack(spacing: 5) {
+                                    Image(systemName: "plus")
+                                        .font(.system(size: 11, weight: .bold))
+                                    Text("New Routine")
+                                        .font(.system(size: 12, weight: .semibold))
+                                }
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 7)
+                                .background(AppColors.brandPrimary)
+                                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                         }
                     }
                     .padding(.horizontal, 14)

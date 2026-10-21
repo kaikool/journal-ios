@@ -469,47 +469,87 @@ public enum PropFirmEngine {
         let activeEntries = entries.filter { !$0.voided }
         let entryMap = Dictionary(activeEntries.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         
-        let direct: [CashMovementItem] = activeEntries
-            .filter { $0.kind != "payout" }
-            .map { e in
-                CashMovementItem(
-                    id: e.id,
-                    entryId: e.id,
-                    accountId: e.accountId,
-                    firm: e.firm,
-                    currency: e.currency,
-                    date: e.occurredOn,
-                    kind: e.kind,
-                    amountMinor: e.amountMinor,
-                    category: e.category,
-                    reference: e.reference
-                )
-            }
+        var movements: [CashMovementItem] = []
         
-        let receiptMovements: [CashMovementItem] = receipts.compactMap { r in
-            guard !r.voided else { return nil }
+        // 1. Direct expenses and fee refunds
+        for e in activeEntries where e.kind != "payout" {
+            movements.append(CashMovementItem(
+                id: e.id,
+                entryId: e.id,
+                accountId: e.accountId,
+                firm: e.firm,
+                currency: e.currency,
+                date: e.occurredOn,
+                kind: e.kind,
+                amountMinor: e.amountMinor,
+                category: e.category,
+                reference: e.reference
+            ))
+        }
+        
+        // 2. Receipt movements (actual payouts cash received)
+        var processedPayoutEntryIds = Set<String>()
+        for r in receipts where !r.voided {
             let matchedEntry = entryMap[r.payoutId] ?? activeEntries.first(where: {
                 $0.id == r.payoutId ||
                 $0.id.hasSuffix(r.payoutId) ||
                 r.payoutId.hasSuffix($0.id) ||
                 $0.id.cleanAccountId == r.payoutId.cleanAccountId
             })
-            guard let entry = matchedEntry else { return nil }
-            return CashMovementItem(
-                id: r.id,
-                entryId: entry.id,
-                accountId: entry.accountId,
-                firm: entry.firm,
-                currency: entry.currency,
-                date: receiptSettlementDate(receipt: r),
-                kind: r.kind,
-                amountMinor: r.amountMinor,
-                category: "payout",
-                reference: r.reference
-            )
+            if let entry = matchedEntry {
+                processedPayoutEntryIds.insert(entry.id)
+                movements.append(CashMovementItem(
+                    id: r.id,
+                    entryId: entry.id,
+                    accountId: entry.accountId,
+                    firm: entry.firm,
+                    currency: entry.currency,
+                    date: receiptSettlementDate(receipt: r),
+                    kind: r.kind,
+                    amountMinor: r.amountMinor,
+                    category: "payout",
+                    reference: r.reference
+                ))
+            } else {
+                movements.append(CashMovementItem(
+                    id: r.id,
+                    entryId: r.payoutId,
+                    accountId: nil,
+                    firm: "Prop Firm",
+                    currency: "USD",
+                    date: receiptSettlementDate(receipt: r),
+                    kind: r.kind,
+                    amountMinor: r.amountMinor,
+                    category: "payout",
+                    reference: r.reference
+                ))
+            }
         }
         
-        return (direct + receiptMovements).sorted {
+        // 3. Completed payouts that don't have a separate receipt record
+        let unreceiptedCompletedPayouts = activeEntries.filter {
+            ($0.kind == "payout" || $0.category.lowercased() == "payout") &&
+            $0.status == .completed &&
+            !processedPayoutEntryIds.contains($0.id) &&
+            !processedPayoutEntryIds.contains($0.id.cleanAccountId)
+        }
+        for p in unreceiptedCompletedPayouts {
+            let actualNet = expectedPayout(entry: p)
+            movements.append(CashMovementItem(
+                id: "payout_net_\(p.id)",
+                entryId: p.id,
+                accountId: p.accountId,
+                firm: p.firm,
+                currency: p.currency,
+                date: p.occurredOn,
+                kind: "receipt",
+                amountMinor: actualNet > 0 ? actualNet : p.amountMinor,
+                category: "payout",
+                reference: p.reference
+            ))
+        }
+        
+        return movements.sorted {
             let dateA = $0.date ?? ""
             let dateB = $1.date ?? ""
             if dateA != dateB {
@@ -591,8 +631,10 @@ public enum PropFirmEngine {
         return entries
             .filter { ($0.kind == "payout" || $0.category.lowercased() == "payout") && !$0.voided }
             .map { entry in
-                let actual = receivedMap[entry.id] ?? receivedMap[entry.id.cleanAccountId] ?? 0
+                let actualFromReceipts = receivedMap[entry.id] ?? receivedMap[entry.id.cleanAccountId] ?? 0
                 let expected = expectedPayout(entry: entry)
+                // If entry is marked completed but has no separate receipt object, actual received is the expected net
+                let actual = (entry.status == .completed && actualFromReceipts == 0) ? (expected > 0 ? expected : entry.amountMinor) : actualFromReceipts
                 let isOpen = entry.status == .requested || entry.status == .approved
                 let remaining = isOpen ? max(0, expected - actual) : 0
                 let variance = actual - expected

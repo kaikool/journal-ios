@@ -105,7 +105,7 @@ public enum JournalIds {
 /// Standard Trade key: "the5ers_" + sha256([sourceAccountId, positionIdentity]): "the5ers_" + sha256([sourceAccountId, positionIdentity])
 /// Ported 1:1 from `source-repo/apps/web/src/server/the5ers/journal.ts` `journalTradeRow`
     public static func the5ersTradeKey(sourceAccountId: String, positionIdentity: String) -> String {
-        return "the5ers_" + sha256Hex([sourceAccountId, positionIdentity])
+        return "the5ers_" + sha256Hex([sourceAccountId.cleanAccountId, positionIdentity])
     }
 }
 

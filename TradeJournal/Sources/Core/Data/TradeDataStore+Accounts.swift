@@ -365,17 +365,57 @@ extension TradeDataStore {
             (the5ersAccountIds.contains(trade.accountId) || trade.accountId.hasPrefix("the5ers_") || trade.tags.contains("the5ers")) && !trade.key.hasPrefix("the5ers_")
         })
 
-        var seenTradeKeys = Set<String>()
-        var cleanedTrades: [Trade] = []
-        for t in trades {
-            if !seenTradeKeys.contains(t.key) {
-                seenTradeKeys.insert(t.key)
-                cleanedTrades.append(t)
+        deduplicateExecutions()
+        deduplicateTrades()
+        deduplicatePropEntries()
+        deduplicatePropReceipts()
+    }
+    
+    /// Deduplicates propEntries by ID and semantic signature (firm, kind, currency, amount, date, account)
+    public func deduplicatePropEntries() {
+        var seenIds = Set<String>()
+        var seenSemantics = Set<String>()
+        var cleaned: [PropEntryItem] = []
+        
+        for entry in propEntries {
+            let cleanAcc = (entry.accountId ?? "").cleanAccountId
+            let semantic = "\(entry.firm)|\(entry.kind)|\(entry.currency.uppercased())|\(entry.amountMinor)|\(entry.occurredOn)|\(cleanAcc)"
+            
+            if seenIds.contains(entry.id) || seenSemantics.contains(semantic) {
+                continue
             }
+            seenIds.insert(entry.id)
+            seenSemantics.insert(semantic)
+            cleaned.append(entry)
         }
-        if cleanedTrades.count != trades.count {
-            AppLogger.info("Deduplicated trades: \(trades.count) -> \(cleanedTrades.count)")
-            self.trades = cleanedTrades
+        
+        if cleaned.count != propEntries.count {
+            AppLogger.info("Deduplicated propEntries: \(propEntries.count) -> \(cleaned.count)")
+            self.propEntries = cleaned
+        }
+    }
+    
+    /// Deduplicates propReceipts by ID and semantic payout reference
+    public func deduplicatePropReceipts() {
+        var seenIds = Set<String>()
+        var seenSemantics = Set<String>()
+        var cleaned: [PropReceiptItem] = []
+        
+        for rcpt in propReceipts {
+            let cleanPayoutId = rcpt.payoutId.cleanAccountId
+            let semantic = "\(cleanPayoutId)|\(rcpt.amountMinor)|\(rcpt.occurredOn)"
+            
+            if seenIds.contains(rcpt.id) || seenSemantics.contains(semantic) {
+                continue
+            }
+            seenIds.insert(rcpt.id)
+            seenSemantics.insert(semantic)
+            cleaned.append(rcpt)
+        }
+        
+        if cleaned.count != propReceipts.count {
+            AppLogger.info("Deduplicated propReceipts: \(propReceipts.count) -> \(cleaned.count)")
+            self.propReceipts = cleaned
         }
     }
     
