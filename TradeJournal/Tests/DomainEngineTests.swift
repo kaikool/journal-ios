@@ -62,7 +62,7 @@ final class DomainEngineTests: XCTestCase {
                 accountId: "acc-1",
                 symbol: "EURUSD",
                 side: .sell,
-                quantity: 10_000,
+                quantity: Decimal(string: "0.1")!,
                 price: Decimal(string: "1.10")!,
                 fee: 0,
                 executedAt: parseDate("2026-02-02T08:00:00Z")
@@ -72,7 +72,7 @@ final class DomainEngineTests: XCTestCase {
                 accountId: "acc-1",
                 symbol: "EURUSD",
                 side: .buy,
-                quantity: 10_000,
+                quantity: Decimal(string: "0.1")!,
                 price: Decimal(string: "1.09")!,
                 fee: 0,
                 executedAt: parseDate("2026-02-02T09:00:00Z")
@@ -242,14 +242,10 @@ final class DomainEngineTests: XCTestCase {
     }
 
     @MainActor
-    func testRebuildAccountPreservesUserAnnotations() {
-        let store = TradeDataStore.shared
+    func testRebuildAccountPreservesUserAnnotations() async {
+        let store = TradeDataStore(loadFromDisk: false)
         let accId = "acc-rebuild-test"
-        store.addAccount(name: "Rebuild Test Acc")
-        guard let account = store.accounts.first(where: { $0.name == "Rebuild Test Acc" }) else {
-            XCTFail("Account not created")
-            return
-        }
+        let account = store.addAccount(name: "Rebuild Test Acc")
         
         let fills = [
             Execution(id: "f1", accountId: account.id, symbol: "AAPL", side: .buy, quantity: 10, price: 100, fee: 1, executedAt: parseDate("2026-08-01T14:00:00Z")),
@@ -384,8 +380,8 @@ final class DomainEngineTests: XCTestCase {
     
     func testFuturesRealizedRWithMultiplier() {
         let executions = [
-            Execution(id: "1", accountId: "a", symbol: "ES", side: .buy, quantity: 2, price: 5000, assetClass: "futures", executedAt: parseDate("2026-04-01T14:00:00Z")),
-            Execution(id: "2", accountId: "a", symbol: "ES", side: .sell, quantity: 2, price: 5010, assetClass: "futures", executedAt: parseDate("2026-04-01T15:00:00Z"))
+            Execution(id: "1", accountId: "a", symbol: "ES", side: .buy, quantity: 2, price: 5000, executedAt: parseDate("2026-04-01T14:00:00Z"), assetClass: "futures"),
+            Execution(id: "2", accountId: "a", symbol: "ES", side: .sell, quantity: 2, price: 5010, executedAt: parseDate("2026-04-01T15:00:00Z"), assetClass: "futures")
         ]
         var trade = TradeReconstructionEngine.buildRoundTrips(
             executions: executions,

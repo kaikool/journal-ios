@@ -70,7 +70,7 @@ public struct CurrencyConversionSettingsView: View {
                     }
                 }
                 
-                Text("These are fixed baseline rates, not live market rates. Changing saved rates recalculates all dashboard and calendar history, including starting balances and drawdown. Original account records, trade details and reports keep their account currencies.")
+                Text("These are fixed baseline rates, not live market rates. Changing saved rates recalculates all dashboard and calendar history, including starting balances and drawdown. Balances are converted into the reporting currency and trade P&L uses the same rates: FX pairs that quote the reporting currency use the exact trade rate, all other pairs use the rates configured here.")
                     .font(AppTypography.caption)
                     .foregroundColor(AppColors.secondaryText)
                 
@@ -127,12 +127,14 @@ public struct CurrencyConversionSettingsView: View {
             }
         }
         
-        dataStore.currencyConversion = CurrencyConversion(
-            enabled: enabled,
-            reportingCurrency: reportingCurrency,
-            rates: parsed
+        // Trade P&L depends on the conversion rates, so the round trips have to be rebuilt.
+        dataStore.applyCurrencyConversion(
+            CurrencyConversion(
+                enabled: enabled,
+                reportingCurrency: reportingCurrency,
+                rates: parsed
+            )
         )
-        dataStore.saveToDisk()
-        statusMessage = "Conversion settings saved. Dashboard and calendar figures now use these settings."
+        statusMessage = "Conversion settings saved. Dashboard, calendar and trade figures now use these settings."
     }
 }

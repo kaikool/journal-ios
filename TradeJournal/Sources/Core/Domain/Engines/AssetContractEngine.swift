@@ -1,8 +1,15 @@
 import Foundation
 
-/// Unified asset contract specification and P&L engine.
-/// Standardizes contract sizes, pip values, price decimals, and P&L calculations
-/// across Gold/Metals, Forex currency pairs, Crypto, Commodities, and Indices.
+/// Unified asset contract specification and gross P&L engine.
+///
+/// The engine is responsible for three things:
+/// 1. Classifying a broker symbol into an asset category (FX, metals, crypto, index, oil, equity).
+/// 2. Deriving the contract size used to convert a price move into money.
+/// 3. Converting the resulting quote-currency P&L into the reporting currency.
+///
+/// Symbol handling is deliberately tolerant of broker suffixes (`EURUSDm`, `EURUSD.m`, `EURUSD.pro`,
+/// `EURUSD_i`, ...) because those spellings are extremely common on MT4/MT5 and would otherwise be
+/// classified as equities and priced with a contract size of 1 (a 100,000x P&L error).
 public enum AssetContractEngine {
     
     public enum AssetCategory: String, Sendable, Equatable {
@@ -18,226 +25,398 @@ public enum AssetContractEngine {
     }
     
     public struct SymbolSpec: Sendable, Equatable {
-        public let symbol: String
-        public let cleanSymbol: String
+        public let assetCategory: AssetCategory
         public let baseCurrency: String
         public let quoteCurrency: String
-        public let assetCategory: AssetCategory
-        public let contractSize: Decimal        // e.g. 100 for Gold, 100,000 for Forex, 1 for Crypto/Index
-        public let pipSize: Decimal             // 0.1 for Gold, 0.0001 for Forex, 0.01 for JPY
+        public let contractSize: Decimal
+        public let pipSize: Decimal
         public let defaultDecimals: Int         // 2 for Gold, 5 for Forex, 3 for JPY
-        public let unitLabel: String            // "oz", "units", "barrels", "coins", "shares"
-        public let pricePlaceholder: String     // "2650.00", "1.08500", "155.250"
-        public let lotDescription: String       // e.g. "1 Lot = 100 oz", "1 Lot = 100,000 units"
+        public let cleanSymbol: String
+        public let pricePlaceholder: String
+        public let lotDescription: String
         
         public init(
-            symbol: String,
-            cleanSymbol: String,
+            assetCategory: AssetCategory,
             baseCurrency: String,
             quoteCurrency: String,
-            assetCategory: AssetCategory,
             contractSize: Decimal,
             pipSize: Decimal,
             defaultDecimals: Int,
-            unitLabel: String,
+            cleanSymbol: String,
             pricePlaceholder: String,
             lotDescription: String
         ) {
-            self.symbol = symbol
-            self.cleanSymbol = cleanSymbol
+            self.assetCategory = assetCategory
             self.baseCurrency = baseCurrency
             self.quoteCurrency = quoteCurrency
-            self.assetCategory = assetCategory
             self.contractSize = contractSize
             self.pipSize = pipSize
             self.defaultDecimals = defaultDecimals
-            self.unitLabel = unitLabel
+            self.cleanSymbol = cleanSymbol
             self.pricePlaceholder = pricePlaceholder
             self.lotDescription = lotDescription
         }
+        
+        /// True when the instrument is a spot FX pair (contract size 100,000 quote units per lot).
+        public var isForex: Bool {
+            switch assetCategory {
+            case .forexMajor, .forexJpy, .forexCross:
+                return true
+            default:
+                return false
+            }
+        }
     }
     
-    // MARK: - Symbol Specification Lookup
+    /// Result of a gross P&L computation, including the currency the amount is denominated in.
+    public struct GrossPnlResult: Sendable, Equatable {
+        /// P&L expressed in the reporting currency (equal to `quoteAmount` when the conversion was impossible).
+        public let amount: Decimal
+        /// Raw P&L denominated in the instrument's quote currency.
+        public let quoteAmount: Decimal
+        public let quoteCurrency: String
+        public let reportingCurrency: String
+        /// False when no exchange rate was available and the raw quote amount had to be used as-is.
+        public let isConverted: Bool
+    }
+    
+    // MARK: - Currency Recognition
+    
+    /// Currency codes used to recognise FX pairs inside broker symbol names.
+    /// Only codes that can realistically start or end a traded FX pair are listed.
+    public static let currencyCodes: Set<String> = [
+        "USD", "EUR", "GBP", "JPY", "AUD", "NZD", "CAD", "CHF", "SEK", "NOK", "DKK",
+        "PLN", "CZK", "HUF", "TRY", "ZAR", "MXN", "SGD", "HKD", "CNH", "CNY", "INR",
+        "KRW", "THB", "ILS", "RON", "BGN", "HRK", "RUB", "UAH", "NGN", "EGP", "SAR",
+        "AED", "QAR", "MYR", "IDR", "PHP", "VND", "TWD", "ARS", "CLP", "COP", "PEN",
+        "ISK", "BRL", "CUP", "DOP", "JOD", "KWD", "BHD", "OMR", "MAD", "TND", "DZD",
+        "BBD", "BSD", "BZD", "BMD", "JMD", "TTD", "XCD", "KYD", "XPF", "LBP", "IQD",
+        "ETB", "GHS", "MUR", "MZN", "AOA", "XOF", "XAF", "BIF", "DJF", "GNF", "KMF",
+        "MGA", "RWF", "PYG", "UGX", "VUV"
+    ]
+    
+    /// Crypto base codes recognised for symbol classification.
+    public static let cryptoCodes: Set<String> = [
+        "BTC", "ETH", "SOL", "BNB", "XRP", "ADA", "DOGE", "AVAX", "LINK", "DOT",
+        "NEAR", "LTC", "TRX", "TON", "XLM", "ATOM", "FIL", "APT", "ARB", "OP",
+        "SUI", "PEPE", "SHIB", "WIF", "ORDI", "JUP", "PYTH", "INJ", "SEI", "TIA",
+        "WLD", "BLUR", "RENDER", "FET", "LDO", "DYDX", "CRV", "MKR", "COMP", "SNX",
+        "YFI", "CAKE", "XTZ", "EOS", "NEO", "WAVES", "ZEC", "DASH", "XMR", "QTUM",
+        "OMG", "KSM", "ZIL", "RVN", "ICX", "DGB", "ONT", "IOST", "NANO", "VET",
+        "ONE", "HOT", "ZRX", "ANKR", "CTSI", "OCEAN", "REEF", "STORJ", "SKL", "AUDIO",
+        "MASK", "ENS", "GMT", "IMX", "RNDR", "GRT", "1INCH", "SAND", "MANA", "GALA",
+        "AXS", "CHZ", "ENJ", "ALGO", "HBAR", "EGLD", "FTM", "KAVA", "NEO", "CELO",
+        "SUSHI", "YGG", "ALICE", "TLM", "SLP", "BADGER", "FARM",
+        "MBOX", "REQ", "GHST", "WOO", "ALPINE", "PORTO", "SANTOS", "CITY", "JUV",
+        "ASR", "ATM", "NEXO", "CKB", "REN", "ARPA", "BAND", "BEL", "CHR", "DENT",
+        "FLM", "FOR", "FRONT", "FTT", "GLM", "HNT", "ICP", "KEEP", "LINA", "LUNC",
+        "LUNA", "MED", "MFT", "MTL", "NKN", "PERP", "POND", "PUNDIX", "SUPER", "TRB",
+        "TRU", "UTK", "XVG", "YOYO", "ZEE"
+    ]
+    
+    private static let indexCodes: [String] = [
+        "US30", "DJ30", "DJI", "NAS100", "USTEC", "NDX", "NQ", "SPX500", "US500",
+        "SP500", "GER", "DAX", "ES"
+    ]
+    
+    private static let oilCodes: [String] = ["OIL", "WTI", "BRENT", "WTICO", "BCO", "XTI"]
+    
+    // MARK: - Symbol Normalisation
+    
+    /// Uppercases the symbol and removes the separators brokers use (`/`, `-`, `.`, `_`, `:`, spaces).
+    public static func cleanSymbol(_ rawSymbol: String) -> String {
+        let upper = rawSymbol.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        return upper.replacingOccurrences(of: "[/\\-\\._: ]", with: "", options: .regularExpression)
+    }
+    
+    /// Detects an FX pair inside a cleaned symbol, tolerating broker prefixes/suffixes.
+    /// Returns the first `(base, quote)` window where both halves are recognised currency codes.
+    public static func detectCurrencyPair(in clean: String) -> (base: String, quote: String)? {
+        let chars = Array(clean)
+        guard chars.count >= 6 else { return nil }
+        for index in 0...(chars.count - 6) {
+            let base = String(chars[index..<(index + 3)])
+            let quote = String(chars[(index + 3)..<(index + 6)])
+            if currencyCodes.contains(base) && currencyCodes.contains(quote) {
+                return (base, quote)
+            }
+        }
+        return nil
+    }
+    
+    /// Canonical instrument identifier used for lookups (multipliers, hashes, grouping).
+    /// `EURUSDm` and `EURUSD.pro` both resolve to `EURUSD`.
+    public static func canonicalSymbol(_ rawSymbol: String) -> String {
+        spec(for: rawSymbol).cleanSymbol
+    }
+    
+    /// Normalised key used to look up user-configured contract multipliers.
+    public static func multiplierKey(for rawSymbol: String) -> String {
+        canonicalSymbol(rawSymbol)
+    }
+    
+    /// Asset class tag derived from the symbol (used when the broker does not provide one).
+    public static func assetClass(for rawSymbol: String) -> String {
+        switch spec(for: rawSymbol).assetCategory {
+        case .forexMajor, .forexJpy, .forexCross:
+            return "forex"
+        case .crypto:
+            return "crypto"
+        case .goldAndMetals, .commodityOil, .index:
+            return "cfd"
+        case .equity, .custom:
+            return "equity"
+        }
+    }
+    
+    // MARK: - Specification
     
     public static func spec(for rawSymbol: String) -> SymbolSpec {
-        let clean = rawSymbol
-            .uppercased()
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .replacingOccurrences(of: "[/\\-\\._]", with: "", options: .regularExpression)
+        let clean = cleanSymbol(rawSymbol)
         
-        // 1. Gold & Precious Metals
-        if clean.hasPrefix("XAU") || clean == "GOLD" || clean.contains("XAU") {
+        // Metals: XAU / XAG with an optional quote currency and any broker suffix.
+        if clean.contains("XAU") || clean.hasPrefix("GOLD") {
+            return metalSpec(prefix: "XAU", clean: clean, contractSize: 100, pipSize: Decimal(string: "0.1")!, decimals: 2, placeholder: "2000.00", lot: "contract size 100 oz per lot")
+        }
+        if clean.contains("XAG") || clean.hasPrefix("SILVER") {
+            return metalSpec(prefix: "XAG", clean: clean, contractSize: 5000, pipSize: Decimal(string: "0.001")!, decimals: 3, placeholder: "25.000", lot: "contract size 5,000 oz per lot")
+        }
+        
+        // Spot FX: detected through currency codes so that broker suffixes stay harmless.
+        if let pair = detectCurrencyPair(in: clean) {
+            let canonical = pair.base + pair.quote
+            if pair.quote == "JPY" {
+                return SymbolSpec(
+                    assetCategory: .forexJpy,
+                    baseCurrency: pair.base,
+                    quoteCurrency: pair.quote,
+                    contractSize: 100_000,
+                    pipSize: Decimal(string: "0.01")!,
+                    defaultDecimals: 3,
+                    cleanSymbol: canonical,
+                    pricePlaceholder: "155.250",
+                    lotDescription: "contract size 100,000 \(pair.quote) per lot"
+                )
+            }
             return SymbolSpec(
-                symbol: rawSymbol,
-                cleanSymbol: "XAUUSD",
-                baseCurrency: "XAU",
-                quoteCurrency: "USD",
-                assetCategory: .goldAndMetals,
-                contractSize: 100, // 1 standard lot = 100 troy oz
-                pipSize: 0.1,      // 0.1 USD = 1 pip (1 giá = 1.00 USD = 10 pips)
-                defaultDecimals: 2,
-                unitLabel: "oz",
-                pricePlaceholder: "2650.00",
-                lotDescription: "1 Lot = 100 oz · 4 giá / 0.25 lot = $100"
+                assetCategory: pair.quote == "USD" ? .forexMajor : .forexCross,
+                baseCurrency: pair.base,
+                quoteCurrency: pair.quote,
+                contractSize: 100_000,
+                pipSize: Decimal(string: "0.0001")!,
+                defaultDecimals: 5,
+                cleanSymbol: canonical,
+                pricePlaceholder: "1.08000",
+                lotDescription: "contract size 100,000 \(pair.quote) per lot"
             )
         }
         
-        if clean.hasPrefix("XAG") || clean == "SILVER" || clean.contains("XAG") {
+        // Oil.
+        if oilCodes.contains(where: { clean.contains($0) }) {
             return SymbolSpec(
-                symbol: rawSymbol,
-                cleanSymbol: "XAGUSD",
-                baseCurrency: "XAG",
-                quoteCurrency: "USD",
-                assetCategory: .goldAndMetals,
-                contractSize: 5000, // 1 standard lot = 5000 troy oz
-                pipSize: 0.001,
-                defaultDecimals: 3,
-                unitLabel: "oz",
-                pricePlaceholder: "31.500",
-                lotDescription: "1 Lot = 5,000 oz"
-            )
-        }
-        
-        // 2. Oil / Energies
-        if clean.contains("OIL") || clean.contains("WTI") || clean.contains("BRENT") || clean.contains("WTICO") || clean.contains("BCO") {
-            return SymbolSpec(
-                symbol: rawSymbol,
-                cleanSymbol: "USOIL",
+                assetCategory: .commodityOil,
                 baseCurrency: "OIL",
                 quoteCurrency: "USD",
-                assetCategory: .commodityOil,
-                contractSize: 100, // 1 standard CFD lot = 100 barrels
-                pipSize: 0.01,
+                contractSize: 100,
+                pipSize: Decimal(string: "0.01")!,
                 defaultDecimals: 2,
-                unitLabel: "barrels",
-                pricePlaceholder: "72.50",
-                lotDescription: "1 Lot = 100 barrels"
+                cleanSymbol: clean,
+                pricePlaceholder: "70.00",
+                lotDescription: "contract size 100 barrels per lot"
             )
         }
         
-        // 3. Stock Indices (CFD)
-        if clean.contains("US30") || clean.contains("DJ30") || clean.contains("DJI") ||
-           clean.contains("NAS100") || clean.contains("USTEC") || clean.contains("NDX") || clean.contains("NQ") ||
-           clean.contains("SPX500") || clean.contains("US500") || clean.contains("SP500") || clean.contains("ES") ||
-           clean.contains("GER") || clean.contains("DAX") {
+        // Indices: prefix matching avoids classifying equities such as AES or WES as indices.
+        if indexCodes.contains(where: { clean.hasPrefix($0) }) {
             return SymbolSpec(
-                symbol: rawSymbol,
-                cleanSymbol: clean,
+                assetCategory: .index,
                 baseCurrency: "INDEX",
                 quoteCurrency: "USD",
-                assetCategory: .index,
-                contractSize: 1, // 1 point = $1 per 1 contract
-                pipSize: 1.0,
-                defaultDecimals: 1,
-                unitLabel: "pts",
-                pricePlaceholder: clean.contains("US30") ? "43500.0" : (clean.contains("NAS") || clean.contains("NQ") ? "20500.0" : "5800.0"),
-                lotDescription: "1 Lot = 1 contract ($1/pt)"
-            )
-        }
-        
-        // 4. Crypto Tokens
-        let cryptoPrefixes = ["BTC", "ETH", "SOL", "BNB", "XRP", "ADA", "DOGE", "AVAX", "LINK", "DOT", "NEAR", "LTC"]
-        if cryptoPrefixes.contains(where: { clean.hasPrefix($0) }) || clean.hasSuffix("USDT") {
-            return SymbolSpec(
-                symbol: rawSymbol,
-                cleanSymbol: clean,
-                baseCurrency: String(clean.prefix(3)),
-                quoteCurrency: "USD",
-                assetCategory: .crypto,
-                contractSize: 1, // 1 lot = 1 coin
-                pipSize: 0.01,
+                contractSize: 1,
+                pipSize: 1,
                 defaultDecimals: 2,
-                unitLabel: "coins",
-                pricePlaceholder: clean.hasPrefix("BTC") ? "68500.00" : (clean.hasPrefix("ETH") ? "2650.00" : "150.00"),
-                lotDescription: "1 Lot = 1 coin"
+                cleanSymbol: clean,
+                pricePlaceholder: "35000.00",
+                lotDescription: "1 contract = 1 USD per point"
             )
         }
         
-        // 5. Forex Currency Pairs (6 characters standard)
-        if clean.count == 6 {
-            let base = String(clean.prefix(3))
-            let quote = String(clean.suffix(3))
-            
-            // JPY quote pairs: 2 or 3 decimals, 1 pip = 0.01
-            if quote == "JPY" {
-                return SymbolSpec(
-                    symbol: rawSymbol,
-                    cleanSymbol: "\(base)\(quote)",
-                    baseCurrency: base,
-                    quoteCurrency: quote,
-                    assetCategory: .forexJpy,
-                    contractSize: 100_000, // 1 standard lot = 100,000 units
-                    pipSize: 0.01,         // 1 pip = 0.01 JPY
-                    defaultDecimals: 3,    // 3 fractional digits (e.g. 155.250)
-                    unitLabel: "units",
-                    pricePlaceholder: "155.250",
-                    lotDescription: "1 Lot = 100,000 \(base) · 1 pip = 0.01"
-                )
-            }
-            
-            // Major pairs quoting in USD (EURUSD, GBPUSD, AUDUSD, NZDUSD)
-            if quote == "USD" {
-                return SymbolSpec(
-                    symbol: rawSymbol,
-                    cleanSymbol: "\(base)\(quote)",
-                    baseCurrency: base,
-                    quoteCurrency: quote,
-                    assetCategory: .forexMajor,
-                    contractSize: 100_000, // 1 standard lot = 100,000 units
-                    pipSize: 0.0001,       // 1 pip = 0.0001 USD ($10 / lot)
-                    defaultDecimals: 5,    // 5 fractional digits (e.g. 1.08500)
-                    unitLabel: "units",
-                    pricePlaceholder: base == "EUR" ? "1.08500" : (base == "GBP" ? "1.29500" : "0.66500"),
-                    lotDescription: "1 Lot = 100,000 \(base) · 1 pip = $10/lot"
-                )
-            }
-            
-            // Other Forex cross pairs (USDCAD, USDCHF, EURGBP, etc.)
-            return SymbolSpec(
-                symbol: rawSymbol,
-                cleanSymbol: "\(base)\(quote)",
-                baseCurrency: base,
-                quoteCurrency: quote,
-                assetCategory: .forexCross,
-                contractSize: 100_000,
-                pipSize: 0.0001,
-                defaultDecimals: 5,
-                unitLabel: "units",
-                pricePlaceholder: "1.35000",
-                lotDescription: "1 Lot = 100,000 \(base)"
-            )
+        // Crypto.
+        if let crypto = cryptoSpec(for: clean) {
+            return crypto
         }
         
-        // 6. Equities / Stocks / Unknown Default
+        // Equity / anything else.
         return SymbolSpec(
-            symbol: rawSymbol,
-            cleanSymbol: clean,
-            baseCurrency: clean,
-            quoteCurrency: "USD",
             assetCategory: .equity,
-            contractSize: 1, // 1 share
-            pipSize: 0.01,
+            baseCurrency: String(clean.prefix(3)),
+            quoteCurrency: "USD",
+            contractSize: 1,
+            pipSize: Decimal(string: "0.01")!,
             defaultDecimals: 2,
-            unitLabel: "shares",
-            pricePlaceholder: "150.00",
-            lotDescription: "1 Lot = 1 share"
+            cleanSymbol: clean,
+            pricePlaceholder: "100.00",
+            lotDescription: "1 share per unit"
         )
     }
     
-    // MARK: - Multiplier Lookup
+    private static func metalSpec(prefix: String, clean: String, contractSize: Decimal, pipSize: Decimal, decimals: Int, placeholder: String, lot: String) -> SymbolSpec {
+        var quote = "USD"
+        let chars = Array(clean)
+        if let start = chars.firstIndex(of: Array(prefix)[0]),
+           start + 3 <= chars.count {
+            // Look for a currency code right after the metal code (XAUUSD, XAUUSDm, XAUEUR...).
+            let tail = String(chars[(start + 3)...])
+            if tail.count >= 3 {
+                let candidate = String(tail.prefix(3))
+                if currencyCodes.contains(candidate) {
+                    quote = candidate
+                }
+            }
+        }
+        return SymbolSpec(
+            assetCategory: .goldAndMetals,
+            baseCurrency: prefix,
+            quoteCurrency: quote,
+            contractSize: contractSize,
+            pipSize: pipSize,
+            defaultDecimals: decimals,
+            cleanSymbol: prefix + quote,
+            pricePlaceholder: placeholder,
+            lotDescription: lot
+        )
+    }
     
-    /// Returns standard contract multiplier for an instrument, checking custom user overrides first.
+    private static func cryptoSpec(for clean: String) -> SymbolSpec? {
+        let chars = Array(clean)
+        // Explicit crypto base code (BTCUSDT, XLMUSD, ...).
+        if chars.count >= 3 {
+            let base = String(chars.prefix(3))
+            if cryptoCodes.contains(base) {
+                let quote = chars.count >= 6 ? String(chars[3..<6]) : "USD"
+                return SymbolSpec(
+                    assetCategory: .crypto,
+                    baseCurrency: base,
+                    quoteCurrency: quote,
+                    contractSize: 1,
+                    pipSize: Decimal(string: "0.01")!,
+                    defaultDecimals: 2,
+                    cleanSymbol: clean,
+                    pricePlaceholder: "60000.00",
+                    lotDescription: "1 coin per unit"
+                )
+            }
+        }
+        // Stablecoin quoted pairs (SHIBUSDT, PEPEUSDT, ...).
+        if clean.hasSuffix("USDT") {
+            return SymbolSpec(
+                assetCategory: .crypto,
+                baseCurrency: String(clean.prefix(clean.count - 4)),
+                quoteCurrency: "USDT",
+                contractSize: 1,
+                pipSize: Decimal(string: "0.01")!,
+                defaultDecimals: 2,
+                cleanSymbol: clean,
+                pricePlaceholder: "60000.00",
+                lotDescription: "1 coin per unit"
+            )
+        }
+        return nil
+    }
+    
+    // MARK: - Contract Multiplier
+    
+    /// Contract multiplier for a symbol, honouring user-configured overrides.
     public static func contractMultiplier(for symbol: String, customMultipliers: [String: Decimal] = [:]) -> Decimal {
-        let clean = symbol.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
-        if let explicit = customMultipliers[clean], explicit > 0 {
-            return explicit
+        if let custom = customMultiplier(for: symbol, multipliers: customMultipliers) {
+            return custom
         }
         return spec(for: symbol).contractSize
     }
     
-    // MARK: - Accurate Gross P&L Calculation
+    /// User-configured contract multiplier for a symbol, or `nil` when the default applies.
+    /// Lookups use the canonical symbol so that `EURUSD` also matches `EURUSDm`.
+    public static func customMultiplier(for symbol: String, multipliers: [String: Decimal]) -> Decimal? {
+        guard !multipliers.isEmpty else { return nil }
+        let key = multiplierKey(for: symbol)
+        if let custom = multipliers[key], custom > 0 {
+            return custom
+        }
+        // Backwards compatibility with multipliers stored under the raw symbol spelling.
+        let rawKey = symbol.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        if let custom = multipliers[rawKey], custom > 0 {
+            return custom
+        }
+        return nil
+    }
     
-    /// Computes realized gross P&L in reporting currency (default USD) using standard asset contract specifications.
+    // MARK: - Gross P&L
+    
+    /// Computes the gross P&L of a position and converts it into the reporting currency.
+    ///
+    /// - Parameter entryNotional: When the entry side was matched across several lots, pass the
+    ///   matched entry notional (price x matched quantity) instead of an averaged entry price.
+    ///   The P&L is then computed as `exit * qty - entryNotional`, which avoids the rounding
+    ///   artefacts of an averaged entry price and keeps the result exact.
+    public static func calculateGrossPnlDetailed(
+        symbol: String,
+        direction: TradeDirection,
+        quantity: Decimal,
+        entryPrice: Decimal,
+        exitPrice: Decimal,
+        customMultiplier: Decimal? = nil,
+        context: CurrencyContext = .default,
+        entryNotional: Decimal? = nil
+    ) -> GrossPnlResult {
+        let spec = spec(for: symbol)
+        let reporting = context.reportingCurrency
+        let quote = spec.quoteCurrency
+        
+        guard quantity > 0, exitPrice > 0 else {
+            return GrossPnlResult(amount: 0, quoteAmount: 0, quoteCurrency: quote, reportingCurrency: reporting, isConverted: false)
+        }
+        if entryNotional == nil && entryPrice <= 0 {
+            return GrossPnlResult(amount: 0, quoteAmount: 0, quoteCurrency: quote, reportingCurrency: reporting, isConverted: false)
+        }
+        
+        let multiplier = (customMultiplier != nil && customMultiplier! > 0) ? customMultiplier! : spec.contractSize
+        let quoteAmount: Decimal
+        if let notional = entryNotional {
+            let signed = direction == .long ? (exitPrice * quantity - notional) : (notional - exitPrice * quantity)
+            quoteAmount = signed * multiplier
+        } else {
+            let priceDelta: Decimal = direction == .long ? (exitPrice - entryPrice) : (entryPrice - exitPrice)
+            quoteAmount = priceDelta * quantity * multiplier
+        }
+        
+        // 1. Quoted in the reporting currency already.
+        if quote == reporting {
+            return GrossPnlResult(amount: quoteAmount, quoteAmount: quoteAmount, quoteCurrency: quote, reportingCurrency: reporting, isConverted: true)
+        }
+        
+        // 1b. USDT is treated as a USD stablecoin (1:1) so stablecoin pairs keep their P&L.
+        if quote == "USDT" && reporting == "USD" {
+            return GrossPnlResult(amount: quoteAmount, quoteAmount: quoteAmount, quoteCurrency: quote, reportingCurrency: reporting, isConverted: true)
+        }
+        
+        // 2. FX pair whose base currency is the reporting currency: the trade price is an exact rate.
+        if spec.isForex && spec.baseCurrency == reporting && exitPrice > 0 {
+            let amount = quoteAmount / exitPrice
+            return GrossPnlResult(amount: amount, quoteAmount: quoteAmount, quoteCurrency: quote, reportingCurrency: reporting, isConverted: true)
+        }
+        
+        // 3. Configured rate table.
+        if let rate = context.rateToReporting(currency: quote) {
+            let amount = quoteAmount * rate
+            return GrossPnlResult(amount: amount, quoteAmount: quoteAmount, quoteCurrency: quote, reportingCurrency: reporting, isConverted: true)
+        }
+        
+        // 4. No rate available: keep the raw quote amount and flag it instead of silently mislabelling it.
+        AppLogger.warning("No \(quote)->\(reporting) rate configured; \(symbol) P&L of \(quoteAmount) could not be converted.")
+        return GrossPnlResult(amount: quoteAmount, quoteAmount: quoteAmount, quoteCurrency: quote, reportingCurrency: reporting, isConverted: false)
+    }
+    
+    /// Convenience wrapper returning only the converted amount.
     public static func calculateGrossPnl(
         symbol: String,
         direction: TradeDirection,
@@ -245,54 +424,46 @@ public enum AssetContractEngine {
         entryPrice: Decimal,
         exitPrice: Decimal,
         customMultiplier: Decimal? = nil,
-        conversionRates: [String: Decimal] = [:]
+        conversionRates: [String: Decimal] = [:],
+        reportingCurrency: String = "USD"
     ) -> Decimal {
-        guard quantity > 0, entryPrice > 0, exitPrice > 0 else { return 0 }
-        
-        let priceDelta = (direction == .long) ? (exitPrice - entryPrice) : (entryPrice - exitPrice)
-        let instrumentSpec = spec(for: symbol)
-        let multiplier = (customMultiplier != nil && customMultiplier! > 0) ? customMultiplier! : instrumentSpec.contractSize
-        
-        // Base gross profit in quote currency
-        let rawPnlInQuote = priceDelta * quantity * multiplier
-        
-        // Convert quote currency to USD where applicable
-        switch instrumentSpec.assetCategory {
-        case .forexJpy:
-            // JPY quote currency:
-            // For USD/JPY: profitInUSD = profitInJPY / exitPrice
-            if instrumentSpec.baseCurrency == "USD" {
-                return rawPnlInQuote / exitPrice
-            } else {
-                // Cross pair like EUR/JPY: use JPY conversion rate or 1 / USDJPY rate
-                let jpyRate = conversionRates["JPY"] ?? (Decimal(1) / exitPrice)
-                return rawPnlInQuote * jpyRate
-            }
-            
-        case .forexCross:
-            if instrumentSpec.baseCurrency == "USD" {
-                // e.g. USD/CAD, USD/CHF: profitInUSD = profitInQuote / exitPrice
-                return rawPnlInQuote / exitPrice
-            } else if instrumentSpec.quoteCurrency == "USD" {
-                // Already in USD
-                return rawPnlInQuote
-            } else {
-                // Cross pair like EUR/GBP: convert GBP to USD using rate
-                if let quoteRate = conversionRates[instrumentSpec.quoteCurrency] {
-                    return rawPnlInQuote * quoteRate
-                }
-                return rawPnlInQuote
-            }
-            
-        default:
-            // Gold (XAUUSD), Majors (EURUSD), Crypto, Indices: already quoted in USD
-            return rawPnlInQuote
-        }
+        let context = CurrencyContext(reportingCurrency: reportingCurrency, rates: conversionRates, isEnabled: true)
+        return calculateGrossPnlDetailed(
+            symbol: symbol,
+            direction: direction,
+            quantity: quantity,
+            entryPrice: entryPrice,
+            exitPrice: exitPrice,
+            customMultiplier: customMultiplier,
+            context: context
+        ).amount
+    }
+    
+    /// Convenience wrapper using an explicit conversion context.
+    public static func calculateGrossPnl(
+        symbol: String,
+        direction: TradeDirection,
+        quantity: Decimal,
+        entryPrice: Decimal,
+        exitPrice: Decimal,
+        customMultiplier: Decimal? = nil,
+        context: CurrencyContext
+    ) -> Decimal {
+        calculateGrossPnlDetailed(
+            symbol: symbol,
+            direction: direction,
+            quantity: quantity,
+            entryPrice: entryPrice,
+            exitPrice: exitPrice,
+            customMultiplier: customMultiplier,
+            context: context
+        ).amount
     }
     
     // MARK: - Pips & Points Decomposition
     
     /// Computes point and pip movement between entry and exit prices.
+    /// `points` is the raw price difference, `pips` expresses it in instrument pips.
     public static func pipDelta(
         symbol: String,
         entryPrice: Decimal,
@@ -306,7 +477,7 @@ public enum AssetContractEngine {
         return (pips: pips, points: rawDiff)
     }
     
-    /// Formats human-readable pip and point movement string (e.g. "+4.00 giá (+40.0 pips)")
+    /// Formats human-readable pip and point movement string (e.g. "+4.00 giá (+40.0 pips)").
     public static func formatDeltaText(
         symbol: String,
         entryPrice: Decimal,

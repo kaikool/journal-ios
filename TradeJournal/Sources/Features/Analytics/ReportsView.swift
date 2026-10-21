@@ -235,11 +235,17 @@ public struct ReportsView: View {
     private var trendsSection: some View {
         VStack(spacing: 14) {
             // Cumulative Net Equity Curve
+            // Balances live in the account currency while the P&L curve is expressed in the
+            // reporting currency, so balances are converted before being compared.
             let initialBalance: Decimal = {
                 if dataStore.selectedAccountId == "all" {
-                    return dataStore.visibleAccounts.reduce(Decimal.zero) { $0 + $1.initialBalance }
+                    return dataStore.visibleAccounts.reduce(Decimal.zero) { total, account in
+                        total + dataStore.currencyConversion.convertedBalance(account.initialBalance, currency: account.currency)
+                    }
                 }
-                return dataStore.selectedAccount?.initialBalance ?? 0
+                let account = dataStore.selectedAccount
+                guard let account else { return 0 }
+                return dataStore.currencyConversion.convertedBalance(account.initialBalance, currency: account.currency)
             }()
             let overview = FinancialMetricsEngine.computeOverview(trades: trades, timeZone: env.currentTimeZone, initialBalance: initialBalance)
             let dailyCurve = FinancialMetricsEngine.dailyCumulativeFromDays(days: overview.days)

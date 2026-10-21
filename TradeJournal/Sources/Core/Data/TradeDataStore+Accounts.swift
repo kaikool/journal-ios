@@ -186,7 +186,8 @@ extension TradeDataStore {
         objectWillChange.send()
     }
     
-    public func addAccount(name: String, broker: String = "", currency: String = "USD", initialBalance: Decimal = 0, profitCalcMethod: ProfitCalcMethod = .fifo) {
+    @discardableResult
+    public func addAccount(name: String, broker: String = "", currency: String = "USD", initialBalance: Decimal = 0, profitCalcMethod: ProfitCalcMethod = .fifo) -> Account {
         let newAccount = Account(
             name: name,
             broker: broker,
@@ -198,6 +199,7 @@ extension TradeDataStore {
         selectedAccountId = newAccount.id
         saveToDisk(immediate: true)
         AppLogger.info("Added account: \(name) (\(newAccount.id))")
+        return newAccount
     }
     
     public func archiveAccount(id: String, archived: Bool) {

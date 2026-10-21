@@ -8,10 +8,25 @@ public enum TradeReconstructionEngine {
     public struct Options {
         public let method: ProfitCalcMethod
         public let multipliers: [String: Decimal]
+        /// Exchange rate context used to express every monetary amount in the reporting currency.
+        public let context: CurrencyContext
+        /// Currency the broker reports commissions and swap in (usually the account currency).
+        public let accountCurrency: String
+        /// Journal defaults (used for the break-even band).
+        public let defaults: JournalDefaults
         
-        public init(method: ProfitCalcMethod = .fifo, multipliers: [String: Decimal] = [:]) {
+        public init(
+            method: ProfitCalcMethod = .fifo,
+            multipliers: [String: Decimal] = [:],
+            context: CurrencyContext = .default,
+            accountCurrency: String = "USD",
+            defaults: JournalDefaults = .empty
+        ) {
             self.method = method
             self.multipliers = multipliers
+            self.context = context
+            self.accountCurrency = accountCurrency.uppercased()
+            self.defaults = defaults
         }
     }
     
@@ -30,6 +45,8 @@ public enum TradeReconstructionEngine {
         var exitNotional: Decimal
         var grossPnl: Decimal
         var fees: Decimal
+        /// Signed swap (negative = cost, positive = credit) in the reporting currency.
+        var swap: Decimal
         var executionIds: [String]
         var exits: [ExitAttribution]
         var executionCount: Int
@@ -44,6 +61,7 @@ public enum TradeReconstructionEngine {
             self.exitNotional = 0
             self.grossPnl = 0
             self.fees = 0
+            self.swap = 0
             self.executionIds = []
             self.exits = []
             self.executionCount = 0
@@ -52,6 +70,18 @@ public enum TradeReconstructionEngine {
         var openQuantity: Decimal {
             lots.reduce(Decimal.zero) { $0 + $1.quantity }
         }
+    }
+    
+    /// Converts a broker-reported monetary amount (commission / swap) into the reporting currency.
+    private static func toReportingCurrency(_ amount: Decimal, options: Options) -> Decimal {
+        let account = options.accountCurrency
+        let reporting = options.context.reportingCurrency
+        if account == reporting { return amount }
+        guard let converted = options.context.convert(amount, from: account, to: reporting) else {
+            AppLogger.warning("No \(account)->\(reporting) rate configured; amount \(amount) kept in \(account).")
+            return amount
+        }
+        return converted
     }
     
 /// Domain specification matching core web repository
@@ -96,16 +126,17 @@ public enum TradeReconstructionEngine {
         closedAt: Date?,
         keyCollisions: inout [String: Int],
         importGroup: String?,
-        contractMultiplier: Decimal?
+        contractMultiplier: Decimal?,
+        breakevenThreshold: Decimal
     ) -> Trade {
         let openQty = cycle.openQuantity
-        let netPnl = cycle.grossPnl - cycle.fees
+        let netPnl = cycle.grossPnl - cycle.fees + cycle.swap
         let isOpen = openQty > flatEpsilon
         
         let status: TradeStatus
         if isOpen {
             status = .open
-        } else if abs(netPnl) <= flatEpsilon {
+        } else if abs(netPnl) <= max(breakevenThreshold, flatEpsilon) {
             status = .breakeven
         } else if netPnl > 0 {
             status = .win
@@ -152,6 +183,7 @@ public enum TradeReconstructionEngine {
             avgExit: avgExit,
             grossPnl: cycle.grossPnl,
             fees: cycle.fees,
+            swap: cycle.swap,
             netPnl: netPnl,
             executionCount: cycle.executionCount,
             executionIds: cycle.executionIds,
@@ -193,12 +225,15 @@ public enum TradeReconstructionEngine {
             let symbol = first.symbol
             let multiplier = AssetContractEngine.contractMultiplier(for: symbol, customMultipliers: options.multipliers)
             let assetClass = group.first(where: { $0.assetClass != nil })?.assetClass
+                ?? AssetContractEngine.assetClass(for: symbol)
+            let customMultiplier = AssetContractEngine.customMultiplier(for: symbol, multipliers: options.multipliers)
             
             var cycle: OpenCycle? = nil
             
             for execution in group {
                 var signedQty = execution.side == .buy ? execution.quantity : -execution.quantity
-                var feeRemaining = execution.fee
+                var feeRemaining = toReportingCurrency(execution.fee, options: options)
+                var swapRemaining = toReportingCurrency(execution.swap ?? 0, options: options)
                 var counted = false
                 
                 while abs(signedQty) > flatEpsilon {
@@ -227,8 +262,10 @@ public enum TradeReconstructionEngine {
                         activeCycle.lots.append(OpenLot(quantity: qty, price: execution.price))
                         activeCycle.entryQuantity += qty
                         activeCycle.entryNotional += qty * execution.price
-                        activeCycle.fees += feeRemaining
+                        activeCycle.fees += feeRemaining + defaultFeeShare(quantity: qty, reportedFee: execution.fee, options: options, accountId: accountId, symbol: symbol)
+                        activeCycle.swap += swapRemaining
                         feeRemaining = 0
+                        swapRemaining = 0
                         signedQty = 0
                     } else {
                         let openQty = activeCycle.openQuantity
@@ -237,25 +274,36 @@ public enum TradeReconstructionEngine {
                         let avgMatchedEntry = exitQty > 0 ? (matchedNotional / exitQty) : 0
                         let exitNotional = exitQty * execution.price
                         
-                        let chunkGross = AssetContractEngine.calculateGrossPnl(
+                        let chunkGross = AssetContractEngine.calculateGrossPnlDetailed(
                             symbol: symbol,
                             direction: activeCycle.direction,
                             quantity: exitQty,
                             entryPrice: avgMatchedEntry,
                             exitPrice: execution.price,
-                            customMultiplier: options.multipliers[symbol]
-                        )
+                            customMultiplier: customMultiplier,
+                            context: options.context,
+                            entryNotional: matchedNotional
+                        ).amount
                         
+                        // Fee and swap are split proportionally over the chunks of this execution.
+                        // Multiplying before dividing keeps the split exact, and the last chunk of an
+                        // execution takes the remainder so the parts always add up to the original.
                         let feeShare: Decimal
-                        if abs(signedQty) > 0 {
-                            feeShare = feeRemaining * (exitQty / abs(signedQty))
+                        let swapShare: Decimal
+                        let remainingQtyAfterChunk = abs(signedQty) - exitQty
+                        if remainingQtyAfterChunk <= flatEpsilon {
+                            feeShare = feeRemaining
+                            swapShare = swapRemaining
                         } else {
-                            feeShare = 0
+                            feeShare = (feeRemaining * exitQty) / abs(signedQty)
+                            swapShare = (swapRemaining * exitQty) / abs(signedQty)
                         }
                         
                         activeCycle.grossPnl += chunkGross
-                        activeCycle.fees += feeShare
+                        activeCycle.fees += feeShare + defaultFeeShare(quantity: exitQty, reportedFee: execution.fee, options: options, accountId: accountId, symbol: symbol)
+                        activeCycle.swap += swapShare
                         feeRemaining -= feeShare
+                        swapRemaining -= swapShare
                         activeCycle.exitQuantity += exitQty
                         activeCycle.exitNotional += exitNotional
                         activeCycle.exits.append(ExitAttribution(
@@ -280,7 +328,12 @@ public enum TradeReconstructionEngine {
                                     closedAt: execution.executedAt,
                                     keyCollisions: &keyCollisions,
                                     importGroup: nil,
-                                    contractMultiplier: multiplier != 1 ? multiplier : nil
+                                    contractMultiplier: multiplier != 1 ? multiplier : nil,
+                                    breakevenThreshold: resolveBreakevenThreshold(
+                                        for: activeCycle,
+                                        options: options,
+                                        multiplier: multiplier
+                                    )
                                 )
                             )
                             cycle = nil
@@ -290,6 +343,9 @@ public enum TradeReconstructionEngine {
                 
                 if feeRemaining != 0, let activeCycle = cycle {
                     activeCycle.fees += feeRemaining
+                }
+                if swapRemaining != 0, let activeCycle = cycle {
+                    activeCycle.swap += swapRemaining
                 }
             }
             
@@ -304,7 +360,8 @@ public enum TradeReconstructionEngine {
                         closedAt: nil,
                         keyCollisions: &keyCollisions,
                         importGroup: nil,
-                        contractMultiplier: multiplier != 1 ? multiplier : nil
+                        contractMultiplier: multiplier != 1 ? multiplier : nil,
+                        breakevenThreshold: resolveBreakevenThreshold(for: activeCycle, options: options, multiplier: multiplier)
                     )
                 )
             }
@@ -319,5 +376,34 @@ public enum TradeReconstructionEngine {
         }
         
         return trips
+    }
+    
+    /// Fee configured in the journal defaults for fills that do not carry a broker commission.
+    /// Broker reported fees always win, so the rule is only a fallback.
+    private static func defaultFeeShare(
+        quantity: Decimal,
+        reportedFee: Decimal,
+        options: Options,
+        accountId: String,
+        symbol: String
+    ) -> Decimal {
+        guard reportedFee == 0 else { return 0 }
+        return JournalDefaultsEngine.defaultFeePerUnit(
+            quantity: quantity,
+            accountId: accountId,
+            symbol: symbol,
+            defaults: options.defaults
+        )
+    }
+    
+    /// Break-even band (net P&L) configured for the journal, in the reporting currency.
+    private static func resolveBreakevenThreshold(for cycle: OpenCycle, options: Options, multiplier: Decimal) -> Decimal {
+        let avgEntry = cycle.entryQuantity > 0 ? (cycle.entryNotional / cycle.entryQuantity) : 0
+        return JournalDefaultsEngine.breakevenThreshold(
+            defaults: options.defaults,
+            entryPrice: avgEntry,
+            quantity: cycle.entryQuantity,
+            multiplier: multiplier
+        )
     }
 }

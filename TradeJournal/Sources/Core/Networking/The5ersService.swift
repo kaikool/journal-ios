@@ -1169,20 +1169,44 @@ public final class The5ersService: ObservableObject {
             let feeCost = abs(rawFee)
             let swapCost = rawSwap < 0 ? abs(rawSwap) : Decimal.zero
             let swapCredit = rawSwap > 0 ? rawSwap : Decimal.zero
-            let totalCosts = feeCost + swapCost
+            // Signed swap: negative = cost charged, positive = credit received.
+            let signedSwap = swapCredit - swapCost
             
             // The5ers MCP reports netPnl which already includes signed swap and commission.
             // Reverse costs for gross only (1:1 with source-repo/apps/web/src/server/the5ers/journal.ts lines 67-75).
-            // Invariant: grossPnl - fees + swapCredit == netPnl
-            let netPnl = isClosed ? rawNetProfit : Decimal.zero
-            let fees = totalCosts
-            let grossPnl = isClosed ? (netPnl + totalCosts - swapCredit) : Decimal.zero
+            // Invariant: grossPnl - fees + swap == netPnl
+            let accountCurrency = acc.currency.uppercased()
+            let reportingCurrency = dataStore.currencyConversion.reportingCurrency.uppercased()
+            let toReporting: (Decimal) -> Decimal = { amount in
+                if accountCurrency == reportingCurrency { return amount }
+                guard let converted = dataStore.currencyConversion.context.convert(
+                    amount,
+                    from: accountCurrency,
+                    to: reportingCurrency
+                ) else {
+                    AppLogger.warning("No \(accountCurrency)->\(reportingCurrency) rate configured; The5ers amount \(amount) kept in \(accountCurrency).")
+                    return amount
+                }
+                return converted
+            }
+            let netPnl = isClosed ? toReporting(rawNetProfit) : Decimal.zero
+            let fees = toReporting(feeCost)
+            let swap = toReporting(signedSwap)
+            let grossPnl = netPnl + fees - swap
             
+            let breakevenBand = JournalDefaultsEngine.breakevenThreshold(
+                defaults: dataStore.defaults,
+                entryPrice: position.entry,
+                quantity: position.quantity,
+                multiplier: AssetContractEngine.contractMultiplier(
+                    for: position.symbol,
+                    customMultipliers: dataStore.multipliers
+                )
+            )
             let status: TradeStatus = {
                 if !isClosed { return .open }
-                if netPnl > 0.0001 { return .win }
-                if netPnl < -0.0001 { return .loss }
-                return .breakeven
+                if abs(netPnl) <= max(breakevenBand, TradeReconstructionEngine.flatEpsilon) { return .breakeven }
+                return netPnl > 0 ? .win : .loss
             }()
             
             let durationMs: Int64? = {
@@ -1210,6 +1234,7 @@ public final class The5ersService: ObservableObject {
                 existing.avgExit = position.exit
                 existing.grossPnl = grossPnl
                 existing.fees = fees
+                existing.swap = swap
                 existing.netPnl = netPnl
                 existing.durationMs = durationMs
                 if existing.notes == nil || existing.notes?.isEmpty == true {
@@ -1232,6 +1257,7 @@ public final class The5ersService: ObservableObject {
                     avgExit: position.exit,
                     grossPnl: grossPnl,
                     fees: fees,
+                    swap: swap,
                     netPnl: netPnl,
                     executionCount: 0,
                     executionIds: [],

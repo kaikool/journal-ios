@@ -323,9 +323,11 @@ public enum Formatters {
             suffix = String(trimmed[range])
         }
         
-        var prefix = "The5ers \(platformTag)"
+        var prefix = platformTag
         if lower.hasPrefix("ftmo") {
             prefix = "FTMO \(platformTag)"
+        } else if lower.contains("the5ers") {
+            prefix = "The5ers \(platformTag)"
         }
         
         var sizePart: String? = nil

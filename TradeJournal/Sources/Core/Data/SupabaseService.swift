@@ -463,7 +463,7 @@ public final class SupabaseService {
             "broker" text DEFAULT '' NOT NULL,
             "kind" text DEFAULT 'trading' NOT NULL,
             "currency" text DEFAULT 'USD' NOT NULL,
-            "initial_balance" double precision DEFAULT 0 NOT NULL,
+            "initial_balance" numeric(38,10) DEFAULT 0 NOT NULL,
             "profit_calc_method" text DEFAULT 'fifo' NOT NULL,
             "credentials_enc" text,
             "auto_sync" boolean DEFAULT false NOT NULL,
@@ -479,9 +479,10 @@ public final class SupabaseService {
             "account_id" text NOT NULL,
             "symbol" text NOT NULL,
             "side" text NOT NULL,
-            "quantity" double precision NOT NULL,
-            "price" double precision NOT NULL,
-            "fee" double precision DEFAULT 0 NOT NULL,
+            "quantity" numeric(38,10) NOT NULL,
+            "price" numeric(38,10) NOT NULL,
+            "fee" numeric(38,10) DEFAULT 0 NOT NULL,
+            "swap" numeric(38,10) DEFAULT 0 NOT NULL,
             "executed_at" text NOT NULL,
             "asset_class" text,
             "source" text NOT NULL,
@@ -499,13 +500,14 @@ public final class SupabaseService {
             "status" text NOT NULL,
             "opened_at" text NOT NULL,
             "closed_at" text,
-            "quantity" double precision NOT NULL,
-            "open_quantity" double precision DEFAULT 0 NOT NULL,
-            "avg_entry" double precision NOT NULL,
-            "avg_exit" double precision,
-            "gross_pnl" double precision DEFAULT 0 NOT NULL,
-            "fees" double precision DEFAULT 0 NOT NULL,
-            "net_pnl" double precision DEFAULT 0 NOT NULL,
+            "quantity" numeric(38,10) NOT NULL,
+            "open_quantity" numeric(38,10) DEFAULT 0 NOT NULL,
+            "avg_entry" numeric(38,10) NOT NULL,
+            "avg_exit" numeric(38,10),
+            "gross_pnl" numeric(38,10) DEFAULT 0 NOT NULL,
+            "fees" numeric(38,10) DEFAULT 0 NOT NULL,
+            "swap" numeric(38,10) DEFAULT 0 NOT NULL,
+            "net_pnl" numeric(38,10) DEFAULT 0 NOT NULL,
             "execution_count" integer DEFAULT 0 NOT NULL,
             "execution_ids_json" text NOT NULL,
             "exits_json" text NOT NULL,
@@ -515,8 +517,8 @@ public final class SupabaseService {
             "mistakes_json" text,
             "playbook_id" text,
             "rating" integer,
-            "stop_loss" double precision,
-            "profit_target" double precision,
+            "stop_loss" numeric(38,10),
+            "profit_target" numeric(38,10),
             "reviewed_at" text
         );
 
@@ -643,17 +645,22 @@ public final class SupabaseService {
             ALTER TABLE IF EXISTS accounts ADD COLUMN IF NOT EXISTS broker text DEFAULT '' NOT NULL;
             ALTER TABLE IF EXISTS accounts ADD COLUMN IF NOT EXISTS kind text DEFAULT 'trading' NOT NULL;
             ALTER TABLE IF EXISTS accounts ADD COLUMN IF NOT EXISTS currency text DEFAULT 'USD' NOT NULL;
-            ALTER TABLE IF EXISTS accounts ADD COLUMN IF NOT EXISTS initial_balance double precision DEFAULT 0 NOT NULL;
+            ALTER TABLE IF EXISTS accounts ADD COLUMN IF NOT EXISTS initial_balance numeric(38,10) DEFAULT 0 NOT NULL;
             ALTER TABLE IF EXISTS accounts ADD COLUMN IF NOT EXISTS profit_calc_method text DEFAULT 'fifo' NOT NULL;
             ALTER TABLE IF EXISTS accounts ADD COLUMN IF NOT EXISTS auto_sync boolean DEFAULT false NOT NULL;
             ALTER TABLE IF EXISTS accounts ADD COLUMN IF NOT EXISTS last_sync_at text;
             ALTER TABLE IF EXISTS accounts ADD COLUMN IF NOT EXISTS archived_at text;
             ALTER TABLE IF EXISTS accounts ADD COLUMN IF NOT EXISTS created_at text DEFAULT '';
+            ALTER TABLE IF EXISTS accounts ALTER COLUMN initial_balance TYPE numeric(38,10) USING initial_balance::numeric;
 
             -- executions
             ALTER TABLE IF EXISTS executions ADD COLUMN IF NOT EXISTS asset_class text;
-            ALTER TABLE IF EXISTS executions ADD COLUMN IF NOT EXISTS fee double precision DEFAULT 0 NOT NULL;
+            ALTER TABLE IF EXISTS executions ADD COLUMN IF NOT EXISTS fee numeric(38,10) DEFAULT 0 NOT NULL;
+            ALTER TABLE IF EXISTS executions ADD COLUMN IF NOT EXISTS swap numeric(38,10) DEFAULT 0 NOT NULL;
             ALTER TABLE IF EXISTS executions ADD COLUMN IF NOT EXISTS import_metadata_json text;
+            ALTER TABLE IF EXISTS executions ALTER COLUMN quantity TYPE numeric(38,10) USING quantity::numeric;
+            ALTER TABLE IF EXISTS executions ALTER COLUMN price TYPE numeric(38,10) USING price::numeric;
+            ALTER TABLE IF EXISTS executions ALTER COLUMN fee TYPE numeric(38,10) USING fee::numeric;
 
             -- trades
             ALTER TABLE IF EXISTS trades ADD COLUMN IF NOT EXISTS asset_class text;
@@ -663,9 +670,19 @@ public final class SupabaseService {
             ALTER TABLE IF EXISTS trades ADD COLUMN IF NOT EXISTS mistakes_json text;
             ALTER TABLE IF EXISTS trades ADD COLUMN IF NOT EXISTS playbook_id text;
             ALTER TABLE IF EXISTS trades ADD COLUMN IF NOT EXISTS rating integer;
-            ALTER TABLE IF EXISTS trades ADD COLUMN IF NOT EXISTS stop_loss double precision;
-            ALTER TABLE IF EXISTS trades ADD COLUMN IF NOT EXISTS profit_target double precision;
+            ALTER TABLE IF EXISTS trades ADD COLUMN IF NOT EXISTS stop_loss numeric(38,10);
+            ALTER TABLE IF EXISTS trades ADD COLUMN IF NOT EXISTS profit_target numeric(38,10);
             ALTER TABLE IF EXISTS trades ADD COLUMN IF NOT EXISTS reviewed_at text;
+            ALTER TABLE IF EXISTS trades ADD COLUMN IF NOT EXISTS swap numeric(38,10) DEFAULT 0 NOT NULL;
+            ALTER TABLE IF EXISTS trades ALTER COLUMN quantity TYPE numeric(38,10) USING quantity::numeric;
+            ALTER TABLE IF EXISTS trades ALTER COLUMN open_quantity TYPE numeric(38,10) USING open_quantity::numeric;
+            ALTER TABLE IF EXISTS trades ALTER COLUMN avg_entry TYPE numeric(38,10) USING avg_entry::numeric;
+            ALTER TABLE IF EXISTS trades ALTER COLUMN avg_exit TYPE numeric(38,10) USING avg_exit::numeric;
+            ALTER TABLE IF EXISTS trades ALTER COLUMN gross_pnl TYPE numeric(38,10) USING gross_pnl::numeric;
+            ALTER TABLE IF EXISTS trades ALTER COLUMN fees TYPE numeric(38,10) USING fees::numeric;
+            ALTER TABLE IF EXISTS trades ALTER COLUMN net_pnl TYPE numeric(38,10) USING net_pnl::numeric;
+            ALTER TABLE IF EXISTS trades ALTER COLUMN stop_loss TYPE numeric(38,10) USING stop_loss::numeric;
+            ALTER TABLE IF EXISTS trades ALTER COLUMN profit_target TYPE numeric(38,10) USING profit_target::numeric;
 
             -- prop_entries
             ALTER TABLE IF EXISTS prop_entries ADD COLUMN IF NOT EXISTS category text DEFAULT '' NOT NULL;
@@ -1110,6 +1127,12 @@ public final class SupabaseService {
 
 // MARK: - PostgREST 1:1 Schema DTOs (Mapped to schema.pg.ts)
 
+/// Encodes a decimal as an exact string so that no floating point rounding happens on the way to Postgres.
+public func supabaseDecimalString(_ value: Decimal) -> String {
+    let text = NSDecimalNumber(decimal: value).stringValue
+    return text.isEmpty ? "0" : text
+}
+
 public struct AnyCodingKey: CodingKey {
     public var stringValue: String
     public var intValue: Int?
@@ -1146,6 +1169,21 @@ extension KeyedDecodingContainer where K == AnyCodingKey {
             }
             if let str = try? decode(String.self, forKey: k), let val = Double(str.trimmingCharacters(in: .whitespaces)) {
                 return val
+            }
+        }
+        return nil
+    }
+    
+    /// Decodes a monetary value without losing precision (accepts JSON numbers and numeric strings).
+    func decodeDecimal(forKeys keys: [String]) -> Decimal? {
+        for key in keys {
+            guard let k = AnyCodingKey(stringValue: key) else { continue }
+            if let val = try? decode(Decimal.self, forKey: k) {
+                return val
+            }
+            if let str = try? decode(String.self, forKey: k) {
+                let trimmed = str.trimmingCharacters(in: .whitespaces)
+                if let val = Decimal(string: trimmed) { return val }
             }
         }
         return nil
@@ -1202,13 +1240,14 @@ public struct SupabaseTradeRecord: Codable {
     public let status: String
     public let openedAt: String
     public let closedAt: String?
-    public let quantity: Double
-    public let openQuantity: Double
-    public let avgEntry: Double
-    public let avgExit: Double?
-    public let grossPnl: Double
-    public let fees: Double
-    public let netPnl: Double
+    public let quantity: Decimal
+    public let openQuantity: Decimal
+    public let avgEntry: Decimal
+    public let avgExit: Decimal?
+    public let grossPnl: Decimal
+    public let fees: Decimal
+    public let swap: Decimal
+    public let netPnl: Decimal
     public let executionCount: Int
     public let executionIdsJson: String
     public let exitsJson: String
@@ -1218,8 +1257,8 @@ public struct SupabaseTradeRecord: Codable {
     public let mistakesJson: String?
     public let playbookId: String?
     public let rating: Int?
-    public let stopLoss: Double?
-    public let profitTarget: Double?
+    public let stopLoss: Decimal?
+    public let profitTarget: Decimal?
     public let reviewedAt: String?
     
     private enum CodingKeys: String, CodingKey {
@@ -1232,6 +1271,7 @@ public struct SupabaseTradeRecord: Codable {
         case avgEntry = "avg_entry"
         case avgExit = "avg_exit"
         case grossPnl = "gross_pnl"
+        case swap = "swap"
         case netPnl = "net_pnl"
         case executionCount = "execution_count"
         case executionIdsJson = "execution_ids_json"
@@ -1256,13 +1296,14 @@ public struct SupabaseTradeRecord: Codable {
         self.status = trade.status.rawValue
         self.openedAt = fmt.string(from: trade.openedAt)
         self.closedAt = trade.closedAt.map { fmt.string(from: $0) }
-        self.quantity = (trade.quantity as NSDecimalNumber).doubleValue
-        self.openQuantity = (trade.openQuantity as NSDecimalNumber).doubleValue
-        self.avgEntry = (trade.avgEntry as NSDecimalNumber).doubleValue
-        self.avgExit = trade.avgExit.map { ($0 as NSDecimalNumber).doubleValue }
-        self.grossPnl = (trade.grossPnl as NSDecimalNumber).doubleValue
-        self.fees = (trade.fees as NSDecimalNumber).doubleValue
-        self.netPnl = (trade.netPnl as NSDecimalNumber).doubleValue
+        self.quantity = trade.quantity
+        self.openQuantity = trade.openQuantity
+        self.avgEntry = trade.avgEntry
+        self.avgExit = trade.avgExit
+        self.grossPnl = trade.grossPnl
+        self.fees = trade.fees
+        self.swap = trade.swapAmount
+        self.netPnl = trade.netPnl
         self.executionCount = trade.executionCount
         
         let enc = JSONEncoder()
@@ -1274,9 +1315,43 @@ public struct SupabaseTradeRecord: Codable {
         self.mistakesJson = (try? String(data: enc.encode(trade.mistakes), encoding: .utf8)) ?? "[]"
         self.playbookId = trade.playbookId
         self.rating = trade.rating
-        self.stopLoss = trade.stopLoss.map { ($0 as NSDecimalNumber).doubleValue }
-        self.profitTarget = trade.profitTarget.map { ($0 as NSDecimalNumber).doubleValue }
+        self.stopLoss = trade.stopLoss
+        self.profitTarget = trade.profitTarget
         self.reviewedAt = trade.reviewedAt.map { fmt.string(from: $0) }
+    }
+    
+    /// Monetary values are encoded as exact decimal strings so that Postgres stores them in `numeric`
+    /// columns without any binary floating point rounding.
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(key, forKey: .key)
+        try c.encode(accountId, forKey: .accountId)
+        try c.encode(symbol, forKey: .symbol)
+        try c.encode(assetClass, forKey: .assetClass)
+        try c.encode(direction, forKey: .direction)
+        try c.encode(status, forKey: .status)
+        try c.encode(openedAt, forKey: .openedAt)
+        try c.encode(closedAt, forKey: .closedAt)
+        try c.encode(supabaseDecimalString(quantity), forKey: .quantity)
+        try c.encode(supabaseDecimalString(openQuantity), forKey: .openQuantity)
+        try c.encode(supabaseDecimalString(avgEntry), forKey: .avgEntry)
+        try c.encode(avgExit.map { supabaseDecimalString($0) }, forKey: .avgExit)
+        try c.encode(supabaseDecimalString(grossPnl), forKey: .grossPnl)
+        try c.encode(supabaseDecimalString(fees), forKey: .fees)
+        try c.encode(supabaseDecimalString(swap), forKey: .swap)
+        try c.encode(supabaseDecimalString(netPnl), forKey: .netPnl)
+        try c.encode(executionCount, forKey: .executionCount)
+        try c.encode(executionIdsJson, forKey: .executionIdsJson)
+        try c.encode(exitsJson, forKey: .exitsJson)
+        try c.encode(durationMs, forKey: .durationMs)
+        try c.encode(notes, forKey: .notes)
+        try c.encode(tagsJson, forKey: .tagsJson)
+        try c.encode(mistakesJson, forKey: .mistakesJson)
+        try c.encode(playbookId, forKey: .playbookId)
+        try c.encode(rating, forKey: .rating)
+        try c.encode(stopLoss.map { supabaseDecimalString($0) }, forKey: .stopLoss)
+        try c.encode(profitTarget.map { supabaseDecimalString($0) }, forKey: .profitTarget)
+        try c.encode(reviewedAt, forKey: .reviewedAt)
     }
     
     public init(from decoder: Decoder) throws {
@@ -1289,13 +1364,14 @@ public struct SupabaseTradeRecord: Codable {
         self.status = c.decodeString(forKeys: ["status"]) ?? "open"
         self.openedAt = c.decodeString(forKeys: ["opened_at", "openedAt", "open_date", "opendate", "open_time", "opentime"]) ?? JournalIds.nowIso()
         self.closedAt = c.decodeString(forKeys: ["closed_at", "closedAt", "close_date", "closedate", "close_time", "closetime"])
-        self.quantity = c.decodeDouble(forKeys: ["quantity", "open_quantity", "size", "lots", "volume"]) ?? 0
-        self.openQuantity = c.decodeDouble(forKeys: ["open_quantity", "openQuantity"]) ?? 0
-        self.avgEntry = c.decodeDouble(forKeys: ["avg_entry", "avgEntry", "open_price", "entry_price", "entry"]) ?? 0
-        self.avgExit = c.decodeDouble(forKeys: ["avg_exit", "avgExit", "close_price", "exit_price", "exit"])
-        self.grossPnl = c.decodeDouble(forKeys: ["gross_pnl", "grossPnl", "gross"]) ?? 0
-        self.fees = c.decodeDouble(forKeys: ["fees", "fee", "commission"]) ?? 0
-        self.netPnl = c.decodeDouble(forKeys: ["net_pnl", "netPnl", "profit", "pnl"]) ?? 0
+        self.quantity = c.decodeDecimal(forKeys: ["quantity", "open_quantity", "size", "lots", "volume"]) ?? 0
+        self.openQuantity = c.decodeDecimal(forKeys: ["open_quantity", "openQuantity"]) ?? 0
+        self.avgEntry = c.decodeDecimal(forKeys: ["avg_entry", "avgEntry", "open_price", "entry_price", "entry"]) ?? 0
+        self.avgExit = c.decodeDecimal(forKeys: ["avg_exit", "avgExit", "close_price", "exit_price", "exit"])
+        self.grossPnl = c.decodeDecimal(forKeys: ["gross_pnl", "grossPnl", "gross"]) ?? 0
+        self.fees = c.decodeDecimal(forKeys: ["fees", "fee", "commission"]) ?? 0
+        self.swap = c.decodeDecimal(forKeys: ["swap"]) ?? 0
+        self.netPnl = c.decodeDecimal(forKeys: ["net_pnl", "netPnl", "profit", "pnl"]) ?? 0
         self.executionCount = c.decodeInt(forKeys: ["execution_count", "executionCount"]) ?? 0
         
         // JSON string or native array of execution IDs
@@ -1337,8 +1413,8 @@ public struct SupabaseTradeRecord: Codable {
         
         self.playbookId = c.decodeString(forKeys: ["playbook_id", "playbookId"])
         self.rating = c.decodeInt(forKeys: ["rating"])
-        self.stopLoss = c.decodeDouble(forKeys: ["stop_loss", "stopLoss"])
-        self.profitTarget = c.decodeDouble(forKeys: ["profit_target", "profitTarget"])
+        self.stopLoss = c.decodeDecimal(forKeys: ["stop_loss", "stopLoss"])
+        self.profitTarget = c.decodeDecimal(forKeys: ["profit_target", "profitTarget"])
         self.reviewedAt = c.decodeString(forKeys: ["reviewed_at", "reviewedAt"])
     }
     
@@ -1361,13 +1437,14 @@ public struct SupabaseTradeRecord: Codable {
             status: TradeStatus(rawValue: status) ?? .open,
             openedAt: parsedOpenedAt,
             closedAt: parsedClosedAt,
-            quantity: Decimal(quantity),
-            openQuantity: Decimal(openQuantity),
-            avgEntry: Decimal(avgEntry),
-            avgExit: avgExit.map { Decimal($0) },
-            grossPnl: Decimal(grossPnl),
-            fees: Decimal(fees),
-            netPnl: Decimal(netPnl),
+            quantity: quantity,
+            openQuantity: openQuantity,
+            avgEntry: avgEntry,
+            avgExit: avgExit,
+            grossPnl: grossPnl,
+            fees: fees,
+            swap: swap,
+            netPnl: netPnl,
             executionCount: executionCount,
             executionIds: parsedExecIds,
             exits: parsedExits,
@@ -1377,8 +1454,8 @@ public struct SupabaseTradeRecord: Codable {
             mistakes: parsedMistakes,
             playbookId: playbookId,
             rating: rating,
-            stopLoss: stopLoss.map { Decimal($0) },
-            profitTarget: profitTarget.map { Decimal($0) },
+            stopLoss: stopLoss,
+            profitTarget: profitTarget,
             reviewedAt: parsedReviewedAt
         )
     }
@@ -1389,9 +1466,10 @@ public struct SupabaseExecutionRecord: Codable {
     public let accountId: String
     public let symbol: String
     public let side: String
-    public let quantity: Double
-    public let price: Double
-    public let fee: Double
+    public let quantity: Decimal
+    public let price: Decimal
+    public let fee: Decimal
+    public let swap: Decimal
     public let executedAt: String
     public let assetClass: String?
     public let source: String
@@ -1402,6 +1480,7 @@ public struct SupabaseExecutionRecord: Codable {
     private enum CodingKeys: String, CodingKey {
         case id, symbol, side, quantity, price, fee, source
         case accountId = "account_id"
+        case swap = "swap"
         case executedAt = "executed_at"
         case assetClass = "asset_class"
         case importMetadataJson = "import_metadata_json"
@@ -1415,9 +1494,10 @@ public struct SupabaseExecutionRecord: Codable {
         self.accountId = execution.accountId
         self.symbol = execution.symbol
         self.side = execution.side.rawValue
-        self.quantity = (execution.quantity as NSDecimalNumber).doubleValue
-        self.price = (execution.price as NSDecimalNumber).doubleValue
-        self.fee = (execution.fee as NSDecimalNumber).doubleValue
+        self.quantity = execution.quantity
+        self.price = execution.price
+        self.fee = execution.fee
+        self.swap = execution.swap ?? 0
         self.executedAt = fmt.string(from: execution.executedAt)
         self.assetClass = execution.assetClass
         self.source = execution.source
@@ -1426,15 +1506,35 @@ public struct SupabaseExecutionRecord: Codable {
         self.createdAt = fmt.string(from: execution.executedAt)
     }
     
+    /// Monetary values are encoded as exact decimal strings (see `SupabaseTradeRecord.encode`).
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(accountId, forKey: .accountId)
+        try c.encode(symbol, forKey: .symbol)
+        try c.encode(side, forKey: .side)
+        try c.encode(supabaseDecimalString(quantity), forKey: .quantity)
+        try c.encode(supabaseDecimalString(price), forKey: .price)
+        try c.encode(supabaseDecimalString(fee), forKey: .fee)
+        try c.encode(supabaseDecimalString(swap), forKey: .swap)
+        try c.encode(executedAt, forKey: .executedAt)
+        try c.encode(assetClass, forKey: .assetClass)
+        try c.encode(source, forKey: .source)
+        try c.encode(importMetadataJson, forKey: .importMetadataJson)
+        try c.encode(contentHash, forKey: .contentHash)
+        try c.encode(createdAt, forKey: .createdAt)
+    }
+    
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: AnyCodingKey.self)
         self.id = c.decodeString(forKeys: ["id"]) ?? UUID().uuidString
         self.accountId = c.decodeString(forKeys: ["account_id", "accountId", "account"]) ?? ""
         self.symbol = c.decodeString(forKeys: ["symbol"]) ?? "UNKNOWN"
         self.side = c.decodeString(forKeys: ["side", "direction"]) ?? "buy"
-        self.quantity = c.decodeDouble(forKeys: ["quantity", "size", "lots", "volume"]) ?? 0
-        self.price = c.decodeDouble(forKeys: ["price", "entry"]) ?? 0
-        self.fee = c.decodeDouble(forKeys: ["fee", "commission", "fees"]) ?? 0
+        self.quantity = c.decodeDecimal(forKeys: ["quantity", "size", "lots", "volume"]) ?? 0
+        self.price = c.decodeDecimal(forKeys: ["price", "entry"]) ?? 0
+        self.fee = c.decodeDecimal(forKeys: ["fee", "commission", "fees"]) ?? 0
+        self.swap = c.decodeDecimal(forKeys: ["swap"]) ?? 0
         self.executedAt = c.decodeString(forKeys: ["executed_at", "executedAt", "timestamp", "date"]) ?? JournalIds.nowIso()
         self.assetClass = c.decodeString(forKeys: ["asset_class", "assetClass"])
         self.source = c.decodeString(forKeys: ["source"]) ?? "manual"
@@ -1450,9 +1550,10 @@ public struct SupabaseExecutionRecord: Codable {
             accountId: accountId,
             symbol: symbol,
             side: ExecutionSide(rawValue: side) ?? .buy,
-            quantity: Decimal(quantity),
-            price: Decimal(price),
-            fee: Decimal(fee),
+            quantity: quantity,
+            price: price,
+            fee: fee,
+            swap: swap,
             executedAt: parsedDate,
             assetClass: assetClass,
             source: source,
@@ -1553,7 +1654,7 @@ public struct SupabaseAccountRecord: Codable {
     public let broker: String
     public let kind: String
     public let currency: String
-    public let initialBalance: Double
+    public let initialBalance: Decimal
     public let profitCalcMethod: String
     public let autoSync: Bool
     public let lastSyncAt: String?
@@ -1577,12 +1678,28 @@ public struct SupabaseAccountRecord: Codable {
         self.broker = account.broker
         self.kind = account.kind.rawValue
         self.currency = account.currency
-        self.initialBalance = (account.initialBalance as NSDecimalNumber).doubleValue
+        self.initialBalance = account.initialBalance
         self.profitCalcMethod = account.profitCalcMethod.rawValue
         self.autoSync = account.autoSync
         self.lastSyncAt = account.lastSyncAt.map { fmt.string(from: $0) }
         self.archivedAt = account.archivedAt.map { fmt.string(from: $0) }
         self.createdAt = fmt.string(from: account.createdAt)
+    }
+    
+    /// Balances are encoded as exact decimal strings (see `SupabaseTradeRecord.encode`).
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(name, forKey: .name)
+        try c.encode(broker, forKey: .broker)
+        try c.encode(kind, forKey: .kind)
+        try c.encode(currency, forKey: .currency)
+        try c.encode(supabaseDecimalString(initialBalance), forKey: .initialBalance)
+        try c.encode(profitCalcMethod, forKey: .profitCalcMethod)
+        try c.encode(autoSync, forKey: .autoSync)
+        try c.encode(lastSyncAt, forKey: .lastSyncAt)
+        try c.encode(archivedAt, forKey: .archivedAt)
+        try c.encode(createdAt, forKey: .createdAt)
     }
     
     public init(from decoder: Decoder) throws {
@@ -1592,7 +1709,7 @@ public struct SupabaseAccountRecord: Codable {
         self.broker = c.decodeString(forKeys: ["broker"]) ?? ""
         self.kind = c.decodeString(forKeys: ["kind", "type"]) ?? "trading"
         self.currency = c.decodeString(forKeys: ["currency"]) ?? "USD"
-        self.initialBalance = c.decodeDouble(forKeys: ["initial_balance", "initialBalance", "balance", "starting_balance", "startingBalance"]) ?? 0
+        self.initialBalance = c.decodeDecimal(forKeys: ["initial_balance", "initialBalance", "balance", "starting_balance", "startingBalance"]) ?? 0
         self.profitCalcMethod = c.decodeString(forKeys: ["profit_calc_method", "profitCalcMethod"]) ?? "fifo"
         self.autoSync = c.decodeBool(forKeys: ["auto_sync", "autoSync"]) ?? false
         self.lastSyncAt = c.decodeString(forKeys: ["last_sync_at", "lastSyncAt"])
@@ -1611,7 +1728,7 @@ public struct SupabaseAccountRecord: Codable {
             broker: broker,
             kind: AccountKind(rawValue: kind) ?? .manual,
             currency: currency,
-            initialBalance: Decimal(initialBalance),
+            initialBalance: initialBalance,
             profitCalcMethod: ProfitCalcMethod(rawValue: profitCalcMethod) ?? .fifo,
             autoSync: autoSync,
             lastSyncAt: parsedLastSync,

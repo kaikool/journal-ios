@@ -15,13 +15,15 @@ final class AnalysisTests: XCTestCase {
         return ISO8601DateFormatter().date(from: iso)!
     }
     
-    private func createSampleTrade() -> Trade {
+    private func createSampleTrade(direction: TradeDirection = .long) -> Trade {
+        let entrySide: ExecutionSide = direction == .long ? .buy : .sell
+        let exitSide: ExecutionSide = direction == .long ? .sell : .buy
         let executions = [
             Execution(
                 id: "e1",
                 accountId: "acct-1",
                 symbol: "ES",
-                side: .buy,
+                side: entrySide,
                 quantity: 2,
                 price: 5000,
                 fee: 0,
@@ -32,7 +34,7 @@ final class AnalysisTests: XCTestCase {
                 id: "e2",
                 accountId: "acct-1",
                 symbol: "ES",
-                side: .sell,
+                side: exitSide,
                 quantity: 2,
                 price: 5010,
                 fee: 0,
@@ -74,8 +76,7 @@ final class AnalysisTests: XCTestCase {
     }
     
     func testShortRiskAndRewardDirection() {
-        var t = createSampleTrade()
-        t.direction = .short
+        var t = createSampleTrade(direction: .short)
         t.stopLoss = 5005
         t.profitTarget = 4985
         t.netPnl = 1000 // In the JS test, gross profit for short when price falls

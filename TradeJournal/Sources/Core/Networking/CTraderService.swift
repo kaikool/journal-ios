@@ -790,9 +790,12 @@ public final class CTraderService: ObservableObject {
                 // Forex: 1 lot = 100,000 units = 10,000,000 cents.
                 // Metals (Gold/Silver): 1 lot = 100 oz = 1,000,000 cents.
                 // Indices / CFDs / Crypto: 1 contract = 1 unit = 100 cents.
-                let isMetals = symbolName.contains("XAU") || symbolName.contains("XAG")
-                let isForex = symbolName.count == 6 && !symbolName.contains("BTC") && !symbolName.contains("ETH")
-                let isCrypto = symbolName.contains("BTC") || symbolName.contains("ETH") || symbolName.contains("SOL")
+                // Symbol classification goes through AssetContractEngine so that broker suffixes
+                // (EURUSDm, EURUSD.pro, ...) do not turn a FX pair into a "1 unit per contract" CFD.
+                let spec = AssetContractEngine.spec(for: symbolName)
+                let isMetals = spec.assetCategory == .goldAndMetals
+                let isForex = spec.isForex
+                let isCrypto = spec.assetCategory == .crypto
                 
                 let lotDivisor: Decimal
                 if isMetals {
@@ -809,9 +812,15 @@ public final class CTraderService: ObservableObject {
                 let commRaw = safeDouble(raw["commission"]) ?? 0.0
                 let fee = Decimal(abs(commRaw) / moneyDivisor)
                 
+                // Swap / overnight interest: negative = cost charged, positive = credit received.
+                // cTrader reports it on the closing deal (closePositionDetail) and on the position.
+                let closeDetail = raw["closePositionDetail"] as? [String: Any]
+                let swapRaw = safeDouble(closeDetail?["swap"]) ?? safeDouble(raw["swap"]) ?? 0.0
+                let swap: Decimal? = swapRaw != 0 ? Decimal(swapRaw / moneyDivisor) : nil
+                
                 let execDate = Date(timeIntervalSince1970: Double(execTimestamp) / 1000.0)
                 let fillId = "ctrader_deal_\(dealId)"
-                let hash = "\(journalAccId)|\(symbolName)|\(side.rawValue)|\(quantity)|\(priceRaw)|\(execTimestamp)"
+                let hash = "\(journalAccId)|\(spec.cleanSymbol)|\(side.rawValue)|\(quantity)|\(priceRaw)|\(execTimestamp)"
                 
                 let assetClass = isForex ? "forex" : (isMetals ? "commodity" : (isCrypto ? "crypto" : "index"))
                 
@@ -823,6 +832,7 @@ public final class CTraderService: ObservableObject {
                     quantity: quantity,
                     price: Decimal(priceRaw),
                     fee: fee,
+                    swap: swap,
                     executedAt: execDate,
                     assetClass: assetClass,
                     source: "ctrader",

@@ -30,7 +30,7 @@ final class FoundationTests: XCTestCase {
     }
     
     func testPercentageFormatting() {
-        XCTAssertEqual(Formatters.percentage(0.542), "54.2%")
+        XCTAssertEqual(Formatters.percentage(0.542), "54.20%")
         XCTAssertEqual(Formatters.percentage(nil), "n/a")
     }
     
@@ -83,10 +83,10 @@ final class FoundationTests: XCTestCase {
     
     func testCleanAccountName() {
         let raw1 = "meta-trader-5 · …7657"
-        XCTAssertEqual(Formatters.cleanAccountName(raw1), "MT5 7657")
+        XCTAssertEqual(Formatters.cleanAccountName(raw1), "MT5 · #7657")
         
         let raw2 = "Meta-Trade-4-......1234"
-        XCTAssertEqual(Formatters.cleanAccountName(raw2), "MT4 1234")
+        XCTAssertEqual(Formatters.cleanAccountName(raw2), "MT4 · #1234")
         
         let customName = "My Swing Trading Account"
         XCTAssertEqual(Formatters.cleanAccountName(customName), customName)

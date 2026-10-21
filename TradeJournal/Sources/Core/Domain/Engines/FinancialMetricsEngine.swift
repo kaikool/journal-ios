@@ -35,11 +35,13 @@ public struct TradeMetrics: Equatable {
 }
 
 extension TradeMetrics {
+    /// Gross profit of the winning trades (net of fees and swap, so it matches the profit factor).
     public var profit: Decimal {
-        grossPnl.map { max(0, $0) } ?? (netPnl > 0 ? netPnl : 0)
+        netPnl > 0 ? netPnl : 0
     }
+    /// Gross loss of the losing trades (net of fees and swap, so it matches the profit factor).
     public var loss: Decimal {
-        grossPnl.map { max(0, -$0) } ?? (netPnl < 0 ? abs(netPnl) : 0)
+        netPnl < 0 ? abs(netPnl) : 0
     }
     public var winningTrades: Int { wins }
     public var losingTrades: Int { losses }
@@ -229,8 +231,10 @@ public enum FinancialMetricsEngine {
             for exit in trade.exits {
                 guard let execTime = executionTimes[exit.executionId],
                       dateFormatter.string(from: execTime) == date else { continue }
-                let feeShare = totalExitQty > 0 ? trade.fees * (exit.quantity / totalExitQty) : 0
-                events.append((execTime, isoFormatter.string(from: execTime), exit.grossPnl - feeShare))
+                let share = totalExitQty > 0 ? (exit.quantity / totalExitQty) : 0
+                let feeShare = trade.fees * share
+                let swapShare = trade.swapAmount * share
+                events.append((execTime, isoFormatter.string(from: execTime), exit.grossPnl - feeShare + swapShare))
             }
         }
 

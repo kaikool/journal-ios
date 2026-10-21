@@ -21,10 +21,10 @@ public enum JournalIds {
     
     public static func toPrecision12(_ value: Decimal) -> String {
         let d = NSDecimalNumber(decimal: value).doubleValue
-        return toPrecision12(d)
+        return toPrecision12Double(d)
     }
     
-    public static func toPrecision12(_ d: Double) -> String {
+    private static func toPrecision12Double(_ d: Double) -> String {
         if d == 0 { return "0.00000000000" }
         let sign = d < 0 ? "-" : ""
         let absD = abs(d)

@@ -91,9 +91,17 @@ public final class TradeDataStore: ObservableObject {
         return paths[0].appendingPathComponent("trade_journal_store_v1.json.bak")
     }
     
-    public init(loadSynchronously: Bool = false) {
+    /// Creates a store instance.
+    /// - Parameters:
+    ///   - loadFromDisk: When false the store starts empty and never touches the persistence
+    ///     layer. Used by tests that need an isolated store.
+    ///   - loadSynchronously: When true the persisted state is loaded synchronously instead of
+    ///     hydrating in the background.
+    public init(loadFromDisk: Bool = true, loadSynchronously: Bool = false) {
         self.folders = NotebookEngine.defaultSystemFolders
-        if loadSynchronously {
+        if !loadFromDisk {
+            isLoaded = true
+        } else if loadSynchronously {
             loadFromDiskSync()
         } else {
             loadFromDiskAsync()

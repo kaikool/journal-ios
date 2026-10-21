@@ -12,6 +12,9 @@ public struct Execution: Identifiable, Codable, Equatable, Hashable, Sendable {
     public let quantity: Decimal
     public let price: Decimal
     public let fee: Decimal
+    /// Signed swap / overnight interest booked by the broker on this fill.
+    /// Negative = cost charged, positive = credit received. `nil` for brokers that do not report it.
+    public let swap: Decimal?
     public let executedAt: Date
     public let assetClass: AssetClass?
     public let source: ExecutionSource
@@ -26,6 +29,7 @@ public struct Execution: Identifiable, Codable, Equatable, Hashable, Sendable {
         quantity: Decimal,
         price: Decimal,
         fee: Decimal = 0,
+        swap: Decimal? = nil,
         executedAt: Date,
         assetClass: AssetClass? = nil,
         source: ExecutionSource = "manual",
@@ -39,6 +43,7 @@ public struct Execution: Identifiable, Codable, Equatable, Hashable, Sendable {
         self.quantity = quantity
         self.price = price
         self.fee = fee
+        self.swap = swap
         self.executedAt = executedAt
         self.assetClass = assetClass
         self.source = source
@@ -108,6 +113,10 @@ public struct Trade: Identifiable, Codable, Equatable, Hashable {
     public var avgExit: Decimal?
     public var grossPnl: Decimal
     public var fees: Decimal
+    /// Signed swap / overnight interest booked on the trade.
+    /// Negative = cost charged, positive = credit received.
+    /// Invariant: `netPnl == grossPnl - fees + swapAmount`.
+    public var swap: Decimal?
     public var netPnl: Decimal
     public let executionCount: Int
     public let executionIds: [String]
@@ -143,6 +152,7 @@ public struct Trade: Identifiable, Codable, Equatable, Hashable {
         avgExit: Decimal? = nil,
         grossPnl: Decimal,
         fees: Decimal,
+        swap: Decimal? = nil,
         netPnl: Decimal,
         executionCount: Int,
         executionIds: [String],
@@ -172,6 +182,7 @@ public struct Trade: Identifiable, Codable, Equatable, Hashable {
         self.avgExit = avgExit
         self.grossPnl = grossPnl
         self.fees = fees
+        self.swap = swap
         self.netPnl = netPnl
         self.executionCount = executionCount
         self.executionIds = executionIds
@@ -200,6 +211,12 @@ public struct Trade: Identifiable, Codable, Equatable, Hashable {
             reviewedAt: reviewedAt
         )
     }
+    
+    /// Signed swap amount (negative = cost, positive = credit). `0` when the broker reports no swap.
+    public var swapAmount: Decimal { swap ?? 0 }
+    
+    /// Total trading costs deducted from gross P&L (commission plus swap cost).
+    public var totalCosts: Decimal { fees + max(0, -swapAmount) }
 }
 
 public struct TradeAnnotations: Codable, Equatable, Sendable {

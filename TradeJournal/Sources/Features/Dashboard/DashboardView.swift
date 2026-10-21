@@ -136,11 +136,17 @@ public struct DashboardView: View {
     }
     
     private func computeSnapshot() -> DashboardSnapshot {
+        // Balances are stored in the account currency while every P&L figure is expressed in the
+        // reporting currency, so balances are converted before being compared with the P&L curve.
         let initialBalance: Decimal = {
             if dataStore.selectedAccountId == "all" {
-                return dataStore.visibleAccounts.reduce(Decimal.zero) { $0 + $1.initialBalance }
+                return dataStore.visibleAccounts.reduce(Decimal.zero) { total, account in
+                    total + dataStore.currencyConversion.convertedBalance(account.initialBalance, currency: account.currency)
+                }
             }
-            return dataStore.selectedAccount?.initialBalance ?? 0
+            let account = dataStore.selectedAccount
+            guard let account else { return 0 }
+            return dataStore.currencyConversion.convertedBalance(account.initialBalance, currency: account.currency)
         }()
         
         let overview = FinancialMetricsEngine.computeOverview(
@@ -225,15 +231,17 @@ public struct DashboardView: View {
         dataStore.selectedAccountId == "all" && dataStore.availableCurrencies.count > 1
     }
     
-    private var currencyGroups: [(currency: String, metrics: TradeMetrics)] {
+    private var currencyGroups: [(currency: String, metrics: TradeMetrics, balance: Decimal)] {
         let visibleAccs = dataStore.visibleAccounts
         let currencies = Array(Set(visibleAccs.map { $0.currency.uppercased() })).sorted()
         return currencies.map { curr in
             let accIds = Set(visibleAccs.filter { $0.currency.uppercased() == curr }.map { $0.id })
             let tradesForCurr = scopedTrades.filter { accIds.contains($0.accountId) || accIds.contains("the5ers_\($0.accountId)") }
-            let initBal = visibleAccs.filter { $0.currency.uppercased() == curr }.reduce(Decimal.zero) { $0 + $1.initialBalance }
+            let initBal = visibleAccs.filter { $0.currency.uppercased() == curr }.reduce(Decimal.zero) { total, account in
+                total + dataStore.currencyConversion.convertedBalance(account.initialBalance, currency: account.currency)
+            }
             let ov = FinancialMetricsEngine.computeOverview(trades: tradesForCurr, timeZone: env.currentTimeZone, initialBalance: initBal)
-            return (curr, ov.metrics)
+            return (curr, ov.metrics, initBal)
         }
     }
     
@@ -606,7 +614,7 @@ public struct DashboardView: View {
                         .font(AppTypography.captionBold)
                         .foregroundColor(AppColors.primaryText)
                     
-                    Text("These accounts use \(dataStore.availableCurrencies.joined(separator: ", ")). Set your conversion rates under Settings to combine their performance. Amounts below remain in their original currencies.")
+                    Text("These accounts use \(dataStore.availableCurrencies.joined(separator: ", ")). Balances are converted to \(dataStore.currencyConversion.reportingCurrency) with the rates configured under Settings; every P&L figure below is already expressed in \(dataStore.currencyConversion.reportingCurrency).")
                         .font(AppTypography.caption)
                         .foregroundColor(AppColors.secondaryText)
                 }
@@ -649,13 +657,17 @@ public struct DashboardView: View {
                                 .tracking(0.5)
                             
                             AppMonetaryText(
-                                Formatters.formatPnL(group.metrics.netPnl, currency: group.currency),
+                                Formatters.formatPnL(group.metrics.netPnl, currency: dataStore.currencyConversion.reportingCurrency),
                                 isPrivate: env.isPrivacyModeEnabled,
                                 font: AppTypography.financialNumber(size: 20, weight: .bold),
                                 color: group.metrics.netPnl >= 0 ? AppColors.profit : AppColors.loss
                             )
                             
                             Text("\(group.metrics.closedTrades) closed · \(group.metrics.winRate.map { String(format: "%.0f%%", $0 * 100) } ?? "–") win")
+                                .font(AppTypography.caption)
+                                .foregroundColor(AppColors.secondaryText)
+                            
+                            Text("Balance \(Formatters.formatCurrency(group.balance, currency: dataStore.currencyConversion.reportingCurrency))")
                                 .font(AppTypography.caption)
                                 .foregroundColor(AppColors.secondaryText)
                         }

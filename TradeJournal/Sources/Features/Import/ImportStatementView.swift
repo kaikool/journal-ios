@@ -89,7 +89,7 @@ public struct ImportStatementView: View {
                                     Text("Choose trade statement (.csv)")
                                         .font(AppTypography.headline)
                                         .foregroundColor(AppColors.primaryText)
-                                    Text("Standard columns: Symbol, Side (Buy/Sell), Quantity, Price, Fee, Executed Date")
+                                    Text("Standard columns: Symbol, Side (Buy/Sell), Quantity, Price, Fee, Date. MetaTrader 4/5 statements (Open Time, Volume, Commission, Swap) and cTrader / TradingView exports are detected automatically.")
                                         .font(AppTypography.caption)
                                         .foregroundColor(AppColors.secondaryText)
                                         .multilineTextAlignment(.center)
@@ -342,11 +342,17 @@ public struct ImportStatementView: View {
     
     private func generatePreview(_ content: String) {
         isImportSuccess = false
+        // Timestamps without an explicit offset are interpreted in the configured import timezone so
+        // that the content hash (and therefore the duplicate detection) does not depend on the device
+        // timezone. The device timezone is still checked to catch statements imported by older builds.
+        let importTimeZone = TimeZone(identifier: dataStore.generalSettings.defaultImportTimeZone)
+            ?? env.currentTimeZone
         previewResult = StandardCSVImporter.preview(
             csvText: content,
             accountId: dataStore.selectedAccountId,
             existingHashes: dataStore.existingHashesForSelectedAccount,
-            timeZone: env.currentTimeZone
+            timeZone: importTimeZone,
+            legacyTimeZone: env.currentTimeZone
         )
     }
     

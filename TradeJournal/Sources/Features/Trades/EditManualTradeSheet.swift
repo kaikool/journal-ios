@@ -96,8 +96,9 @@ public struct EditManualTradeSheet: View {
             quantity: quantity,
             entryPrice: entryPrice,
             exitPrice: exit,
-            customMultiplier: dataStore.multipliers[symbol.uppercased().trimmingCharacters(in: .whitespaces)],
-            conversionRates: dataStore.currencyConversion.rates
+            customMultiplier: AssetContractEngine.customMultiplier(for: symbol, multipliers: dataStore.multipliers),
+            conversionRates: dataStore.currencyConversion.rates,
+            reportingCurrency: dataStore.currencyConversion.reportingCurrency
         )
         return gross - fee
     }

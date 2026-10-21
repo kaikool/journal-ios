@@ -32,7 +32,7 @@
 **Trade Journal** is an institutional-grade trading journal crafted for disciplined forex, futures, metals, crypto, and equity traders. Engineered from the ground up for iOS, it combines high-precision financial arithmetic with an edge-to-edge frosted glass design system.
 
 - **Offline-First & Resilient:** Instant startup via atomic JSON persistence with automatic backup recovery (`.bak`) and quarantine protection.
-- **Accurate Financial Modeling:** Zero floating-point rounding errors. Uses exact `Decimal` and `Int64` minor units with standardized lot sizes and tick values (Gold 100 oz/lot, Forex 100k units/lot, Crypto, and CFDs).
+- **Accurate Financial Modeling:** Zero floating-point rounding errors. Uses exact `Decimal` and `Int64` minor units with standardized lot sizes and tick values (Gold 100 oz/lot, Forex 100k units/lot, Crypto, and CFDs). Cloud sync stores monetary columns as Postgres `numeric(38,10)` and transfers them as exact decimal strings.
 - **Edge-to-Edge Frosted Canvas:** Content glides seamlessly under the floating island tab bar and streamlined top navigation.
 
 ---
@@ -48,6 +48,9 @@
 ### 2. ⚡ Flat-to-Flat Reconstruction
 - Reconstructs closed round-trip positions from raw execution fills using standard order matching (**FIFO**, **LIFO**, **WAVG**).
 - Calculates gross P&L, fees, swaps, net P&L, and holds duration down to the millisecond.
+- **Broker-proof symbol handling:** symbols such as `EURUSDm`, `EURUSD.m`, `EURUSD.pro` or `EURUSD_i` are canonicalised to `EURUSD`, so the contract size (100,000 units per lot) is never silently reduced to a single share.
+- **Currency-correct P&L:** every monetary figure is expressed in the reporting currency. FX pairs that quote the reporting currency are converted with the exact trade rate, all other pairs use the configured rate table; a missing rate is reported instead of being silently mislabelled.
+- **Swap / overnight interest** booked by the broker is part of the net P&L (`netP&L = gross P&L − fees + swap`) and is shown separately in the trade detail.
 
 ### 3. 🎨 Modern iOS HIG UI/UX
 - **Unified Top Bar:** Integrated hamburger drawer menu, interactive **Account Selector Capsule Chip** (`[💳 All Accounts ▾]`), and Quick Add Trade button (`[+ Add]`).
@@ -65,6 +68,7 @@
 ### 6. 🔄 Multi-Broker Sync & Universal CSV Import
 - Direct OAuth & API integration for **cTrader** and **The5ers**.
 - Universal RFC 4180 CSV importer with SHA-256 deduplication for **MetaTrader 4/5**, **cTrader**, **TradingView**, **TradeLocker**, and generic formats.
+- Column auto-mapping understands broker headers such as `Open Time` / `Close Time` (MT4/MT5), `Volume` (MT5), `Size` (MT4), `Ticker`, `Executed Date`, `Commission`, `Rebate` and `Swap`. Timestamps without an offset are read in the configured import timezone, which keeps the content hash stable and prevents duplicate fills when the same statement is imported again.
 
 ---
 

@@ -42,12 +42,15 @@ public struct GeneralSettingsConfig: Codable, Equatable, Sendable {
 // MARK: - 3. Currency Conversion Settings
 // Core implementation detail
 public struct CurrencyConversion: Codable, Equatable, Sendable {
+    /// When true the dashboard and calendar convert account balances into the reporting currency.
     public var enabled: Bool
+    /// Currency every aggregated figure is expressed in.
     public var reportingCurrency: String
+    /// `rates[code]` = 1 unit of `code` expressed in `reportingCurrency`.
     public var rates: [String: Decimal]
     
     public static let `default` = CurrencyConversion(
-        enabled: false,
+        enabled: true,
         reportingCurrency: "USD",
         rates: [
             "EUR": 1.08,
@@ -60,10 +63,36 @@ public struct CurrencyConversion: Codable, Equatable, Sendable {
         ]
     )
     
-    public init(enabled: Bool = false, reportingCurrency: String = "USD", rates: [String: Decimal] = [:]) {
+    public init(enabled: Bool = true, reportingCurrency: String = "USD", rates: [String: Decimal] = [:]) {
         self.enabled = enabled
-        self.reportingCurrency = reportingCurrency
-        self.rates = rates
+        self.reportingCurrency = reportingCurrency.uppercased()
+        self.rates = rates.reduce(into: [String: Decimal]()) { acc, item in
+            acc[item.key.uppercased()] = item.value
+        }
+    }
+    
+    /// Conversion context used by the financial engines.
+    public var context: CurrencyContext {
+        CurrencyContext(reportingCurrency: reportingCurrency, rates: rates, isEnabled: enabled)
+    }
+    
+    /// Converts an amount from `currency` into the reporting currency.
+    /// Returns `nil` when no rate is available for the requested pair.
+    public func convert(_ amount: Decimal, from currency: String) -> Decimal? {
+        context.convert(amount, from: currency, to: reportingCurrency)
+    }
+    
+    /// Converts an account balance into the reporting currency.
+    /// Falls back to the raw amount when the currency matches the reporting currency or no rate exists.
+    public func convertedBalance(_ amount: Decimal, currency: String) -> Decimal {
+        let code = currency.uppercased()
+        if code == reportingCurrency.uppercased() { return amount }
+        guard enabled else { return amount }
+        guard let converted = convert(amount, from: code) else {
+            AppLogger.warning("No \(code)->\(reportingCurrency) rate configured; balance of \(amount) \(code) could not be converted.")
+            return amount
+        }
+        return converted
     }
     
     public func rate(for currency: String) -> Decimal {

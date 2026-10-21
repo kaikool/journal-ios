@@ -27,12 +27,12 @@ final class FeatureVerificationTests: XCTestCase {
         // config = { breakeven: 5, breakevenMode: 'money', feeRules: [{ accountId: A, symbol: 'ES', amount: 1, mode: 'unit' }], riskRules: [{ accountId: A, symbol: 'ES', stop: 2, target: 4, mode: 'price' }] }
         let defaults = JournalDefaults(
             breakeven: 5,
-            breakevenMode: .money,
+            breakevenMode: "money",
             feeRules: [
-                FeeRule(id: "f", accountId: accountAId, symbol: "ES", amount: 1, mode: .unit)
+                FeeRule(id: "f", accountId: accountAId, symbol: "ES", amount: 1, mode: "unit")
             ],
             riskRules: [
-                RiskRule(id: "r", accountId: accountAId, symbol: "ES", stop: 2, target: 4, mode: .price)
+                RiskRule(id: "r", accountId: accountAId, symbol: "ES", stop: 2, target: 4, mode: "price")
             ]
         )
         
@@ -68,24 +68,16 @@ final class FeatureVerificationTests: XCTestCase {
         // Reconstruction with multiplier 50 and defaults
         var reconstructedTrades = TradeReconstructionEngine.buildRoundTrips(
             executions: fills,
-            options: .init(multipliers: ["ES": 50])
+            options: .init(multipliers: ["ES": 50], defaults: defaults)
         )
         XCTAssertEqual(reconstructedTrades.count, 1)
         
         // Apply journal defaults (fee: 1 per unit -> 2 in + 2 out = 4; risk: stop=2 -> 4998, target=4 -> 5004)
         for i in 0..<reconstructedTrades.count {
             let t = reconstructedTrades[i]
-            let fee = JournalDefaultsEngine.defaultFee(
-                entryQuantity: t.quantity,
-                exitQuantity: t.quantity,
-                entryPrice: t.avgEntry,
-                exitPrice: t.avgExit ?? t.avgEntry,
-                accountId: t.accountId,
-                symbol: t.symbol,
-                defaults: defaults
-            )
-            reconstructedTrades[i].fees = fee
-            reconstructedTrades[i].netPnl = t.grossPnl - fee
+            // The reconstruction already charges the configured fee rule on both sides of the round trip.
+            XCTAssertEqual(t.fees, 4, "Fees must be 4 (1/unit on entry and exit)")
+            reconstructedTrades[i].netPnl = t.grossPnl - t.fees
             
             let risk = JournalDefaultsEngine.defaultRisk(
                 entry: t.avgEntry,
@@ -130,8 +122,22 @@ final class FeatureVerificationTests: XCTestCase {
         
         // CHECK 3: Reimport deduplication & annotation preservation
         // Reimporting the same fills must not duplicate execution hashes or overwrite annotations
-        let hash1 = JournalIds.executionHash(fills[0])
-        let hash2 = JournalIds.executionHash(fills[0])
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime]
+        let hash1 = JournalIds.executionHash(
+            symbol: "ES",
+            side: "buy",
+            quantity: 2,
+            price: 5000,
+            executedAt: iso.string(from: executedAtBuy)
+        )
+        let hash2 = JournalIds.executionHash(
+            symbol: "ES",
+            side: "buy",
+            quantity: 2,
+            price: 5000,
+            executedAt: iso.string(from: executedAtBuy)
+        )
         XCTAssertEqual(hash1, hash2, "Content hashes must be identical for identical execution")
         
         // CHECK 4: Breakeven tolerance changes classification without changing P&L
@@ -140,15 +146,15 @@ final class FeatureVerificationTests: XCTestCase {
             Execution(id: "e3", accountId: accountAId, symbol: "AAPL", side: .sell, quantity: 1, price: 100, fee: 0, executedAt: iso.date(from: "2026-09-02T14:30:00Z")!, assetClass: "equity"),
             Execution(id: "e4", accountId: accountAId, symbol: "AAPL", side: .buy, quantity: 1, price: 105, fee: 0, executedAt: iso.date(from: "2026-09-02T15:30:00Z")!, assetClass: "equity")
         ]
-        var aaplTrades = TradeReconstructionEngine.buildRoundTrips(executions: aaplFills)
+        var aaplTrades = TradeReconstructionEngine.buildRoundTrips(
+            executions: aaplFills,
+            options: .init(defaults: defaults)
+        )
         XCTAssertEqual(aaplTrades.count, 1)
         var t2 = aaplTrades[0]
         XCTAssertEqual(t2.netPnl, -5)
         
         // With breakeven tolerance of 5 money: netPnl -5 is within [-5, 5] -> status becomes breakeven!
-        if abs(t2.netPnl) <= defaults.breakeven {
-            t2.status = .breakeven
-        }
         XCTAssertEqual(t2.status, .breakeven)
         XCTAssertEqual(t2.netPnl, -5, "P&L remains unchanged at -5 even when classified as breakeven")
         

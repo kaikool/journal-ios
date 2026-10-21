@@ -176,14 +176,14 @@ final class NotebookEngineTests: XCTestCase {
         let date15 = calendar.date(from: comp)!
         
         let trade1 = Trade(
-            id: "t1", accountId: "acc-1", symbol: "AAPL", direction: .long, status: .closed,
-            openedAt: date14, closedAt: date14, totalQuantity: 10, totalCost: 1500,
-            avgEntryPrice: 150, avgExitPrice: 155, grossPnl: 50, netPnl: 48, totalFee: 2, fillsCount: 2
+            key: "t1", accountId: "acc-1", symbol: "AAPL", direction: .long, status: .win,
+            openedAt: date14, closedAt: date14, quantity: 10, openQuantity: 0,
+            avgEntry: 150, avgExit: 155, grossPnl: 50, fees: 2, netPnl: 48, executionCount: 2, executionIds: []
         )
         let trade2 = Trade(
-            id: "t2", accountId: "acc-1", symbol: "NVDA", direction: .short, status: .closed,
-            openedAt: date15, closedAt: date15, totalQuantity: 5, totalCost: 600,
-            avgEntryPrice: 120, avgExitPrice: 110, grossPnl: 50, netPnl: 49, totalFee: 1, fillsCount: 2
+            key: "t2", accountId: "acc-1", symbol: "NVDA", direction: .short, status: .win,
+            openedAt: date15, closedAt: date15, quantity: 5, openQuantity: 0,
+            avgEntry: 120, avgExit: 110, grossPnl: 50, fees: 1, netPnl: 49, executionCount: 2, executionIds: []
         )
         
         // Ngày 2026-10-16 là ngày nghỉ (không có trade nào, chỉ có ghi chú lập kế hoạch)

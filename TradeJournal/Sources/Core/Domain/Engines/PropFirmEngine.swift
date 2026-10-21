@@ -386,11 +386,27 @@ public enum PropFirmEngine {
         "BHD", "IQD", "JOD", "KWD", "LYD", "OMR", "TND"
     ]
     
+    /// Currencies that are valid but not part of the traded FX set.
+    private static let additionalCurrencies: Set<String> = [
+        "AED", "AFN", "ALL", "AMD", "ANG", "AWG", "AZN", "BAM", "BOB", "BYN", "BZD",
+        "CDF", "CRC", "CVE", "DJF", "ERN", "ETB", "GHS", "GMD", "GNF", "GTQ", "GYD",
+        "HNL", "HTG", "IQD", "JMD", "KES", "KGS", "KHR", "KMF", "KPW", "KZT", "LAK",
+        "LBP", "LKR", "LRD", "LSL", "LYD", "MGA", "MKD", "MMK", "MNT", "MRO", "MRU",
+        "MUR", "MVR", "MWK", "MZN", "NAD", "NIO", "PAB", "PEN", "PGK", "PKR", "PYG",
+        "RWF", "SBD", "SCR", "SDG", "SLE", "SLL", "SOS", "SSP", "STN", "SVC", "SYP",
+        "SZL", "TJS", "TOP", "TTD", "TWD", "TZS", "UAH", "UGX", "UYU", "UZS", "VES",
+        "VND", "VUV", "WST", "XAF", "XCD", "XOF", "YER", "ZMW", "ZWL"
+    ]
+    
     /// Returns decimal digit precision for currency (0 for JPY, 3 for BHD/KWD, 2 for USD/EUR/etc.)
     public static func currencyDigits(_ currency: String) throws -> Int {
         let code = currency.trimmingCharacters(in: .whitespaces).uppercased()
         guard code.count == 3, code.range(of: "^[A-Z]{3}$", options: .regularExpression) != nil else {
             throw PropFirmError.validation("Choose a supported three-letter currency code.")
+        }
+        // Fail closed: an unknown currency must never be silently treated as a 2 decimal currency.
+        guard AssetContractEngine.currencyCodes.contains(code) || additionalCurrencies.contains(code) else {
+            throw PropFirmError.validation("\(code) is not a supported currency code.")
         }
         if zeroDecimalCurrencies.contains(code) { return 0 }
         if threeDecimalCurrencies.contains(code) { return 3 }
@@ -817,7 +833,11 @@ public enum PropFirmEngine {
             let rowId = row["id"]!
             let idHash = JournalIds.sha256(rowId)
             let entryId = "csv-\(idHash)"
-            let rowJson = (try? String(data: JSONEncoder().encode(row), encoding: .utf8)) ?? ""
+            // Sorted keys are required: the fingerprint has to be stable across runs, otherwise a
+            // re-import of the same file would look like "different data" and be rejected.
+            let rowEncoder = JSONEncoder()
+            rowEncoder.outputFormatting = .sortedKeys
+            let rowJson = (try? String(data: rowEncoder.encode(row), encoding: .utf8)) ?? ""
             let fingerprint = "CSV import \(JournalIds.sha256(rowJson))"
             
             if let oldEntry = updatedEntries.first(where: { $0.id == entryId }) {

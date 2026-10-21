@@ -166,6 +166,20 @@ public struct TradeDetailView: View {
                                             .lineLimit(1)
                                     }
                                     
+                                    if trade.swapAmount != 0 {
+                                        HStack {
+                                            Text("Swap / Overnight Interest")
+                                                .font(AppTypography.caption)
+                                                .foregroundColor(AppColors.secondaryText)
+                                            Spacer()
+                                            Text(Formatters.formatPnL(trade.swapAmount, currency: env.currentCurrency))
+                                                .font(AppTypography.subheadlineBold)
+                                                .monospacedDigit()
+                                                .foregroundColor(trade.swapAmount < 0 ? AppColors.warning : AppColors.profit)
+                                                .lineLimit(1)
+                                        }
+                                    }
+                                    
                                     Divider().background(AppColors.border.opacity(0.4))
                                     
                                     HStack {

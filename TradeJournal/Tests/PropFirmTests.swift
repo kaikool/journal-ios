@@ -25,6 +25,9 @@ final class PropFirmTests: XCTestCase {
         // Expected payout: amount 101 minor, split 5000 bps (50%), fee 1 minor
         // ((101 * 5000 + 5000) / 10000) - 1 = 51 - 1 = 50
         let pEntry = PropEntryItem(
+            firm: "Fixture firm",
+            kind: "payout",
+            category: "payout",
             amountMinor: 101,
             splitBps: 5000,
             feeMinor: 1,
@@ -190,7 +193,7 @@ final class PropFirmTests: XCTestCase {
             "csv-purchase,expense,Fixture firm,a,USD,2025-01-02,100,evaluation,,INV1,Purchase",
             "rebate,refund,Fixture firm,a,USD,2025-02-01,20,,csv-purchase,,Rebate",
             "reward,payout,Fixture firm,a,USD,2026-01-02,890,,,,Paid"
-        ].join("\n")
+        ].joined(separator: "\n")
         
         let fundedAccount = PropAccountItem(
             id: "a", firm: "Fixture firm", name: "Funded", program: .funded, status: .active, currency: "USD", openedOn: "2025-01-01"

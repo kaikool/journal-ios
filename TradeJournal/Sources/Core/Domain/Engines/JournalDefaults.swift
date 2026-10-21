@@ -67,8 +67,24 @@ public enum JournalDefaultsEngine {
         defaults: JournalDefaults
     ) -> Decimal {
         if fee != 0 { return fee }
+        return defaultFeePerUnit(
+            quantity: quantity,
+            accountId: accountId,
+            symbol: symbol,
+            defaults: defaults
+        )
+    }
+    
+    /// Fee configured for one side of a fill (entry and exit are charged separately).
+    /// `unit` mode scales the amount with the traded quantity, `execution` mode charges it once.
+    public static func defaultFeePerUnit(
+        quantity: Decimal,
+        accountId: String,
+        symbol: String,
+        defaults: JournalDefaults
+    ) -> Decimal {
         let rule = defaults.feeRules.first { matchesRule(ruleAccountId: $0.accountId, ruleSymbol: $0.symbol, accountId: accountId, symbol: symbol) }
-        guard let r = rule else { return fee }
+        guard let r = rule else { return 0 }
         return r.amount * (r.mode == "unit" ? quantity : 1)
     }
     
@@ -86,5 +102,26 @@ public enum JournalDefaultsEngine {
         let stopLoss = entry - sign * r.stop * unit
         let profitTarget = entry + sign * r.target * unit
         return (stopLoss, profitTarget)
+    }
+    
+    /// Net P&L band (in the reporting currency) inside which a closed trade counts as break-even.
+    ///
+    /// - `money` mode: the configured amount is used verbatim.
+    /// - `percent` mode: the configured percentage is applied to the notional
+    ///   (entry price x total entry quantity x contract multiplier), matching the Settings copy.
+    public static func breakevenThreshold(
+        defaults: JournalDefaults,
+        entryPrice: Decimal,
+        quantity: Decimal,
+        multiplier: Decimal
+    ) -> Decimal {
+        let configured = abs(defaults.breakeven)
+        guard configured > 0 else { return 0 }
+        if defaults.breakevenMode == "percent" {
+            let contractMultiplier = multiplier > 0 ? multiplier : 1
+            let notional = abs(entryPrice) * abs(quantity) * contractMultiplier
+            return notional * configured / 100
+        }
+        return configured
     }
 }

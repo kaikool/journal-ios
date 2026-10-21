@@ -37,6 +37,37 @@ extension TradeDataStore {
         Set(executions.filter { $0.accountId == selectedAccountId }.map { $0.contentHash })
     }
     
+    /// Currency of every known account, keyed by account id.
+    /// Used to convert balances into the reporting currency when accounts are aggregated.
+    public var accountCurrencyMap: [String: String] {
+        var map: [String: String] = [:]
+        for account in accounts {
+            map[account.id] = account.currency.uppercased()
+            map[account.id.cleanAccountId] = account.currency.uppercased()
+        }
+        return map
+    }
+    
+    /// Applies new conversion settings and rebuilds the round trips so that the trade P&L,
+    /// balances and reports all use the same currency.
+    public func applyCurrencyConversion(_ conversion: CurrencyConversion) {
+        guard conversion != currencyConversion else { return }
+        currencyConversion = conversion
+        rebuildAllAccounts(forceRebuildTrades: true)
+        saveToDisk(immediate: true)
+    }
+    
+    /// Currency the given account reports commissions and swap in.
+    public func accountCurrency(for accountId: String) -> String {
+        if let account = accounts.first(where: { $0.id == accountId }) {
+            return account.currency.uppercased()
+        }
+        if let account = accounts.first(where: { $0.id.cleanAccountId == accountId.cleanAccountId }) {
+            return account.currency.uppercased()
+        }
+        return currencyConversion.reportingCurrency
+    }
+    
     /// Imports new fills for an account and triggers reconstruction
     public func importExecutions(accountId: String, newExecutions: [Execution]) {
         let existingIds = Set(executions.map { $0.id })
@@ -47,15 +78,9 @@ extension TradeDataStore {
                 return false
             }
             // Check semantic duplicate in existing executions
-            let fillCleanAcc = fill.accountId.cleanAccountId
-            let fillSec = Int64(fill.executedAt.timeIntervalSince1970)
+            let semantic = TradeDeduplicator.executionSemanticKey(for: fill)
             let isDuplicate = executions.contains { existing in
-                existing.accountId.cleanAccountId == fillCleanAcc &&
-                existing.symbol.uppercased() == fill.symbol.uppercased() &&
-                existing.side == fill.side &&
-                abs(Int64(existing.executedAt.timeIntervalSince1970) - fillSec) <= 1 &&
-                existing.quantity == fill.quantity &&
-                existing.price == fill.price
+                TradeDeduplicator.executionSemanticKey(for: existing) == semantic
             }
             return !isDuplicate
         }
@@ -86,25 +111,7 @@ extension TradeDataStore {
     
     /// Deduplicates executions by ID, contentHash, and semantic execution attributes
     public func deduplicateExecutions() {
-        var seenIds = Set<String>()
-        var seenHashes = Set<String>()
-        var seenSemantics = Set<String>()
-        var cleaned: [Execution] = []
-        
-        for fill in executions {
-            let cleanAcc = fill.accountId.cleanAccountId
-            let fillSec = Int64(fill.executedAt.timeIntervalSince1970)
-            let semantic = "\(cleanAcc)|\(fill.symbol.uppercased())|\(fill.side.rawValue)|\(fill.quantity)|\(fill.price)|\(fillSec)"
-            
-            if seenIds.contains(fill.id) || seenHashes.contains(fill.contentHash) || seenSemantics.contains(semantic) {
-                continue
-            }
-            seenIds.insert(fill.id)
-            seenHashes.insert(fill.contentHash)
-            seenSemantics.insert(semantic)
-            cleaned.append(fill)
-        }
-        
+        let cleaned = TradeDeduplicator.deduplicate(executions)
         if cleaned.count != executions.count {
             AppLogger.info("Deduplicated executions from \(executions.count) down to \(cleaned.count)")
             self.executions = cleaned
@@ -114,35 +121,7 @@ extension TradeDataStore {
     
     /// Deduplicates trades by key, and by semantic signature (account, symbol, direction, open time, quantity)
     public func deduplicateTrades() {
-        var seenKeys = Set<String>()
-        var seenSemantics = Set<String>()
-        var cleaned: [Trade] = []
-        
-        // Prioritize trades that contain notes, tags, executionIds, or non-zero P&L
-        let sorted = trades.sorted { a, b in
-            let aScore = (a.notes != nil ? 1 : 0) + (!a.tags.isEmpty ? 1 : 0) + (a.netPnl != 0 ? 2 : 0) + a.executionCount
-            let bScore = (b.notes != nil ? 1 : 0) + (!b.tags.isEmpty ? 1 : 0) + (b.netPnl != 0 ? 2 : 0) + b.executionCount
-            return aScore > bScore
-        }
-        
-        for trade in sorted {
-            let cleanAcc = trade.accountId.cleanAccountId
-            let openSec = Int64(trade.openedAt.timeIntervalSince1970)
-            let qtyStr = NSDecimalNumber(decimal: trade.quantity).stringValue
-            // Window of 5 seconds to catch slight timestamp variations across syncs
-            let semantic = "\(cleanAcc)|\(trade.symbol.uppercased())|\(trade.direction.rawValue)|\(openSec / 5)|\(qtyStr)"
-            
-            if seenKeys.contains(trade.key) || seenSemantics.contains(semantic) {
-                continue
-            }
-            
-            seenKeys.insert(trade.key)
-            seenSemantics.insert(semantic)
-            cleaned.append(trade)
-        }
-        
-        cleaned.sort { $0.openedAt < $1.openedAt }
-        
+        let cleaned = TradeDeduplicator.deduplicate(trades)
         if cleaned.count != trades.count {
             AppLogger.info("Deduplicated trades from \(trades.count) down to \(cleaned.count)")
             self.trades = cleaned
@@ -164,7 +143,13 @@ extension TradeDataStore {
         
         let reconstructed = TradeReconstructionEngine.buildRoundTrips(
             executions: accountFills,
-            options: .init(method: account.profitCalcMethod, multipliers: multipliers)
+            options: .init(
+                method: account.profitCalcMethod,
+                multipliers: multipliers,
+                context: currencyConversion.context,
+                accountCurrency: account.currency.uppercased(),
+                defaults: defaults
+            )
         )
         
         // Preserve existing user annotations (notes, tags, mistakes, ratings, risk levels) across rebuilds
@@ -644,7 +629,7 @@ extension TradeDataStore {
     
     /// Exports all trades to standard CSV format
     public func exportTradesCsv() -> String {
-        var lines = ["Key,Account,Symbol,Direction,Status,OpenedAt,ClosedAt,Quantity,AvgEntry,AvgExit,GrossPnL,Fees,NetPnL,Notes,Tags"]
+        var lines = ["Key,Account,Symbol,Direction,Status,OpenedAt,ClosedAt,Quantity,AvgEntry,AvgExit,GrossPnL,Fees,Swap,NetPnL,Notes,Tags"]
         let f = ISO8601DateFormatter()
         
         let escapeCsv: (String) -> String = { text in
@@ -669,6 +654,7 @@ extension TradeDataStore {
                 t.avgExit.map { "\($0)" } ?? "",
                 "\(t.grossPnl)",
                 "\(t.fees)",
+                "\(t.swapAmount)",
                 "\(t.netPnl)",
                 escapeCsv(t.notes ?? ""),
                 escapeCsv(t.tags.joined(separator: ";"))

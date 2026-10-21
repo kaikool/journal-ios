@@ -77,10 +77,12 @@ public enum TradeAnalysisEngine {
             multiplier = explicitMultiplier
         } else {
             let derivatives: Set<String> = ["futures", "option", "cfd", "forex"]
-            if let asset = trade.assetClass, derivatives.contains(asset) {
+            let spec = AssetContractEngine.spec(for: trade.symbol)
+            if spec.contractSize == 1, let asset = trade.assetClass, derivatives.contains(asset) {
+                // Derivative without a known contract size: risk cannot be expressed in money.
                 return nil
             }
-            multiplier = 1
+            multiplier = spec.contractSize
         }
         
         guard multiplier > 0 && trade.quantity > 0 else { return nil }

@@ -2,6 +2,7 @@ import SwiftUI
 
 public struct RootTabView: View {
     @EnvironmentObject private var env: AppEnvironment
+    @ObservedObject private var dataStore = TradeDataStore.shared
     
     public init() {}
     
@@ -100,6 +101,12 @@ public struct RootTabView: View {
         .preferredColorScheme(env.colorScheme)
         .sheet(isPresented: $env.showSyncCenter) {
             SyncCenterSheet()
+        }
+        .onAppear {
+            env.applyReportingCurrency(dataStore.currencyConversion.reportingCurrency)
+        }
+        .onChange(of: dataStore.currencyConversion.reportingCurrency) { _, newValue in
+            env.applyReportingCurrency(newValue)
         }
     }
     

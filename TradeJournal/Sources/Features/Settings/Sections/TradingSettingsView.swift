@@ -281,7 +281,9 @@ public struct TradingSettingsView: View {
                 multiplierError = "Check line \(index + 1): enter a unique symbol and a positive multiplier, such as ESU6=50."
                 return
             }
-            parsed[parts[0].uppercased()] = val
+            // Keys are canonicalised so that a multiplier configured for "EURUSD" also applies to
+            // broker spellings such as "EURUSDm" or "EURUSD.pro".
+            parsed[AssetContractEngine.multiplierKey(for: parts[0])] = val
         }
         
         dataStore.multipliers = parsed

@@ -48,6 +48,14 @@ public final class AppEnvironment: ObservableObject {
         AppLogger.debug("Privacy mode toggled to: \(isPrivacyModeEnabled)")
     }
     
+    /// Keeps the display currency aligned with the reporting currency all monetary values are
+    /// expressed in (trade P&L, balances and aggregated metrics).
+    public func applyReportingCurrency(_ currency: String) {
+        let code = currency.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !code.isEmpty, code != currentCurrency else { return }
+        currentCurrency = code
+    }
+    
     public func toggleTheme() {
         appTheme = (appTheme == .dark) ? .light : .dark
         AppLogger.debug("Theme toggled to: \(appTheme.rawValue)")

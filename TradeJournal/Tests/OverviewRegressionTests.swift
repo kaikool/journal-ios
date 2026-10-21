@@ -20,22 +20,22 @@ final class OverviewRegressionTests: XCTestCase {
             openedAt: openedAt,
             closedAt: closedAt,
             quantity: 10,
+            openQuantity: 0,
             avgEntry: 100,
             avgExit: 110,
             grossPnl: netPnl,
             fees: 0,
             netPnl: netPnl,
             executionCount: 2,
-            annotations: TradeAnnotations(
-                notes: nil,
-                tags: nil,
-                mistakes: nil,
-                playbook: "plan",
-                rating: nil,
-                stopLoss: 98,
-                profitTarget: 104,
-                reviewedAt: nil
-            )
+            executionIds: [],
+            notes: nil,
+            tags: [],
+            mistakes: [],
+            playbookId: "plan",
+            rating: nil,
+            stopLoss: 98,
+            profitTarget: 104,
+            reviewedAt: nil
         )
     }
 
@@ -89,7 +89,7 @@ final class OverviewRegressionTests: XCTestCase {
         for tzId in tzIdentifiers {
             guard let timeZone = TimeZone(identifier: tzId) else { continue }
             let overview = FinancialMetricsEngine.computeOverview(trades: trades, timeZone: timeZone, initialBalance: 1000)
-            let directMetrics = FinancialMetricsEngine.computeMetrics(trades: trades, timeZone: timeZone, initialBalance: 1000)
+            let directMetrics = FinancialMetricsEngine.computeMetrics(trades: trades, initialBalance: 1000, timeZone: timeZone)
             XCTAssertEqual(overview.metrics, directMetrics)
             
             let dailyFromDays = FinancialMetricsEngine.dailyCumulativeFromDays(days: overview.days)
