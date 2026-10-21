@@ -564,48 +564,50 @@ public final class CTraderService: ObservableObject {
                 payload: ["ctidTraderAccountId": accId, "accessToken": cleanToken]
             )
             
-            // 2. Fetch Symbol Dictionary
+            // 2. Fetch Symbol Dictionary (including archived symbols to handle closed trades on delisted/renamed symbols)
             var symbolMap: [Int64: String] = [:]
-            if let symbolsRes = try? await sendRequest(payloadType: 2114, payload: ["ctidTraderAccountId": accId, "includeArchivedSymbols": false]),
-               let symbolArray = symbolsRes["symbol"] as? [[String: Any]] {
-                for s in symbolArray {
-                    if let sId = (s["symbolId"] as? NSNumber)?.int64Value,
-                       let sName = s["symbolName"] as? String {
-                        symbolMap[sId] = sName
+            if let symbolsRes = try? await sendRequest(payloadType: 2114, payload: ["ctidTraderAccountId": accId, "includeArchivedSymbols": true]) {
+                if let symbolArray = symbolsRes["symbol"] as? [[String: Any]] {
+                    for s in symbolArray {
+                        if let sId = (s["symbolId"] as? NSNumber)?.int64Value ?? (s["symbolId"] as? Int64),
+                           let sName = s["symbolName"] as? String {
+                            symbolMap[sId] = sName
+                        }
+                    }
+                }
+                if let archivedArray = symbolsRes["archivedSymbol"] as? [[String: Any]] {
+                    for s in archivedArray {
+                        if let sId = (s["symbolId"] as? NSNumber)?.int64Value ?? (s["symbolId"] as? Int64),
+                           let sName = s["symbolName"] as? String {
+                            if symbolMap[sId] == nil {
+                                symbolMap[sId] = sName
+                            }
+                        }
                     }
                 }
             }
             
-            // 3. Fetch Historical Deals (Completed executions)
-            let nowMs = Int64(Date().timeIntervalSince1970 * 1000)
-            let dealsFrom = fromTimestamp ?? 0
-            let dealsTo = toTimestamp ?? nowMs
-            let dealsRes = try await sendRequest(
-                payloadType: 2133,
-                payload: [
-                    "ctidTraderAccountId": accId,
-                    "fromTimestamp": dealsFrom,
-                    "toTimestamp": dealsTo,
-                    "maxRows": 2000
-                ]
-            )
-            
-            let rawDeals = dealsRes["deal"] as? [[String: Any]] ?? []
-            
-            // 4. Ensure Journal Account exists
+            // 3. Ensure Journal Account exists
             let journalAccId = "ctrader_\(accId)"
             let brokerName = account.brokerTitleShort.trimmingCharacters(in: .whitespacesAndNewlines)
             let safeBroker = brokerName.isEmpty ? "cTrader" : brokerName
             let envLabel = account.isLive ? "Live" : "Demo"
             let accountName = "\(safeBroker) #\(account.traderLogin) (\(envLabel))"
             
-            if let existingIdx = dataStore.accounts.firstIndex(where: { $0.id == journalAccId || $0.name.contains("\(account.traderLogin)") }) {
+            if let existingIdx = dataStore.accounts.firstIndex(where: {
+                $0.id == journalAccId ||
+                $0.id.isEquivalentAccountId(to: journalAccId) ||
+                $0.id.cleanAccountId == String(account.ctidTraderAccountId) ||
+                $0.id.cleanAccountId == String(account.traderLogin) ||
+                $0.name.contains("\(account.traderLogin)")
+            }) {
                 var acc = dataStore.accounts[existingIdx]
                 acc.name = accountName
                 acc.broker = safeBroker
                 acc.currency = account.currency
                 acc.kind = .sync
                 acc.autoSync = true
+                acc.visibleInJournal = true
                 if acc.initialBalance == 0 && account.balance > 0 {
                     acc.initialBalance = account.balance
                 }
@@ -619,43 +621,132 @@ public final class CTraderService: ObservableObject {
                     currency: account.currency,
                     initialBalance: account.balance,
                     profitCalcMethod: .fifo,
-                    autoSync: true
+                    autoSync: true,
+                    visibleInJournal: true
                 )
                 dataStore.accounts.append(newAcc)
                 dataStore.saveToDisk()
             }
             
+            // 4. Fetch Historical Deals in 7-day chunks
+            // cTrader Open API enforces a strict maximum 7-day window (604,800,000 ms) per ProtoOADealListReq.
+            // Sending larger intervals triggers ProtoOAErrorRes (2142) INCORRECT_BOUNDS.
+            let nowMs = Int64(Date().timeIntervalSince1970 * 1000)
+            let maxChunkMs: Int64 = 7 * 24 * 60 * 60 * 1000 - 1000 // 604,799,000 ms (~6.99 days)
+            let dealsTo = toTimestamp ?? nowMs
+            
+            let defaultLookbackDays: Int64 = 180 // Initial lookback window of 6 months
+            let fallbackStart = max(nowMs - (defaultLookbackDays * 86_400 * 1000), 0)
+            
+            let existingAccountExecs = dataStore.executions.filter { $0.accountId == journalAccId }
+            let dealsFrom: Int64
+            if let fromTimestamp = fromTimestamp, fromTimestamp > 0 {
+                dealsFrom = fromTimestamp
+            } else if let latestDate = existingAccountExecs.map({ $0.executedAt }).max() {
+                // Incremental sync: rewind 2 days before latest known fill to catch any delayed fills or fee reconciliations
+                let latestMs = Int64(latestDate.timeIntervalSince1970 * 1000)
+                dealsFrom = max(latestMs - (2 * 86_400 * 1000), 0)
+            } else {
+                dealsFrom = fallbackStart
+            }
+            
+            var rawDeals: [[String: Any]] = []
+            var seenDealIds = Set<Int64>()
+            var chunkStart = dealsFrom
+            let totalSpanMs = max(dealsTo - dealsFrom, 1)
+            let estimatedChunks = max(1, Int((totalSpanMs + maxChunkMs - 1) / maxChunkMs))
+            var chunkIndex = 0
+            
+            while chunkStart < dealsTo {
+                chunkIndex += 1
+                let chunkEnd = min(chunkStart + maxChunkMs, dealsTo)
+                guard chunkEnd > chunkStart else { break }
+                
+                self.lastStatus = "Fetching cTrader deals (\(chunkIndex)/\(estimatedChunks))..."
+                let payload: [String: Any] = [
+                    "ctidTraderAccountId": accId,
+                    "fromTimestamp": chunkStart,
+                    "toTimestamp": chunkEnd,
+                    "maxRows": 2000
+                ]
+                
+                do {
+                    let dealsRes = try await sendRequest(payloadType: 2133, payload: payload)
+                    if let deals = dealsRes["deal"] as? [[String: Any]] {
+                        for d in deals {
+                            if let dealId = (d["dealId"] as? NSNumber)?.int64Value ?? (d["dealId"] as? Int64) {
+                                if seenDealIds.insert(dealId).inserted {
+                                    rawDeals.append(d)
+                                }
+                            }
+                        }
+                    }
+                } catch {
+                    AppLogger.warn("cTrader deal chunk [\(chunkStart)-\(chunkEnd)] returned error: \(error.localizedDescription)")
+                }
+                
+                chunkStart = chunkEnd
+                if chunkStart < dealsTo {
+                    try? await Task.sleep(nanoseconds: 60_000_000) // 60ms throttle between chunk requests
+                }
+            }
+            
             // 5. Convert Deals to Atomic Executions
             var newExecutions: [Execution] = []
             for raw in rawDeals {
-                guard let dealId = (raw["dealId"] as? NSNumber)?.int64Value,
-                      let symbolId = (raw["symbolId"] as? NSNumber)?.int64Value,
-                      let filledVolume = (raw["filledVolume"] as? NSNumber)?.int64Value,
-                      let executionPrice = raw["executionPrice"] as? Double,
-                      let execTimestamp = (raw["executionTimestamp"] as? NSNumber)?.int64Value else {
+                guard let dealId = (raw["dealId"] as? NSNumber)?.int64Value ?? (raw["dealId"] as? Int64),
+                      let symbolId = (raw["symbolId"] as? NSNumber)?.int64Value ?? (raw["symbolId"] as? Int64),
+                      let execTimestamp = (raw["executionTimestamp"] as? NSNumber)?.int64Value ?? (raw["executionTimestamp"] as? Int64) else {
                     continue
                 }
+                
+                // Validate deal status if present (FILLED = 1, PARTIALLY_FILLED = 2)
+                if let statusVal = (raw["dealStatus"] as? NSNumber)?.intValue {
+                    if statusVal != 1 && statusVal != 2 { continue }
+                } else if let statusStr = raw["dealStatus"] as? String {
+                    let upper = statusStr.uppercased()
+                    if upper != "FILLED" && upper != "PARTIALLY_FILLED" { continue }
+                }
+                
+                let volRaw = (raw["filledVolume"] as? NSNumber)?.int64Value ?? (raw["volume"] as? NSNumber)?.int64Value ?? 0
+                guard volRaw > 0 else { continue }
+                
+                let priceRaw = (raw["executionPrice"] as? NSNumber)?.doubleValue ?? (raw["executionPrice"] as? Double) ?? 0.0
+                guard priceRaw > 0 else { continue }
                 
                 let symbolName = symbolMap[symbolId] ?? "Symbol_\(symbolId)"
                 let sideStr = String(describing: raw["tradeSide"] ?? "BUY").uppercased()
                 let side: ExecutionSide = (sideStr == "SELL" || sideStr == "2") ? .sell : .buy
                 
-                // Volume conversion: Standard forex lots (10,000,000 cents = 1.0 lot) or contracts
-                let isForexOrMetals = symbolName.count == 6 || symbolName.contains("XAU") || symbolName.contains("XAG")
+                // Volume conversion:
+                // In cTrader Open API, volume is represented in cents.
+                // Forex: 1 lot = 100,000 units = 10,000,000 cents.
+                // Metals (Gold/Silver): 1 lot = 100 oz = 1,000,000 cents.
+                // Indices / CFDs / Crypto: 1 contract = 1 unit = 100 cents.
+                let isMetals = symbolName.contains("XAU") || symbolName.contains("XAG")
+                let isForex = symbolName.count == 6 && !symbolName.contains("BTC") && !symbolName.contains("ETH")
                 let isCrypto = symbolName.contains("BTC") || symbolName.contains("ETH") || symbolName.contains("SOL")
-                let lotDivisor: Decimal = isForexOrMetals ? 10_000_000 : 100
-                let quantity = max(Decimal(0.01), Decimal(filledVolume) / lotDivisor)
                 
-                let moneyDigits = raw["moneyDigits"] as? Int ?? 2
+                let lotDivisor: Decimal
+                if isMetals {
+                    lotDivisor = 1_000_000
+                } else if isForex {
+                    lotDivisor = 10_000_000
+                } else {
+                    lotDivisor = 100
+                }
+                let quantity = max(Decimal(0.01), Decimal(volRaw) / lotDivisor)
+                
+                let moneyDigits = (raw["moneyDigits"] as? NSNumber)?.intValue ?? (raw["moneyDigits"] as? Int) ?? 2
                 let moneyDivisor = pow(10.0, Double(moneyDigits))
                 let commRaw = (raw["commission"] as? NSNumber)?.doubleValue ?? 0
                 let fee = Decimal(abs(commRaw) / moneyDivisor)
                 
                 let execDate = Date(timeIntervalSince1970: Double(execTimestamp) / 1000.0)
                 let fillId = "ctrader_deal_\(dealId)"
-                let hash = "\(journalAccId)|\(symbolName)|\(side.rawValue)|\(quantity)|\(executionPrice)|\(execTimestamp)"
+                let hash = "\(journalAccId)|\(symbolName)|\(side.rawValue)|\(quantity)|\(priceRaw)|\(execTimestamp)"
                 
-                let assetClass = isForexOrMetals ? "forex" : (isCrypto ? "crypto" : "index")
+                let assetClass = isForex ? "forex" : (isMetals ? "commodity" : (isCrypto ? "crypto" : "index"))
                 
                 let exec = Execution(
                     id: fillId,
@@ -663,7 +754,7 @@ public final class CTraderService: ObservableObject {
                     symbol: symbolName,
                     side: side,
                     quantity: quantity,
-                    price: Decimal(executionPrice),
+                    price: Decimal(priceRaw),
                     fee: fee,
                     executedAt: execDate,
                     assetClass: assetClass,
@@ -677,64 +768,102 @@ public final class CTraderService: ObservableObject {
             if !newExecutions.isEmpty {
                 dataStore.importExecutions(accountId: journalAccId, newExecutions: newExecutions)
                 totalDeals += newExecutions.count
+            } else if dataStore.trades.filter({ $0.accountId == journalAccId }).isEmpty && !dataStore.executions.filter({ $0.accountId == journalAccId }).isEmpty {
+                dataStore.rebuildAccount(accountId: journalAccId)
             }
             
-            // 7. Check for open positions via Reconcile
+            // 7. Check for open positions via Reconcile (payloadType 2124)
             if let reconcileRes = try? await sendRequest(payloadType: 2124, payload: ["ctidTraderAccountId": accId]),
                let positions = reconcileRes["position"] as? [[String: Any]] {
+                
+                var activePosKeys = Set<String>()
+                
                 for pos in positions {
-                    guard let posId = (pos["positionId"] as? NSNumber)?.int64Value,
-                          let tradeData = pos["tradeData"] as? [String: Any],
-                          let sId = (tradeData["symbolId"] as? NSNumber)?.int64Value,
-                          let vol = (tradeData["volume"] as? NSNumber)?.int64Value,
-                          let price = pos["price"] as? Double else {
+                    let tradeData = (pos["tradeData"] as? [String: Any]) ?? pos
+                    guard let posId = (pos["positionId"] as? NSNumber)?.int64Value ?? (tradeData["positionId"] as? NSNumber)?.int64Value,
+                          let sId = (tradeData["symbolId"] as? NSNumber)?.int64Value ?? (pos["symbolId"] as? NSNumber)?.int64Value,
+                          let vol = (tradeData["volume"] as? NSNumber)?.int64Value ?? (pos["volume"] as? NSNumber)?.int64Value,
+                          let price = (pos["price"] as? NSNumber)?.doubleValue ?? (tradeData["price"] as? NSNumber)?.doubleValue else {
                         continue
                     }
                     
+                    let openTradeKey = "ctrader_open_\(posId)"
+                    activePosKeys.insert(openTradeKey)
+                    
                     let sName = symbolMap[sId] ?? "Symbol_\(sId)"
-                    let sideStr = String(describing: tradeData["tradeSide"] ?? "BUY").uppercased()
+                    let sideStr = String(describing: tradeData["tradeSide"] ?? pos["tradeSide"] ?? "BUY").uppercased()
                     let dir: TradeDirection = (sideStr == "SELL" || sideStr == "2") ? .short : .long
-                    let openTs = (tradeData["openTimestamp"] as? NSNumber)?.int64Value ?? nowMs
+                    let openTs = (tradeData["openTimestamp"] as? NSNumber)?.int64Value ?? (pos["openTimestamp"] as? NSNumber)?.int64Value ?? nowMs
                     let openDate = Date(timeIntervalSince1970: Double(openTs) / 1000.0)
                     
-                    let isForexOrMetals = sName.count == 6 || sName.contains("XAU") || sName.contains("XAG")
-                    let lotDivisor: Decimal = isForexOrMetals ? 10_000_000 : 100
+                    let isMetals = sName.contains("XAU") || sName.contains("XAG")
+                    let isForex = sName.count == 6 && !sName.contains("BTC") && !sName.contains("ETH")
+                    let lotDivisor: Decimal = isMetals ? 1_000_000 : (isForex ? 10_000_000 : 100)
                     let qty = max(Decimal(0.01), Decimal(vol) / lotDivisor)
                     
-                    let openTradeKey = "ctrader_open_\(posId)"
+                    let stopLossVal = (pos["stopLoss"] as? NSNumber)?.doubleValue ?? (tradeData["stopLoss"] as? NSNumber)?.doubleValue
+                    let takeProfitVal = (pos["takeProfit"] as? NSNumber)?.doubleValue ?? (tradeData["takeProfit"] as? NSNumber)?.doubleValue
+                    
                     if let existingIdx = dataStore.trades.firstIndex(where: { $0.key == openTradeKey }) {
                         var existing = dataStore.trades[existingIdx]
                         existing.openQuantity = qty
+                        existing.quantity = qty
                         existing.avgEntry = Decimal(price)
+                        if let sl = stopLossVal { existing.stopLoss = Decimal(sl) }
+                        if let tp = takeProfitVal { existing.profitTarget = Decimal(tp) }
                         dataStore.trades[existingIdx] = existing
                     } else {
-                        let openTrade = Trade(
-                            key: openTradeKey,
-                            accountId: journalAccId,
-                            symbol: sName,
-                            assetClass: isForexOrMetals ? "forex" : "cfd",
-                            direction: dir,
-                            status: .open,
-                            openedAt: openDate,
-                            closedAt: nil,
-                            quantity: qty,
-                            openQuantity: qty,
-                            avgEntry: Decimal(price),
-                            avgExit: nil,
-                            grossPnl: 0,
-                            fees: 0,
-                            netPnl: 0,
-                            executionCount: 1,
-                            executionIds: [],
-                            notes: "Open position synced from cTrader (Position #\(posId))",
-                            tags: ["ctrader", "open"]
-                        )
-                        dataStore.trades.append(openTrade)
+                        // Check if TradeReconstructionEngine already has an open trade for this position
+                        let alreadyHasOpenTrade = dataStore.trades.contains { t in
+                            t.accountId == journalAccId &&
+                            t.status == .open &&
+                            t.symbol == sName &&
+                            t.direction == dir &&
+                            abs(t.openQuantity - qty) < Decimal(0.01)
+                        }
+                        
+                        if !alreadyHasOpenTrade {
+                            let openTrade = Trade(
+                                key: openTradeKey,
+                                accountId: journalAccId,
+                                symbol: sName,
+                                assetClass: isForex ? "forex" : (isMetals ? "commodity" : "cfd"),
+                                direction: dir,
+                                status: .open,
+                                openedAt: openDate,
+                                closedAt: nil,
+                                quantity: qty,
+                                openQuantity: qty,
+                                avgEntry: Decimal(price),
+                                avgExit: nil,
+                                grossPnl: 0,
+                                fees: 0,
+                                netPnl: 0,
+                                executionCount: 1,
+                                executionIds: [],
+                                notes: "Open position synced from cTrader (Position #\(posId))",
+                                tags: ["ctrader", "open"],
+                                stopLoss: stopLossVal.map { Decimal($0) },
+                                profitTarget: takeProfitVal.map { Decimal($0) }
+                            )
+                            dataStore.trades.append(openTrade)
+                        }
                     }
+                }
+                
+                // Clean up closed positions that were previously tracked under ctrader_open_*
+                dataStore.trades.removeAll { trade in
+                    trade.accountId == journalAccId &&
+                    trade.key.hasPrefix("ctrader_open_") &&
+                    !activePosKeys.contains(trade.key)
                 }
             }
             
             totalRebuiltTrades += dataStore.trades.filter { $0.accountId == journalAccId }.count
+            
+            if dataStore.selectedAccountId == "default-acc" || dataStore.selectedAccountId.isEmpty {
+                dataStore.selectedAccountId = journalAccId
+            }
         }
         
         dataStore.deduplicateAndCleanAccounts()
