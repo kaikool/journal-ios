@@ -103,12 +103,13 @@ public struct AccountsManagerView: View {
                     allAccountsScopeCard
                     
                     // Account Cards List
+                    let countMap = tradeCountMap
                     if filteredAccounts.isEmpty {
                         emptyStateView
                     } else {
                         LazyVStack(spacing: 12) {
                             ForEach(filteredAccounts) { acc in
-                                accountCard(acc)
+                                accountCard(acc, tradeCount: countMap[acc.id] ?? countMap[acc.id.cleanAccountId] ?? 0)
                             }
                         }
                         .padding(.horizontal, 16)
@@ -382,10 +383,9 @@ public struct AccountsManagerView: View {
     }
     
     @ViewBuilder
-    private func accountCard(_ acc: Account) -> some View {
+    private func accountCard(_ acc: Account, tradeCount: Int) -> some View {
         let isSelected = dataStore.selectedAccountId == acc.id
         let isArchived = acc.archivedAt != nil
-        let tradeCount = tradeCountMap[acc.id] ?? tradeCountMap[acc.id.cleanAccountId] ?? 0
         let isVisible = dataStore.isAccountVisible(acc)
         
         cardContainer {

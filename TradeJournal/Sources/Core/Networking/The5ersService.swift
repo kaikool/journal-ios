@@ -606,25 +606,33 @@ public final class The5ersService: ObservableObject {
             
             var rawAccountsList: [[String: Any]] = []
             var seenAccountRefs = Set<String>()
+            var successfulArgTemplate: [String: Any]? = nil
             
             for page in 1...20 {
                 lastStatus = "Loading The5ers accounts (Page \(page))..."
-                let candidateArgsList: [[String: Any]] = [
-                    [
-                        "operation": "list",
-                        "page": page,
-                        "limit": 50,
-                        "contract_version": "1.0",
-                        "request_context": ["timezone": "UTC", "locale": "en"]
-                    ],
-                    [
-                        "operation": "list",
-                        "page": page,
-                        "limit": 50
-                    ],
-                    ["operation": "list"],
-                    [:]
-                ]
+                let candidateArgsList: [[String: Any]] = {
+                    if let template = successfulArgTemplate {
+                        var pArgs = template
+                        pArgs["page"] = page
+                        return [pArgs]
+                    }
+                    return [
+                        [
+                            "operation": "list",
+                            "page": page,
+                            "limit": 50,
+                            "contract_version": "1.0",
+                            "request_context": ["timezone": "UTC", "locale": "en"]
+                        ],
+                        [
+                            "operation": "list",
+                            "page": page,
+                            "limit": 50
+                        ],
+                        ["operation": "list"],
+                        [:]
+                    ]
+                }()
                 
                 var accountResult: [String: Any]? = nil
                 var lastErr: String = ""
@@ -634,6 +642,9 @@ public final class The5ersService: ObservableObject {
                         let isErr = (res["isError"] as? Bool) ?? false
                         if !isErr {
                             accountResult = res
+                            if successfulArgTemplate == nil {
+                                successfulArgTemplate = candidateArgs
+                            }
                             break
                         } else {
                             lastErr = (res["content"] as? [[String: Any]])?.compactMap { $0["text"] as? String }.joined(separator: " ") ?? ""
@@ -663,8 +674,8 @@ public final class The5ersService: ObservableObject {
                     }
                 }
                 
-                // Break pagination loop if end of stream reached
-                if pageRows.count < 50 || newCount == 0 {
+                // Break pagination loop if end of stream reached, or candidateArgs didn't include pagination, or no new accounts
+                if pageRows.count < 50 || newCount == 0 || (successfulArgTemplate?["page"] == nil && page == 1) {
                     break
                 }
             }
@@ -1464,12 +1475,19 @@ public final class The5ersService: ObservableObject {
         }
         
         // 2. Discover tool names for purchases
-        var toolNames = ["the5ers_purchase", "the5ers_purchases", "the5ers_orders", "the5ers_order", "the5ers_challenges"]
+        var candidateTools: [String] = []
+        let primaryTool = "the5ers_purchase"
+        if discoveredToolNames.contains(primaryTool) {
+            candidateTools.append(primaryTool)
+        }
         for dName in discoveredToolNames {
             let lower = dName.lowercased()
-            if (lower.contains("purchase") || lower.contains("order") || lower.contains("fee") || lower.contains("challenge") || lower.contains("invoice")) && !toolNames.contains(dName) {
-                toolNames.append(dName)
+            if (lower.contains("purchase") || lower.contains("order") || lower.contains("fee") || lower.contains("challenge") || lower.contains("invoice")) && !candidateTools.contains(dName) {
+                candidateTools.append(dName)
             }
+        }
+        if candidateTools.isEmpty {
+            candidateTools = ["the5ers_purchase", "the5ers_purchases", "the5ers_orders"]
         }
         
         let argSets: [[String: Any]] = [
@@ -1488,8 +1506,12 @@ public final class The5ersService: ObservableObject {
             [:]
         ]
         
-        for tool in toolNames {
-            if !allPurchases.isEmpty { break }
+        var workingToolName: String? = nil
+        for tool in candidateTools {
+            if !allPurchases.isEmpty {
+                workingToolName = tool
+                break
+            }
             for args in argSets {
                 if Task.isCancelled { break }
                 guard let res = try? await callMcpTool(name: tool, arguments: args) else { continue }
@@ -1497,6 +1519,7 @@ public final class The5ersService: ObservableObject {
                 let unwrapped = unwrapMcpToolResult(res)
                 let rows = extractAnyPurchaseCollection(from: unwrapped)
                 if !rows.isEmpty {
+                    workingToolName = tool
                     for r in rows {
                         let pId = String(describing: r["id"] ?? r["orderid"] ?? r["order_id"] ?? r["purchaseid"] ?? UUID().uuidString)
                         if !seenPurchaseIds.contains(pId) {
@@ -1509,13 +1532,13 @@ public final class The5ersService: ObservableObject {
             }
         }
         
-        // Query per-account purchases across all accounts
-        for acc in targetAccounts {
-            if Task.isCancelled { break }
-            for tool in toolNames {
+        // 3. Query per-account purchases across accounts ONLY if global query returned nothing
+        if allPurchases.isEmpty, let toolToQuery = workingToolName ?? candidateTools.first {
+            for acc in targetAccounts {
+                if Task.isCancelled { break }
                 for op in ["list", "history"] {
-                    let perAccArgs = buildAccountArgs(toolName: tool, accountRef: acc.ref, op: op)
-                    if let perAccRes = try? await callMcpTool(name: tool, arguments: perAccArgs) {
+                    let perAccArgs = buildAccountArgs(toolName: toolToQuery, accountRef: acc.ref, op: op)
+                    if let perAccRes = try? await callMcpTool(name: toolToQuery, arguments: perAccArgs) {
                         if let isErr = perAccRes["isError"] as? Bool, isErr { continue }
                         let unwrapped = unwrapMcpToolResult(perAccRes)
                         let rows = extractAnyPurchaseCollection(from: unwrapped)
@@ -1735,12 +1758,19 @@ public final class The5ersService: ObservableObject {
         }
         
         // 2. Discover tool names for payouts
-        var toolNames = ["the5ers_payout", "the5ers_payouts", "the5ers_withdrawals", "the5ers_withdrawal", "the5ers_transactions"]
+        var candidateTools: [String] = []
+        let primaryTool = "the5ers_payout"
+        if discoveredToolNames.contains(primaryTool) {
+            candidateTools.append(primaryTool)
+        }
         for dName in discoveredToolNames {
             let lower = dName.lowercased()
-            if (lower.contains("payout") || lower.contains("withdraw") || lower.contains("reward") || lower.contains("settle") || lower.contains("wallet")) && !toolNames.contains(dName) {
-                toolNames.append(dName)
+            if (lower.contains("payout") || lower.contains("withdraw") || lower.contains("reward") || lower.contains("settle") || lower.contains("wallet")) && !candidateTools.contains(dName) {
+                candidateTools.append(dName)
             }
+        }
+        if candidateTools.isEmpty {
+            candidateTools = ["the5ers_payout", "the5ers_payouts", "the5ers_withdrawals"]
         }
         
         let argSets: [[String: Any]] = [
@@ -1759,8 +1789,12 @@ public final class The5ersService: ObservableObject {
             [:]
         ]
         
-        for tool in toolNames {
-            if !allRawPayouts.isEmpty { break }
+        var workingToolName: String? = nil
+        for tool in candidateTools {
+            if !allRawPayouts.isEmpty {
+                workingToolName = tool
+                break
+            }
             for args in argSets {
                 if Task.isCancelled { break }
                 guard let res = try? await callMcpTool(name: tool, arguments: args) else { continue }
@@ -1768,6 +1802,7 @@ public final class The5ersService: ObservableObject {
                 let unwrapped = unwrapMcpToolResult(res)
                 let rows = extractAnyPayoutCollection(from: unwrapped)
                 if !rows.isEmpty {
+                    workingToolName = tool
                     for r in rows {
                         let pId = String(describing: r["id"] ?? r["payout_id"] ?? r["withdrawalid"] ?? UUID().uuidString)
                         if !seenPayoutIds.contains(pId) {
@@ -1780,13 +1815,13 @@ public final class The5ersService: ObservableObject {
             }
         }
         
-        // Query per-account history across all accounts
-        for acc in targetAccounts {
-            if Task.isCancelled { break }
-            for tool in toolNames {
+        // 3. Query per-account history across accounts ONLY if global query returned nothing
+        if allRawPayouts.isEmpty, let toolToQuery = workingToolName ?? candidateTools.first {
+            for acc in targetAccounts {
+                if Task.isCancelled { break }
                 for op in ["history", "list"] {
-                    let perAccArgs = buildAccountArgs(toolName: tool, accountRef: acc.ref, op: op)
-                    if let perAccResult = try? await callMcpTool(name: tool, arguments: perAccArgs) {
+                    let perAccArgs = buildAccountArgs(toolName: toolToQuery, accountRef: acc.ref, op: op)
+                    if let perAccResult = try? await callMcpTool(name: toolToQuery, arguments: perAccArgs) {
                         if let isErr = perAccResult["isError"] as? Bool, isErr { continue }
                         let unwrapped = unwrapMcpToolResult(perAccResult)
                         let rows = extractAnyPayoutCollection(from: unwrapped)

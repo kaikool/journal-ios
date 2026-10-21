@@ -216,8 +216,10 @@ extension TradeDataStore {
         }
         
         // Rebuild trades for any accounts that have imported executions but no reconstructed trades
+        let accountsWithTrades = Set(trades.map { $0.accountId })
+        let accountsWithExecutions = Set(executions.map { $0.accountId })
         for acc in accounts {
-            if trades.filter({ $0.accountId == acc.id }).isEmpty && !executions.filter({ $0.accountId == acc.id }).isEmpty {
+            if !accountsWithTrades.contains(acc.id) && accountsWithExecutions.contains(acc.id) {
                 rebuildAccount(accountId: acc.id)
             }
         }

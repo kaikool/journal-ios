@@ -424,6 +424,7 @@ public final class CTraderService: ObservableObject {
         }
         
         // Enrich accounts with balance and currency by authorizing and querying each account
+        var assetCache: [Int64: String] = [:]
         for idx in accounts.indices {
             let accId = accounts[idx].ctidTraderAccountId
             do {
@@ -443,13 +444,21 @@ public final class CTraderService: ObservableObject {
                     accounts[idx].balance = balDecimal
                     accounts[idx].leverage = leverage
                     
-                    // Lookup deposit currency from asset list
-                    if let assetListRes = try? await sendRequest(payloadType: 2112, payload: ["ctidTraderAccountId": accId]),
-                       let assets = (assetListRes["asset"] as? [[String: Any]]) ?? (assetListRes["assets"] as? [[String: Any]]),
-                       let depId = safeInt64(trader["depositAssetId"]),
-                       let matched = assets.first(where: { (safeInt64($0["assetId"]) ?? 0) == depId }),
-                       let ccy = matched["name"] as? String {
-                        accounts[idx].currency = ccy
+                    // Lookup deposit currency from asset cache or asset list
+                    if let depId = safeInt64(trader["depositAssetId"]) {
+                        if let cached = assetCache[depId] {
+                            accounts[idx].currency = cached
+                        } else if let assetListRes = try? await sendRequest(payloadType: 2112, payload: ["ctidTraderAccountId": accId]),
+                                  let assets = (assetListRes["asset"] as? [[String: Any]]) ?? (assetListRes["assets"] as? [[String: Any]]) {
+                            for a in assets {
+                                if let aId = safeInt64(a["assetId"]), let aName = a["name"] as? String {
+                                    assetCache[aId] = aName
+                                }
+                            }
+                            if let matched = assetCache[depId] {
+                                accounts[idx].currency = matched
+                            }
+                        }
                     }
                 }
             } catch {
