@@ -269,6 +269,24 @@ public final class CTraderService: ObservableObject {
         if payloadType == 2142 {
             let errorCode = payload["errorCode"] as? String ?? "UNKNOWN_ERROR"
             let desc = payload["description"] as? String ?? "An error occurred with cTrader Open API."
+            
+            // "ALREADY_LOGGED_IN" or "Trading account is already authorized" is a normal/expected idempotent response
+            // when an account or application was authorized previously on the same WebSocket session.
+            let isAlreadyAuthorized = errorCode == "ALREADY_LOGGED_IN" ||
+                                      desc.lowercased().contains("already authorized") ||
+                                      desc.lowercased().contains("already logged in") ||
+                                      desc.lowercased().contains("already authenticated")
+            
+            if isAlreadyAuthorized {
+                AppLogger.info("cTrader session/account is already authorized (\(errorCode): \(desc)). Resuming with success.")
+                if let cont = pendingContinuations.removeValue(forKey: clientMsgId) {
+                    cont.resume(returning: payload)
+                } else if pendingContinuations.count == 1, let firstKey = pendingContinuations.keys.first, let cont = pendingContinuations.removeValue(forKey: firstKey) {
+                    cont.resume(returning: payload)
+                }
+                return
+            }
+            
             let error = NSError(domain: "cTrader", code: payloadType, userInfo: [NSLocalizedDescriptionKey: "\(errorCode): \(desc)"])
             
             if let cont = pendingContinuations.removeValue(forKey: clientMsgId) {
@@ -347,13 +365,22 @@ public final class CTraderService: ObservableObject {
         }
         
         self.lastStatus = "Authorizing application..."
-        _ = try await sendRequest(
-            payloadType: 2100,
-            payload: [
-                "clientId": cleanId,
-                "clientSecret": cleanSecret
-            ]
-        )
+        do {
+            _ = try await sendRequest(
+                payloadType: 2100,
+                payload: [
+                    "clientId": cleanId,
+                    "clientSecret": cleanSecret
+                ]
+            )
+        } catch {
+            let msg = error.localizedDescription.lowercased()
+            if msg.contains("already_logged_in") || msg.contains("already authorized") || msg.contains("already authenticated") {
+                AppLogger.info("cTrader application is already authorized.")
+            } else {
+                throw error
+            }
+        }
     }
     
     /// Fetches all trading accounts linked to the user's Access Token (ProtoOAGetAccountListByAccessTokenReq, 2149).
@@ -573,10 +600,19 @@ public final class CTraderService: ObservableObject {
             self.lastStatus = "Syncing account \(account.traderLogin) (\(account.brokerTitleShort))..."
             
             // 1. Authorize specific account session
-            _ = try await sendRequest(
-                payloadType: 2102,
-                payload: ["ctidTraderAccountId": accId, "accessToken": cleanToken]
-            )
+            do {
+                _ = try await sendRequest(
+                    payloadType: 2102,
+                    payload: ["ctidTraderAccountId": accId, "accessToken": cleanToken]
+                )
+            } catch {
+                let msg = error.localizedDescription.lowercased()
+                if msg.contains("already_logged_in") || msg.contains("already authorized") || msg.contains("already logged in") {
+                    AppLogger.info("cTrader account \(accId) is already authorized on this session.")
+                } else {
+                    AppLogger.warn("cTrader account authorization notice for \(accId): \(error.localizedDescription)")
+                }
+            }
             
             // 2. Fetch Symbol Dictionary (including archived symbols to handle closed trades on delisted/renamed symbols)
             var symbolMap: [Int64: String] = [:]
