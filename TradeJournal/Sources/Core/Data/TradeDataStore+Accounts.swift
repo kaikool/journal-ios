@@ -359,21 +359,28 @@ extension TradeDataStore {
     /// Deduplicates propEntries by ID and semantic signature (firm, kind, currency, amount, date, account)
     public func deduplicatePropEntries() {
         var seenIds = Set<String>()
+        var seenCanonicals = Set<String>()
         var seenSemantics = Set<String>()
         var cleaned: [PropEntryItem] = []
         
         for entry in propEntries {
             let cleanAcc = (entry.accountId ?? "").cleanAccountId
+            let canonId = PropFirmEngine.canonicalPayoutId(entry.id)
             let semantic = "\(entry.firm)|\(entry.kind)|\(entry.currency.uppercased())|\(entry.amountMinor)|\(entry.occurredOn)|\(cleanAcc)"
             
             if seenIds.contains(entry.id) {
                 continue
             }
-            let isAuthoritative = !entry.reference.isEmpty && (entry.id.contains("order_") || entry.id.contains("purchase_") || entry.id.contains("payout_"))
-            if !isAuthoritative && seenSemantics.contains(semantic) {
+            if !canonId.isEmpty && canonId != entry.id && seenCanonicals.contains(canonId) {
+                continue
+            }
+            if seenSemantics.contains(semantic) {
                 continue
             }
             seenIds.insert(entry.id)
+            if !canonId.isEmpty {
+                seenCanonicals.insert(canonId)
+            }
             seenSemantics.insert(semantic)
             cleaned.append(entry)
         }
@@ -387,6 +394,7 @@ extension TradeDataStore {
     /// Deduplicates propReceipts by ID and semantic payout reference
     public func deduplicatePropReceipts() {
         var seenIds = Set<String>()
+        var seenCanonicals = Set<String>()
         var seenSemantics = Set<String>()
         var cleaned: [PropReceiptItem] = []
         
@@ -394,12 +402,20 @@ extension TradeDataStore {
             if seenIds.contains(rcpt.id) {
                 continue
             }
-            let isAuthoritative = !rcpt.reference.isEmpty && rcpt.id.contains("rcpt_")
-            let semantic = "\(rcpt.payoutId.cleanAccountId)|\(rcpt.amountMinor)|\(rcpt.occurredOn)"
-            if !isAuthoritative && seenSemantics.contains(semantic) {
+            let canonPayout = PropFirmEngine.canonicalPayoutId(rcpt.payoutId)
+            let canonRcpt = PropFirmEngine.canonicalPayoutId(rcpt.id)
+            let semantic = "\(canonPayout)|\(rcpt.amountMinor)|\(rcpt.occurredOn)"
+            
+            if !canonRcpt.isEmpty && canonRcpt != rcpt.id && seenCanonicals.contains(canonRcpt) {
+                continue
+            }
+            if seenSemantics.contains(semantic) {
                 continue
             }
             seenIds.insert(rcpt.id)
+            if !canonRcpt.isEmpty {
+                seenCanonicals.insert(canonRcpt)
+            }
             seenSemantics.insert(semantic)
             cleaned.append(rcpt)
         }

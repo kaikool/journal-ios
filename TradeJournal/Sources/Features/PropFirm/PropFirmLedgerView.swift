@@ -44,22 +44,30 @@ public struct PropFirmLedgerView: View {
     }
     
     var filteredAccounts: [PropAccountItem] {
-        dataStore.propAccounts.filter { prop in
-            (showArchivedAccounts || !prop.archived) &&
-            (prop.currency.uppercased() == selectedCurrency.uppercased() || (prop.currency.isEmpty && selectedCurrency.uppercased() == "USD"))
+        let sel = selectedCurrency.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        return dataStore.propAccounts.filter { prop in
+            let c = prop.currency.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
+            return (showArchivedAccounts || !prop.archived) &&
+                   (c == sel || (c.isEmpty && (sel == "USD" || sel.isEmpty)))
         }
     }
     
     var filteredEntries: [PropEntryItem] {
-        dataStore.propEntries.filter { entry in
-            !entry.voided &&
-            (entry.currency.uppercased() == selectedCurrency.uppercased() || (entry.currency.isEmpty && selectedCurrency.uppercased() == "USD"))
+        let sel = selectedCurrency.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        return dataStore.propEntries.filter { entry in
+            let c = entry.currency.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
+            return !entry.voided &&
+                   (c == sel || (c.isEmpty && (sel == "USD" || sel.isEmpty)))
         }
     }
     
     var movements: [CashMovementItem] {
-        PropFirmEngine.cashMovements(entries: filteredEntries, receipts: dataStore.propReceipts)
-            .filter { $0.currency.uppercased() == selectedCurrency.uppercased() || ($0.currency.isEmpty && selectedCurrency.uppercased() == "USD") }
+        let sel = selectedCurrency.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        return PropFirmEngine.cashMovements(entries: filteredEntries, receipts: dataStore.propReceipts)
+            .filter { mov in
+                let c = mov.currency.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
+                return c == sel || (c.isEmpty && (sel == "USD" || sel.isEmpty))
+            }
     }
     
     var summary: CashSummaryResult {

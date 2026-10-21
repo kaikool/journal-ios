@@ -308,13 +308,17 @@ extension PropFirmLedgerView {
     // MARK: - 2. Accounts Tab
     
     internal func accountCashSummary(account: PropAccountItem) -> CashSummaryResult {
+        let accClean = account.id.cleanAccountId
+        let accCurr = account.currency.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
         let accMovements = movements.filter { mov in
-            guard mov.currency == account.currency else { return false }
-            guard let mAccId = mov.accountId else { return false }
+            let movCurr = mov.currency.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
+            guard movCurr == accCurr || (movCurr.isEmpty && (accCurr == "USD" || accCurr.isEmpty)) else { return false }
+            guard let mAccId = mov.accountId, !mAccId.isEmpty else { return false }
             return mAccId == account.id ||
                    mAccId == account.journalAccountId ||
                    TradeDataStore.isSameAccountId(mAccId, account.id) ||
-                   (account.journalAccountId.map { TradeDataStore.isSameAccountId(mAccId, $0) } ?? false)
+                   (account.journalAccountId.map { TradeDataStore.isSameAccountId(mAccId, $0) } ?? false) ||
+                   mAccId.cleanAccountId == accClean
         }
         return (try? PropFirmEngine.cashSummary(rows: accMovements)) ?? CashSummaryResult(
             spentMinor: 0, refundsMinor: 0, netSpendMinor: 0, receivedMinor: 0, netMinor: 0, roi: nil

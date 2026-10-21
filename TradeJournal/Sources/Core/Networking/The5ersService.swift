@@ -776,82 +776,8 @@ public final class The5ersService: ObservableObject {
                 }
             }
             
-            // 4. Sync purchases / challenges & evaluation fees across all pages and accounts
-            lastStatus = "Loading purchases and evaluation fees from the5ers_purchase..."
-            var allPurchases: [[String: Any]] = []
-            var seenPurchaseIds = Set<String>()
-            
-            for page in 1...10 {
-                if Task.isCancelled { break }
-                let purchaseArgs: [String: Any] = [
-                    "operation": "list",
-                    "page": page,
-                    "limit": 50,
-                    "view": "all",
-                    "contract_version": "1.0",
-                    "request_context": ["timezone": "UTC", "locale": "en"]
-                ]
-                guard let purchaseResult = try? await callMcpTool(name: "the5ers_purchase", arguments: purchaseArgs) else { break }
-                let unwrapped = unwrapMcpToolResult(purchaseResult)
-                let rows = extractAnyPurchaseCollection(from: unwrapped)
-                if rows.isEmpty { break }
-                for r in rows {
-                    let pId = String(describing: r["id"] ?? r["orderid"] ?? r["order_id"] ?? r["purchaseid"] ?? UUID().uuidString)
-                    if !seenPurchaseIds.contains(pId) {
-                        seenPurchaseIds.insert(pId)
-                        allPurchases.append(r)
-                    }
-                }
-                if rows.count < 50 { break }
-            }
-            
-            if allPurchases.isEmpty {
-                for page in 1...5 {
-                    if Task.isCancelled { break }
-                    let histArgs: [String: Any] = [
-                        "operation": "history",
-                        "page": page,
-                        "limit": 50,
-                        "view": "all"
-                    ]
-                    guard let histResult = try? await callMcpTool(name: "the5ers_purchase", arguments: histArgs) else { break }
-                    let unwrapped = unwrapMcpToolResult(histResult)
-                    let rows = extractAnyPurchaseCollection(from: unwrapped)
-                    if rows.isEmpty { break }
-                    for r in rows {
-                        let pId = String(describing: r["id"] ?? r["orderid"] ?? r["order_id"] ?? r["purchaseid"] ?? UUID().uuidString)
-                        if !seenPurchaseIds.contains(pId) {
-                            seenPurchaseIds.insert(pId)
-                            allPurchases.append(r)
-                        }
-                    }
-                    if rows.count < 50 { break }
-                }
-            }
-            
-            // Query per-account purchases across all accounts
-            for acc in allTargetAccounts {
-                if Task.isCancelled { break }
-                if let perAccRes = try? await callMcpTool(name: "the5ers_purchase", arguments: [
-                    "operation": "list",
-                    "account_ref": acc.ref
-                ]) {
-                    let unwrapped = unwrapMcpToolResult(perAccRes)
-                    let rows = extractAnyPurchaseCollection(from: unwrapped)
-                    for var r in rows {
-                        if r["account_ref"] == nil { r["account_ref"] = acc.ref }
-                        let pId = String(describing: r["id"] ?? r["orderid"] ?? r["order_id"] ?? r["purchaseid"] ?? UUID().uuidString)
-                        if !seenPurchaseIds.contains(pId) {
-                            seenPurchaseIds.insert(pId)
-                            allPurchases.append(r)
-                        }
-                    }
-                }
-            }
-            
-            if !allPurchases.isEmpty {
-                mergePurchases(allPurchases, into: dataStore, targetAccounts: allTargetAccounts)
-            }
+            // 4. Sync purchases / challenges & evaluation fees across all tools and accounts
+            await syncPurchases(into: dataStore, targetAccounts: allTargetAccounts)
             
             // 5. Sync payouts & withdrawal settlements across ALL accounts
             await syncPayouts(into: dataStore, targetAccounts: allTargetAccounts)
@@ -1328,6 +1254,85 @@ public final class The5ersService: ObservableObject {
     }
     
     @MainActor
+    private func syncPurchases(
+        into dataStore: TradeDataStore,
+        targetAccounts: [The5ersMcpAccount]
+    ) async {
+        lastStatus = "Loading purchases and evaluation fees from the5ers_purchase..."
+        var allPurchases: [[String: Any]] = []
+        var seenPurchaseIds = Set<String>()
+        
+        let toolNames = ["the5ers_purchase", "the5ers_purchases", "the5ers_orders"]
+        
+        let argSets: [[String: Any]] = [
+            [
+                "operation": "list",
+                "contract_version": "1.0",
+                "request_context": ["timezone": "UTC", "locale": "en"]
+            ],
+            ["operation": "list"],
+            [
+                "operation": "history",
+                "contract_version": "1.0",
+                "request_context": ["timezone": "UTC", "locale": "en"]
+            ],
+            ["operation": "history"],
+            [:]
+        ]
+        
+        for tool in toolNames {
+            if !allPurchases.isEmpty { break }
+            for args in argSets {
+                if Task.isCancelled { break }
+                guard let res = try? await callMcpTool(name: tool, arguments: args) else { continue }
+                if let isErr = res["isError"] as? Bool, isErr { continue }
+                let unwrapped = unwrapMcpToolResult(res)
+                let rows = extractAnyPurchaseCollection(from: unwrapped)
+                if !rows.isEmpty {
+                    for r in rows {
+                        let pId = String(describing: r["id"] ?? r["orderid"] ?? r["order_id"] ?? r["purchaseid"] ?? UUID().uuidString)
+                        if !seenPurchaseIds.contains(pId) {
+                            seenPurchaseIds.insert(pId)
+                            allPurchases.append(r)
+                        }
+                    }
+                    break
+                }
+            }
+        }
+        
+        // Query per-account purchases across all accounts
+        for acc in targetAccounts {
+            if Task.isCancelled { break }
+            for tool in toolNames {
+                for op in ["list", "history"] {
+                    if let perAccRes = try? await callMcpTool(name: tool, arguments: [
+                        "operation": op,
+                        "account_ref": acc.ref
+                    ]) {
+                        if let isErr = perAccRes["isError"] as? Bool, isErr { continue }
+                        let unwrapped = unwrapMcpToolResult(perAccRes)
+                        let rows = extractAnyPurchaseCollection(from: unwrapped)
+                        for var r in rows {
+                            if r["account_ref"] == nil { r["account_ref"] = acc.ref }
+                            let pId = String(describing: r["id"] ?? r["orderid"] ?? r["order_id"] ?? r["purchaseid"] ?? UUID().uuidString)
+                            if !seenPurchaseIds.contains(pId) {
+                                seenPurchaseIds.insert(pId)
+                                allPurchases.append(r)
+                            }
+                        }
+                        if !rows.isEmpty { break }
+                    }
+                }
+            }
+        }
+        
+        if !allPurchases.isEmpty {
+            mergePurchases(allPurchases, into: dataStore, targetAccounts: targetAccounts)
+        }
+    }
+    
+    @MainActor
     private func mergePurchases(
         _ rawPurchases: [[String: Any]],
         into dataStore: TradeDataStore,
@@ -1401,7 +1406,11 @@ public final class The5ersService: ObservableObject {
             })?.id
             let journalAccId = matchingAccId.map { $0.hasPrefix("the5ers_") ? $0 : "the5ers_\($0)" }
             
-            if let existingIdx = dataStore.propEntries.firstIndex(where: { $0.id == entryId }) {
+            if let existingIdx = dataStore.propEntries.firstIndex(where: {
+                $0.id == entryId ||
+                (!orderId.isEmpty && ($0.id.contains(orderId) || $0.reference.contains(orderId))) ||
+                ($0.occurredOn == dateStr && $0.amountMinor == amountMinor && $0.currency == currency && $0.kind == "expense")
+            }) {
                 var existing = dataStore.propEntries[existingIdx]
                 existing.amountMinor = amountMinor
                 existing.currency = currency
@@ -1468,96 +1477,67 @@ public final class The5ersService: ObservableObject {
         var allRawPayouts: [[String: Any]] = []
         var seenPayoutIds = Set<String>()
         
-        // 1. Try global queries with pagination across pages
-        for page in 1...10 {
-            if Task.isCancelled { break }
-            let payArgs: [String: Any] = [
+        let toolNames = ["the5ers_payout", "the5ers_payouts", "the5ers_withdrawals"]
+        
+        let argSets: [[String: Any]] = [
+            [
                 "operation": "history",
-                "page": page,
-                "limit": 50,
-                "view": "all",
                 "contract_version": "1.0",
                 "request_context": ["timezone": "UTC", "locale": "en"]
-            ]
-            guard let globalResult = try? await callMcpTool(name: "the5ers_payout", arguments: payArgs) else { break }
-            let unwrapped = unwrapMcpToolResult(globalResult)
-            let rows = extractAnyPayoutCollection(from: unwrapped)
-            if rows.isEmpty { break }
-            for r in rows {
-                let pId = String(describing: r["id"] ?? r["payout_id"] ?? r["withdrawalid"] ?? UUID().uuidString)
-                if !seenPayoutIds.contains(pId) {
-                    seenPayoutIds.insert(pId)
-                    allRawPayouts.append(r)
-                }
-            }
-            if rows.count < 50 { break }
-        }
+            ],
+            ["operation": "history"],
+            [
+                "operation": "list",
+                "contract_version": "1.0",
+                "request_context": ["timezone": "UTC", "locale": "en"]
+            ],
+            ["operation": "list"],
+            [:]
+        ]
         
-        if allRawPayouts.isEmpty {
-            for page in 1...5 {
+        for tool in toolNames {
+            if !allRawPayouts.isEmpty { break }
+            for args in argSets {
                 if Task.isCancelled { break }
-                let listArgs: [String: Any] = [
-                    "operation": "list",
-                    "page": page,
-                    "limit": 50,
-                    "view": "all"
-                ]
-                guard let listResult = try? await callMcpTool(name: "the5ers_payout", arguments: listArgs) else { break }
-                let unwrapped = unwrapMcpToolResult(listResult)
-                let rows = extractAnyPayoutCollection(from: unwrapped)
-                if rows.isEmpty { break }
-                for r in rows {
-                    let pId = String(describing: r["id"] ?? r["payout_id"] ?? r["withdrawalid"] ?? UUID().uuidString)
-                    if !seenPayoutIds.contains(pId) {
-                        seenPayoutIds.insert(pId)
-                        allRawPayouts.append(r)
-                    }
-                }
-                if rows.count < 50 { break }
-            }
-        }
-        
-        if allRawPayouts.isEmpty {
-            if let bareResult = try? await callMcpTool(name: "the5ers_payout", arguments: [:]) {
-                let unwrapped = unwrapMcpToolResult(bareResult)
-                let rows = extractAnyPayoutCollection(from: unwrapped)
-                for r in rows {
-                    let pId = String(describing: r["id"] ?? r["payout_id"] ?? r["withdrawalid"] ?? UUID().uuidString)
-                    if !seenPayoutIds.contains(pId) {
-                        seenPayoutIds.insert(pId)
-                        allRawPayouts.append(r)
-                    }
-                }
-            }
-        }
-        
-        // 2. Query per-account history if targetAccounts available
-        for acc in targetAccounts {
-            var perAccResult = try? await callMcpTool(name: "the5ers_payout", arguments: [
-                "operation": "history",
-                "account_ref": acc.ref
-            ])
-            if perAccResult == nil {
-                perAccResult = try? await callMcpTool(name: "the5ers_payout", arguments: [
-                    "operation": "list",
-                    "account_ref": acc.ref
-                ])
-            }
-            if perAccResult == nil {
-                perAccResult = try? await callMcpTool(name: "the5ers_payout", arguments: [
-                    "account_ref": acc.ref
-                ])
-            }
-            if let res = perAccResult {
+                guard let res = try? await callMcpTool(name: tool, arguments: args) else { continue }
+                if let isErr = res["isError"] as? Bool, isErr { continue }
                 let unwrapped = unwrapMcpToolResult(res)
                 let rows = extractAnyPayoutCollection(from: unwrapped)
-                for var r in rows {
-                    if r["account_ref"] == nil { r["account_ref"] = acc.ref }
-                    if r["currency"] == nil { r["currency"] = acc.currency }
-                    let pId = String(describing: r["id"] ?? r["payout_id"] ?? r["withdrawalid"] ?? UUID().uuidString)
-                    if !seenPayoutIds.contains(pId) {
-                        seenPayoutIds.insert(pId)
-                        allRawPayouts.append(r)
+                if !rows.isEmpty {
+                    for r in rows {
+                        let pId = String(describing: r["id"] ?? r["payout_id"] ?? r["withdrawalid"] ?? UUID().uuidString)
+                        if !seenPayoutIds.contains(pId) {
+                            seenPayoutIds.insert(pId)
+                            allRawPayouts.append(r)
+                        }
+                    }
+                    break
+                }
+            }
+        }
+        
+        // Query per-account history across all accounts
+        for acc in targetAccounts {
+            if Task.isCancelled { break }
+            for tool in toolNames {
+                for op in ["history", "list"] {
+                    if let perAccResult = try? await callMcpTool(name: tool, arguments: [
+                        "operation": op,
+                        "account_ref": acc.ref
+                    ]) {
+                        if let isErr = perAccResult["isError"] as? Bool, isErr { continue }
+                        let unwrapped = unwrapMcpToolResult(perAccResult)
+                        let rows = extractAnyPayoutCollection(from: unwrapped)
+                        for var r in rows {
+                            if r["account_ref"] == nil { r["account_ref"] = acc.ref }
+                            if r["currency"] == nil { r["currency"] = acc.currency }
+                            let pId = String(describing: r["id"] ?? r["payout_id"] ?? r["withdrawalid"] ?? UUID().uuidString)
+                            if !seenPayoutIds.contains(pId) {
+                                seenPayoutIds.insert(pId)
+                                allRawPayouts.append(r)
+                            }
+                        }
+                        if !rows.isEmpty { break }
                     }
                 }
             }
@@ -1566,12 +1546,13 @@ public final class The5ersService: ObservableObject {
         for pay in allRawPayouts {
             let fields = sourceFields(pay)
             let id = String(describing: fields["id"] ?? fields["payoutid"] ?? fields["withdrawalid"] ?? fields["requestid"] ?? UUID().uuidString)
+            let canonicalId = PropFirmEngine.canonicalPayoutId(id)
             
             let status = String(describing: fields["status"] ?? "completed").lowercased().trimmingCharacters(in: .whitespaces)
             let isReversed = (fields["reversed"] as? Bool) == true
             let isCompleted = ["completed", "paid", "received", "settled", "approved", "processed", "successful", "done", "transferred"].contains(status) || status.isEmpty
             
-            // Extract Gross, Net, and Split information matching web source specification
+            // 1. Extract Trader Split percentage/ratio
             let splitPercentVal: Double? = {
                 for key in [
                     "splitpercent", "split_percent", "profitsplit", "profit_split",
@@ -1589,8 +1570,9 @@ public final class The5ersService: ObservableObject {
                 return nil
             }()
             
-            let grossAmountVal: Double? = {
-                for k in ["grossamount", "gross_amount", "grossprofit", "gross_profit", "profit", "tradingprofit", "trading_profit", "amount", "total", "price", "value"] {
+            // 2. Extract Explicit Gross Amount
+            let explicitGross: Double? = {
+                for k in ["grossamount", "gross_amount", "grossprofit", "gross_profit", "tradingprofit", "trading_profit", "profit"] {
                     if let val = fields[k] {
                         if let n = val as? NSNumber, n.doubleValue > 0 { return n.doubleValue }
                         if let s = val as? String {
@@ -1602,7 +1584,8 @@ public final class The5ersService: ObservableObject {
                 return nil
             }()
             
-            let netAmountVal: Double? = {
+            // 3. Extract Explicit Net Received Amount
+            let explicitNet: Double? = {
                 for k in ["receivedamount", "received_amount", "netamount", "net_amount", "paidamount", "paid_amount", "netpaid", "traderprofit", "trader_profit", "tradershare", "trader_share", "payoutamount", "payout_amount", "withdrawalamount", "withdrawal_amount", "usershare", "user_share", "net"] {
                     if let val = fields[k] {
                         if let n = val as? NSNumber, n.doubleValue > 0 { return n.doubleValue }
@@ -1615,8 +1598,22 @@ public final class The5ersService: ObservableObject {
                 return nil
             }()
             
+            // 4. Extract Generic Amount (often payout amount requested)
+            let genericAmount: Double? = {
+                for k in ["amount", "total", "price", "value"] {
+                    if let val = fields[k] {
+                        if let n = val as? NSNumber, n.doubleValue > 0 { return n.doubleValue }
+                        if let s = val as? String {
+                            let clean = s.replacingOccurrences(of: "$", with: "").replacingOccurrences(of: ",", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
+                            if let d = Double(clean), d > 0 { return d }
+                        }
+                    }
+                }
+                return nil
+            }()
+            
             let feeVal: Double = {
-                if let f = fields["fee"] ?? fields["transfer_fee"] {
+                if let f = fields["fee"] ?? fields["fees"] ?? fields["transferfee"] ?? fields["transfer_fee"] {
                     if let n = f as? NSNumber { return n.doubleValue }
                     if let s = f as? String, let d = Double(s.trimmingCharacters(in: .whitespaces)) { return d }
                 }
@@ -1624,38 +1621,51 @@ public final class The5ersService: ObservableObject {
             }()
             let feeMinor = Int64(round(feeVal * 100))
             
-            // Determine split bps (basis points): 80% = 8000 bps, 100% = 10000 bps
-            let splitBps: Int = {
+            // Determine split basis points (bps)
+            var splitBps: Int = {
                 if let sp = splitPercentVal, sp > 0 {
-                    if sp > 1.0 {
-                        return Int(round(sp * 100))
-                    } else {
-                        return Int(round(sp * 10000))
-                    }
+                    return Int(round(sp > 1.0 ? sp * 100 : sp * 10000))
                 }
-                if let net = netAmountVal, let gross = grossAmountVal, gross > 0, net < gross {
+                if let net = explicitNet, let gross = explicitGross, gross > 0, net < gross {
                     return Int(round((net / gross) * 10000))
                 }
-                if netAmountVal != nil && grossAmountVal == nil {
-                    return 8000 // Standard The5ers trader split when net received is reported
-                }
-                return 8000 // Standard The5ers trader split
+                return 8000 // Standard The5ers trader split (80%)
             }()
             
-            // Determine Gross Minor and Net Received Minor
+            // Determine grossMinor and netReceivedMinor
             let grossMinor: Int64
             let netReceivedMinor: Int64
             
-            if let gross = grossAmountVal, gross > 0 {
-                grossMinor = Int64(round(gross * 100))
-                if let net = netAmountVal, net > 0 {
-                    netReceivedMinor = Int64(round(net * 100))
+            if let eg = explicitGross, let en = explicitNet {
+                grossMinor = Int64(round(eg * 100))
+                netReceivedMinor = Int64(round(en * 100))
+                if splitPercentVal == nil && grossMinor > 0 {
+                    splitBps = Int(round(Double(netReceivedMinor) * 10000.0 / Double(grossMinor)))
+                }
+            } else if let eg = explicitGross {
+                grossMinor = Int64(round(eg * 100))
+                if let ga = genericAmount, ga < eg {
+                    netReceivedMinor = Int64(round(ga * 100))
+                    if splitPercentVal == nil && grossMinor > 0 {
+                        splitBps = Int(round(Double(netReceivedMinor) * 10000.0 / Double(grossMinor)))
+                    }
                 } else {
                     netReceivedMinor = max(0, Int64((Double(grossMinor) * Double(splitBps) + 5000) / 10000) - feeMinor)
                 }
-            } else if let net = netAmountVal, net > 0 {
-                netReceivedMinor = Int64(round(net * 100))
-                grossMinor = Int64(round(Double(netReceivedMinor + feeMinor) * 10000 / Double(splitBps)))
+            } else if let en = explicitNet {
+                netReceivedMinor = Int64(round(en * 100))
+                if let ga = genericAmount, ga > en {
+                    grossMinor = Int64(round(ga * 100))
+                    if splitPercentVal == nil && grossMinor > 0 {
+                        splitBps = Int(round(Double(netReceivedMinor) * 10000.0 / Double(grossMinor)))
+                    }
+                } else {
+                    grossMinor = splitBps > 0 ? Int64(round(Double(netReceivedMinor + feeMinor) * 10000.0 / Double(splitBps))) : netReceivedMinor
+                }
+            } else if let ga = genericAmount {
+                // In a withdrawal/payout record, generic amount is the cash payout received
+                netReceivedMinor = Int64(round(ga * 100))
+                grossMinor = splitBps > 0 ? Int64(round(Double(netReceivedMinor + feeMinor) * 10000.0 / Double(splitBps))) : netReceivedMinor
             } else {
                 continue
             }
@@ -1687,7 +1697,12 @@ public final class The5ersService: ObservableObject {
             }()
             let currency = String(describing: fields["currency"] ?? matchedAcc?.currency ?? "USD").uppercased()
             
-            if let existingIdx = dataStore.propEntries.firstIndex(where: { $0.id == payoutEntryId }) {
+            if let existingIdx = dataStore.propEntries.firstIndex(where: {
+                $0.id == payoutEntryId ||
+                PropFirmEngine.canonicalPayoutId($0.id) == canonicalId ||
+                (!id.isEmpty && ($0.id.contains(id) || $0.reference.contains(id))) ||
+                ($0.occurredOn == dateStr && $0.kind == "payout" && ($0.amountMinor == grossMinor || $0.amountMinor == netReceivedMinor))
+            }) {
                 var existing = dataStore.propEntries[existingIdx]
                 existing.amountMinor = grossMinor
                 existing.splitBps = splitBps
@@ -1719,8 +1734,15 @@ public final class The5ersService: ObservableObject {
             
             // Settlement receipt records actual cash in-pocket
             if isCompleted && !isReversed {
-                if let rIdx = dataStore.propReceipts.firstIndex(where: { $0.id == rcptId || $0.payoutId == payoutEntryId }) {
+                if let rIdx = dataStore.propReceipts.firstIndex(where: {
+                    $0.id == rcptId ||
+                    $0.payoutId == payoutEntryId ||
+                    PropFirmEngine.canonicalPayoutId($0.payoutId) == canonicalId ||
+                    (!id.isEmpty && ($0.id.contains(id) || $0.reference.contains(id))) ||
+                    ($0.occurredOn == dateStr && $0.amountMinor == netReceivedMinor)
+                }) {
                     var existingRcpt = dataStore.propReceipts[rIdx]
+                    existingRcpt.payoutId = payoutEntryId
                     existingRcpt.amountMinor = netReceivedMinor
                     existingRcpt.occurredOn = dateStr
                     dataStore.propReceipts[rIdx] = existingRcpt

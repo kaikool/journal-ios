@@ -464,6 +464,23 @@ public enum PropFirmEngine {
         return receipt.occurredOn
     }
     
+    /// Normalizes payout IDs by stripping canonical provider prefixes (the5ers_payout_, payout_, the5ers_rcpt_, rcpt_, etc.)
+    public static func canonicalPayoutId(_ id: String) -> String {
+        var clean = id.trimmingCharacters(in: .whitespacesAndNewlines)
+        let prefixes = ["the5ers_payout_", "payout_", "the5ers_rcpt_", "rcpt_", "THE5ERS-", "the5ers_"]
+        var changed = true
+        while changed {
+            changed = false
+            for prefix in prefixes {
+                if clean.hasPrefix(prefix) {
+                    clean = String(clean.dropFirst(prefix.count))
+                    changed = true
+                }
+            }
+        }
+        return clean
+    }
+    
     /// Constructs unified cash movement timeline combining expenses, payouts, and refunds
     public static func cashMovements(entries: [PropEntryItem], receipts: [PropReceiptItem]) -> [CashMovementItem] {
         let activeEntries = entries.filter { !$0.voided }
@@ -490,14 +507,18 @@ public enum PropFirmEngine {
         // 2. Receipt movements (actual payouts cash received)
         var processedPayoutEntryIds = Set<String>()
         for r in receipts where !r.voided {
+            let rCanon = canonicalPayoutId(r.payoutId)
             let matchedEntry = entryMap[r.payoutId] ?? activeEntries.first(where: {
                 $0.id == r.payoutId ||
+                canonicalPayoutId($0.id) == rCanon ||
                 $0.id.hasSuffix(r.payoutId) ||
                 r.payoutId.hasSuffix($0.id) ||
                 $0.id.cleanAccountId == r.payoutId.cleanAccountId
             })
             if let entry = matchedEntry {
                 processedPayoutEntryIds.insert(entry.id)
+                processedPayoutEntryIds.insert(canonicalPayoutId(entry.id))
+                processedPayoutEntryIds.insert(entry.id.cleanAccountId)
                 movements.append(CashMovementItem(
                     id: r.id,
                     entryId: entry.id,
@@ -515,7 +536,7 @@ public enum PropFirmEngine {
                     id: r.id,
                     entryId: r.payoutId,
                     accountId: nil,
-                    firm: "Prop Firm",
+                    firm: "The5ers",
                     currency: "USD",
                     date: receiptSettlementDate(receipt: r),
                     kind: r.kind,
@@ -531,6 +552,7 @@ public enum PropFirmEngine {
             ($0.kind == "payout" || $0.category.lowercased() == "payout") &&
             $0.status == .completed &&
             !processedPayoutEntryIds.contains($0.id) &&
+            !processedPayoutEntryIds.contains(canonicalPayoutId($0.id)) &&
             !processedPayoutEntryIds.contains($0.id.cleanAccountId)
         }
         for p in unreceiptedCompletedPayouts {
@@ -561,8 +583,11 @@ public enum PropFirmEngine {
     
     /// Aggregates net spend, total payouts, and overall ROI across prop firm activities
     public static func cashSummary(rows: [CashMovementItem]) throws -> CashSummaryResult {
-        let currencies = Set(rows.map { $0.currency })
-        if currencies.count > 1 {
+        let normalizedCurrencies = Set(rows.map {
+            let c = $0.currency.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
+            return c.isEmpty ? "USD" : c
+        })
+        if normalizedCurrencies.count > 1 {
             throw PropFirmError.validation("Select one currency before combining cash amounts.")
         }
         var spent: Int64 = 0
@@ -622,16 +647,21 @@ public enum PropFirmEngine {
         for row in receipts where !row.voided {
             let signed = row.kind == "reversal" ? -row.amountMinor : row.amountMinor
             receivedMap[row.payoutId, default: 0] += signed
-            let cleanPId = row.payoutId.cleanAccountId
+            let cleanPId = canonicalPayoutId(row.payoutId)
             if cleanPId != row.payoutId {
                 receivedMap[cleanPId, default: 0] += signed
+            }
+            let accClean = row.payoutId.cleanAccountId
+            if accClean != row.payoutId && accClean != cleanPId {
+                receivedMap[accClean, default: 0] += signed
             }
         }
         
         return entries
             .filter { ($0.kind == "payout" || $0.category.lowercased() == "payout") && !$0.voided }
             .map { entry in
-                let actualFromReceipts = receivedMap[entry.id] ?? receivedMap[entry.id.cleanAccountId] ?? 0
+                let cleanEId = canonicalPayoutId(entry.id)
+                let actualFromReceipts = receivedMap[entry.id] ?? receivedMap[cleanEId] ?? receivedMap[entry.id.cleanAccountId] ?? 0
                 let expected = expectedPayout(entry: entry)
                 // If entry is marked completed but has no separate receipt object, actual received is the expected net
                 let actual = (entry.status == .completed && actualFromReceipts == 0) ? (expected > 0 ? expected : entry.amountMinor) : actualFromReceipts
