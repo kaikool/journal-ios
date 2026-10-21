@@ -437,7 +437,8 @@ public final class CTraderService: ObservableObject {
             let journalAccId = "ctrader_\(account.ctidTraderAccountId)"
             let brokerName = account.brokerTitleShort.trimmingCharacters(in: .whitespacesAndNewlines)
             let safeBroker = brokerName.isEmpty ? "cTrader" : brokerName
-            let accountName = "cTrader \(account.traderLogin) (\(safeBroker))"
+            let envLabel = account.isLive ? "Live" : "Demo"
+            let accountName = "\(safeBroker) #\(account.traderLogin) (\(envLabel))"
             
             if let existingIdx = dataStore.accounts.firstIndex(where: {
                 $0.id == journalAccId ||
@@ -447,9 +448,10 @@ public final class CTraderService: ObservableObject {
                 $0.name.contains("\(account.traderLogin)")
             }) {
                 var acc = dataStore.accounts[existingIdx]
+                acc.name = accountName
+                acc.broker = safeBroker
                 acc.currency = account.currency
                 acc.kind = .sync
-                acc.broker = safeBroker
                 acc.autoSync = true
                 if acc.initialBalance == 0 && account.balance > 0 {
                     acc.initialBalance = account.balance
@@ -592,17 +594,27 @@ public final class CTraderService: ObservableObject {
             
             // 4. Ensure Journal Account exists
             let journalAccId = "ctrader_\(accId)"
+            let brokerName = account.brokerTitleShort.trimmingCharacters(in: .whitespacesAndNewlines)
+            let safeBroker = brokerName.isEmpty ? "cTrader" : brokerName
+            let envLabel = account.isLive ? "Live" : "Demo"
+            let accountName = "\(safeBroker) #\(account.traderLogin) (\(envLabel))"
+            
             if let existingIdx = dataStore.accounts.firstIndex(where: { $0.id == journalAccId || $0.name.contains("\(account.traderLogin)") }) {
                 var acc = dataStore.accounts[existingIdx]
+                acc.name = accountName
+                acc.broker = safeBroker
                 acc.currency = account.currency
                 acc.kind = .sync
                 acc.autoSync = true
+                if acc.initialBalance == 0 && account.balance > 0 {
+                    acc.initialBalance = account.balance
+                }
                 dataStore.accounts[existingIdx] = acc
             } else {
                 let newAcc = Account(
                     id: journalAccId,
-                    name: "cTrader \(account.traderLogin) (\(account.brokerTitleShort))",
-                    broker: "cTrader",
+                    name: accountName,
+                    broker: safeBroker,
                     kind: .sync,
                     currency: account.currency,
                     initialBalance: account.balance,
@@ -630,6 +642,7 @@ public final class CTraderService: ObservableObject {
                 
                 // Volume conversion: Standard forex lots (10,000,000 cents = 1.0 lot) or contracts
                 let isForexOrMetals = symbolName.count == 6 || symbolName.contains("XAU") || symbolName.contains("XAG")
+                let isCrypto = symbolName.contains("BTC") || symbolName.contains("ETH") || symbolName.contains("SOL")
                 let lotDivisor: Decimal = isForexOrMetals ? 10_000_000 : 100
                 let quantity = max(Decimal(0.01), Decimal(filledVolume) / lotDivisor)
                 
@@ -642,6 +655,8 @@ public final class CTraderService: ObservableObject {
                 let fillId = "ctrader_deal_\(dealId)"
                 let hash = "\(journalAccId)|\(symbolName)|\(side.rawValue)|\(quantity)|\(executionPrice)|\(execTimestamp)"
                 
+                let assetClass = isForexOrMetals ? "forex" : (isCrypto ? "crypto" : "index")
+                
                 let exec = Execution(
                     id: fillId,
                     accountId: journalAccId,
@@ -651,8 +666,8 @@ public final class CTraderService: ObservableObject {
                     price: Decimal(executionPrice),
                     fee: fee,
                     executedAt: execDate,
-                    assetClass: isForexOrMetals ? "forex" : "cfd",
-                    source: "sync",
+                    assetClass: assetClass,
+                    source: "ctrader",
                     contentHash: hash
                 )
                 newExecutions.append(exec)

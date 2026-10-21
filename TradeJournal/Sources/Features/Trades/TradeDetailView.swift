@@ -755,8 +755,10 @@ public struct TradeDetailView: View {
         .toolbar(.hidden, for: .navigationBar)
         .interactiveEdgeBack(onBack: { dismiss() })
         .enableNativePopGesture()
-        .fullScreenCover(isPresented: $showReplayView) {
-            TradeReplayView(trade: trade, executions: fills)
+        .sheet(isPresented: $showReplayView) {
+            TradeReplayView(trade: trade, executions: fills, isModal: true)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
         }
         .alert("Delete trade \(trade.symbol)?", isPresented: $showDeleteAlert) {
             Button("Cancel", role: .cancel) {}

@@ -375,7 +375,7 @@ public struct AccountsManagerView: View {
         var map: [String: Int] = [:]
         for t in dataStore.trades {
             map[t.accountId, default: 0] += 1
-            let clean = t.accountId.hasPrefix("the5ers_") ? String(t.accountId.dropFirst(8)) : t.accountId
+            let clean = t.accountId.cleanAccountId
             map[clean, default: 0] += 1
         }
         return map
@@ -385,8 +385,7 @@ public struct AccountsManagerView: View {
     private func accountCard(_ acc: Account) -> some View {
         let isSelected = dataStore.selectedAccountId == acc.id
         let isArchived = acc.archivedAt != nil
-        let altId = acc.id.hasPrefix("the5ers_") ? String(acc.id.dropFirst(8)) : "the5ers_\(acc.id)"
-        let tradeCount = tradeCountMap[acc.id] ?? tradeCountMap[altId] ?? 0
+        let tradeCount = tradeCountMap[acc.id] ?? tradeCountMap[acc.id.cleanAccountId] ?? 0
         let isVisible = dataStore.isAccountVisible(acc)
         
         cardContainer {
@@ -593,12 +592,12 @@ public struct CreateAccountSheet: View {
     @Environment(\.dismiss) private var dismiss
     
     @State private var name: String = ""
-    @State private var broker: String = "The5ers"
+    @State private var broker: String = "IC Markets"
     @State private var currency: String = "USD"
     @State private var initialBalanceText: String = "10000"
     @State private var calcMethod: ProfitCalcMethod = .fifo
     
-    private let commonBrokers = ["The5ers", "FTMO", "Topstep", "Oanda", "MetaTrader 5", "Binance", "Manual"]
+    private let commonBrokers = ["IC Markets", "Pepperstone", "The5ers", "FTMO", "FxPro", "FundingPips", "Topstep", "Oanda", "Binance", "Manual"]
     private let commonCurrencies = ["USD", "EUR", "GBP", "JPY", "CAD", "AUD"]
     
     public init() {}
@@ -607,7 +606,7 @@ public struct CreateAccountSheet: View {
         NavigationStack {
             Form {
                 Section(header: Text("Account & Broker")) {
-                    TextField("Account name (e.g. The5ers 100K Bootcamp)", text: $name)
+                    TextField("Account name (e.g. IC Markets Live #5123981)", text: $name)
                     
                     AppDropdownField(
                         label: "Broker",
@@ -684,7 +683,7 @@ public struct EditAccountSheet: View {
     @State private var initialBalanceText: String
     @State private var kind: AccountKind
     
-    private let commonBrokers = ["The5ers", "FTMO", "Topstep", "Oanda", "MetaTrader 5", "Binance", "Manual"]
+    private let commonBrokers = ["IC Markets", "Pepperstone", "The5ers", "FTMO", "FxPro", "FundingPips", "Topstep", "Oanda", "Binance", "Manual"]
     private let commonCurrencies = ["USD", "EUR", "GBP", "JPY", "CAD", "AUD"]
     
     public init(account: Account) {

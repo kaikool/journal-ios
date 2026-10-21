@@ -6,6 +6,7 @@ import SwiftUI
 public struct TradeReplayView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var env: AppEnvironment
+    public let isModal: Bool
     let trade: Trade
     let executions: [Execution]
     
@@ -20,9 +21,10 @@ public struct TradeReplayView: View {
     @State private var replaySpeed: Double = 2.0
     @State private var excursionEstimate: ExcursionEstimate? = nil
     
-    public init(trade: Trade, executions: [Execution]) {
+    public init(trade: Trade, executions: [Execution], isModal: Bool = false) {
         self.trade = trade
         self.executions = executions
+        self.isModal = isModal
         let durationMs = trade.durationMs ?? (trade.closedAt.map { Int64($0.timeIntervalSince(trade.openedAt) * 1000) } ?? 3_600_000)
         let minutes = Double(max(60_000, durationMs)) / 60_000.0
         let res: MarketResolution = {
@@ -79,7 +81,8 @@ public struct TradeReplayView: View {
             FilterBarView(
                 title: "Trade Replay · \(trade.symbol)",
                 showFilters: false,
-                onBack: { dismiss() }
+                onBack: { dismiss() },
+                isModal: isModal
             )
         }
         .navigationBarBackButtonHidden(true)
