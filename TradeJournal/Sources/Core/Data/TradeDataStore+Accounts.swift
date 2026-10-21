@@ -365,10 +365,21 @@ extension TradeDataStore {
         var seenSemantics = Set<String>()
         var cleaned: [PropEntryItem] = []
         
-        for entry in propEntries {
-            let cleanAcc = (entry.accountId ?? "").cleanAccountId
+        // Prioritize deterministic provider IDs ("the5ers_payout_...", "the5ers_purchase_...") over random UUIDs
+        let sortedEntries = propEntries.sorted { a, b in
+            let aIsDeterministic = a.id.hasPrefix("the5ers_payout_") || a.id.hasPrefix("the5ers_purchase_")
+            let bIsDeterministic = b.id.hasPrefix("the5ers_payout_") || b.id.hasPrefix("the5ers_purchase_")
+            if aIsDeterministic != bIsDeterministic {
+                return aIsDeterministic && !bIsDeterministic
+            }
+            return a.revision > b.revision
+        }
+        
+        for entry in sortedEntries {
             let canonId = PropFirmEngine.canonicalPayoutId(entry.id)
-            let semantic = "\(entry.firm)|\(entry.kind)|\(entry.currency.uppercased())|\(entry.amountMinor)|\(entry.occurredOn)|\(cleanAcc)"
+            let semantic = entry.kind == "payout" ?
+                "\(entry.firm.lowercased())|payout|\(entry.amountMinor)|\(entry.occurredOn)" :
+                "\(entry.firm.lowercased())|\(entry.kind.lowercased())|\(entry.currency.uppercased())|\(entry.amountMinor)|\(entry.occurredOn)"
             
             if seenIds.contains(entry.id) {
                 continue
@@ -400,7 +411,17 @@ extension TradeDataStore {
         var seenSemantics = Set<String>()
         var cleaned: [PropReceiptItem] = []
         
-        for rcpt in propReceipts {
+        // Prioritize deterministic provider IDs ("the5ers_rcpt_...") over random UUIDs
+        let sortedReceipts = propReceipts.sorted { a, b in
+            let aIsDeterministic = a.id.hasPrefix("the5ers_rcpt_")
+            let bIsDeterministic = b.id.hasPrefix("the5ers_rcpt_")
+            if aIsDeterministic != bIsDeterministic {
+                return aIsDeterministic && !bIsDeterministic
+            }
+            return a.id > b.id
+        }
+        
+        for rcpt in sortedReceipts {
             if seenIds.contains(rcpt.id) {
                 continue
             }

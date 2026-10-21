@@ -40,15 +40,21 @@ public struct PropFirmLedgerView: View {
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
         let set = Set(raw)
-        return set.isEmpty ? ["USD"] : Array(set).sorted()
+        var list = Array(set).sorted()
+        if list.isEmpty { list = ["USD"] }
+        return ["ALL"] + list
+    }
+    
+    var displayCurrency: String {
+        selectedCurrency == "ALL" ? (dataStore.currencyConversion.reportingCurrency.isEmpty ? "USD" : dataStore.currencyConversion.reportingCurrency) : selectedCurrency
     }
     
     var filteredAccounts: [PropAccountItem] {
         let sel = selectedCurrency.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
         return dataStore.propAccounts.filter { prop in
             let c = prop.currency.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
-            return (showArchivedAccounts || !prop.archived) &&
-                   (c == sel || (c.isEmpty && (sel == "USD" || sel.isEmpty)))
+            let matches = (sel == "ALL" || c == sel || (c.isEmpty && (sel == "USD" || sel.isEmpty)))
+            return (showArchivedAccounts || !prop.archived) && matches
         }
     }
     
@@ -56,8 +62,8 @@ public struct PropFirmLedgerView: View {
         let sel = selectedCurrency.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
         return dataStore.propEntries.filter { entry in
             let c = entry.currency.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
-            return !entry.voided &&
-                   (c == sel || (c.isEmpty && (sel == "USD" || sel.isEmpty)))
+            let matches = (sel == "ALL" || c == sel || (c.isEmpty && (sel == "USD" || sel.isEmpty)))
+            return !entry.voided && matches
         }
     }
     
@@ -66,7 +72,7 @@ public struct PropFirmLedgerView: View {
         return PropFirmEngine.cashMovements(entries: filteredEntries, receipts: dataStore.propReceipts)
             .filter { mov in
                 let c = mov.currency.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
-                return c == sel || (c.isEmpty && (sel == "USD" || sel.isEmpty))
+                return sel == "ALL" || c == sel || (c.isEmpty && (sel == "USD" || sel.isEmpty))
             }
     }
     

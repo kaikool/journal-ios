@@ -599,13 +599,6 @@ public enum PropFirmEngine {
     
     /// Aggregates net spend, total payouts, and overall ROI across prop firm activities
     public static func cashSummary(rows: [CashMovementItem]) throws -> CashSummaryResult {
-        let normalizedCurrencies = Set(rows.map {
-            let c = $0.currency.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
-            return c.isEmpty ? "USD" : c
-        })
-        if normalizedCurrencies.count > 1 {
-            throw PropFirmError.validation("Select one currency before combining cash amounts.")
-        }
         var spent: Int64 = 0
         var refunds: Int64 = 0
         var received: Int64 = 0

@@ -692,7 +692,7 @@ public final class CTraderService: ObservableObject {
             let maxChunkMs: Int64 = 6 * 24 * 60 * 60 * 1000 // 518,400,000 ms (6 days safe margin)
             let dealsTo = toTimestamp ?? nowMs
             
-            let defaultLookbackDays: Int64 = 730 // Lookback window of 2 years to catch full trading history
+            let defaultLookbackDays: Int64 = 180 // Fast lookback window (6 months) for responsive account loading
             let fallbackStart = max(nowMs - (defaultLookbackDays * 86_400 * 1000), 0)
             
             let existingAccountExecs = dataStore.executions.filter { $0.accountId == journalAccId }
@@ -712,6 +712,7 @@ public final class CTraderService: ObservableObject {
             let totalSpanMs = max(dealsTo - dealsFrom, 1)
             let estimatedChunks = max(1, Int((totalSpanMs + maxChunkMs - 1) / maxChunkMs))
             var chunkIndex = 0
+            var consecutiveEmptyChunks = 0
             
             // Query backwards from dealsTo -> dealsFrom (Recent -> Past)
             // Ensures latest trades are fetched immediately on the very first chunk
@@ -723,6 +724,7 @@ public final class CTraderService: ObservableObject {
                 
                 self.lastStatus = "Fetching cTrader deals (\(chunkIndex)/\(estimatedChunks))..."
                 
+                var dealsFoundInChunk = 0
                 var chunkFrom = currentChunkStart
                 while chunkFrom < currentChunkEnd {
                     let payload: [String: Any] = [
@@ -740,6 +742,7 @@ public final class CTraderService: ObservableObject {
                             if let dealId = safeInt64(d["dealId"]) ?? safeInt64(d["id"]) {
                                 if seenDealIds.insert(dealId).inserted {
                                     rawDeals.append(d)
+                                    dealsFoundInChunk += 1
                                 }
                             }
                             if let ts = safeInt64(d["executionTimestamp"]) ?? safeInt64(d["createTimestamp"]) ?? safeInt64(d["timestamp"]) {
@@ -759,9 +762,19 @@ public final class CTraderService: ObservableObject {
                     }
                 }
                 
+                if dealsFoundInChunk == 0 && !rawDeals.isEmpty {
+                    consecutiveEmptyChunks += 1
+                    if consecutiveEmptyChunks >= 4 {
+                        // Encountered 24 consecutive days without activity prior to known trades
+                        break
+                    }
+                } else if dealsFoundInChunk > 0 {
+                    consecutiveEmptyChunks = 0
+                }
+                
                 currentChunkEnd = currentChunkStart
                 if currentChunkEnd > dealsFrom {
-                    try? await Task.sleep(nanoseconds: 60_000_000) // 60ms throttle between chunk requests
+                    try? await Task.sleep(nanoseconds: 30_000_000) // 30ms throttle between chunk requests
                 }
             }
             

@@ -285,6 +285,7 @@ extension TradeDataStore {
                     propEntries.append(rEntry)
                 }
             }
+            deduplicatePropEntries()
             
             let currentPropIds = Set(propAccounts.map { $0.id })
             let currentEntryIds = Set(propEntries.map { $0.id })
@@ -332,6 +333,8 @@ extension TradeDataStore {
                     propReceipts.append(rRcpt)
                 }
             }
+            deduplicatePropReceipts()
+            reconcileReceiptsToEntries()
             
             let validEntryIds = Set(propEntries.map { $0.id })
             var validReceipts: [PropReceiptItem] = []

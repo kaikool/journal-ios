@@ -58,7 +58,7 @@ extension PropFirmLedgerView {
                     
                     HStack(alignment: .firstTextBaseline) {
                         let netDecimal = Decimal(summary.netMinor) / 100
-                        Text(Formatters.formatPnL(netDecimal, currency: selectedCurrency))
+                        Text(Formatters.formatPnL(netDecimal, currency: displayCurrency))
                             .font(AppTypography.financialNumber(size: 32, weight: .bold))
                             .monospacedDigit()
                             .foregroundColor(Formatters.pnlColor(netDecimal))
@@ -74,24 +74,24 @@ extension PropFirmLedgerView {
                         GridRow {
                             subMetricBlock(
                                 title: "Gross spent",
-                                value: Formatters.formatCurrency(Decimal(summary.spentMinor) / 100, currency: selectedCurrency),
+                                value: Formatters.formatCurrency(Decimal(summary.spentMinor) / 100, currency: displayCurrency),
                                 color: AppColors.loss
                             )
                             subMetricBlock(
                                 title: "Refunded",
-                                value: Formatters.formatCurrency(Decimal(summary.refundsMinor) / 100, currency: selectedCurrency),
+                                value: Formatters.formatCurrency(Decimal(summary.refundsMinor) / 100, currency: displayCurrency),
                                 color: AppColors.profit
                             )
                         }
                         GridRow {
                             subMetricBlock(
                                 title: "Net spend",
-                                value: Formatters.formatCurrency(Decimal(summary.netSpendMinor) / 100, currency: selectedCurrency),
+                                value: Formatters.formatCurrency(Decimal(summary.netSpendMinor) / 100, currency: displayCurrency),
                                 color: AppColors.primaryText
                             )
                             subMetricBlock(
                                 title: "Payouts received",
-                                value: Formatters.formatCurrency(Decimal(summary.receivedMinor) / 100, currency: selectedCurrency),
+                                value: Formatters.formatCurrency(Decimal(summary.receivedMinor) / 100, currency: displayCurrency),
                                 color: AppColors.profit
                             )
                         }
@@ -248,7 +248,7 @@ extension PropFirmLedgerView {
                                     .foregroundStyle(AppColors.border.opacity(0.3))
                                 AxisValueLabel {
                                     if let d = value.as(Double.self) {
-                                        Text(Formatters.formatCurrency(Decimal(d), currency: selectedCurrency))
+                                        Text(Formatters.formatCurrency(Decimal(d), currency: displayCurrency))
                                             .font(.system(size: 9, weight: .medium, design: .rounded))
                                             .monospacedDigit()
                                             .foregroundStyle(AppColors.secondaryText)

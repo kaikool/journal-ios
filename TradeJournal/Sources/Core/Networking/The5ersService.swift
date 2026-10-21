@@ -682,14 +682,36 @@ public final class The5ersService: ObservableObject {
             for item in rawAccountsList {
                 let ref = String(describing: item["ref"] ?? item["account_ref"] ?? item["id"] ?? UUID().uuidString)
                 let label = String(describing: item["label"] ?? item["name"] ?? "The5ers Account")
-                let bal = Decimal(string: String(describing: item["balance"] ?? item["effectiveBalance"] ?? "0")) ?? 0
-                let eq = Decimal(string: String(describing: item["equity"] ?? bal)) ?? bal
+                var bal = Decimal(string: String(describing: item["balance"] ?? item["effectiveBalance"] ?? "0")) ?? 0
+                var eq = Decimal(string: String(describing: item["equity"] ?? bal)) ?? bal
                 let curr = String(describing: item["currency"] ?? "USD")
                 let status = String(describing: item["status"] ?? "active")
                 let prog = String(describing: item["type"] ?? item["accountType"] ?? item["program"] ?? "funded")
-                let startBal = Decimal(string: String(describing: item["startingBalance"] ?? item["initial_balance"] ?? bal)) ?? bal
+                var startBal = Decimal(string: String(describing: item["startingBalance"] ?? item["initial_balance"] ?? bal)) ?? bal
                 let platform = String(describing: item["tradingPlatform"] ?? item["platform"] ?? item["tradingSystem"] ?? "MT5")
                 let createdAt = item["createdAt"] as? String ?? item["creationDate"] as? String ?? item["created_at"] as? String
+                
+                // Query Authoritative Balance & Initial Balance from official the5ers_account.balance
+                let balArgs: [String: Any] = [
+                    "operation": "balance",
+                    "account_ref": ref,
+                    "contract_version": "1.0"
+                ]
+                if let bRes = try? await callMcpTool(name: "the5ers_account", arguments: balArgs),
+                   !(bRes["isError"] as? Bool ?? false) {
+                    let uBal = unwrapMcpToolResult(bRes)
+                    if let bDict = (uBal as? [String: Any])?["data"] as? [String: Any] ?? uBal as? [String: Any] {
+                        if let initB = sourceNumber(bDict["initialBalance"] ?? bDict["baseBalance"]), initB > 0 {
+                            startBal = initB
+                        }
+                        if let cb = sourceNumber(bDict["balance"]), cb > 0 {
+                            bal = cb
+                        }
+                        if let ce = sourceNumber(bDict["equity"]), ce > 0 {
+                            eq = ce
+                        }
+                    }
+                }
                 
                 let defaultName = Self.the5ersDefaultName(
                     from: item,
@@ -743,13 +765,34 @@ public final class The5ersService: ObservableObject {
                 
                 let startingMinor = NSDecimalNumber(decimal: (acc.startingBalance ?? acc.balance) * 100).int64Value
                 let journalAccId = acc.id.hasPrefix("the5ers_") ? acc.id : "the5ers_\(acc.id)"
-                
                 let isActive = (mappedStatus == .active)
                 
-                if let existingIndex = dataStore.propAccounts.firstIndex(where: { TradeDataStore.isSameAccountId($0.id, journalAccId) || $0.name == acc.label }) {
+                // Extract account login/number to link with existing cTrader trading account
+                let accountNumber: String? = {
+                    let pattern = #"(?:…|\.{3}|[-_·\s])?(\d{3,12})\s*$"#
+                    if let regex = try? NSRegularExpression(pattern: pattern),
+                       let match = regex.firstMatch(in: acc.label, range: NSRange(acc.label.startIndex..., in: acc.label)),
+                       let range = Range(match.range(at: 1), in: acc.label) {
+                        return String(acc.label[range])
+                    }
+                    return nil
+                }()
+                
+                let existingLinkedAcc = dataStore.accounts.first(where: {
+                    $0.id == journalAccId ||
+                    $0.name == acc.label ||
+                    (accountNumber != nil && ($0.id.cleanAccountId == accountNumber! || $0.name.contains(accountNumber!)))
+                })
+                let linkedAccountId = existingLinkedAcc?.id ?? journalAccId
+                
+                if let existingIndex = dataStore.propAccounts.firstIndex(where: {
+                    TradeDataStore.isSameAccountId($0.id, journalAccId) ||
+                    $0.name == acc.label ||
+                    (accountNumber != nil && ($0.id.cleanAccountId == accountNumber! || $0.name.contains(accountNumber!)))
+                }) {
                     let old = dataStore.propAccounts[existingIndex]
                     dataStore.propAccounts[existingIndex] = PropAccountItem(
-                        id: journalAccId,
+                        id: old.id,
                         firm: "The5ers",
                         name: acc.label,
                         program: mappedProgram,
@@ -757,7 +800,7 @@ public final class The5ersService: ObservableObject {
                         currency: acc.currency,
                         sizeMinor: startingMinor,
                         parentId: old.parentId,
-                        journalAccountId: journalAccId,
+                        journalAccountId: linkedAccountId,
                         openedOn: old.openedOn,
                         closedOn: old.closedOn,
                         renewalOn: old.renewalOn,
@@ -777,7 +820,7 @@ public final class The5ersService: ObservableObject {
                         status: mappedStatus,
                         currency: acc.currency,
                         sizeMinor: startingMinor,
-                        journalAccountId: journalAccId,
+                        journalAccountId: linkedAccountId,
                         openedOn: acc.createdAt ?? DateFormatter.localizedString(from: Date(), dateStyle: .short, timeStyle: .none),
                         notes: "Synced from The5ers MCP Hub (Protocol 2025-03-26)",
                         archived: false
@@ -785,22 +828,21 @@ public final class The5ersService: ObservableObject {
                     dataStore.propAccounts.append(newPropAccount)
                 }
                 
-                if let accIdx = dataStore.accounts.firstIndex(where: { TradeDataStore.isSameAccountId($0.id, journalAccId) || $0.name == acc.label }) {
-                    let old = dataStore.accounts[accIdx]
-                    dataStore.accounts[accIdx] = Account(
-                        id: journalAccId,
-                        name: acc.label,
-                        broker: "The5ers",
-                        kind: .sync,
-                        currency: acc.currency,
-                        initialBalance: acc.startingBalance ?? acc.balance,
-                        profitCalcMethod: old.profitCalcMethod,
-                        autoSync: isActive,
-                        lastSyncAt: Date(),
-                        archivedAt: old.archivedAt,
-                        visibleInJournal: old.visibleInJournal ?? true,
-                        createdAt: old.createdAt
-                    )
+                if let accIdx = dataStore.accounts.firstIndex(where: {
+                    TradeDataStore.isSameAccountId($0.id, journalAccId) ||
+                    $0.name == acc.label ||
+                    (accountNumber != nil && ($0.id.cleanAccountId == accountNumber! || $0.name.contains(accountNumber!)))
+                }) {
+                    var old = dataStore.accounts[accIdx]
+                    old.broker = "The5ers"
+                    old.currency = acc.currency
+                    if old.initialBalance == 0 || (acc.startingBalance ?? 0) > 0 {
+                        old.initialBalance = acc.startingBalance ?? acc.balance
+                    }
+                    old.autoSync = isActive
+                    old.lastSyncAt = Date()
+                    old.propProgram = mappedProgram.rawValue
+                    dataStore.accounts[accIdx] = old
                 } else {
                     let newAcc = Account(
                         id: journalAccId,
@@ -811,60 +853,15 @@ public final class The5ersService: ObservableObject {
                         initialBalance: acc.startingBalance ?? acc.balance,
                         autoSync: isActive,
                         archivedAt: nil,
-                        visibleInJournal: true
+                        visibleInJournal: true,
+                        propProgram: mappedProgram.rawValue
                     )
                     dataStore.accounts.append(newAcc)
                 }
             }
             
-            // Target all available accounts from The5ers (both freshly discovered and existing historical accounts)
-            var allTargetAccounts: [The5ersMcpAccount] = []
-            var seenTargetRefs = Set<String>()
-            
-            for acc in accountsList {
-                if !seenTargetRefs.contains(acc.ref) {
-                    seenTargetRefs.insert(acc.ref)
-                    allTargetAccounts.append(acc)
-                }
-            }
-            
-            for prop in dataStore.propAccounts where prop.firm.lowercased() == "the5ers" || prop.id.hasPrefix("the5ers_") {
-                let ref = prop.id.cleanAccountId
-                if !ref.isEmpty && !seenTargetRefs.contains(ref) {
-                    seenTargetRefs.insert(ref)
-                    allTargetAccounts.append(The5ersMcpAccount(
-                        id: prop.id,
-                        ref: ref,
-                        label: prop.name,
-                        platform: "cTrader",
-                        balance: Decimal(prop.sizeMinor ?? 0) / 100,
-                        equity: Decimal(prop.sizeMinor ?? 0) / 100,
-                        currency: prop.currency,
-                        status: prop.status.rawValue,
-                        program: prop.program.rawValue,
-                        startingBalance: Decimal(prop.sizeMinor ?? 0) / 100
-                    ))
-                }
-            }
-            
-            for acc in dataStore.accounts where acc.broker.lowercased() == "the5ers" || acc.id.hasPrefix("the5ers_") {
-                let ref = acc.id.cleanAccountId
-                if !ref.isEmpty && !seenTargetRefs.contains(ref) {
-                    seenTargetRefs.insert(ref)
-                    allTargetAccounts.append(The5ersMcpAccount(
-                        id: acc.id,
-                        ref: ref,
-                        label: acc.name,
-                        platform: "cTrader",
-                        balance: acc.initialBalance,
-                        equity: acc.initialBalance,
-                        currency: acc.currency,
-                        status: "active",
-                        program: "funded",
-                        startingBalance: acc.initialBalance
-                    ))
-                }
-            }
+            // Official MCP accounts with valid session-minted account_ref
+            let allTargetAccounts: [The5ersMcpAccount] = accountsList
             
             // Incremental sync optimization: only query positions for active accounts or accounts with 0 trades
             let accountsToSyncPositions = allTargetAccounts.filter { acc in
@@ -882,8 +879,9 @@ public final class The5ersService: ObservableObject {
                 let posArgs: [String: Any] = [
                     "operation": "list",
                     "account_ref": acc.ref,
+                    "view": "all",
                     "page": 1,
-                    "limit": 50,
+                    "limit": 100,
                     "contract_version": "1.0",
                     "request_context": ["timezone": "UTC", "locale": "en"]
                 ]
@@ -898,10 +896,13 @@ public final class The5ersService: ObservableObject {
                     let rawPositions = extractMcpCollection(unwrappedPos, collectionKey: "positions")
                     mergePositions(rawPositions, for: acc, into: dataStore, count: &importedPositionsCount)
                     
-                    // Paginate if full page returned
-                    if rawPositions.count >= 50 {
+                    // Paginate if full page returned or pagination indicates more
+                    let posPagination = (unwrappedPos as? [String: Any])?["pagination"] as? [String: Any]
+                    let initialHasMore = (posPagination?["has_more"] as? Bool) ?? (rawPositions.count >= 100)
+                    
+                    if initialHasMore {
                         var page = 2
-                        while page <= 10 {
+                        while page <= 20 {
                             if Task.isCancelled { break }
                             var pArgs = posArgs
                             pArgs["page"] = page
@@ -910,7 +911,9 @@ public final class The5ersService: ObservableObject {
                             let nextPositions = extractMcpCollection(nextUnwrapped, collectionKey: "positions")
                             if nextPositions.isEmpty { break }
                             mergePositions(nextPositions, for: acc, into: dataStore, count: &importedPositionsCount)
-                            if nextPositions.count < 50 { break }
+                            let nextPag = (nextUnwrapped as? [String: Any])?["pagination"] as? [String: Any]
+                            let hasMore = (nextPag?["has_more"] as? Bool) ?? (nextPositions.count >= 100)
+                            if !hasMore { break }
                             page += 1
                         }
                     }
@@ -1723,7 +1726,24 @@ public final class The5ersService: ObservableObject {
         for acc in targetAccounts {
             if Task.isCancelled { break }
             
-            // A. Query 'explain' for exact recorded split breakdown and userPayoutPercentage
+            // A. Query 'eligibility' for userPayoutPercentage (e.g. 80.0, 85.0)
+            let eligArgs: [String: Any] = [
+                "operation": "eligibility",
+                "account_ref": acc.ref,
+                "contract_version": "1.0"
+            ]
+            if let eligRes = try? await callMcpTool(name: "the5ers_payout", arguments: eligArgs),
+               !(eligRes["isError"] as? Bool ?? false) {
+                let unwrapped = unwrapMcpToolResult(eligRes)
+                if let eDict = (unwrapped as? [String: Any])?["data"] as? [String: Any] ?? unwrapped as? [String: Any] {
+                    if let split = eDict["userPayoutPercentage"] as? NSNumber {
+                        accountSplitMap[acc.ref] = split.doubleValue
+                    }
+                }
+            }
+            
+            // B. Query 'explain' for recorded split breakdown and traderSplitPercent
+            var latestPayoutDict: [String: Any]? = nil
             let explainArgs: [String: Any] = [
                 "operation": "explain",
                 "account_ref": acc.ref,
@@ -1732,28 +1752,26 @@ public final class The5ersService: ObservableObject {
             if let explainRes = try? await callMcpTool(name: "the5ers_payout", arguments: explainArgs),
                !(explainRes["isError"] as? Bool ?? false) {
                 let unwrappedExplain = unwrapMcpToolResult(explainRes)
-                if let explainDict = unwrappedExplain as? [String: Any] {
-                    if let avail = explainDict["available"] as? [String: Any],
-                       let split = avail["userPayoutPercentage"] as? NSNumber {
-                        accountSplitMap[acc.ref] = split.doubleValue
+                if let expDict = (unwrappedExplain as? [String: Any])?["data"] as? [String: Any] ?? unwrappedExplain as? [String: Any] {
+                    if let avail = expDict["available"] as? [String: Any] {
+                        if let split = avail["traderSplitPercent"] as? NSNumber ?? avail["userPayoutPercentage"] as? NSNumber {
+                            accountSplitMap[acc.ref] = split.doubleValue
+                        }
                     }
-                    if let latest = explainDict["latestPayout"] as? [String: Any] {
+                    if let latest = expDict["latestPayout"] as? [String: Any] {
                         var p = latest
                         if p["account_ref"] == nil { p["account_ref"] = acc.ref }
                         if p["currency"] == nil { p["currency"] = acc.currency }
                         if let b = latest["breakdown"] as? [String: Any] {
                             for (k, v) in b { p[k] = v }
                         }
-                        let pId = String(describing: p["id"] ?? p["payout_id"] ?? p["withdrawalid"] ?? UUID().uuidString)
-                        if !seenPayoutIds.contains(pId) {
-                            seenPayoutIds.insert(pId)
-                            allRawPayouts.append(p)
-                        }
+                        latestPayoutDict = p
                     }
                 }
             }
             
-            // B. Query 'history' for past completed/processed payouts
+            // C. Query 'history' for past completed/processed payouts
+            var historyPayouts: [[String: Any]] = []
             let histArgs: [String: Any] = [
                 "operation": "history",
                 "account_ref": acc.ref,
@@ -1769,19 +1787,34 @@ public final class The5ersService: ObservableObject {
                     if let s = accountSplitMap[acc.ref], r["split_percent"] == nil {
                         r["split_percent"] = s
                     }
-                    let pId = String(describing: r["id"] ?? r["payout_id"] ?? r["withdrawalid"] ?? UUID().uuidString)
-                    if !seenPayoutIds.contains(pId) {
-                        seenPayoutIds.insert(pId)
-                        allRawPayouts.append(r)
+                    // If this history payout matches latestPayout, enrich with breakdown
+                    if let latest = latestPayoutDict {
+                        let histReq = String(describing: r["requestedAt"] ?? r["requested_at"] ?? "")
+                        let latestReq = String(describing: latest["requestedAt"] ?? latest["requested_at"] ?? "")
+                        let histAmt = String(describing: r["amount"] ?? "")
+                        let latestAmt = String(describing: latest["amount"] ?? "")
+                        if (!histReq.isEmpty && histReq == latestReq) || (!histAmt.isEmpty && histAmt == latestAmt) {
+                            for (k, v) in latest {
+                                if r[k] == nil { r[k] = v }
+                            }
+                        }
                     }
+                    historyPayouts.append(r)
                 }
+            }
+            
+            if !historyPayouts.isEmpty {
+                for p in historyPayouts {
+                    allRawPayouts.append(p)
+                }
+            } else if let latest = latestPayoutDict {
+                allRawPayouts.append(latest)
             }
         }
         
         for pay in allRawPayouts {
             let fields = sourceFields(pay)
-            let id = String(describing: fields["id"] ?? fields["payoutid"] ?? fields["withdrawalid"] ?? fields["requestid"] ?? UUID().uuidString)
-            let canonicalId = PropFirmEngine.canonicalPayoutId(id)
+            let rawId = String(describing: fields["id"] ?? fields["payoutid"] ?? fields["withdrawalid"] ?? fields["requestid"] ?? fields["ref"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             
             let status = String(describing: fields["status"] ?? "completed").lowercased().trimmingCharacters(in: .whitespaces)
             let isReversed = (fields["reversed"] as? Bool) == true
@@ -1917,10 +1950,6 @@ public final class The5ersService: ObservableObject {
             fmt.locale = Locale(identifier: "en_US_POSIX")
             let dateStr = fmt.string(from: parsedDate)
             
-            let payoutEntryId = "the5ers_payout_\(id)"
-            let rcptId = "the5ers_rcpt_\(id)"
-            let shortRef = "Payout #\(id.prefix(8))"
-            
             let payAccRef = String(describing: fields["accountref"] ?? fields["accountid"] ?? fields["ref"] ?? "")
             let matchedAcc = targetAccounts.first(where: {
                 $0.id == payAccRef || $0.ref == payAccRef || "the5ers_\($0.id)" == payAccRef || $0.id.cleanAccountId == payAccRef.cleanAccountId || $0.ref.cleanAccountId == payAccRef.cleanAccountId
@@ -1936,13 +1965,30 @@ public final class The5ersService: ObservableObject {
             }()
             let currency = String(describing: fields["currency"] ?? matchedAcc?.currency ?? "USD").uppercased()
             
+            let cleanAcc = (primaryAccId ?? "the5ers").cleanAccountId
+            let dateKey = dateStr.replacingOccurrences(of: "-", with: "")
+            let amtKey = netReceivedMinor > 0 ? "\(netReceivedMinor)" : "\(grossMinor)"
+            
+            let deterministicKey: String = {
+                if !rawId.isEmpty && !rawId.hasPrefix("the5ers_") && rawId.count < 64 {
+                    return rawId
+                }
+                return "\(cleanAcc)_\(dateKey)_\(amtKey)"
+            }()
+            
+            let payoutEntryId = "the5ers_payout_\(deterministicKey)"
+            let rcptId = "the5ers_rcpt_\(deterministicKey)"
+            let canonicalId = PropFirmEngine.canonicalPayoutId(deterministicKey)
+            let shortRef = "Payout #\(deterministicKey.prefix(8))"
+            
             if let existingIdx = dataStore.propEntries.firstIndex(where: {
                 $0.id == payoutEntryId ||
                 PropFirmEngine.canonicalPayoutId($0.id) == canonicalId ||
-                (!id.isEmpty && ($0.id.contains(id) || $0.reference.contains(id))) ||
-                ($0.occurredOn == dateStr && $0.kind == "payout" && ($0.amountMinor == grossMinor || $0.amountMinor == netReceivedMinor))
+                (!deterministicKey.isEmpty && ($0.id.contains(deterministicKey) || $0.reference.contains(deterministicKey))) ||
+                ($0.firm == "The5ers" && $0.kind == "payout" && $0.occurredOn == dateStr && ($0.amountMinor == grossMinor || $0.amountMinor == netReceivedMinor))
             }) {
                 var existing = dataStore.propEntries[existingIdx]
+                existing.id = payoutEntryId
                 existing.amountMinor = grossMinor
                 existing.splitBps = splitBps
                 existing.feeMinor = feeMinor
@@ -1977,10 +2023,12 @@ public final class The5ersService: ObservableObject {
                     $0.id == rcptId ||
                     $0.payoutId == payoutEntryId ||
                     PropFirmEngine.canonicalPayoutId($0.payoutId) == canonicalId ||
-                    (!id.isEmpty && ($0.id.contains(id) || $0.reference.contains(id))) ||
+                    PropFirmEngine.canonicalPayoutId($0.id) == canonicalId ||
+                    (!deterministicKey.isEmpty && ($0.id.contains(deterministicKey) || $0.reference.contains(deterministicKey))) ||
                     ($0.occurredOn == dateStr && $0.amountMinor == netReceivedMinor)
                 }) {
                     var existingRcpt = dataStore.propReceipts[rIdx]
+                    existingRcpt.id = rcptId
                     existingRcpt.payoutId = payoutEntryId
                     existingRcpt.amountMinor = netReceivedMinor
                     existingRcpt.occurredOn = dateStr
@@ -1992,12 +2040,15 @@ public final class The5ersService: ObservableObject {
                         kind: "receipt",
                         amountMinor: netReceivedMinor,
                         occurredOn: dateStr,
-                        reference: "Receipt #\(id.prefix(8))",
+                        reference: "Receipt #\(deterministicKey.prefix(8))",
                         notes: "The5ers Settlement Receipt"
                     )
                     dataStore.propReceipts.append(rcpt)
                 }
             }
         }
+        
+        dataStore.deduplicatePropEntries()
+        dataStore.deduplicatePropReceipts()
     }
 }
