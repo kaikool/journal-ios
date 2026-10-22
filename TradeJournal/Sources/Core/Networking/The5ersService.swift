@@ -97,7 +97,12 @@ public final class The5ersService: ObservableObject {
     private var discoveredToolNames: Set<String> = []
     
     public var isConfigured: Bool {
-        !mcpToken.trimmingCharacters(in: .whitespaces).isEmpty
+        if !mcpToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return true }
+        if let stored = UserDefaults.standard.string(forKey: "the5ers_mcp_token"),
+           !stored.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return true
+        }
+        return false
     }
     
     @MainActor
@@ -134,6 +139,7 @@ public final class The5ersService: ObservableObject {
         self.discoveredToolNames.removeAll()
         UserDefaults.standard.removeObject(forKey: "the5ers_mcp_token")
         UserDefaults.standard.removeObject(forKey: "the5ers_mcp_refresh_token")
+        UserDefaults.standard.removeObject(forKey: "the5ers_mcp_client_id")
     }
     
     // MARK: - 1. OAuth 2.0 PKCE Flow (Official The5ers Hub OAuth)
@@ -354,7 +360,10 @@ public final class The5ersService: ObservableObject {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json, text/event-stream", forHTTPHeaderField: "Accept")
-        request.setValue("Bearer \(mcpToken)", forHTTPHeaderField: "Authorization")
+        let effectiveToken = mcpToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? (UserDefaults.standard.string(forKey: "the5ers_mcp_token") ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            : mcpToken
+        request.setValue("Bearer \(effectiveToken)", forHTTPHeaderField: "Authorization")
         request.setValue(Self.protocolVersion, forHTTPHeaderField: "MCP-Protocol-Version")
         if let sId = mcpSessionId {
             request.setValue(sId, forHTTPHeaderField: "Mcp-Session-Id")
@@ -377,8 +386,21 @@ public final class The5ersService: ObservableObject {
     
     /// Dispatches a raw JSON-RPC 2.0 request to the MCP endpoint
     private func sendRawMcpRpc(method: String, params: [String: Any]) async throws -> [String: Any] {
-        guard isConfigured else {
+        let effectiveToken: String = {
+            let direct = mcpToken.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !direct.isEmpty { return direct }
+            return (UserDefaults.standard.string(forKey: "the5ers_mcp_token") ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        }()
+        
+        guard !effectiveToken.isEmpty else {
             throw NSError(domain: "The5ersMCP", code: 401, userInfo: [NSLocalizedDescriptionKey: "Bearer Session Token not configured"])
+        }
+        
+        if mcpToken != effectiveToken {
+            Task { @MainActor in
+                self.mcpToken = effectiveToken
+                self.isConnected = true
+            }
         }
         
         rpcIdCounter += 1
@@ -390,7 +412,7 @@ public final class The5ersService: ObservableObject {
         request.timeoutInterval = 15
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json, text/event-stream", forHTTPHeaderField: "Accept")
-        request.setValue("Bearer \(mcpToken)", forHTTPHeaderField: "Authorization")
+        request.setValue("Bearer \(effectiveToken)", forHTTPHeaderField: "Authorization")
         request.setValue(Self.protocolVersion, forHTTPHeaderField: "MCP-Protocol-Version")
         if let sId = mcpSessionId {
             request.setValue(sId, forHTTPHeaderField: "Mcp-Session-Id")

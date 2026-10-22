@@ -10,9 +10,10 @@ public struct ConnectionsSettingsView: View {
     @ObservedObject private var the5ers = The5ersService.shared
     @ObservedObject private var ctrader = CTraderService.shared
     
-    @State private var mcpToken: String = The5ersService.shared.mcpToken
     @State private var the5ersStatus: String = ""
     @State private var isConnectingThe5ers: Bool = false
+    @State private var showAdvancedThe5ers: Bool = false
+    @State private var manualMcpToken: String = ""
     
     @State private var ctraderToken: String = CTraderService.shared.accessToken
     @State private var ctraderClientId: String = CTraderService.shared.clientId
@@ -110,10 +111,39 @@ public struct ConnectionsSettingsView: View {
                             
                             AppButton("Disconnect", icon: "xmark.circle", style: .destructive, size: .compact, fullWidth: true) {
                                 the5ers.disconnect()
-                                mcpToken = ""
+                                manualMcpToken = ""
                                 the5ersStatus = "Disconnected from The5ers."
                             }
                         }
+                    }
+                    
+                    DisclosureGroup(isExpanded: $showAdvancedThe5ers) {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("If OAuth login is unavailable, paste your Bearer token directly:")
+                                .font(AppTypography.caption)
+                                .foregroundColor(AppColors.secondaryText)
+                            
+                            SecureField("The5ers MCP Bearer Token", text: $manualMcpToken)
+                                .textFieldStyle(.plain)
+                                .padding(10)
+                                .background(AppColors.secondaryBackground)
+                                .cornerRadius(8)
+                            
+                            HStack(spacing: 8) {
+                                AppButton("Save & Ping", icon: "checkmark.circle", style: .secondary, size: .compact, fullWidth: true) {
+                                    saveManualTokenAndPing()
+                                }
+                                
+                                AppButton("Ping MCP", icon: "antenna.radiowaves.left.and.right", style: .secondary, size: .compact, fullWidth: true) {
+                                    pingMcp()
+                                }
+                            }
+                        }
+                        .padding(.top, 8)
+                    } label: {
+                        Text("Manual Token (Advanced)")
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.brand)
                     }
                     
                     if !the5ersStatus.isEmpty {
@@ -335,7 +365,7 @@ public struct ConnectionsSettingsView: View {
             }
         }
         .onAppear {
-            mcpToken = the5ers.mcpToken
+            manualMcpToken = the5ers.mcpToken
             ctraderToken = ctrader.accessToken
             ctraderClientId = ctrader.clientId
             ctraderClientSecret = ctrader.clientSecret
@@ -353,12 +383,6 @@ public struct ConnectionsSettingsView: View {
         .onChange(of: ctraderIsLive) { val in
             ctrader.isLive = val
         }
-        .onChange(of: mcpToken) { val in
-            the5ers.configure(token: val)
-        }
-        .onChange(of: the5ers.mcpToken) { val in
-            mcpToken = val
-        }
     }
     
     // MARK: - Actions
@@ -370,35 +394,59 @@ public struct ConnectionsSettingsView: View {
             do {
                 let token = try await the5ers.startOAuthLogin()
                 await MainActor.run {
-                    self.mcpToken = token
+                    self.manualMcpToken = token
                     self.isConnectingThe5ers = false
                     self.the5ersStatus = "The5ers Hub authorization successful! Connected to MCP Server."
                 }
             } catch {
                 await MainActor.run {
                     self.isConnectingThe5ers = false
-                    self.the5ersStatus = "OAuth error: \(error.localizedDescription)"
+                    if (error as? ASWebAuthenticationSessionError)?.code == .canceledLogin {
+                        self.the5ersStatus = "Login cancelled by user."
+                    } else {
+                        self.the5ersStatus = "OAuth error: \(error.localizedDescription)"
+                    }
                 }
             }
         }
     }
     
+    private func saveManualTokenAndPing() {
+        let clean = manualMcpToken.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clean.isEmpty else {
+            the5ersStatus = "Please enter a valid Bearer token."
+            return
+        }
+        the5ers.configure(token: clean)
+        the5ersStatus = "Token saved. Testing connection..."
+        pingMcp()
+    }
+    
     private func pingMcp() {
-        the5ers.configure(token: mcpToken)
+        guard the5ers.isConfigured else {
+            the5ersStatus = "The5ers MCP is not configured. Please log in or enter a token."
+            return
+        }
         the5ersStatus = "Sending tools/list request to The5ers MCP Server..."
         Task {
             do {
                 let res = try await the5ers.pingMcpConnection()
-                the5ersStatus = res.message
+                await MainActor.run {
+                    self.the5ersStatus = res.message
+                }
             } catch {
-                the5ersStatus = "MCP connection error: \(error.localizedDescription)"
+                await MainActor.run {
+                    self.the5ersStatus = "MCP connection error: \(error.localizedDescription)"
+                }
             }
         }
     }
     
     private func syncThe5ers() {
-        let tokenToUse = the5ers.mcpToken.isEmpty ? mcpToken : the5ers.mcpToken
-        the5ers.configure(token: tokenToUse)
+        guard the5ers.isConfigured else {
+            the5ersStatus = "Not connected to The5ers. Please connect first."
+            return
+        }
         the5ersStatus = "Starting synchronization with The5ers MCP Hub..."
         currentThe5ersSyncTask?.cancel()
         currentThe5ersSyncTask = Task {

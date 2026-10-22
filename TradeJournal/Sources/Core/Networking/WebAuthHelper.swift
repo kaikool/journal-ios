@@ -39,8 +39,32 @@ public final class WebAuthHelper: NSObject, ASWebAuthenticationPresentationConte
     public func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
         #if canImport(UIKit)
         let scenes = UIApplication.shared.connectedScenes
-        let windowScene = scenes.first as? UIWindowScene
-        return windowScene?.windows.first { $0.isKeyWindow } ?? UIWindow()
+        // 1. Look for foreground active window scene
+        for scene in scenes {
+            guard let windowScene = scene as? UIWindowScene,
+                  windowScene.activationState == .foregroundActive else { continue }
+            if let keyWindow = windowScene.windows.first(where: { $0.isKeyWindow }) {
+                return keyWindow
+            }
+            if let firstWindow = windowScene.windows.first {
+                return firstWindow
+            }
+        }
+        // 2. Fallback to any window scene
+        for scene in scenes {
+            guard let windowScene = scene as? UIWindowScene else { continue }
+            if let keyWindow = windowScene.windows.first(where: { $0.isKeyWindow }) {
+                return keyWindow
+            }
+            if let firstWindow = windowScene.windows.first {
+                return firstWindow
+            }
+        }
+        // 3. Fallback: create window attached to first scene
+        if let windowScene = scenes.compactMap({ $0 as? UIWindowScene }).first {
+            return UIWindow(windowScene: windowScene)
+        }
+        return UIWindow()
         #else
         return ASPresentationAnchor()
         #endif
