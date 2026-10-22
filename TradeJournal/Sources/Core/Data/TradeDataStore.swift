@@ -25,7 +25,7 @@ public final class TradeDataStore: ObservableObject {
     @Published public var selectedAccountId: String = "default-acc" {
         didSet { invalidatePerformanceCaches() }
     }
-    @Published public var selectedTimeRange: JournalTimeRange = .d30 {
+    @Published public var selectedTimeRange: JournalTimeRange = .all {
         didSet { invalidatePerformanceCaches() }
     }
     @Published public private(set) var cacheVersion: Int = 0

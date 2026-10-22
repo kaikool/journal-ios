@@ -117,13 +117,13 @@ public struct TimeHeatmapView: View {
                     AxisMarks(position: .leading, values: .automatic(desiredCount: 3)) { value in
                         AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
                             .foregroundStyle(AppColors.border.opacity(0.3))
-                        AxisValueLabel {
+                        AxisValueLabel(anchor: .trailing) {
                             if let d = value.as(Double.self) {
-                                Text(isPrivate ? "••••" : Formatters.formatCurrency(Decimal(d), currency: currency))
-                                    .font(.system(size: 9, weight: .medium, design: .rounded))
+                                Text(isPrivate ? "••••" : Formatters.compactCurrency(Decimal(d), currency: currency))
+                                    .font(.system(size: 8.5, weight: .medium, design: .rounded))
                                     .monospacedDigit()
                                     .foregroundColor(AppColors.secondaryText)
-                                    .frame(width: 52, alignment: .trailing)
+                                    .frame(width: 32, alignment: .trailing)
                             }
                         }
                     }
@@ -185,13 +185,13 @@ public struct TimeHeatmapView: View {
                 .chartXSelection(value: $selectedHourKey)
                 .chartYAxis {
                     AxisMarks(position: .leading, values: .automatic(desiredCount: 2)) { value in
-                        AxisValueLabel {
+                        AxisValueLabel(anchor: .trailing) {
                             if let intVal = value.as(Int.self) {
                                 Text("\(intVal)")
-                                    .font(.system(size: 9, weight: .medium, design: .rounded))
+                                    .font(.system(size: 8.5, weight: .medium, design: .rounded))
                                     .monospacedDigit()
                                     .foregroundColor(AppColors.secondaryText)
-                                    .frame(width: 52, alignment: .trailing)
+                                    .frame(width: 32, alignment: .trailing)
                             }
                         }
                     }
@@ -202,7 +202,7 @@ public struct TimeHeatmapView: View {
                             .foregroundStyle(AppColors.border.opacity(0.3))
                         AxisTick(stroke: StrokeStyle(lineWidth: 0.5))
                             .foregroundStyle(AppColors.border)
-                        AxisValueLabel {
+                        AxisValueLabel(collisionResolution: .disabled) {
                             if let label = value.as(String.self) {
                                 let shortLabel: String = {
                                     switch label {
@@ -216,8 +216,9 @@ public struct TimeHeatmapView: View {
                                     }
                                 }()
                                 Text(shortLabel)
-                                    .font(.system(size: 9, weight: .semibold, design: .rounded))
+                                    .font(.system(size: 8.5, weight: .semibold, design: .rounded))
                                     .foregroundStyle(AppColors.secondaryText)
+                                    .fixedSize()
                             }
                         }
                     }

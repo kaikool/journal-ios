@@ -10,12 +10,21 @@ public enum PropLedgerTab: String, CaseIterable, Identifiable {
     public var id: String { rawValue }
 }
 
+public enum PropAccountStatusFilter: String, CaseIterable, Identifiable {
+    case active = "Active"
+    case inactive = "Inactive"
+    case all = "All"
+    
+    public var id: String { rawValue }
+}
+
 public struct PropFirmLedgerView: View {
     @ObservedObject var dataStore = TradeDataStore.shared
     @ObservedObject var env = AppEnvironment.shared
     
     @State var selectedTab: PropLedgerTab = .overview
     @State var selectedCurrency: String = "USD"
+    @State var selectedAccountStatus: PropAccountStatusFilter = .active
     @State var showArchivedAccounts: Bool = false
     
     @State var showNewAccountSheet: Bool = false
@@ -50,11 +59,18 @@ public struct PropFirmLedgerView: View {
     }
     
     var filteredAccounts: [PropAccountItem] {
-        let sel = selectedCurrency.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
-        return dataStore.propAccounts.filter { prop in
-            let c = prop.currency.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
-            let matches = (sel == "ALL" || c == sel || (c.isEmpty && (sel == "USD" || sel.isEmpty)))
-            return (showArchivedAccounts || !prop.archived) && matches
+        dataStore.propAccounts.filter { prop in
+            let statusMatch: Bool = {
+                switch selectedAccountStatus {
+                case .active:
+                    return prop.status == .active
+                case .inactive:
+                    return prop.status != .active
+                case .all:
+                    return true
+                }
+            }()
+            return (showArchivedAccounts || !prop.archived) && statusMatch
         }
     }
     
@@ -112,15 +128,28 @@ public struct PropFirmLedgerView: View {
             .padding(.horizontal, 14)
             .padding(.vertical, 6)
             
-            // Sub-Toolbar: Currency Pill, Archived Toggle & New Action Menu
+            // Sub-Toolbar: Status Pill (for Accounts tab) or Currency Pill (for other tabs), Archived Toggle & New Action Menu
             HStack(spacing: 8) {
-                AppleMenuChip(title: "Currency", selectionText: selectedCurrency, icon: "dollarsign.circle") {
-                    ForEach(availableCurrencies, id: \.self) { c in
-                        Button(c) {
-                            #if canImport(UIKit)
-                            UISelectionFeedbackGenerator().selectionChanged()
-                            #endif
-                            selectedCurrency = c
+                if selectedTab == .accounts {
+                    AppleMenuChip(title: "Status", selectionText: selectedAccountStatus.rawValue, icon: "circle.circle") {
+                        ForEach(PropAccountStatusFilter.allCases) { s in
+                            Button(s.rawValue) {
+                                #if canImport(UIKit)
+                                UISelectionFeedbackGenerator().selectionChanged()
+                                #endif
+                                selectedAccountStatus = s
+                            }
+                        }
+                    }
+                } else {
+                    AppleMenuChip(title: "Currency", selectionText: selectedCurrency, icon: "dollarsign.circle") {
+                        ForEach(availableCurrencies, id: \.self) { c in
+                            Button(c) {
+                                #if canImport(UIKit)
+                                UISelectionFeedbackGenerator().selectionChanged()
+                                #endif
+                                selectedCurrency = c
+                            }
                         }
                     }
                 }

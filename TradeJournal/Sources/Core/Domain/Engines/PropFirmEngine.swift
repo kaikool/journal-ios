@@ -112,6 +112,15 @@ public struct PropAccountItem: Identifiable, Codable, Equatable, Sendable {
     public var winRate: Double?
     public var profitFactor: Double?
     
+    // Authoritative Program Objectives & Progress (synced from official the5ers_program / rules / journey)
+    public var profitTargetMinor: Int64?
+    public var maxLossMinor: Int64?
+    public var maxDailyLossMinor: Int64?
+    public var minTradingDays: Int?
+    public var currentTradingDays: Int?
+    public var winningDays: Int?
+    public var currentStepName: String?
+    
     public init(
         id: String = JournalIds.newId(),
         firm: String,
@@ -137,7 +146,14 @@ public struct PropAccountItem: Identifiable, Codable, Equatable, Sendable {
         totalFeesMinor: Int64? = nil,
         totalTrades: Int? = nil,
         winRate: Double? = nil,
-        profitFactor: Double? = nil
+        profitFactor: Double? = nil,
+        profitTargetMinor: Int64? = nil,
+        maxLossMinor: Int64? = nil,
+        maxDailyLossMinor: Int64? = nil,
+        minTradingDays: Int? = nil,
+        currentTradingDays: Int? = nil,
+        winningDays: Int? = nil,
+        currentStepName: String? = nil
     ) {
         self.id = id
         self.firm = firm
@@ -164,6 +180,13 @@ public struct PropAccountItem: Identifiable, Codable, Equatable, Sendable {
         self.totalTrades = totalTrades
         self.winRate = winRate
         self.profitFactor = profitFactor
+        self.profitTargetMinor = profitTargetMinor
+        self.maxLossMinor = maxLossMinor
+        self.maxDailyLossMinor = maxDailyLossMinor
+        self.minTradingDays = minTradingDays
+        self.currentTradingDays = currentTradingDays
+        self.winningDays = winningDays
+        self.currentStepName = currentStepName
     }
 }
 

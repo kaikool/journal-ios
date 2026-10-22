@@ -27,6 +27,15 @@ public struct The5ersMcpAccount: Identifiable, Codable, Sendable {
     public let profitFactor: Double?
     public let tradingBlocked: Bool?
     
+    // Authoritative Program Objectives & Progress
+    public let profitTarget: Decimal?
+    public let maxLoss: Decimal?
+    public let maxDailyLoss: Decimal?
+    public let minTradingDays: Int?
+    public let currentTradingDays: Int?
+    public let winningDays: Int?
+    public let currentStepName: String?
+    
     public init(
         id: String,
         ref: String? = nil,
@@ -47,7 +56,14 @@ public struct The5ersMcpAccount: Identifiable, Codable, Sendable {
         totalTrades: Int? = nil,
         winRate: Double? = nil,
         profitFactor: Double? = nil,
-        tradingBlocked: Bool? = nil
+        tradingBlocked: Bool? = nil,
+        profitTarget: Decimal? = nil,
+        maxLoss: Decimal? = nil,
+        maxDailyLoss: Decimal? = nil,
+        minTradingDays: Int? = nil,
+        currentTradingDays: Int? = nil,
+        winningDays: Int? = nil,
+        currentStepName: String? = nil
     ) {
         self.id = id
         self.ref = ref ?? id
@@ -69,6 +85,13 @@ public struct The5ersMcpAccount: Identifiable, Codable, Sendable {
         self.winRate = winRate
         self.profitFactor = profitFactor
         self.tradingBlocked = tradingBlocked
+        self.profitTarget = profitTarget
+        self.maxLoss = maxLoss
+        self.maxDailyLoss = maxDailyLoss
+        self.minTradingDays = minTradingDays
+        self.currentTradingDays = currentTradingDays
+        self.winningDays = winningDays
+        self.currentStepName = currentStepName
     }
 }
 
@@ -736,10 +759,9 @@ public final class The5ersService: ObservableObject {
                     return [
                         [
                             "operation": "list",
-                            "page": page,
-                            "limit": 50,
                             "contract_version": "1.0",
-                            "request_context": ["timezone": "UTC", "locale": "en"]
+                            "page": page,
+                            "limit": 50
                         ],
                         [
                             "operation": "list",
@@ -851,18 +873,56 @@ public final class The5ersService: ObservableObject {
                     }
                 }
                 
-                // Query Authoritative Balance & Initial Balance from official the5ers_account.balance
+                // Concurrently query Authoritative Balance, Statistics, and Journey in parallel
                 var accProfitAndLoss: Decimal? = nil
                 var accDailyProfitAndLoss: Decimal? = nil
                 var accUnrealized: Decimal? = nil
                 var accTradingBlocked: Bool? = nil
-                let balArgs: [String: Any] = [
-                    "operation": "balance",
-                    "account_ref": ref,
-                    "contract_version": "1.0"
-                ]
-                if let bRes = try? await callMcpTool(name: "the5ers_account", arguments: balArgs),
-                   !(bRes["isError"] as? Bool ?? false) {
+                var accTotalTrades: Int? = nil
+                var accWinRate: Double? = nil
+                var accProfitFactor: Double? = nil
+                var accTotalFees: Decimal? = nil
+                var authoritativeWinningDays: Int? = nil
+                var authoritativeTradingDays: Int? = nil
+                var authoritativeProgramName: String? = nil
+                var authoritativeStepName: String? = nil
+                var authoritativeAccountType: String? = nil
+                var authoritativeProfitTarget: Decimal? = nil
+                var authoritativeMaxLoss: Decimal? = nil
+                var authoritativeMaxDailyLoss: Decimal? = nil
+                var authoritativeMinTradingDays: Int? = nil
+                
+                async let balTask: [String: Any]? = {
+                    let balArgs: [String: Any] = [
+                        "operation": "balance",
+                        "account_ref": ref,
+                        "contract_version": "1.0"
+                    ]
+                    return try? await self.callMcpTool(name: "the5ers_account", arguments: balArgs)
+                }()
+                
+                async let statsTask: [String: Any]? = {
+                    let statsArgs: [String: Any] = [
+                        "operation": "statistics",
+                        "account_ref": ref,
+                        "contract_version": "1.0"
+                    ]
+                    return try? await self.callMcpTool(name: "the5ers_account", arguments: statsArgs)
+                }()
+                
+                async let journeyTask: [String: Any]? = {
+                    let journeyArgs: [String: Any] = [
+                        "operation": "journey",
+                        "account_ref": ref,
+                        "contract_version": "1.0"
+                    ]
+                    return try? await self.callMcpTool(name: "the5ers_program", arguments: journeyArgs)
+                }()
+                
+                let (bRes, sRes, jRes) = await (balTask, statsTask, journeyTask)
+                
+                // Parse Authoritative Balance
+                if let bRes = bRes, !(bRes["isError"] as? Bool ?? false) {
                     let uBal = unwrapMcpToolResult(bRes)
                     if let bDict = (uBal as? [String: Any])?["data"] as? [String: Any] ?? uBal as? [String: Any] {
                         if let initB = sourceNumber(bDict["initialBalance"] ?? bDict["baseBalance"] ?? bDict["startingBalance"]), initB > 0 {
@@ -883,18 +943,8 @@ public final class The5ersService: ObservableObject {
                     }
                 }
                 
-                // Query Authoritative Statistics from official the5ers_account.statistics
-                var accTotalTrades: Int? = nil
-                var accWinRate: Double? = nil
-                var accProfitFactor: Double? = nil
-                var accTotalFees: Decimal? = nil
-                let statsArgs: [String: Any] = [
-                    "operation": "statistics",
-                    "account_ref": ref,
-                    "contract_version": "1.0"
-                ]
-                if let sRes = try? await callMcpTool(name: "the5ers_account", arguments: statsArgs),
-                   !(sRes["isError"] as? Bool ?? false) {
+                // Parse Authoritative Statistics
+                if let sRes = sRes, !(sRes["isError"] as? Bool ?? false) {
                     let uStats = unwrapMcpToolResult(sRes)
                     if let sDict = (uStats as? [String: Any])?["data"] as? [String: Any] ?? uStats as? [String: Any] {
                         if let tt = sDict["totalTrades"] as? Int ?? (sDict["tradesCount"] as? Int) ?? (sDict["total_trades"] as? Int) {
@@ -914,21 +964,22 @@ public final class The5ersService: ObservableObject {
                             accProfitFactor = num.doubleValue
                         }
                         accTotalFees = sourceNumber(sDict["totalFees"] ?? sDict["fees"] ?? sDict["total_fees"])
+                        
+                        if let wd = sDict["winningDays"] as? Int ?? (sDict["profitableDays"] as? Int) ?? (sDict["winning_days"] as? Int) {
+                            authoritativeWinningDays = wd
+                        } else if let num = sDict["winningDays"] as? NSNumber {
+                            authoritativeWinningDays = num.intValue
+                        }
+                        if let td = sDict["tradingDays"] as? Int ?? (sDict["activeDays"] as? Int) ?? (sDict["trading_days"] as? Int) {
+                            authoritativeTradingDays = td
+                        } else if let num = sDict["tradingDays"] as? NSNumber {
+                            authoritativeTradingDays = num.intValue
+                        }
                     }
                 }
                 
-                // Query official the5ers_program.journey (returns authoritative programName, currentStep.name, and phase in 1 single call)
-                var authoritativeProgramName: String? = nil
-                var authoritativeStepName: String? = nil
-                var authoritativeAccountType: String? = nil
-                
-                let journeyArgs: [String: Any] = [
-                    "operation": "journey",
-                    "account_ref": ref,
-                    "contract_version": "1.0"
-                ]
-                if let jRes = try? await callMcpTool(name: "the5ers_program", arguments: journeyArgs),
-                   !(jRes["isError"] as? Bool ?? false) {
+                // Parse Authoritative Program & Objectives from Journey
+                if let jRes = jRes, !(jRes["isError"] as? Bool ?? false) {
                     let uJourney = unwrapMcpToolResult(jRes)
                     if let jData = (uJourney as? [String: Any])?["data"] as? [String: Any] ?? uJourney as? [String: Any],
                        let auth = jData["authoritative"] as? [String: Any] {
@@ -941,6 +992,19 @@ public final class The5ersService: ObservableObject {
                             }
                             if let ph = currStep["phase"] as? String, !ph.trimmingCharacters(in: .whitespaces).isEmpty {
                                 authoritativeAccountType = ph.trimmingCharacters(in: .whitespaces)
+                            }
+                            authoritativeProfitTarget = sourceNumber(currStep["profitTarget"] ?? currStep["target"])
+                        }
+                        if let reqs = auth["requirements"] as? [String: Any] {
+                            if authoritativeProfitTarget == nil {
+                                authoritativeProfitTarget = sourceNumber(reqs["profitTarget"] ?? reqs["target"])
+                            }
+                            authoritativeMaxLoss = sourceNumber(reqs["maxLoss"] ?? reqs["maxTotalLoss"] ?? reqs["maximumLoss"] ?? reqs["lossLimit"])
+                            authoritativeMaxDailyLoss = sourceNumber(reqs["maxDailyLoss"] ?? reqs["dailyLoss"] ?? reqs["dailyLossLimit"])
+                            if let mtd = reqs["minTradingDays"] as? Int ?? (reqs["minimumTradingDays"] as? Int) {
+                                authoritativeMinTradingDays = mtd
+                            } else if let num = reqs["minTradingDays"] as? NSNumber {
+                                authoritativeMinTradingDays = num.intValue
                             }
                         }
                     }
@@ -995,7 +1059,14 @@ public final class The5ersService: ObservableObject {
                     totalTrades: accTotalTrades,
                     winRate: accWinRate,
                     profitFactor: accProfitFactor,
-                    tradingBlocked: accTradingBlocked
+                    tradingBlocked: accTradingBlocked,
+                    profitTarget: authoritativeProfitTarget,
+                    maxLoss: authoritativeMaxLoss,
+                    maxDailyLoss: authoritativeMaxDailyLoss,
+                    minTradingDays: authoritativeMinTradingDays,
+                    currentTradingDays: authoritativeTradingDays,
+                    winningDays: authoritativeWinningDays,
+                    currentStepName: authoritativeStepName
                 ))
             }
             
@@ -1113,7 +1184,14 @@ public final class The5ersService: ObservableObject {
                         totalFeesMinor: feesMinor,
                         totalTrades: acc.totalTrades,
                         winRate: acc.winRate,
-                        profitFactor: acc.profitFactor
+                        profitFactor: acc.profitFactor,
+                        profitTargetMinor: acc.profitTarget.map { NSDecimalNumber(decimal: abs($0) * 100).int64Value },
+                        maxLossMinor: acc.maxLoss.map { NSDecimalNumber(decimal: abs($0) * 100).int64Value },
+                        maxDailyLossMinor: acc.maxDailyLoss.map { NSDecimalNumber(decimal: abs($0) * 100).int64Value },
+                        minTradingDays: acc.minTradingDays,
+                        currentTradingDays: acc.currentTradingDays,
+                        winningDays: acc.winningDays,
+                        currentStepName: acc.currentStepName
                     )
                 } else {
                     let newPropAccount = PropAccountItem(
@@ -1134,7 +1212,14 @@ public final class The5ersService: ObservableObject {
                         totalFeesMinor: feesMinor,
                         totalTrades: acc.totalTrades,
                         winRate: acc.winRate,
-                        profitFactor: acc.profitFactor
+                        profitFactor: acc.profitFactor,
+                        profitTargetMinor: acc.profitTarget.map { NSDecimalNumber(decimal: abs($0) * 100).int64Value },
+                        maxLossMinor: acc.maxLoss.map { NSDecimalNumber(decimal: abs($0) * 100).int64Value },
+                        maxDailyLossMinor: acc.maxDailyLoss.map { NSDecimalNumber(decimal: abs($0) * 100).int64Value },
+                        minTradingDays: acc.minTradingDays,
+                        currentTradingDays: acc.currentTradingDays,
+                        winningDays: acc.winningDays,
+                        currentStepName: acc.currentStepName
                     )
                     dataStore.propAccounts.append(newPropAccount)
                 }
@@ -1175,12 +1260,21 @@ public final class The5ersService: ObservableObject {
             // Official MCP accounts with valid session-minted account_ref
             let allTargetAccounts: [The5ersMcpAccount] = accountsList
             
-            // Sync positions for all target accounts to ensure fees, swaps, and PnL are completely accurate
-            let accountsToSyncPositions = allTargetAccounts
+            // Prioritize active accounts to stream data to UI immediately
+            let accountsToSyncPositions = allTargetAccounts.sorted { a, b in
+                let aActive = a.status.lowercased() == "active" || a.status.lowercased() == "trading"
+                let bActive = b.status.lowercased() == "active" || b.status.lowercased() == "trading"
+                if aActive != bActive { return aActive && !bActive }
+                return a.label < b.label
+            }
             
             var importedPositionsCount = 0
             for (idx, acc) in accountsToSyncPositions.enumerated() {
                 if Task.isCancelled || isCancelledByUser { break }
+                // Skip positions query for accounts confirmed by official statistics to have 0 trades
+                if let tradesCount = acc.totalTrades, tradesCount == 0 {
+                    continue
+                }
                 lastStatus = "Syncing trades (\(idx + 1)/\(accountsToSyncPositions.count)): \(acc.label)..."
                 await Task.yield()
                 
@@ -1431,7 +1525,7 @@ public final class The5ersService: ObservableObject {
             
             let pnlKeys = [
                 "profitandloss", "profit_and_loss", "netpnl", "net_pnl", "realizedpnl",
-                "realized_pnl", "net", "profit", "pnl", "gross"
+                "realized_pnl", "net", "profit", "pnl"
             ]
             let pnlVal = firstValue(in: row, keys: pnlKeys)
             netPnl = sourceNumber(pnlVal) ?? 0
@@ -1451,9 +1545,9 @@ public final class The5ersService: ObservableObject {
             return nil
         }()
         
-        let feeVal = firstValue(in: row, keys: ["fee", "commission", "fees", "commissions", "totalfees"])
+        let feeVal = firstValue(in: row, keys: ["fee", "commission", "fees", "commissions", "totalfees", "brokerfee", "broker_fee", "orderfee", "order_fee", "cost", "costs", "comm"])
         let fee = sourceNumber(feeVal)
-        let swapVal = firstValue(in: row, keys: ["swap", "swaps", "totalswap", "rollover"])
+        let swapVal = firstValue(in: row, keys: ["swap", "swaps", "totalswap", "total_swap", "rollover", "financing", "interest", "overnight"])
         let swap = sourceNumber(swapVal)
         let isValid = sourceBoolean(row["isvalid"])
         
@@ -1936,21 +2030,31 @@ public final class The5ersService: ObservableObject {
             }
         }
         
-        // 2. Query 'accounts' for each order reference to map directly to created accounts
-        for i in allPurchases.indices {
-            if Task.isCancelled || isCancelledByUser { break }
-            let pRef = String(describing: allPurchases[i]["ref"] ?? allPurchases[i]["purchase_ref"] ?? allPurchases[i]["id"] ?? "")
-            if !pRef.isEmpty && (allPurchases[i]["account_ref"] == nil || String(describing: allPurchases[i]["account_ref"] ?? "").isEmpty) {
-                if let accRes = try? await callMcpTool(name: "the5ers_purchase", arguments: [
-                    "operation": "accounts",
-                    "purchase_ref": pRef,
-                    "contract_version": "1.0"
-                ]), !(accRes["isError"] as? Bool ?? false) {
-                    let unwrappedAcc = unwrapMcpToolResult(accRes)
-                    let accRows = extractMcpCollection(unwrappedAcc, collectionKey: "accounts")
-                    if let firstAcc = accRows.first, let createdRef = firstAcc["account_ref"] ?? firstAcc["ref"] {
-                        allPurchases[i]["account_ref"] = String(describing: createdRef)
+        // 2. Concurrently query 'accounts' for each order reference to map directly to created accounts
+        await withTaskGroup(of: (Int, String?).self) { group in
+            for i in allPurchases.indices {
+                let pRef = String(describing: allPurchases[i]["ref"] ?? allPurchases[i]["purchase_ref"] ?? allPurchases[i]["id"] ?? "")
+                let existingAccRef = String(describing: allPurchases[i]["account_ref"] ?? "")
+                if !pRef.isEmpty && existingAccRef.isEmpty {
+                    group.addTask {
+                        if let accRes = try? await self.callMcpTool(name: "the5ers_purchase", arguments: [
+                            "operation": "accounts",
+                            "purchase_ref": pRef,
+                            "contract_version": "1.0"
+                        ]), !(accRes["isError"] as? Bool ?? false) {
+                            let unwrappedAcc = self.unwrapMcpToolResult(accRes)
+                            let accRows = self.extractMcpCollection(unwrappedAcc, collectionKey: "accounts")
+                            if let firstAcc = accRows.first, let createdRef = firstAcc["account_ref"] ?? firstAcc["ref"] {
+                                return (i, String(describing: createdRef))
+                            }
+                        }
+                        return (i, nil)
                     }
+                }
+            }
+            for await (idx, createdRef) in group {
+                if let createdRef = createdRef {
+                    allPurchases[idx]["account_ref"] = createdRef
                 }
             }
         }
@@ -2206,14 +2310,39 @@ public final class The5ersService: ObservableObject {
         for acc in candidateAccounts {
             if Task.isCancelled || isCancelledByUser { break }
             
-            // A. Query 'eligibility' for userPayoutPercentage (e.g. 80.0, 85.0)
-            let eligArgs: [String: Any] = [
-                "operation": "eligibility",
-                "account_ref": acc.ref,
-                "contract_version": "1.0"
-            ]
-            if let eligRes = try? await callMcpTool(name: "the5ers_payout", arguments: eligArgs),
-               !(eligRes["isError"] as? Bool ?? false) {
+            // Concurrently query eligibility, explain, and history in parallel
+            async let eligTask: [String: Any]? = {
+                let eligArgs: [String: Any] = [
+                    "operation": "eligibility",
+                    "account_ref": acc.ref,
+                    "contract_version": "1.0"
+                ]
+                return try? await self.callMcpTool(name: "the5ers_payout", arguments: eligArgs)
+            }()
+            
+            async let explainTask: [String: Any]? = {
+                let explainArgs: [String: Any] = [
+                    "operation": "explain",
+                    "account_ref": acc.ref,
+                    "contract_version": "1.0"
+                ]
+                return try? await self.callMcpTool(name: "the5ers_payout", arguments: explainArgs)
+            }()
+            
+            async let histTask: [String: Any]? = {
+                let histArgs: [String: Any] = [
+                    "operation": "history",
+                    "account_ref": acc.ref,
+                    "contract_version": "1.0",
+                    "limit": 50
+                ]
+                return try? await self.callMcpTool(name: "the5ers_payout", arguments: histArgs)
+            }()
+            
+            let (eligRes, explainRes, histRes) = await (eligTask, explainTask, histTask)
+            
+            // A. Parse eligibility
+            if let eligRes = eligRes, !(eligRes["isError"] as? Bool ?? false) {
                 let unwrapped = unwrapMcpToolResult(eligRes)
                 if let eDict = (unwrapped as? [String: Any])?["data"] as? [String: Any] ?? unwrapped as? [String: Any] {
                     if let split = eDict["userPayoutPercentage"] as? NSNumber {
@@ -2222,15 +2351,9 @@ public final class The5ersService: ObservableObject {
                 }
             }
             
-            // B. Query 'explain' for recorded split breakdown and traderSplitPercent
+            // B. Parse explain
             var latestPayoutDict: [String: Any]? = nil
-            let explainArgs: [String: Any] = [
-                "operation": "explain",
-                "account_ref": acc.ref,
-                "contract_version": "1.0"
-            ]
-            if let explainRes = try? await callMcpTool(name: "the5ers_payout", arguments: explainArgs),
-               !(explainRes["isError"] as? Bool ?? false) {
+            if let explainRes = explainRes, !(explainRes["isError"] as? Bool ?? false) {
                 let unwrappedExplain = unwrapMcpToolResult(explainRes)
                 if let expDict = (unwrappedExplain as? [String: Any])?["data"] as? [String: Any] ?? unwrappedExplain as? [String: Any] {
                     if let avail = expDict["available"] as? [String: Any] {
@@ -2250,16 +2373,9 @@ public final class The5ersService: ObservableObject {
                 }
             }
             
-            // C. Query 'history' for past payouts (limit: 50)
+            // C. Parse history payouts
             var historyPayouts: [[String: Any]] = []
-            let histArgs: [String: Any] = [
-                "operation": "history",
-                "account_ref": acc.ref,
-                "contract_version": "1.0",
-                "limit": 50
-            ]
-            if let histRes = try? await callMcpTool(name: "the5ers_payout", arguments: histArgs),
-               !(histRes["isError"] as? Bool ?? false) {
+            if let histRes = histRes, !(histRes["isError"] as? Bool ?? false) {
                 let unwrappedHist = unwrapMcpToolResult(histRes)
                 let rows = extractAnyPayoutCollection(from: unwrappedHist)
                 for var r in rows {

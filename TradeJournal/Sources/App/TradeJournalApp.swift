@@ -342,8 +342,8 @@ private struct InteractiveDrawerOverlay: View {
                 )
                 .ignoresSafeArea(.container, edges: .vertical)
         }
-        .allowsHitTesting(env.isDrawerOpen || isDragging)
         .gesture(
+            (env.isDrawerOpen || isDragging) ?
             DragGesture(minimumDistance: 10, coordinateSpace: .local)
                 .onChanged { value in
                     guard env.isDrawerOpen else { return }
@@ -371,7 +371,8 @@ private struct InteractiveDrawerOverlay: View {
                             dragOffset = 0
                         }
                     }
-                }
+                } : nil
         )
+        .allowsHitTesting(env.isDrawerOpen || isDragging)
     }
 }

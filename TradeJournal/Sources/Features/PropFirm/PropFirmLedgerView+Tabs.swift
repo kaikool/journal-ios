@@ -341,7 +341,7 @@ extension PropFirmLedgerView {
             if filteredAccounts.isEmpty {
                 EmptyStateView(
                     icon: "building.columns",
-                    title: "No prop accounts in \(selectedCurrency)",
+                    title: selectedAccountStatus == .all ? "No prop accounts" : "No \(selectedAccountStatus.rawValue.lowercased()) prop accounts",
                     message: "Tap 'Track account' above to add your Topstep, FTMO, The5ers accounts."
                 )
             } else {
@@ -459,6 +459,93 @@ extension PropFirmLedgerView {
                             .padding(.horizontal, 10)
                             .background(AppColors.secondaryBackground.opacity(0.6))
                             .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            
+                            // Program Objectives & Criteria (The5ers authoritative journey & stats)
+                            if acc.status == .active && (acc.profitTargetMinor != nil || acc.maxLossMinor != nil || acc.maxDailyLossMinor != nil || acc.winningDays != nil || acc.minTradingDays != nil || acc.currentStepName != nil) {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    HStack {
+                                        HStack(spacing: 5) {
+                                            Image(systemName: "target")
+                                                .font(.system(size: 11, weight: .semibold))
+                                                .foregroundColor(AppColors.brand)
+                                            Text(acc.currentStepName ?? "Program Objectives")
+                                                .font(.system(size: 11.5, weight: .bold))
+                                                .foregroundColor(AppColors.primaryText)
+                                                .lineLimit(1)
+                                        }
+                                        Spacer()
+                                        if let winDays = acc.winningDays {
+                                            HStack(spacing: 3) {
+                                                Image(systemName: "checkmark.seal.fill")
+                                                    .font(.system(size: 10))
+                                                Text("\(winDays) win day\(winDays == 1 ? "" : "s")")
+                                                    .font(.system(size: 10.5, weight: .semibold))
+                                            }
+                                            .foregroundColor(AppColors.profit)
+                                            .padding(.horizontal, 7)
+                                            .padding(.vertical, 2.5)
+                                            .background(AppColors.profit.opacity(0.12))
+                                            .clipShape(Capsule())
+                                        }
+                                    }
+                                    
+                                    // Target & Risk Thresholds
+                                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 6) {
+                                        if let target = acc.profitTargetMinor {
+                                            VStack(alignment: .leading, spacing: 1) {
+                                                Text("Target")
+                                                    .font(.system(size: 10))
+                                                    .foregroundColor(AppColors.secondaryText)
+                                                Text(Formatters.formatCurrency(Decimal(target) / 100, currency: acc.currency))
+                                                    .font(.system(size: 11, weight: .semibold))
+                                                    .monospacedDigit()
+                                                    .foregroundColor(AppColors.profit)
+                                            }
+                                        }
+                                        if let maxLoss = acc.maxLossMinor {
+                                            VStack(alignment: .leading, spacing: 1) {
+                                                Text("Max Loss (Terminate)")
+                                                    .font(.system(size: 10))
+                                                    .foregroundColor(AppColors.secondaryText)
+                                                Text(Formatters.formatCurrency(Decimal(maxLoss) / 100, currency: acc.currency))
+                                                    .font(.system(size: 11, weight: .semibold))
+                                                    .monospacedDigit()
+                                                    .foregroundColor(AppColors.loss)
+                                            }
+                                        }
+                                        if let dailyLoss = acc.maxDailyLossMinor {
+                                            VStack(alignment: .leading, spacing: 1) {
+                                                Text("Daily Cap")
+                                                    .font(.system(size: 10))
+                                                    .foregroundColor(AppColors.secondaryText)
+                                                Text(Formatters.formatCurrency(Decimal(dailyLoss) / 100, currency: acc.currency))
+                                                    .font(.system(size: 11, weight: .semibold))
+                                                    .monospacedDigit()
+                                                    .foregroundColor(AppColors.loss)
+                                            }
+                                        }
+                                        if let minDays = acc.minTradingDays {
+                                            VStack(alignment: .leading, spacing: 1) {
+                                                Text("Trading Days")
+                                                    .font(.system(size: 10))
+                                                    .foregroundColor(AppColors.secondaryText)
+                                                let curr = acc.currentTradingDays ?? 0
+                                                Text("\(curr)/\(minDays) days")
+                                                    .font(.system(size: 11, weight: .semibold))
+                                                    .monospacedDigit()
+                                                    .foregroundColor(AppColors.primaryText)
+                                            }
+                                        }
+                                    }
+                                }
+                                .padding(9)
+                                .background(AppColors.brand.opacity(0.06))
+                                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                        .stroke(AppColors.brand.opacity(0.18), lineWidth: 1)
+                                )
+                            }
                             
                             Divider().background(AppColors.border.opacity(0.5))
                             
