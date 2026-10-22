@@ -123,6 +123,7 @@ public struct TimeHeatmapView: View {
                                     .font(.system(size: 9, weight: .medium, design: .rounded))
                                     .monospacedDigit()
                                     .foregroundColor(AppColors.secondaryText)
+                                    .frame(width: 52, alignment: .trailing)
                             }
                         }
                     }
@@ -190,20 +191,32 @@ public struct TimeHeatmapView: View {
                                     .font(.system(size: 9, weight: .medium, design: .rounded))
                                     .monospacedDigit()
                                     .foregroundColor(AppColors.secondaryText)
+                                    .frame(width: 52, alignment: .trailing)
                             }
                         }
                     }
                 }
                 .chartXAxis {
-                    AxisMarks(position: .bottom, values: ["00:00", "04:00", "08:00", "12:00", "16:00", "20:00", "23:00"]) { value in
+                    AxisMarks(position: .bottom, values: ["00:00", "04:00", "08:00", "12:00", "16:00", "20:00"]) { value in
                         AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
                             .foregroundStyle(AppColors.border.opacity(0.3))
                         AxisTick(stroke: StrokeStyle(lineWidth: 0.5))
                             .foregroundStyle(AppColors.border)
                         AxisValueLabel {
                             if let label = value.as(String.self) {
-                                Text(label)
-                                    .font(.system(size: 8.5, weight: .medium, design: .rounded))
+                                let shortLabel: String = {
+                                    switch label {
+                                    case "00:00": return "0h"
+                                    case "04:00": return "4h"
+                                    case "08:00": return "8h"
+                                    case "12:00": return "12h"
+                                    case "16:00": return "16h"
+                                    case "20:00": return "20h"
+                                    default: return label.replacingOccurrences(of: ":00", with: "h")
+                                    }
+                                }()
+                                Text(shortLabel)
+                                    .font(.system(size: 9, weight: .semibold, design: .rounded))
                                     .foregroundStyle(AppColors.secondaryText)
                             }
                         }

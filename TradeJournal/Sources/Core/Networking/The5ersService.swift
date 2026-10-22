@@ -16,6 +16,16 @@ public struct The5ersMcpAccount: Identifiable, Codable, Sendable {
     public let startingBalance: Decimal?
     public let createdAt: String?
     
+    // Authoritative Hub / Broker Metrics
+    public let profitAndLoss: Decimal?
+    public let dailyProfitAndLoss: Decimal?
+    public let unrealized: Decimal?
+    public let totalNetProfit: Decimal?
+    public let totalFees: Decimal?
+    public let totalTrades: Int?
+    public let winRate: Double?
+    public let profitFactor: Double?
+    
     public init(
         id: String,
         ref: String? = nil,
@@ -27,7 +37,15 @@ public struct The5ersMcpAccount: Identifiable, Codable, Sendable {
         status: String = "active",
         program: String = "funded",
         startingBalance: Decimal? = nil,
-        createdAt: String? = nil
+        createdAt: String? = nil,
+        profitAndLoss: Decimal? = nil,
+        dailyProfitAndLoss: Decimal? = nil,
+        unrealized: Decimal? = nil,
+        totalNetProfit: Decimal? = nil,
+        totalFees: Decimal? = nil,
+        totalTrades: Int? = nil,
+        winRate: Double? = nil,
+        profitFactor: Double? = nil
     ) {
         self.id = id
         self.ref = ref ?? id
@@ -40,6 +58,14 @@ public struct The5ersMcpAccount: Identifiable, Codable, Sendable {
         self.program = program
         self.startingBalance = startingBalance
         self.createdAt = createdAt
+        self.profitAndLoss = profitAndLoss
+        self.dailyProfitAndLoss = dailyProfitAndLoss
+        self.unrealized = unrealized
+        self.totalNetProfit = totalNetProfit
+        self.totalFees = totalFees
+        self.totalTrades = totalTrades
+        self.winRate = winRate
+        self.profitFactor = profitFactor
     }
 }
 
@@ -728,6 +754,9 @@ public final class The5ersService: ObservableObject {
                 }
                 
                 // Query Authoritative Balance & Initial Balance from official the5ers_account.balance
+                var accProfitAndLoss: Decimal? = nil
+                var accDailyProfitAndLoss: Decimal? = nil
+                var accUnrealized: Decimal? = nil
                 let balArgs: [String: Any] = [
                     "operation": "balance",
                     "account_ref": ref,
@@ -745,6 +774,40 @@ public final class The5ersService: ObservableObject {
                         }
                         if let ce = sourceNumber(bDict["equity"]), ce > 0 {
                             eq = ce
+                        }
+                        accProfitAndLoss = sourceNumber(bDict["profitAndLoss"] ?? bDict["profit_and_loss"] ?? bDict["pnl"] ?? bDict["netProfit"])
+                        accDailyProfitAndLoss = sourceNumber(bDict["dailyProfitAndLoss"] ?? bDict["daily_profit_and_loss"] ?? bDict["dailyPnl"])
+                        accUnrealized = sourceNumber(bDict["unrealized"] ?? bDict["floatingProfit"] ?? bDict["unrealizedPnl"])
+                    }
+                }
+                
+                // Query Authoritative Statistics (totalNetProfit, totalFees, totalTrades, winRate, profitFactor)
+                var accTotalNetProfit: Decimal? = nil
+                var accTotalFees: Decimal? = nil
+                var accTotalTrades: Int? = nil
+                var accWinRate: Double? = nil
+                var accProfitFactor: Double? = nil
+                let statArgs: [String: Any] = [
+                    "operation": "statistics",
+                    "account_ref": ref,
+                    "contract_version": "1.0"
+                ]
+                if let sRes = try? await callMcpTool(name: "the5ers_account", arguments: statArgs),
+                   !(sRes["isError"] as? Bool ?? false) {
+                    let uStat = unwrapMcpToolResult(sRes)
+                    if let sDict = (uStat as? [String: Any])?["data"] as? [String: Any] ?? uStat as? [String: Any] {
+                        accTotalNetProfit = sourceNumber(sDict["totalNetProfit"] ?? sDict["netProfit"] ?? sDict["profitAndLoss"])
+                        accTotalFees = sourceNumber(sDict["totalFees"] ?? sDict["fees"] ?? sDict["commission"])
+                        if let tt = sDict["totalTrades"] as? NSNumber {
+                            accTotalTrades = tt.intValue
+                        } else if let ttStr = sDict["totalTrades"] as? String, let ttInt = Int(ttStr) {
+                            accTotalTrades = ttInt
+                        }
+                        if let wr = sourceNumber(sDict["winRate"] ?? sDict["winRatio"]) {
+                            accWinRate = NSDecimalNumber(decimal: wr).doubleValue
+                        }
+                        if let pf = sourceNumber(sDict["profitFactor"]) {
+                            accProfitFactor = NSDecimalNumber(decimal: pf).doubleValue
                         }
                     }
                 }
@@ -786,7 +849,15 @@ public final class The5ersService: ObservableObject {
                     status: status,
                     program: prog,
                     startingBalance: resolvedStartBal,
-                    createdAt: createdAt
+                    createdAt: createdAt,
+                    profitAndLoss: accProfitAndLoss ?? accTotalNetProfit,
+                    dailyProfitAndLoss: accDailyProfitAndLoss,
+                    unrealized: accUnrealized,
+                    totalNetProfit: accTotalNetProfit ?? accProfitAndLoss,
+                    totalFees: accTotalFees,
+                    totalTrades: accTotalTrades,
+                    winRate: accWinRate,
+                    profitFactor: accProfitFactor
                 ))
             }
             
@@ -819,6 +890,21 @@ public final class The5ersService: ObservableObject {
                 let startingMinor = NSDecimalNumber(decimal: (acc.startingBalance ?? acc.balance) * 100).int64Value
                 let journalAccId = acc.id.hasPrefix("the5ers_") ? acc.id : "the5ers_\(acc.id)"
                 let isActive = (mappedStatus == .active)
+                
+                let pnlMinor: Int64? = {
+                    if let pnl = acc.profitAndLoss ?? acc.totalNetProfit {
+                        return NSDecimalNumber(decimal: pnl * 100).int64Value
+                    }
+                    return nil
+                }()
+                let balMinor: Int64 = NSDecimalNumber(decimal: acc.balance * 100).int64Value
+                let eqMinor: Int64 = NSDecimalNumber(decimal: acc.equity * 100).int64Value
+                let feesMinor: Int64? = {
+                    if let f = acc.totalFees {
+                        return NSDecimalNumber(decimal: abs(f) * 100).int64Value
+                    }
+                    return nil
+                }()
                 
                 // Extract account login/number to link with existing cTrader trading account
                 let accountNumber: String? = {
@@ -862,7 +948,14 @@ public final class The5ersService: ObservableObject {
                         archived: old.archived,
                         revision: old.revision + 1,
                         createdAt: old.createdAt,
-                        updatedAt: JournalIds.nowIso()
+                        updatedAt: JournalIds.nowIso(),
+                        balanceMinor: balMinor,
+                        equityMinor: eqMinor,
+                        netPnlMinor: pnlMinor,
+                        totalFeesMinor: feesMinor,
+                        totalTrades: acc.totalTrades,
+                        winRate: acc.winRate,
+                        profitFactor: acc.profitFactor
                     )
                 } else {
                     let newPropAccount = PropAccountItem(
@@ -876,7 +969,14 @@ public final class The5ersService: ObservableObject {
                         journalAccountId: linkedAccountId,
                         openedOn: acc.createdAt ?? DateFormatter.localizedString(from: Date(), dateStyle: .short, timeStyle: .none),
                         notes: "Synced from The5ers MCP Hub (Protocol 2025-03-26)",
-                        archived: false
+                        archived: false,
+                        balanceMinor: balMinor,
+                        equityMinor: eqMinor,
+                        netPnlMinor: pnlMinor,
+                        totalFeesMinor: feesMinor,
+                        totalTrades: acc.totalTrades,
+                        winRate: acc.winRate,
+                        profitFactor: acc.profitFactor
                     )
                     dataStore.propAccounts.append(newPropAccount)
                 }
@@ -1238,17 +1338,8 @@ public final class The5ersService: ObservableObject {
             
             let isClosed = position.closedAtDate != nil
             let rawNetProfit = position.netPnl
-            let rawFee = position.fee ?? 0
+            let rawFee = abs(position.fee ?? 0)
             let rawSwap = position.swap ?? 0
-            
-            // 1:1 with source-repo/apps/web/src/server/the5ers/journal.ts lines 67-75:
-            // The5ers MCP reports netPnl which ALREADY includes signed swap and commission.
-            // Commission (fee) is negative in MT/The5ers; swap is signed (negative cost / positive credit).
-            // Total transaction costs/fees = -fee - swap
-            // Reverse costs for gross only: grossPnl = netPnl + fees.
-            // Invariant: grossPnl - fees == netPnl.
-            let hasCosts = (position.fee != nil && position.swap != nil)
-            let costTotal: Decimal = hasCosts ? (-rawFee - rawSwap) : Decimal.zero
             
             let accountCurrency = acc.currency.uppercased()
             let reportingCurrency = dataStore.currencyConversion.reportingCurrency.uppercased()
@@ -1265,9 +1356,11 @@ public final class The5ersService: ObservableObject {
                 return converted
             }
             let netPnl = isClosed ? toReporting(rawNetProfit) : Decimal.zero
-            let fees = isClosed ? toReporting(costTotal) : Decimal.zero
-            let swap = toReporting(rawSwap)
-            let grossPnl = netPnl + fees
+            let fees = isClosed ? toReporting(rawFee) : Decimal.zero
+            let swap: Decimal? = position.swap != nil ? toReporting(rawSwap) : nil
+            // Authoritative invariant from Execution.swift: netPnl == grossPnl - fees + swapAmount
+            // Reverse costs for gross calculation: grossPnl = netPnl + fees - swapAmount
+            let grossPnl = netPnl + fees - (swap ?? 0)
             
             let breakevenBand = JournalDefaultsEngine.breakevenThreshold(
                 defaults: dataStore.defaults,
@@ -1440,25 +1533,64 @@ public final class The5ersService: ObservableObject {
             return "MT5"
         }()
         
-        let leadTitle = packageName ?? "The5ers \(platformTag)"
-        var parts: [String] = [leadTitle]
+        let rawCombined = "\(fallbackLabel) \(packageName ?? "") \(fields["type"] ?? "") \(fields["step"] ?? "") \(fields["phase"] ?? "") \(fields["stage"] ?? "")".lowercased()
+        
+        let pkg: String = {
+            if rawCombined.contains("high stakes") || rawCombined.contains("highstakes") || rawCombined.contains("high-stakes") {
+                return "HighStakes"
+            }
+            if rawCombined.contains("hyper growth") || rawCombined.contains("hypergrowth") || rawCombined.contains("hyper-growth") {
+                return "HyperGrowth"
+            }
+            if rawCombined.contains("bootcamp") || rawCombined.contains("boot camp") {
+                return "Bootcamp"
+            }
+            if rawCombined.contains("instant") {
+                return "Instant Funding"
+            }
+            if let p = packageName, !p.isEmpty {
+                return p
+            }
+            return "The5ers \(platformTag)"
+        }()
+        
+        let phase: String = {
+            if rawCombined.contains("step 1") || rawCombined.contains("step1") || rawCombined.contains("phase 1") || rawCombined.contains("phase1") || rawCombined.contains("evaluation") {
+                return "Phase 1"
+            }
+            if rawCombined.contains("step 2") || rawCombined.contains("step2") || rawCombined.contains("phase 2") || rawCombined.contains("phase2") || rawCombined.contains("verification") {
+                return "Phase 2"
+            }
+            if rawCombined.contains("funded") || rawCombined.contains("live") || rawCombined.contains("master") {
+                return "Funded"
+            }
+            return ""
+        }()
+        
+        var nameComponents: [String] = []
+        let title = phase.isEmpty ? pkg : "\(pkg) \(phase)"
+        nameComponents.append(title)
         
         if let sz = accountSize, sz > 0 {
-            let formatter = NumberFormatter()
-            formatter.numberStyle = .currency
-            formatter.currencyCode = "USD"
-            formatter.maximumFractionDigits = 0
-            if let formatted = formatter.string(from: sz as NSDecimalNumber),
-               !leadTitle.contains(formatted) && !leadTitle.contains("\(sz)") {
-                parts.append(formatted)
+            let szInt = NSDecimalNumber(decimal: sz).intValue
+            if szInt >= 1000 && szInt % 1000 == 0 {
+                nameComponents.append("$\(szInt / 1000)K")
+            } else {
+                let formatter = NumberFormatter()
+                formatter.numberStyle = .currency
+                formatter.currencyCode = "USD"
+                formatter.maximumFractionDigits = 0
+                if let formatted = formatter.string(from: sz as NSDecimalNumber) {
+                    nameComponents.append(formatted)
+                }
             }
         }
         
-        if let s = suffix, !leadTitle.contains(s) {
-            parts.append("#\(s)")
+        if let s = suffix, !title.contains(s) {
+            nameComponents.append("#\(s)")
         }
         
-        return parts.joined(separator: " · ")
+        return nameComponents.joined(separator: " · ")
     }
     
     private func isLikelyPurchaseDictionary(_ dict: [String: Any]) -> Bool {
@@ -1596,7 +1728,7 @@ public final class The5ersService: ObservableObject {
             fmt.locale = Locale(identifier: "en_US_POSIX")
             let dateStr = fmt.string(from: date)
             
-            let currency = String(describing: fields["currency"] ?? "USD").uppercased()
+            var currency = String(describing: fields["currency"] ?? "USD").uppercased()
             
             var itemNames: [String] = []
             var productType = "challenge_fee"
@@ -1618,17 +1750,31 @@ public final class The5ersService: ObservableObject {
             }
             
             var priceNum: Double = 0
-            for k in ["price", "amount", "total", "netpaid", "net_paid", "cost", "value"] {
+            // Prioritize authoritative USD-denominated fields per MCP contract (Root Cause #4)
+            for k in ["priceusd", "price_usd", "netpaid", "net_paid", "total", "amount", "price", "cost", "value"] {
                 if let val = fields[k] {
-                    if let n = val as? NSNumber, n.doubleValue > 0 { priceNum = n.doubleValue; break }
+                    if let n = val as? NSNumber, n.doubleValue > 0 {
+                        priceNum = n.doubleValue
+                        if k == "priceusd" || k == "price_usd" || k == "netpaid" || k == "net_paid" {
+                            currency = "USD"
+                        }
+                        break
+                    }
                     if let s = val as? String {
                         let clean = s.replacingOccurrences(of: "$", with: "").replacingOccurrences(of: ",", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
-                        if let d = Double(clean), d > 0 { priceNum = d; break }
+                        if let d = Double(clean), d > 0 {
+                            priceNum = d
+                            if k == "priceusd" || k == "price_usd" || k == "netpaid" || k == "net_paid" {
+                                currency = "USD"
+                            }
+                            break
+                        }
                     }
                 }
             }
             if priceNum == 0 && itemsTotal > 0 {
                 priceNum = itemsTotal
+                currency = "USD"
             }
             guard priceNum > 0 else { continue }
             let amountMinor = Int64(round(priceNum * 100))
@@ -1660,8 +1806,13 @@ public final class The5ersService: ObservableObject {
                 return "other"
             }()
             
-            // Per docs/the5ers.md line 52: "Purchase expenses stay firm-wide unless attribution can be verified; no account is guessed from a cart or progression chain."
-            let journalAccId: String? = nil
+            // Match account attribution if account_ref or account identifier is present in order metadata
+            let candidateAccRef = String(describing: fields["accountref"] ?? fields["account_ref"] ?? fields["accountid"] ?? fields["account_id"] ?? "")
+            let matchedAcc = targetAccounts.first(where: {
+                (!candidateAccRef.isEmpty && ($0.ref == candidateAccRef || $0.id == candidateAccRef)) ||
+                (!candidateAccRef.isEmpty && $0.label.contains(candidateAccRef))
+            })
+            let journalAccId: String? = matchedAcc != nil ? (matchedAcc!.id.hasPrefix("the5ers_") ? matchedAcc!.id : "the5ers_\(matchedAcc!.id)") : nil
             
             if let existingIdx = dataStore.propEntries.firstIndex(where: {
                 $0.id == entryId ||
@@ -1909,7 +2060,7 @@ public final class The5ersService: ObservableObject {
             
             // 2. Extract Explicit Gross Amount
             let explicitGross: Double? = {
-                for k in ["grossamount", "gross_amount", "grossprofit", "gross_profit", "tradingprofit", "trading_profit", "profit"] {
+                for k in ["availableprofit", "available_profit", "grossamount", "gross_amount", "grossprofit", "gross_profit", "tradingprofit", "trading_profit", "profit"] {
                     if let val = fields[k] {
                         if let n = val as? NSNumber, n.doubleValue > 0 { return n.doubleValue }
                         if let s = val as? String {
@@ -1923,7 +2074,7 @@ public final class The5ersService: ObservableObject {
             
             // 3. Extract Explicit Net Received Amount
             let explicitNet: Double? = {
-                for k in ["receivedamount", "received_amount", "netamount", "net_amount", "paidamount", "paid_amount", "netpaid", "traderprofit", "trader_profit", "tradershare", "trader_share", "payoutamount", "payout_amount", "withdrawalamount", "withdrawal_amount", "usershare", "user_share", "net"] {
+                for k in ["finalamount", "final_amount", "requestedamount", "requested_amount", "receivedamount", "received_amount", "netamount", "net_amount", "paidamount", "paid_amount", "netpaid", "traderprofit", "trader_profit", "tradershare", "trader_share", "payoutamount", "payout_amount", "withdrawalamount", "withdrawal_amount", "usershare", "user_share", "net"] {
                     if let val = fields[k] {
                         if let n = val as? NSNumber, n.doubleValue > 0 { return n.doubleValue }
                         if let s = val as? String {
@@ -1969,6 +2120,10 @@ public final class The5ersService: ObservableObject {
                 if let eg = explicitGross, eg >= en {
                     grossMinor = Int64(round(eg * 100))
                     splitBps = grossMinor > 0 ? Int(round(Double(netReceivedMinor) * 10000.0 / Double(grossMinor))) : 10000
+                } else if let sp = splitPercentVal, sp > 0 && sp <= 100 {
+                    let ratio = sp > 1.0 ? (sp / 100.0) : sp
+                    grossMinor = Int64(round(Double(netReceivedMinor) / ratio))
+                    splitBps = Int(round(ratio * 10000.0))
                 } else {
                     grossMinor = netReceivedMinor
                     splitBps = 10000
@@ -1978,12 +2133,18 @@ public final class The5ersService: ObservableObject {
                 splitBps = Int(round(sp > 1.0 ? sp * 100 : sp * 10000))
                 netReceivedMinor = max(0, Int64((Double(grossMinor) * Double(splitBps) + 5000) / 10000) - feeMinor)
             } else if let ga = genericAmount {
-                // 1:1 with source-repo/docs/the5ers.md:62-73 and payouts.ts:320-335:
-                // Under owner confirmation, reported payout amounts represent actual received cash.
-                // Do not invent artificial gross profit multipliers without explicit provider breakdown.
                 netReceivedMinor = Int64(round(ga * 100))
-                grossMinor = netReceivedMinor
-                splitBps = 10000
+                if let eg = explicitGross, eg >= ga {
+                    grossMinor = Int64(round(eg * 100))
+                    splitBps = grossMinor > 0 ? Int(round(Double(netReceivedMinor) * 10000.0 / Double(grossMinor))) : 10000
+                } else if let sp = splitPercentVal, sp > 0 && sp <= 100 {
+                    let ratio = sp > 1.0 ? (sp / 100.0) : sp
+                    grossMinor = Int64(round(Double(netReceivedMinor) / ratio))
+                    splitBps = Int(round(ratio * 10000.0))
+                } else {
+                    grossMinor = netReceivedMinor
+                    splitBps = 10000
+                }
             } else {
                 continue
             }

@@ -103,6 +103,15 @@ public struct PropAccountItem: Identifiable, Codable, Equatable, Sendable {
     public let createdAt: String
     public var updatedAt: String
     
+    // Authoritative Hub / Broker Metrics (synced from official API/MCP balance & statistics)
+    public var balanceMinor: Int64?
+    public var equityMinor: Int64?
+    public var netPnlMinor: Int64?
+    public var totalFeesMinor: Int64?
+    public var totalTrades: Int?
+    public var winRate: Double?
+    public var profitFactor: Double?
+    
     public init(
         id: String = JournalIds.newId(),
         firm: String,
@@ -121,7 +130,14 @@ public struct PropAccountItem: Identifiable, Codable, Equatable, Sendable {
         archived: Bool = false,
         revision: Int = 0,
         createdAt: String = JournalIds.nowIso(),
-        updatedAt: String = JournalIds.nowIso()
+        updatedAt: String = JournalIds.nowIso(),
+        balanceMinor: Int64? = nil,
+        equityMinor: Int64? = nil,
+        netPnlMinor: Int64? = nil,
+        totalFeesMinor: Int64? = nil,
+        totalTrades: Int? = nil,
+        winRate: Double? = nil,
+        profitFactor: Double? = nil
     ) {
         self.id = id
         self.firm = firm
@@ -141,6 +157,13 @@ public struct PropAccountItem: Identifiable, Codable, Equatable, Sendable {
         self.revision = revision
         self.createdAt = createdAt
         self.updatedAt = updatedAt
+        self.balanceMinor = balanceMinor
+        self.equityMinor = equityMinor
+        self.netPnlMinor = netPnlMinor
+        self.totalFeesMinor = totalFeesMinor
+        self.totalTrades = totalTrades
+        self.winRate = winRate
+        self.profitFactor = profitFactor
     }
 }
 

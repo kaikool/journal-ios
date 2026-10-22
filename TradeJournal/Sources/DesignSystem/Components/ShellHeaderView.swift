@@ -1,11 +1,10 @@
 import SwiftUI
 
 /// Unified Modern Top Navigation Bar conforming to Apple Human Interface Guidelines:
-/// - Brand logo emblem button as the primary drawer navigation trigger (replaces generic 3-line hamburger icon)
+/// - Brand logo emblem button as the primary drawer navigation trigger
 /// - Contextual page identity: Dedicated page-specific SF Symbol + prominent title (18pt bold rounded)
-/// - Trailing cluster: Refined Account Selector chip (concrete accounts only, no "All Accounts"),
-///   clean Time Range selector (7D, 30D, 90D, YTD, no "ALL"), and Quick Privacy toggle
-/// - Spacious Apple HIG vertical padding (10pt) and horizontal breathing room (16pt)
+/// - Modern concise Account Selector chip (concrete accounts only, no truncation)
+/// - Pure black background matching body in dark mode (no 2-tone gray/black banding)
 public struct ShellHeaderView: View {
     @EnvironmentObject private var env: AppEnvironment
     @ObservedObject private var dataStore = TradeDataStore.shared
@@ -49,18 +48,9 @@ public struct ShellHeaderView: View {
         }
     }
     
-    private var shouldShowTimeRangeSelector: Bool {
-        switch env.selectedTab {
-        case .dashboard, .trades, .reports:
-            return true
-        default:
-            return false
-        }
-    }
-    
     public var body: some View {
-        HStack(spacing: 10) {
-            // Leading: App Brand Logo as Drawer Menu Trigger (Replaces generic 3-line hamburger icon)
+        HStack(spacing: 12) {
+            // Leading: App Brand Logo as Drawer Menu Trigger
             Button {
                 #if os(iOS)
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -97,25 +87,17 @@ public struct ShellHeaderView: View {
             }
             .layoutPriority(1)
             
-            Spacer(minLength: 6)
+            Spacer(minLength: 8)
             
-            // Trailing 1: Compact Account Selector Chip (Shown when multiple accounts exist; concrete accounts only, no "All Accounts")
+            // Trailing: Compact Account Selector Chip (concrete accounts only, no "All Accounts")
             if shouldShowAccountSelector {
                 accountSelectorMenu
             }
-            
-            // Trailing 2: Compact Time Range Selector Chip (Dashboard, Trades, Reports; 7D, 30D, 90D, YTD, no "ALL")
-            if shouldShowTimeRangeSelector {
-                timeRangeSelectorMenu
-            }
-            
-            // Trailing 3: Sleek Privacy Mode Toggle Button
-            privacyToggleButton
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
         .frame(minHeight: 56)
-        .background(.ultraThinMaterial)
+        .background(AppColors.background)
         .overlay(
             Divider().background(AppColors.border.opacity(0.35)),
             alignment: .bottom
@@ -123,51 +105,6 @@ public struct ShellHeaderView: View {
     }
     
     // MARK: - Subcomponents
-    
-    private var timeRangeSelectorMenu: some View {
-        Menu {
-            ForEach(JournalTimeRange.selectableCases) { range in
-                Button {
-                    #if os(iOS)
-                    UISelectionFeedbackGenerator().selectionChanged()
-                    #endif
-                    dataStore.selectedTimeRange = range
-                } label: {
-                    HStack {
-                        Text(range.rawValue)
-                        if dataStore.selectedTimeRange == range {
-                            Image(systemName: "checkmark")
-                        }
-                    }
-                }
-            }
-        } label: {
-            HStack(spacing: 4) {
-                Image(systemName: "calendar")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(AppColors.brand)
-                
-                Text(dataStore.selectedTimeRange.rawValue == "ALL" ? "30D" : dataStore.selectedTimeRange.rawValue)
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
-                    .foregroundColor(AppColors.primaryText)
-                    .lineLimit(1)
-                
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 8, weight: .bold))
-                    .foregroundColor(AppColors.secondaryText)
-            }
-            .padding(.horizontal, 9)
-            .padding(.vertical, 6)
-            .frame(height: 32)
-            .background(AppColors.cardBackground.opacity(0.9))
-            .clipShape(Capsule())
-            .overlay(
-                Capsule().stroke(AppColors.border.opacity(0.6), lineWidth: 0.7)
-            )
-        }
-        .buttonStyle(ApplePressableButtonStyle())
-        .accessibilityLabel("Select Time Range")
-    }
     
     private var accountSelectorMenu: some View {
         Menu {
@@ -195,7 +132,7 @@ public struct ShellHeaderView: View {
                 Label("Manage Accounts...", systemImage: "creditcard")
             }
         } label: {
-            HStack(spacing: 5) {
+            HStack(spacing: 6) {
                 Circle()
                     .fill(AppColors.profit)
                     .frame(width: 6, height: 6)
@@ -204,14 +141,12 @@ public struct ShellHeaderView: View {
                     .font(.system(size: 12, weight: .semibold, design: .rounded))
                     .foregroundColor(AppColors.primaryText)
                     .lineLimit(1)
-                    .truncationMode(.tail)
-                    .frame(maxWidth: 110)
                 
                 Image(systemName: "chevron.down")
                     .font(.system(size: 8, weight: .bold))
                     .foregroundColor(AppColors.secondaryText.opacity(0.8))
             }
-            .padding(.horizontal, 10)
+            .padding(.horizontal, 12)
             .padding(.vertical, 6)
             .frame(height: 32)
             .background(AppColors.cardBackground.opacity(0.85))
@@ -223,29 +158,5 @@ public struct ShellHeaderView: View {
         }
         .buttonStyle(ApplePressableButtonStyle())
         .accessibilityLabel("Select Trading Account")
-    }
-    
-    private var privacyToggleButton: some View {
-        Button {
-            #if os(iOS)
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            #endif
-            withAnimation(.easeInOut(duration: 0.2)) {
-                env.isPrivacyModeEnabled.toggle()
-            }
-        } label: {
-            Image(systemName: env.isPrivacyModeEnabled ? "eye.slash.fill" : "eye")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(env.isPrivacyModeEnabled ? AppColors.warning : AppColors.secondaryText)
-                .frame(width: 32, height: 32)
-                .background(AppColors.cardBackground.opacity(0.85))
-                .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 9, style: .continuous)
-                        .stroke(AppColors.border.opacity(0.55), lineWidth: 0.7)
-                )
-        }
-        .buttonStyle(ApplePressableButtonStyle())
-        .accessibilityLabel(env.isPrivacyModeEnabled ? "Disable privacy mode" : "Enable privacy mode")
     }
 }

@@ -31,7 +31,13 @@ public struct NavigationDrawerView: View {
         if dataStore.selectedAccountId == "all" {
             return "All accounts"
         }
-        return dataStore.accounts.first(where: { $0.id == dataStore.selectedAccountId })?.name ?? "Trading Terminal"
+        if let acc = dataStore.accounts.first(where: { $0.id == dataStore.selectedAccountId || TradeDataStore.isSameAccountId($0.id, dataStore.selectedAccountId) }) {
+            return Formatters.cleanAccountName(acc.name, balance: acc.initialBalance)
+        }
+        if let first = dataStore.visibleAccounts.first {
+            return Formatters.cleanAccountName(first.name, balance: first.initialBalance)
+        }
+        return "Trading Terminal"
     }
     
     public var body: some View {
@@ -127,7 +133,8 @@ public struct NavigationDrawerView: View {
                         Text(activeAccountScope)
                             .font(.system(size: 11, weight: .medium))
                             .foregroundColor(AppColors.secondaryText)
-                            .lineLimit(1)
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.85)
                     }
                 }
                 

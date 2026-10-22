@@ -277,13 +277,18 @@ public enum Formatters {
     
     // MARK: - Account & Reference Clean Formatters
     
-    /// Cleans raw broker/prop labels (such as "meta-trader-5 · …7657" or "Meta-Trade-5-......7657")
-    /// into professional, human-readable account titles.
+    /// Cleans raw broker/prop labels into standardized, professional account titles:
+    /// e.g. "HighStakes Phase 1 · $100K · #123456"
     public static func cleanAccountName(_ raw: String, balance: Decimal? = nil) -> String {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return "Trading Account" }
         
         let lower = trimmed.lowercased()
+        
+        // If already well formatted with dots (e.g. "HighStakes Phase 1 · $100K · #123456"), preserve it
+        if trimmed.contains(" · ") && !lower.contains("meta-trader") && !lower.contains("c-trader") {
+            return trimmed
+        }
         
         let isRawIdOrPrefix = lower.hasPrefix("account the5ers_") ||
                               lower.hasPrefix("account ") ||
@@ -298,7 +303,7 @@ public enum Formatters {
                             lower.contains("traderevolution") ||
                             isRawIdOrPrefix
         
-        guard isRawPlatform else {
+        guard isRawPlatform || lower.contains("phase") || lower.contains("step") || lower.contains("stakes") || lower.contains("bootcamp") || lower.contains("growth") else {
             return trimmed
         }
         
@@ -316,34 +321,63 @@ public enum Formatters {
         }
         
         var suffix = ""
-        let pattern = #"(?:…|\.{3}|[-_·\s])?(\d{3,12})\s*$"#
+        let pattern = #"(?:…|\.{3}|[-_·\s#])?(\d{3,12})\s*$"#
         if let regex = try? NSRegularExpression(pattern: pattern),
            let match = regex.firstMatch(in: trimmed, range: NSRange(trimmed.startIndex..., in: trimmed)),
            let range = Range(match.range(at: 1), in: trimmed) {
             suffix = String(trimmed[range])
         }
         
-        var prefix = platformTag
-        if lower.hasPrefix("ftmo") {
-            prefix = "FTMO \(platformTag)"
-        } else if lower.contains("the5ers") {
-            prefix = "The5ers \(platformTag)"
-        }
+        let pkg: String = {
+            if lower.contains("high stakes") || lower.contains("highstakes") || lower.contains("high-stakes") {
+                return "HighStakes"
+            }
+            if lower.contains("hyper growth") || lower.contains("hypergrowth") || lower.contains("hyper-growth") {
+                return "HyperGrowth"
+            }
+            if lower.contains("bootcamp") || lower.contains("boot camp") {
+                return "Bootcamp"
+            }
+            if lower.contains("instant") {
+                return "Instant Funding"
+            }
+            if lower.hasPrefix("ftmo") {
+                return "FTMO \(platformTag)"
+            }
+            return "The5ers \(platformTag)"
+        }()
         
-        var sizePart: String? = nil
+        let phase: String = {
+            if lower.contains("step 1") || lower.contains("step1") || lower.contains("phase 1") || lower.contains("phase1") || lower.contains("evaluation") {
+                return "Phase 1"
+            }
+            if lower.contains("step 2") || lower.contains("step2") || lower.contains("phase 2") || lower.contains("phase2") || lower.contains("verification") {
+                return "Phase 2"
+            }
+            if lower.contains("funded") || lower.contains("live") || lower.contains("master") {
+                return "Funded"
+            }
+            return ""
+        }()
+        
+        let title = phase.isEmpty ? pkg : "\(pkg) \(phase)"
+        var components: [String] = [title]
+        
         if let b = balance, b > 0 {
-            let num = b as NSDecimalNumber
-            let formatter = NumberFormatter()
-            formatter.numberStyle = .currency
-            formatter.currencyCode = "USD"
-            formatter.maximumFractionDigits = 0
-            sizePart = formatter.string(from: num)
+            let bInt = NSDecimalNumber(decimal: b).intValue
+            if bInt >= 1000 && bInt % 1000 == 0 {
+                components.append("$\(bInt / 1000)K")
+            } else {
+                let formatter = NumberFormatter()
+                formatter.numberStyle = .currency
+                formatter.currencyCode = "USD"
+                formatter.maximumFractionDigits = 0
+                if let formatted = formatter.string(from: b as NSDecimalNumber) {
+                    components.append(formatted)
+                }
+            }
         }
         
-        var components: [String] = [prefix]
-        if let s = sizePart {
-            components.append(s)
-        }
         if !suffix.isEmpty {
             components.append("#\(suffix)")
         }
