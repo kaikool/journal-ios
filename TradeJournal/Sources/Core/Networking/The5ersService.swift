@@ -898,7 +898,7 @@ public final class The5ersService: ObservableObject {
                     return nil
                 }()
                 let balMinor: Int64 = NSDecimalNumber(decimal: acc.balance * 100).int64Value
-                let eqMinor: Int64 = NSDecimalNumber(decimal: acc.equity * 100).int64Value
+                let eqMinor: Int64? = acc.equity.map { NSDecimalNumber(decimal: $0 * 100).int64Value }
                 let feesMinor: Int64? = {
                     if let f = acc.totalFees {
                         return NSDecimalNumber(decimal: abs(f) * 100).int64Value
