@@ -248,7 +248,8 @@ public struct DashboardView: View {
     // MARK: - Calendar Widget Helpers
     
     var calendarWeeks: [[Date?]] {
-        let cal = Calendar.current
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = env.currentTimeZone
         let now = Date()
         guard let firstDay = cal.date(from: cal.dateComponents([.year, .month], from: now)),
               let range = cal.range(of: .day, in: .month, for: now) else {

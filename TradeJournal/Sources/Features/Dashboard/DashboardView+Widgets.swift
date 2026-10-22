@@ -491,6 +491,7 @@ extension DashboardView {
                 let isoFormatter: DateFormatter = {
                     let f = DateFormatter()
                     f.dateFormat = "yyyy-MM-dd"
+                    f.timeZone = env.currentTimeZone
                     return f
                 }()
                 

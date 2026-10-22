@@ -56,6 +56,26 @@ extension TradeDataStore {
         return true
     }
 
+    public func propAccount(for account: Account) -> PropAccountItem? {
+        let clean = account.id.cleanAccountId
+        let canon = account.id.the5ersCanonicalId
+        return propAccounts.first { p in
+            p.id == account.id ||
+            p.id.cleanAccountId == clean ||
+            p.id.the5ersCanonicalId == canon ||
+            p.journalAccountId == account.id ||
+            (p.journalAccountId != nil && p.journalAccountId!.cleanAccountId == clean) ||
+            p.name == account.name
+        }
+    }
+
+    public func isPropAccount(_ account: Account) -> Bool {
+        account.broker.lowercased() == "the5ers" ||
+        account.propProgram != nil ||
+        account.id.hasPrefix("the5ers_") ||
+        propAccount(for: account) != nil
+    }
+
     public func isAccountVisible(_ account: Account) -> Bool {
         if let v = account.visibleInJournal {
             return v

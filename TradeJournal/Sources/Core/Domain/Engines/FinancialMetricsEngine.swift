@@ -105,10 +105,10 @@ public enum FinancialMetricsEngine {
     /// Computes chronological cumulative equity points for all closed trades
     public static func equityCurve(trades: [Trade]) -> [EquityPoint] {
         let closedTrades = trades
-            .filter { $0.status != .open && $0.closedAt != nil }
+            .filter { $0.status != .open }
             .sorted {
-                let d0 = $0.closedAt ?? .distantPast
-                let d1 = $1.closedAt ?? .distantPast
+                let d0 = $0.closedAt ?? $0.openedAt
+                let d1 = $1.closedAt ?? $1.openedAt
                 if d0 != d1 {
                     return d0 < d1
                 }
@@ -117,12 +117,12 @@ public enum FinancialMetricsEngine {
         
         var cum: Decimal = 0
         let formatter = ISO8601DateFormatter()
-        return closedTrades.compactMap { trade in
-            guard let closedAt = trade.closedAt else { return nil }
+        return closedTrades.map { trade in
+            let date = trade.closedAt ?? trade.openedAt
             cum += trade.netPnl
             return EquityPoint(
-                timestamp: closedAt,
-                dateString: formatter.string(from: closedAt),
+                timestamp: date,
+                dateString: formatter.string(from: date),
                 cumNetPnl: cum
             )
         }
@@ -131,10 +131,10 @@ public enum FinancialMetricsEngine {
     /// Aggregates trade performance by calendar date according to the specified timezone
     public static func dailyStats(trades: [Trade], timeZone: TimeZone = .current) -> [DayStats] {
         let closedTrades = trades
-            .filter { $0.status != .open && $0.closedAt != nil }
+            .filter { $0.status != .open }
             .sorted {
-                let d0 = $0.closedAt ?? .distantPast
-                let d1 = $1.closedAt ?? .distantPast
+                let d0 = $0.closedAt ?? $0.openedAt
+                let d1 = $1.closedAt ?? $1.openedAt
                 if d0 != d1 {
                     return d0 < d1
                 }
@@ -148,8 +148,8 @@ public enum FinancialMetricsEngine {
         var dayMap: [String: DayStats] = [:]
         
         for trade in closedTrades {
-            guard let closedAt = trade.closedAt else { continue }
-            let dateKey = dateFormatter.string(from: closedAt)
+            let targetDate = trade.closedAt ?? trade.openedAt
+            let dateKey = dateFormatter.string(from: targetDate)
             var day = dayMap[dateKey] ?? DayStats(
                 date: dateKey,
                 netPnl: 0,
@@ -296,9 +296,9 @@ public enum FinancialMetricsEngine {
         let dayWinRate: Double? = !dayStatsList.isEmpty ? (Double(winningDays) / Double(dayStatsList.count)) : nil
         
         // Chronological order for streak analysis
-        let ordered = closed.compactMap { trade -> (Trade, Date)? in
-            guard let closedAt = trade.closedAt else { return nil }
-            return (trade, closedAt)
+        let ordered = closed.map { trade -> (Trade, Date) in
+            let date = trade.closedAt ?? trade.openedAt
+            return (trade, date)
         }.sorted { $0.1 < $1.1 }.map { $0.0 }
         var maxWinStreak = 0
         var maxLossStreak = 0

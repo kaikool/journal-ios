@@ -109,7 +109,7 @@ public struct AccountsManagerView: View {
                     } else {
                         LazyVStack(spacing: 12) {
                             ForEach(filteredAccounts) { acc in
-                                accountCard(acc, tradeCount: countMap[acc.id] ?? countMap[acc.id.cleanAccountId] ?? 0)
+                                accountCard(acc, tradeCount: countMap[acc.id.cleanAccountId] ?? countMap[acc.id] ?? (dataStore.propAccount(for: acc)?.totalTrades ?? 0))
                             }
                         }
                         .padding(.horizontal, 16)
@@ -375,7 +375,6 @@ public struct AccountsManagerView: View {
     private var tradeCountMap: [String: Int] {
         var map: [String: Int] = [:]
         for t in dataStore.trades {
-            map[t.accountId, default: 0] += 1
             let clean = t.accountId.cleanAccountId
             map[clean, default: 0] += 1
         }
@@ -463,10 +462,41 @@ public struct AccountsManagerView: View {
                 // Badges
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 6) {
+                        let prop = dataStore.propAccount(for: acc)
+                        let isProp = dataStore.isPropAccount(acc)
+                        
                         if isArchived {
                             badgeView("Archived", color: AppColors.secondaryText)
+                        } else if isProp {
+                            // Prop firm account status
+                            if let p = prop {
+                                switch p.status {
+                                case .active:
+                                    badgeView("Active", color: AppColors.profit)
+                                case .passed:
+                                    badgeView("Passed", color: Color.blue)
+                                case .breached:
+                                    badgeView("Breached", color: AppColors.loss)
+                                case .closed:
+                                    badgeView("Closed", color: AppColors.secondaryText)
+                                case .inactive:
+                                    badgeView("Inactive", color: AppColors.secondaryText)
+                                }
+                            } else {
+                                if dataStore.isAccountActive(acc) {
+                                    badgeView("Active", color: AppColors.profit)
+                                } else {
+                                    badgeView("Inactive", color: AppColors.secondaryText)
+                                }
+                            }
                         } else {
+                            // Broker accounts (cTrader, manual, etc.) are always active unless archived
                             badgeView("Active", color: AppColors.profit)
+                        }
+                        
+                        // Prop Program / Phase badge
+                        if let prog = prop?.program.label ?? acc.propProgram?.capitalized, !prog.isEmpty {
+                            badgeView(prog, color: AppColors.brand)
                         }
                         
                         if !acc.broker.isEmpty {

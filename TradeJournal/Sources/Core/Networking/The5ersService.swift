@@ -883,6 +883,40 @@ public final class The5ersService: ObservableObject {
                     }
                 }
                 
+                // Query Authoritative Statistics from official the5ers_account.statistics
+                var accTotalTrades: Int? = nil
+                var accWinRate: Double? = nil
+                var accProfitFactor: Double? = nil
+                var accTotalFees: Decimal? = nil
+                let statsArgs: [String: Any] = [
+                    "operation": "statistics",
+                    "account_ref": ref,
+                    "contract_version": "1.0"
+                ]
+                if let sRes = try? await callMcpTool(name: "the5ers_account", arguments: statsArgs),
+                   !(sRes["isError"] as? Bool ?? false) {
+                    let uStats = unwrapMcpToolResult(sRes)
+                    if let sDict = (uStats as? [String: Any])?["data"] as? [String: Any] ?? uStats as? [String: Any] {
+                        if let tt = sDict["totalTrades"] as? Int ?? (sDict["tradesCount"] as? Int) ?? (sDict["total_trades"] as? Int) {
+                            accTotalTrades = tt
+                        } else if let num = sDict["totalTrades"] as? NSNumber {
+                            accTotalTrades = num.intValue
+                        }
+                        if let wr = sDict["winRate"] as? Double ?? (sDict["win_rate"] as? Double) {
+                            accWinRate = wr > 1.0 ? wr / 100.0 : wr
+                        } else if let num = sDict["winRate"] as? NSNumber {
+                            let d = num.doubleValue
+                            accWinRate = d > 1.0 ? d / 100.0 : d
+                        }
+                        if let pf = sDict["profitFactor"] as? Double ?? (sDict["profit_factor"] as? Double) {
+                            accProfitFactor = pf
+                        } else if let num = sDict["profitFactor"] as? NSNumber {
+                            accProfitFactor = num.doubleValue
+                        }
+                        accTotalFees = sourceNumber(sDict["totalFees"] ?? sDict["fees"] ?? sDict["total_fees"])
+                    }
+                }
+                
                 // Query official the5ers_program.journey (returns authoritative programName, currentStep.name, and phase in 1 single call)
                 var authoritativeProgramName: String? = nil
                 var authoritativeStepName: String? = nil
@@ -957,10 +991,10 @@ public final class The5ersService: ObservableObject {
                     dailyProfitAndLoss: accDailyProfitAndLoss,
                     unrealized: accUnrealized,
                     totalNetProfit: accProfitAndLoss,
-                    totalFees: nil,
-                    totalTrades: nil,
-                    winRate: nil,
-                    profitFactor: nil,
+                    totalFees: accTotalFees,
+                    totalTrades: accTotalTrades,
+                    winRate: accWinRate,
+                    profitFactor: accProfitFactor,
                     tradingBlocked: accTradingBlocked
                 ))
             }
@@ -1339,15 +1373,36 @@ public final class The5ersService: ObservableObject {
             return nil
         }
         
-        // Robust closed status: boolean flag, status token, or presence of close date
+        // Robust closed status: boolean flag, status token, or presence of close date/exit price/realized PnL
         let isClosed: Bool = {
             if let b = sourceBoolean(firstValue(in: row, keys: ["isclosed", "closed", "isclose"])) {
                 return b
             }
             let st = String(describing: row["status"] ?? "").lowercased()
-            if st.contains("close") || st == "filled" || st == "done" { return true }
+            if st.contains("close") || st == "filled" || st == "done" || st.contains("exit") || st.contains("history") { return true }
             if st.contains("open") { return false }
-            return row["closedate"] != nil || row["close_date"] != nil || row["closedat"] != nil
+            
+            // Check if any close date/time exists
+            let hasCloseDate = firstValue(in: row, keys: [
+                "closedate", "closedat", "closetime", "close_date", "close_time",
+                "closedatetime", "exittime", "exit_time", "exitdate", "timeclose",
+                "time_close", "outtime", "out_time"
+            ]) != nil
+            if hasCloseDate { return true }
+            
+            // Check if exit price is present
+            let hasExitPrice = sourceNumber(firstValue(in: row, keys: [
+                "exit", "closeprice", "exitprice", "close_price", "exit_price", "closedprice", "outprice", "out_price"
+            ])) != nil
+            if hasExitPrice { return true }
+            
+            // Check if non-zero or explicit profitAndLoss field is present
+            let hasRealizedPnl = sourceNumber(firstValue(in: row, keys: [
+                "profitandloss", "profit_and_loss", "netpnl", "net_pnl", "realizedpnl", "realized_pnl"
+            ])) != nil
+            if hasRealizedPnl { return true }
+            
+            return false
         }()
         
         let closedAtTuple: (iso: String, date: Date)?
@@ -1355,7 +1410,11 @@ public final class The5ersService: ObservableObject {
         let netPnl: Decimal
         
         if isClosed {
-            let closeKeys = ["closedate", "closedat", "closetime", "close_date", "closedatetime", "exittime", "exitdate", "timeclose", "time_close"]
+            let closeKeys = [
+                "closedate", "closedat", "closetime", "close_date", "close_time",
+                "closedatetime", "exittime", "exit_time", "exitdate", "timeclose",
+                "time_close", "outtime", "out_time"
+            ]
             let closeVal = firstValue(in: row, keys: closeKeys)
             if let cl = sourceInstant(closeVal) {
                 closedAtTuple = cl.date >= openedAtDate ? cl : (openedAtIso, openedAtDate)
@@ -1363,11 +1422,17 @@ public final class The5ersService: ObservableObject {
                 closedAtTuple = (openedAtIso, openedAtDate)
             }
             
-            let exitKeys = ["exit", "closeprice", "exitprice", "close_price", "closedprice", "outprice"]
+            let exitKeys = [
+                "exit", "closeprice", "exitprice", "close_price", "exit_price",
+                "closedprice", "outprice", "out_price"
+            ]
             let exitVal = firstValue(in: row, keys: exitKeys)
             exit = sourceNumber(exitVal) ?? entry
             
-            let pnlKeys = ["profitandloss", "netpnl", "net_pnl", "realizedpnl", "net", "profit", "pnl", "gross"]
+            let pnlKeys = [
+                "profitandloss", "profit_and_loss", "netpnl", "net_pnl", "realizedpnl",
+                "realized_pnl", "net", "profit", "pnl", "gross"
+            ]
             let pnlVal = firstValue(in: row, keys: pnlKeys)
             netPnl = sourceNumber(pnlVal) ?? 0
         } else {
@@ -1376,7 +1441,7 @@ public final class The5ersService: ObservableObject {
             netPnl = 0
         }
         
-        let provKeys = ["positionid", "ticket", "id", "dealid", "positionref"]
+        let provKeys = ["positionid", "ticket", "id", "dealid", "positionref", "position_ref", "orderid", "order_id"]
         let provVal = firstValue(in: row, keys: provKeys)
         let providerId: String? = {
             if let p = provVal {
@@ -1386,9 +1451,9 @@ public final class The5ersService: ObservableObject {
             return nil
         }()
         
-        let feeVal = firstValue(in: row, keys: ["fee", "commission", "fees"])
+        let feeVal = firstValue(in: row, keys: ["fee", "commission", "fees", "commissions", "totalfees"])
         let fee = sourceNumber(feeVal)
-        let swapVal = firstValue(in: row, keys: ["swap", "swaps"])
+        let swapVal = firstValue(in: row, keys: ["swap", "swaps", "totalswap", "rollover"])
         let swap = sourceNumber(swapVal)
         let isValid = sourceBoolean(row["isvalid"])
         
@@ -1513,11 +1578,20 @@ public final class The5ersService: ObservableObject {
             
             let openSec = Int64(position.openedAtDate.timeIntervalSince1970)
             let existingIdx = dataStore.trades.firstIndex(where: {
-                $0.key == tradeKey ||
-                ($0.symbol.uppercased() == position.symbol.uppercased() &&
-                 $0.direction == position.direction &&
-                 abs(Int64($0.openedAt.timeIntervalSince1970) - openSec) <= 3 &&
-                 abs($0.quantity - position.quantity) < 0.001)
+                if $0.key == tradeKey { return true }
+                // If this position has an authoritative provider ticket, match by ticket in notes
+                if let pid = position.providerId, !pid.isEmpty {
+                    if let notes = $0.notes, notes.contains("Ticket: \(pid)") {
+                        return true
+                    }
+                    return false
+                }
+                // Fallback fuzzy match only when neither trade has a provider ticket
+                return $0.symbol.uppercased() == position.symbol.uppercased() &&
+                       $0.direction == position.direction &&
+                       abs(Int64($0.openedAt.timeIntervalSince1970) - openSec) <= 1 &&
+                       abs($0.quantity - position.quantity) < 0.001 &&
+                       abs($0.avgEntry - position.entry) < 0.0001
             })
             
             if let tIdx = existingIdx {

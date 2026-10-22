@@ -22,10 +22,8 @@ extension TradeDataStore {
             }
         } else {
             let selId = selectedAccountId
-            let cleanSel = selId.cleanAccountId
-            let altId = selId.the5ersCanonicalId
             result = trades.filter { trade in
-                trade.accountId == selId || trade.accountId == cleanSel || trade.accountId == altId
+                trade.accountId == selId || TradeDataStore.isSameAccountId(trade.accountId, selId)
             }
         }
         _cachedFilteredTrades = result
