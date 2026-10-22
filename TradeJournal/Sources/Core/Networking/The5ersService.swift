@@ -25,6 +25,7 @@ public struct The5ersMcpAccount: Identifiable, Codable, Sendable {
     public let totalTrades: Int?
     public let winRate: Double?
     public let profitFactor: Double?
+    public let tradingBlocked: Bool?
     
     public init(
         id: String,
@@ -45,7 +46,8 @@ public struct The5ersMcpAccount: Identifiable, Codable, Sendable {
         totalFees: Decimal? = nil,
         totalTrades: Int? = nil,
         winRate: Double? = nil,
-        profitFactor: Double? = nil
+        profitFactor: Double? = nil,
+        tradingBlocked: Bool? = nil
     ) {
         self.id = id
         self.ref = ref ?? id
@@ -66,6 +68,7 @@ public struct The5ersMcpAccount: Identifiable, Codable, Sendable {
         self.totalTrades = totalTrades
         self.winRate = winRate
         self.profitFactor = profitFactor
+        self.tradingBlocked = tradingBlocked
     }
 }
 
@@ -757,6 +760,7 @@ public final class The5ersService: ObservableObject {
                 var accProfitAndLoss: Decimal? = nil
                 var accDailyProfitAndLoss: Decimal? = nil
                 var accUnrealized: Decimal? = nil
+                var accTradingBlocked: Bool? = nil
                 let balArgs: [String: Any] = [
                     "operation": "balance",
                     "account_ref": ref,
@@ -778,6 +782,9 @@ public final class The5ersService: ObservableObject {
                         accProfitAndLoss = sourceNumber(bDict["profitAndLoss"] ?? bDict["profit_and_loss"] ?? bDict["pnl"] ?? bDict["netProfit"])
                         accDailyProfitAndLoss = sourceNumber(bDict["dailyProfitAndLoss"] ?? bDict["daily_profit_and_loss"] ?? bDict["dailyPnl"])
                         accUnrealized = sourceNumber(bDict["unrealized"] ?? bDict["floatingProfit"] ?? bDict["unrealizedPnl"])
+                        if let tb = bDict["tradingBlocked"] as? Bool ?? (bDict["trading_blocked"] as? Bool) {
+                            accTradingBlocked = tb
+                        }
                     }
                 }
                 
@@ -857,7 +864,8 @@ public final class The5ersService: ObservableObject {
                     totalFees: accTotalFees,
                     totalTrades: accTotalTrades,
                     winRate: accWinRate,
-                    profitFactor: accProfitFactor
+                    profitFactor: accProfitFactor,
+                    tradingBlocked: accTradingBlocked
                 ))
             }
             
@@ -869,12 +877,32 @@ public final class The5ersService: ObservableObject {
             // Sync accounts into local PropAccountItem and Account models
             for acc in accountsList {
                 let rawStatus = acc.status.trimmingCharacters(in: .whitespaces).lowercased()
+                let isBlocked = (acc.tradingBlocked == true)
                 let mappedStatus: PropStatus = {
-                    if rawStatus == "passed" || rawStatus.contains("pass") || rawStatus.contains("qualif") { return .passed }
-                    if rawStatus == "breached" || rawStatus == "failed" || rawStatus.contains("breach") || rawStatus.contains("fail") || rawStatus.contains("viola") { return .breached }
-                    if rawStatus == "closed" || rawStatus.contains("term") || rawStatus.contains("ended") || rawStatus.contains("expir") { return .closed }
-                    if rawStatus == "inactive" || rawStatus == "disabled" || rawStatus.contains("inact") { return .inactive }
-                    if rawStatus == "active" || rawStatus == "available" || rawStatus.contains("trad") || rawStatus.contains("open") { return .active }
+                    // 1. Terminated / Breached / Failed / Disqualified / Violated (Highest priority)
+                    if rawStatus.contains("term") || rawStatus.contains("breach") || rawStatus.contains("fail") || rawStatus.contains("viola") || rawStatus.contains("disqual") {
+                        return .breached
+                    }
+                    // 2. Passed / Qualified
+                    if rawStatus.contains("pass") || rawStatus.contains("qualif") {
+                        return .passed
+                    }
+                    // 3. Closed / Ended / Expired / Archived
+                    if rawStatus.contains("close") || rawStatus.contains("ended") || rawStatus.contains("expir") || rawStatus.contains("arch") {
+                        return .closed
+                    }
+                    // 4. Inactive / Disabled
+                    if rawStatus.contains("inact") || rawStatus.contains("disab") {
+                        return .inactive
+                    }
+                    // 5. If broker/Hub balance has tradingBlocked == true, account is terminated/halted
+                    if isBlocked {
+                        return .closed
+                    }
+                    // 6. Explicit Active only (exact tokens, never substring 'trad' that matched 'trading_blocked')
+                    if rawStatus == "active" || rawStatus == "open" || rawStatus == "available" || rawStatus == "trading" {
+                        return .active
+                    }
                     return .closed
                 }()
                 
