@@ -22,6 +22,8 @@ public struct ConnectionsSettingsView: View {
     @State private var isTestingCTrader: Bool = false
     @State private var isSyncingCTrader: Bool = false
     @State private var showAdvancedCTrader: Bool = false
+    @State private var currentThe5ersSyncTask: Task<Void, Never>? = nil
+    @State private var currentCTraderSyncTask: Task<Void, Never>? = nil
     
     public init() {}
     
@@ -45,16 +47,27 @@ public struct ConnectionsSettingsView: View {
                             env.showSyncCenter = true
                         }
                         
-                        AppButton(
-                            "Quick Sync",
-                            icon: "arrow.triangle.2.circlepath",
-                            style: .secondary,
-                            size: .compact,
-                            fullWidth: true,
-                            isLoading: SyncManager.shared.isSyncing
-                        ) {
-                            Task {
-                                await SyncManager.shared.performQuickSync()
+                        if SyncManager.shared.isSyncing {
+                            AppButton(
+                                "Stop Sync",
+                                icon: "stop.fill",
+                                style: .destructive,
+                                size: .compact,
+                                fullWidth: true
+                            ) {
+                                SyncManager.shared.cancelSync()
+                            }
+                        } else {
+                            AppButton(
+                                "Quick Sync",
+                                icon: "arrow.triangle.2.circlepath",
+                                style: .secondary,
+                                size: .compact,
+                                fullWidth: true
+                            ) {
+                                Task {
+                                    await SyncManager.shared.performQuickSync()
+                                }
                             }
                         }
                     }
@@ -81,9 +94,17 @@ public struct ConnectionsSettingsView: View {
                         AppButton("Connect The5ers", icon: "person.badge.key.fill", style: .primary, size: .compact, fullWidth: true, isLoading: isConnectingThe5ers) {
                             loginThe5ersOAuth()
                         }
+                    } else if the5ers.isSyncing || dataStore.isSyncing {
+                        AppButton("Stop Sync", icon: "stop.fill", style: .destructive, size: .compact, fullWidth: true) {
+                            currentThe5ersSyncTask?.cancel()
+                            currentThe5ersSyncTask = nil
+                            the5ers.cancelSync()
+                            dataStore.cancelSync()
+                            the5ersStatus = "Synchronization cancelled by user."
+                        }
                     } else {
                         HStack(spacing: 8) {
-                            AppButton("Sync Now", icon: "arrow.triangle.2.circlepath", style: .primary, size: .compact, fullWidth: true, isLoading: the5ers.isSyncing || dataStore.isSyncing) {
+                            AppButton("Sync Now", icon: "arrow.triangle.2.circlepath", style: .primary, size: .compact, fullWidth: true) {
                                 syncThe5ers()
                             }
                             
@@ -246,17 +267,32 @@ public struct ConnectionsSettingsView: View {
                     
                     // Action Buttons
                     HStack(spacing: 8) {
-                        AppButton(
-                            "Sync cTrader",
-                            icon: "arrow.triangle.2.circlepath",
-                            style: .primary,
-                            size: .compact,
-                            fullWidth: true,
-                            isLoading: isSyncingCTrader || ctrader.isSyncing
-                        ) {
-                            syncCTrader()
+                        if isSyncingCTrader || ctrader.isSyncing {
+                            AppButton(
+                                "Stop Sync",
+                                icon: "stop.fill",
+                                style: .destructive,
+                                size: .compact,
+                                fullWidth: true
+                            ) {
+                                currentCTraderSyncTask?.cancel()
+                                currentCTraderSyncTask = nil
+                                ctrader.cancelSync()
+                                isSyncingCTrader = false
+                                ctraderStatus = "Synchronization cancelled."
+                            }
+                        } else {
+                            AppButton(
+                                "Sync cTrader",
+                                icon: "arrow.triangle.2.circlepath",
+                                style: .primary,
+                                size: .compact,
+                                fullWidth: true
+                            ) {
+                                syncCTrader()
+                            }
+                            .disabled(ctraderToken.trimmingCharacters(in: .whitespaces).isEmpty || isSyncingCTrader)
                         }
-                        .disabled(ctraderToken.trimmingCharacters(in: .whitespaces).isEmpty || isSyncingCTrader)
                         
                         AppButton(
                             "Fetch Accounts",
@@ -268,7 +304,7 @@ public struct ConnectionsSettingsView: View {
                         ) {
                             testCTraderConnection()
                         }
-                        .disabled(ctraderToken.trimmingCharacters(in: .whitespaces).isEmpty || isTestingCTrader)
+                        .disabled(ctraderToken.trimmingCharacters(in: .whitespaces).isEmpty || isTestingCTrader || isSyncingCTrader || ctrader.isSyncing)
                         
                         if !ctraderToken.isEmpty {
                             AppButton("Disconnect", icon: "xmark.circle", style: .destructive, size: .compact, fullWidth: true) {
@@ -360,18 +396,29 @@ public struct ConnectionsSettingsView: View {
     private func syncThe5ers() {
         the5ers.configure(token: mcpToken)
         the5ersStatus = "Starting synchronization with The5ers MCP Hub..."
-        Task {
+        currentThe5ersSyncTask?.cancel()
+        currentThe5ersSyncTask = Task {
             do {
                 let count = try await dataStore.syncWithThe5ers()
+                guard !Task.isCancelled else { return }
                 await MainActor.run {
-                    self.the5ersStatus = "Successfully synced \(count) accounts, expenses & payouts from The5ers!"
+                    if self.the5ers.isCancelledByUser {
+                        self.the5ersStatus = "Synchronization cancelled by user."
+                    } else {
+                        self.the5ersStatus = "Successfully synced \(count) accounts, expenses & payouts from The5ers!"
+                    }
                 }
-                if SupabaseService.shared.isConfigured {
+                if SupabaseService.shared.isConfigured && !Task.isCancelled {
                     await dataStore.syncWithSupabase(isBackground: true)
                 }
             } catch {
+                guard !Task.isCancelled else { return }
                 await MainActor.run {
-                    self.the5ersStatus = "Sync failed: \(error.localizedDescription)"
+                    if TradeDataStore.isCancellation(error) {
+                        self.the5ersStatus = "Synchronization cancelled by user."
+                    } else {
+                        self.the5ersStatus = "Sync failed: \(error.localizedDescription)"
+                    }
                 }
             }
         }
@@ -420,17 +467,24 @@ public struct ConnectionsSettingsView: View {
         isSyncingCTrader = true
         ctraderStatus = "Starting cTrader synchronization..."
         
-        Task {
+        currentCTraderSyncTask?.cancel()
+        currentCTraderSyncTask = Task {
             do {
                 let summary = try await dataStore.syncWithCTrader()
+                guard !Task.isCancelled else { return }
                 await MainActor.run {
                     self.isSyncingCTrader = false
                     self.ctraderStatus = summary.message
                 }
             } catch {
+                guard !Task.isCancelled else { return }
                 await MainActor.run {
                     self.isSyncingCTrader = false
-                    self.ctraderStatus = "Sync failed: \(error.localizedDescription)"
+                    if TradeDataStore.isCancellation(error) {
+                        self.ctraderStatus = "Synchronization cancelled."
+                    } else {
+                        self.ctraderStatus = "Sync failed: \(error.localizedDescription)"
+                    }
                 }
             }
         }

@@ -84,6 +84,7 @@ public final class The5ersService: ObservableObject {
     
     @Published public var mcpToken: String = ""
     @Published public var isSyncing: Bool = false
+    @Published public private(set) var isCancelledByUser: Bool = false
     @Published public var lastSyncTime: Date? = nil
     @Published public var lastStatus: String = ""
     @Published public var isConnected: Bool = false
@@ -97,6 +98,13 @@ public final class The5ersService: ObservableObject {
     
     public var isConfigured: Bool {
         !mcpToken.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+    
+    @MainActor
+    public func cancelSync() {
+        isCancelledByUser = true
+        isSyncing = false
+        lastStatus = "Synchronization cancelled by user."
     }
     
     private init() {
@@ -623,6 +631,7 @@ public final class The5ersService: ObservableObject {
             throw NSError(domain: "The5ersMCP", code: 401, userInfo: [NSLocalizedDescriptionKey: "Bearer Session Token not configured"])
         }
         
+        isCancelledByUser = false
         isSyncing = true
         lastStatus = "Connecting to The5ers MCP Hub (Protocol 2025-03-26)..."
         defer { isSyncing = false }
@@ -636,6 +645,7 @@ public final class The5ersService: ObservableObject {
             var successfulArgTemplate: [String: Any]? = nil
             
             for page in 1...20 {
+                if Task.isCancelled || isCancelledByUser { throw CancellationError() }
                 lastStatus = "Loading The5ers accounts (Page \(page))..."
                 let candidateArgsList: [[String: Any]] = {
                     if let template = successfulArgTemplate {
@@ -709,6 +719,7 @@ public final class The5ersService: ObservableObject {
             
             var accountsList: [The5ersMcpAccount] = []
             for item in rawAccountsList {
+                if Task.isCancelled || isCancelledByUser { throw CancellationError() }
                 // Ignore contest accounts which belong to a separate space and cannot be read by standard operations
                 if item["contest_account_ref"] != nil && item["ref"] == nil {
                     continue
@@ -1110,7 +1121,7 @@ public final class The5ersService: ObservableObject {
             
             var importedPositionsCount = 0
             for (idx, acc) in accountsToSyncPositions.enumerated() {
-                if Task.isCancelled { break }
+                if Task.isCancelled || isCancelledByUser { break }
                 lastStatus = "Syncing trades (\(idx + 1)/\(accountsToSyncPositions.count)): \(acc.label)..."
                 await Task.yield()
                 
@@ -1141,7 +1152,7 @@ public final class The5ersService: ObservableObject {
                     if initialHasMore {
                         var page = 2
                         while page <= 20 {
-                            if Task.isCancelled { break }
+                            if Task.isCancelled || isCancelledByUser { break }
                             var pArgs = posArgs
                             pArgs["page"] = page
                             guard let nextRes = try? await callMcpTool(name: "the5ers_positions", arguments: pArgs) else { break }
@@ -1156,13 +1167,17 @@ public final class The5ersService: ObservableObject {
                         }
                     }
                 } catch {
-                    if Task.isCancelled { break }
+                    if Task.isCancelled || isCancelledByUser { break }
                     AppLogger.error("Error syncing trades for account \(acc.label) (\(acc.id)): \(error.localizedDescription)")
                 }
             }
             
+            if Task.isCancelled || isCancelledByUser { throw CancellationError() }
+            
             // 4. Sync purchases / challenges & evaluation fees across official MCP tools
             await syncPurchases(into: dataStore, targetAccounts: allTargetAccounts)
+            
+            if Task.isCancelled || isCancelledByUser { throw CancellationError() }
             
             // 5. Sync payouts & withdrawal settlements strictly for funded accounts
             await syncPayouts(into: dataStore, targetAccounts: allTargetAccounts)
@@ -1187,8 +1202,9 @@ public final class The5ersService: ObservableObject {
             
             return accountsList.count
         } catch {
-            if Task.isCancelled || error is CancellationError || (error as? URLError)?.code == .cancelled || error.localizedDescription.lowercased().contains("cancel") {
-                lastStatus = "Sync cancelled."
+            if Task.isCancelled || isCancelledByUser || error is CancellationError || (error as? URLError)?.code == .cancelled || error.localizedDescription.lowercased().contains("cancel") {
+                isCancelledByUser = false
+                lastStatus = "Synchronization cancelled by user."
                 throw CancellationError()
             }
             lastStatus = "The5ers MCP sync error: \(error.localizedDescription)"
@@ -1777,7 +1793,7 @@ public final class The5ersService: ObservableObject {
         ]
         
         for pArgs in purchaseArgsList {
-            if Task.isCancelled { break }
+            if Task.isCancelled || isCancelledByUser { break }
             if let res = try? await callMcpTool(name: "the5ers_purchase", arguments: pArgs),
                !(res["isError"] as? Bool ?? false) {
                 let unwrapped = unwrapMcpToolResult(res)
@@ -1797,7 +1813,7 @@ public final class The5ersService: ObservableObject {
         
         // 3. For orders that have a 'ref', query 'accounts' to map directly to created accounts
         for i in allPurchases.indices {
-            if Task.isCancelled { break }
+            if Task.isCancelled || isCancelledByUser { break }
             let pRef = String(describing: allPurchases[i]["ref"] ?? allPurchases[i]["purchase_ref"] ?? allPurchases[i]["id"] ?? "")
             if !pRef.isEmpty && (allPurchases[i]["account_ref"] == nil || String(describing: allPurchases[i]["account_ref"] ?? "").isEmpty) {
                 if let accRes = try? await callMcpTool(name: "the5ers_purchase", arguments: [
@@ -2031,7 +2047,7 @@ public final class The5ersService: ObservableObject {
         var accountSplitMap: [String: Double] = [:]
         
         for acc in candidateAccounts {
-            if Task.isCancelled { break }
+            if Task.isCancelled || isCancelledByUser { break }
             
             // A. Query 'eligibility' for userPayoutPercentage (e.g. 80.0, 85.0)
             let eligArgs: [String: Any] = [

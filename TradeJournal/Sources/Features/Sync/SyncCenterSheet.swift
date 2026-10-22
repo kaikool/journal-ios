@@ -15,6 +15,7 @@ public struct SyncCenterSheet: View {
     @State private var customStart: Date = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
     @State private var customEnd: Date = Date()
     @State private var saveConfirmationMessage: String? = nil
+    @State private var syncTask: Task<Void, Never>? = nil
     
     public init() {}
     
@@ -408,17 +409,28 @@ public struct SyncCenterSheet: View {
                     .transition(.opacity)
             }
             
-            AppButton(
-                syncManager.isSyncing ? "Synchronizing..." : "Start Synchronization",
-                icon: "arrow.triangle.2.circlepath",
-                style: .primary,
-                size: .regular,
-                fullWidth: true,
-                isLoading: syncManager.isSyncing
-            ) {
-                startSync()
+            if syncManager.isSyncing {
+                AppButton(
+                    "Stop Synchronization",
+                    icon: "stop.fill",
+                    style: .destructive,
+                    size: .regular,
+                    fullWidth: true
+                ) {
+                    cancelSync()
+                }
+            } else {
+                AppButton(
+                    "Start Synchronization",
+                    icon: "arrow.triangle.2.circlepath",
+                    style: .primary,
+                    size: .regular,
+                    fullWidth: true
+                ) {
+                    startSync()
+                }
+                .disabled(options.enabledProviderIds.isEmpty)
             }
-            .disabled(syncManager.isSyncing || options.enabledProviderIds.isEmpty)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
@@ -444,11 +456,21 @@ public struct SyncCenterSheet: View {
         }
     }
     
+    private func cancelSync() {
+        #if canImport(UIKit)
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        #endif
+        syncTask?.cancel()
+        syncTask = nil
+        syncManager.cancelSync()
+    }
+    
     private func startSync() {
         #if canImport(UIKit)
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         #endif
-        Task {
+        syncTask?.cancel()
+        syncTask = Task {
             _ = await syncManager.performSync(with: options)
         }
     }

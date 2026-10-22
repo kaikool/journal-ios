@@ -567,6 +567,13 @@ public final class CTraderService: ObservableObject {
     
     // MARK: - Full Synchronization with TradeDataStore
     
+    @MainActor
+    public func cancelSync() {
+        self.isSyncing = false
+        self.lastStatus = "Synchronization cancelled."
+        disconnect()
+    }
+    
     /// Fully synchronizes selected cTrader accounts and their deal histories into TradeDataStore.
     public func syncWithTradeStore(
         dataStore: TradeDataStore,

@@ -56,6 +56,21 @@ public final class SyncManager: ObservableObject {
     }
     
     private var backgroundBackupTask: Task<Void, Never>? = nil
+    private var activeSyncTask: Task<[SyncResult], Never>? = nil
+    
+    /// Cancels any in-progress sync operation across all registered providers
+    @MainActor
+    public func cancelSync() {
+        activeSyncTask?.cancel()
+        activeSyncTask = nil
+        The5ersService.shared.cancelSync()
+        CTraderService.shared.cancelSync()
+        self.isSyncing = false
+        self.currentProgress = "Synchronization cancelled."
+        TradeDataStore.shared.isSyncing = false
+        TradeDataStore.shared.lastSyncSummary = "Synchronization cancelled."
+        TradeDataStore.shared.lastSyncError = nil
+    }
     
     /// Schedules an asynchronous, debounced cloud backup to Supabase.
     /// Runs quietly in the background without blocking the UI or pull-to-refresh spinner.
@@ -121,7 +136,8 @@ public final class SyncManager: ObservableObject {
         
         // 2. Synchronize market data sources sequentially
         for provider in brokerProviders {
-            if Task.isCancelled {
+            if Task.isCancelled || !isSyncing {
+                TradeDataStore.shared.lastSyncSummary = "Synchronization cancelled."
                 TradeDataStore.shared.lastSyncError = nil
                 return results
             }
@@ -140,8 +156,9 @@ public final class SyncManager: ObservableObject {
                 results.append(res)
                 lastSyncResults[provider.id] = res
             } catch {
-                if TradeDataStore.isCancellation(error) {
+                if TradeDataStore.isCancellation(error) || !isSyncing {
                     AppLogger.info("Sync cancelled for \(provider.displayName)")
+                    TradeDataStore.shared.lastSyncSummary = "Synchronization cancelled."
                     TradeDataStore.shared.lastSyncError = nil
                     return results
                 }
@@ -157,7 +174,8 @@ public final class SyncManager: ObservableObject {
             }
         }
         
-        if Task.isCancelled {
+        if Task.isCancelled || !isSyncing {
+            TradeDataStore.shared.lastSyncSummary = "Synchronization cancelled."
             TradeDataStore.shared.lastSyncError = nil
             return results
         }
@@ -167,7 +185,8 @@ public final class SyncManager: ObservableObject {
         
         // 4. If Cloud Backup is requested and Supabase provider is configured, backup fresh data
         if options.backupToCloud, let supabaseProvider = provider(for: "supabase"), supabaseProvider.isConfigured {
-            if Task.isCancelled {
+            if Task.isCancelled || !isSyncing {
+                TradeDataStore.shared.lastSyncSummary = "Synchronization cancelled."
                 TradeDataStore.shared.lastSyncError = nil
                 return results
             }
@@ -186,8 +205,9 @@ public final class SyncManager: ObservableObject {
                 results.append(cloudRes)
                 lastSyncResults["supabase"] = cloudRes
             } catch {
-                if TradeDataStore.isCancellation(error) {
+                if TradeDataStore.isCancellation(error) || !isSyncing {
                     AppLogger.info("Supabase sync cancelled.")
+                    TradeDataStore.shared.lastSyncSummary = "Synchronization cancelled."
                     TradeDataStore.shared.lastSyncError = nil
                     return results
                 }
@@ -206,7 +226,8 @@ public final class SyncManager: ObservableObject {
         let now = Date()
         self.lastSyncDate = now
         
-        if Task.isCancelled {
+        if Task.isCancelled || !isSyncing {
+            TradeDataStore.shared.lastSyncSummary = "Synchronization cancelled."
             TradeDataStore.shared.lastSyncError = nil
             return results
         }
