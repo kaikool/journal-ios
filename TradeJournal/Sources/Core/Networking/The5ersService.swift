@@ -691,6 +691,24 @@ public final class The5ersService: ObservableObject {
                 let platform = String(describing: item["tradingPlatform"] ?? item["platform"] ?? item["tradingSystem"] ?? "MT5")
                 let createdAt = item["createdAt"] as? String ?? item["creationDate"] as? String ?? item["created_at"] as? String
                 
+                // Deterministic persistent account ID (source-repo/apps/web/src/server/the5ers/data.ts:173-175: sha256([label, platform, stamp]))
+                // Ephemeral opaque refs expire after 10m and are never used as persistent journal identity (docs/the5ers.md:16)
+                let stamp: String = {
+                    if let raw = createdAt, let d = FlexibleDateParser.parse(raw) {
+                        let iso = ISO8601DateFormatter()
+                        iso.formatOptions = [.withInternetDateTime]
+                        return iso.string(from: d)
+                    }
+                    return createdAt ?? ""
+                }()
+                let stableId: String = {
+                    if !stamp.isEmpty {
+                        return JournalIds.sha256Hex([label, platform, stamp])
+                    } else {
+                        return JournalIds.sha256Hex([label, platform])
+                    }
+                }()
+                
                 // Query Authoritative Balance & Initial Balance from official the5ers_account.balance
                 let balArgs: [String: Any] = [
                     "operation": "balance",
@@ -723,7 +741,7 @@ public final class The5ersService: ObservableObject {
                 let cleanLabel = defaultName.isEmpty ? Formatters.cleanAccountName(label, balance: startBal) : defaultName
                 
                 accountsList.append(The5ersMcpAccount(
-                    id: ref,
+                    id: stableId,
                     ref: ref,
                     label: cleanLabel,
                     platform: platform,
@@ -1137,6 +1155,11 @@ public final class The5ersService: ObservableObject {
         guard !parsed.isEmpty else { return }
         
         let journalAccId = acc.id.hasPrefix("the5ers_") ? acc.id : "the5ers_\(acc.id)"
+        let targetAccId = dataStore.propAccounts.first(where: {
+            TradeDataStore.isSameAccountId($0.id, journalAccId) ||
+            $0.id == acc.id ||
+            $0.name == acc.label
+        })?.journalAccountId ?? journalAccId
         
         // Group duplicate positions to compute disambiguation discriminators
         var groups: [String: [SourcePosition]] = [:]
@@ -1178,15 +1201,16 @@ public final class The5ersService: ObservableObject {
             let rawNetProfit = position.netPnl
             let rawFee = position.fee ?? 0
             let rawSwap = position.swap ?? 0
-            let feeCost = abs(rawFee)
-            let swapCost = rawSwap < 0 ? abs(rawSwap) : Decimal.zero
-            let swapCredit = rawSwap > 0 ? rawSwap : Decimal.zero
-            // Signed swap: negative = cost charged, positive = credit received.
-            let signedSwap = swapCredit - swapCost
             
-            // The5ers MCP reports netPnl which already includes signed swap and commission.
-            // Reverse costs for gross only (1:1 with source-repo/apps/web/src/server/the5ers/journal.ts lines 67-75).
-            // Invariant: grossPnl - fees + swap == netPnl
+            // 1:1 with source-repo/apps/web/src/server/the5ers/journal.ts lines 67-75:
+            // The5ers MCP reports netPnl which ALREADY includes signed swap and commission.
+            // Commission (fee) is negative in MT/The5ers; swap is signed (negative cost / positive credit).
+            // Total transaction costs/fees = -fee - swap
+            // Reverse costs for gross only: grossPnl = netPnl + fees.
+            // Invariant: grossPnl - fees == netPnl.
+            let hasCosts = (position.fee != nil && position.swap != nil)
+            let costTotal: Decimal = hasCosts ? (-rawFee - rawSwap) : Decimal.zero
+            
             let accountCurrency = acc.currency.uppercased()
             let reportingCurrency = dataStore.currencyConversion.reportingCurrency.uppercased()
             let toReporting: (Decimal) -> Decimal = { amount in
@@ -1202,9 +1226,9 @@ public final class The5ersService: ObservableObject {
                 return converted
             }
             let netPnl = isClosed ? toReporting(rawNetProfit) : Decimal.zero
-            let fees = toReporting(feeCost)
-            let swap = toReporting(signedSwap)
-            let grossPnl = netPnl + fees - swap
+            let fees = isClosed ? toReporting(costTotal) : Decimal.zero
+            let swap = toReporting(rawSwap)
+            let grossPnl = netPnl + fees
             
             let breakevenBand = JournalDefaultsEngine.breakevenThreshold(
                 defaults: dataStore.defaults,
@@ -1226,7 +1250,7 @@ public final class The5ersService: ObservableObject {
                 return Int64(closedDate.timeIntervalSince(position.openedAtDate) * 1000)
             }()
             
-            let cleanAcc = journalAccId.cleanAccountId
+            let cleanAcc = targetAccId.cleanAccountId
             let openSec = Int64(position.openedAtDate.timeIntervalSince1970)
             let existingIdx = dataStore.trades.firstIndex(where: {
                 $0.key == tradeKey ||
@@ -1239,7 +1263,7 @@ public final class The5ersService: ObservableObject {
             
             if let tIdx = existingIdx {
                 var existing = dataStore.trades[tIdx]
-                existing.accountId = journalAccId
+                existing.accountId = targetAccId
                 existing.status = status
                 existing.closedAt = position.closedAtDate
                 existing.openQuantity = isClosed ? 0 : position.quantity
@@ -1257,7 +1281,7 @@ public final class The5ersService: ObservableObject {
             } else {
                 let trade = Trade(
                     key: tradeKey,
-                    accountId: journalAccId,
+                    accountId: targetAccId,
                     symbol: position.symbol,
                     direction: position.direction,
                     status: status,
@@ -1582,34 +1606,47 @@ public final class The5ersService: ObservableObject {
             guard priceNum > 0 else { continue }
             let amountMinor = Int64(round(priceNum * 100))
             
-            let orderId = String(describing: fields["id"] ?? fields["orderid"] ?? fields["order_id"] ?? fields["purchaseid"] ?? fields["purchase_id"] ?? fields["ref"] ?? "")
+            let orderId = String(describing: fields["id"] ?? fields["orderid"] ?? fields["order_id"] ?? fields["purchaseid"] ?? fields["purchase_id"] ?? "")
             let title = itemNames.isEmpty ? (fields["name"] as? String ?? "The5ers Program Evaluation") : itemNames.joined(separator: ", ")
-            let entryId: String = {
-                if !orderId.isEmpty {
-                    return "the5ers_purchase_\(orderId)"
-                }
-                let purchaseHash = JournalIds.sha256("\(dateStr)_\(currency)_\(amountMinor)_\(title)")
-                return "the5ers_purchase_\(purchaseHash.prefix(16))"
-            }()
-            let shortRef = !orderId.isEmpty ? "Order #\(orderId.prefix(8))" : "Order #\(entryId.suffix(8))"
             
-            let matchingAccId = targetAccounts.first(where: {
-                title.contains("\($0.startingBalance ?? 0)") || $0.currency == currency
-            })?.id
-            let journalAccId = matchingAccId.map { $0.hasPrefix("the5ers_") ? $0 : "the5ers_\($0)" }
+            // 1:1 with source-repo/apps/web/src/server/the5ers/journal.ts:353:
+            // Deterministic identity uses hash([placedAt, currency, name]) rather than ephemeral order ref
+            let purchaseHash = JournalIds.sha256Hex([rawDate, currency, title])
+            let entryId = "the5ers_purchase_\(purchaseHash)"
+            let shortRef = !orderId.isEmpty && !orderId.contains("opaque") ? "Order #\(orderId.prefix(8))" : "Order #\(purchaseHash.prefix(8))"
+            
+            // Normalize category matching EXPENSE_CATEGORIES: "evaluation", "reset", "activation", etc.
+            let normalizedCategory: String = {
+                let validCategories: Set<String> = [
+                    "evaluation", "reset", "activation", "subscription",
+                    "platform", "market_data", "transfer", "other"
+                ]
+                let cleanType = productType.lowercased().trimmingCharacters(in: .whitespaces)
+                if validCategories.contains(cleanType) {
+                    return cleanType
+                }
+                if cleanType.contains("challenge") || cleanType.contains("eval") || cleanType.contains("bootcamp") || cleanType.contains("hyper") || cleanType.contains("high stakes") {
+                    return "evaluation"
+                }
+                if cleanType.contains("reset") { return "reset" }
+                if cleanType.contains("activat") { return "activation" }
+                return "other"
+            }()
+            
+            // Per docs/the5ers.md line 52: "Purchase expenses stay firm-wide unless attribution can be verified; no account is guessed from a cart or progression chain."
+            let journalAccId: String? = nil
             
             if let existingIdx = dataStore.propEntries.firstIndex(where: {
                 $0.id == entryId ||
-                (!orderId.isEmpty && ($0.id.contains(orderId) || $0.reference.contains(orderId))) ||
-                ($0.occurredOn == dateStr && $0.amountMinor == amountMinor && $0.currency == currency && $0.kind == "expense")
+                (!orderId.isEmpty && !orderId.contains("opaque") && ($0.id.contains(orderId) || $0.reference.contains(orderId))) ||
+                ($0.firm == "The5ers" && $0.kind == "expense" && $0.occurredOn == dateStr && $0.amountMinor == amountMinor && $0.currency == currency)
             }) {
                 var existing = dataStore.propEntries[existingIdx]
                 existing.amountMinor = amountMinor
                 existing.currency = currency
                 existing.occurredOn = dateStr
-                if existing.accountId == nil || existing.accountId?.isEmpty == true {
-                    existing.accountId = journalAccId
-                }
+                existing.category = normalizedCategory
+                existing.accountId = journalAccId
                 dataStore.propEntries[existingIdx] = existing
             } else {
                 let entry = PropEntryItem(
@@ -1617,13 +1654,13 @@ public final class The5ersService: ObservableObject {
                     accountId: journalAccId,
                     firm: "The5ers",
                     kind: "expense",
-                    category: productType,
+                    category: normalizedCategory,
                     currency: currency,
                     amountMinor: amountMinor,
                     occurredOn: dateStr,
                     status: .completed,
                     reference: shortRef,
-                    notes: "\(title) (The5ers official order)"
+                    notes: "\(title) (The5ers official order placed \(rawDate))"
                 )
                 dataStore.propEntries.append(entry)
             }
@@ -1893,51 +1930,32 @@ public final class The5ersService: ObservableObject {
             }()
             let feeMinor = Int64(round(feeVal * 100))
             
-            // Determine split basis points (bps)
-            var splitBps: Int = {
-                if let sp = splitPercentVal, sp > 0 {
-                    return Int(round(sp > 1.0 ? sp * 100 : sp * 10000))
-                }
-                if let net = explicitNet, let gross = explicitGross, gross > 0, net < gross {
-                    return Int(round((net / gross) * 10000))
-                }
-                return 8000 // Standard The5ers trader split (80%)
-            }()
+            let hasExplicitSplit = (fields["usershare"] != nil || fields["splitpercent"] != nil || fields["split_percent"] != nil)
             
-            // Determine grossMinor and netReceivedMinor
-            let grossMinor: Int64
             let netReceivedMinor: Int64
+            let grossMinor: Int64
+            let splitBps: Int
             
-            if let eg = explicitGross, let en = explicitNet {
-                grossMinor = Int64(round(eg * 100))
+            if let en = explicitNet {
                 netReceivedMinor = Int64(round(en * 100))
-                if splitPercentVal == nil && grossMinor > 0 {
-                    splitBps = Int(round(Double(netReceivedMinor) * 10000.0 / Double(grossMinor)))
+                if let eg = explicitGross, eg >= en {
+                    grossMinor = Int64(round(eg * 100))
+                    splitBps = grossMinor > 0 ? Int(round(Double(netReceivedMinor) * 10000.0 / Double(grossMinor))) : 10000
+                } else {
+                    grossMinor = netReceivedMinor
+                    splitBps = 10000
                 }
-            } else if let eg = explicitGross {
+            } else if let eg = explicitGross, hasExplicitSplit, let sp = splitPercentVal, sp > 0 {
                 grossMinor = Int64(round(eg * 100))
-                if let ga = genericAmount, ga < eg {
-                    netReceivedMinor = Int64(round(ga * 100))
-                    if splitPercentVal == nil && grossMinor > 0 {
-                        splitBps = Int(round(Double(netReceivedMinor) * 10000.0 / Double(grossMinor)))
-                    }
-                } else {
-                    netReceivedMinor = max(0, Int64((Double(grossMinor) * Double(splitBps) + 5000) / 10000) - feeMinor)
-                }
-            } else if let en = explicitNet {
-                netReceivedMinor = Int64(round(en * 100))
-                if let ga = genericAmount, ga > en {
-                    grossMinor = Int64(round(ga * 100))
-                    if splitPercentVal == nil && grossMinor > 0 {
-                        splitBps = Int(round(Double(netReceivedMinor) * 10000.0 / Double(grossMinor)))
-                    }
-                } else {
-                    grossMinor = splitBps > 0 ? Int64(round(Double(netReceivedMinor + feeMinor) * 10000.0 / Double(splitBps))) : netReceivedMinor
-                }
+                splitBps = Int(round(sp > 1.0 ? sp * 100 : sp * 10000))
+                netReceivedMinor = max(0, Int64((Double(grossMinor) * Double(splitBps) + 5000) / 10000) - feeMinor)
             } else if let ga = genericAmount {
-                // In a withdrawal/payout record, generic amount is the cash payout received
+                // 1:1 with source-repo/docs/the5ers.md:62-73 and payouts.ts:320-335:
+                // Under owner confirmation, reported payout amounts represent actual received cash.
+                // Do not invent artificial gross profit multipliers without explicit provider breakdown.
                 netReceivedMinor = Int64(round(ga * 100))
-                grossMinor = splitBps > 0 ? Int64(round(Double(netReceivedMinor + feeMinor) * 10000.0 / Double(splitBps))) : netReceivedMinor
+                grossMinor = netReceivedMinor
+                splitBps = 10000
             } else {
                 continue
             }
@@ -1958,7 +1976,7 @@ public final class The5ersService: ObservableObject {
                 if let m = matchedAcc {
                     return m.id.hasPrefix("the5ers_") ? m.id : "the5ers_\(m.id)"
                 }
-                if !payAccRef.isEmpty {
+                if !payAccRef.isEmpty && !payAccRef.contains("opaque") {
                     return payAccRef.hasPrefix("the5ers_") ? payAccRef : "the5ers_\(payAccRef)"
                 }
                 return targetAccounts.first?.id
@@ -1966,25 +1984,19 @@ public final class The5ersService: ObservableObject {
             let currency = String(describing: fields["currency"] ?? matchedAcc?.currency ?? "USD").uppercased()
             
             let cleanAcc = (primaryAccId ?? "the5ers").cleanAccountId
-            let dateKey = dateStr.replacingOccurrences(of: "-", with: "")
-            let amtKey = netReceivedMinor > 0 ? "\(netReceivedMinor)" : "\(grossMinor)"
             
-            let deterministicKey: String = {
-                if !rawId.isEmpty && !rawId.hasPrefix("the5ers_") && rawId.count < 64 {
-                    return rawId
-                }
-                return "\(cleanAcc)_\(dateKey)_\(amtKey)"
-            }()
-            
-            let payoutEntryId = "the5ers_payout_\(deterministicKey)"
-            let rcptId = "the5ers_rcpt_\(deterministicKey)"
-            let canonicalId = PropFirmEngine.canonicalPayoutId(deterministicKey)
-            let shortRef = "Payout #\(deterministicKey.prefix(8))"
+            // Stable deterministic key matching payouts.ts:21-36 payoutKey:
+            // sha256([accountId, requestedAt ?? date, currency, amount])
+            let stablePayoutHash = JournalIds.sha256Hex([cleanAcc, dateStr, currency, netReceivedMinor])
+            let payoutEntryId = "the5ers_payout_\(stablePayoutHash)"
+            let rcptId = "the5ers_rcpt_\(stablePayoutHash)"
+            let canonicalId = PropFirmEngine.canonicalPayoutId(stablePayoutHash)
+            let shortRef = !rawId.isEmpty && !rawId.contains("opaque") ? "Payout #\(rawId.prefix(8))" : "Payout #\(stablePayoutHash.prefix(8))"
             
             if let existingIdx = dataStore.propEntries.firstIndex(where: {
                 $0.id == payoutEntryId ||
                 PropFirmEngine.canonicalPayoutId($0.id) == canonicalId ||
-                (!deterministicKey.isEmpty && ($0.id.contains(deterministicKey) || $0.reference.contains(deterministicKey))) ||
+                (!rawId.isEmpty && !rawId.contains("opaque") && ($0.id.contains(rawId) || $0.reference.contains(rawId))) ||
                 ($0.firm == "The5ers" && $0.kind == "payout" && $0.occurredOn == dateStr && ($0.amountMinor == grossMinor || $0.amountMinor == netReceivedMinor))
             }) {
                 let existing = dataStore.propEntries[existingIdx]
@@ -2036,7 +2048,7 @@ public final class The5ersService: ObservableObject {
                     $0.payoutId == payoutEntryId ||
                     PropFirmEngine.canonicalPayoutId($0.payoutId) == canonicalId ||
                     PropFirmEngine.canonicalPayoutId($0.id) == canonicalId ||
-                    (!deterministicKey.isEmpty && ($0.id.contains(deterministicKey) || $0.reference.contains(deterministicKey))) ||
+                    (!rawId.isEmpty && !rawId.contains("opaque") && ($0.id.contains(rawId) || $0.reference.contains(rawId))) ||
                     ($0.occurredOn == dateStr && $0.amountMinor == netReceivedMinor)
                 }) {
                     let existingRcpt = dataStore.propReceipts[rIdx]
@@ -2046,7 +2058,7 @@ public final class The5ersService: ObservableObject {
                         kind: existingRcpt.kind,
                         amountMinor: netReceivedMinor,
                         occurredOn: dateStr,
-                        reference: existingRcpt.reference.isEmpty ? "Receipt #\(deterministicKey.prefix(8))" : existingRcpt.reference,
+                        reference: existingRcpt.reference.isEmpty ? "Receipt #\(stablePayoutHash.prefix(8))" : existingRcpt.reference,
                         notes: existingRcpt.notes.isEmpty ? "The5ers Settlement Receipt" : existingRcpt.notes,
                         voided: existingRcpt.voided,
                         createdAt: existingRcpt.createdAt
@@ -2059,7 +2071,7 @@ public final class The5ersService: ObservableObject {
                         kind: "receipt",
                         amountMinor: netReceivedMinor,
                         occurredOn: dateStr,
-                        reference: "Receipt #\(deterministicKey.prefix(8))",
+                        reference: "Receipt #\(stablePayoutHash.prefix(8))",
                         notes: "The5ers Settlement Receipt"
                     )
                     dataStore.propReceipts.append(rcpt)
