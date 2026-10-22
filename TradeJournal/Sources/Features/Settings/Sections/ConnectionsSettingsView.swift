@@ -1,4 +1,5 @@
 import SwiftUI
+import AuthenticationServices
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -401,7 +402,9 @@ public struct ConnectionsSettingsView: View {
             } catch {
                 await MainActor.run {
                     self.isConnectingThe5ers = false
-                    if (error as? ASWebAuthenticationSessionError)?.code == .canceledLogin {
+                    let nsError = error as NSError
+                    if (error as? ASWebAuthenticationSessionError)?.code == .canceledLogin ||
+                       (nsError.domain == ASWebAuthenticationSessionErrorDomain && nsError.code == 1) {
                         self.the5ersStatus = "Login cancelled by user."
                     } else {
                         self.the5ersStatus = "OAuth error: \(error.localizedDescription)"
