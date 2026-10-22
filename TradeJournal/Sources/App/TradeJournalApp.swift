@@ -44,10 +44,7 @@ public struct RootTabView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .safeAreaInset(edge: .top, spacing: 0) {
                     // Shell Header Bar with ultraThinMaterial blur (data scrolls underneath)
-                    VStack(spacing: 0) {
-                        ShellHeaderView()
-                        GlobalSyncBannerView()
-                    }
+                    ShellHeaderView()
                 }
                 
                 // Layer 2: Quick Bottom Bar floating with translucent glassmorphism (content glides underneath)

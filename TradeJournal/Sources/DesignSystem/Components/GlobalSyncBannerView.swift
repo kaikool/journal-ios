@@ -12,41 +12,7 @@ public struct GlobalSyncBannerView: View {
     
     public var body: some View {
         Group {
-            if dataStore.isSyncing {
-                HStack(spacing: 8) {
-                    ProgressView()
-                        .scaleEffect(0.7)
-                        .tint(AppColors.brand)
-                    Text(dataStore.lastSyncSummary ?? "Synchronizing...")
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.primaryText)
-                        .lineLimit(1)
-                    Spacer()
-                    Button {
-                        dataStore.cancelSync()
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "stop.fill")
-                                .font(.system(size: 9))
-                            Text("Stop")
-                                .font(.system(size: 11, weight: .bold))
-                        }
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(AppColors.loss.opacity(0.18))
-                        .foregroundColor(AppColors.loss)
-                        .clipShape(Capsule())
-                    }
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-                .background(AppColors.secondaryBackground.opacity(0.95))
-                .overlay(
-                    Divider().background(AppColors.border.opacity(0.3)),
-                    alignment: .bottom
-                )
-                .transition(.move(edge: .top).combined(with: .opacity))
-            } else if let error = dataStore.lastSyncError, !isDismissed, !error.lowercased().contains("cancel") {
+            if let error = dataStore.lastSyncError, !isDismissed, !error.lowercased().contains("cancel") {
                 HStack(spacing: 8) {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .font(.system(size: 13, weight: .semibold))

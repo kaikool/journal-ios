@@ -281,12 +281,56 @@ public final class The5ersService: ObservableObject {
         return accessToken
     }
     
+    /// Refreshes the OAuth access token using saved refresh token
+    public func refreshAccessTokenIfNeeded() async throws -> String? {
+        guard let refreshToken = UserDefaults.standard.string(forKey: "the5ers_mcp_refresh_token"), !refreshToken.isEmpty else {
+            return nil
+        }
+        guard let url = URL(string: "\(Self.authHost)/oauth2/v1/apps/agentic/\(Self.tenantPath)/token") else { return nil }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 15
+        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        
+        let callbackScheme = "tradejournal"
+        let redirectUri = "\(callbackScheme)://the5ers-callback"
+        guard let clientId = try? await getOrRegisterClientId(redirectUri: redirectUri) else { return nil }
+        
+        let bodyParams = [
+            "grant_type=refresh_token",
+            "client_id=\(clientId.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? clientId)",
+            "refresh_token=\(refreshToken.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? refreshToken)",
+            "resource=\(Self.mcpUrl.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? Self.mcpUrl)"
+        ].joined(separator: "&")
+        request.httpBody = bodyParams.data(using: .utf8)
+        
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            return nil
+        }
+        
+        if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let newAccessToken = json["access_token"] as? String {
+            if let newRefresh = json["refresh_token"] as? String {
+                UserDefaults.standard.set(newRefresh, forKey: "the5ers_mcp_refresh_token")
+            }
+            await MainActor.run {
+                self.configure(token: newAccessToken)
+            }
+            return newAccessToken
+        }
+        return nil
+    }
+    
     // MARK: - 2. JSON-RPC 2.0 MCP Client (`https://mcp.the5ers.com/mcp`)
     
     /// Initializes JSON-RPC protocol handshake with The5ers MCP server
     public func ensureInitialized() async throws {
         guard !isSessionInitialized else { return }
         guard isConfigured else { return }
+        
+        self.mcpSessionId = nil
         
         // Protocol initialization handshake
         _ = try await sendRawMcpRpc(method: "initialize", params: [
@@ -343,6 +387,7 @@ public final class The5ersService: ObservableObject {
         guard let url = URL(string: Self.mcpUrl) else { throw URLError(.badURL) }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
+        request.timeoutInterval = 15
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json, text/event-stream", forHTTPHeaderField: "Accept")
         request.setValue("Bearer \(mcpToken)", forHTTPHeaderField: "Authorization")
@@ -359,9 +404,22 @@ public final class The5ersService: ObservableObject {
         ]
         request.httpBody = try JSONSerialization.data(withJSONObject: rpcPayload)
         
-        let (data, response) = try await session.data(for: request)
-        guard let http = response as? HTTPURLResponse else {
+        var (data, response) = try await session.data(for: request)
+        guard var http = response as? HTTPURLResponse else {
             throw URLError(.badServerResponse)
+        }
+        
+        // Auto-refresh token if 401 Unauthorized
+        if http.statusCode == 401 {
+            if let refreshedToken = try? await refreshAccessTokenIfNeeded() {
+                var retryReq = request
+                retryReq.setValue("Bearer \(refreshedToken)", forHTTPHeaderField: "Authorization")
+                if let (retriedData, retriedResponse) = try? await session.data(for: retryReq),
+                   let retriedHttp = retriedResponse as? HTTPURLResponse, (200...299).contains(retriedHttp.statusCode) {
+                    data = retriedData
+                    http = retriedHttp
+                }
+            }
         }
         
         if let newSessionId = http.value(forHTTPHeaderField: "Mcp-Session-Id") {
@@ -803,86 +861,31 @@ public final class The5ersService: ObservableObject {
                     }
                 }
                 
-                // Query Authoritative Statistics (totalNetProfit, totalFees, totalTrades, winRate, profitFactor)
-                var accTotalNetProfit: Decimal? = nil
-                var accTotalFees: Decimal? = nil
-                var accTotalTrades: Int? = nil
-                var accWinRate: Double? = nil
-                var accProfitFactor: Double? = nil
-                let statArgs: [String: Any] = [
-                    "operation": "statistics",
-                    "account_ref": ref,
-                    "contract_version": "1.0"
-                ]
-                if let sRes = try? await callMcpTool(name: "the5ers_account", arguments: statArgs),
-                   !(sRes["isError"] as? Bool ?? false) {
-                    let uStat = unwrapMcpToolResult(sRes)
-                    if let sDict = (uStat as? [String: Any])?["data"] as? [String: Any] ?? uStat as? [String: Any] {
-                        accTotalNetProfit = sourceNumber(sDict["totalNetProfit"] ?? sDict["netProfit"] ?? sDict["profitAndLoss"])
-                        accTotalFees = sourceNumber(sDict["totalFees"] ?? sDict["fees"] ?? sDict["commission"])
-                        if let tt = sDict["totalTrades"] as? NSNumber {
-                            accTotalTrades = tt.intValue
-                        } else if let ttStr = sDict["totalTrades"] as? String, let ttInt = Int(ttStr) {
-                            accTotalTrades = ttInt
-                        }
-                        if let wr = sourceNumber(sDict["winRate"] ?? sDict["winRatio"]) {
-                            accWinRate = NSDecimalNumber(decimal: wr).doubleValue
-                        }
-                        if let pf = sourceNumber(sDict["profitFactor"]) {
-                            accProfitFactor = NSDecimalNumber(decimal: pf).doubleValue
-                        }
-                    }
-                }
-                
-                // Query official the5ers_program.rules (for authoritative package name: High Stakes, Bootcamp, Hyper Growth, etc.)
+                // Query official the5ers_program.journey (returns authoritative programName, currentStep.name, and phase in 1 single call)
                 var authoritativeProgramName: String? = nil
-                let progRulesArgs: [String: Any] = [
-                    "operation": "rules",
+                var authoritativeStepName: String? = nil
+                var authoritativeAccountType: String? = nil
+                
+                let journeyArgs: [String: Any] = [
+                    "operation": "journey",
                     "account_ref": ref,
                     "contract_version": "1.0"
                 ]
-                if let pRes = try? await callMcpTool(name: "the5ers_program", arguments: progRulesArgs),
-                   !(pRes["isError"] as? Bool ?? false) {
-                    let uProg = unwrapMcpToolResult(pRes)
-                    if let pDict = (uProg as? [String: Any])?["data"] as? [String: Any] ?? uProg as? [String: Any] {
-                        if let pName = pDict["name"] as? String, !pName.trimmingCharacters(in: .whitespaces).isEmpty {
+                if let jRes = try? await callMcpTool(name: "the5ers_program", arguments: journeyArgs),
+                   !(jRes["isError"] as? Bool ?? false) {
+                    let uJourney = unwrapMcpToolResult(jRes)
+                    if let jData = (uJourney as? [String: Any])?["data"] as? [String: Any] ?? uJourney as? [String: Any],
+                       let auth = jData["authoritative"] as? [String: Any] {
+                        if let pName = auth["programName"] as? String, !pName.trimmingCharacters(in: .whitespaces).isEmpty {
                             authoritativeProgramName = pName.trimmingCharacters(in: .whitespaces)
                         }
-                    }
-                }
-                
-                // Query official the5ers_program.progression (for active step / phase: Phase 1, Phase 2, Funded)
-                var authoritativeStepName: String? = nil
-                let progStepArgs: [String: Any] = [
-                    "operation": "progression",
-                    "account_ref": ref,
-                    "contract_version": "1.0"
-                ]
-                if let stRes = try? await callMcpTool(name: "the5ers_program", arguments: progStepArgs),
-                   !(stRes["isError"] as? Bool ?? false) {
-                    let uStep = unwrapMcpToolResult(stRes)
-                    if let stDict = (uStep as? [String: Any])?["data"] as? [String: Any] ?? uStep as? [String: Any],
-                       let steps = stDict["steps"] as? [[String: Any]] {
-                        if let activeStep = steps.first(where: { ($0["isCurrent"] as? Bool == true) || ($0["active"] as? Bool == true) }),
-                           let sName = activeStep["name"] as? String, !sName.trimmingCharacters(in: .whitespaces).isEmpty {
-                            authoritativeStepName = sName.trimmingCharacters(in: .whitespaces)
-                        }
-                    }
-                }
-                
-                // Query official the5ers_payout.eligibility (for accountType: evaluation vs funded, and profit split)
-                var authoritativeAccountType: String? = nil
-                let eligArgs: [String: Any] = [
-                    "operation": "eligibility",
-                    "account_ref": ref,
-                    "contract_version": "1.0"
-                ]
-                if let eRes = try? await callMcpTool(name: "the5ers_payout", arguments: eligArgs),
-                   !(eRes["isError"] as? Bool ?? false) {
-                    let uElig = unwrapMcpToolResult(eRes)
-                    if let eDict = (uElig as? [String: Any])?["data"] as? [String: Any] ?? uElig as? [String: Any] {
-                        if let at = eDict["accountType"] as? String {
-                            authoritativeAccountType = at
+                        if let currStep = auth["currentStep"] as? [String: Any] {
+                            if let sName = currStep["name"] as? String, !sName.trimmingCharacters(in: .whitespaces).isEmpty {
+                                authoritativeStepName = sName.trimmingCharacters(in: .whitespaces)
+                            }
+                            if let ph = currStep["phase"] as? String, !ph.trimmingCharacters(in: .whitespaces).isEmpty {
+                                authoritativeAccountType = ph.trimmingCharacters(in: .whitespaces)
+                            }
                         }
                     }
                 }
@@ -928,14 +931,14 @@ public final class The5ersService: ObservableObject {
                     program: prog,
                     startingBalance: resolvedStartBal,
                     createdAt: createdAt,
-                    profitAndLoss: accProfitAndLoss ?? accTotalNetProfit,
+                    profitAndLoss: accProfitAndLoss,
                     dailyProfitAndLoss: accDailyProfitAndLoss,
                     unrealized: accUnrealized,
-                    totalNetProfit: accTotalNetProfit ?? accProfitAndLoss,
-                    totalFees: accTotalFees,
-                    totalTrades: accTotalTrades,
-                    winRate: accWinRate,
-                    profitFactor: accProfitFactor,
+                    totalNetProfit: accProfitAndLoss,
+                    totalFees: nil,
+                    totalTrades: nil,
+                    winRate: nil,
+                    profitFactor: nil,
                     tradingBlocked: accTradingBlocked
                 ))
             }
@@ -1007,7 +1010,7 @@ public final class The5ersService: ObservableObject {
                 
                 // Extract account login/number to link with existing cTrader trading account
                 let accountNumber: String? = {
-                    let pattern = #"(?:…|\.{3}|[-_·\s])?(\d{3,12})\s*$"#
+                    let pattern = #"(?:…|\.{3}|[-_·\s#])?(\d{3,12})\s*$"#
                     if let regex = try? NSRegularExpression(pattern: pattern),
                        let match = regex.firstMatch(in: acc.label, range: NSRange(acc.label.startIndex..., in: acc.label)),
                        let range = Range(match.range(at: 1), in: acc.label) {

@@ -356,6 +356,9 @@ public struct ConnectionsSettingsView: View {
         .onChange(of: mcpToken) { val in
             the5ers.configure(token: val)
         }
+        .onChange(of: the5ers.mcpToken) { val in
+            mcpToken = val
+        }
     }
     
     // MARK: - Actions
@@ -394,7 +397,8 @@ public struct ConnectionsSettingsView: View {
     }
     
     private func syncThe5ers() {
-        the5ers.configure(token: mcpToken)
+        let tokenToUse = the5ers.mcpToken.isEmpty ? mcpToken : the5ers.mcpToken
+        the5ers.configure(token: tokenToUse)
         the5ersStatus = "Starting synchronization with The5ers MCP Hub..."
         currentThe5ersSyncTask?.cancel()
         currentThe5ersSyncTask = Task {
@@ -404,8 +408,10 @@ public struct ConnectionsSettingsView: View {
                 await MainActor.run {
                     if self.the5ers.isCancelledByUser {
                         self.the5ersStatus = "Synchronization cancelled by user."
-                    } else {
+                    } else if count > 0 {
                         self.the5ersStatus = "Successfully synced \(count) accounts, expenses & payouts from The5ers!"
+                    } else {
+                        self.the5ersStatus = self.the5ers.lastStatus
                     }
                 }
                 if SupabaseService.shared.isConfigured && !Task.isCancelled {
