@@ -74,7 +74,8 @@ public enum TradeDeduplicator {
             let qtyStr = NSDecimalNumber(decimal: trade.quantity).stringValue
             let entryStr = NSDecimalNumber(decimal: trade.avgEntry).stringValue
             let symbol = AssetContractEngine.canonicalSymbol(trade.symbol)
-            let baseSemantic = "\(symbol)|\(trade.direction.rawValue)"
+            let cleanAcc = trade.accountId.cleanAccountId
+            let baseSemantic = "\(cleanAcc)|\(symbol)|\(trade.direction.rawValue)"
             let exactKey = "\(baseSemantic)|\(openSec)|\(qtyStr)|\(entryStr)"
             let prevSecKey = "\(baseSemantic)|\(openSec - 1)|\(qtyStr)|\(entryStr)"
             let nextSecKey = "\(baseSemantic)|\(openSec + 1)|\(qtyStr)|\(entryStr)"
@@ -94,7 +95,8 @@ public enum TradeDeduplicator {
         let hasNotes = trade.notes != nil && trade.notes?.isEmpty == false ? 2 : 0
         let hasTags = !trade.tags.isEmpty ? 1 : 0
         let hasPnl = trade.netPnl != 0 ? 2 : 0
+        let hasFees = trade.fees > 0 ? 3 : 0
         let isStableAcc = !trade.accountId.contains("opaque") ? 2 : 0
-        return hasNotes + hasTags + hasPnl + isStableAcc + trade.executionCount
+        return hasNotes + hasTags + hasPnl + hasFees + isStableAcc + trade.executionCount
     }
 }

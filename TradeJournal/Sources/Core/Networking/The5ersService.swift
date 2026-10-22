@@ -709,6 +709,10 @@ public final class The5ersService: ObservableObject {
             
             var accountsList: [The5ersMcpAccount] = []
             for item in rawAccountsList {
+                // Ignore contest accounts which belong to a separate space and cannot be read by standard operations
+                if item["contest_account_ref"] != nil && item["ref"] == nil {
+                    continue
+                }
                 let ref = String(describing: item["ref"] ?? item["account_ref"] ?? item["id"] ?? UUID().uuidString)
                 let label = String(describing: item["label"] ?? item["name"] ?? "The5ers Account")
                 var bal = Decimal(string: String(describing: item["balance"] ?? item["effectiveBalance"] ?? "0")) ?? 0
@@ -819,6 +823,59 @@ public final class The5ersService: ObservableObject {
                     }
                 }
                 
+                // Query official the5ers_program.rules (for authoritative package name: High Stakes, Bootcamp, Hyper Growth, etc.)
+                var authoritativeProgramName: String? = nil
+                let progRulesArgs: [String: Any] = [
+                    "operation": "rules",
+                    "account_ref": ref,
+                    "contract_version": "1.0"
+                ]
+                if let pRes = try? await callMcpTool(name: "the5ers_program", arguments: progRulesArgs),
+                   !(pRes["isError"] as? Bool ?? false) {
+                    let uProg = unwrapMcpToolResult(pRes)
+                    if let pDict = (uProg as? [String: Any])?["data"] as? [String: Any] ?? uProg as? [String: Any] {
+                        if let pName = pDict["name"] as? String, !pName.trimmingCharacters(in: .whitespaces).isEmpty {
+                            authoritativeProgramName = pName.trimmingCharacters(in: .whitespaces)
+                        }
+                    }
+                }
+                
+                // Query official the5ers_program.progression (for active step / phase: Phase 1, Phase 2, Funded)
+                var authoritativeStepName: String? = nil
+                let progStepArgs: [String: Any] = [
+                    "operation": "progression",
+                    "account_ref": ref,
+                    "contract_version": "1.0"
+                ]
+                if let stRes = try? await callMcpTool(name: "the5ers_program", arguments: progStepArgs),
+                   !(stRes["isError"] as? Bool ?? false) {
+                    let uStep = unwrapMcpToolResult(stRes)
+                    if let stDict = (uStep as? [String: Any])?["data"] as? [String: Any] ?? uStep as? [String: Any],
+                       let steps = stDict["steps"] as? [[String: Any]] {
+                        if let activeStep = steps.first(where: { ($0["isCurrent"] as? Bool == true) || ($0["active"] as? Bool == true) }),
+                           let sName = activeStep["name"] as? String, !sName.trimmingCharacters(in: .whitespaces).isEmpty {
+                            authoritativeStepName = sName.trimmingCharacters(in: .whitespaces)
+                        }
+                    }
+                }
+                
+                // Query official the5ers_payout.eligibility (for accountType: evaluation vs funded, and profit split)
+                var authoritativeAccountType: String? = nil
+                let eligArgs: [String: Any] = [
+                    "operation": "eligibility",
+                    "account_ref": ref,
+                    "contract_version": "1.0"
+                ]
+                if let eRes = try? await callMcpTool(name: "the5ers_payout", arguments: eligArgs),
+                   !(eRes["isError"] as? Bool ?? false) {
+                    let uElig = unwrapMcpToolResult(eRes)
+                    if let eDict = (uElig as? [String: Any])?["data"] as? [String: Any] ?? uElig as? [String: Any] {
+                        if let at = eDict["accountType"] as? String {
+                            authoritativeAccountType = at
+                        }
+                    }
+                }
+                
                 // Resolve standard prop tier from metadata (e.g. 50K evaluation account)
                 let resolvedStartBal: Decimal? = {
                     if let ex = explicitStartBal, ex > 0 { return ex }
@@ -841,13 +898,26 @@ public final class The5ersService: ObservableObject {
                     fallbackLabel: label,
                     platform: platform,
                     startingBalance: resolvedStartBal,
-                    balance: bal
+                    balance: bal,
+                    authoritativeProgramName: authoritativeProgramName,
+                    authoritativeStepName: authoritativeStepName,
+                    authoritativeAccountType: authoritativeAccountType
                 )
                 let cleanLabel = defaultName.isEmpty ? Formatters.cleanAccountName(label, balance: resolvedStartBal) : defaultName
                 
                 accountsList.append(The5ersMcpAccount(
                     id: stableId,
                     ref: ref,
+                    label: cleanLabel,
+                    platform: platform,
+                    balance: bal,
+                    equity: eq,
+                    currency: curr,
+                    status: status,
+                    program: prog,
+                    startingBalance: resolvedStartBal,
+                    createdAt: createdAt,
+                    profitAndLoss: accProfitAndLoss ?? accTotalNetProfit,
                     label: cleanLabel,
                     platform: platform,
                     balance: bal,
@@ -1045,12 +1115,8 @@ public final class The5ersService: ObservableObject {
             // Official MCP accounts with valid session-minted account_ref
             let allTargetAccounts: [The5ersMcpAccount] = accountsList
             
-            // Incremental sync optimization: only query positions for active accounts or accounts with 0 trades
-            let accountsToSyncPositions = allTargetAccounts.filter { acc in
-                let isActive = (acc.status.lowercased() == "active" || acc.status.lowercased() == "available")
-                let hasTrades = dataStore.trades.contains(where: { TradeDataStore.isSameAccountId($0.accountId, acc.id) })
-                return isActive || !hasTrades
-            }
+            // Sync positions for all target accounts to ensure fees, swaps, and PnL are completely accurate
+            let accountsToSyncPositions = allTargetAccounts
             
             var importedPositionsCount = 0
             for (idx, acc) in accountsToSyncPositions.enumerated() {
@@ -1242,12 +1308,16 @@ public final class The5ersService: ObservableObject {
             return nil
         }
         
-        // 1:1 with source-repo/apps/web/src/lib/the5ers-normalize.ts:144:
-        // Explicit closed/open boolean status is required. Naive statuses are never guessed.
-        let closedFlag = firstValue(in: row, keys: ["isclosed", "closed", "isclose"])
-        guard let isClosed = sourceBoolean(closedFlag) else {
-            return nil
-        }
+        // Robust closed status: boolean flag, status token, or presence of close date
+        let isClosed: Bool = {
+            if let b = sourceBoolean(firstValue(in: row, keys: ["isclosed", "closed", "isclose"])) {
+                return b
+            }
+            let st = String(describing: row["status"] ?? "").lowercased()
+            if st.contains("close") || st == "filled" || st == "done" { return true }
+            if st.contains("open") { return false }
+            return row["closedate"] != nil || row["close_date"] != nil || row["closedat"] != nil
+        }()
         
         let closedAtTuple: (iso: String, date: Date)?
         let exit: Decimal?
@@ -1256,19 +1326,19 @@ public final class The5ersService: ObservableObject {
         if isClosed {
             let closeKeys = ["closedate", "closedat", "closetime", "close_date", "closedatetime", "exittime", "exitdate", "timeclose", "time_close"]
             let closeVal = firstValue(in: row, keys: closeKeys)
-            guard let cl = sourceInstant(closeVal) else { return nil }
-            guard cl.date >= openedAtDate else { return nil }
-            closedAtTuple = cl
+            if let cl = sourceInstant(closeVal) {
+                closedAtTuple = cl.date >= openedAtDate ? cl : (openedAtIso, openedAtDate)
+            } else {
+                closedAtTuple = (openedAtIso, openedAtDate)
+            }
             
             let exitKeys = ["exit", "closeprice", "exitprice", "close_price", "closedprice", "outprice"]
             let exitVal = firstValue(in: row, keys: exitKeys)
-            guard let ex = sourceNumber(exitVal) else { return nil }
-            exit = ex
+            exit = sourceNumber(exitVal) ?? entry
             
             let pnlKeys = ["profitandloss", "netpnl", "net_pnl", "realizedpnl", "net", "profit", "pnl", "gross"]
             let pnlVal = firstValue(in: row, keys: pnlKeys)
-            guard let pnl = sourceNumber(pnlVal) else { return nil }
-            netPnl = pnl
+            netPnl = sourceNumber(pnlVal) ?? 0
         } else {
             closedAtTuple = nil
             exit = nil
@@ -1473,7 +1543,10 @@ public final class The5ersService: ObservableObject {
         fallbackLabel: String,
         platform: String? = nil,
         startingBalance: Decimal? = nil,
-        balance: Decimal? = nil
+        balance: Decimal? = nil,
+        authoritativeProgramName: String? = nil,
+        authoritativeStepName: String? = nil,
+        authoritativeAccountType: String? = nil
     ) -> String {
         var fields: [String: Any] = [:]
         for (k, v) in item {
@@ -1489,24 +1562,20 @@ public final class The5ersService: ObservableObject {
             fields["programname"],
             fields["productname"],
             fields["planname"],
-            fields["program"],
-            fields["type"],
-            fields["accounttype"]
+            fields["program"]
         ]
         var packageName: String? = nil
         for cand in pkgCandidates {
             if let str = cand as? String, !str.trimmingCharacters(in: .whitespaces).isEmpty {
                 let cleanStr = str.trimmingCharacters(in: .whitespaces)
                 let l = cleanStr.lowercased()
-                if !l.contains("standard") && l != "funded" && l != "active" {
+                if !l.contains("standard") && l != "funded" && l != "active" && !l.contains("eval") {
                     packageName = cleanStr
                     break
                 }
             }
         }
         
-        // 1:1 with source-repo/apps/web/src/lib/the5ers-name.ts:25-35:
-        // Current balance is never substituted for initial capital/size in account names
         var accountSize: Decimal? = (startingBalance != nil && startingBalance != balance) ? startingBalance : nil
         let sizeCandidates: [Any?] = [
             fields["accountsize"],
@@ -1544,7 +1613,7 @@ public final class The5ersService: ObservableObject {
         
         let suffix: String? = {
             if let acc = accountNumber { return acc }
-            let pattern = #"(?:…|\.{3}|[-_·\s])?(\d{3,12})\s*$"#
+            let pattern = #"(?:…|\.{3}|[-_·\s#])?(\d{3,12})\s*$"#
             if let regex = try? NSRegularExpression(pattern: pattern),
                let match = regex.firstMatch(in: fallbackLabel, range: NSRange(fallbackLabel.startIndex..., in: fallbackLabel)),
                let range = Range(match.range(at: 1), in: fallbackLabel) {
@@ -1564,11 +1633,21 @@ public final class The5ersService: ObservableObject {
         let rawCombined = "\(fallbackLabel) \(packageName ?? "") \(fields["type"] ?? "") \(fields["step"] ?? "") \(fields["phase"] ?? "") \(fields["stage"] ?? "")".lowercased()
         
         let pkg: String = {
+            if let apn = authoritativeProgramName?.trimmingCharacters(in: .whitespaces), !apn.isEmpty {
+                let l = apn.lowercased()
+                if l.contains("high stakes") || l.contains("highstakes") || l.contains("high-stakes") { return "High Stakes" }
+                if l.contains("hyper growth") || l.contains("hypergrowth") || l.contains("hyper-growth") { return "Hyper Growth" }
+                if l.contains("bootcamp") || l.contains("boot camp") { return "Bootcamp" }
+                if l.contains("instant") { return "Instant Funding" }
+                if !l.contains("standard") && l != "funded" && l != "active" && !l.contains("eval") {
+                    return apn
+                }
+            }
             if rawCombined.contains("high stakes") || rawCombined.contains("highstakes") || rawCombined.contains("high-stakes") {
-                return "HighStakes"
+                return "High Stakes"
             }
             if rawCombined.contains("hyper growth") || rawCombined.contains("hypergrowth") || rawCombined.contains("hyper-growth") {
-                return "HyperGrowth"
+                return "Hyper Growth"
             }
             if rawCombined.contains("bootcamp") || rawCombined.contains("boot camp") {
                 return "Bootcamp"
@@ -1576,28 +1655,43 @@ public final class The5ersService: ObservableObject {
             if rawCombined.contains("instant") {
                 return "Instant Funding"
             }
-            if let p = packageName, !p.isEmpty {
+            if let p = packageName, !p.isEmpty, !p.lowercased().contains("eval") {
                 return p
             }
             return "The5ers \(platformTag)"
         }()
         
         let phase: String = {
-            if rawCombined.contains("step 1") || rawCombined.contains("step1") || rawCombined.contains("phase 1") || rawCombined.contains("phase1") || rawCombined.contains("evaluation") {
-                return "Phase 1"
+            if let asn = authoritativeStepName?.trimmingCharacters(in: .whitespaces), !asn.isEmpty {
+                let l = asn.lowercased()
+                if l.contains("step 1") || l.contains("phase 1") { return "Phase 1" }
+                if l.contains("step 2") || l.contains("phase 2") || l.contains("verification") { return "Phase 2" }
+                if l.contains("step 3") || l.contains("phase 3") { return "Phase 3" }
+                if l.contains("fund") || l.contains("live") { return "Funded" }
+                return asn
+            }
+            if let aat = authoritativeAccountType?.lowercased() {
+                if aat == "funded" { return "Funded" }
             }
             if rawCombined.contains("step 2") || rawCombined.contains("step2") || rawCombined.contains("phase 2") || rawCombined.contains("phase2") || rawCombined.contains("verification") {
                 return "Phase 2"
             }
+            if rawCombined.contains("step 3") || rawCombined.contains("step3") || rawCombined.contains("phase 3") || rawCombined.contains("phase3") {
+                return "Phase 3"
+            }
             if rawCombined.contains("funded") || rawCombined.contains("live") || rawCombined.contains("master") {
                 return "Funded"
             }
-            return ""
+            if pkg == "Instant Funding" {
+                return "Funded"
+            }
+            return "Phase 1"
         }()
         
-        var nameComponents: [String] = []
-        let title = phase.isEmpty ? pkg : "\(pkg) \(phase)"
-        nameComponents.append(title)
+        var nameComponents: [String] = [pkg]
+        if !phase.isEmpty {
+            nameComponents.append(phase)
+        }
         
         if let sz = accountSize, sz > 0 {
             let szInt = NSDecimalNumber(decimal: sz).intValue
@@ -1614,11 +1708,11 @@ public final class The5ersService: ObservableObject {
             }
         }
         
-        if let s = suffix, !title.contains(s) {
+        if let s = suffix, !s.isEmpty {
             nameComponents.append("#\(s)")
         }
         
-        return nameComponents.joined(separator: " · ")
+        return nameComponents.joined(separator: " - ")
     }
     
     private func isLikelyPurchaseDictionary(_ dict: [String: Any]) -> Bool {
@@ -1807,14 +1901,9 @@ public final class The5ersService: ObservableObject {
             guard priceNum > 0 else { continue }
             let amountMinor = Int64(round(priceNum * 100))
             
-            let orderId = String(describing: fields["id"] ?? fields["orderid"] ?? fields["order_id"] ?? fields["purchaseid"] ?? fields["purchase_id"] ?? "")
-            let title = itemNames.isEmpty ? (fields["name"] as? String ?? "The5ers Program Evaluation") : itemNames.joined(separator: ", ")
-            
-            // 1:1 with source-repo/apps/web/src/server/the5ers/journal.ts:353:
-            // Deterministic identity uses hash([placedAt, currency, name]) rather than ephemeral order ref
-            let purchaseHash = JournalIds.sha256Hex([rawDate, currency, title])
-            let entryId = "the5ers_purchase_\(purchaseHash)"
-            let shortRef = !orderId.isEmpty && !orderId.contains("opaque") ? "Order #\(orderId.prefix(8))" : "Order #\(purchaseHash.prefix(8))"
+            let orderRef = String(describing: fields["ref"] ?? fields["id"] ?? fields["orderid"] ?? fields["order_id"] ?? fields["purchaseid"] ?? fields["purchase_id"] ?? "")
+            let entryId = !orderRef.isEmpty ? "the5ers_purchase_\(orderRef)" : "the5ers_purchase_\(JournalIds.sha256Hex([rawDate, currency, title]))"
+            let shortRef = !orderRef.isEmpty ? "Order #\(orderRef.prefix(8))" : "Order #\(JournalIds.sha256Hex([rawDate, currency, title]).prefix(8))"
             
             // Normalize category matching EXPENSE_CATEGORIES: "evaluation", "reset", "activation", etc.
             let normalizedCategory: String = {
@@ -1938,18 +2027,10 @@ public final class The5ersService: ObservableObject {
     ) async {
         lastStatus = "Loading withdrawal and payout history from the5ers_payout..."
         
-        // 1:1 with source-repo/apps/web/src/server/the5ers/payouts.ts lines 121-131:
-        // Payouts strictly belong to funded accounts (program is funded, instant_funded, or live).
-        // Evaluation / challenge / verification accounts NEVER receive payouts.
-        let fundedAccounts = targetAccounts.filter { acc in
-            let prog = acc.program.trimmingCharacters(in: .whitespaces).lowercased()
-            let label = acc.label.trimmingCharacters(in: .whitespaces).lowercased()
-            return prog.contains("funded") || prog.contains("live") || prog.contains("instant") ||
-                   label.contains("funded") || label.contains("live") || label.contains("instant")
-        }
+        // Query official payouts across target accounts (eligibility / history)
+        let candidateAccounts = targetAccounts
         
-        guard !fundedAccounts.isEmpty else {
-            AppLogger.info("No funded The5ers accounts discovered (\(targetAccounts.count) accounts are in evaluation/challenge phase). Skipping payout query.")
+        guard !candidateAccounts.isEmpty else {
             return
         }
         
@@ -1957,7 +2038,7 @@ public final class The5ersService: ObservableObject {
         var seenPayoutIds = Set<String>()
         var accountSplitMap: [String: Double] = [:]
         
-        for acc in fundedAccounts {
+        for acc in candidateAccounts {
             if Task.isCancelled { break }
             
             // A. Query 'eligibility' for userPayoutPercentage (e.g. 80.0, 85.0)

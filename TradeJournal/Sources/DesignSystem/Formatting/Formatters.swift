@@ -330,10 +330,10 @@ public enum Formatters {
         
         let pkg: String = {
             if lower.contains("high stakes") || lower.contains("highstakes") || lower.contains("high-stakes") {
-                return "HighStakes"
+                return "High Stakes"
             }
             if lower.contains("hyper growth") || lower.contains("hypergrowth") || lower.contains("hyper-growth") {
-                return "HyperGrowth"
+                return "Hyper Growth"
             }
             if lower.contains("bootcamp") || lower.contains("boot camp") {
                 return "Bootcamp"
@@ -360,8 +360,10 @@ public enum Formatters {
             return ""
         }()
         
-        let title = phase.isEmpty ? pkg : "\(pkg) \(phase)"
-        var components: [String] = [title]
+        var components: [String] = [pkg]
+        if !phase.isEmpty {
+            components.append(phase)
+        }
         
         if let b = balance, b > 0 {
             let bInt = NSDecimalNumber(decimal: b).intValue
@@ -382,30 +384,37 @@ public enum Formatters {
             components.append("#\(suffix)")
         }
         
-        return components.joined(separator: " · ")
+        return components.joined(separator: " - ")
     }
     
-    /// Produces a concise account label tailored for tight navigation bars (e.g. "HighStakes #123456" or "cTrader #7657")
+    /// Produces a concise account label tailored for tight navigation bars (e.g. "HighStakes P1 · $50K" or "cTrader #7657")
     public static func compactAccountName(_ raw: String) -> String {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return "Account" }
         
-        let cleaned = cleanAccountName(trimmed)
-        let parts = cleaned.components(separatedBy: " · ")
-        
-        // If clean format is: [Title, Size, #Number]
-        if parts.count >= 3 {
-            let title = parts[0]
-            let num = parts[parts.count - 1]
-            let shortTitle = title.replacingOccurrences(of: " Phase 1", with: "")
-                                  .replacingOccurrences(of: " Phase 2", with: "")
-                                  .replacingOccurrences(of: " Evaluation", with: "")
-                                  .replacingOccurrences(of: " Verification", with: "")
-            return "\(shortTitle) \(num)"
-        } else if parts.count == 2 {
-            return "\(parts[0]) \(parts[1])"
+        // Handle dash-separated format: [Package, Phase, Size, #Number]
+        let sep = trimmed.contains(" - ") ? " - " : (trimmed.contains(" · ") ? " · " : "")
+        if !sep.isEmpty {
+            let parts = trimmed.components(separatedBy: sep).map { $0.trimmingCharacters(in: .whitespaces) }
+            if parts.count >= 4 {
+                let p0 = parts[0].replacingOccurrences(of: " ", with: "")
+                let p1 = parts[1].replacingOccurrences(of: "Phase ", with: "P").replacingOccurrences(of: "Step ", with: "P")
+                let p2 = parts[2]
+                return "\(p0) \(p1) · \(p2)"
+            } else if parts.count == 3 {
+                let p0 = parts[0].replacingOccurrences(of: " ", with: "")
+                let p1 = parts[1]
+                let p2 = parts[2]
+                return "\(p0) \(p1) · \(p2)"
+            } else if parts.count == 2 {
+                return "\(parts[0]) \(parts[1])"
+            }
         }
         
+        let cleaned = cleanAccountName(trimmed)
+        if cleaned.contains(" - ") {
+            return compactAccountName(cleaned)
+        }
         return cleaned
     }
     
