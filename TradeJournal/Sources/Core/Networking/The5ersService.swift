@@ -1041,7 +1041,7 @@ public final class The5ersService: ObservableObject {
                 let mappedProgram: PropProgram = {
                     if rawProg.contains("instant") || rawLabel.contains("instant") { return .instantFunded }
                     if rawProg.contains("step2") || rawProg.contains("step 2") || rawProg.contains("phase2") || rawProg.contains("phase 2") || rawProg.contains("verification") || rawLabel.contains("phase 2") || rawLabel.contains("step 2") || rawLabel.contains("high stakes - 2") { return .verification }
-                    if rawProg.contains("fund") || rawProg.contains("live") || rawLabel.contains("funded") || rawLabel.contains("live") { return .funded }
+                    if rawProg.contains("fund") || rawProg.contains("live") || rawProg.contains("master") || rawProg.contains("step 3") || rawProg.contains("phase 3") || rawLabel.contains("funded") || rawLabel.contains("live") || rawLabel.contains("step 3") || rawLabel.contains("phase 3") { return .funded }
                     return .evaluation
                 }()
                 
@@ -1822,11 +1822,12 @@ public final class The5ersService: ObservableObject {
     
     private func isLikelyPurchaseDictionary(_ dict: [String: Any]) -> Bool {
         let keys = Set(dict.keys.map { $0.lowercased().replacingOccurrences(of: "_", with: "") })
-        let hasCost = keys.contains("netpaid") || keys.contains("price") || keys.contains("cost") ||
-                      keys.contains("fee") || keys.contains("amount") || keys.contains("total")
+        let hasCost = keys.contains("netpaid") || keys.contains("price") || keys.contains("priceusd") ||
+                      keys.contains("cost") || keys.contains("fee") || keys.contains("amount") || keys.contains("total")
         let hasIdentity = keys.contains("id") || keys.contains("orderid") || keys.contains("purchaseid") ||
-                          keys.contains("reference") || keys.contains("items") || keys.contains("placedat")
-        return hasCost && hasIdentity
+                          keys.contains("reference") || keys.contains("ref") || keys.contains("purchaseref") ||
+                          keys.contains("items") || keys.contains("placedat")
+        return (hasCost || keys.contains("items")) && (hasIdentity || keys.contains("status"))
     }
     
     private func extractAnyPurchaseCollection(from unwrapped: Any?) -> [[String: Any]] {
@@ -1837,24 +1838,17 @@ public final class The5ersService: ObservableObject {
             }
             return []
         }
-        if let arr = unwrapped as? [[String: Any]] {
-            var results: [[String: Any]] = []
-            for item in arr {
-                let sub = extractAnyPurchaseCollection(from: item)
-                if !sub.isEmpty {
-                    results.append(contentsOf: sub)
-                } else if isLikelyPurchaseDictionary(item) {
-                    results.append(item)
-                }
-            }
-            if !results.isEmpty { return results }
-            return arr.filter { isLikelyPurchaseDictionary($0) }
-        }
         if let dict = unwrapped as? [String: Any] {
+            if let data = dict["data"] as? [String: Any] {
+                if let p = data["purchases"] as? [[String: Any]], !p.isEmpty { return p }
+                if let p = data["orders"] as? [[String: Any]], !p.isEmpty { return p }
+            }
+            if let p = dict["purchases"] as? [[String: Any]], !p.isEmpty { return p }
+            if let p = dict["orders"] as? [[String: Any]], !p.isEmpty { return p }
             if isLikelyPurchaseDictionary(dict) {
                 return [dict]
             }
-            let possibleKeys = ["purchases", "orders", "items", "transactions", "history", "data", "lineitems", "rows", "records", "challenges", "invoices"]
+            let possibleKeys = ["purchases", "orders", "transactions", "history", "data", "lineitems", "rows", "records", "challenges", "invoices"]
             for k in possibleKeys {
                 if let arr = dict[k] as? [[String: Any]], !arr.isEmpty {
                     return arr
@@ -1869,6 +1863,9 @@ public final class The5ersService: ObservableObject {
                 if !sub.isEmpty { return sub }
             }
         }
+        if let arr = unwrapped as? [[String: Any]] {
+            return arr.filter { isLikelyPurchaseDictionary($0) }
+        }
         return []
     }
     
@@ -1881,36 +1878,65 @@ public final class The5ersService: ObservableObject {
         var allPurchases: [[String: Any]] = []
         var seenPurchaseIds = Set<String>()
         
-        // 1:1 with source-repo/apps/web/src/lib/the5ers-normalize.ts and docs/the5ers.md:48-52:
-        // Purchases are ONLY retrieved from the dedicated official the5ers_purchase MCP tool.
-        // Never extract purchases from raw trading account records.
-        
-        // 2. Query official the5ers_purchase operation 'list'
-        let purchaseArgsList: [[String: Any]] = [
-            ["operation": "list", "contract_version": "1.0", "limit": 50],
-            ["operation": "list"]
-        ]
-        
-        for pArgs in purchaseArgsList {
+        // 1. Fetch paginated orders from official the5ers_purchase 'list'
+        var page = 1
+        while page <= 10 {
             if Task.isCancelled || isCancelledByUser { break }
-            if let res = try? await callMcpTool(name: "the5ers_purchase", arguments: pArgs),
-               !(res["isError"] as? Bool ?? false) {
-                let unwrapped = unwrapMcpToolResult(res)
-                let rows = extractAnyPurchaseCollection(from: unwrapped)
-                if !rows.isEmpty {
-                    for r in rows {
-                        let pId = String(describing: r["id"] ?? r["orderid"] ?? r["order_id"] ?? r["purchaseid"] ?? r["ref"] ?? UUID().uuidString)
-                        if !seenPurchaseIds.contains(pId) {
-                            seenPurchaseIds.insert(pId)
-                            allPurchases.append(r)
+            let pArgs: [String: Any] = [
+                "operation": "list",
+                "contract_version": "1.0",
+                "page": page,
+                "limit": 50
+            ]
+            guard let res = try? await callMcpTool(name: "the5ers_purchase", arguments: pArgs),
+                  !(res["isError"] as? Bool ?? false) else { break }
+            let unwrapped = unwrapMcpToolResult(res)
+            let rows = extractAnyPurchaseCollection(from: unwrapped)
+            if rows.isEmpty { break }
+            for r in rows {
+                let pId = String(describing: r["ref"] ?? r["id"] ?? r["orderid"] ?? r["order_id"] ?? r["purchaseid"] ?? UUID().uuidString)
+                if !seenPurchaseIds.contains(pId) {
+                    seenPurchaseIds.insert(pId)
+                    allPurchases.append(r)
+                }
+            }
+            if let dict = unwrapped as? [String: Any],
+               let pagination = dict["pagination"] as? [String: Any],
+               let hasMore = pagination["has_more"] as? Bool,
+               !hasMore {
+                break
+            }
+            if rows.count < 50 { break }
+            page += 1
+        }
+        
+        // Fallback without pagination parameters if paginated query was empty
+        if allPurchases.isEmpty {
+            let fallbackArgsList: [[String: Any]] = [
+                ["operation": "list", "contract_version": "1.0", "limit": 50],
+                ["operation": "list"]
+            ]
+            for pArgs in fallbackArgsList {
+                if Task.isCancelled || isCancelledByUser { break }
+                if let res = try? await callMcpTool(name: "the5ers_purchase", arguments: pArgs),
+                   !(res["isError"] as? Bool ?? false) {
+                    let unwrapped = unwrapMcpToolResult(res)
+                    let rows = extractAnyPurchaseCollection(from: unwrapped)
+                    if !rows.isEmpty {
+                        for r in rows {
+                            let pId = String(describing: r["ref"] ?? r["id"] ?? r["orderid"] ?? r["order_id"] ?? r["purchaseid"] ?? UUID().uuidString)
+                            if !seenPurchaseIds.contains(pId) {
+                                seenPurchaseIds.insert(pId)
+                                allPurchases.append(r)
+                            }
                         }
+                        break
                     }
-                    break
                 }
             }
         }
         
-        // 3. For orders that have a 'ref', query 'accounts' to map directly to created accounts
+        // 2. Query 'accounts' for each order reference to map directly to created accounts
         for i in allPurchases.indices {
             if Task.isCancelled || isCancelledByUser { break }
             let pRef = String(describing: allPurchases[i]["ref"] ?? allPurchases[i]["purchase_ref"] ?? allPurchases[i]["id"] ?? "")
@@ -2030,13 +2056,40 @@ public final class The5ersService: ObservableObject {
                 return "other"
             }()
             
-            // Match account attribution if account_ref or account identifier is present in order metadata
+            // Match account attribution:
+            // 1. By exact account_ref / ID
             let candidateAccRef = String(describing: fields["accountref"] ?? fields["account_ref"] ?? fields["accountid"] ?? fields["account_id"] ?? "")
-            let matchedAcc = targetAccounts.first(where: {
+            var matchedAcc = targetAccounts.first(where: {
                 (!candidateAccRef.isEmpty && ($0.ref == candidateAccRef || $0.id == candidateAccRef)) ||
                 (!candidateAccRef.isEmpty && $0.label.contains(candidateAccRef))
             })
-            let journalAccId: String? = matchedAcc != nil ? (matchedAcc!.id.hasPrefix("the5ers_") ? matchedAcc!.id : "the5ers_\(matchedAcc!.id)") : nil
+            // 2. If single target account, attribute to it directly
+            if matchedAcc == nil && targetAccounts.count == 1 {
+                matchedAcc = targetAccounts.first
+            }
+            // 3. Match by account size (e.g. "100k" in title)
+            if matchedAcc == nil {
+                for acc in targetAccounts {
+                    let sz = NSDecimalNumber(decimal: acc.balance).intValue
+                    if sz > 0 {
+                        let kStr = "\(sz / 1000)k"
+                        if title.lowercased().contains(kStr) {
+                            matchedAcc = acc
+                            break
+                        }
+                    }
+                }
+            }
+            // 4. Fallback attribute to primary active The5ers account
+            let journalAccId: String? = {
+                if let m = matchedAcc {
+                    return m.id.hasPrefix("the5ers_") ? m.id : "the5ers_\(m.id)"
+                }
+                if let first = targetAccounts.first {
+                    return first.id.hasPrefix("the5ers_") ? first.id : "the5ers_\(first.id)"
+                }
+                return nil
+            }()
             
             if let existingIdx = dataStore.propEntries.firstIndex(where: {
                 $0.id == entryId ||
@@ -2048,7 +2101,9 @@ public final class The5ersService: ObservableObject {
                 existing.currency = currency
                 existing.occurredOn = dateStr
                 existing.category = normalizedCategory
-                existing.accountId = journalAccId
+                if existing.accountId == nil || existing.accountId?.isEmpty == true {
+                    existing.accountId = journalAccId
+                }
                 dataStore.propEntries[existingIdx] = existing
             } else {
                 let entry = PropEntryItem(
@@ -2075,9 +2130,14 @@ public final class The5ersService: ObservableObject {
         let keys = Set(dict.keys.map { $0.lowercased().replacingOccurrences(of: "_", with: "") })
         let hasAmount = keys.contains("amount") || keys.contains("payoutamount") || keys.contains("netamount") ||
                         keys.contains("grossamount") || keys.contains("grossprofit") || keys.contains("receivedamount") ||
-                        keys.contains("withdrawalamount") || keys.contains("paidamount") || keys.contains("netpaid")
-        let hasIdentity = keys.contains("payoutid") || keys.contains("withdrawalid") || keys.contains("requestid")
-        return hasAmount && (hasIdentity || keys.contains("paymentdate") || keys.contains("settledat"))
+                        keys.contains("withdrawalamount") || keys.contains("paidamount") || keys.contains("netpaid") ||
+                        keys.contains("finalamount") || keys.contains("usershare")
+        let hasIdentity = keys.contains("payoutid") || keys.contains("withdrawalid") || keys.contains("requestid") ||
+                          keys.contains("id") || keys.contains("ref")
+        let hasDate = keys.contains("requestedat") || keys.contains("completedat") || keys.contains("paymentdate") ||
+                      keys.contains("settledat") || keys.contains("paidat") || keys.contains("date") || keys.contains("createdat")
+        let hasStatus = keys.contains("status") || keys.contains("method")
+        return hasAmount && (hasIdentity || hasDate || hasStatus)
     }
     
     private func extractAnyPayoutCollection(from unwrapped: Any?) -> [[String: Any]] {
@@ -2088,20 +2148,15 @@ public final class The5ersService: ObservableObject {
             }
             return []
         }
-        if let arr = unwrapped as? [[String: Any]] {
-            var results: [[String: Any]] = []
-            for item in arr {
-                let sub = extractAnyPayoutCollection(from: item)
-                if !sub.isEmpty {
-                    results.append(contentsOf: sub)
-                } else if isLikelyPayoutDictionary(item) {
-                    results.append(item)
-                }
-            }
-            if !results.isEmpty { return results }
-            return arr.filter { isLikelyPayoutDictionary($0) }
-        }
         if let dict = unwrapped as? [String: Any] {
+            if let data = dict["data"] as? [String: Any] {
+                if let p = data["payouts"] as? [[String: Any]], !p.isEmpty { return p }
+                if let p = data["payout_history"] as? [[String: Any]], !p.isEmpty { return p }
+                if let p = data["history"] as? [[String: Any]], !p.isEmpty { return p }
+                if let p = data["requests"] as? [[String: Any]], !p.isEmpty { return p }
+            }
+            if let p = dict["payouts"] as? [[String: Any]], !p.isEmpty { return p }
+            if let p = dict["payout_history"] as? [[String: Any]], !p.isEmpty { return p }
             if isLikelyPayoutDictionary(dict) {
                 return [dict]
             }
@@ -2123,6 +2178,9 @@ public final class The5ersService: ObservableObject {
                 let sub = extractAnyPayoutCollection(from: res)
                 if !sub.isEmpty { return sub }
             }
+        }
+        if let arr = unwrapped as? [[String: Any]] {
+            return arr.filter { isLikelyPayoutDictionary($0) }
         }
         return []
     }
@@ -2192,12 +2250,13 @@ public final class The5ersService: ObservableObject {
                 }
             }
             
-            // C. Query 'history' for past completed/processed payouts
+            // C. Query 'history' for past payouts (limit: 50)
             var historyPayouts: [[String: Any]] = []
             let histArgs: [String: Any] = [
                 "operation": "history",
                 "account_ref": acc.ref,
-                "contract_version": "1.0"
+                "contract_version": "1.0",
+                "limit": 50
             ]
             if let histRes = try? await callMcpTool(name: "the5ers_payout", arguments: histArgs),
                !(histRes["isError"] as? Bool ?? false) {
@@ -2209,7 +2268,7 @@ public final class The5ersService: ObservableObject {
                     if let s = accountSplitMap[acc.ref], r["split_percent"] == nil {
                         r["split_percent"] = s
                     }
-                    // If this history payout matches latestPayout, enrich with breakdown
+                    // If this history payout matches latestPayout, enrich with detailed breakdown
                     if let latest = latestPayoutDict {
                         let histReq = String(describing: r["requestedAt"] ?? r["requested_at"] ?? "")
                         let latestReq = String(describing: latest["requestedAt"] ?? latest["requested_at"] ?? "")
@@ -2227,14 +2286,18 @@ public final class The5ersService: ObservableObject {
             
             if !historyPayouts.isEmpty {
                 for p in historyPayouts {
-                    let pId = String(describing: p["id"] ?? p["payout_id"] ?? p["withdrawalid"] ?? UUID().uuidString)
+                    let reqDate = String(describing: p["requestedAt"] ?? p["requested_at"] ?? "")
+                    let amt = String(describing: p["amount"] ?? "")
+                    let pId = String(describing: p["id"] ?? p["payout_id"] ?? p["withdrawalid"] ?? "\(acc.ref)_\(reqDate)_\(amt)")
                     if !seenPayoutIds.contains(pId) {
                         seenPayoutIds.insert(pId)
                         allRawPayouts.append(p)
                     }
                 }
             } else if let latest = latestPayoutDict {
-                let pId = String(describing: latest["id"] ?? latest["payout_id"] ?? latest["withdrawalid"] ?? UUID().uuidString)
+                let reqDate = String(describing: latest["requestedAt"] ?? latest["requested_at"] ?? "")
+                let amt = String(describing: latest["amount"] ?? "")
+                let pId = String(describing: latest["id"] ?? latest["payout_id"] ?? latest["withdrawalid"] ?? "\(acc.ref)_\(reqDate)_\(amt)")
                 if !seenPayoutIds.contains(pId) {
                     seenPayoutIds.insert(pId)
                     allRawPayouts.append(latest)
@@ -2248,9 +2311,11 @@ public final class The5ersService: ObservableObject {
             
             let status = String(describing: fields["status"] ?? "").lowercased().trimmingCharacters(in: .whitespaces)
             let isReversed = (fields["reversed"] as? Bool) == true
-            // 1:1 with payouts.ts:67: status MUST be one of completed, paid, received, settled, or approved
-            let isCompleted = ["completed", "paid", "received", "settled", "approved", "processed"].contains(status)
-            guard isCompleted && !isReversed else { continue }
+            guard !isReversed else { continue }
+            
+            let isCompleted = ["completed", "paid", "received", "settled", "approved", "processed", "success", "successful"].contains(status)
+            let isRejected = ["rejected", "cancelled", "declined", "failed"].contains(status)
+            let payoutStatus: PayoutStatus = isCompleted ? .completed : (isRejected ? .rejected : .requested)
             
             // 1. Extract Trader Split percentage/ratio
             let splitPercentVal: Double? = {
@@ -2317,7 +2382,7 @@ public final class The5ersService: ObservableObject {
             }()
             
             let feeVal: Double = {
-                if let f = fields["fee"] ?? fields["fees"] ?? fields["transferfee"] ?? fields["transfer_fee"] {
+                if let f = fields["fee"] ?? fields["fees"] ?? fields["transferfee"] ?? fields["transfer_fee"] ?? fields["commission"] {
                     if let n = f as? NSNumber { return n.doubleValue }
                     if let s = f as? String, let d = Double(s.trimmingCharacters(in: .whitespaces)) { return d }
                 }
@@ -2325,42 +2390,27 @@ public final class The5ersService: ObservableObject {
             }()
             let feeMinor = Int64(round(feeVal * 100))
             
-            let hasExplicitSplit = (fields["usershare"] != nil || fields["splitpercent"] != nil || fields["split_percent"] != nil)
+            let effectiveSplit = splitPercentVal ?? 80.0
+            let ratio = effectiveSplit > 1.0 ? (effectiveSplit / 100.0) : effectiveSplit
+            let splitBps = Int(round(ratio * 10000.0))
             
             let netReceivedMinor: Int64
             let grossMinor: Int64
-            let splitBps: Int
             
             if let en = explicitNet {
                 netReceivedMinor = Int64(round(en * 100))
                 if let eg = explicitGross, eg >= en {
                     grossMinor = Int64(round(eg * 100))
-                    splitBps = grossMinor > 0 ? Int(round(Double(netReceivedMinor) * 10000.0 / Double(grossMinor))) : 10000
-                } else if let sp = splitPercentVal, sp > 0 && sp <= 100 {
-                    let ratio = sp > 1.0 ? (sp / 100.0) : sp
-                    grossMinor = Int64(round(Double(netReceivedMinor) / ratio))
-                    splitBps = Int(round(ratio * 10000.0))
                 } else {
-                    grossMinor = netReceivedMinor
-                    splitBps = 10000
+                    grossMinor = Int64(round(Double(netReceivedMinor) / ratio))
                 }
-            } else if let eg = explicitGross, hasExplicitSplit, let sp = splitPercentVal, sp > 0 {
+            } else if let eg = explicitGross {
                 grossMinor = Int64(round(eg * 100))
-                splitBps = Int(round(sp > 1.0 ? sp * 100 : sp * 10000))
                 netReceivedMinor = max(0, Int64((Double(grossMinor) * Double(splitBps) + 5000) / 10000) - feeMinor)
             } else if let ga = genericAmount {
-                netReceivedMinor = Int64(round(ga * 100))
-                if let eg = explicitGross, eg >= ga {
-                    grossMinor = Int64(round(eg * 100))
-                    splitBps = grossMinor > 0 ? Int(round(Double(netReceivedMinor) * 10000.0 / Double(grossMinor))) : 10000
-                } else if let sp = splitPercentVal, sp > 0 && sp <= 100 {
-                    let ratio = sp > 1.0 ? (sp / 100.0) : sp
-                    grossMinor = Int64(round(Double(netReceivedMinor) / ratio))
-                    splitBps = Int(round(ratio * 10000.0))
-                } else {
-                    grossMinor = netReceivedMinor
-                    splitBps = 10000
-                }
+                // In The5ers history, 'amount' is the gross profit payout requested!
+                grossMinor = Int64(round(ga * 100))
+                netReceivedMinor = max(0, Int64((Double(grossMinor) * Double(splitBps) + 5000) / 10000) - feeMinor)
             } else {
                 continue
             }
@@ -2391,12 +2441,19 @@ public final class The5ersService: ObservableObject {
             let cleanAcc = (primaryAccId ?? "the5ers").cleanAccountId
             
             // Stable deterministic key matching payouts.ts:21-36 payoutKey:
-            // sha256([accountId, requestedAt ?? date, currency, amount])
-            let stablePayoutHash = JournalIds.sha256Hex([cleanAcc, dateStr, currency, netReceivedMinor])
+            // sha256([accountId, requestedAt ?? date, currency, grossMinor])
+            let stablePayoutHash = JournalIds.sha256Hex([cleanAcc, dateStr, currency, grossMinor])
             let payoutEntryId = "the5ers_payout_\(stablePayoutHash)"
             let rcptId = "the5ers_rcpt_\(stablePayoutHash)"
             let canonicalId = PropFirmEngine.canonicalPayoutId(stablePayoutHash)
             let shortRef = !rawId.isEmpty && !rawId.contains("opaque") ? "Payout #\(rawId.prefix(8))" : "Payout #\(stablePayoutHash.prefix(8))"
+            
+            // Mark the corresponding prop account as funded program
+            if let pAccIdx = dataStore.propAccounts.firstIndex(where: { $0.id == primaryAccId || TradeDataStore.isSameAccountId($0.id, primaryAccId ?? "") }) {
+                if dataStore.propAccounts[pAccIdx].program == .evaluation {
+                    dataStore.propAccounts[pAccIdx].program = .funded
+                }
+            }
             
             if let existingIdx = dataStore.propEntries.firstIndex(where: {
                 $0.id == payoutEntryId ||
@@ -2417,7 +2474,7 @@ public final class The5ersService: ObservableObject {
                     feeMinor: feeMinor,
                     occurredOn: dateStr,
                     dueOn: existing.dueOn,
-                    status: isCompleted ? .completed : .requested,
+                    status: payoutStatus,
                     parentId: existing.parentId,
                     reference: existing.reference.isEmpty ? shortRef : existing.reference,
                     notes: existing.notes.isEmpty ? "The5ers Official Withdrawal" : existing.notes,
@@ -2439,7 +2496,7 @@ public final class The5ersService: ObservableObject {
                     splitBps: splitBps,
                     feeMinor: feeMinor,
                     occurredOn: dateStr,
-                    status: isCompleted ? .completed : .requested,
+                    status: payoutStatus,
                     reference: shortRef,
                     notes: "The5ers Official Withdrawal"
                 )

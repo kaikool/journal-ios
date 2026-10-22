@@ -380,70 +380,25 @@ extension TradeDataStore {
     }
     
     /// Audits and cleans up legacy corrupted The5ers records:
-    /// - Purges fake payout entries and receipts accidentally created for evaluation/verification accounts or from account dicts
-    /// - Purges fake purchase entries accidentally created from account dicts
+    /// - Purges test records accidentally created with "opaque" IDs from old builds
     /// - Enforces zero Net P&L on all open / unclosed positions
     /// - Deduplicates and aligns all The5ers trades
     public func cleanupLegacyThe5ersCorruptions() {
-        let nonFundedPropIds = Set(propAccounts.filter {
-            let prog = $0.program.rawValue.lowercased()
-            return !prog.contains("funded") && !prog.contains("live")
-        }.flatMap { [$0.id, $0.id.cleanAccountId, $0.id.the5ersCanonicalId, $0.journalAccountId ?? ""] }.filter { !$0.isEmpty })
-        
-        let hasFundedAccount = accounts.contains(where: {
-            let name = $0.name.lowercased()
-            return name.contains("funded") || name.contains("live") || name.contains("instant")
-        }) || propAccounts.contains(where: {
-            let prog = $0.program.rawValue.lowercased()
-            let name = $0.name.lowercased()
-            return prog.contains("funded") || prog.contains("live") || prog.contains("instant") || name.contains("funded") || name.contains("live")
-        })
-        
-        // 1. Remove fake payout entries and receipts on evaluation accounts
-        let invalidPayoutEntryIds = Set(propEntries.filter { entry in
-            guard entry.firm == "The5ers" && entry.kind == "payout" else { return false }
-            if !hasFundedAccount { return true }
-            if let accId = entry.accountId {
-                if nonFundedPropIds.contains(accId) { return true }
-                if let acc = accounts.first(where: { TradeDataStore.isSameAccountId($0.id, accId) }) {
-                    let accLower = acc.name.lowercased()
-                    if accLower.contains("evaluation") || accLower.contains("step 1") || accLower.contains("phase 1") || accLower.contains("eval") {
-                        return true
-                    }
-                }
-            } else {
-                return true
-            }
-            if entry.id.contains("opaque") || entry.reference.contains("opaque") { return true }
-            return false
-        }.map { $0.id })
-        
-        if !invalidPayoutEntryIds.isEmpty {
-            propEntries.removeAll(where: { invalidPayoutEntryIds.contains($0.id) })
-            propReceipts.removeAll(where: { invalidPayoutEntryIds.contains($0.payoutId) || invalidPayoutEntryIds.contains($0.id) })
-            AppLogger.info("Cleaned up \(invalidPayoutEntryIds.count) invalid payout records on evaluation accounts.")
-        }
-        
-        // 2. Remove fake purchase entries created from raw account dicts
-        let allKnownAccountIds = Set(accounts.flatMap { [$0.id, $0.id.cleanAccountId] } + propAccounts.flatMap { [$0.id, $0.id.cleanAccountId] })
+        // 1. Remove ONLY invalid test records with "opaque" IDs from old buggy builds
         propEntries.removeAll(where: { entry in
-            guard entry.firm == "The5ers" && entry.kind == "expense" else { return false }
-            if entry.id.contains("opaque") { return true }
-            for accId in allKnownAccountIds where !accId.isEmpty {
-                if entry.id == "the5ers_purchase_\(accId)" || entry.reference.contains(accId) {
-                    return true
-                }
-            }
-            return false
+            entry.firm == "The5ers" && (entry.id.contains("opaque") || entry.reference.contains("opaque"))
+        })
+        propReceipts.removeAll(where: { rcpt in
+            rcpt.id.contains("opaque") || rcpt.payoutId.contains("opaque") || rcpt.reference.contains("opaque")
         })
         
-        // 3. Remove orphaned receipts that don't match any active entry
+        // 2. Remove orphaned receipts that don't match any active entry
         let activeEntryIds = Set(propEntries.map { $0.id })
         propReceipts.removeAll(where: { rcpt in
             rcpt.id.hasPrefix("the5ers_") && !activeEntryIds.contains(rcpt.payoutId)
         })
         
-        // 4. Ensure open/unclosed trades strictly have zero Net P&L and are not counted in closed analytics
+        // 3. Ensure open/unclosed trades strictly have zero Net P&L and are not counted in closed analytics
         for i in 0..<trades.count {
             if trades[i].status == .open || trades[i].closedAt == nil {
                 trades[i].status = .open
@@ -474,9 +429,10 @@ extension TradeDataStore {
         
         for entry in sortedEntries {
             let canonId = PropFirmEngine.canonicalPayoutId(entry.id)
+            let refKey = entry.reference.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
             let semantic = entry.kind == "payout" ?
-                "\(entry.firm.lowercased())|payout|\(entry.amountMinor)|\(entry.occurredOn)" :
-                "\(entry.firm.lowercased())|\(entry.kind.lowercased())|\(entry.currency.uppercased())|\(entry.amountMinor)|\(entry.occurredOn)"
+                "\(entry.firm.lowercased())|payout|\(entry.amountMinor)|\(entry.occurredOn)|\(refKey)" :
+                "\(entry.firm.lowercased())|\(entry.kind.lowercased())|\(entry.currency.uppercased())|\(entry.amountMinor)|\(entry.occurredOn)|\(refKey)"
             
             if seenIds.contains(entry.id) {
                 continue
@@ -557,6 +513,7 @@ extension TradeDataStore {
             })
             if !hasEntry {
                 let payoutEntryId = rcpt.payoutId.isEmpty ? "the5ers_payout_\(rcpt.id)" : rcpt.payoutId
+                let grossMinor = Int64(round(Double(rcpt.amountMinor) / 0.8))
                 let newEntry = PropEntryItem(
                     id: payoutEntryId,
                     accountId: nil,
@@ -564,7 +521,7 @@ extension TradeDataStore {
                     kind: "payout",
                     category: "payout",
                     currency: "USD",
-                    amountMinor: rcpt.amountMinor,
+                    amountMinor: grossMinor,
                     splitBps: 8000,
                     feeMinor: 0,
                     occurredOn: rcpt.occurredOn,

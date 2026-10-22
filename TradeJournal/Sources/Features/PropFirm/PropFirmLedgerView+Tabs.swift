@@ -9,7 +9,7 @@ extension PropFirmLedgerView {
         VStack(spacing: 16) {
             // Renewal Reminders Banner
             let upcomingRenewals = dataStore.propAccounts.filter {
-                $0.currency == selectedCurrency && !$0.archived && $0.status == .active && $0.renewalOn != nil && $0.renewalMinor != nil
+                (selectedCurrency == "ALL" || $0.currency == selectedCurrency) && !$0.archived && $0.status == .active && $0.renewalOn != nil && $0.renewalMinor != nil
             }
             if !upcomingRenewals.isEmpty {
                 VStack(spacing: 8) {
@@ -310,15 +310,26 @@ extension PropFirmLedgerView {
     internal func accountCashSummary(account: PropAccountItem) -> CashSummaryResult {
         let accClean = account.id.cleanAccountId
         let accCurr = account.currency.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        let totalFirmAccounts = dataStore.propAccounts.filter { $0.firm.lowercased() == account.firm.lowercased() }
+        let isOnlyAccountForFirm = totalFirmAccounts.count == 1
+        
         let accMovements = movements.filter { mov in
             let movCurr = mov.currency.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
             guard movCurr == accCurr || (movCurr.isEmpty && (accCurr == "USD" || accCurr.isEmpty)) else { return false }
-            guard let mAccId = mov.accountId, !mAccId.isEmpty else { return false }
-            return mAccId == account.id ||
-                   mAccId == account.journalAccountId ||
-                   TradeDataStore.isSameAccountId(mAccId, account.id) ||
-                   (account.journalAccountId.map { TradeDataStore.isSameAccountId(mAccId, $0) } ?? false) ||
-                   mAccId.cleanAccountId == accClean
+            
+            if let mAccId = mov.accountId, !mAccId.isEmpty {
+                return mAccId == account.id ||
+                       mAccId == account.journalAccountId ||
+                       TradeDataStore.isSameAccountId(mAccId, account.id) ||
+                       (account.journalAccountId.map { TradeDataStore.isSameAccountId(mAccId, $0) } ?? false) ||
+                       mAccId.cleanAccountId == accClean
+            }
+            
+            // Fallback: If movement has no account ID, but this is the only account for this firm, attribute it
+            if isOnlyAccountForFirm && mov.firm.lowercased() == account.firm.lowercased() {
+                return true
+            }
+            return false
         }
         return (try? PropFirmEngine.cashSummary(rows: accMovements)) ?? CashSummaryResult(
             spentMinor: 0, refundsMinor: 0, netSpendMinor: 0, receivedMinor: 0, netMinor: 0, roi: nil
