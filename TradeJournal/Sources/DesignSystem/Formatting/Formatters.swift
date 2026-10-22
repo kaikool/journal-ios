@@ -385,6 +385,30 @@ public enum Formatters {
         return components.joined(separator: " · ")
     }
     
+    /// Produces a concise account label tailored for tight navigation bars (e.g. "HighStakes #123456" or "cTrader #7657")
+    public static func compactAccountName(_ raw: String) -> String {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "Account" }
+        
+        let cleaned = cleanAccountName(trimmed)
+        let parts = cleaned.components(separatedBy: " · ")
+        
+        // If clean format is: [Title, Size, #Number]
+        if parts.count >= 3 {
+            let title = parts[0]
+            let num = parts[parts.count - 1]
+            let shortTitle = title.replacingOccurrences(of: " Phase 1", with: "")
+                                  .replacingOccurrences(of: " Phase 2", with: "")
+                                  .replacingOccurrences(of: " Evaluation", with: "")
+                                  .replacingOccurrences(of: " Verification", with: "")
+            return "\(shortTitle) \(num)"
+        } else if parts.count == 2 {
+            return "\(parts[0]) \(parts[1])"
+        }
+        
+        return cleaned
+    }
+    
     /// Formats technical UUIDs, SHA256 hashes, or internal database keys into clean references
     public static func formatReference(_ ref: String) -> String {
         let trimmed = ref.trimmingCharacters(in: .whitespacesAndNewlines)

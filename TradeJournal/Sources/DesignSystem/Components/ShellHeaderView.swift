@@ -13,10 +13,10 @@ public struct ShellHeaderView: View {
     
     private var currentAccountName: String {
         if let acc = dataStore.accounts.first(where: { $0.id == dataStore.selectedAccountId || TradeDataStore.isSameAccountId($0.id, dataStore.selectedAccountId) }) {
-            return Formatters.cleanAccountName(acc.name, balance: acc.initialBalance)
+            return Formatters.compactAccountName(acc.name)
         }
         if let first = dataStore.visibleAccounts.first {
-            return Formatters.cleanAccountName(first.name, balance: first.initialBalance)
+            return Formatters.compactAccountName(first.name)
         }
         return "Trading Account"
     }
@@ -141,6 +141,8 @@ public struct ShellHeaderView: View {
                     .font(.system(size: 12, weight: .semibold, design: .rounded))
                     .foregroundColor(AppColors.primaryText)
                     .lineLimit(1)
+                    .truncationMode(.tail)
+                    .frame(maxWidth: 130)
                 
                 Image(systemName: "chevron.down")
                     .font(.system(size: 8, weight: .bold))
