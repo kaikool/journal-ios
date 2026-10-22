@@ -918,16 +918,6 @@ public final class The5ersService: ObservableObject {
                     startingBalance: resolvedStartBal,
                     createdAt: createdAt,
                     profitAndLoss: accProfitAndLoss ?? accTotalNetProfit,
-                    label: cleanLabel,
-                    platform: platform,
-                    balance: bal,
-                    equity: eq,
-                    currency: curr,
-                    status: status,
-                    program: prog,
-                    startingBalance: resolvedStartBal,
-                    createdAt: createdAt,
-                    profitAndLoss: accProfitAndLoss ?? accTotalNetProfit,
                     dailyProfitAndLoss: accDailyProfitAndLoss,
                     unrealized: accUnrealized,
                     totalNetProfit: accTotalNetProfit ?? accProfitAndLoss,
@@ -1902,8 +1892,10 @@ public final class The5ersService: ObservableObject {
             let amountMinor = Int64(round(priceNum * 100))
             
             let orderRef = String(describing: fields["ref"] ?? fields["id"] ?? fields["orderid"] ?? fields["order_id"] ?? fields["purchaseid"] ?? fields["purchase_id"] ?? "")
-            let entryId = !orderRef.isEmpty ? "the5ers_purchase_\(orderRef)" : "the5ers_purchase_\(JournalIds.sha256Hex([rawDate, currency, title]))"
-            let shortRef = !orderRef.isEmpty ? "Order #\(orderRef.prefix(8))" : "Order #\(JournalIds.sha256Hex([rawDate, currency, title]).prefix(8))"
+            let title = itemNames.isEmpty ? (fields["name"] as? String ?? "The5ers Program Evaluation") : itemNames.joined(separator: ", ")
+            let purchaseHash = JournalIds.sha256Hex([rawDate, currency, title])
+            let entryId = !orderRef.isEmpty ? "the5ers_purchase_\(orderRef)" : "the5ers_purchase_\(purchaseHash)"
+            let shortRef = !orderRef.isEmpty && !orderRef.contains("opaque") ? "Order #\(orderRef.prefix(8))" : "Order #\(purchaseHash.prefix(8))"
             
             // Normalize category matching EXPENSE_CATEGORIES: "evaluation", "reset", "activation", etc.
             let normalizedCategory: String = {
@@ -1933,7 +1925,7 @@ public final class The5ersService: ObservableObject {
             
             if let existingIdx = dataStore.propEntries.firstIndex(where: {
                 $0.id == entryId ||
-                (!orderId.isEmpty && !orderId.contains("opaque") && ($0.id.contains(orderId) || $0.reference.contains(orderId))) ||
+                (!orderRef.isEmpty && !orderRef.contains("opaque") && ($0.id.contains(orderRef) || $0.reference.contains(orderRef))) ||
                 ($0.firm == "The5ers" && $0.kind == "expense" && $0.occurredOn == dateStr && $0.amountMinor == amountMinor && $0.currency == currency)
             }) {
                 var existing = dataStore.propEntries[existingIdx]
@@ -2267,7 +2259,7 @@ public final class The5ersService: ObservableObject {
             let dateStr = fmt.string(from: parsedDate)
             
             let payAccRef = String(describing: fields["accountref"] ?? fields["accountid"] ?? fields["ref"] ?? "")
-            let matchedAcc = fundedAccounts.first(where: {
+            let matchedAcc = candidateAccounts.first(where: {
                 $0.id == payAccRef || $0.ref == payAccRef || "the5ers_\($0.id)" == payAccRef || $0.id.cleanAccountId == payAccRef.cleanAccountId || $0.ref.cleanAccountId == payAccRef.cleanAccountId
             })
             let primaryAccId: String? = {
@@ -2277,7 +2269,7 @@ public final class The5ersService: ObservableObject {
                 if !payAccRef.isEmpty && !payAccRef.contains("opaque") {
                     return payAccRef.hasPrefix("the5ers_") ? payAccRef : "the5ers_\(payAccRef)"
                 }
-                return fundedAccounts.first?.id
+                return candidateAccounts.first?.id
             }()
             let currency = String(describing: fields["currency"] ?? matchedAcc?.currency ?? "USD").uppercased()
             
