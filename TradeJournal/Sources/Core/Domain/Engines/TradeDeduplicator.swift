@@ -47,17 +47,17 @@ public enum TradeDeduplicator {
     // MARK: - Trades
     
     public static func tradeSemanticKey(for trade: Trade) -> String {
-        let cleanAcc = trade.accountId.cleanAccountId
         let openSec = Int64(trade.openedAt.timeIntervalSince1970.rounded())
         let qtyStr = NSDecimalNumber(decimal: trade.quantity).stringValue
         let entryStr = NSDecimalNumber(decimal: trade.avgEntry).stringValue
         let symbol = AssetContractEngine.canonicalSymbol(trade.symbol)
-        return "\(cleanAcc)|\(symbol)|\(trade.direction.rawValue)|\(openSec)|\(qtyStr)|\(entryStr)"
+        return "\(symbol)|\(trade.direction.rawValue)|\(openSec)|\(qtyStr)|\(entryStr)"
     }
     
-    /// Removes duplicate trades. Trades carrying annotations win over bare ones.
+    /// Removes duplicate trades. Trades carrying annotations and stable IDs win over bare ones.
+    /// Incorporates a 1-second tolerance so slight timestamp differences between syncs collapse into one entry.
     public static func deduplicate(_ trades: [Trade]) -> [Trade] {
-        // Prioritize trades that contain notes, tags, executionIds, or non-zero P&L
+        // Prioritize trades that contain notes, tags, executionIds, stable canonical account IDs, or non-zero P&L
         let sorted = trades.sorted { a, b in
             score(a) > score(b)
         }
@@ -70,12 +70,20 @@ public enum TradeDeduplicator {
             if seenKeys.contains(trade.key) {
                 continue
             }
-            let semantic = tradeSemanticKey(for: trade)
-            if seenSemantics.contains(semantic) {
+            let openSec = Int64(trade.openedAt.timeIntervalSince1970.rounded())
+            let qtyStr = NSDecimalNumber(decimal: trade.quantity).stringValue
+            let entryStr = NSDecimalNumber(decimal: trade.avgEntry).stringValue
+            let symbol = AssetContractEngine.canonicalSymbol(trade.symbol)
+            let baseSemantic = "\(symbol)|\(trade.direction.rawValue)"
+            let exactKey = "\(baseSemantic)|\(openSec)|\(qtyStr)|\(entryStr)"
+            let prevSecKey = "\(baseSemantic)|\(openSec - 1)|\(qtyStr)|\(entryStr)"
+            let nextSecKey = "\(baseSemantic)|\(openSec + 1)|\(qtyStr)|\(entryStr)"
+            
+            if seenSemantics.contains(exactKey) || seenSemantics.contains(prevSecKey) || seenSemantics.contains(nextSecKey) {
                 continue
             }
             seenKeys.insert(trade.key)
-            seenSemantics.insert(semantic)
+            seenSemantics.insert(exactKey)
             cleaned.append(trade)
         }
         
@@ -83,6 +91,10 @@ public enum TradeDeduplicator {
     }
     
     private static func score(_ trade: Trade) -> Int {
-        (trade.notes != nil ? 1 : 0) + (!trade.tags.isEmpty ? 1 : 0) + (trade.netPnl != 0 ? 2 : 0) + trade.executionCount
+        let hasNotes = trade.notes != nil && trade.notes?.isEmpty == false ? 2 : 0
+        let hasTags = !trade.tags.isEmpty ? 1 : 0
+        let hasPnl = trade.netPnl != 0 ? 2 : 0
+        let isStableAcc = !trade.accountId.contains("opaque") ? 2 : 0
+        return hasNotes + hasTags + hasPnl + isStableAcc + trade.executionCount
     }
 }

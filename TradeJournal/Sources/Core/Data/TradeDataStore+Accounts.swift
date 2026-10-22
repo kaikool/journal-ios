@@ -352,10 +352,87 @@ extension TradeDataStore {
             (the5ersAccountIds.contains(trade.accountId) || trade.accountId.hasPrefix("the5ers_") || trade.tags.contains("the5ers")) && !trade.key.hasPrefix("the5ers_")
         })
 
+        cleanupLegacyThe5ersCorruptions()
         deduplicateExecutions()
         deduplicateTrades()
         deduplicatePropEntries()
         deduplicatePropReceipts()
+    }
+    
+    /// Audits and cleans up legacy corrupted The5ers records:
+    /// - Purges fake payout entries and receipts accidentally created for evaluation/verification accounts or from account dicts
+    /// - Purges fake purchase entries accidentally created from account dicts
+    /// - Enforces zero Net P&L on all open / unclosed positions
+    /// - Deduplicates and aligns all The5ers trades
+    public func cleanupLegacyThe5ersCorruptions() {
+        let nonFundedPropIds = Set(propAccounts.filter {
+            let prog = $0.program.rawValue.lowercased()
+            return !prog.contains("funded") && !prog.contains("live")
+        }.flatMap { [$0.id, $0.id.cleanAccountId, $0.id.the5ersCanonicalId, $0.journalAccountId ?? ""] }.filter { !$0.isEmpty })
+        
+        let hasFundedAccount = accounts.contains(where: {
+            let name = $0.name.lowercased()
+            return name.contains("funded") || name.contains("live") || name.contains("instant")
+        }) || propAccounts.contains(where: {
+            let prog = $0.program.rawValue.lowercased()
+            let name = $0.name.lowercased()
+            return prog.contains("funded") || prog.contains("live") || prog.contains("instant") || name.contains("funded") || name.contains("live")
+        })
+        
+        // 1. Remove fake payout entries and receipts on evaluation accounts
+        let invalidPayoutEntryIds = Set(propEntries.filter { entry in
+            guard entry.firm == "The5ers" && entry.kind == "payout" else { return false }
+            if !hasFundedAccount { return true }
+            if let accId = entry.accountId {
+                if nonFundedPropIds.contains(accId) { return true }
+                if let acc = accounts.first(where: { TradeDataStore.isSameAccountId($0.id, accId) }) {
+                    let accLower = acc.name.lowercased()
+                    if accLower.contains("evaluation") || accLower.contains("step 1") || accLower.contains("phase 1") || accLower.contains("eval") {
+                        return true
+                    }
+                }
+            } else {
+                return true
+            }
+            if entry.id.contains("opaque") || entry.reference.contains("opaque") { return true }
+            return false
+        }.map { $0.id })
+        
+        if !invalidPayoutEntryIds.isEmpty {
+            propEntries.removeAll(where: { invalidPayoutEntryIds.contains($0.id) })
+            propReceipts.removeAll(where: { invalidPayoutEntryIds.contains($0.payoutId) || invalidPayoutEntryIds.contains($0.id) })
+            AppLogger.info("Cleaned up \(invalidPayoutEntryIds.count) invalid payout records on evaluation accounts.")
+        }
+        
+        // 2. Remove fake purchase entries created from raw account dicts
+        let allKnownAccountIds = Set(accounts.flatMap { [$0.id, $0.id.cleanAccountId] } + propAccounts.flatMap { [$0.id, $0.id.cleanAccountId] })
+        propEntries.removeAll(where: { entry in
+            guard entry.firm == "The5ers" && entry.kind == "expense" else { return false }
+            if entry.id.contains("opaque") { return true }
+            for accId in allKnownAccountIds where !accId.isEmpty {
+                if entry.id == "the5ers_purchase_\(accId)" || entry.reference.contains(accId) {
+                    return true
+                }
+            }
+            return false
+        })
+        
+        // 3. Remove orphaned receipts that don't match any active entry
+        let activeEntryIds = Set(propEntries.map { $0.id })
+        propReceipts.removeAll(where: { rcpt in
+            rcpt.id.hasPrefix("the5ers_") && !activeEntryIds.contains(rcpt.payoutId)
+        })
+        
+        // 4. Ensure open/unclosed trades strictly have zero Net P&L and are not counted in closed analytics
+        for i in 0..<trades.count {
+            if trades[i].status == .open || trades[i].closedAt == nil {
+                trades[i].status = .open
+                trades[i].netPnl = 0
+                trades[i].grossPnl = 0
+                trades[i].fees = 0
+                trades[i].openQuantity = trades[i].quantity
+            }
+        }
     }
     
     /// Deduplicates propEntries by ID and semantic signature (firm, kind, currency, amount, date, account)

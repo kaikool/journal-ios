@@ -224,6 +224,7 @@ extension TradeDataStore {
             }
         }
         
+        deduplicateAndCleanAccounts()
         refreshActiveAccountCache()
         invalidatePerformanceCaches()
     }

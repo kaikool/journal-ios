@@ -687,7 +687,6 @@ public final class The5ersService: ObservableObject {
                 let curr = String(describing: item["currency"] ?? "USD")
                 let status = String(describing: item["status"] ?? "active")
                 let prog = String(describing: item["type"] ?? item["accountType"] ?? item["program"] ?? "funded")
-                var startBal = Decimal(string: String(describing: item["startingBalance"] ?? item["initial_balance"] ?? bal)) ?? bal
                 let platform = String(describing: item["tradingPlatform"] ?? item["platform"] ?? item["tradingSystem"] ?? "MT5")
                 let createdAt = item["createdAt"] as? String ?? item["creationDate"] as? String ?? item["created_at"] as? String
                 
@@ -709,6 +708,25 @@ public final class The5ersService: ObservableObject {
                     }
                 }()
                 
+                // Authoritative initial capital detection (docs/the5ers.md:12: Never substitute current balance for starting capital)
+                var explicitStartBal: Decimal? = nil
+                let startCandidates: [Any?] = [
+                    item["startingBalance"],
+                    item["initialBalance"],
+                    item["initial_balance"],
+                    item["starting_balance"],
+                    item["accountSize"],
+                    item["account_size"],
+                    item["nominalBalance"]
+                ]
+                for cand in startCandidates {
+                    if let num = cand as? NSNumber, num.doubleValue > 0 {
+                        explicitStartBal = Decimal(string: num.stringValue); break
+                    } else if let s = cand as? String, let dec = Decimal(string: s.trimmingCharacters(in: .whitespaces)), dec > 0 {
+                        explicitStartBal = dec; break
+                    }
+                }
+                
                 // Query Authoritative Balance & Initial Balance from official the5ers_account.balance
                 let balArgs: [String: Any] = [
                     "operation": "balance",
@@ -719,8 +737,8 @@ public final class The5ersService: ObservableObject {
                    !(bRes["isError"] as? Bool ?? false) {
                     let uBal = unwrapMcpToolResult(bRes)
                     if let bDict = (uBal as? [String: Any])?["data"] as? [String: Any] ?? uBal as? [String: Any] {
-                        if let initB = sourceNumber(bDict["initialBalance"] ?? bDict["baseBalance"]), initB > 0 {
-                            startBal = initB
+                        if let initB = sourceNumber(bDict["initialBalance"] ?? bDict["baseBalance"] ?? bDict["startingBalance"]), initB > 0 {
+                            explicitStartBal = initB
                         }
                         if let cb = sourceNumber(bDict["balance"]), cb > 0 {
                             bal = cb
@@ -731,14 +749,31 @@ public final class The5ersService: ObservableObject {
                     }
                 }
                 
+                // Resolve standard prop tier from metadata (e.g. 50K evaluation account)
+                let resolvedStartBal: Decimal? = {
+                    if let ex = explicitStartBal, ex > 0 { return ex }
+                    let combined = "\(label.lowercased()) \(prog.lowercased())"
+                    if combined.contains("50k") || combined.contains("50,000") || combined.contains("50000") { return 50000 }
+                    if combined.contains("100k") || combined.contains("100,000") || combined.contains("100000") { return 100000 }
+                    if combined.contains("25k") || combined.contains("25,000") || combined.contains("25000") { return 25000 }
+                    if combined.contains("10k") || combined.contains("10,000") || combined.contains("10000") { return 10000 }
+                    if combined.contains("5k") || combined.contains("5,000") || combined.contains("5000") { return 5000 }
+                    if combined.contains("60k") || combined.contains("60,000") || combined.contains("60000") { return 60000 }
+                    if combined.contains("200k") || combined.contains("200,000") || combined.contains("200000") { return 200000 }
+                    if combined.contains("20k") || combined.contains("20,000") || combined.contains("20000") { return 20000 }
+                    if bal >= 40000 && bal <= 55000 { return 50000 }
+                    if bal >= 80000 && bal <= 110000 { return 100000 }
+                    return nil
+                }()
+                
                 let defaultName = Self.the5ersDefaultName(
                     from: item,
                     fallbackLabel: label,
                     platform: platform,
-                    startingBalance: startBal,
+                    startingBalance: resolvedStartBal,
                     balance: bal
                 )
-                let cleanLabel = defaultName.isEmpty ? Formatters.cleanAccountName(label, balance: startBal) : defaultName
+                let cleanLabel = defaultName.isEmpty ? Formatters.cleanAccountName(label, balance: resolvedStartBal) : defaultName
                 
                 accountsList.append(The5ersMcpAccount(
                     id: stableId,
@@ -750,7 +785,7 @@ public final class The5ersService: ObservableObject {
                     currency: curr,
                     status: status,
                     program: prog,
-                    startingBalance: startBal,
+                    startingBalance: resolvedStartBal,
                     createdAt: createdAt
                 ))
             }
@@ -852,10 +887,11 @@ public final class The5ersService: ObservableObject {
                     (accountNumber != nil && ($0.id.cleanAccountId == accountNumber! || $0.name.contains(accountNumber!)))
                 }) {
                     var old = dataStore.accounts[accIdx]
+                    old.name = acc.label
                     old.broker = "The5ers"
                     old.currency = acc.currency
-                    if old.initialBalance == 0 || (acc.startingBalance ?? 0) > 0 {
-                        old.initialBalance = acc.startingBalance ?? acc.balance
+                    if let sb = acc.startingBalance, sb > 0 {
+                        old.initialBalance = sb
                     }
                     old.autoSync = isActive
                     old.lastSyncAt = Date()
@@ -868,7 +904,7 @@ public final class The5ersService: ObservableObject {
                         broker: "The5ers",
                         kind: .sync,
                         currency: acc.currency,
-                        initialBalance: acc.startingBalance ?? acc.balance,
+                        initialBalance: acc.startingBalance ?? (acc.balance > 0 ? acc.balance : 50000),
                         autoSync: isActive,
                         archivedAt: nil,
                         visibleInJournal: true,
@@ -941,11 +977,11 @@ public final class The5ersService: ObservableObject {
                 }
             }
             
-            // 4. Sync purchases / challenges & evaluation fees across all tools and accounts
-            await syncPurchases(into: dataStore, targetAccounts: allTargetAccounts, rawAccounts: rawAccountsList)
+            // 4. Sync purchases / challenges & evaluation fees across official MCP tools
+            await syncPurchases(into: dataStore, targetAccounts: allTargetAccounts)
             
-            // 5. Sync payouts & withdrawal settlements across ALL accounts
-            await syncPayouts(into: dataStore, targetAccounts: allTargetAccounts, rawAccounts: rawAccountsList)
+            // 5. Sync payouts & withdrawal settlements strictly for funded accounts
+            await syncPayouts(into: dataStore, targetAccounts: allTargetAccounts)
             
             lastSyncTime = Date()
             dataStore.rebuildAllAccounts()
@@ -1078,34 +1114,37 @@ public final class The5ersService: ObservableObject {
             return nil
         }
         
+        // 1:1 with source-repo/apps/web/src/lib/the5ers-normalize.ts:144:
+        // Explicit closed/open boolean status is required. Naive statuses are never guessed.
         let closedFlag = firstValue(in: row, keys: ["isclosed", "closed", "isclose"])
-        let rawStatusField = String(describing: firstValue(in: row, keys: ["status", "state"]) ?? "").lowercased()
-        let isClosedByStatus = rawStatusField == "closed" || rawStatusField == "win" || rawStatusField == "loss"
-        let isClosed = sourceBoolean(closedFlag) ?? (isClosedByStatus || row["closedate"] != nil || row["exit"] != nil || row["closetime"] != nil || row["closeprice"] != nil)
-        
-        let closeKeys = ["closedate", "closedat", "closetime", "close_date", "closedatetime", "exittime", "exitdate", "timeclose", "time_close"]
-        let closeVal = firstValue(in: row, keys: closeKeys)
-        var closedAtTuple = isClosed ? sourceInstant(closeVal) : nil
-        
-        let exitKeys = ["exit", "closeprice", "exitprice", "close_price", "price", "closedprice", "outprice"]
-        let exitVal = firstValue(in: row, keys: exitKeys)
-        var exit = isClosed ? sourceNumber(exitVal) : nil
-        
-        if isClosed {
-            if closedAtTuple == nil {
-                closedAtTuple = (openedAtIso, openedAtDate)
-            }
-            if exit == nil {
-                exit = entry
-            }
+        guard let isClosed = sourceBoolean(closedFlag) else {
+            return nil
         }
         
-        let pnlKeys = ["profitandloss", "netpnl", "net_pnl", "realizedpnl", "net", "profit", "pnl", "gross"]
-        let pnlVal = firstValue(in: row, keys: pnlKeys)
-        let netPnl = isClosed ? (sourceNumber(pnlVal) ?? 0) : 0
+        let closedAtTuple: (iso: String, date: Date)?
+        let exit: Decimal?
+        let netPnl: Decimal
         
-        if let cl = closedAtTuple, cl.date < openedAtDate {
-            return nil
+        if isClosed {
+            let closeKeys = ["closedate", "closedat", "closetime", "close_date", "closedatetime", "exittime", "exitdate", "timeclose", "time_close"]
+            let closeVal = firstValue(in: row, keys: closeKeys)
+            guard let cl = sourceInstant(closeVal) else { return nil }
+            guard cl.date >= openedAtDate else { return nil }
+            closedAtTuple = cl
+            
+            let exitKeys = ["exit", "closeprice", "exitprice", "close_price", "closedprice", "outprice"]
+            let exitVal = firstValue(in: row, keys: exitKeys)
+            guard let ex = sourceNumber(exitVal) else { return nil }
+            exit = ex
+            
+            let pnlKeys = ["profitandloss", "netpnl", "net_pnl", "realizedpnl", "net", "profit", "pnl", "gross"]
+            let pnlVal = firstValue(in: row, keys: pnlKeys)
+            guard let pnl = sourceNumber(pnlVal) else { return nil }
+            netPnl = pnl
+        } else {
+            closedAtTuple = nil
+            exit = nil
+            netPnl = 0
         }
         
         let provKeys = ["positionid", "ticket", "id", "dealid", "positionref"]
@@ -1250,14 +1289,12 @@ public final class The5ersService: ObservableObject {
                 return Int64(closedDate.timeIntervalSince(position.openedAtDate) * 1000)
             }()
             
-            let cleanAcc = targetAccId.cleanAccountId
             let openSec = Int64(position.openedAtDate.timeIntervalSince1970)
             let existingIdx = dataStore.trades.firstIndex(where: {
                 $0.key == tradeKey ||
-                ($0.accountId.cleanAccountId == cleanAcc &&
-                 $0.symbol.uppercased() == position.symbol.uppercased() &&
+                ($0.symbol.uppercased() == position.symbol.uppercased() &&
                  $0.direction == position.direction &&
-                 abs(Int64($0.openedAt.timeIntervalSince1970) - openSec) <= 2 &&
+                 abs(Int64($0.openedAt.timeIntervalSince1970) - openSec) <= 3 &&
                  abs($0.quantity - position.quantity) < 0.001)
             })
             
@@ -1347,14 +1384,15 @@ public final class The5ersService: ObservableObject {
             }
         }
         
-        var accountSize: Decimal? = startingBalance ?? balance
+        // 1:1 with source-repo/apps/web/src/lib/the5ers-name.ts:25-35:
+        // Current balance is never substituted for initial capital/size in account names
+        var accountSize: Decimal? = (startingBalance != nil && startingBalance != balance) ? startingBalance : nil
         let sizeCandidates: [Any?] = [
             fields["accountsize"],
             fields["startingbalance"],
             fields["initialbalance"],
             fields["nominalbalance"],
-            fields["size"],
-            fields["balance"]
+            fields["size"]
         ]
         for cand in sizeCandidates {
             if let num = cand as? NSNumber, num.doubleValue > 0 {
@@ -1478,26 +1516,15 @@ public final class The5ersService: ObservableObject {
     @MainActor
     private func syncPurchases(
         into dataStore: TradeDataStore,
-        targetAccounts: [The5ersMcpAccount],
-        rawAccounts: [[String: Any]] = []
+        targetAccounts: [The5ersMcpAccount]
     ) async {
         lastStatus = "Loading purchases and evaluation fees from the5ers_purchase..."
         var allPurchases: [[String: Any]] = []
         var seenPurchaseIds = Set<String>()
         
-        // 1. Extract any purchases embedded inside raw account records
-        for rawAcc in rawAccounts {
-            let accRef = String(describing: rawAcc["ref"] ?? rawAcc["account_ref"] ?? rawAcc["id"] ?? "")
-            let embedded = extractAnyPurchaseCollection(from: rawAcc)
-            for var p in embedded {
-                if p["account_ref"] == nil && !accRef.isEmpty { p["account_ref"] = accRef }
-                let pId = String(describing: p["id"] ?? p["orderid"] ?? p["order_id"] ?? p["purchaseid"] ?? p["ref"] ?? UUID().uuidString)
-                if !seenPurchaseIds.contains(pId) {
-                    seenPurchaseIds.insert(pId)
-                    allPurchases.append(p)
-                }
-            }
-        }
+        // 1:1 with source-repo/apps/web/src/lib/the5ers-normalize.ts and docs/the5ers.md:48-52:
+        // Purchases are ONLY retrieved from the dedicated official the5ers_purchase MCP tool.
+        // Never extract purchases from raw trading account records.
         
         // 2. Query official the5ers_purchase operation 'list'
         let purchaseArgsList: [[String: Any]] = [
@@ -1673,14 +1700,9 @@ public final class The5ersService: ObservableObject {
         let keys = Set(dict.keys.map { $0.lowercased().replacingOccurrences(of: "_", with: "") })
         let hasAmount = keys.contains("amount") || keys.contains("payoutamount") || keys.contains("netamount") ||
                         keys.contains("grossamount") || keys.contains("grossprofit") || keys.contains("receivedamount") ||
-                        keys.contains("withdrawalamount") || keys.contains("paidamount") || keys.contains("netpaid") ||
-                        keys.contains("tradershare") || keys.contains("profit") || keys.contains("split") ||
-                        keys.contains("profitsplit") || keys.contains("tradersplit")
-        let hasIdentity = keys.contains("id") || keys.contains("payoutid") || keys.contains("withdrawalid") ||
-                          keys.contains("requestid") || keys.contains("reference") || keys.contains("ref") ||
-                          keys.contains("status") || keys.contains("date") || keys.contains("createdat") ||
-                          keys.contains("processedat") || keys.contains("placedat")
-        return hasAmount && hasIdentity
+                        keys.contains("withdrawalamount") || keys.contains("paidamount") || keys.contains("netpaid")
+        let hasIdentity = keys.contains("payoutid") || keys.contains("withdrawalid") || keys.contains("requestid")
+        return hasAmount && (hasIdentity || keys.contains("paymentdate") || keys.contains("settledat"))
     }
     
     private func extractAnyPayoutCollection(from unwrapped: Any?) -> [[String: Any]] {
@@ -1733,34 +1755,30 @@ public final class The5ersService: ObservableObject {
     @MainActor
     private func syncPayouts(
         into dataStore: TradeDataStore,
-        targetAccounts: [The5ersMcpAccount],
-        rawAccounts: [[String: Any]] = []
+        targetAccounts: [The5ersMcpAccount]
     ) async {
         lastStatus = "Loading withdrawal and payout history from the5ers_payout..."
         
-        var allRawPayouts: [[String: Any]] = []
-        var seenPayoutIds = Set<String>()
-        
-        // 1. Extract any payouts embedded inside raw account objects
-        for rawAcc in rawAccounts {
-            let accRef = String(describing: rawAcc["ref"] ?? rawAcc["account_ref"] ?? rawAcc["id"] ?? "")
-            let accCurr = String(describing: rawAcc["currency"] ?? "USD")
-            let embedded = extractAnyPayoutCollection(from: rawAcc)
-            for var p in embedded {
-                if p["account_ref"] == nil && !accRef.isEmpty { p["account_ref"] = accRef }
-                if p["currency"] == nil { p["currency"] = accCurr }
-                let pId = String(describing: p["id"] ?? p["payout_id"] ?? p["withdrawalid"] ?? UUID().uuidString)
-                if !seenPayoutIds.contains(pId) {
-                    seenPayoutIds.insert(pId)
-                    allRawPayouts.append(p)
-                }
-            }
+        // 1:1 with source-repo/apps/web/src/server/the5ers/payouts.ts lines 121-131:
+        // Payouts strictly belong to funded accounts (program is funded, instant_funded, or live).
+        // Evaluation / challenge / verification accounts NEVER receive payouts.
+        let fundedAccounts = targetAccounts.filter { acc in
+            let prog = acc.program.trimmingCharacters(in: .whitespaces).lowercased()
+            let label = acc.label.trimmingCharacters(in: .whitespaces).lowercased()
+            return prog.contains("funded") || prog.contains("live") || prog.contains("instant") ||
+                   label.contains("funded") || label.contains("live") || label.contains("instant")
         }
         
-        // 2. Query official the5ers_payout operations for target accounts
+        guard !fundedAccounts.isEmpty else {
+            AppLogger.info("No funded The5ers accounts discovered (\(targetAccounts.count) accounts are in evaluation/challenge phase). Skipping payout query.")
+            return
+        }
+        
+        var allRawPayouts: [[String: Any]] = []
+        var seenPayoutIds = Set<String>()
         var accountSplitMap: [String: Double] = [:]
         
-        for acc in targetAccounts {
+        for acc in fundedAccounts {
             if Task.isCancelled { break }
             
             // A. Query 'eligibility' for userPayoutPercentage (e.g. 80.0, 85.0)
@@ -1842,10 +1860,18 @@ public final class The5ersService: ObservableObject {
             
             if !historyPayouts.isEmpty {
                 for p in historyPayouts {
-                    allRawPayouts.append(p)
+                    let pId = String(describing: p["id"] ?? p["payout_id"] ?? p["withdrawalid"] ?? UUID().uuidString)
+                    if !seenPayoutIds.contains(pId) {
+                        seenPayoutIds.insert(pId)
+                        allRawPayouts.append(p)
+                    }
                 }
             } else if let latest = latestPayoutDict {
-                allRawPayouts.append(latest)
+                let pId = String(describing: latest["id"] ?? latest["payout_id"] ?? latest["withdrawalid"] ?? UUID().uuidString)
+                if !seenPayoutIds.contains(pId) {
+                    seenPayoutIds.insert(pId)
+                    allRawPayouts.append(latest)
+                }
             }
         }
         
@@ -1853,9 +1879,11 @@ public final class The5ersService: ObservableObject {
             let fields = sourceFields(pay)
             let rawId = String(describing: fields["id"] ?? fields["payoutid"] ?? fields["withdrawalid"] ?? fields["requestid"] ?? fields["ref"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             
-            let status = String(describing: fields["status"] ?? "completed").lowercased().trimmingCharacters(in: .whitespaces)
+            let status = String(describing: fields["status"] ?? "").lowercased().trimmingCharacters(in: .whitespaces)
             let isReversed = (fields["reversed"] as? Bool) == true
-            let isCompleted = ["completed", "paid", "received", "settled", "approved", "processed", "successful", "done", "transferred"].contains(status) || status.isEmpty
+            // 1:1 with payouts.ts:67: status MUST be one of completed, paid, received, settled, or approved
+            let isCompleted = ["completed", "paid", "received", "settled", "approved", "processed"].contains(status)
+            guard isCompleted && !isReversed else { continue }
             
             // 1. Extract Trader Split percentage/ratio
             let splitPercentVal: Double? = {
@@ -1969,7 +1997,7 @@ public final class The5ersService: ObservableObject {
             let dateStr = fmt.string(from: parsedDate)
             
             let payAccRef = String(describing: fields["accountref"] ?? fields["accountid"] ?? fields["ref"] ?? "")
-            let matchedAcc = targetAccounts.first(where: {
+            let matchedAcc = fundedAccounts.first(where: {
                 $0.id == payAccRef || $0.ref == payAccRef || "the5ers_\($0.id)" == payAccRef || $0.id.cleanAccountId == payAccRef.cleanAccountId || $0.ref.cleanAccountId == payAccRef.cleanAccountId
             })
             let primaryAccId: String? = {
@@ -1979,7 +2007,7 @@ public final class The5ersService: ObservableObject {
                 if !payAccRef.isEmpty && !payAccRef.contains("opaque") {
                     return payAccRef.hasPrefix("the5ers_") ? payAccRef : "the5ers_\(payAccRef)"
                 }
-                return targetAccounts.first?.id
+                return fundedAccounts.first?.id
             }()
             let currency = String(describing: fields["currency"] ?? matchedAcc?.currency ?? "USD").uppercased()
             
