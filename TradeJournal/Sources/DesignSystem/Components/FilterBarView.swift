@@ -25,6 +25,9 @@ public enum JournalTimeRange: String, CaseIterable, Identifiable {
     
     public var id: String { rawValue }
     
+    /// User selectable time ranges (excluding "ALL" per user requirements)
+    public static let selectableCases: [JournalTimeRange] = [.d7, .d30, .d90, .ytd]
+    
     /// Ported 1:1 from `apps/web/src/components/filter-bar.tsx` useFilters:
     /// Returns `(from: String?, to: String?)` date strings in `YYYY-MM-DD` format according to the given timezone.
     public func dayBounds(timeZone: TimeZone = .current, referenceDate: Date = Date()) -> (from: String?, to: String?) {
@@ -199,22 +202,6 @@ public struct FilterBarView<Actions: View>: View {
     
     private var accountSelectorMenu: some View {
         Menu {
-            Button {
-                #if os(iOS)
-                UISelectionFeedbackGenerator().selectionChanged()
-                #endif
-                dataStore.selectAccount(id: "all")
-            } label: {
-                HStack {
-                    Text("All accounts (\(dataStore.visibleAccounts.count))")
-                    if dataStore.selectedAccountId == "all" {
-                        Image(systemName: "checkmark")
-                    }
-                }
-            }
-            
-            Divider()
-            
             ForEach(dataStore.visibleAccounts) { acc in
                 Button {
                     #if os(iOS)
@@ -275,7 +262,7 @@ public struct FilterBarView<Actions: View>: View {
     
     private var timeRangeSelector: some View {
         HStack(spacing: 2) {
-            ForEach(JournalTimeRange.allCases) { range in
+            ForEach(JournalTimeRange.selectableCases) { range in
                 Button {
                     if selectedRange != range {
                         #if os(iOS)
@@ -397,13 +384,14 @@ public struct FilterBarView<Actions: View>: View {
     }
     
     private var currentAccountName: String {
-        if dataStore.selectedAccountId == "all" {
-            return "All accounts (\(dataStore.visibleAccounts.count))"
-        }
-        if let acc = dataStore.accounts.first(where: { $0.id == dataStore.selectedAccountId }) {
+        if let acc = dataStore.accounts.first(where: { $0.id == dataStore.selectedAccountId || TradeDataStore.isSameAccountId($0.id, dataStore.selectedAccountId) }) {
             let title = acc.name.isEmpty ? "\(acc.broker.isEmpty ? "Standard" : acc.broker) Account" : acc.name
             return Formatters.cleanAccountName(title, balance: acc.initialBalance)
         }
-        return "All accounts (\(dataStore.visibleAccounts.count))"
+        if let first = dataStore.visibleAccounts.first {
+            let title = first.name.isEmpty ? "\(first.broker.isEmpty ? "Standard" : first.broker) Account" : first.name
+            return Formatters.cleanAccountName(title, balance: first.initialBalance)
+        }
+        return "Trading Account"
     }
 }
