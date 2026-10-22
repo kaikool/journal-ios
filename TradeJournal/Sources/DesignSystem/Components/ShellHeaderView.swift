@@ -12,6 +12,9 @@ public struct ShellHeaderView: View {
     public init() {}
     
     private var currentAccountName: String {
+        if dataStore.selectedAccountId == "all" {
+            return "All Accounts"
+        }
         if let acc = dataStore.accounts.first(where: { $0.id == dataStore.selectedAccountId || TradeDataStore.isSameAccountId($0.id, dataStore.selectedAccountId) }) {
             return Formatters.compactAccountName(acc.name)
         }
@@ -108,6 +111,22 @@ public struct ShellHeaderView: View {
     
     private var accountSelectorMenu: some View {
         Menu {
+            Button {
+                #if os(iOS)
+                UISelectionFeedbackGenerator().selectionChanged()
+                #endif
+                dataStore.selectAccount(id: "all")
+            } label: {
+                HStack {
+                    Text("All Accounts")
+                    if dataStore.selectedAccountId == "all" {
+                        Image(systemName: "checkmark")
+                    }
+                }
+            }
+            
+            Divider()
+            
             ForEach(dataStore.visibleAccounts) { acc in
                 Button {
                     #if os(iOS)

@@ -1271,10 +1271,6 @@ public final class The5ersService: ObservableObject {
             var importedPositionsCount = 0
             for (idx, acc) in accountsToSyncPositions.enumerated() {
                 if Task.isCancelled || isCancelledByUser { break }
-                // Skip positions query for accounts confirmed by official statistics to have 0 trades
-                if let tradesCount = acc.totalTrades, tradesCount == 0 {
-                    continue
-                }
                 lastStatus = "Syncing trades (\(idx + 1)/\(accountsToSyncPositions.count)): \(acc.label)..."
                 await Task.yield()
                 
@@ -1289,13 +1285,41 @@ public final class The5ersService: ObservableObject {
                 ]
                 
                 do {
-                    let posResult = try await callMcpTool(name: "the5ers_positions", arguments: posArgs)
+                    var posResult = try await callMcpTool(name: "the5ers_positions", arguments: posArgs)
                     if let isErr = posResult["isError"] as? Bool, isErr {
-                        AppLogger.error("The5ers MCP reported error for account \(acc.label) (\(acc.id)): \(posResult)")
-                        continue
+                        // Resilient retry without request_context
+                        let fbArgs: [String: Any] = [
+                            "operation": "list",
+                            "account_ref": acc.ref,
+                            "view": "all",
+                            "contract_version": "1.0"
+                        ]
+                        if let fbRes = try? await callMcpTool(name: "the5ers_positions", arguments: fbArgs),
+                           !(fbRes["isError"] as? Bool ?? false) {
+                            posResult = fbRes
+                        } else {
+                            AppLogger.error("The5ers MCP reported error for account \(acc.label) (\(acc.id)): \(posResult)")
+                            // Check embedded positions in raw account record
+                            if let rawAcc = rawAccountsList.first(where: { ($0["ref"] as? String) == acc.ref || ($0["account_ref"] as? String) == acc.ref || ($0["id"] as? String) == acc.id }) {
+                                let embeddedPos = extractMcpCollection(rawAcc, collectionKey: "positions")
+                                if !embeddedPos.isEmpty {
+                                    mergePositions(embeddedPos, for: acc, into: dataStore, count: &importedPositionsCount)
+                                }
+                            }
+                            continue
+                        }
                     }
                     let unwrappedPos = unwrapMcpToolResult(posResult)
-                    let rawPositions = extractMcpCollection(unwrappedPos, collectionKey: "positions")
+                    var rawPositions = extractMcpCollection(unwrappedPos, collectionKey: "positions")
+                    if rawPositions.isEmpty {
+                        // Check embedded positions in raw account record
+                        if let rawAcc = rawAccountsList.first(where: { ($0["ref"] as? String) == acc.ref || ($0["account_ref"] as? String) == acc.ref || ($0["id"] as? String) == acc.id }) {
+                            let embeddedPos = extractMcpCollection(rawAcc, collectionKey: "positions")
+                            if !embeddedPos.isEmpty {
+                                rawPositions = embeddedPos
+                            }
+                        }
+                    }
                     mergePositions(rawPositions, for: acc, into: dataStore, count: &importedPositionsCount)
                     
                     // Paginate if full page returned or pagination indicates more
@@ -1328,24 +1352,18 @@ public final class The5ersService: ObservableObject {
             if Task.isCancelled || isCancelledByUser { throw CancellationError() }
             
             // 4. Sync purchases / challenges & evaluation fees across official MCP tools
-            await syncPurchases(into: dataStore, targetAccounts: allTargetAccounts)
+            await syncPurchases(into: dataStore, targetAccounts: allTargetAccounts, rawAccounts: rawAccountsList)
             
             if Task.isCancelled || isCancelledByUser { throw CancellationError() }
             
             // 5. Sync payouts & withdrawal settlements strictly for funded accounts
-            await syncPayouts(into: dataStore, targetAccounts: allTargetAccounts)
+            await syncPayouts(into: dataStore, targetAccounts: allTargetAccounts, rawAccounts: rawAccountsList)
             
             lastSyncTime = Date()
             dataStore.rebuildAllAccounts()
             
             if dataStore.selectedAccountId == "default-acc" || dataStore.selectedAccountId.isEmpty {
-                if let activeAcc = dataStore.mostRecentActiveAccount {
-                    dataStore.selectAccount(id: activeAcc.id)
-                } else if let firstWithTrade = dataStore.accounts.first(where: { acc in dataStore.trades.contains(where: { $0.accountId == acc.id }) }) {
-                    dataStore.selectAccount(id: firstWithTrade.id)
-                } else {
-                    dataStore.selectAccount(id: "all")
-                }
+                dataStore.selectAccount(id: "all")
             }
             
             dataStore.saveToDisk(immediate: true)
@@ -1966,95 +1984,69 @@ public final class The5ersService: ObservableObject {
     @MainActor
     private func syncPurchases(
         into dataStore: TradeDataStore,
-        targetAccounts: [The5ersMcpAccount]
+        targetAccounts: [The5ersMcpAccount],
+        rawAccounts: [[String: Any]] = []
     ) async {
         lastStatus = "Loading purchases and evaluation fees from the5ers_purchase..."
         var allPurchases: [[String: Any]] = []
         var seenPurchaseIds = Set<String>()
         
-        // 1. Fetch paginated orders from official the5ers_purchase 'list'
-        var page = 1
-        while page <= 10 {
-            if Task.isCancelled || isCancelledByUser { break }
-            let pArgs: [String: Any] = [
-                "operation": "list",
-                "contract_version": "1.0",
-                "page": page,
-                "limit": 50
-            ]
-            guard let res = try? await callMcpTool(name: "the5ers_purchase", arguments: pArgs),
-                  !(res["isError"] as? Bool ?? false) else { break }
-            let unwrapped = unwrapMcpToolResult(res)
-            let rows = extractAnyPurchaseCollection(from: unwrapped)
-            if rows.isEmpty { break }
-            for r in rows {
-                let pId = String(describing: r["ref"] ?? r["id"] ?? r["orderid"] ?? r["order_id"] ?? r["purchaseid"] ?? UUID().uuidString)
+        // 1. Extract any purchases embedded inside raw account records
+        for rawAcc in rawAccounts {
+            let accRef = String(describing: rawAcc["ref"] ?? rawAcc["account_ref"] ?? rawAcc["id"] ?? "")
+            let embedded = extractAnyPurchaseCollection(from: rawAcc)
+            for var p in embedded {
+                if p["account_ref"] == nil && !accRef.isEmpty { p["account_ref"] = accRef }
+                let pId = String(describing: p["ref"] ?? p["id"] ?? p["orderid"] ?? p["order_id"] ?? p["purchaseid"] ?? UUID().uuidString)
                 if !seenPurchaseIds.contains(pId) {
                     seenPurchaseIds.insert(pId)
-                    allPurchases.append(r)
-                }
-            }
-            if let dict = unwrapped as? [String: Any],
-               let pagination = dict["pagination"] as? [String: Any],
-               let hasMore = pagination["has_more"] as? Bool,
-               !hasMore {
-                break
-            }
-            if rows.count < 50 { break }
-            page += 1
-        }
-        
-        // Fallback without pagination parameters if paginated query was empty
-        if allPurchases.isEmpty {
-            let fallbackArgsList: [[String: Any]] = [
-                ["operation": "list", "contract_version": "1.0", "limit": 50],
-                ["operation": "list"]
-            ]
-            for pArgs in fallbackArgsList {
-                if Task.isCancelled || isCancelledByUser { break }
-                if let res = try? await callMcpTool(name: "the5ers_purchase", arguments: pArgs),
-                   !(res["isError"] as? Bool ?? false) {
-                    let unwrapped = unwrapMcpToolResult(res)
-                    let rows = extractAnyPurchaseCollection(from: unwrapped)
-                    if !rows.isEmpty {
-                        for r in rows {
-                            let pId = String(describing: r["ref"] ?? r["id"] ?? r["orderid"] ?? r["order_id"] ?? r["purchaseid"] ?? UUID().uuidString)
-                            if !seenPurchaseIds.contains(pId) {
-                                seenPurchaseIds.insert(pId)
-                                allPurchases.append(r)
-                            }
-                        }
-                        break
-                    }
+                    allPurchases.append(p)
                 }
             }
         }
         
-        // 2. Concurrently query 'accounts' for each order reference to map directly to created accounts
-        await withTaskGroup(of: (Int, String?).self) { group in
-            for i in allPurchases.indices {
-                let pRef = String(describing: allPurchases[i]["ref"] ?? allPurchases[i]["purchase_ref"] ?? allPurchases[i]["id"] ?? "")
-                let existingAccRef = String(describing: allPurchases[i]["account_ref"] ?? "")
-                if !pRef.isEmpty && existingAccRef.isEmpty {
-                    group.addTask {
-                        if let accRes = try? await self.callMcpTool(name: "the5ers_purchase", arguments: [
-                            "operation": "accounts",
-                            "purchase_ref": pRef,
-                            "contract_version": "1.0"
-                        ]), !(accRes["isError"] as? Bool ?? false) {
-                            let unwrappedAcc = self.unwrapMcpToolResult(accRes)
-                            let accRows = self.extractMcpCollection(unwrappedAcc, collectionKey: "accounts")
-                            if let firstAcc = accRows.first, let createdRef = firstAcc["account_ref"] ?? firstAcc["ref"] {
-                                return (i, String(describing: createdRef))
-                            }
+        // 2. Fetch orders from official the5ers_purchase 'list'
+        let pArgsList: [[String: Any]] = [
+            ["operation": "list", "contract_version": "1.0", "limit": 50],
+            ["operation": "list"]
+        ]
+        for pArgs in pArgsList {
+            if Task.isCancelled || isCancelledByUser { break }
+            if let res = try? await callMcpTool(name: "the5ers_purchase", arguments: pArgs),
+               !(res["isError"] as? Bool ?? false) {
+                let unwrapped = unwrapMcpToolResult(res)
+                let rows = extractAnyPurchaseCollection(from: unwrapped)
+                if !rows.isEmpty {
+                    for r in rows {
+                        let pId = String(describing: r["ref"] ?? r["id"] ?? r["orderid"] ?? r["order_id"] ?? r["purchaseid"] ?? UUID().uuidString)
+                        if !seenPurchaseIds.contains(pId) {
+                            seenPurchaseIds.insert(pId)
+                            allPurchases.append(r)
                         }
-                        return (i, nil)
                     }
+                    break
                 }
             }
-            for await (idx, createdRef) in group {
-                if let createdRef = createdRef {
-                    allPurchases[idx]["account_ref"] = createdRef
+        }
+        
+        // 3. Resiliently associate orders with accounts if account_ref is missing
+        var unmappedLookupCount = 0
+        for i in allPurchases.indices {
+            if unmappedLookupCount >= 8 { break }
+            let pRef = String(describing: allPurchases[i]["ref"] ?? allPurchases[i]["purchase_ref"] ?? allPurchases[i]["id"] ?? "")
+            let existingAccRef = String(describing: allPurchases[i]["account_ref"] ?? "")
+            if !pRef.isEmpty && existingAccRef.isEmpty {
+                unmappedLookupCount += 1
+                if let accRes = try? await self.callMcpTool(name: "the5ers_purchase", arguments: [
+                    "operation": "accounts",
+                    "purchase_ref": pRef,
+                    "contract_version": "1.0"
+                ]), !(accRes["isError"] as? Bool ?? false) {
+                    let unwrappedAcc = self.unwrapMcpToolResult(accRes)
+                    let accRows = self.extractMcpCollection(unwrappedAcc, collectionKey: "accounts")
+                    if let firstAcc = accRows.first, let createdRef = firstAcc["account_ref"] ?? firstAcc["ref"] {
+                        allPurchases[i]["account_ref"] = String(describing: createdRef)
+                    }
                 }
             }
         }
@@ -2292,20 +2284,44 @@ public final class The5ersService: ObservableObject {
     @MainActor
     private func syncPayouts(
         into dataStore: TradeDataStore,
-        targetAccounts: [The5ersMcpAccount]
+        targetAccounts: [The5ersMcpAccount],
+        rawAccounts: [[String: Any]] = []
     ) async {
         lastStatus = "Loading withdrawal and payout history from the5ers_payout..."
-        
-        // Query official payouts across target accounts (eligibility / history)
-        let candidateAccounts = targetAccounts
-        
-        guard !candidateAccounts.isEmpty else {
-            return
-        }
         
         var allRawPayouts: [[String: Any]] = []
         var seenPayoutIds = Set<String>()
         var accountSplitMap: [String: Double] = [:]
+        
+        // 1. Extract any payouts embedded inside raw account objects
+        for rawAcc in rawAccounts {
+            let accRef = String(describing: rawAcc["ref"] ?? rawAcc["account_ref"] ?? rawAcc["id"] ?? "")
+            let accCurr = String(describing: rawAcc["currency"] ?? "USD")
+            let embedded = extractAnyPayoutCollection(from: rawAcc)
+            for var p in embedded {
+                if p["account_ref"] == nil && !accRef.isEmpty { p["account_ref"] = accRef }
+                if p["currency"] == nil { p["currency"] = accCurr }
+                let pId = String(describing: p["id"] ?? p["payout_id"] ?? p["withdrawalid"] ?? UUID().uuidString)
+                if !seenPayoutIds.contains(pId) {
+                    seenPayoutIds.insert(pId)
+                    allRawPayouts.append(p)
+                }
+            }
+        }
+        
+        // 2. Query official payouts across target accounts (eligibility / explain / history)
+        let fundedAccounts = targetAccounts.filter { acc in
+            let prog = acc.program.lowercased()
+            let label = acc.label.lowercased()
+            let stat = acc.status.lowercased()
+            return prog.contains("fund") || prog.contains("live") || prog.contains("master") ||
+                   label.contains("fund") || label.contains("live") || stat.contains("fund")
+        }
+        let candidateAccounts = fundedAccounts.isEmpty ? targetAccounts : fundedAccounts
+        
+        guard !candidateAccounts.isEmpty || !allRawPayouts.isEmpty else {
+            return
+        }
         
         for acc in candidateAccounts {
             if Task.isCancelled || isCancelledByUser { break }

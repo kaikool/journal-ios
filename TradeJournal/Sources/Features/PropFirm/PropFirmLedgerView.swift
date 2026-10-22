@@ -114,7 +114,7 @@ public struct PropFirmLedgerView: View {
     }
     
     var passRate: Double? {
-        PropFirmEngine.resolvedPhasePassRate(accounts: filteredAccounts)
+        PropFirmEngine.resolvedPhasePassRate(accounts: dataStore.propAccounts)
     }
     
     public var body: some View {
