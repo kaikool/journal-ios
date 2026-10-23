@@ -2180,7 +2180,8 @@ public final class The5ersService: ObservableObject {
                 }
                 tradesModified = true
             }
-            
+        }
+        
         if tradesModified {
             dataStore.trades = localTrades
         }
