@@ -452,8 +452,10 @@ extension TradeDataStore {
             propEntries = localEntries
         }
         
-        // 5. Ensure all The5ers PropAccountItems have complete program rules & trade stats
+        // 5. Ensure all The5ers PropAccountItems have complete program rules, realized Net P&L, & reconciled trade stats
         var propsModified = false
+        var tradesReconciled = false
+        var currentTrades = trades
         var localProps = propAccounts
         let dayFmt = DateFormatter()
         dayFmt.dateFormat = "yyyy-MM-dd"
@@ -464,6 +466,9 @@ extension TradeDataStore {
             var p = localProps[i]
             var changed = false
             let sizeMinor = p.sizeMinor ?? 0
+            let settledPayoutsMinor = propEntries
+                .filter { $0.firm == "The5ers" && $0.kind == "payout" && $0.status == "settled" && $0.accountId != nil && ($0.accountId == p.id || $0.accountId == p.journalAccountId || TradeDataStore.isSameAccountId($0.accountId!, p.id)) }
+                .reduce(Int64(0)) { $0 + $1.netMinor }
             if sizeMinor > 0 {
                 let text = "\(p.name) \(p.currentStepName ?? "") \(p.program.rawValue)".lowercased()
                 let isStep2 = p.program == .verification || text.contains("- 2") || text.contains("step 2") || text.contains("phase 2")
@@ -489,38 +494,98 @@ extension TradeDataStore {
                     p.minTradingDays = 3
                     changed = true
                 }
-                if p.netPnlMinor == nil, let bal = p.balanceMinor, bal > 0 {
-                    p.netPnlMinor = bal - sizeMinor
-                    changed = true
+                if let bal = p.balanceMinor, bal > 0 {
+                    let expectedNetMinor = (bal - sizeMinor) + settledPayoutsMinor
+                    if p.netPnlMinor != expectedNetMinor {
+                        p.netPnlMinor = expectedNetMinor
+                        changed = true
+                    }
                 }
             }
             let targetId = p.journalAccountId ?? p.id
-            let accClosedTrades = trades.filter {
-                $0.symbol != "ACCOUNT" && $0.status != .open && $0.closedAt != nil &&
-                ($0.accountId == targetId || TradeDataStore.isSameAccountId($0.accountId, targetId))
+            let closedIndices = currentTrades.indices.filter { idx in
+                let t = currentTrades[idx]
+                return t.symbol != "ACCOUNT" && t.status != .open && t.closedAt != nil &&
+                       (t.accountId == targetId || TradeDataStore.isSameAccountId(t.accountId, targetId))
             }
-            if !accClosedTrades.isEmpty {
+            if !closedIndices.isEmpty {
+                // Reconcile closed trades' netPnl/grossPnl against authoritative account balance ((balance - size) + settledPayouts)
+                if sizeMinor > 0, let bal = p.balanceMinor, bal > 0 {
+                    let expectedRealizedPnl = Decimal((bal - sizeMinor) + settledPayoutsMinor) / 100
+                    let sumAsIs = closedIndices.reduce(Decimal.zero) { $0 + currentTrades[$1].netPnl }
+                    let diffAsIs = abs(sumAsIs - expectedRealizedPnl)
+                    if diffAsIs > 0.05 {
+                        let sumUndoDouble = closedIndices.reduce(Decimal.zero) { $0 + currentTrades[$1].netPnl + currentTrades[$1].fees - (currentTrades[$1].swap ?? 0) }
+                        let sumRawIsGross = closedIndices.reduce(Decimal.zero) { $0 + currentTrades[$1].netPnl - currentTrades[$1].fees + (currentTrades[$1].swap ?? 0) }
+                        let sumNeedsSwap = closedIndices.reduce(Decimal.zero) { $0 + currentTrades[$1].netPnl + (currentTrades[$1].swap ?? 0) }
+                        let sumNeedsFee = closedIndices.reduce(Decimal.zero) { $0 + currentTrades[$1].netPnl - currentTrades[$1].fees }
+                        let candidates: [(mode: Int, diff: Decimal)] = [
+                            (1, abs(sumUndoDouble - expectedRealizedPnl)),
+                            (2, abs(sumRawIsGross - expectedRealizedPnl)),
+                            (3, abs(sumNeedsSwap - expectedRealizedPnl)),
+                            (4, abs(sumNeedsFee - expectedRealizedPnl))
+                        ]
+                        if let best = candidates.min(by: { $0.diff < $1.diff }),
+                           best.diff <= 0.50 && best.diff < diffAsIs {
+                            for idx in closedIndices {
+                                let fee = currentTrades[idx].fees
+                                let sw = currentTrades[idx].swap ?? 0
+                                let oldNet = currentTrades[idx].netPnl
+                                let newNet: Decimal
+                                switch best.mode {
+                                case 1:
+                                    newNet = oldNet + fee - sw
+                                case 2:
+                                    newNet = oldNet - fee + sw
+                                case 3:
+                                    newNet = oldNet + sw
+                                default:
+                                    newNet = oldNet - fee
+                                }
+                                currentTrades[idx].netPnl = newNet
+                                currentTrades[idx].grossPnl = newNet + fee - sw
+                                let breakevenBand = JournalDefaultsEngine.breakevenThreshold(
+                                    defaults: defaults,
+                                    entryPrice: currentTrades[idx].avgEntry,
+                                    quantity: currentTrades[idx].quantity,
+                                    multiplier: AssetContractEngine.contractMultiplier(
+                                        for: currentTrades[idx].symbol,
+                                        customMultipliers: multipliers
+                                    )
+                                )
+                                if abs(newNet) <= max(breakevenBand, TradeReconstructionEngine.flatEpsilon) {
+                                    currentTrades[idx].status = .breakeven
+                                } else {
+                                    currentTrades[idx].status = newNet > 0 ? .win : .loss
+                                }
+                            }
+                            tradesReconciled = true
+                        }
+                    }
+                }
+                
                 var dailyMap: [String: Decimal] = [:]
-                for t in accClosedTrades {
+                for idx in closedIndices {
+                    let t = currentTrades[idx]
                     let dk = dayFmt.string(from: t.closedAt ?? t.openedAt)
                     dailyMap[dk, default: .zero] += t.netPnl
                 }
                 let td = dailyMap.count
                 let wd = dailyMap.values.filter { $0 > 0 }.count
-                if p.currentTradingDays == nil || (p.currentTradingDays == 0 && td > 0) {
+                if p.currentTradingDays == nil || (p.currentTradingDays == 0 && td > 0) || tradesReconciled {
                     p.currentTradingDays = td
                     changed = true
                 }
-                if p.winningDays == nil || (p.winningDays == 0 && wd > 0) {
+                if p.winningDays == nil || (p.winningDays == 0 && wd > 0) || tradesReconciled {
                     p.winningDays = wd
                     changed = true
                 }
-                if p.totalTrades == nil || (p.totalTrades == 0 && !accClosedTrades.isEmpty) {
-                    p.totalTrades = accClosedTrades.count
+                if p.totalTrades == nil || (p.totalTrades == 0 && !closedIndices.isEmpty) {
+                    p.totalTrades = closedIndices.count
                     changed = true
                 }
                 if p.totalFeesMinor == nil {
-                    let feeSum = accClosedTrades.reduce(Decimal.zero) { $0 + $1.fees }
+                    let feeSum = closedIndices.reduce(Decimal.zero) { $0 + currentTrades[$1].fees }
                     p.totalFeesMinor = NSDecimalNumber(decimal: abs(feeSum) * 100).int64Value
                     changed = true
                 }
@@ -538,6 +603,10 @@ extension TradeDataStore {
                 localProps[i] = p
                 propsModified = true
             }
+        }
+        if tradesReconciled {
+            trades = currentTrades
+            invalidatePerformanceCaches()
         }
         if propsModified {
             propAccounts = localProps

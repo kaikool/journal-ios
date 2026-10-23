@@ -1222,8 +1222,12 @@ public final class The5ersService: ObservableObject {
                     if authoritativeMinTradingDays == nil && !isHyperOrInstant && !isBootcamp {
                         authoritativeMinTradingDays = 3
                     }
-                    if accProfitAndLoss == nil && bal > 0 {
-                        accProfitAndLoss = bal - sb
+                    if bal > 0 {
+                        let journalIdForPayout = stableId.hasPrefix("the5ers_") ? stableId : "the5ers_\(stableId)"
+                        let settledAccountPayouts = dataStore.propEntries
+                            .filter { $0.firm == "The5ers" && $0.kind == "payout" && $0.status == "settled" && $0.accountId != nil && ($0.accountId == journalIdForPayout || TradeDataStore.isSameAccountId($0.accountId!, journalIdForPayout)) }
+                            .reduce(Decimal.zero) { $0 + Decimal($1.netMinor) / 100 }
+                        accProfitAndLoss = (bal - sb) + settledAccountPayouts
                     }
                 }
                 
@@ -1659,14 +1663,20 @@ public final class The5ersService: ObservableObject {
         let journalAccId = acc.id.hasPrefix("the5ers_") ? acc.id : "the5ers_\(acc.id)"
         let isActive = (mappedStatus == .active)
         
+        let balMinor: Int64 = NSDecimalNumber(decimal: acc.balance * 100).int64Value
+        let eqMinor: Int64? = acc.equity.map { NSDecimalNumber(decimal: $0 * 100).int64Value }
+        let settledPayoutsMinor = dataStore.propEntries
+            .filter { $0.firm == "The5ers" && $0.kind == "payout" && $0.status == "settled" && $0.accountId != nil && ($0.accountId == journalAccId || TradeDataStore.isSameAccountId($0.accountId!, journalAccId)) }
+            .reduce(Int64(0)) { $0 + $1.netMinor }
         let pnlMinor: Int64? = {
+            if balMinor > 0 && startingMinor > 0 {
+                return (balMinor - startingMinor) + settledPayoutsMinor
+            }
             if let pnl = acc.profitAndLoss ?? acc.totalNetProfit {
                 return NSDecimalNumber(decimal: pnl * 100).int64Value
             }
             return nil
         }()
-        let balMinor: Int64 = NSDecimalNumber(decimal: acc.balance * 100).int64Value
-        let eqMinor: Int64? = acc.equity.map { NSDecimalNumber(decimal: $0 * 100).int64Value }
         let feesMinor: Int64? = {
             if let f = acc.totalFees {
                 return NSDecimalNumber(decimal: abs(f) * 100).int64Value
@@ -1807,17 +1817,19 @@ public final class The5ersService: ObservableObject {
         lastStatus = "Syncing trades: \(acc.label)..."
         await Task.yield()
         
+        let pageLimit = 50
         let posArgs: [String: Any] = [
             "operation": "list",
             "account_ref": acc.ref,
             "view": "all",
             "page": 1,
-            "limit": 100,
+            "limit": pageLimit,
             "contract_version": "1.0",
             "request_context": ["timezone": "UTC", "locale": "en"]
         ]
         
         do {
+            var activePosArgs = posArgs
             var posResult = try await callMcpTool(name: "the5ers_positions", arguments: posArgs)
             if let isErr = posResult["isError"] as? Bool, isErr {
                 let fbArgs: [String: Any] = [
@@ -1829,6 +1841,7 @@ public final class The5ersService: ObservableObject {
                 if let fbRes = try? await callMcpTool(name: "the5ers_positions", arguments: fbArgs),
                    !(fbRes["isError"] as? Bool ?? false) {
                     posResult = fbRes
+                    activePosArgs = fbArgs
                 } else {
                     if !embeddedPositions.isEmpty {
                         mergePositions(embeddedPositions, for: acc, into: dataStore, count: &importedPositionsCount, replaceAccountPositions: true)
@@ -1851,16 +1864,22 @@ public final class The5ersService: ObservableObject {
                 seenPageFingerprints.insert(firstFp)
             }
             
-            let posPagination = (unwrappedPos as? [String: Any])?["pagination"] as? [String: Any]
-            let initialHasMore = (posPagination?["has_more"] as? Bool) ?? (allPositions.count >= 100)
+            let topDict = unwrappedPos as? [String: Any]
+            let dataDict = topDict?["data"] as? [String: Any]
+            let posPagination = (topDict?["pagination"] as? [String: Any]) ?? (dataDict?["pagination"] as? [String: Any])
+            let totalReported = (posPagination?["total"] as? Int) ?? (posPagination?["total"] as? NSNumber)?.intValue
+            let initialHasMore = (posPagination?["has_more"] as? Bool) ??
+                                 (posPagination?["hasMore"] as? Bool) ??
+                                 (totalReported != nil ? allPositions.count < totalReported! : allPositions.count >= pageLimit)
             
             if initialHasMore {
                 var page = 2
-                while page <= 20 {
+                while page <= 25 {
                     if Task.isCancelled || isCancelledByUser { break }
-                    var pArgs = posArgs
+                    var pArgs = activePosArgs
                     pArgs["page"] = page
-                    guard let nextRes = try? await callMcpTool(name: "the5ers_positions", arguments: pArgs) else { break }
+                    guard let nextRes = try? await callMcpTool(name: "the5ers_positions", arguments: pArgs),
+                          !(nextRes["isError"] as? Bool ?? false) else { break }
                     let nextUnwrapped = unwrapMcpToolResult(nextRes)
                     let nextPositions = extractMcpCollection(nextUnwrapped, collectionKey: "positions")
                     if nextPositions.isEmpty { break }
@@ -1871,8 +1890,13 @@ public final class The5ersService: ObservableObject {
                     if seenPageFingerprints.contains(nextFp) { break }
                     seenPageFingerprints.insert(nextFp)
                     allPositions.append(contentsOf: nextPositions)
-                    let nextPag = (nextUnwrapped as? [String: Any])?["pagination"] as? [String: Any]
-                    let hasMore = (nextPag?["has_more"] as? Bool) ?? (nextPositions.count >= 100)
+                    let nextTop = nextUnwrapped as? [String: Any]
+                    let nextData = nextTop?["data"] as? [String: Any]
+                    let nextPag = (nextTop?["pagination"] as? [String: Any]) ?? (nextData?["pagination"] as? [String: Any])
+                    let nextTotal = (nextPag?["total"] as? Int) ?? (nextPag?["total"] as? NSNumber)?.intValue ?? totalReported
+                    let hasMore = (nextPag?["has_more"] as? Bool) ??
+                                  (nextPag?["hasMore"] as? Bool) ??
+                                  (nextTotal != nil ? allPositions.count < nextTotal! : nextPositions.count >= pageLimit)
                     if !hasMore { break }
                     page += 1
                 }
@@ -1887,7 +1911,7 @@ public final class The5ersService: ObservableObject {
         }
     }
     
-    /// Reconciles account-level statistics (`totalFees`, `tradingDays`, `winningDays`, `totalTrades`) without fabricating synthetic trades or double-deducting fees
+    /// Reconciles account-level statistics (`totalFees`, `tradingDays`, `winningDays`, `totalTrades`) and verifies closed trade P&L against authoritative account balance
     @MainActor
     private func reconcileAccountTradesWithMcp(for acc: The5ersMcpAccount, into dataStore: TradeDataStore) async {
         let journalAccId = acc.id.hasPrefix("the5ers_") ? acc.id : "the5ers_\(acc.id)"
@@ -1921,7 +1945,7 @@ public final class The5ersService: ObservableObject {
                    t.status != .open && t.closedAt != nil
         }
         
-        // Only if individual positions omitted fee (sum == 0) while `account.statistics.totalFees` reported non-zero fees,
+        // 1. Only if individual positions omitted fee (sum == 0) while `account.statistics.totalFees` reported non-zero fees,
         // distribute authoritative `totalFees` across closed trades by quantity (never modifying `netPnl` per docs/the5ers.md:24).
         if !closedIndices.isEmpty {
             let currentFeeSum = closedIndices.reduce(Decimal.zero) { $0 + localTrades[$1].fees }
@@ -1944,6 +1968,66 @@ public final class The5ersService: ObservableObject {
                     localTrades[idx].grossPnl = localTrades[idx].netPnl + share - (localTrades[idx].swap ?? 0)
                 }
                 tradesModified = true
+            }
+            
+            // 2. Cross-verify sum of closed trades' netPnl against authoritative realized account P&L ((balance - startingBalance) + settledPayouts)
+            if let sb = acc.startingBalance, sb > 0, acc.balance > 0 {
+                let settledPayouts = dataStore.propEntries
+                    .filter { $0.firm == "The5ers" && $0.kind == "payout" && $0.status == "settled" && $0.accountId != nil && ($0.accountId == journalAccId || $0.accountId == targetAccId || TradeDataStore.isSameAccountId($0.accountId!, targetAccId)) }
+                    .reduce(Decimal.zero) { $0 + Decimal($1.netMinor) / 100 }
+                let expectedRealizedPnl = toReporting((acc.balance - sb) + settledPayouts)
+                let sumAsIs = closedIndices.reduce(Decimal.zero) { $0 + localTrades[$1].netPnl }
+                let diffAsIs = abs(sumAsIs - expectedRealizedPnl)
+                
+                if diffAsIs > 0.05 {
+                    let sumUndoDouble = closedIndices.reduce(Decimal.zero) { $0 + localTrades[$1].netPnl + localTrades[$1].fees - (localTrades[$1].swap ?? 0) }
+                    let sumRawIsGross = closedIndices.reduce(Decimal.zero) { $0 + localTrades[$1].netPnl - localTrades[$1].fees + (localTrades[$1].swap ?? 0) }
+                    let sumNeedsSwap = closedIndices.reduce(Decimal.zero) { $0 + localTrades[$1].netPnl + (localTrades[$1].swap ?? 0) }
+                    let sumNeedsFee = closedIndices.reduce(Decimal.zero) { $0 + localTrades[$1].netPnl - localTrades[$1].fees }
+                    
+                    let candidates: [(mode: Int, diff: Decimal)] = [
+                        (1, abs(sumUndoDouble - expectedRealizedPnl)),
+                        (2, abs(sumRawIsGross - expectedRealizedPnl)),
+                        (3, abs(sumNeedsSwap - expectedRealizedPnl)),
+                        (4, abs(sumNeedsFee - expectedRealizedPnl))
+                    ]
+                    if let best = candidates.min(by: { $0.diff < $1.diff }),
+                       best.diff <= 0.50 && best.diff < diffAsIs {
+                        for idx in closedIndices {
+                            let fee = localTrades[idx].fees
+                            let sw = localTrades[idx].swap ?? 0
+                            let oldNet = localTrades[idx].netPnl
+                            let newNet: Decimal
+                            switch best.mode {
+                            case 1:
+                                newNet = oldNet + fee - sw
+                            case 2:
+                                newNet = oldNet - fee + sw
+                            case 3:
+                                newNet = oldNet + sw
+                            default:
+                                newNet = oldNet - fee
+                            }
+                            localTrades[idx].netPnl = newNet
+                            localTrades[idx].grossPnl = newNet + fee - sw
+                            let breakevenBand = JournalDefaultsEngine.breakevenThreshold(
+                                defaults: dataStore.defaults,
+                                entryPrice: localTrades[idx].avgEntry,
+                                quantity: localTrades[idx].quantity,
+                                multiplier: AssetContractEngine.contractMultiplier(
+                                    for: localTrades[idx].symbol,
+                                    customMultipliers: dataStore.multipliers
+                                )
+                            )
+                            if abs(newNet) <= max(breakevenBand, TradeReconstructionEngine.flatEpsilon) {
+                                localTrades[idx].status = .breakeven
+                            } else {
+                                localTrades[idx].status = newNet > 0 ? .win : .loss
+                            }
+                        }
+                        tradesModified = true
+                    }
+                }
             }
         }
         

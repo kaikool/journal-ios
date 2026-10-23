@@ -48,10 +48,13 @@ public enum TradeDeduplicator {
     
     public static func tradeSemanticKey(for trade: Trade) -> String {
         let openSec = Int64(trade.openedAt.timeIntervalSince1970.rounded())
+        let closedSec = trade.closedAt.map { Int64($0.timeIntervalSince1970.rounded()) } ?? 0
         let qtyStr = NSDecimalNumber(decimal: trade.quantity).stringValue
         let entryStr = NSDecimalNumber(decimal: trade.avgEntry).stringValue
+        let exitStr = trade.avgExit.map { NSDecimalNumber(decimal: $0).stringValue } ?? "open"
+        let pnlStr = NSDecimalNumber(decimal: trade.netPnl).stringValue
         let symbol = AssetContractEngine.canonicalSymbol(trade.symbol)
-        return "\(symbol)|\(trade.direction.rawValue)|\(openSec)|\(qtyStr)|\(entryStr)"
+        return "\(symbol)|\(trade.direction.rawValue)|\(openSec)|\(closedSec)|\(qtyStr)|\(entryStr)|\(exitStr)|\(pnlStr)"
     }
     
     /// Removes duplicate trades. Trades carrying annotations and stable IDs win over bare ones.
@@ -75,20 +78,29 @@ public enum TradeDeduplicator {
                 continue
             }
             
-            let openSec = Int64(trade.openedAt.timeIntervalSince1970.rounded())
-            let qtyStr = NSDecimalNumber(decimal: trade.quantity).stringValue
-            let entryStr = NSDecimalNumber(decimal: trade.avgEntry).stringValue
-            let symbol = AssetContractEngine.canonicalSymbol(trade.symbol)
-            let cleanAcc = trade.accountId.cleanAccountId
-            let baseSemantic = "\(cleanAcc)|\(symbol)|\(trade.direction.rawValue)"
-            let exactKey = "\(baseSemantic)|\(openSec)|\(qtyStr)|\(entryStr)"
-            let prevSecKey = "\(baseSemantic)|\(openSec - 1)|\(qtyStr)|\(entryStr)"
-            let nextSecKey = "\(baseSemantic)|\(openSec + 1)|\(qtyStr)|\(entryStr)"
-            
-            if seenSemantics.contains(exactKey) || seenSemantics.contains(prevSecKey) || seenSemantics.contains(nextSecKey) {
-                continue
+            // Distinct The5ers positions that were explicitly disambiguated with a provider ticket or entry hash
+            // must never be collapsed by semantic similarity (e.g. MT5 partial closes or simultaneous split orders).
+            let hasExplicitThe5ersDiscriminator = trade.key.hasPrefix("the5ers_") && (trade.key.contains("|provider:") || trade.key.contains("|entry:"))
+            if !hasExplicitThe5ersDiscriminator {
+                let openSec = Int64(trade.openedAt.timeIntervalSince1970.rounded())
+                let closedSec = trade.closedAt.map { Int64($0.timeIntervalSince1970.rounded()) } ?? 0
+                let qtyStr = NSDecimalNumber(decimal: trade.quantity).stringValue
+                let entryStr = NSDecimalNumber(decimal: trade.avgEntry).stringValue
+                let exitStr = trade.avgExit.map { NSDecimalNumber(decimal: $0).stringValue } ?? "open"
+                let pnlStr = NSDecimalNumber(decimal: trade.netPnl).stringValue
+                let symbol = AssetContractEngine.canonicalSymbol(trade.symbol)
+                let cleanAcc = trade.accountId.cleanAccountId
+                let baseSemantic = "\(cleanAcc)|\(symbol)|\(trade.direction.rawValue)"
+                let tailSemantic = "\(closedSec)|\(qtyStr)|\(entryStr)|\(exitStr)|\(pnlStr)"
+                let exactKey = "\(baseSemantic)|\(openSec)|\(tailSemantic)"
+                let prevSecKey = "\(baseSemantic)|\(openSec - 1)|\(tailSemantic)"
+                let nextSecKey = "\(baseSemantic)|\(openSec + 1)|\(tailSemantic)"
+                
+                if seenSemantics.contains(exactKey) || seenSemantics.contains(prevSecKey) || seenSemantics.contains(nextSecKey) {
+                    continue
+                }
+                seenSemantics.insert(exactKey)
             }
-            seenSemantics.insert(exactKey)
             
             seenKeys.insert(trade.key)
             cleaned.append(trade)

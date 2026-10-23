@@ -54,8 +54,8 @@ extension TradeDataStore {
                         accounts.append(rAcc)
                     }
                 }
-                if selectedAccountId == "default-acc" || (!accounts.contains(where: { $0.id == selectedAccountId }) && selectedAccountId != "all") {
-                    selectedAccountId = "all"
+                if selectedAccountId == "default-acc" || selectedAccountId == "all" || !accounts.contains(where: { $0.id == selectedAccountId || TradeDataStore.isSameAccountId($0.id, selectedAccountId) }) {
+                    selectedAccountId = mostRecentActiveAccount?.id ?? visibleAccounts.first?.id ?? accounts.first?.id ?? "default-acc"
                 }
                 accounts.removeAll(where: { $0.id == "default-acc" && accounts.count > 1 })
             }
@@ -102,8 +102,26 @@ extension TradeDataStore {
             fetchedTradesCount = remoteTrades.count
             for rTrade in remoteTrades {
                 if let idx = trades.firstIndex(where: { $0.key == rTrade.key }) {
-                    let local = trades[idx]
-                    if (local.netPnl != 0 || local.grossPnl != 0) && (rTrade.netPnl == 0 && rTrade.grossPnl == 0) {
+                    var local = trades[idx]
+                    let isBrokerSynced = local.key.hasPrefix("the5ers_") || local.key.hasPrefix("ctrader_")
+                    if isBrokerSynced {
+                        // Preserve authoritative local broker P&L, fees, swap, and status; only merge user annotations from cloud if local is empty
+                        if (local.notes == nil || local.notes?.isEmpty == true), let rNotes = rTrade.notes, !rNotes.isEmpty {
+                            local.notes = rNotes
+                        }
+                        if local.tags.isEmpty && !rTrade.tags.isEmpty {
+                            local.tags = rTrade.tags
+                        }
+                        if local.mistakes.isEmpty && !rTrade.mistakes.isEmpty {
+                            local.mistakes = rTrade.mistakes
+                        }
+                        if local.rating == nil { local.rating = rTrade.rating }
+                        if local.stopLoss == nil { local.stopLoss = rTrade.stopLoss }
+                        if local.profitTarget == nil { local.profitTarget = rTrade.profitTarget }
+                        if local.playbookId == nil { local.playbookId = rTrade.playbookId }
+                        if local.reviewedAt == nil { local.reviewedAt = rTrade.reviewedAt }
+                        trades[idx] = local
+                    } else if (local.netPnl != 0 || local.grossPnl != 0) && (rTrade.netPnl == 0 && rTrade.grossPnl == 0) {
                         // Keep local non-zero PnL if remote has zero PnL
                     } else {
                         trades[idx] = rTrade
@@ -119,8 +137,10 @@ extension TradeDataStore {
                     }
                 }
             }
-            if selectedAccountId != "all" && !accounts.contains(where: { $0.id == selectedAccountId }) {
-                selectedAccountId = "all"
+            cleanupLegacyThe5ersCorruptions()
+            deduplicateTrades()
+            if selectedAccountId == "default-acc" || selectedAccountId == "all" || !accounts.contains(where: { $0.id == selectedAccountId || TradeDataStore.isSameAccountId($0.id, selectedAccountId) }) {
+                selectedAccountId = mostRecentActiveAccount?.id ?? visibleAccounts.first?.id ?? accounts.first?.id ?? "default-acc"
             }
             if !trades.isEmpty {
                 do {
@@ -232,13 +252,19 @@ extension TradeDataStore {
             fetchedPropCount = remotePropAccounts.count
             for rAcc in remotePropAccounts {
                 if let idx = propAccounts.firstIndex(where: { $0.id.isEquivalentAccountId(to: rAcc.id) }) {
-                    if rAcc.revision >= propAccounts[idx].revision {
+                    let local = propAccounts[idx]
+                    if local.firm == "The5ers" {
+                        var merged = local
+                        merged.revision = max(local.revision, rAcc.revision)
+                        propAccounts[idx] = merged
+                    } else if rAcc.revision >= local.revision {
                         propAccounts[idx] = rAcc
                     }
                 } else {
                     propAccounts.append(rAcc)
                 }
             }
+            cleanupLegacyThe5ersCorruptions()
             let validAccIds = Set(accounts.map { $0.id })
             let validPropIds = Set(propAccounts.map { $0.id })
             for idx in 0..<propAccounts.count {
@@ -285,17 +311,18 @@ extension TradeDataStore {
                     propEntries.append(rEntry)
                 }
             }
+            cleanupLegacyThe5ersCorruptions()
             deduplicatePropEntries()
             
             let currentPropIds = Set(propAccounts.map { $0.id })
             let currentEntryIds = Set(propEntries.map { $0.id })
             for idx in 0..<propEntries.count {
-                if let aId = propEntries[idx].accountId, !aId.isEmpty {
+                if propEntries[idx].firm == "The5ers" && propEntries[idx].kind == "expense" && propEntries[idx].id.hasPrefix("the5ers_purchase_") {
+                    propEntries[idx].accountId = nil
+                } else if let aId = propEntries[idx].accountId, !aId.isEmpty {
                     if !currentPropIds.contains(aId) {
                         if let matched = propAccounts.first(where: { $0.id.isEquivalentAccountId(to: aId) }) {
                             propEntries[idx].accountId = matched.id
-                        } else if let firstProp = propAccounts.first {
-                            propEntries[idx].accountId = firstProp.id
                         } else {
                             propEntries[idx].accountId = nil
                         }
