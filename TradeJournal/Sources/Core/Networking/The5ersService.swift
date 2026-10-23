@@ -1669,11 +1669,11 @@ public final class The5ersService: ObservableObject {
             .filter { $0.firm == "The5ers" && $0.kind == "payout" && $0.status == .completed && !$0.voided && $0.accountId != nil && ($0.accountId == journalAccId || TradeDataStore.isSameAccountId($0.accountId!, journalAccId)) }
             .reduce(Int64(0)) { $0 + $1.amountMinor }
         let pnlMinor: Int64? = {
-            if balMinor > 0 && startingMinor > 0 {
-                return (balMinor - startingMinor) + settledPayoutsMinor
-            }
             if let pnl = acc.profitAndLoss ?? acc.totalNetProfit {
                 return NSDecimalNumber(decimal: pnl * 100).int64Value
+            }
+            if balMinor > 0 && startingMinor > 0 {
+                return (balMinor - startingMinor) + settledPayoutsMinor
             }
             return nil
         }()
@@ -1970,12 +1970,20 @@ public final class The5ersService: ObservableObject {
                 tradesModified = true
             }
             
-            // 2. Cross-verify sum of closed trades' netPnl against authoritative realized account P&L ((balance - startingBalance) + settledPayouts)
-            if let sb = acc.startingBalance, sb > 0, acc.balance > 0 {
-                let settledPayouts = dataStore.propEntries
-                    .filter { $0.firm == "The5ers" && $0.kind == "payout" && $0.status == .completed && !$0.voided && $0.accountId != nil && ($0.accountId == journalAccId || $0.accountId == targetAccId || TradeDataStore.isSameAccountId($0.accountId!, targetAccId)) }
-                    .reduce(Decimal.zero) { $0 + Decimal($1.amountMinor) / 100 }
-                let expectedRealizedPnl = toReporting((acc.balance - sb) + settledPayouts)
+            // 2. Cross-verify sum of closed trades' netPnl against authoritative realized account P&L
+            let expectedRealizedPnl: Decimal = {
+                if let pnl = acc.profitAndLoss ?? acc.totalNetProfit {
+                    return toReporting(pnl)
+                }
+                if let sb = acc.startingBalance, sb > 0, acc.balance > 0 {
+                    let settledPayouts = dataStore.propEntries
+                        .filter { $0.firm == "The5ers" && $0.kind == "payout" && $0.status == .completed && !$0.voided && $0.accountId != nil && ($0.accountId == journalAccId || $0.accountId == targetAccId || TradeDataStore.isSameAccountId($0.accountId!, targetAccId)) }
+                        .reduce(Decimal.zero) { $0 + Decimal($1.amountMinor) / 100 }
+                    return toReporting((acc.balance - sb) + settledPayouts)
+                }
+                return Decimal.zero
+            }()
+            if expectedRealizedPnl != 0 {
                 let sumAsIs = closedIndices.reduce(Decimal.zero) { $0 + localTrades[$1].netPnl }
                 let diffAsIs = abs(sumAsIs - expectedRealizedPnl)
                 
@@ -2072,11 +2080,14 @@ public final class The5ersService: ObservableObject {
                 p.totalFeesMinor = NSDecimalNumber(decimal: abs(computedFees) * 100).int64Value
                 pChanged = true
             }
-            if p.netPnlMinor == nil {
-                if !closedIndices.isEmpty {
-                    p.netPnlMinor = NSDecimalNumber(decimal: computedNetPnl * 100).int64Value
+            if !closedIndices.isEmpty {
+                let computedNetMinor = NSDecimalNumber(decimal: computedNetPnl * 100).int64Value
+                if p.netPnlMinor != computedNetMinor {
+                    p.netPnlMinor = computedNetMinor
                     pChanged = true
-                } else if let bal = p.balanceMinor, let sz = p.sizeMinor, sz > 0 {
+                }
+            } else if p.netPnlMinor == nil {
+                if let bal = p.balanceMinor, let sz = p.sizeMinor, sz > 0 {
                     p.netPnlMinor = bal - sz
                     pChanged = true
                 }

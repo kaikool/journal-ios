@@ -494,13 +494,6 @@ extension TradeDataStore {
                     p.minTradingDays = 3
                     changed = true
                 }
-                if let bal = p.balanceMinor, bal > 0 {
-                    let expectedNetMinor = (bal - sizeMinor) + settledPayoutsMinor
-                    if p.netPnlMinor != expectedNetMinor {
-                        p.netPnlMinor = expectedNetMinor
-                        changed = true
-                    }
-                }
             }
             let targetId = p.journalAccountId ?? p.id
             let closedIndices = currentTrades.indices.filter { idx in
@@ -509,9 +502,31 @@ extension TradeDataStore {
                        (t.accountId == targetId || TradeDataStore.isSameAccountId(t.accountId, targetId))
             }
             if !closedIndices.isEmpty {
-                // Reconcile closed trades' netPnl/grossPnl against authoritative account balance ((balance - size) + settledPayouts)
-                if sizeMinor > 0, let bal = p.balanceMinor, bal > 0 {
-                    let expectedRealizedPnl = Decimal((bal - sizeMinor) + settledPayoutsMinor) / 100
+                let tradeNetSum = closedIndices.reduce(Decimal.zero) { $0 + currentTrades[$1].netPnl }
+                let expectedTradeNetMinor = NSDecimalNumber(decimal: tradeNetSum * 100).int64Value
+                if p.netPnlMinor != expectedTradeNetMinor {
+                    p.netPnlMinor = expectedTradeNetMinor
+                    changed = true
+                }
+            } else if let bal = p.balanceMinor, bal > 0, sizeMinor > 0 {
+                let expectedNetMinor = (bal - sizeMinor) + settledPayoutsMinor
+                if p.netPnlMinor != expectedNetMinor {
+                    p.netPnlMinor = expectedNetMinor
+                    changed = true
+                }
+            }
+            if !closedIndices.isEmpty {
+                // Reconcile closed trades' netPnl/grossPnl against authoritative account Net P&L
+                let expectedRealizedPnl: Decimal = {
+                    if let pnlMinor = p.netPnlMinor {
+                        return Decimal(pnlMinor) / 100
+                    }
+                    if sizeMinor > 0, let bal = p.balanceMinor, bal > 0 {
+                        return Decimal((bal - sizeMinor) + settledPayoutsMinor) / 100
+                    }
+                    return Decimal.zero
+                }()
+                if expectedRealizedPnl != 0 {
                     let sumAsIs = closedIndices.reduce(Decimal.zero) { $0 + currentTrades[$1].netPnl }
                     let diffAsIs = abs(sumAsIs - expectedRealizedPnl)
                     if diffAsIs > 0.05 {
