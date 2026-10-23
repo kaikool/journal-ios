@@ -1969,13 +1969,137 @@ public final class The5ersService: ObservableObject {
                 }
             }
             
-            mergePositions(allPositions, for: acc, into: dataStore, count: &importedPositionsCount, replaceAccountPositions: true)
+            let resolvedPositions = await enrichIncompletePositionsIfNeeded(allPositions)
+            mergePositions(resolvedPositions, for: acc, into: dataStore, count: &importedPositionsCount, replaceAccountPositions: true)
         } catch {
             if !embeddedPositions.isEmpty {
-                mergePositions(embeddedPositions, for: acc, into: dataStore, count: &importedPositionsCount, replaceAccountPositions: false)
+                let resolvedEmbedded = await enrichIncompletePositionsIfNeeded(embeddedPositions)
+                mergePositions(resolvedEmbedded, for: acc, into: dataStore, count: &importedPositionsCount, replaceAccountPositions: false)
             }
             AppLogger.error("Error syncing trades for account \(acc.label) (\(acc.id)): \(error.localizedDescription)")
         }
+    }
+    
+    /// Drills into any incomplete / bridge-stuck position rows using `the5ers_positions.detail` or `the5ers_positions.trades`
+    @MainActor
+    private func enrichIncompletePositionsIfNeeded(_ positions: [[String: Any]]) async -> [[String: Any]] {
+        var resolved: [[String: Any]] = []
+        
+        let exitKeys = ["exit", "closeprice", "exitprice", "close_price", "exit_price", "closedprice", "outprice", "out_price"]
+        let pnlKeys = ["profitandloss", "profit_and_loss", "netpnl", "net_pnl", "realizedpnl", "realized_pnl", "net", "profit", "pnl"]
+        let entryKeys = ["entry", "openprice", "entryprice", "open_price", "entry_price", "priceopen", "price_open", "inprice", "in_price", "price"]
+        let closeKeys = ["closedate", "closedat", "closetime", "close_date", "close_time", "closedatetime", "exittime", "exit_time", "exitdate", "timeclose", "time_close", "outtime", "out_time"]
+        
+        for row in positions {
+            if Task.isCancelled || isCancelledByUser {
+                resolved.append(row)
+                continue
+            }
+            
+            var enriched = row
+            guard let posRef = (row["position_ref"] as? String) ?? (row["ref"] as? String), !posRef.isEmpty else {
+                resolved.append(row)
+                continue
+            }
+            
+            let rawExit = sourceNumber(firstValue(in: row, keys: exitKeys))
+            let rawPnl = sourceNumber(firstValue(in: row, keys: pnlKeys))
+            let entry = sourceNumber(firstValue(in: row, keys: entryKeys))
+            let hasCloseDate = firstValue(in: row, keys: closeKeys) != nil
+            let isClosedFlag = sourceBoolean(firstValue(in: row, keys: ["isclosed", "closed", "isclose"]))
+            let st = String(describing: row["status"] ?? "").lowercased()
+            
+            let openDateTuple = sourceInstant(firstValue(in: row, keys: ["opendate", "openedat", "opentime", "open_date", "open_time", "opendatetime"]))
+            let isOlderThan24h = (openDateTuple?.date.timeIntervalSinceNow ?? 0) < -86400
+            
+            let appearsClosed = (isClosedFlag == true) || hasCloseDate || st.contains("close") || st == "filled" || st == "done" || isOlderThan24h
+            let isIncomplete = appearsClosed && ((rawExit == nil || rawExit == entry) || (rawPnl == nil || rawPnl == 0))
+            
+            guard isIncomplete else {
+                resolved.append(row)
+                continue
+            }
+            
+            // 1. Drill into position detail: operation 'detail'
+            let detailArgs: [String: Any] = [
+                "operation": "detail",
+                "position_ref": posRef,
+                "contract_version": "1.0",
+                "request_context": ["timezone": "UTC", "locale": "en"]
+            ]
+            
+            var detailSucceeded = false
+            if let detailRes = try? await callMcpTool(name: "the5ers_positions", arguments: detailArgs),
+               !(detailRes["isError"] as? Bool ?? false) {
+                let unwrapped = unwrapMcpToolResult(detailRes)
+                let detailDict: [String: Any]? = {
+                    if let top = unwrapped as? [String: Any] {
+                        if let d = top["data"] as? [String: Any] { return d }
+                        return top
+                    }
+                    return nil
+                }()
+                
+                if let dict = detailDict {
+                    for (k, v) in dict {
+                        let lk = k.lowercased()
+                        if lk == "exit" || lk == "closeprice" || lk == "profitandloss" || lk == "fee" || lk == "swap" || lk == "closedate" {
+                            enriched[k] = v
+                        } else if enriched[k] == nil {
+                            enriched[k] = v
+                        }
+                    }
+                    let resExit = sourceNumber(firstValue(in: enriched, keys: exitKeys))
+                    let resPnl = sourceNumber(firstValue(in: enriched, keys: pnlKeys))
+                    if resExit != nil && resExit != entry && resPnl != nil && resPnl != 0 {
+                        detailSucceeded = true
+                    }
+                }
+            }
+            
+            // 2. If detail still lacks exit or PnL, drill into underlying fills: operation 'trades'
+            if !detailSucceeded {
+                let tradesArgs: [String: Any] = [
+                    "operation": "trades",
+                    "position_ref": posRef,
+                    "contract_version": "1.0",
+                    "request_context": ["timezone": "UTC", "locale": "en"]
+                ]
+                if let tradesRes = try? await callMcpTool(name: "the5ers_positions", arguments: tradesArgs),
+                   !(tradesRes["isError"] as? Bool ?? false) {
+                    let unwrapped = unwrapMcpToolResult(tradesRes)
+                    let fills = extractMcpCollection(unwrapped, collectionKey: "trades")
+                    if !fills.isEmpty {
+                        var closingDeal = fills.last
+                        for fill in fills {
+                            if let pnl = sourceNumber(firstValue(in: fill, keys: pnlKeys)), pnl != 0 {
+                                closingDeal = fill
+                                break
+                            }
+                        }
+                        if let closeFill = closingDeal {
+                            if let p = sourceNumber(firstValue(in: closeFill, keys: ["price", "exit", "closeprice"])) {
+                                enriched["exit"] = p
+                            }
+                            if let pnl = sourceNumber(firstValue(in: closeFill, keys: pnlKeys)) {
+                                enriched["profitAndLoss"] = pnl
+                            }
+                            if let d = firstValue(in: closeFill, keys: ["date", "time", "closedate"]) {
+                                enriched["closeDate"] = d
+                            }
+                            let totalFees = fills.compactMap { sourceNumber(firstValue(in: $0, keys: ["fee", "commission"])) }.reduce(0, +)
+                            if totalFees > 0 {
+                                enriched["fee"] = totalFees
+                            }
+                        }
+                    }
+                }
+            }
+            
+            resolved.append(enriched)
+        }
+        
+        return resolved
     }
     
     /// Reconciles account-level statistics (`totalFees`, `tradingDays`, `winningDays`, `totalTrades`) and verifies closed trade P&L against authoritative account balance
@@ -2537,9 +2661,12 @@ public final class The5ersService: ObservableObject {
                 existing.key = tradeKey
                 existing.accountId = targetAccId
                 
-                // Protect already-closed trades from regressing to open if broker returns stale/incomplete record:
+                // Protect already-closed trades from regressing to open or wiping out exit & PnL:
+                let incomingIsDefective = (position.exit == nil || position.exit == position.entry) && position.netPnl == 0
+                let localIsComplete = existing.avgExit != nil && existing.avgExit != existing.avgEntry && existing.netPnl != 0
+                let shouldPreserveComplete = localIsComplete && incomingIsDefective
                 let shouldPreserveClosed = (existing.status != .open && existing.closedAt != nil) && !isClosed && position.openedAtDate.timeIntervalSinceNow < -86400
-                if !shouldPreserveClosed {
+                if !shouldPreserveClosed && !shouldPreserveComplete {
                     existing.status = status
                     existing.closedAt = position.closedAtDate
                     existing.openQuantity = isClosed ? 0 : position.quantity
