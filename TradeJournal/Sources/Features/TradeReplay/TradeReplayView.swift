@@ -132,14 +132,23 @@ public struct TradeReplayView: View {
                     
                     VStack(alignment: .trailing, spacing: 2) {
                         let isEnd = (bars.isEmpty || currentStep >= bars.count) && trade.status != .open
-                        Text(isEnd ? "NET P&L" : "UNREALIZED P&L")
+                        let title: String = {
+                            if !frame.hasEntered { return "WAITING FOR ENTRY" }
+                            if isEnd || frame.hasExited { return "NET P&L" }
+                            return "UNREALIZED P&L"
+                        }()
+                        Text(title)
                             .font(AppTypography.cardTitle)
                             .foregroundColor(AppColors.secondaryText)
                         
-                        let displayPnl = (isEnd || bars.isEmpty) ? trade.netPnl : frame.unrealizedPnl
+                        let displayPnl: Decimal = {
+                            if !frame.hasEntered { return 0 }
+                            if isEnd || frame.hasExited || bars.isEmpty { return trade.netPnl }
+                            return frame.unrealizedPnl
+                        }()
                         Text(Formatters.formatPnL(displayPnl, currency: env.currentCurrency))
                             .font(AppTypography.financialNumber(size: 18, weight: .bold))
-                            .foregroundColor(Formatters.pnlColor(displayPnl))
+                            .foregroundColor(!frame.hasEntered ? AppColors.secondaryText : Formatters.pnlColor(displayPnl))
                     }
                 }
                 

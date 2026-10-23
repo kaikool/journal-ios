@@ -476,9 +476,8 @@ public struct AppActionPill: View {
                     .lineLimit(1)
                     .fixedSize(horizontal: true, vertical: false)
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .frame(height: 30)
+            .padding(.horizontal, 12)
+            .frame(height: 34)
             .background(isPrimary ? AppColors.brand : AppColors.cardBackground.opacity(0.85))
             .foregroundColor(isPrimary ? AppColors.brandTextOnDark : AppColors.primaryText)
             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
@@ -589,9 +588,8 @@ public struct AppActionPillLink<Destination: View>: View {
                     .lineLimit(1)
                     .fixedSize(horizontal: true, vertical: false)
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .frame(height: 30)
+            .padding(.horizontal, 12)
+            .frame(height: 34)
             .background(isPrimary ? AppColors.brand : AppColors.cardBackground.opacity(0.85))
             .foregroundColor(isPrimary ? AppColors.brandTextOnDark : AppColors.primaryText)
             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
@@ -650,9 +648,8 @@ public struct AppActionMenu<MenuContent: View>: View {
                 Image(systemName: "chevron.down")
                     .font(.system(size: 9, weight: .semibold))
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .frame(height: 30)
+            .padding(.horizontal, 12)
+            .frame(height: 34)
             .background(isPrimary ? AppColors.brand : AppColors.cardBackground.opacity(0.85))
             .foregroundColor(isPrimary ? AppColors.brandTextOnDark : AppColors.primaryText)
             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
@@ -722,11 +719,11 @@ public struct AppleMenuChip<Content: View>: View {
                     .foregroundColor(AppColors.secondaryText.opacity(0.8))
             }
             .padding(.horizontal, 10)
-            .padding(.vertical, 6)
+            .frame(height: 34)
             .background(AppColors.secondaryBackground.opacity(0.8))
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
                     .stroke(AppColors.border.opacity(0.6), lineWidth: 0.5)
             )
         }

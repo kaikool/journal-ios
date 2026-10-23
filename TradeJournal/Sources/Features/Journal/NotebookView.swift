@@ -161,7 +161,7 @@ public struct NotebookView: View {
                 }
             }
             .padding(.horizontal, 12)
-            .padding(.vertical, 8)
+            .frame(height: 36)
             .background(AppColors.secondaryBackground)
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             .overlay(
@@ -183,7 +183,7 @@ public struct NotebookView: View {
                 }
                 .foregroundColor(.white)
                 .padding(.horizontal, 12)
-                .padding(.vertical, 8)
+                .frame(height: 36)
                 .background(AppColors.brandPrimary)
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             }

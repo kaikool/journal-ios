@@ -21,10 +21,40 @@ public struct TradeDetailView: View {
     public init(trade: Trade, isModal: Bool = false) {
         self.isModal = isModal
         self._trade = State(initialValue: trade)
-        self._noteContent = State(initialValue: trade.notes ?? "")
+        let cleanNote: String = {
+            guard let notes = trade.notes else { return "" }
+            if notes.hasPrefix("Position synced from") { return "" }
+            return notes
+        }()
+        self._noteContent = State(initialValue: cleanNote)
         self._stopLossText = State(initialValue: Formatters.formatDecimalInput(trade.stopLoss, maxDecimals: 5))
         self._profitTargetText = State(initialValue: Formatters.formatDecimalInput(trade.profitTarget, maxDecimals: 5))
         self._selectedPlaybookId = State(initialValue: trade.playbookId ?? "")
+    }
+    
+    private var ticketDisplay: String? {
+        if let firstId = trade.executionIds.first, !firstId.isEmpty {
+            return Formatters.formatEntityId(firstId)
+        }
+        return nil
+    }
+    
+    private var tradeDurationString: String? {
+        guard let closedAt = trade.closedAt else { return "Open" }
+        let diff = closedAt.timeIntervalSince(trade.openedAt)
+        if diff <= 0 { return "< 1m" }
+        let mins = Int(diff / 60)
+        let hours = mins / 60
+        let days = hours / 24
+        if days > 0 {
+            let remHours = hours % 24
+            return remHours > 0 ? "\(days)d \(remHours)h" : "\(days)d"
+        } else if hours > 0 {
+            let remMins = mins % 60
+            return remMins > 0 ? "\(hours)h \(remMins)m" : "\(hours)h"
+        } else {
+            return "\(max(1, mins))m"
+        }
     }
     
     private var fills: [Execution] {
@@ -77,214 +107,207 @@ public struct TradeDetailView: View {
     public var body: some View {
         ScrollView {
             VStack(spacing: 14) {
-                // Header PnL Card
-                    cardContainer {
-                        VStack(alignment: .leading, spacing: 12) {
-                            HStack {
-                                Text(trade.symbol)
-                                    .font(AppTypography.headline)
-                                    .foregroundColor(AppColors.primaryText)
-                                
-                                Text(trade.direction.rawValue.uppercased())
-                                    .font(.system(size: 10, weight: .bold))
-                                    .foregroundColor(trade.direction == .long ? AppColors.brand : AppColors.warning)
-                                    .padding(.horizontal, 7)
-                                    .padding(.vertical, 3)
-                                    .background((trade.direction == .long ? AppColors.brand : AppColors.warning).opacity(0.12))
-                                    .clipShape(Capsule())
-                                
-                                AppBadge(
-                                    text: trade.status.rawValue.uppercased(),
-                                    color: trade.status == .win ? AppColors.profit : (trade.status == .loss ? AppColors.loss : AppColors.breakeven)
-                                )
-                                
-                                Spacer()
-                            }
-                            
-                            Divider().background(AppColors.border.opacity(0.5))
-                            
-                            HStack(alignment: .firstTextBaseline) {
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text("Net P&L")
-                                        .font(AppTypography.caption)
-                                        .foregroundColor(AppColors.secondaryText)
-                                    AppMonetaryText(
-                                        Formatters.formatPnL(trade.netPnl, currency: env.currentCurrency),
-                                        isPrivate: env.isPrivacyModeEnabled,
-                                        font: AppTypography.financialNumber(size: 26, weight: .bold),
-                                        color: Formatters.pnlColor(trade.netPnl)
-                                    )
-                                }
-                                Spacer()
-                                VStack(alignment: .trailing, spacing: 3) {
-                                    Text("Volume")
-                                        .font(AppTypography.caption)
-                                        .foregroundColor(AppColors.secondaryText)
-                                    Text("\(trade.quantity)")
-                                        .font(AppTypography.financialNumber(size: 22, weight: .bold))
-                                        .monospacedDigit()
-                                        .foregroundColor(AppColors.primaryText)
-                                }
-                            }
-                            
-                            // Visual Financial Breakdown (Gross - Fees = Net)
-                            VStack(spacing: 8) {
-                                HStack {
-                                    Text("FINANCIAL BREAKDOWN")
-                                        .font(.system(size: 10, weight: .bold))
-                                        .foregroundColor(AppColors.secondaryText)
-                                    Spacer()
-                                    Text("Gross - Fees = Net")
-                                        .font(.system(size: 10, weight: .medium))
-                                        .foregroundColor(AppColors.secondaryText.opacity(0.8))
-                                }
-                                
-                                VStack(spacing: 6) {
-                                    HStack {
-                                        Text("Gross P&L")
-                                            .font(AppTypography.caption)
-                                            .foregroundColor(AppColors.secondaryText)
-                                        Spacer()
-                                        AppMonetaryText(
-                                            Formatters.formatPnL(trade.grossPnl, currency: env.currentCurrency),
-                                            isPrivate: env.isPrivacyModeEnabled,
-                                            font: AppTypography.subheadlineBold,
-                                            color: Formatters.pnlColor(trade.grossPnl)
-                                        )
-                                        .lineLimit(1)
-                                    }
-                                    
-                                    HStack {
-                                        Text("Fees & Costs")
-                                            .font(AppTypography.caption)
-                                            .foregroundColor(AppColors.secondaryText)
-                                        Spacer()
-                                        Text(Formatters.formatCurrency(trade.fees, currency: env.currentCurrency))
-                                            .font(AppTypography.subheadlineBold)
-                                            .monospacedDigit()
-                                            .foregroundColor(trade.fees > 0 ? AppColors.warning : AppColors.primaryText)
-                                            .lineLimit(1)
-                                    }
-                                    
-                                    if trade.swapAmount != 0 {
-                                        HStack {
-                                            Text("Swap / Overnight Interest")
-                                                .font(AppTypography.caption)
-                                                .foregroundColor(AppColors.secondaryText)
-                                            Spacer()
-                                            Text(Formatters.formatPnL(trade.swapAmount, currency: env.currentCurrency))
-                                                .font(AppTypography.subheadlineBold)
-                                                .monospacedDigit()
-                                                .foregroundColor(trade.swapAmount < 0 ? AppColors.warning : AppColors.profit)
-                                                .lineLimit(1)
-                                        }
-                                    }
-                                    
-                                    Divider().background(AppColors.border.opacity(0.4))
-                                    
-                                    HStack {
-                                        Text("Net Realized P&L")
-                                            .font(AppTypography.captionBold)
-                                            .foregroundColor(AppColors.primaryText)
-                                        Spacer()
-                                        AppMonetaryText(
-                                            Formatters.formatPnL(trade.netPnl, currency: env.currentCurrency),
-                                            isPrivate: env.isPrivacyModeEnabled,
-                                            font: AppTypography.subheadlineBold,
-                                            color: Formatters.pnlColor(trade.netPnl)
-                                        )
-                                        .lineLimit(1)
-                                    }
-                                }
-                                .padding(12)
-                                .background(AppColors.secondaryBackground.opacity(0.6))
-                                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                        .stroke(AppColors.border.opacity(0.4), lineWidth: 0.5)
-                                )
-                            }
-                        }
-                    }
-                    
-                    // Pricing & Execution Details
-                    cardContainer {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Execution Details")
+                // MARK: - 1. Unified Trade Performance & Overview Terminal
+                cardContainer {
+                    VStack(alignment: .leading, spacing: 12) {
+                        // Title bar: Symbol, Direction, Status, Ticket, Duration
+                        HStack(spacing: 8) {
+                            Text(trade.symbol)
                                 .font(AppTypography.headline)
                                 .foregroundColor(AppColors.primaryText)
                             
-                            HStack {
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text("Avg entry")
-                                        .font(AppTypography.caption)
-                                        .foregroundColor(AppColors.secondaryText)
-                                    Text(Formatters.price(trade.avgEntry))
-                                        .font(AppTypography.subheadlineBold)
-                                        .monospacedDigit()
-                                        .foregroundColor(AppColors.primaryText)
-                                }
-                                Spacer()
-                                VStack(alignment: .center, spacing: 3) {
-                                    Text("Avg exit")
-                                        .font(AppTypography.caption)
-                                        .foregroundColor(AppColors.secondaryText)
-                                    Text(trade.avgExit.map(Formatters.price) ?? "Open")
-                                        .font(AppTypography.subheadlineBold)
-                                        .monospacedDigit()
-                                        .foregroundColor(AppColors.primaryText)
-                                }
-                                Spacer()
-                                VStack(alignment: .center, spacing: 3) {
-                                    Text("Gross P&L")
-                                        .font(AppTypography.caption)
-                                        .foregroundColor(AppColors.secondaryText)
-                                    AppMonetaryText(
-                                        Formatters.formatPnL(trade.grossPnl, currency: env.currentCurrency),
-                                        isPrivate: env.isPrivacyModeEnabled,
-                                        font: AppTypography.subheadlineBold,
-                                        color: Formatters.pnlColor(trade.grossPnl)
-                                    )
-                                }
-                                Spacer()
-                                VStack(alignment: .trailing, spacing: 3) {
-                                    Text("Fees")
-                                        .font(AppTypography.caption)
-                                        .foregroundColor(AppColors.secondaryText)
-                                    Text(Formatters.formatCurrency(trade.fees, currency: env.currentCurrency))
-                                        .font(AppTypography.subheadlineBold)
-                                        .monospacedDigit()
-                                        .foregroundColor(AppColors.primaryText)
-                                }
+                            Text(trade.direction.rawValue.uppercased())
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundColor(trade.direction == .long ? AppColors.brand : AppColors.warning)
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 3)
+                                .background((trade.direction == .long ? AppColors.brand : AppColors.warning).opacity(0.12))
+                                .clipShape(Capsule())
+                            
+                            AppBadge(
+                                text: trade.status.rawValue.uppercased(),
+                                color: trade.status == .win ? AppColors.profit : (trade.status == .loss ? AppColors.loss : AppColors.breakeven)
+                            )
+                            
+                            if let ticket = ticketDisplay {
+                                Text("#\(ticket)")
+                                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                                    .foregroundColor(AppColors.secondaryText.opacity(0.8))
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(AppColors.secondaryBackground)
+                                    .clipShape(Capsule())
                             }
                             
-                            Divider().background(AppColors.border.opacity(0.5))
+                            Spacer()
                             
-                            HStack {
-                                Text("Opened at:")
+                            if let duration = tradeDurationString {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "clock")
+                                        .font(.system(size: 10))
+                                    Text(duration)
+                                        .font(.system(size: 11, weight: .medium))
+                                }
+                                .foregroundColor(AppColors.secondaryText)
+                            }
+                        }
+                        
+                        Divider().background(AppColors.border.opacity(0.5))
+                        
+                        // Primary Financial Metrics Row (Net PnL, Volume, Return)
+                        HStack(alignment: .firstTextBaseline) {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("Net Realized P&L")
                                     .font(AppTypography.caption)
                                     .foregroundColor(AppColors.secondaryText)
-                                Spacer()
-                                Text(Formatters.formatDateTime(trade.openedAt, timeZone: env.currentTimeZone))
+                                AppMonetaryText(
+                                    Formatters.formatPnL(trade.netPnl, currency: env.currentCurrency),
+                                    isPrivate: env.isPrivacyModeEnabled,
+                                    font: AppTypography.financialNumber(size: 20, weight: .bold),
+                                    color: Formatters.pnlColor(trade.netPnl)
+                                )
+                            }
+                            
+                            Spacer()
+                            
+                            VStack(alignment: .center, spacing: 3) {
+                                Text("Volume")
                                     .font(AppTypography.caption)
-                                    .monospacedDigit()
+                                    .foregroundColor(AppColors.secondaryText)
+                                Text("\(Formatters.formatNumber(trade.quantity)) Lots")
+                                    .font(.system(size: 14, weight: .semibold, design: .monospaced))
                                     .foregroundColor(AppColors.primaryText)
                             }
                             
-                            if let closedAt = trade.closedAt {
-                                HStack {
-                                    Text("Closed at:")
-                                        .font(AppTypography.caption)
+                            Spacer()
+                            
+                            VStack(alignment: .trailing, spacing: 3) {
+                                Text("Realized Return")
+                                    .font(AppTypography.caption)
+                                    .foregroundColor(AppColors.secondaryText)
+                                if let rR = realizedR {
+                                    Text(String(format: "%+.2fR", (rR as NSDecimalNumber).doubleValue))
+                                        .font(.system(size: 14, weight: .bold, design: .monospaced))
+                                        .foregroundColor(rR >= 0 ? AppColors.profit : AppColors.loss)
+                                } else {
+                                    Text(trade.status == .win ? "Win" : (trade.status == .loss ? "Loss" : "BE"))
+                                        .font(.system(size: 13, weight: .medium))
                                         .foregroundColor(AppColors.secondaryText)
-                                    Spacer()
-                                    Text(Formatters.formatDateTime(closedAt, timeZone: env.currentTimeZone))
-                                        .font(AppTypography.caption)
-                                        .monospacedDigit()
-                                        .foregroundColor(AppColors.primaryText)
                                 }
                             }
                         }
+                        
+                        // Financial Breakdown Strip (Gross • Fees • Swap • Net)
+                        HStack(spacing: 0) {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("Gross P&L")
+                                    .font(.system(size: 10, weight: .medium))
+                                    .foregroundColor(AppColors.secondaryText)
+                                AppMonetaryText(
+                                    Formatters.formatPnL(trade.grossPnl, currency: env.currentCurrency),
+                                    isPrivate: env.isPrivacyModeEnabled,
+                                    font: .system(size: 12, weight: .semibold, design: .monospaced),
+                                    color: Formatters.pnlColor(trade.grossPnl)
+                                )
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            
+                            Divider().frame(height: 22).background(AppColors.border.opacity(0.4))
+                            
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("Fees & Comm")
+                                    .font(.system(size: 10, weight: .medium))
+                                    .foregroundColor(AppColors.secondaryText)
+                                Text(Formatters.formatCurrency(trade.fees, currency: env.currentCurrency))
+                                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                                    .foregroundColor(trade.fees > 0 ? AppColors.warning : AppColors.primaryText)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.leading, 8)
+                            
+                            if trade.swapAmount != 0 {
+                                Divider().frame(height: 22).background(AppColors.border.opacity(0.4))
+                                
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text("Swap")
+                                        .font(.system(size: 10, weight: .medium))
+                                        .foregroundColor(AppColors.secondaryText)
+                                    Text(Formatters.formatPnL(trade.swapAmount, currency: env.currentCurrency))
+                                        .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                                        .foregroundColor(trade.swapAmount < 0 ? AppColors.warning : AppColors.profit)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.leading, 8)
+                            }
+                            
+                            Divider().frame(height: 22).background(AppColors.border.opacity(0.4))
+                            
+                            VStack(alignment: .trailing, spacing: 3) {
+                                Text("Net P&L")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundColor(AppColors.primaryText)
+                                AppMonetaryText(
+                                    Formatters.formatPnL(trade.netPnl, currency: env.currentCurrency),
+                                    isPrivate: env.isPrivacyModeEnabled,
+                                    font: .system(size: 12, weight: .bold, design: .monospaced),
+                                    color: Formatters.pnlColor(trade.netPnl)
+                                )
+                            }
+                            .frame(maxWidth: .infinity, alignment: .trailing)
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 8)
+                        .background(AppColors.secondaryBackground.opacity(0.7))
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .stroke(AppColors.border.opacity(0.4), lineWidth: 0.5)
+                        )
+                        
+                        Divider().background(AppColors.border.opacity(0.5))
+                        
+                        // Execution Specifications (Entry, Exit, Open, Close)
+                        HStack {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("Avg Entry")
+                                    .font(.system(size: 10, weight: .medium))
+                                    .foregroundColor(AppColors.secondaryText)
+                                Text(Formatters.price(trade.avgEntry))
+                                    .font(AppTypography.captionBold)
+                                    .monospacedDigit()
+                                    .foregroundColor(AppColors.primaryText)
+                            }
+                            Spacer()
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("Avg Exit")
+                                    .font(.system(size: 10, weight: .medium))
+                                    .foregroundColor(AppColors.secondaryText)
+                                Text(trade.avgExit.map(Formatters.price) ?? "Open")
+                                    .font(AppTypography.captionBold)
+                                    .monospacedDigit()
+                                    .foregroundColor(AppColors.primaryText)
+                            }
+                            Spacer()
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("Opened")
+                                    .font(.system(size: 10, weight: .medium))
+                                    .foregroundColor(AppColors.secondaryText)
+                                Text(Formatters.formatDateTime(trade.openedAt, timeZone: env.currentTimeZone))
+                                    .font(.system(size: 11, design: .monospaced))
+                                    .foregroundColor(AppColors.primaryText)
+                            }
+                            Spacer()
+                            VStack(alignment: .trailing, spacing: 3) {
+                                Text("Closed")
+                                    .font(.system(size: 10, weight: .medium))
+                                    .foregroundColor(AppColors.secondaryText)
+                                Text(trade.closedAt != nil ? Formatters.formatDateTime(trade.closedAt!, timeZone: env.currentTimeZone) : "Open")
+                                    .font(.system(size: 11, design: .monospaced))
+                                    .foregroundColor(AppColors.primaryText)
+                            }
+                        }
                     }
+                }
                     
                     // Execution Legs List
                     if !fills.isEmpty {
@@ -358,7 +381,7 @@ public struct TradeDetailView: View {
                                         .font(AppTypography.body)
                                         .monospacedDigit()
                                         .padding(.horizontal, 10)
-                                        .frame(height: 38)
+                                        .frame(height: 36)
                                         .background(AppColors.secondaryBackground)
                                         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                                         .keyboardType(.decimalPad)
@@ -372,7 +395,7 @@ public struct TradeDetailView: View {
                                         .font(AppTypography.body)
                                         .monospacedDigit()
                                         .padding(.horizontal, 10)
-                                        .frame(height: 38)
+                                        .frame(height: 36)
                                         .background(AppColors.secondaryBackground)
                                         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                                         .keyboardType(.decimalPad)
@@ -392,7 +415,7 @@ public struct TradeDetailView: View {
                                             .lineLimit(1)
                                     }
                                     .padding(.horizontal, 14)
-                                    .frame(height: 38)
+                                    .frame(height: 36)
                                     .background(AppColors.brand)
                                     .foregroundColor(AppColors.brandTextOnDark)
                                     .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
@@ -786,7 +809,12 @@ public struct TradeDetailView: View {
         .sheet(isPresented: $showEditTradeSheet) {
             EditManualTradeSheet(trade: trade) { updated in
                 self.trade = updated
-                self.noteContent = updated.notes ?? ""
+                let cleanNote: String = {
+                    guard let notes = updated.notes else { return "" }
+                    if notes.hasPrefix("Position synced from") { return "" }
+                    return notes
+                }()
+                self.noteContent = cleanNote
                 self.stopLossText = Formatters.formatDecimalInput(updated.stopLoss, maxDecimals: 5)
                 self.profitTargetText = Formatters.formatDecimalInput(updated.profitTarget, maxDecimals: 5)
                 self.selectedPlaybookId = updated.playbookId ?? ""
@@ -797,7 +825,8 @@ public struct TradeDetailView: View {
     private func persistTradeUpdates() {
         let sl = Decimal(string: stopLossText.replacingOccurrences(of: ",", with: "."))
         let tp = Decimal(string: profitTargetText.replacingOccurrences(of: ",", with: "."))
-        let notesToSave = noteContent.trimmingCharacters(in: .whitespaces).isEmpty ? nil : noteContent
+        let trimmedNote = noteContent.trimmingCharacters(in: .whitespacesAndNewlines)
+        let notesToSave = trimmedNote.isEmpty || trimmedNote.hasPrefix("Position synced from") ? nil : trimmedNote
         
         dataStore.updateTradeAnnotations(
             key: trade.key,

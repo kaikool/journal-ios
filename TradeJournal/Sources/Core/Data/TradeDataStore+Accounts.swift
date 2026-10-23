@@ -437,10 +437,16 @@ extension TradeDataStore {
                     if localTrades[i].closedAt == nil {
                         localTrades[i].closedAt = localTrades[i].openedAt.addingTimeInterval(120)
                     }
-                    localTrades[i].notes = "Position synced from The5ers Hub (Ticket: 619412294 · Reconciled from MT5 deal history)"
+                    if localTrades[i].notes?.hasPrefix("Position synced from") == true {
+                        localTrades[i].notes = nil
+                    }
                     modified = true
                 }
                 continue
+            }
+            if localTrades[i].notes?.hasPrefix("Position synced from") == true {
+                localTrades[i].notes = nil
+                modified = true
             }
             if localTrades[i].status == .open || localTrades[i].closedAt == nil {
                 if localTrades[i].status != .open || localTrades[i].netPnl != 0 || localTrades[i].grossPnl != 0 || localTrades[i].fees != 0 || localTrades[i].openQuantity != localTrades[i].quantity {
@@ -461,10 +467,20 @@ extension TradeDataStore {
         var entriesModified = false
         var localEntries = propEntries
         for i in 0..<localEntries.count {
-            if localEntries[i].firm == "The5ers" && localEntries[i].kind == "expense" && localEntries[i].id.hasPrefix("the5ers_purchase_") {
+            if localEntries[i].firm == "The5ers" && localEntries[i].kind == "expense" {
                 if localEntries[i].accountId != nil {
                     localEntries[i].accountId = nil
                     entriesModified = true
+                }
+                if localEntries[i].category == "other" || localEntries[i].category.isEmpty {
+                    localEntries[i].category = "evaluation"
+                    entriesModified = true
+                }
+                if localEntries[i].notes.contains("(The5ers official order placed") {
+                    if let clean = localEntries[i].notes.components(separatedBy: " (The5ers official order placed").first, !clean.isEmpty {
+                        localEntries[i].notes = clean
+                        entriesModified = true
+                    }
                 }
             }
         }

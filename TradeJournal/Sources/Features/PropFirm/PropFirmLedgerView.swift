@@ -171,10 +171,10 @@ public struct PropFirmLedgerView: View {
                         }
                         .foregroundColor(showArchivedAccounts ? AppColors.brand : AppColors.secondaryText)
                         .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
+                        .frame(height: 34)
                         .background(showArchivedAccounts ? AppColors.brand.opacity(0.12) : AppColors.cardBackground)
-                        .clipShape(Capsule())
-                        .overlay(Capsule().stroke(showArchivedAccounts ? AppColors.brand.opacity(0.4) : AppColors.border.opacity(0.6), lineWidth: 0.5))
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(showArchivedAccounts ? AppColors.brand.opacity(0.4) : AppColors.border.opacity(0.6), lineWidth: 0.5))
                     }
                     .buttonStyle(ApplePressableButtonStyle())
                 }

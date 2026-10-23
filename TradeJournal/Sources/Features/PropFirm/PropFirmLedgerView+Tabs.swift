@@ -742,8 +742,8 @@ extension PropFirmLedgerView {
             } else {
                 ForEach(movements) { m in
                     cardContainer {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 4) {
+                        HStack(alignment: .center) {
+                            VStack(alignment: .leading, spacing: 5) {
                                 HStack(spacing: 6) {
                                     Text(m.firm)
                                         .font(AppTypography.subheadlineBold)
@@ -752,14 +752,24 @@ extension PropFirmLedgerView {
                                         .truncationMode(.tail)
                                     
                                     let badgeLabel: String = {
-                                        if m.kind == "refund" { return "Fee refund" }
-                                        if m.kind == "expense" { return m.category.capitalized }
-                                        return "Payout receipt"
+                                        if m.kind == "refund" { return "Fee Refund" }
+                                        if m.kind == "receipt" || m.kind == "payout" { return "Payout" }
+                                        switch m.category.lowercased() {
+                                        case "evaluation", "program": return "Evaluation Fee"
+                                        case "reset": return "Reset Fee"
+                                        case "activation": return "Activation Fee"
+                                        case "subscription": return "Subscription"
+                                        default: return "Evaluation Fee"
+                                        }
                                     }()
                                     let badgeColor: Color = {
                                         if m.kind == "refund" { return AppColors.brand }
                                         if m.kind == "receipt" || m.kind == "payout" { return AppColors.profit }
-                                        return AppColors.secondaryText
+                                        switch m.category.lowercased() {
+                                        case "evaluation", "program", "activation": return AppColors.brand
+                                        case "reset": return AppColors.warning
+                                        default: return AppColors.secondaryText
+                                        }
                                     }()
                                     AppBadge(text: badgeLabel, color: badgeColor)
                                 }
@@ -769,24 +779,31 @@ extension PropFirmLedgerView {
                                         .font(AppTypography.caption)
                                         .foregroundColor(AppColors.secondaryText)
                                         .lineLimit(1)
+                                } else if let entry = dataStore.propEntries.first(where: { $0.id == m.entryId }), !entry.notes.isEmpty {
+                                    let cleanNote = Formatters.cleanTransactionNote(entry.notes.components(separatedBy: "\n").first ?? entry.notes)
+                                    if !cleanNote.isEmpty {
+                                        Text(cleanNote)
+                                            .font(AppTypography.caption)
+                                            .foregroundColor(AppColors.primaryText)
+                                            .lineLimit(1)
+                                    }
                                 }
                                 
-                                if let entry = dataStore.propEntries.first(where: { $0.id == m.entryId }), !entry.notes.isEmpty {
-                                    Text(entry.notes.components(separatedBy: "\n").first ?? entry.notes)
+                                HStack(spacing: 6) {
+                                    Text(Formatters.formatDisplayDate(m.date))
                                         .font(AppTypography.caption)
-                                        .foregroundColor(AppColors.primaryText)
-                                        .lineLimit(2)
-                                }
-                                
-                                Text(m.date ?? "Pending settlement")
-                                    .font(AppTypography.caption)
-                                    .foregroundColor(AppColors.secondaryText)
-                                    .lineLimit(1)
-                                if !m.reference.isEmpty {
-                                    Text(Formatters.formatReference(m.reference))
-                                        .font(.system(size: 10, design: .monospaced))
-                                        .foregroundColor(AppColors.secondaryText.opacity(0.8))
+                                        .foregroundColor(AppColors.secondaryText)
                                         .lineLimit(1)
+                                    
+                                    if !m.reference.isEmpty {
+                                        Text("•")
+                                            .font(AppTypography.caption)
+                                            .foregroundColor(AppColors.secondaryText.opacity(0.5))
+                                        Text(Formatters.formatReference(m.reference))
+                                            .font(.system(size: 11, weight: .medium, design: .monospaced))
+                                            .foregroundColor(AppColors.secondaryText.opacity(0.8))
+                                            .lineLimit(1)
+                                    }
                                 }
                             }
                             

@@ -2494,14 +2494,15 @@ public final class The5ersService: ObservableObject {
                 existing.swap = swap
                 existing.netPnl = netPnl
                 existing.durationMs = durationMs
-                if existing.notes == nil || existing.notes?.isEmpty == true || existing.notes?.contains("Ticket: )") == true || existing.notes?.hasPrefix("Position synced from The5ers Hub") == true {
-                    let ticketSuffix = position.providerId.map { " (Ticket: \($0))" } ?? ""
-                    existing.notes = "Position synced from The5ers Hub\(ticketSuffix)"
+                if existing.notes?.hasPrefix("Position synced from The5ers Hub") == true {
+                    existing.notes = nil
+                }
+                if let t = position.providerId, !t.isEmpty, !existing.executionIds.contains(t) {
+                    existing.executionIds.append(t)
                 }
                 syncedAccountTrades.append(existing)
                 count += 1
             } else {
-                let ticketSuffix = position.providerId.map { " (Ticket: \($0))" } ?? ""
                 let trade = Trade(
                     key: tradeKey,
                     accountId: targetAccId,
@@ -2518,10 +2519,10 @@ public final class The5ersService: ObservableObject {
                     fees: fees,
                     swap: swap,
                     netPnl: netPnl,
-                    executionCount: 0,
-                    executionIds: [],
+                    executionCount: position.providerId != nil ? 1 : 0,
+                    executionIds: position.providerId.map { [$0] } ?? [],
                     durationMs: durationMs,
-                    notes: "Position synced from The5ers Hub\(ticketSuffix)",
+                    notes: nil,
                     tags: ["the5ers", acc.program.lowercased()]
                 )
                 syncedAccountTrades.append(trade)
@@ -2946,15 +2947,19 @@ public final class The5ersService: ObservableObject {
                     "platform", "market_data", "transfer", "other"
                 ]
                 let cleanType = productType.lowercased().trimmingCharacters(in: .whitespaces)
-                if validCategories.contains(cleanType) {
+                let titleLower = title.lowercased()
+                if validCategories.contains(cleanType) && cleanType != "other" {
                     return cleanType
                 }
-                if cleanType.contains("challenge") || cleanType.contains("eval") || cleanType.contains("bootcamp") || cleanType.contains("hyper") || cleanType.contains("high stakes") {
+                if cleanType.contains("program") || cleanType.contains("challenge") || cleanType.contains("eval") || cleanType.contains("bootcamp") || cleanType.contains("hyper") || cleanType.contains("high stakes") {
                     return "evaluation"
                 }
-                if cleanType.contains("reset") { return "reset" }
-                if cleanType.contains("activat") { return "activation" }
-                return "other"
+                if titleLower.contains("high stakes") || titleLower.contains("bootcamp") || titleLower.contains("hyper") || titleLower.contains("eval") || titleLower.contains("challenge") || titleLower.contains("program") {
+                    return "evaluation"
+                }
+                if cleanType.contains("reset") || titleLower.contains("reset") { return "reset" }
+                if cleanType.contains("activat") || titleLower.contains("activat") { return "activation" }
+                return "evaluation"
             }()
             
             // Per docs/the5ers.md:52 and domain rules, purchase expenses are firm-wide ('The5ers')
@@ -2969,6 +2974,7 @@ public final class The5ersService: ObservableObject {
                 existing.occurredOn = dateStr
                 existing.category = normalizedCategory
                 existing.accountId = nil
+                existing.notes = title
                 dataStore.propEntries[existingIdx] = existing
             } else {
                 let entry = PropEntryItem(
@@ -2982,7 +2988,7 @@ public final class The5ersService: ObservableObject {
                     occurredOn: dateStr,
                     status: .completed,
                     reference: shortRef,
-                    notes: "\(title) (The5ers official order placed \(rawDate))"
+                    notes: title
                 )
                 dataStore.propEntries.append(entry)
             }

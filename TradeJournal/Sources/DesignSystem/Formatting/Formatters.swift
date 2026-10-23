@@ -518,4 +518,35 @@ public enum Formatters {
         }
         return id
     }
+    
+    /// Formats raw ISO date strings or day strings into clean human-readable date (e.g. "Oct 1, 2026")
+    public static func formatDisplayDate(_ raw: String?) -> String {
+        guard let raw = raw?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else {
+            return "Pending settlement"
+        }
+        let isoFormatter = ISO8601DateFormatter()
+        isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let d = isoFormatter.date(from: raw) {
+            return dateOnly(d)
+        }
+        let isoBasic = ISO8601DateFormatter()
+        if let d = isoBasic.date(from: raw) {
+            return dateOnly(d)
+        }
+        if let d = date(fromIsoDay: raw) {
+            return dateOnly(d)
+        }
+        return raw
+    }
+    
+    /// Cleans verbose or system-generated notes from prop transactions (e.g. stripping ISO order timestamps)
+    public static func cleanTransactionNote(_ text: String) -> String {
+        var cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let parenIndex = cleaned.range(of: " (The5ers official order") {
+            cleaned = String(cleaned[..<parenIndex.lowerBound]).trimmingCharacters(in: .whitespaces)
+        } else if let parenIndex = cleaned.range(of: " (The5ers") {
+            cleaned = String(cleaned[..<parenIndex.lowerBound]).trimmingCharacters(in: .whitespaces)
+        }
+        return cleaned
+    }
 }

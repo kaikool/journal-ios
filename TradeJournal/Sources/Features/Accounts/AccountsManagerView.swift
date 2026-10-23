@@ -181,7 +181,7 @@ public struct AccountsManagerView: View {
                     }
                 }
                 .padding(.horizontal, 12)
-                .padding(.vertical, 9)
+                .frame(height: 36)
                 .background(AppColors.cardBackground)
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 .overlay(
@@ -203,7 +203,7 @@ public struct AccountsManagerView: View {
                     }
                     .foregroundColor(.white)
                     .padding(.horizontal, 12)
-                    .padding(.vertical, 9)
+                    .frame(height: 36)
                     .background(AppColors.brandPrimary)
                     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 }

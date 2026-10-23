@@ -229,7 +229,7 @@ public struct DailyJournalListView: View {
                 }
             }
             .padding(.horizontal, 10)
-            .padding(.vertical, 8)
+            .frame(height: 36)
             .background(AppColors.cardBackground)
             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             .overlay(
@@ -248,7 +248,7 @@ public struct DailyJournalListView: View {
                 }
                 .foregroundColor(.white)
                 .padding(.horizontal, 12)
-                .padding(.vertical, 8)
+                .frame(height: 36)
                 .background(AppColors.brandPrimary)
                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             }

@@ -90,19 +90,25 @@ public struct ReplayFrame: Sendable {
     public let activeFills: [Execution]
     public let unrealizedPnl: Decimal
     public let currentBar: MarketBar?
+    public let hasEntered: Bool
+    public let hasExited: Bool
     
     public init(
         visibleBars: [MarketBar],
         throughTimestamp: Int64,
         activeFills: [Execution],
         unrealizedPnl: Decimal,
-        currentBar: MarketBar? = nil
+        currentBar: MarketBar? = nil,
+        hasEntered: Bool = false,
+        hasExited: Bool = false
     ) {
         self.visibleBars = visibleBars
         self.throughTimestamp = throughTimestamp
         self.activeFills = activeFills
         self.unrealizedPnl = unrealizedPnl
         self.currentBar = currentBar ?? visibleBars.last
+        self.hasEntered = hasEntered
+        self.hasExited = hasExited
     }
 }
 
@@ -124,26 +130,45 @@ public enum TradeReplayEngine {
                 throughTimestamp: 0,
                 activeFills: [],
                 unrealizedPnl: 0,
-                currentBar: nil
+                currentBar: nil,
+                hasEntered: false,
+                hasExited: false
             )
         }
         
         let through = lastBar.timestamp + resolution.durationMs
         let currentFills = fills.filter { Int64($0.executedAt.timeIntervalSince1970 * 1000) <= through }
         
+        let entryTimeMs = Int64(trade.openedAt.timeIntervalSince1970 * 1000)
+        let exitTimeMs: Int64? = trade.closedAt.map { Int64($0.timeIntervalSince1970 * 1000) }
+        
+        let hasEntered = through >= entryTimeMs
+        let hasExited = exitTimeMs != nil && through >= exitTimeMs!
         let isLast = clampedIndex >= bars.count
-        let unrealized = computeUnrealizedPnl(
-            trade: trade,
-            currentPrice: lastBar.close,
-            isLastBar: isLast
-        )
+        
+        // Accurate entry gating: unrealized PnL is 0 until position is actually entered
+        let unrealized: Decimal = {
+            if !hasEntered {
+                return 0
+            }
+            if hasExited || (isLast && trade.status != .open) {
+                return trade.netPnl
+            }
+            return computeUnrealizedPnl(
+                trade: trade,
+                currentPrice: lastBar.close,
+                isLastBar: isLast
+            )
+        }()
         
         return ReplayFrame(
             visibleBars: visible,
             throughTimestamp: through,
             activeFills: currentFills,
             unrealizedPnl: unrealized,
-            currentBar: lastBar
+            currentBar: lastBar,
+            hasEntered: hasEntered,
+            hasExited: hasExited
         )
     }
     
