@@ -1611,7 +1611,7 @@ public final class The5ersService: ObservableObject {
                 if let unreal = acc.unrealized, unreal != 0, let sb = acc.startingBalance, sb > 0 {
                     // Check whether profitAndLoss equals (equity - startingBalance) or (balance - startingBalance)
                     let realizedFromBal = acc.balance - sb
-                    let floatingFromEq = acc.equity - sb
+                    let floatingFromEq = (acc.equity ?? acc.balance) - sb
                     if abs(pnl - floatingFromEq) < 0.05 && abs(pnl - realizedFromBal) > 0.05 {
                         return toReporting(realizedFromBal)
                     }

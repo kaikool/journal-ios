@@ -99,7 +99,7 @@ public struct ExitAttribution: Codable, Equatable, Hashable {
 /// Flat-to-Flat round-trip trade cycle (RoundTrip / Trade)
 public struct Trade: Identifiable, Codable, Equatable, Hashable {
     public var id: String { key }
-    public let key: String
+    public var key: String
     public var accountId: String
     public let symbol: String
     public let assetClass: AssetClass?
