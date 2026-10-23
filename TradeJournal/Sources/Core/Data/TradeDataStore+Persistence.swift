@@ -226,6 +226,9 @@ extension TradeDataStore {
         
         deduplicateAndCleanAccounts()
         refreshActiveAccountCache()
+        if selectedAccountId == "default-acc" || selectedAccountId.isEmpty || (selectedAccountId != "all" && filteredTrades.isEmpty && !trades.isEmpty) {
+            selectedAccountId = "all"
+        }
         invalidatePerformanceCaches()
     }
 }

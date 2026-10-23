@@ -472,6 +472,10 @@ public final class The5ersService: ObservableObject {
         }
         
         guard (200...299).contains(http.statusCode) else {
+            if http.statusCode == 400 || http.statusCode == 401 || http.statusCode == 404 {
+                self.isSessionInitialized = false
+                self.mcpSessionId = nil
+            }
             let msg: String = {
                 switch http.statusCode {
                 case 401: return "The5ers MCP authorization session expired. Please reconnect."
@@ -506,6 +510,11 @@ public final class The5ersService: ObservableObject {
         
         if let rpcError = json["error"] as? [String: Any],
            let errorMsg = rpcError["message"] as? String {
+            let lowerErr = errorMsg.lowercased()
+            if lowerErr.contains("session") || lowerErr.contains("init") || lowerErr.contains("unauth") {
+                self.isSessionInitialized = false
+                self.mcpSessionId = nil
+            }
             throw NSError(domain: "The5ersMCP", code: -1, userInfo: [NSLocalizedDescriptionKey: "The5ers MCP error: \(errorMsg)"])
         }
         
@@ -740,6 +749,9 @@ public final class The5ersService: ObservableObject {
         defer { isSyncing = false }
         
         do {
+            // Always start sync with a fresh MCP session handshake so account_ref tokens are newly minted
+            self.isSessionInitialized = false
+            self.mcpSessionId = nil
             try await ensureInitialized()
             await refreshAvailableTools()
             
@@ -759,9 +771,10 @@ public final class The5ersService: ObservableObject {
                     return [
                         [
                             "operation": "list",
-                            "contract_version": "1.0",
                             "page": page,
-                            "limit": 50
+                            "limit": 50,
+                            "contract_version": "1.0",
+                            "request_context": ["timezone": "UTC", "locale": "en"]
                         ],
                         [
                             "operation": "list",
@@ -819,8 +832,17 @@ public final class The5ersService: ObservableObject {
                 }
             }
             
+            // Sort raw accounts so active accounts are enriched first
+            rawAccountsList.sort { a, b in
+                let sa = String(describing: a["status"] ?? "").lowercased()
+                let sb = String(describing: b["status"] ?? "").lowercased()
+                let aAct = sa == "active" || sa == "trading" || sa == "available" || sa == "open"
+                let bAct = sb == "active" || sb == "trading" || sb == "available" || sb == "open"
+                return aAct && !bAct
+            }
+            
             var accountsList: [The5ersMcpAccount] = []
-            for item in rawAccountsList {
+            for (accIdx, item) in rawAccountsList.enumerated() {
                 if Task.isCancelled || isCancelledByUser { throw CancellationError() }
                 // Ignore contest accounts which belong to a separate space and cannot be read by standard operations
                 if item["contest_account_ref"] != nil && item["ref"] == nil {
@@ -828,6 +850,7 @@ public final class The5ersService: ObservableObject {
                 }
                 let ref = String(describing: item["ref"] ?? item["account_ref"] ?? item["id"] ?? UUID().uuidString)
                 let label = String(describing: item["label"] ?? item["name"] ?? "The5ers Account")
+                lastStatus = "Loading account (\(accIdx + 1)/\(rawAccountsList.count)): \(label)..."
                 var bal = Decimal(string: String(describing: item["balance"] ?? item["effectiveBalance"] ?? "0")) ?? 0
                 var eq = Decimal(string: String(describing: item["equity"] ?? bal)) ?? bal
                 let curr = String(describing: item["currency"] ?? "USD")
@@ -873,7 +896,7 @@ public final class The5ersService: ObservableObject {
                     }
                 }
                 
-                // Concurrently query Authoritative Balance, Statistics, and Journey in parallel
+                // Sequentially query Authoritative Balance, Statistics, and Journey (MCP session is stateful; never fire concurrent RPCs on same session)
                 var accProfitAndLoss: Decimal? = nil
                 var accDailyProfitAndLoss: Decimal? = nil
                 var accUnrealized: Decimal? = nil
@@ -892,37 +915,13 @@ public final class The5ersService: ObservableObject {
                 var authoritativeMaxDailyLoss: Decimal? = nil
                 var authoritativeMinTradingDays: Int? = nil
                 
-                async let balTask: [String: Any]? = {
-                    let balArgs: [String: Any] = [
-                        "operation": "balance",
-                        "account_ref": ref,
-                        "contract_version": "1.0"
-                    ]
-                    return try? await self.callMcpTool(name: "the5ers_account", arguments: balArgs)
-                }()
-                
-                async let statsTask: [String: Any]? = {
-                    let statsArgs: [String: Any] = [
-                        "operation": "statistics",
-                        "account_ref": ref,
-                        "contract_version": "1.0"
-                    ]
-                    return try? await self.callMcpTool(name: "the5ers_account", arguments: statsArgs)
-                }()
-                
-                async let journeyTask: [String: Any]? = {
-                    let journeyArgs: [String: Any] = [
-                        "operation": "journey",
-                        "account_ref": ref,
-                        "contract_version": "1.0"
-                    ]
-                    return try? await self.callMcpTool(name: "the5ers_program", arguments: journeyArgs)
-                }()
-                
-                let (bRes, sRes, jRes) = await (balTask, statsTask, journeyTask)
-                
-                // Parse Authoritative Balance
-                if let bRes = bRes, !(bRes["isError"] as? Bool ?? false) {
+                let balArgs: [String: Any] = [
+                    "operation": "balance",
+                    "account_ref": ref,
+                    "contract_version": "1.0"
+                ]
+                if let bRes = try? await callMcpTool(name: "the5ers_account", arguments: balArgs),
+                   !(bRes["isError"] as? Bool ?? false) {
                     let uBal = unwrapMcpToolResult(bRes)
                     if let bDict = (uBal as? [String: Any])?["data"] as? [String: Any] ?? uBal as? [String: Any] {
                         if let initB = sourceNumber(bDict["initialBalance"] ?? bDict["baseBalance"] ?? bDict["startingBalance"]), initB > 0 {
@@ -943,8 +942,14 @@ public final class The5ersService: ObservableObject {
                     }
                 }
                 
-                // Parse Authoritative Statistics
-                if let sRes = sRes, !(sRes["isError"] as? Bool ?? false) {
+                // Query Authoritative Statistics from official the5ers_account.statistics
+                let statsArgs: [String: Any] = [
+                    "operation": "statistics",
+                    "account_ref": ref,
+                    "contract_version": "1.0"
+                ]
+                if let sRes = try? await callMcpTool(name: "the5ers_account", arguments: statsArgs),
+                   !(sRes["isError"] as? Bool ?? false) {
                     let uStats = unwrapMcpToolResult(sRes)
                     if let sDict = (uStats as? [String: Any])?["data"] as? [String: Any] ?? uStats as? [String: Any] {
                         if let tt = sDict["totalTrades"] as? Int ?? (sDict["tradesCount"] as? Int) ?? (sDict["total_trades"] as? Int) {
@@ -978,8 +983,14 @@ public final class The5ersService: ObservableObject {
                     }
                 }
                 
-                // Parse Authoritative Program & Objectives from Journey
-                if let jRes = jRes, !(jRes["isError"] as? Bool ?? false) {
+                // Query official the5ers_program.journey (returns authoritative programName, currentStep.name, phase, and objectives in 1 single call)
+                let journeyArgs: [String: Any] = [
+                    "operation": "journey",
+                    "account_ref": ref,
+                    "contract_version": "1.0"
+                ]
+                if let jRes = try? await callMcpTool(name: "the5ers_program", arguments: journeyArgs),
+                   !(jRes["isError"] as? Bool ?? false) {
                     let uJourney = unwrapMcpToolResult(jRes)
                     if let jData = (uJourney as? [String: Any])?["data"] as? [String: Any] ?? uJourney as? [String: Any],
                        let auth = jData["authoritative"] as? [String: Any] {
@@ -1343,6 +1354,10 @@ public final class The5ersService: ObservableObject {
                             page += 1
                         }
                     }
+                    
+                    // Immediately refresh UI caches so Dashboard, Calendar, Trades, and Journal display incoming trades live
+                    dataStore.invalidatePerformanceCaches()
+                    dataStore.objectWillChange.send()
                 } catch {
                     if Task.isCancelled || isCancelledByUser { break }
                     AppLogger.error("Error syncing trades for account \(acc.label) (\(acc.id)): \(error.localizedDescription)")
@@ -1352,17 +1367,17 @@ public final class The5ersService: ObservableObject {
             if Task.isCancelled || isCancelledByUser { throw CancellationError() }
             
             // 4. Sync purchases / challenges & evaluation fees across official MCP tools
-            await syncPurchases(into: dataStore, targetAccounts: allTargetAccounts, rawAccounts: rawAccountsList)
+            await syncPurchases(into: dataStore, targetAccounts: allTargetAccounts)
             
             if Task.isCancelled || isCancelledByUser { throw CancellationError() }
             
-            // 5. Sync payouts & withdrawal settlements strictly for funded accounts
-            await syncPayouts(into: dataStore, targetAccounts: allTargetAccounts, rawAccounts: rawAccountsList)
+            // 5. Sync payouts & withdrawal settlements across official MCP tools
+            await syncPayouts(into: dataStore, targetAccounts: allTargetAccounts)
             
             lastSyncTime = Date()
             dataStore.rebuildAllAccounts()
             
-            if dataStore.selectedAccountId == "default-acc" || dataStore.selectedAccountId.isEmpty {
+            if dataStore.selectedAccountId == "default-acc" || dataStore.selectedAccountId.isEmpty || (dataStore.selectedAccountId != "all" && dataStore.filteredTrades.isEmpty && !dataStore.trades.isEmpty) {
                 dataStore.selectAccount(id: "all")
             }
             
@@ -1984,66 +1999,82 @@ public final class The5ersService: ObservableObject {
     @MainActor
     private func syncPurchases(
         into dataStore: TradeDataStore,
-        targetAccounts: [The5ersMcpAccount],
-        rawAccounts: [[String: Any]] = []
+        targetAccounts: [The5ersMcpAccount]
     ) async {
         lastStatus = "Loading purchases and evaluation fees from the5ers_purchase..."
         var allPurchases: [[String: Any]] = []
         var seenPurchaseIds = Set<String>()
         
-        // 1. Extract any purchases embedded inside raw account records
-        for rawAcc in rawAccounts {
-            let accRef = String(describing: rawAcc["ref"] ?? rawAcc["account_ref"] ?? rawAcc["id"] ?? "")
-            let embedded = extractAnyPurchaseCollection(from: rawAcc)
-            for var p in embedded {
-                if p["account_ref"] == nil && !accRef.isEmpty { p["account_ref"] = accRef }
-                let pId = String(describing: p["ref"] ?? p["id"] ?? p["orderid"] ?? p["order_id"] ?? p["purchaseid"] ?? UUID().uuidString)
+        // 1. Fetch paginated orders from official the5ers_purchase 'list'
+        var page = 1
+        while page <= 10 {
+            if Task.isCancelled || isCancelledByUser { break }
+            let pArgs: [String: Any] = [
+                "operation": "list",
+                "contract_version": "1.0",
+                "page": page,
+                "limit": 50
+            ]
+            guard let res = try? await callMcpTool(name: "the5ers_purchase", arguments: pArgs),
+                  !(res["isError"] as? Bool ?? false) else { break }
+            let unwrapped = unwrapMcpToolResult(res)
+            let rows = extractAnyPurchaseCollection(from: unwrapped)
+            if rows.isEmpty { break }
+            for r in rows {
+                let pId = String(describing: r["ref"] ?? r["id"] ?? r["orderid"] ?? r["order_id"] ?? r["purchaseid"] ?? UUID().uuidString)
                 if !seenPurchaseIds.contains(pId) {
                     seenPurchaseIds.insert(pId)
-                    allPurchases.append(p)
+                    allPurchases.append(r)
                 }
             }
+            if let dict = unwrapped as? [String: Any],
+               let pagination = dict["pagination"] as? [String: Any],
+               let hasMore = pagination["has_more"] as? Bool,
+               !hasMore {
+                break
+            }
+            if rows.count < 50 { break }
+            page += 1
         }
         
-        // 2. Fetch orders from official the5ers_purchase 'list'
-        let pArgsList: [[String: Any]] = [
-            ["operation": "list", "contract_version": "1.0", "limit": 50],
-            ["operation": "list"]
-        ]
-        for pArgs in pArgsList {
-            if Task.isCancelled || isCancelledByUser { break }
-            if let res = try? await callMcpTool(name: "the5ers_purchase", arguments: pArgs),
-               !(res["isError"] as? Bool ?? false) {
-                let unwrapped = unwrapMcpToolResult(res)
-                let rows = extractAnyPurchaseCollection(from: unwrapped)
-                if !rows.isEmpty {
-                    for r in rows {
-                        let pId = String(describing: r["ref"] ?? r["id"] ?? r["orderid"] ?? r["order_id"] ?? r["purchaseid"] ?? UUID().uuidString)
-                        if !seenPurchaseIds.contains(pId) {
-                            seenPurchaseIds.insert(pId)
-                            allPurchases.append(r)
+        // Fallback without pagination parameters if paginated query was empty
+        if allPurchases.isEmpty {
+            let fallbackArgsList: [[String: Any]] = [
+                ["operation": "list", "contract_version": "1.0", "limit": 50],
+                ["operation": "list"]
+            ]
+            for pArgs in fallbackArgsList {
+                if Task.isCancelled || isCancelledByUser { break }
+                if let res = try? await callMcpTool(name: "the5ers_purchase", arguments: pArgs),
+                   !(res["isError"] as? Bool ?? false) {
+                    let unwrapped = unwrapMcpToolResult(res)
+                    let rows = extractAnyPurchaseCollection(from: unwrapped)
+                    if !rows.isEmpty {
+                        for r in rows {
+                            let pId = String(describing: r["ref"] ?? r["id"] ?? r["orderid"] ?? r["order_id"] ?? r["purchaseid"] ?? UUID().uuidString)
+                            if !seenPurchaseIds.contains(pId) {
+                                seenPurchaseIds.insert(pId)
+                                allPurchases.append(r)
+                            }
                         }
+                        break
                     }
-                    break
                 }
             }
         }
         
-        // 3. Resiliently associate orders with accounts if account_ref is missing
-        var unmappedLookupCount = 0
+        // 2. Query 'accounts' sequentially for each order reference to map directly to created accounts
         for i in allPurchases.indices {
-            if unmappedLookupCount >= 8 { break }
+            if Task.isCancelled || isCancelledByUser { break }
             let pRef = String(describing: allPurchases[i]["ref"] ?? allPurchases[i]["purchase_ref"] ?? allPurchases[i]["id"] ?? "")
-            let existingAccRef = String(describing: allPurchases[i]["account_ref"] ?? "")
-            if !pRef.isEmpty && existingAccRef.isEmpty {
-                unmappedLookupCount += 1
-                if let accRes = try? await self.callMcpTool(name: "the5ers_purchase", arguments: [
+            if !pRef.isEmpty && (allPurchases[i]["account_ref"] == nil || String(describing: allPurchases[i]["account_ref"] ?? "").isEmpty) {
+                if let accRes = try? await callMcpTool(name: "the5ers_purchase", arguments: [
                     "operation": "accounts",
                     "purchase_ref": pRef,
                     "contract_version": "1.0"
                 ]), !(accRes["isError"] as? Bool ?? false) {
-                    let unwrappedAcc = self.unwrapMcpToolResult(accRes)
-                    let accRows = self.extractMcpCollection(unwrappedAcc, collectionKey: "accounts")
+                    let unwrappedAcc = unwrapMcpToolResult(accRes)
+                    let accRows = extractMcpCollection(unwrappedAcc, collectionKey: "accounts")
                     if let firstAcc = accRows.first, let createdRef = firstAcc["account_ref"] ?? firstAcc["ref"] {
                         allPurchases[i]["account_ref"] = String(describing: createdRef)
                     }
@@ -2284,81 +2315,32 @@ public final class The5ersService: ObservableObject {
     @MainActor
     private func syncPayouts(
         into dataStore: TradeDataStore,
-        targetAccounts: [The5ersMcpAccount],
-        rawAccounts: [[String: Any]] = []
+        targetAccounts: [The5ersMcpAccount]
     ) async {
         lastStatus = "Loading withdrawal and payout history from the5ers_payout..."
+        
+        // Query official payouts across target accounts sequentially (eligibility / explain / history)
+        let candidateAccounts = targetAccounts
+        
+        guard !candidateAccounts.isEmpty else {
+            return
+        }
         
         var allRawPayouts: [[String: Any]] = []
         var seenPayoutIds = Set<String>()
         var accountSplitMap: [String: Double] = [:]
         
-        // 1. Extract any payouts embedded inside raw account objects
-        for rawAcc in rawAccounts {
-            let accRef = String(describing: rawAcc["ref"] ?? rawAcc["account_ref"] ?? rawAcc["id"] ?? "")
-            let accCurr = String(describing: rawAcc["currency"] ?? "USD")
-            let embedded = extractAnyPayoutCollection(from: rawAcc)
-            for var p in embedded {
-                if p["account_ref"] == nil && !accRef.isEmpty { p["account_ref"] = accRef }
-                if p["currency"] == nil { p["currency"] = accCurr }
-                let pId = String(describing: p["id"] ?? p["payout_id"] ?? p["withdrawalid"] ?? UUID().uuidString)
-                if !seenPayoutIds.contains(pId) {
-                    seenPayoutIds.insert(pId)
-                    allRawPayouts.append(p)
-                }
-            }
-        }
-        
-        // 2. Query official payouts across target accounts (eligibility / explain / history)
-        let fundedAccounts = targetAccounts.filter { acc in
-            let prog = acc.program.lowercased()
-            let label = acc.label.lowercased()
-            let stat = acc.status.lowercased()
-            return prog.contains("fund") || prog.contains("live") || prog.contains("master") ||
-                   label.contains("fund") || label.contains("live") || stat.contains("fund")
-        }
-        let candidateAccounts = fundedAccounts.isEmpty ? targetAccounts : fundedAccounts
-        
-        guard !candidateAccounts.isEmpty || !allRawPayouts.isEmpty else {
-            return
-        }
-        
         for acc in candidateAccounts {
             if Task.isCancelled || isCancelledByUser { break }
             
-            // Concurrently query eligibility, explain, and history in parallel
-            async let eligTask: [String: Any]? = {
-                let eligArgs: [String: Any] = [
-                    "operation": "eligibility",
-                    "account_ref": acc.ref,
-                    "contract_version": "1.0"
-                ]
-                return try? await self.callMcpTool(name: "the5ers_payout", arguments: eligArgs)
-            }()
-            
-            async let explainTask: [String: Any]? = {
-                let explainArgs: [String: Any] = [
-                    "operation": "explain",
-                    "account_ref": acc.ref,
-                    "contract_version": "1.0"
-                ]
-                return try? await self.callMcpTool(name: "the5ers_payout", arguments: explainArgs)
-            }()
-            
-            async let histTask: [String: Any]? = {
-                let histArgs: [String: Any] = [
-                    "operation": "history",
-                    "account_ref": acc.ref,
-                    "contract_version": "1.0",
-                    "limit": 50
-                ]
-                return try? await self.callMcpTool(name: "the5ers_payout", arguments: histArgs)
-            }()
-            
-            let (eligRes, explainRes, histRes) = await (eligTask, explainTask, histTask)
-            
-            // A. Parse eligibility
-            if let eligRes = eligRes, !(eligRes["isError"] as? Bool ?? false) {
+            // A. Query 'eligibility' for userPayoutPercentage (e.g. 80.0, 85.0)
+            let eligArgs: [String: Any] = [
+                "operation": "eligibility",
+                "account_ref": acc.ref,
+                "contract_version": "1.0"
+            ]
+            if let eligRes = try? await callMcpTool(name: "the5ers_payout", arguments: eligArgs),
+               !(eligRes["isError"] as? Bool ?? false) {
                 let unwrapped = unwrapMcpToolResult(eligRes)
                 if let eDict = (unwrapped as? [String: Any])?["data"] as? [String: Any] ?? unwrapped as? [String: Any] {
                     if let split = eDict["userPayoutPercentage"] as? NSNumber {
@@ -2367,9 +2349,15 @@ public final class The5ersService: ObservableObject {
                 }
             }
             
-            // B. Parse explain
+            // B. Query 'explain' for recorded split breakdown and traderSplitPercent
             var latestPayoutDict: [String: Any]? = nil
-            if let explainRes = explainRes, !(explainRes["isError"] as? Bool ?? false) {
+            let explainArgs: [String: Any] = [
+                "operation": "explain",
+                "account_ref": acc.ref,
+                "contract_version": "1.0"
+            ]
+            if let explainRes = try? await callMcpTool(name: "the5ers_payout", arguments: explainArgs),
+               !(explainRes["isError"] as? Bool ?? false) {
                 let unwrappedExplain = unwrapMcpToolResult(explainRes)
                 if let expDict = (unwrappedExplain as? [String: Any])?["data"] as? [String: Any] ?? unwrappedExplain as? [String: Any] {
                     if let avail = expDict["available"] as? [String: Any] {
@@ -2389,9 +2377,16 @@ public final class The5ersService: ObservableObject {
                 }
             }
             
-            // C. Parse history payouts
+            // C. Query 'history' for past payouts (limit: 50)
             var historyPayouts: [[String: Any]] = []
-            if let histRes = histRes, !(histRes["isError"] as? Bool ?? false) {
+            let histArgs: [String: Any] = [
+                "operation": "history",
+                "account_ref": acc.ref,
+                "contract_version": "1.0",
+                "limit": 50
+            ]
+            if let histRes = try? await callMcpTool(name: "the5ers_payout", arguments: histArgs),
+               !(histRes["isError"] as? Bool ?? false) {
                 let unwrappedHist = unwrapMcpToolResult(histRes)
                 let rows = extractAnyPayoutCollection(from: unwrappedHist)
                 for var r in rows {

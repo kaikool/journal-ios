@@ -207,11 +207,11 @@ extension TradeDataStore {
             for acc in accounts {
                 rebuildAccount(accountId: acc.id)
             }
-            deduplicateTrades()
-            invalidatePerformanceCaches()
-            saveToDisk(immediate: true)
-            objectWillChange.send()
         }
+        deduplicateTrades()
+        invalidatePerformanceCaches()
+        saveToDisk(immediate: true)
+        objectWillChange.send()
     }
     
     public func updateTradeAnnotations(
