@@ -2499,6 +2499,7 @@ public final class The5ersService: ObservableObject {
                 }
                 if let t = position.providerId, !t.isEmpty, !existing.executionIds.contains(t) {
                     existing.executionIds.append(t)
+                    existing.executionCount = existing.executionIds.count
                 }
                 syncedAccountTrades.append(existing)
                 count += 1

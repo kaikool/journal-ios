@@ -118,8 +118,8 @@ public struct Trade: Identifiable, Codable, Equatable, Hashable {
     /// Invariant: `netPnl == grossPnl - fees + swapAmount`.
     public var swap: Decimal?
     public var netPnl: Decimal
-    public let executionCount: Int
-    public let executionIds: [String]
+    public var executionCount: Int
+    public var executionIds: [String]
     public var exits: [ExitAttribution]
     public var durationMs: Int64?
     public var contractMultiplier: Decimal?
