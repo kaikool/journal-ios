@@ -5,14 +5,21 @@ import SwiftUI
 extension TradeDataStore {
     
     public var filteredTrades: [Trade] {
+        let effectiveAccountId: String = {
+            if selectedAccountId == "all" || selectedAccountId == "default-acc" || selectedAccountId.isEmpty {
+                return selectedAccount?.id ?? selectedAccountId
+            }
+            return selectedAccountId
+        }()
         if let cached = _cachedFilteredTrades,
-           _cachedFilteredTradesAccountId == selectedAccountId {
+           _cachedFilteredTradesAccountId == effectiveAccountId {
             return cached
         }
         let result: [Trade]
-        if selectedAccountId == "all" {
+        if effectiveAccountId.isEmpty || effectiveAccountId == "all" {
             let visibleIds = visibleAccountIds
             result = trades.filter { trade in
+                if trade.symbol == "ACCOUNT" { return false }
                 if visibleIds.contains(trade.accountId) { return true }
                 let clean = trade.accountId.cleanAccountId
                 if visibleIds.contains(clean) || visibleIds.contains(trade.accountId.the5ersCanonicalId) {
@@ -21,13 +28,14 @@ extension TradeDataStore {
                 return false
             }
         } else {
-            let selId = selectedAccountId
+            let selId = effectiveAccountId
             result = trades.filter { trade in
-                trade.accountId == selId || TradeDataStore.isSameAccountId(trade.accountId, selId)
+                guard trade.symbol != "ACCOUNT" else { return false }
+                return trade.accountId == selId || TradeDataStore.isSameAccountId(trade.accountId, selId)
             }
         }
         _cachedFilteredTrades = result
-        _cachedFilteredTradesAccountId = selectedAccountId
+        _cachedFilteredTradesAccountId = effectiveAccountId
         return result
     }
     

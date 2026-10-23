@@ -223,8 +223,8 @@ extension TradeDataStore {
         if folders.isEmpty {
             folders = NotebookEngine.defaultSystemFolders
         }
-        if selectedAccountId == "default-acc" || (selectedAccountId != "all" && !accounts.contains(where: { $0.id == selectedAccountId || TradeDataStore.isSameAccountId($0.id, selectedAccountId) })) {
-            selectedAccountId = "all"
+        if selectedAccountId == "default-acc" || selectedAccountId == "all" || !accounts.contains(where: { $0.id == selectedAccountId || TradeDataStore.isSameAccountId($0.id, selectedAccountId) }) {
+            selectedAccountId = mostRecentActiveAccount?.id ?? visibleAccounts.first?.id ?? accounts.first?.id ?? "default-acc"
         }
         
         // Rebuild trades for any accounts that have imported executions but no reconstructed trades
@@ -238,8 +238,8 @@ extension TradeDataStore {
         
         deduplicateAndCleanAccounts()
         refreshActiveAccountCache()
-        if selectedAccountId == "default-acc" || selectedAccountId.isEmpty || (selectedAccountId != "all" && filteredTrades.isEmpty && !trades.isEmpty) {
-            selectedAccountId = "all"
+        if selectedAccountId == "default-acc" || selectedAccountId == "all" || selectedAccountId.isEmpty || !accounts.contains(where: { $0.id == selectedAccountId || TradeDataStore.isSameAccountId($0.id, selectedAccountId) }) {
+            selectedAccountId = mostRecentActiveAccount?.id ?? visibleAccounts.first?.id ?? accounts.first?.id ?? "default-acc"
         }
         invalidatePerformanceCaches()
     }

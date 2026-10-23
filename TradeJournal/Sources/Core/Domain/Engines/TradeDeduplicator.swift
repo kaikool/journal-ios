@@ -67,31 +67,28 @@ public enum TradeDeduplicator {
         var cleaned: [Trade] = []
         
         for trade in sorted {
+            // Never keep legacy synthetic summary/midnight placeholder trades
+            if trade.symbol == "ACCOUNT" || trade.key.contains("_midnight_") || trade.key.hasSuffix("_summary") {
+                continue
+            }
             if seenKeys.contains(trade.key) {
                 continue
             }
             
-            // Never drop distinct trades that have authoritative broker tickets or tags
-            let hasAuthoritativeTicket = trade.key.contains("provider:") ||
-                                         (trade.notes?.contains("Ticket:") == true) ||
-                                         trade.tags.contains("the5ers")
+            let openSec = Int64(trade.openedAt.timeIntervalSince1970.rounded())
+            let qtyStr = NSDecimalNumber(decimal: trade.quantity).stringValue
+            let entryStr = NSDecimalNumber(decimal: trade.avgEntry).stringValue
+            let symbol = AssetContractEngine.canonicalSymbol(trade.symbol)
+            let cleanAcc = trade.accountId.cleanAccountId
+            let baseSemantic = "\(cleanAcc)|\(symbol)|\(trade.direction.rawValue)"
+            let exactKey = "\(baseSemantic)|\(openSec)|\(qtyStr)|\(entryStr)"
+            let prevSecKey = "\(baseSemantic)|\(openSec - 1)|\(qtyStr)|\(entryStr)"
+            let nextSecKey = "\(baseSemantic)|\(openSec + 1)|\(qtyStr)|\(entryStr)"
             
-            if !hasAuthoritativeTicket {
-                let openSec = Int64(trade.openedAt.timeIntervalSince1970.rounded())
-                let qtyStr = NSDecimalNumber(decimal: trade.quantity).stringValue
-                let entryStr = NSDecimalNumber(decimal: trade.avgEntry).stringValue
-                let symbol = AssetContractEngine.canonicalSymbol(trade.symbol)
-                let cleanAcc = trade.accountId.cleanAccountId
-                let baseSemantic = "\(cleanAcc)|\(symbol)|\(trade.direction.rawValue)"
-                let exactKey = "\(baseSemantic)|\(openSec)|\(qtyStr)|\(entryStr)"
-                let prevSecKey = "\(baseSemantic)|\(openSec - 1)|\(qtyStr)|\(entryStr)"
-                let nextSecKey = "\(baseSemantic)|\(openSec + 1)|\(qtyStr)|\(entryStr)"
-                
-                if seenSemantics.contains(exactKey) || seenSemantics.contains(prevSecKey) || seenSemantics.contains(nextSecKey) {
-                    continue
-                }
-                seenSemantics.insert(exactKey)
+            if seenSemantics.contains(exactKey) || seenSemantics.contains(prevSecKey) || seenSemantics.contains(nextSecKey) {
+                continue
             }
+            seenSemantics.insert(exactKey)
             
             seenKeys.insert(trade.key)
             cleaned.append(trade)

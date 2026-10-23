@@ -139,13 +139,7 @@ public struct DashboardView: View {
         // Balances are stored in the account currency while every P&L figure is expressed in the
         // reporting currency, so balances are converted before being compared with the P&L curve.
         let initialBalance: Decimal = {
-            if dataStore.selectedAccountId == "all" {
-                return dataStore.visibleAccounts.reduce(Decimal.zero) { total, account in
-                    total + dataStore.currencyConversion.convertedBalance(account.initialBalance, currency: account.currency)
-                }
-            }
-            let account = dataStore.selectedAccount
-            guard let account else { return 0 }
+            guard let account = dataStore.selectedAccount else { return 0 }
             return dataStore.currencyConversion.convertedBalance(account.initialBalance, currency: account.currency)
         }()
         

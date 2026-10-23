@@ -310,8 +310,6 @@ extension PropFirmLedgerView {
     internal func accountCashSummary(account: PropAccountItem) -> CashSummaryResult {
         let accClean = account.id.cleanAccountId
         let accCurr = account.currency.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
-        let totalFirmAccounts = dataStore.propAccounts.filter { $0.firm.lowercased() == account.firm.lowercased() }
-        let isOnlyAccountForFirm = totalFirmAccounts.count == 1
         
         let accMovements = movements.filter { mov in
             let movCurr = mov.currency.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
@@ -323,11 +321,6 @@ extension PropFirmLedgerView {
                        TradeDataStore.isSameAccountId(mAccId, account.id) ||
                        (account.journalAccountId.map { TradeDataStore.isSameAccountId(mAccId, $0) } ?? false) ||
                        mAccId.cleanAccountId == accClean
-            }
-            
-            // Fallback: If movement has no account ID, but this is the only account for this firm, attribute it
-            if isOnlyAccountForFirm && mov.firm.lowercased() == account.firm.lowercased() {
-                return true
             }
             return false
         }
@@ -399,28 +392,34 @@ extension PropFirmLedgerView {
                             
                             HStack {
                                 if let size = acc.sizeMinor {
-                                    Text("Size: \(Formatters.formatCurrency(Decimal(size) / 100, currency: acc.currency))")
+                                    Text("Initial Size: \(Formatters.formatCurrency(Decimal(size) / 100, currency: acc.currency))")
                                         .font(AppTypography.caption)
                                         .monospacedDigit()
                                         .foregroundColor(AppColors.secondaryText)
                                         .lineLimit(1)
                                 }
                                 Spacer()
-                                Text(acc.program.label)
+                                Text(acc.currentStepName ?? acc.program.label)
                                     .font(AppTypography.caption)
                                     .foregroundColor(AppColors.secondaryText)
                                     .lineLimit(1)
                             }
                             
-                            // 3-Column Account Economics matching web prop-firm-tracker.tsx:900-913
-                            let accSummary = accountCashSummary(account: acc)
+                            // 3-Column Account Balance, Equity & Net P&L (Authoritative MCP Account State)
+                            let balMinor = acc.balanceMinor ?? acc.sizeMinor ?? 0
+                            let eqMinor = acc.equityMinor ?? balMinor
+                            let pnlMinor: Int64 = {
+                                if let np = acc.netPnlMinor { return np }
+                                if let b = acc.balanceMinor, let s = acc.sizeMinor, s > 0 { return b - s }
+                                return 0
+                            }()
                             HStack {
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text("Net spend")
+                                    Text("Balance")
                                         .font(AppTypography.caption)
                                         .foregroundColor(AppColors.secondaryText)
                                         .lineLimit(1)
-                                    Text(Formatters.formatCurrency(Decimal(accSummary.netSpendMinor) / 100, currency: acc.currency))
+                                    Text(Formatters.formatCurrency(Decimal(balMinor) / 100, currency: acc.currency))
                                         .font(AppTypography.captionBold)
                                         .monospacedDigit()
                                         .foregroundColor(AppColors.primaryText)
@@ -429,28 +428,28 @@ extension PropFirmLedgerView {
                                 }
                                 Spacer()
                                 VStack(alignment: .center, spacing: 2) {
-                                    Text("Payout cash")
+                                    Text("Equity")
                                         .font(AppTypography.caption)
                                         .foregroundColor(AppColors.secondaryText)
                                         .lineLimit(1)
-                                    Text(Formatters.formatCurrency(Decimal(accSummary.receivedMinor) / 100, currency: acc.currency))
+                                    Text(Formatters.formatCurrency(Decimal(eqMinor) / 100, currency: acc.currency))
                                         .font(AppTypography.captionBold)
                                         .monospacedDigit()
-                                        .foregroundColor(AppColors.profit)
+                                        .foregroundColor(AppColors.primaryText)
                                         .lineLimit(1)
                                         .minimumScaleFactor(0.8)
                                 }
                                 Spacer()
                                 VStack(alignment: .trailing, spacing: 2) {
-                                    Text("Net return")
+                                    Text("Net P&L")
                                         .font(AppTypography.caption)
                                         .foregroundColor(AppColors.secondaryText)
                                         .lineLimit(1)
-                                    let isNetPos = accSummary.netMinor >= 0
-                                    Text("\(isNetPos ? "+" : "")\(Formatters.formatCurrency(Decimal(accSummary.netMinor) / 100, currency: acc.currency))")
+                                    let isNetPos = pnlMinor >= 0
+                                    Text("\(isNetPos ? "+" : "")\(Formatters.formatCurrency(Decimal(pnlMinor) / 100, currency: acc.currency))")
                                         .font(AppTypography.captionBold)
                                         .monospacedDigit()
-                                        .foregroundColor(isNetPos ? AppColors.profit : AppColors.loss)
+                                        .foregroundColor(pnlMinor == 0 ? AppColors.primaryText : (isNetPos ? AppColors.profit : AppColors.loss))
                                         .lineLimit(1)
                                         .minimumScaleFactor(0.8)
                                 }
@@ -460,25 +459,27 @@ extension PropFirmLedgerView {
                             .background(AppColors.secondaryBackground.opacity(0.6))
                             .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                             
-                            // Program Objectives & Criteria (The5ers authoritative journey & stats)
-                            if acc.status == .active && (acc.profitTargetMinor != nil || acc.maxLossMinor != nil || acc.maxDailyLossMinor != nil || acc.winningDays != nil || acc.minTradingDays != nil || acc.currentStepName != nil) {
+                            // Program Rules, Stop Loss & Progression (from the5ers_program / the5ers_consistency / the5ers_account)
+                            let hasProgramDetails = acc.profitTargetMinor != nil || acc.maxLossMinor != nil || acc.maxDailyLossMinor != nil || acc.winningDays != nil || acc.minTradingDays != nil || acc.currentStepName != nil || acc.totalTrades != nil
+                            if acc.status == .active || hasProgramDetails {
                                 VStack(alignment: .leading, spacing: 8) {
                                     HStack {
                                         HStack(spacing: 5) {
                                             Image(systemName: "target")
                                                 .font(.system(size: 11, weight: .semibold))
                                                 .foregroundColor(AppColors.brand)
-                                            Text(acc.currentStepName ?? "Program Objectives")
+                                            Text(acc.currentStepName ?? "Program Rules & Objectives")
                                                 .font(.system(size: 11.5, weight: .bold))
                                                 .foregroundColor(AppColors.primaryText)
                                                 .lineLimit(1)
                                         }
                                         Spacer()
                                         if let winDays = acc.winningDays {
+                                            let minDays = acc.minTradingDays ?? 0
                                             HStack(spacing: 3) {
                                                 Image(systemName: "checkmark.seal.fill")
                                                     .font(.system(size: 10))
-                                                Text("\(winDays) win day\(winDays == 1 ? "" : "s")")
+                                                Text(minDays > 0 ? "Winning Days: \(winDays)/\(minDays)" : "Winning Days: \(winDays)")
                                                     .font(.system(size: 10.5, weight: .semibold))
                                             }
                                             .foregroundColor(AppColors.profit)
@@ -493,7 +494,7 @@ extension PropFirmLedgerView {
                                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 6) {
                                         if let target = acc.profitTargetMinor {
                                             VStack(alignment: .leading, spacing: 1) {
-                                                Text("Target")
+                                                Text("Profit Target")
                                                     .font(.system(size: 10))
                                                     .foregroundColor(AppColors.secondaryText)
                                                 Text(Formatters.formatCurrency(Decimal(target) / 100, currency: acc.currency))
@@ -502,20 +503,9 @@ extension PropFirmLedgerView {
                                                     .foregroundColor(AppColors.profit)
                                             }
                                         }
-                                        if let maxLoss = acc.maxLossMinor {
-                                            VStack(alignment: .leading, spacing: 1) {
-                                                Text("Max Loss (Terminate)")
-                                                    .font(.system(size: 10))
-                                                    .foregroundColor(AppColors.secondaryText)
-                                                Text(Formatters.formatCurrency(Decimal(maxLoss) / 100, currency: acc.currency))
-                                                    .font(.system(size: 11, weight: .semibold))
-                                                    .monospacedDigit()
-                                                    .foregroundColor(AppColors.loss)
-                                            }
-                                        }
                                         if let dailyLoss = acc.maxDailyLossMinor {
                                             VStack(alignment: .leading, spacing: 1) {
-                                                Text("Daily Cap")
+                                                Text("Daily Stop Loss")
                                                     .font(.system(size: 10))
                                                     .foregroundColor(AppColors.secondaryText)
                                                 Text(Formatters.formatCurrency(Decimal(dailyLoss) / 100, currency: acc.currency))
@@ -524,13 +514,47 @@ extension PropFirmLedgerView {
                                                     .foregroundColor(AppColors.loss)
                                             }
                                         }
-                                        if let minDays = acc.minTradingDays {
+                                        if let maxLoss = acc.maxLossMinor {
                                             VStack(alignment: .leading, spacing: 1) {
-                                                Text("Trading Days")
+                                                Text("Max Stop Loss")
                                                     .font(.system(size: 10))
                                                     .foregroundColor(AppColors.secondaryText)
-                                                let curr = acc.currentTradingDays ?? 0
-                                                Text("\(curr)/\(minDays) days")
+                                                Text(Formatters.formatCurrency(Decimal(maxLoss) / 100, currency: acc.currency))
+                                                    .font(.system(size: 11, weight: .semibold))
+                                                    .monospacedDigit()
+                                                    .foregroundColor(AppColors.loss)
+                                            }
+                                        }
+                                        if let minDays = acc.minTradingDays {
+                                            VStack(alignment: .leading, spacing: 1) {
+                                                Text("Min Winning Days")
+                                                    .font(.system(size: 10))
+                                                    .foregroundColor(AppColors.secondaryText)
+                                                let wins = acc.winningDays ?? 0
+                                                Text("\(wins)/\(minDays) days")
+                                                    .font(.system(size: 11, weight: .semibold))
+                                                    .monospacedDigit()
+                                                    .foregroundColor(wins >= minDays ? AppColors.profit : AppColors.primaryText)
+                                            }
+                                        }
+                                        if let tradingDays = acc.currentTradingDays, tradingDays > 0 {
+                                            VStack(alignment: .leading, spacing: 1) {
+                                                Text("Active Trading Days")
+                                                    .font(.system(size: 10))
+                                                    .foregroundColor(AppColors.secondaryText)
+                                                Text("\(tradingDays) day\(tradingDays == 1 ? "" : "s")")
+                                                    .font(.system(size: 11, weight: .semibold))
+                                                    .monospacedDigit()
+                                                    .foregroundColor(AppColors.primaryText)
+                                            }
+                                        }
+                                        if let totalTrades = acc.totalTrades {
+                                            VStack(alignment: .leading, spacing: 1) {
+                                                Text("Trades / Fees")
+                                                    .font(.system(size: 10))
+                                                    .foregroundColor(AppColors.secondaryText)
+                                                let feeStr = acc.totalFeesMinor.map { Formatters.formatCurrency(Decimal($0) / 100, currency: acc.currency) } ?? "$0.00"
+                                                Text("\(totalTrades) trades • \(feeStr)")
                                                     .font(.system(size: 11, weight: .semibold))
                                                     .monospacedDigit()
                                                     .foregroundColor(AppColors.primaryText)

@@ -847,12 +847,9 @@ public final class The5ersService: ObservableObject {
                 return aAct && !bAct
             }
             
-            // Immediately ensure default placeholder account is removed and selectedAccountId is ready to display incoming trades
+            // Immediately ensure default placeholder account is removed
             if !rawAccountsList.isEmpty {
                 dataStore.accounts.removeAll(where: { $0.id == "default-acc" })
-                if dataStore.selectedAccountId == "default-acc" || dataStore.selectedAccountId.isEmpty {
-                    dataStore.selectedAccountId = "all"
-                }
             }
             
             var accountsList: [The5ersMcpAccount] = []
@@ -1040,40 +1037,36 @@ public final class The5ersService: ObservableObject {
                 if let sRes = try? await callMcpTool(name: "the5ers_account", arguments: statsArgs),
                    !(sRes["isError"] as? Bool ?? false) {
                     let uStats = unwrapMcpToolResult(sRes)
-                    if let sDict = (uStats as? [String: Any])?["data"] as? [String: Any] ?? uStats as? [String: Any] {
-                        if let tt = sDict["totalTrades"] as? Int ?? (sDict["tradesCount"] as? Int) ?? (sDict["total_trades"] as? Int) {
+                    if let sRaw = (uStats as? [String: Any])?["data"] as? [String: Any] ?? uStats as? [String: Any] {
+                        let sDict = sourceFields(sRaw)
+                        if let tt = extractRequirementInt(sDict["totaltrades"] ?? sDict["tradescount"] ?? sDict["closedtrades"]) {
                             accTotalTrades = tt
-                        } else if let num = sDict["totalTrades"] as? NSNumber {
-                            accTotalTrades = num.intValue
                         }
-                        if let wr = sDict["winRate"] as? Double ?? (sDict["win_rate"] as? Double) {
+                        if let wrDec = sourceNumber(sDict["winrate"] ?? sDict["winningrate"]) {
+                            let wr = NSDecimalNumber(decimal: wrDec).doubleValue
                             accWinRate = wr > 1.0 ? wr / 100.0 : wr
-                        } else if let num = sDict["winRate"] as? NSNumber {
-                            let d = num.doubleValue
-                            accWinRate = d > 1.0 ? d / 100.0 : d
                         }
-                        if let pf = sDict["profitFactor"] as? Double ?? (sDict["profit_factor"] as? Double) {
-                            accProfitFactor = pf
-                        } else if let num = sDict["profitFactor"] as? NSNumber {
-                            accProfitFactor = num.doubleValue
+                        if let pfDec = sourceNumber(sDict["profitfactor"]) {
+                            accProfitFactor = NSDecimalNumber(decimal: pfDec).doubleValue
                         }
-                        accTotalFees = sourceNumber(sDict["totalFees"] ?? sDict["fees"] ?? sDict["total_fees"])
-                        
-                        if let wd = sDict["winningDays"] as? Int ?? (sDict["profitableDays"] as? Int) ?? (sDict["winning_days"] as? Int) {
+                        if let tf = sourceNumber(sDict["totalfees"] ?? sDict["fees"] ?? sDict["commissions"]) {
+                            accTotalFees = abs(tf)
+                        }
+                        if accProfitAndLoss == nil,
+                           let tnp = sourceNumber(sDict["totalnetprofit"] ?? sDict["netprofit"] ?? sDict["profitandloss"] ?? sDict["pnl"]) {
+                            accProfitAndLoss = tnp
+                        }
+                        if let wd = extractRequirementInt(sDict["winningdays"] ?? sDict["profitabledays"]) {
                             authoritativeWinningDays = wd
-                        } else if let num = sDict["winningDays"] as? NSNumber {
-                            authoritativeWinningDays = num.intValue
                         }
-                        if let td = sDict["tradingDays"] as? Int ?? (sDict["activeDays"] as? Int) ?? (sDict["trading_days"] as? Int) {
+                        if let td = extractRequirementInt(sDict["tradingdays"] ?? sDict["activedays"]) {
                             authoritativeTradingDays = td
-                        } else if let num = sDict["tradingDays"] as? NSNumber {
-                            authoritativeTradingDays = num.intValue
                         }
                     }
                 }
                 
                 // Resolve standard prop tier from metadata (e.g. 50K evaluation account)
-                let resolvedStartBal: Decimal? = {
+                var resolvedStartBal: Decimal? = {
                     if let ex = explicitStartBal, ex > 0 { return ex }
                     let combined = "\(label.lowercased()) \(prog.lowercased())"
                     if combined.contains("50k") || combined.contains("50,000") || combined.contains("50000") { return 50000 }
@@ -1089,48 +1082,78 @@ public final class The5ersService: ObservableObject {
                     return nil
                 }()
                 
-                // Query official the5ers_program.journey (returns authoritative programName, currentStep.name, phase, and { value, unit } objectives)
+                // Also extract any embedded rules/limits directly from the account list item
+                parseProgramAndHealthPayload(
+                    item,
+                    startingBalance: &resolvedStartBal,
+                    profitTarget: &authoritativeProfitTarget,
+                    maxLoss: &authoritativeMaxLoss,
+                    maxDailyLoss: &authoritativeMaxDailyLoss,
+                    minTradingDays: &authoritativeMinTradingDays,
+                    currentTradingDays: &authoritativeTradingDays,
+                    winningDays: &authoritativeWinningDays,
+                    programName: &authoritativeProgramName,
+                    stepName: &authoritativeStepName,
+                    accountType: &authoritativeAccountType
+                )
+                
+                // Query official the5ers_program (rules, progression, journey) and the5ers_consistency (list)
                 let existingCachedProp = dataStore.propAccounts.first(where: { TradeDataStore.isSameAccountId($0.id, journalAccId) })
-                let needsJourney = isRawActive || existingCachedProp == nil || (existingCachedProp?.name.hasPrefix("The5ers ") ?? true)
-                if needsJourney {
-                    let journeyArgs: [String: Any] = [
-                        "operation": "journey",
-                        "account_ref": ref,
-                        "contract_version": "1.0"
-                    ]
-                    if let jRes = try? await callMcpTool(name: "the5ers_program", arguments: journeyArgs),
-                       !(jRes["isError"] as? Bool ?? false) {
-                        let uJourney = unwrapMcpToolResult(jRes)
-                        if let jData = (uJourney as? [String: Any])?["data"] as? [String: Any] ?? uJourney as? [String: Any],
-                           let auth = jData["authoritative"] as? [String: Any] {
-                            if let pName = auth["programName"] as? String, !pName.trimmingCharacters(in: .whitespaces).isEmpty {
-                                authoritativeProgramName = pName.trimmingCharacters(in: .whitespaces)
-                            }
-                            if let currStep = auth["currentStep"] as? [String: Any] {
-                                if let sName = currStep["name"] as? String, !sName.trimmingCharacters(in: .whitespaces).isEmpty {
-                                    authoritativeStepName = sName.trimmingCharacters(in: .whitespaces)
-                                }
-                                if let ph = currStep["phase"] as? String, !ph.trimmingCharacters(in: .whitespaces).isEmpty {
-                                    authoritativeAccountType = ph.trimmingCharacters(in: .whitespaces)
-                                }
-                                if let pt = extractRequirementDecimal(currStep["profitTarget"] ?? currStep["target"], startingBalance: resolvedStartBal) {
-                                    authoritativeProfitTarget = pt
-                                }
-                            }
-                            if let reqs = auth["requirements"] as? [String: Any] {
-                                if authoritativeProfitTarget == nil {
-                                    authoritativeProfitTarget = extractRequirementDecimal(reqs["profitTarget"] ?? reqs["target"], startingBalance: resolvedStartBal)
-                                }
-                                if let ml = extractRequirementDecimal(reqs["maxTotalLoss"] ?? reqs["maxLoss"] ?? reqs["maximumLoss"] ?? reqs["lossLimit"], startingBalance: resolvedStartBal) {
-                                    authoritativeMaxLoss = ml
-                                }
-                                if let mdl = extractRequirementDecimal(reqs["maxDailyLoss"] ?? reqs["dailyLoss"] ?? reqs["dailyLossLimit"], startingBalance: resolvedStartBal) {
-                                    authoritativeMaxDailyLoss = mdl
-                                }
-                                if let mtd = extractRequirementInt(reqs["minTradingDays"] ?? reqs["minimumTradingDays"]) {
-                                    authoritativeMinTradingDays = mtd
-                                }
-                            }
+                let needsProgramDetails = isRawActive ||
+                                          existingCachedProp == nil ||
+                                          (existingCachedProp?.name.hasPrefix("The5ers ") ?? true) ||
+                                          existingCachedProp?.profitTargetMinor == nil ||
+                                          existingCachedProp?.maxDailyLossMinor == nil ||
+                                          existingCachedProp?.maxLossMinor == nil
+                if needsProgramDetails {
+                    let programOps = isRawActive ? ["rules", "progression", "journey"] : ["rules", "journey"]
+                    for op in programOps {
+                        let pArgs: [String: Any] = [
+                            "operation": op,
+                            "account_ref": ref,
+                            "contract_version": "1.0"
+                        ]
+                        if let pRes = try? await callMcpTool(name: "the5ers_program", arguments: pArgs),
+                           !(pRes["isError"] as? Bool ?? false) {
+                            let uProg = unwrapMcpToolResult(pRes)
+                            parseProgramAndHealthPayload(
+                                uProg,
+                                startingBalance: &resolvedStartBal,
+                                profitTarget: &authoritativeProfitTarget,
+                                maxLoss: &authoritativeMaxLoss,
+                                maxDailyLoss: &authoritativeMaxDailyLoss,
+                                minTradingDays: &authoritativeMinTradingDays,
+                                currentTradingDays: &authoritativeTradingDays,
+                                winningDays: &authoritativeWinningDays,
+                                programName: &authoritativeProgramName,
+                                stepName: &authoritativeStepName,
+                                accountType: &authoritativeAccountType
+                            )
+                        }
+                    }
+                    
+                    if isRawActive {
+                        let consArgs: [String: Any] = [
+                            "operation": "list",
+                            "account_ref": ref,
+                            "contract_version": "1.0"
+                        ]
+                        if let cRes = try? await callMcpTool(name: "the5ers_consistency", arguments: consArgs),
+                           !(cRes["isError"] as? Bool ?? false) {
+                            let uCons = unwrapMcpToolResult(cRes)
+                            parseProgramAndHealthPayload(
+                                uCons,
+                                startingBalance: &resolvedStartBal,
+                                profitTarget: &authoritativeProfitTarget,
+                                maxLoss: &authoritativeMaxLoss,
+                                maxDailyLoss: &authoritativeMaxDailyLoss,
+                                minTradingDays: &authoritativeMinTradingDays,
+                                currentTradingDays: &authoritativeTradingDays,
+                                winningDays: &authoritativeWinningDays,
+                                programName: &authoritativeProgramName,
+                                stepName: &authoritativeStepName,
+                                accountType: &authoritativeAccountType
+                            )
                         }
                     }
                 }
@@ -1145,42 +1168,24 @@ public final class The5ersService: ObservableObject {
                     if let hRes = try? await callMcpTool(name: "the5ers_account", arguments: healthArgs),
                        !(hRes["isError"] as? Bool ?? false) {
                         let uHealth = unwrapMcpToolResult(hRes)
-                        if let hData = (uHealth as? [String: Any])?["data"] as? [String: Any] ?? uHealth as? [String: Any] {
-                            if let derived = hData["derived"] as? [String: Any] {
-                                if let obj = derived["objectives"] as? [String: Any],
-                                   let pg = sourceNumber(obj["profitGoal"]), pg > 0 {
-                                    authoritativeProfitTarget = pg
-                                }
-                                if let mlObj = derived["maxLoss"] as? [String: Any],
-                                   let mlLim = sourceNumber(mlObj["limit"]), mlLim > 0 {
-                                    authoritativeMaxLoss = mlLim
-                                }
-                                if let dlObj = derived["dailyLoss"] as? [String: Any],
-                                   let dlLim = sourceNumber(dlObj["limit"]), dlLim > 0 {
-                                    authoritativeMaxDailyLoss = dlLim
-                                }
-                            }
-                            if let auth = hData["authoritative"] as? [String: Any],
-                               let consistency = auth["consistency"] as? [[String: Any]] {
-                                for rule in consistency {
-                                    let rName = String(describing: rule["name"] ?? "").lowercased()
-                                    if rName.contains("profitable-days") || rName.contains("winning-days") || rName.contains("profitable_days") {
-                                        if let cv = extractRequirementInt(rule["currentValue"] ?? rule["current_value"]) {
-                                            authoritativeWinningDays = cv
-                                        }
-                                        if authoritativeMinTradingDays == nil,
-                                           let th = extractRequirementInt(rule["threshold"]), th > 0 {
-                                            authoritativeMinTradingDays = th
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                        parseProgramAndHealthPayload(
+                            uHealth,
+                            startingBalance: &resolvedStartBal,
+                            profitTarget: &authoritativeProfitTarget,
+                            maxLoss: &authoritativeMaxLoss,
+                            maxDailyLoss: &authoritativeMaxDailyLoss,
+                            minTradingDays: &authoritativeMinTradingDays,
+                            currentTradingDays: &authoritativeTradingDays,
+                            winningDays: &authoritativeWinningDays,
+                            programName: &authoritativeProgramName,
+                            stepName: &authoritativeStepName,
+                            accountType: &authoritativeAccountType
+                        )
                     }
                 }
                 
                 let defaultName: String = {
-                    if !needsJourney, let cachedName = existingCachedProp?.name, !cachedName.hasPrefix("The5ers ") {
+                    if !needsProgramDetails, let cachedName = existingCachedProp?.name, !cachedName.hasPrefix("The5ers ") {
                         return cachedName
                     }
                     return Self.the5ersDefaultName(
@@ -1195,6 +1200,32 @@ public final class The5ersService: ObservableObject {
                     )
                 }()
                 let cleanLabel = defaultName.isEmpty ? Formatters.cleanAccountName(label, balance: resolvedStartBal) : defaultName
+                
+                // Fallback to standard The5ers program specifications when MCP omits a specific rule threshold
+                if let sb = resolvedStartBal, sb > 0 {
+                    let combinedText = "\(cleanLabel) \(authoritativeProgramName ?? "") \(authoritativeStepName ?? "") \(authoritativeAccountType ?? "") \(prog)".lowercased()
+                    let isStep2 = combinedText.contains("- 2") || combinedText.contains("step 2") || combinedText.contains("phase 2") || combinedText.contains("verification")
+                    let isBootcamp = combinedText.contains("bootcamp")
+                    let isHyperOrInstant = combinedText.contains("hyper") || combinedText.contains("instant")
+                    if authoritativeProfitTarget == nil {
+                        let pct: Decimal = isHyperOrInstant ? 10 : (isBootcamp ? 6 : (isStep2 ? 5 : 8))
+                        authoritativeProfitTarget = (sb * pct) / 100
+                    }
+                    if authoritativeMaxLoss == nil {
+                        let pct: Decimal = isHyperOrInstant ? 6 : (isBootcamp ? 5 : 10)
+                        authoritativeMaxLoss = (sb * pct) / 100
+                    }
+                    if authoritativeMaxDailyLoss == nil {
+                        let pct: Decimal = isHyperOrInstant ? 3 : (isBootcamp ? 3 : 5)
+                        authoritativeMaxDailyLoss = (sb * pct) / 100
+                    }
+                    if authoritativeMinTradingDays == nil && !isHyperOrInstant && !isBootcamp {
+                        authoritativeMinTradingDays = 3
+                    }
+                    if accProfitAndLoss == nil && bal > 0 {
+                        accProfitAndLoss = bal - sb
+                    }
+                }
                 
                 let mcpAcc = The5ersMcpAccount(
                     id: stableId,
@@ -1270,8 +1301,10 @@ public final class The5ersService: ObservableObject {
             lastSyncTime = Date()
             dataStore.rebuildAllAccounts()
             
-            if dataStore.selectedAccountId == "default-acc" || dataStore.selectedAccountId.isEmpty || (dataStore.selectedAccountId != "all" && dataStore.filteredTrades.isEmpty && !dataStore.trades.isEmpty) {
-                dataStore.selectAccount(id: "all")
+            if dataStore.selectedAccountId == "default-acc" || dataStore.selectedAccountId == "all" || dataStore.selectedAccountId.isEmpty || !dataStore.accounts.contains(where: { $0.id == dataStore.selectedAccountId || TradeDataStore.isSameAccountId($0.id, dataStore.selectedAccountId) }) {
+                if let targetId = dataStore.mostRecentActiveAccount?.id ?? dataStore.visibleAccounts.first?.id ?? dataStore.accounts.first?.id {
+                    dataStore.selectAccount(id: targetId)
+                }
             }
             
             dataStore.saveToDisk()
@@ -1297,20 +1330,45 @@ public final class The5ersService: ObservableObject {
     /// Extracts a Decimal requirement from either a plain number or a The5ers `{ "value": number, "unit": "currency" | "percent" }` object
     private func extractRequirementDecimal(_ val: Any?, startingBalance: Decimal?) -> Decimal? {
         guard let val = val else { return nil }
-        if let dict = val as? [String: Any] {
-            guard let num = sourceNumber(dict["value"] ?? dict["amount"] ?? dict["limit"] ?? dict["threshold"]), num != 0 else {
+        if let rawDict = val as? [String: Any] {
+            let dict = sourceFields(rawDict)
+            if let amt = sourceNumber(dict["currencyvalue"] ?? dict["amountusd"] ?? dict["usd"] ?? dict["dollaramount"]), amt != 0 {
+                return abs(amt)
+            }
+            guard let num = sourceNumber(dict["value"] ?? dict["amount"] ?? dict["limit"] ?? dict["threshold"] ?? dict["target"] ?? dict["goal"] ?? dict["max"] ?? dict["cap"] ?? dict["required"]), num != 0 else {
                 return nil
             }
+            let absNum = abs(num)
             let unit = String(describing: dict["unit"] ?? "currency").lowercased()
-            if unit.contains("percent") || unit == "%" {
+            if unit.contains("percent") || unit == "%" || unit == "pct" {
                 if let sb = startingBalance, sb > 0 {
-                    return (abs(num) * sb) / 100
+                    return absNum < 1 ? (absNum * sb) : ((absNum * sb) / 100)
                 }
             }
-            return abs(num)
+            if let sb = startingBalance, sb >= 1000 {
+                if absNum > 0 && absNum <= 25 {
+                    return (absNum * sb) / 100
+                }
+                if absNum > sb * Decimal(string: "0.70")! && absNum < sb {
+                    return sb - absNum
+                }
+            }
+            return absNum
         }
         if let num = sourceNumber(val), num != 0 {
-            return abs(num)
+            let absNum = abs(num)
+            if let sb = startingBalance, sb >= 1000 {
+                if absNum > 0 && absNum < 1 {
+                    return absNum * sb
+                }
+                if absNum >= 1 && absNum <= 25 {
+                    return (absNum * sb) / 100
+                }
+                if absNum > sb * Decimal(string: "0.70")! && absNum < sb {
+                    return sb - absNum
+                }
+            }
+            return absNum
         }
         return nil
     }
@@ -1318,16 +1376,234 @@ public final class The5ersService: ObservableObject {
     /// Extracts an Int requirement from either a plain integer or a The5ers `{ "value": number, "unit": "days" }` object
     private func extractRequirementInt(_ val: Any?) -> Int? {
         guard let val = val else { return nil }
-        if let dict = val as? [String: Any] {
-            if let i = dict["value"] as? Int { return i }
-            if let n = dict["value"] as? NSNumber { return n.intValue }
-            if let d = sourceNumber(dict["value"]) { return NSDecimalNumber(decimal: d).intValue }
+        if let rawDict = val as? [String: Any] {
+            let dict = sourceFields(rawDict)
+            let candidate = dict["value"] ?? dict["currentvalue"] ?? dict["current"] ?? dict["completed"] ?? dict["count"] ?? dict["threshold"] ?? dict["target"] ?? dict["required"] ?? dict["min"] ?? dict["days"]
+            if let i = candidate as? Int { return i }
+            if let n = candidate as? NSNumber { return n.intValue }
+            if let d = sourceNumber(candidate) { return NSDecimalNumber(decimal: d).intValue }
             return nil
         }
         if let i = val as? Int { return i }
         if let n = val as? NSNumber { return n.intValue }
         if let d = sourceNumber(val) { return NSDecimalNumber(decimal: d).intValue }
         return nil
+    }
+    
+    /// Recursively extracts program rules, targets, stop-loss limits, and consistency metrics from `the5ers_program`, `the5ers_consistency`, and `the5ers_account` payloads
+    private func parseProgramAndHealthPayload(
+        _ raw: Any?,
+        startingBalance: inout Decimal?,
+        profitTarget: inout Decimal?,
+        maxLoss: inout Decimal?,
+        maxDailyLoss: inout Decimal?,
+        minTradingDays: inout Int?,
+        currentTradingDays: inout Int?,
+        winningDays: inout Int?,
+        programName: inout String?,
+        stepName: inout String?,
+        accountType: inout String?,
+        depth: Int = 0
+    ) {
+        guard depth <= 5, let raw = raw else { return }
+        if let arr = raw as? [[String: Any]] {
+            for item in arr {
+                let r = sourceFields(item)
+                let rName = String(describing: r["name"] ?? r["key"] ?? r["type"] ?? r["id"] ?? r["label"] ?? r["rule"] ?? "").lowercased()
+                if rName.contains("profitable") || rName.contains("winning") {
+                    if let cv = extractRequirementInt(r["currentvalue"] ?? r["current"] ?? r["completed"] ?? r["count"] ?? r["achieved"] ?? r["value"]) {
+                        winningDays = cv
+                    }
+                    if minTradingDays == nil,
+                       let th = extractRequirementInt(r["threshold"] ?? r["target"] ?? r["required"] ?? r["min"] ?? r["minimum"] ?? r["limit"]), th > 0 {
+                        minTradingDays = th
+                    }
+                } else if rName.contains("trading") && rName.contains("day") {
+                    if let cv = extractRequirementInt(r["currentvalue"] ?? r["current"] ?? r["completed"] ?? r["count"]) {
+                        currentTradingDays = cv
+                    }
+                    if minTradingDays == nil,
+                       let th = extractRequirementInt(r["threshold"] ?? r["target"] ?? r["required"] ?? r["min"] ?? r["minimum"] ?? r["limit"] ?? r["value"]), th > 0 {
+                        minTradingDays = th
+                    }
+                } else if rName.contains("target") || rName.contains("profitgoal") || rName.contains("profit_goal") {
+                    if profitTarget == nil,
+                       let pt = extractRequirementDecimal(r["target"] ?? r["threshold"] ?? r["limit"] ?? r["value"] ?? r["amount"] ?? r["goal"], startingBalance: startingBalance) {
+                        profitTarget = pt
+                    }
+                } else if rName.contains("daily") && (rName.contains("loss") || rName.contains("drawdown") || rName.contains("pause") || rName.contains("stop") || rName.contains("cap")) {
+                    if maxDailyLoss == nil,
+                       let dl = extractRequirementDecimal(r["limit"] ?? r["threshold"] ?? r["max"] ?? r["value"] ?? r["amount"], startingBalance: startingBalance) {
+                        maxDailyLoss = dl
+                    }
+                } else if (rName.contains("max") || rName.contains("total") || rName.contains("stopout")) && (rName.contains("loss") || rName.contains("drawdown") || rName.contains("stop")) {
+                    if maxLoss == nil,
+                       let ml = extractRequirementDecimal(r["limit"] ?? r["threshold"] ?? r["max"] ?? r["value"] ?? r["amount"], startingBalance: startingBalance) {
+                        maxLoss = ml
+                    }
+                }
+                // Check if this array item is an active step in a steps/phases list
+                let statusStr = String(describing: r["status"] ?? "").lowercased()
+                let isCurrStep = (r["iscurrent"] as? Bool == true) || (r["current"] as? Bool == true) || (r["active"] as? Bool == true) || statusStr == "active" || statusStr == "in_progress" || statusStr == "inprogress" || statusStr == "current"
+                if isCurrStep {
+                    parseProgramAndHealthPayload(
+                        item,
+                        startingBalance: &startingBalance,
+                        profitTarget: &profitTarget,
+                        maxLoss: &maxLoss,
+                        maxDailyLoss: &maxDailyLoss,
+                        minTradingDays: &minTradingDays,
+                        currentTradingDays: &currentTradingDays,
+                        winningDays: &winningDays,
+                        programName: &programName,
+                        stepName: &stepName,
+                        accountType: &accountType,
+                        depth: depth + 1
+                    )
+                }
+            }
+            return
+        }
+        
+        guard let rawDict = raw as? [String: Any] else { return }
+        let d = sourceFields(rawDict)
+        
+        // 1. Starting balance
+        if startingBalance == nil {
+            if let sb = sourceNumber(d["startingbalance"] ?? d["initialbalance"] ?? d["basebalance"] ?? d["accountsize"] ?? d["nominalbalance"]), sb > 0 {
+                startingBalance = sb
+            }
+        }
+        
+        // 2. Program & Step names
+        if programName == nil {
+            for k in ["programname", "programtitle", "name"] {
+                if let s = d[k] as? String {
+                    let clean = s.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !clean.isEmpty && !["active", "closed", "open", "usd", "eur", "profitable-days", "winning-days"].contains(clean.lowercased()) {
+                        programName = clean
+                        break
+                    }
+                }
+            }
+        }
+        if stepName == nil {
+            for k in ["stepname", "phasename", "currentstepname", "levelname"] {
+                if let s = d[k] as? String, !s.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    stepName = s.trimmingCharacters(in: .whitespacesAndNewlines)
+                    break
+                }
+            }
+        }
+        if accountType == nil {
+            for k in ["phase", "accounttype"] {
+                if let s = d[k] as? String, !s.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    accountType = s.trimmingCharacters(in: .whitespacesAndNewlines)
+                    break
+                }
+            }
+        }
+        
+        // 3. Profit Target
+        if profitTarget == nil {
+            let targetCandidate = firstValue(in: d, keys: [
+                "profittarget", "profitgoal", "targetprofit", "profitobjective", "target", "goal", "targetamount"
+            ])
+            if let pt = extractRequirementDecimal(targetCandidate, startingBalance: startingBalance), pt > 0 {
+                profitTarget = pt
+            }
+        }
+        
+        // 4. Max Loss (Stop-out / Terminate)
+        if maxLoss == nil {
+            let maxLossCandidate = firstValue(in: d, keys: [
+                "maxtotalloss", "maxloss", "maximumloss", "losslimit", "totallosslimit", "maxdrawdown", "maximumdrawdown", "totaldrawdown", "stopoutlevel", "maxstoploss"
+            ])
+            if let ml = extractRequirementDecimal(maxLossCandidate, startingBalance: startingBalance), ml > 0 {
+                maxLoss = ml
+            }
+        }
+        
+        // 5. Max Daily Loss (Daily Cap / Daily Pause)
+        if maxDailyLoss == nil {
+            let dailyLossCandidate = firstValue(in: d, keys: [
+                "maxdailyloss", "dailylosslimit", "dailyloss", "alloweddailylosses", "dailydrawdown", "maxdailydrawdown", "dailypause", "dailystoploss", "dailycap"
+            ])
+            if let dl = extractRequirementDecimal(dailyLossCandidate, startingBalance: startingBalance), dl > 0 {
+                maxDailyLoss = dl
+            }
+        }
+        
+        // 6. Winning Days, Trading Days & Min Required Days
+        if winningDays == nil {
+            let winDaysCandidate = firstValue(in: d, keys: [
+                "winningdays", "profitabledays", "profitabletradingdays", "currentwinningdays", "currentprofitabledays", "completedwinningdays", "completedprofitabledays"
+            ])
+            if let wd = extractRequirementInt(winDaysCandidate), wd >= 0 {
+                winningDays = wd
+            }
+        }
+        if currentTradingDays == nil {
+            let trdDaysCandidate = firstValue(in: d, keys: [
+                "tradingdays", "currenttradingdays", "activedays", "completedtradingdays"
+            ])
+            if let td = extractRequirementInt(trdDaysCandidate), td >= 0 {
+                currentTradingDays = td
+            }
+        }
+        if minTradingDays == nil {
+            let minDaysCandidate = firstValue(in: d, keys: [
+                "minprofitabledays", "minimumprofitabledays", "minwinningdays", "requiredwinningdays", "mintradingdays", "minimumtradingdays", "minactivedays", "requireddays"
+            ])
+            if let md = extractRequirementInt(minDaysCandidate), md > 0 {
+                minTradingDays = md
+            }
+        }
+        
+        // 7. Inspect nested containers
+        if let currStep = rawDict["currentStep"] as? [String: Any] ?? d["currentstep"] as? [String: Any] {
+            if stepName == nil, let sn = (currStep["name"] ?? currStep["title"] ?? currStep["label"]) as? String, !sn.trimmingCharacters(in: .whitespaces).isEmpty {
+                stepName = sn.trimmingCharacters(in: .whitespaces)
+            }
+            parseProgramAndHealthPayload(
+                currStep,
+                startingBalance: &startingBalance,
+                profitTarget: &profitTarget,
+                maxLoss: &maxLoss,
+                maxDailyLoss: &maxDailyLoss,
+                minTradingDays: &minTradingDays,
+                currentTradingDays: &currentTradingDays,
+                winningDays: &winningDays,
+                programName: &programName,
+                stepName: &stepName,
+                accountType: &accountType,
+                depth: depth + 1
+            )
+        }
+        
+        let nestedContainers = [
+            "data", "authoritative", "derived", "rules", "program", "progression", "journey",
+            "requirements", "objectives", "limits", "metrics", "progress", "summary",
+            "consistency", "steps", "phases", "stages", "items"
+        ]
+        for key in nestedContainers {
+            if let sub = d[key] {
+                parseProgramAndHealthPayload(
+                    sub,
+                    startingBalance: &startingBalance,
+                    profitTarget: &profitTarget,
+                    maxLoss: &maxLoss,
+                    maxDailyLoss: &maxDailyLoss,
+                    minTradingDays: &minTradingDays,
+                    currentTradingDays: &currentTradingDays,
+                    winningDays: &winningDays,
+                    programName: &programName,
+                    stepName: &stepName,
+                    accountType: &accountType,
+                    depth: depth + 1
+                )
+            }
+        }
     }
     
     /// Upserts a single The5ersMcpAccount into dataStore.propAccounts and dataStore.accounts (preserving exact name & status rules)
@@ -1548,20 +1824,28 @@ public final class The5ersService: ObservableObject {
                     posResult = fbRes
                 } else {
                     if !embeddedPositions.isEmpty {
-                        mergePositions(embeddedPositions, for: acc, into: dataStore, count: &importedPositionsCount)
+                        mergePositions(embeddedPositions, for: acc, into: dataStore, count: &importedPositionsCount, replaceAccountPositions: true)
                     }
                     return
                 }
             }
             let unwrappedPos = unwrapMcpToolResult(posResult)
-            var rawPositions = extractMcpCollection(unwrappedPos, collectionKey: "positions")
-            if rawPositions.isEmpty && !embeddedPositions.isEmpty {
-                rawPositions = embeddedPositions
+            var allPositions = extractMcpCollection(unwrappedPos, collectionKey: "positions")
+            if allPositions.isEmpty && !embeddedPositions.isEmpty {
+                allPositions = embeddedPositions
             }
-            mergePositions(rawPositions, for: acc, into: dataStore, count: &importedPositionsCount)
+            
+            var seenPageFingerprints = Set<String>()
+            if !allPositions.isEmpty {
+                let firstFp = allPositions.compactMap { row -> String? in
+                    let f = sourceFields(row)
+                    return "\(f["symbol"] ?? "")|\(f["opendate"] ?? "")|\(f["quantity"] ?? "")|\(f["entry"] ?? "")"
+                }.sorted().joined(separator: ";")
+                seenPageFingerprints.insert(firstFp)
+            }
             
             let posPagination = (unwrappedPos as? [String: Any])?["pagination"] as? [String: Any]
-            let initialHasMore = (posPagination?["has_more"] as? Bool) ?? (rawPositions.count >= 100)
+            let initialHasMore = (posPagination?["has_more"] as? Bool) ?? (allPositions.count >= 100)
             
             if initialHasMore {
                 var page = 2
@@ -1573,22 +1857,30 @@ public final class The5ersService: ObservableObject {
                     let nextUnwrapped = unwrapMcpToolResult(nextRes)
                     let nextPositions = extractMcpCollection(nextUnwrapped, collectionKey: "positions")
                     if nextPositions.isEmpty { break }
-                    mergePositions(nextPositions, for: acc, into: dataStore, count: &importedPositionsCount)
+                    let nextFp = nextPositions.compactMap { row -> String? in
+                        let f = sourceFields(row)
+                        return "\(f["symbol"] ?? "")|\(f["opendate"] ?? "")|\(f["quantity"] ?? "")|\(f["entry"] ?? "")"
+                    }.sorted().joined(separator: ";")
+                    if seenPageFingerprints.contains(nextFp) { break }
+                    seenPageFingerprints.insert(nextFp)
+                    allPositions.append(contentsOf: nextPositions)
                     let nextPag = (nextUnwrapped as? [String: Any])?["pagination"] as? [String: Any]
                     let hasMore = (nextPag?["has_more"] as? Bool) ?? (nextPositions.count >= 100)
                     if !hasMore { break }
                     page += 1
                 }
             }
+            
+            mergePositions(allPositions, for: acc, into: dataStore, count: &importedPositionsCount, replaceAccountPositions: true)
         } catch {
             if !embeddedPositions.isEmpty {
-                mergePositions(embeddedPositions, for: acc, into: dataStore, count: &importedPositionsCount)
+                mergePositions(embeddedPositions, for: acc, into: dataStore, count: &importedPositionsCount, replaceAccountPositions: false)
             }
             AppLogger.error("Error syncing trades for account \(acc.label) (\(acc.id)): \(error.localizedDescription)")
         }
     }
     
-    /// Cross-validates synced trades against authoritative MCP `account.balance` (`profitAndLoss`), `account.statistics` (`totalFees`), and `account.midnight_history`
+    /// Reconciles account-level statistics (`totalFees`, `tradingDays`, `winningDays`, `totalTrades`) without fabricating synthetic trades or double-deducting fees
     @MainActor
     private func reconcileAccountTradesWithMcp(for acc: The5ersMcpAccount, into dataStore: TradeDataStore) async {
         let journalAccId = acc.id.hasPrefix("the5ers_") ? acc.id : "the5ers_\(acc.id)"
@@ -1605,174 +1897,44 @@ public final class The5ersService: ObservableObject {
             return dataStore.currencyConversion.context.convert(amount, from: accountCurrency, to: reportingCurrency) ?? amount
         }
         
-        // Realized authoritative PnL from account.balance / account.statistics (subtracting floating unrealized if included)
-        let authRealizedPnl: Decimal? = {
-            if let pnl = acc.profitAndLoss ?? acc.totalNetProfit {
-                if let unreal = acc.unrealized, unreal != 0, let sb = acc.startingBalance, sb > 0 {
-                    // Check whether profitAndLoss equals (equity - startingBalance) or (balance - startingBalance)
-                    let realizedFromBal = acc.balance - sb
-                    let floatingFromEq = (acc.equity ?? acc.balance) - sb
-                    if abs(pnl - floatingFromEq) < 0.05 && abs(pnl - realizedFromBal) > 0.05 {
-                        return toReporting(realizedFromBal)
-                    }
-                }
-                return toReporting(pnl)
-            }
-            return nil
-        }()
         let authTotalFees: Decimal = toReporting(abs(acc.totalFees ?? 0))
         
+        // Remove any legacy synthetic "ACCOUNT" trades for this account
         var localTrades = dataStore.trades
-        var closedIndices = localTrades.indices.filter { idx in
+        let beforePurge = localTrades.count
+        localTrades.removeAll { t in
+            (t.accountId == targetAccId || TradeDataStore.isSameAccountId(t.accountId, targetAccId)) &&
+            (t.symbol == "ACCOUNT" || t.key.contains("_midnight_") || t.key.hasSuffix("_summary"))
+        }
+        var tradesModified = (localTrades.count != beforePurge)
+        
+        let closedIndices = localTrades.indices.filter { idx in
             let t = localTrades[idx]
             return (t.accountId == targetAccId || TradeDataStore.isSameAccountId(t.accountId, targetAccId)) &&
                    t.status != .open && t.closedAt != nil
         }
         
-        // 1. If account has authoritative realized PnL or trades, but `positions.list` returned 0 closed positions,
-        // fallback to `the5ers_account.midnight_history` so daily PnL on Calendar/Journal and Dashboard Net P&L are never missing!
-        if closedIndices.isEmpty,
-           let targetPnl = authRealizedPnl,
-           (abs(targetPnl) > 0.01 || (acc.totalTrades ?? 0) > 0) {
-            let mhArgs: [String: Any] = [
-                "operation": "midnight_history",
-                "account_ref": acc.ref,
-                "contract_version": "1.0"
-            ]
-            var createdFromMidnight = false
-            if let mhRes = try? await callMcpTool(name: "the5ers_account", arguments: mhArgs),
-               !(mhRes["isError"] as? Bool ?? false) {
-                let uMh = unwrapMcpToolResult(mhRes)
-                let dayRows = extractMcpCollection(uMh, collectionKey: "days")
-                let nonZeroDays = dayRows.compactMap { row -> (date: Date, dateStr: String, netProfit: Decimal, tradesCount: Int)? in
-                    let f = sourceFields(row)
-                    let dStr = String(describing: f["date"] ?? "")
-                    guard let d = FlexibleDateParser.parse(dStr) else { return nil }
-                    let np = sourceNumber(f["netprofit"] ?? f["profitandloss"] ?? f["pnl"]) ?? 0
-                    let tc = (f["trades"] as? Int) ?? (f["trades"] as? NSNumber)?.intValue ?? 0
-                    guard abs(np) > 0.001 || tc > 0 else { return nil }
-                    return (d, dStr, toReporting(np), max(1, tc))
-                }
-                if !nonZeroDays.isEmpty {
-                    let totalDayTrades = Decimal(nonZeroDays.reduce(0) { $0 + $1.tradesCount })
-                    for day in nonZeroDays {
-                        let tradeKey = "the5ers_\(acc.id)_midnight_\(day.dateStr)"
-                        guard !localTrades.contains(where: { $0.key == tradeKey }) else { continue }
-                        let dayFee = totalDayTrades > 0 ? (authTotalFees * Decimal(day.tradesCount) / totalDayTrades) : 0
-                        let dayGross = day.netProfit + dayFee
-                        let st: TradeStatus = abs(day.netProfit) <= 0.005 ? .breakeven : (day.netProfit > 0 ? .win : .loss)
-                        let t = Trade(
-                            key: tradeKey,
-                            accountId: targetAccId,
-                            symbol: "ACCOUNT",
-                            direction: day.netProfit >= 0 ? .long : .short,
-                            status: st,
-                            openedAt: day.date,
-                            closedAt: day.date,
-                            quantity: Decimal(day.tradesCount),
-                            openQuantity: 0,
-                            avgEntry: 1,
-                            avgExit: 1,
-                            grossPnl: dayGross,
-                            fees: dayFee,
-                            swap: nil,
-                            netPnl: day.netProfit,
-                            executionCount: day.tradesCount,
-                            executionIds: [],
-                            durationMs: 0,
-                            notes: "Daily summary synced from The5ers Hub midnight_history (\(day.dateStr))",
-                            tags: ["the5ers", acc.program.lowercased()]
-                        )
-                        localTrades.append(t)
-                        createdFromMidnight = true
+        // Only if individual positions omitted fee (sum == 0) while `account.statistics.totalFees` reported non-zero fees,
+        // distribute authoritative `totalFees` across closed trades by quantity (never modifying `netPnl` per docs/the5ers.md:24).
+        if !closedIndices.isEmpty {
+            let currentFeeSum = closedIndices.reduce(Decimal.zero) { $0 + localTrades[$1].fees }
+            if currentFeeSum == 0 && authTotalFees > 0.01 {
+                let totalQty = closedIndices.reduce(Decimal.zero) { $0 + max(localTrades[$1].quantity, 0.01) }
+                var allocatedFees = Decimal.zero
+                for (pos, idx) in closedIndices.enumerated() {
+                    let share: Decimal
+                    if pos == closedIndices.count - 1 {
+                        share = max(0, authTotalFees - allocatedFees)
+                    } else {
+                        let weight = max(localTrades[idx].quantity, 0.01) / (totalQty > 0 ? totalQty : Decimal(closedIndices.count))
+                        var rawShare = authTotalFees * weight
+                        var rounded = Decimal.zero
+                        NSDecimalRound(&rounded, &rawShare, 2, .plain)
+                        share = rounded
+                        allocatedFees += share
                     }
-                }
-            }
-            if !createdFromMidnight && abs(targetPnl) > 0.01 {
-                let fallbackDate = FlexibleDateParser.parse(acc.createdAt ?? "") ?? Date()
-                let tradeKey = "the5ers_\(acc.id)_summary"
-                if !localTrades.contains(where: { $0.key == tradeKey }) {
-                    let st: TradeStatus = targetPnl > 0 ? .win : .loss
-                    let t = Trade(
-                        key: tradeKey,
-                        accountId: targetAccId,
-                        symbol: "ACCOUNT",
-                        direction: targetPnl >= 0 ? .long : .short,
-                        status: st,
-                        openedAt: fallbackDate,
-                        closedAt: fallbackDate,
-                        quantity: 1,
-                        openQuantity: 0,
-                        avgEntry: 1,
-                        avgExit: 1,
-                        grossPnl: targetPnl + authTotalFees,
-                        fees: authTotalFees,
-                        swap: nil,
-                        netPnl: targetPnl,
-                        executionCount: max(1, acc.totalTrades ?? 1),
-                        executionIds: [],
-                        durationMs: 0,
-                        notes: "Account summary synced from The5ers Hub balance",
-                        tags: ["the5ers", acc.program.lowercased()]
-                    )
-                    localTrades.append(t)
-                }
-            }
-            closedIndices = localTrades.indices.filter { idx in
-                let t = localTrades[idx]
-                return (t.accountId == targetAccId || TradeDataStore.isSameAccountId(t.accountId, targetAccId)) &&
-                       t.status != .open && t.closedAt != nil
-            }
-        }
-        
-        guard !closedIndices.isEmpty else { return }
-        var tradesModified = (localTrades.count != dataStore.trades.count)
-        
-        // 2. Cross-check fees: if `account.statistics.totalFees` is non-zero and differs from sum of per-trade fees,
-        // distribute authoritative `totalFees` proportionally across the account's closed trades.
-        let currentFeeSum = closedIndices.reduce(Decimal.zero) { $0 + localTrades[$1].fees }
-        if authTotalFees > 0.01 && abs(currentFeeSum - authTotalFees) > 0.05 {
-            let totalQty = closedIndices.reduce(Decimal.zero) { $0 + max(localTrades[$1].quantity, 0.01) }
-            var allocatedFees = Decimal.zero
-            for (pos, idx) in closedIndices.enumerated() {
-                let share: Decimal
-                if pos == closedIndices.count - 1 {
-                    share = max(0, authTotalFees - allocatedFees)
-                } else {
-                    let weight = max(localTrades[idx].quantity, 0.01) / (totalQty > 0 ? totalQty : Decimal(closedIndices.count))
-                    var rawShare = authTotalFees * weight
-                    var rounded = Decimal.zero
-                    NSDecimalRound(&rounded, &rawShare, 2, .plain)
-                    share = rounded
-                    allocatedFees += share
-                }
-                localTrades[idx].fees = share
-                localTrades[idx].grossPnl = localTrades[idx].netPnl + share - (localTrades[idx].swap ?? 0)
-            }
-            tradesModified = true
-        }
-        
-        // 3. Cross-check whether `positions.list` returned Gross PnL (before fees/swap) vs Net PnL (after fees/swap)
-        // by comparing against `account.balance.profitAndLoss`!
-        if let targetPnl = authRealizedPnl {
-            let sumAsNet = closedIndices.reduce(Decimal.zero) { $0 + localTrades[$1].netPnl }
-            let sumFees = closedIndices.reduce(Decimal.zero) { $0 + localTrades[$1].fees }
-            let sumSwap = closedIndices.reduce(Decimal.zero) { $0 + (localTrades[$1].swap ?? 0) }
-            let sumIfRawWasGross = sumAsNet - sumFees + sumSwap
-            
-            let distAsNet = abs(sumAsNet - targetPnl)
-            let distAsGross = abs(sumIfRawWasGross - targetPnl)
-            
-            // If subtracting fees + adding swap makes the trade sum match `account.balance.profitAndLoss`!
-            if distAsGross + 0.05 < distAsNet && distAsGross <= max(1.0, abs(targetPnl) * 0.02) {
-                for idx in closedIndices {
-                    let rawGross = localTrades[idx].netPnl
-                    let fee = localTrades[idx].fees
-                    let sw = localTrades[idx].swap ?? 0
-                    let correctedNet = rawGross - fee + sw
-                    localTrades[idx].grossPnl = rawGross
-                    localTrades[idx].netPnl = correctedNet
-                    localTrades[idx].status = abs(correctedNet) <= 0.005 ? .breakeven : (correctedNet > 0 ? .win : .loss)
+                    localTrades[idx].fees = share
+                    localTrades[idx].grossPnl = localTrades[idx].netPnl + share - (localTrades[idx].swap ?? 0)
                 }
                 tradesModified = true
             }
@@ -1782,7 +1944,7 @@ public final class The5ersService: ObservableObject {
             dataStore.trades = localTrades
         }
         
-        // 4. Reconcile tradingDays and winningDays on PropAccountItem from closed trades if missing from MCP
+        // Reconcile tradingDays, winningDays, totalTrades, totalFeesMinor, and netPnlMinor on PropAccountItem from closed trades if missing from MCP
         var dailyNetMap: [String: Decimal] = [:]
         let dayFmt = DateFormatter()
         dayFmt.dateFormat = "yyyy-MM-dd"
@@ -1795,6 +1957,8 @@ public final class The5ersService: ObservableObject {
         }
         let computedTradingDays = dailyNetMap.count
         let computedWinningDays = dailyNetMap.values.filter { $0 > 0 }.count
+        let computedNetPnl = closedIndices.reduce(Decimal.zero) { $0 + localTrades[$1].netPnl }
+        let computedFees = closedIndices.reduce(Decimal.zero) { $0 + localTrades[$1].fees }
         
         if let pIdx = dataStore.propAccounts.firstIndex(where: {
             TradeDataStore.isSameAccountId($0.id, journalAccId) || $0.journalAccountId == targetAccId
@@ -1812,6 +1976,19 @@ public final class The5ersService: ObservableObject {
             if p.totalTrades == nil && !closedIndices.isEmpty {
                 p.totalTrades = closedIndices.count
                 pChanged = true
+            }
+            if p.totalFeesMinor == nil && computedFees > 0 {
+                p.totalFeesMinor = NSDecimalNumber(decimal: abs(computedFees) * 100).int64Value
+                pChanged = true
+            }
+            if p.netPnlMinor == nil {
+                if !closedIndices.isEmpty {
+                    p.netPnlMinor = NSDecimalNumber(decimal: computedNetPnl * 100).int64Value
+                    pChanged = true
+                } else if let bal = p.balanceMinor, let sz = p.sizeMinor, sz > 0 {
+                    p.netPnlMinor = bal - sz
+                    pChanged = true
+                }
             }
             if pChanged {
                 dataStore.propAccounts[pIdx] = p
@@ -1921,7 +2098,7 @@ public final class The5ersService: ObservableObject {
             return nil
         }
         
-        // Robust closed status: boolean flag, status token, or presence of close date/exit price/realized PnL
+        // Robust closed status: boolean flag, status token, or presence of close date/exit price
         let isClosed: Bool = {
             if let b = sourceBoolean(firstValue(in: row, keys: ["isclosed", "closed", "isclose"])) {
                 return b
@@ -1943,12 +2120,6 @@ public final class The5ersService: ObservableObject {
                 "exit", "closeprice", "exitprice", "close_price", "exit_price", "closedprice", "outprice", "out_price"
             ])) != nil
             if hasExitPrice { return true }
-            
-            // Check if non-zero or explicit profitAndLoss field is present
-            let hasRealizedPnl = sourceNumber(firstValue(in: row, keys: [
-                "profitandloss", "profit_and_loss", "netpnl", "net_pnl", "realizedpnl", "realized_pnl"
-            ])) != nil
-            if hasRealizedPnl { return true }
             
             return false
         }()
@@ -1989,12 +2160,18 @@ public final class The5ersService: ObservableObject {
             netPnl = 0
         }
         
-        let provKeys = ["ref", "positionid", "ticket", "id", "dealid", "positionref", "position_ref", "orderid", "order_id"]
+        // Never use ephemeral session-scoped 'ref' ('position-1', 'position-2') as providerId;
+        // 'ref' rotates every 10 minutes per session and changes order across pages.
+        let provKeys = ["positionid", "ticket", "id", "dealid", "orderid", "order_id"]
         let provVal = firstValue(in: row, keys: provKeys)
         let providerId: String? = {
             if let p = provVal {
                 let s = String(describing: p).trimmingCharacters(in: .whitespaces)
-                return s.isEmpty ? nil : s
+                let sl = s.lowercased()
+                if s.isEmpty || sl.contains("opaque") || sl.hasPrefix("position-") || sl.hasPrefix("account-") {
+                    return nil
+                }
+                return s
             }
             return nil
         }()
@@ -2030,7 +2207,8 @@ public final class The5ersService: ObservableObject {
         _ rawPositions: [[String: Any]],
         for acc: The5ersMcpAccount,
         into dataStore: TradeDataStore,
-        count: inout Int
+        count: inout Int,
+        replaceAccountPositions: Bool = false
     ) {
         let parsed = rawPositions.compactMap { normalizePosition(from: $0) }
         guard !parsed.isEmpty else { return }
@@ -2042,7 +2220,7 @@ public final class The5ersService: ObservableObject {
             $0.name == acc.label
         })?.journalAccountId ?? journalAccId
         
-        // Group duplicate positions to compute disambiguation discriminators
+        // Group duplicate positions to compute disambiguation discriminators (matching journal.ts:116-135)
         var groups: [String: [SourcePosition]] = [:]
         for p in parsed {
             let baseKey = JournalIds.positionIdentity(symbol: p.symbol, direction: p.direction.rawValue, openedAt: p.openedAtIso, discriminator: nil)
@@ -2052,15 +2230,20 @@ public final class The5ersService: ObservableObject {
         var valid: [SourcePosition] = []
         for (_, group) in groups {
             if group.count == 1 {
+                // Keep identityDiscriminator = nil for unique (symbol, direction, openedAt) positions
+                // so tradeKey remains 100% deterministic across sync sessions.
                 var item = group[0]
-                if let pid = item.providerId, !pid.isEmpty, !pid.contains("opaque") {
-                    item.identityDiscriminator = "provider:\(pid)"
-                }
+                item.identityDiscriminator = nil
                 valid.append(item)
                 continue
             }
             // Assign deterministic discriminator to distinguish identical concurrent positions
-            for (idxInGroup, p) in group.enumerated() {
+            let sortedGroup = group.sorted { lhs, rhs in
+                if lhs.quantity != rhs.quantity { return lhs.quantity < rhs.quantity }
+                if lhs.entry != rhs.entry { return lhs.entry < rhs.entry }
+                return lhs.netPnl < rhs.netPnl
+            }
+            for (idxInGroup, p) in sortedGroup.enumerated() {
                 var item = p
                 let disc: String
                 if let pid = p.providerId, !pid.isEmpty {
@@ -2073,8 +2256,18 @@ public final class The5ersService: ObservableObject {
             }
         }
         
-        var localTrades = dataStore.trades
-        var didModify = false
+        let existingAccountTrades = dataStore.trades.filter {
+            $0.accountId == targetAccId || TradeDataStore.isSameAccountId($0.accountId, targetAccId)
+        }
+        var nonAccountTrades: [Trade] = []
+        if replaceAccountPositions {
+            nonAccountTrades = dataStore.trades.filter {
+                !($0.accountId == targetAccId || TradeDataStore.isSameAccountId($0.accountId, targetAccId))
+            }
+        }
+        
+        var syncedAccountTrades: [Trade] = []
+        var usedExistingKeys = Set<String>()
         
         for position in valid {
             let posIdentity = JournalIds.positionIdentity(
@@ -2139,30 +2332,18 @@ public final class The5ersService: ObservableObject {
             }()
             
             let openSec = Int64(position.openedAtDate.timeIntervalSince1970)
-            let existingIdx = localTrades.firstIndex(where: {
-                if $0.key == tradeKey { return true }
-                let isSameAccount = ($0.accountId == targetAccId || TradeDataStore.isSameAccountId($0.accountId, targetAccId))
-                guard isSameAccount else { return false }
-                if let pid = position.providerId, !pid.isEmpty {
-                    if let notes = $0.notes, notes.contains("Ticket: \(pid)") {
-                        return true
-                    }
-                    if $0.key == legacyTradeKey && ($0.notes == nil || $0.notes?.contains("Ticket: ") == false || $0.notes?.contains("Ticket: )") == true) {
-                        return true
-                    }
-                    return false
-                }
-                if $0.key == legacyTradeKey { return true }
-                // Fallback fuzzy match only within the same account when neither trade has a provider ticket
-                return $0.symbol.uppercased() == position.symbol.uppercased() &&
-                       $0.direction == position.direction &&
-                       abs(Int64($0.openedAt.timeIntervalSince1970) - openSec) <= 1 &&
-                       abs($0.quantity - position.quantity) < 0.001 &&
-                       abs($0.avgEntry - position.entry) < 0.0001
+            let existingMatch = existingAccountTrades.first(where: { candidate in
+                guard !usedExistingKeys.contains(candidate.key) else { return false }
+                if candidate.key == tradeKey || candidate.key == legacyTradeKey { return true }
+                return candidate.symbol.uppercased() == position.symbol.uppercased() &&
+                       candidate.direction == position.direction &&
+                       abs(Int64(candidate.openedAt.timeIntervalSince1970) - openSec) <= 1 &&
+                       abs(candidate.quantity - position.quantity) < 0.001 &&
+                       abs(candidate.avgEntry - position.entry) < 0.0001
             })
             
-            if let tIdx = existingIdx {
-                var existing = localTrades[tIdx]
+            if var existing = existingMatch {
+                usedExistingKeys.insert(existing.key)
                 existing.key = tradeKey
                 existing.accountId = targetAccId
                 existing.status = status
@@ -2174,13 +2355,14 @@ public final class The5ersService: ObservableObject {
                 existing.swap = swap
                 existing.netPnl = netPnl
                 existing.durationMs = durationMs
-                if existing.notes == nil || existing.notes?.isEmpty == true || existing.notes?.contains("Ticket: )") == true {
-                    existing.notes = "Position synced from The5ers Hub (Ticket: \(position.providerId ?? ""))"
+                if existing.notes == nil || existing.notes?.isEmpty == true || existing.notes?.contains("Ticket: )") == true || existing.notes?.hasPrefix("Position synced from The5ers Hub") == true {
+                    let ticketSuffix = position.providerId.map { " (Ticket: \($0))" } ?? ""
+                    existing.notes = "Position synced from The5ers Hub\(ticketSuffix)"
                 }
-                localTrades[tIdx] = existing
-                didModify = true
+                syncedAccountTrades.append(existing)
                 count += 1
             } else {
+                let ticketSuffix = position.providerId.map { " (Ticket: \($0))" } ?? ""
                 let trade = Trade(
                     key: tradeKey,
                     accountId: targetAccId,
@@ -2200,17 +2382,26 @@ public final class The5ersService: ObservableObject {
                     executionCount: 0,
                     executionIds: [],
                     durationMs: durationMs,
-                    notes: "Position synced from The5ers Hub (Ticket: \(position.providerId ?? ""))",
+                    notes: "Position synced from The5ers Hub\(ticketSuffix)",
                     tags: ["the5ers", acc.program.lowercased()]
                 )
-                localTrades.append(trade)
-                didModify = true
+                syncedAccountTrades.append(trade)
                 count += 1
             }
         }
         
-        if didModify {
-            dataStore.trades = localTrades
+        if replaceAccountPositions {
+            dataStore.trades = nonAccountTrades + syncedAccountTrades
+        } else {
+            var updatedTrades = dataStore.trades
+            for synced in syncedAccountTrades {
+                if let idx = updatedTrades.firstIndex(where: { $0.key == synced.key }) {
+                    updatedTrades[idx] = synced
+                } else {
+                    updatedTrades.append(synced)
+                }
+            }
+            dataStore.trades = updatedTrades
         }
     }
     
@@ -2510,28 +2701,6 @@ public final class The5ersService: ObservableObject {
             }
         }
         
-        // 2. Query 'accounts' sequentially ONLY for unlinked orders to avoid redundant RPCs on every sync
-        for i in allPurchases.indices {
-            if Task.isCancelled || isCancelledByUser { break }
-            let pRef = String(describing: allPurchases[i]["ref"] ?? allPurchases[i]["purchase_ref"] ?? allPurchases[i]["id"] ?? "")
-            let alreadyLinkedInStore = !pRef.isEmpty && dataStore.propEntries.contains(where: {
-                ($0.id == "the5ers_purchase_\(pRef)" || $0.reference.contains(pRef.prefix(8))) && ($0.accountId?.isEmpty == false)
-            })
-            if !pRef.isEmpty && !alreadyLinkedInStore && (allPurchases[i]["account_ref"] == nil || String(describing: allPurchases[i]["account_ref"] ?? "").isEmpty) {
-                if let accRes = try? await callMcpTool(name: "the5ers_purchase", arguments: [
-                    "operation": "accounts",
-                    "purchase_ref": pRef,
-                    "contract_version": "1.0"
-                ]), !(accRes["isError"] as? Bool ?? false) {
-                    let unwrappedAcc = unwrapMcpToolResult(accRes)
-                    let accRows = extractMcpCollection(unwrappedAcc, collectionKey: "accounts")
-                    if let firstAcc = accRows.first, let createdRef = firstAcc["account_ref"] ?? firstAcc["ref"] {
-                        allPurchases[i]["account_ref"] = String(describing: createdRef)
-                    }
-                }
-            }
-        }
-        
         if !allPurchases.isEmpty {
             mergePurchases(allPurchases, into: dataStore, targetAccounts: targetAccounts)
         }
@@ -2633,41 +2802,8 @@ public final class The5ersService: ObservableObject {
                 return "other"
             }()
             
-            // Match account attribution:
-            // 1. By exact account_ref / ID
-            let candidateAccRef = String(describing: fields["accountref"] ?? fields["account_ref"] ?? fields["accountid"] ?? fields["account_id"] ?? "")
-            var matchedAcc = targetAccounts.first(where: {
-                (!candidateAccRef.isEmpty && ($0.ref == candidateAccRef || $0.id == candidateAccRef)) ||
-                (!candidateAccRef.isEmpty && $0.label.contains(candidateAccRef))
-            })
-            // 2. If single target account, attribute to it directly
-            if matchedAcc == nil && targetAccounts.count == 1 {
-                matchedAcc = targetAccounts.first
-            }
-            // 3. Match by account size (e.g. "100k" in title)
-            if matchedAcc == nil {
-                for acc in targetAccounts {
-                    let sz = NSDecimalNumber(decimal: acc.startingBalance ?? acc.balance).intValue
-                    if sz > 0 {
-                        let kStr = "\(sz / 1000)k"
-                        if title.lowercased().contains(kStr) {
-                            matchedAcc = acc
-                            break
-                        }
-                    }
-                }
-            }
-            // 4. Fallback attribute to primary active The5ers account
-            let journalAccId: String? = {
-                if let m = matchedAcc {
-                    return m.id.hasPrefix("the5ers_") ? m.id : "the5ers_\(m.id)"
-                }
-                if let first = targetAccounts.first {
-                    return first.id.hasPrefix("the5ers_") ? first.id : "the5ers_\(first.id)"
-                }
-                return nil
-            }()
-            
+            // Per docs/the5ers.md:52 and domain rules, purchase expenses are firm-wide ('The5ers')
+            // and must NEVER be attributed to an individual trading account.
             if let existingIdx = dataStore.propEntries.firstIndex(where: {
                 $0.id == entryId ||
                 (!orderRef.isEmpty && !orderRef.contains("opaque") && ($0.id.contains(orderRef) || $0.reference.contains(orderRef)))
@@ -2677,14 +2813,12 @@ public final class The5ersService: ObservableObject {
                 existing.currency = currency
                 existing.occurredOn = dateStr
                 existing.category = normalizedCategory
-                if existing.accountId == nil || existing.accountId?.isEmpty == true {
-                    existing.accountId = journalAccId
-                }
+                existing.accountId = nil
                 dataStore.propEntries[existingIdx] = existing
             } else {
                 let entry = PropEntryItem(
                     id: entryId,
-                    accountId: journalAccId,
+                    accountId: nil,
                     firm: "The5ers",
                     kind: "expense",
                     category: normalizedCategory,

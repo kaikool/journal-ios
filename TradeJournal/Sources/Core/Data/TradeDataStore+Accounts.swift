@@ -411,9 +411,16 @@ extension TradeDataStore {
             })
         }
         
-        // 3. Ensure open/unclosed trades strictly have zero Net P&L and are not counted in closed analytics
+        // 3. Purge legacy synthetic "ACCOUNT" summary/midnight trades and enforce zero Net P&L on open positions
         var localTrades = trades
         var modified = false
+        let countBeforePurge = localTrades.count
+        localTrades.removeAll { t in
+            t.symbol == "ACCOUNT" || t.key.contains("_midnight_") || t.key.hasSuffix("_summary")
+        }
+        if localTrades.count != countBeforePurge {
+            modified = true
+        }
         for i in 0..<localTrades.count {
             if localTrades[i].status == .open || localTrades[i].closedAt == nil {
                 if localTrades[i].status != .open || localTrades[i].netPnl != 0 || localTrades[i].grossPnl != 0 || localTrades[i].fees != 0 || localTrades[i].openQuantity != localTrades[i].quantity {
@@ -428,6 +435,112 @@ extension TradeDataStore {
         }
         if modified {
             trades = localTrades
+        }
+        
+        // 4. Keep The5ers purchase expenses strictly firm-wide (accountId = nil per docs/the5ers.md:52)
+        var entriesModified = false
+        var localEntries = propEntries
+        for i in 0..<localEntries.count {
+            if localEntries[i].firm == "The5ers" && localEntries[i].kind == "expense" && localEntries[i].id.hasPrefix("the5ers_purchase_") {
+                if localEntries[i].accountId != nil {
+                    localEntries[i].accountId = nil
+                    entriesModified = true
+                }
+            }
+        }
+        if entriesModified {
+            propEntries = localEntries
+        }
+        
+        // 5. Ensure all The5ers PropAccountItems have complete program rules & trade stats
+        var propsModified = false
+        var localProps = propAccounts
+        let dayFmt = DateFormatter()
+        dayFmt.dateFormat = "yyyy-MM-dd"
+        dayFmt.locale = Locale(identifier: "en_US_POSIX")
+        dayFmt.timeZone = TimeZone(secondsFromGMT: 0)
+        for i in 0..<localProps.count {
+            guard localProps[i].firm == "The5ers" else { continue }
+            var p = localProps[i]
+            var changed = false
+            let sizeMinor = p.sizeMinor ?? 0
+            if sizeMinor > 0 {
+                let text = "\(p.name) \(p.currentStepName ?? "") \(p.program.rawValue)".lowercased()
+                let isStep2 = p.program == .verification || text.contains("- 2") || text.contains("step 2") || text.contains("phase 2")
+                let isBootcamp = text.contains("bootcamp")
+                let isHyperOrInstant = text.contains("hyper") || text.contains("instant") || p.program == .instantFunded
+                
+                if p.profitTargetMinor == nil {
+                    let pct: Int64 = isHyperOrInstant ? 10 : (isBootcamp ? 6 : (isStep2 ? 5 : 8))
+                    p.profitTargetMinor = (sizeMinor * pct) / 100
+                    changed = true
+                }
+                if p.maxLossMinor == nil {
+                    let pct: Int64 = isHyperOrInstant ? 6 : (isBootcamp ? 5 : 10)
+                    p.maxLossMinor = (sizeMinor * pct) / 100
+                    changed = true
+                }
+                if p.maxDailyLossMinor == nil {
+                    let pct: Int64 = isHyperOrInstant ? 3 : (isBootcamp ? 3 : 5)
+                    p.maxDailyLossMinor = (sizeMinor * pct) / 100
+                    changed = true
+                }
+                if p.minTradingDays == nil && !isHyperOrInstant && !isBootcamp {
+                    p.minTradingDays = 3
+                    changed = true
+                }
+                if p.netPnlMinor == nil, let bal = p.balanceMinor, bal > 0 {
+                    p.netPnlMinor = bal - sizeMinor
+                    changed = true
+                }
+            }
+            let targetId = p.journalAccountId ?? p.id
+            let accClosedTrades = trades.filter {
+                $0.symbol != "ACCOUNT" && $0.status != .open && $0.closedAt != nil &&
+                ($0.accountId == targetId || TradeDataStore.isSameAccountId($0.accountId, targetId))
+            }
+            if !accClosedTrades.isEmpty {
+                var dailyMap: [String: Decimal] = [:]
+                for t in accClosedTrades {
+                    let dk = dayFmt.string(from: t.closedAt ?? t.openedAt)
+                    dailyMap[dk, default: .zero] += t.netPnl
+                }
+                let td = dailyMap.count
+                let wd = dailyMap.values.filter { $0 > 0 }.count
+                if p.currentTradingDays == nil || (p.currentTradingDays == 0 && td > 0) {
+                    p.currentTradingDays = td
+                    changed = true
+                }
+                if p.winningDays == nil || (p.winningDays == 0 && wd > 0) {
+                    p.winningDays = wd
+                    changed = true
+                }
+                if p.totalTrades == nil || (p.totalTrades == 0 && !accClosedTrades.isEmpty) {
+                    p.totalTrades = accClosedTrades.count
+                    changed = true
+                }
+                if p.totalFeesMinor == nil {
+                    let feeSum = accClosedTrades.reduce(Decimal.zero) { $0 + $1.fees }
+                    p.totalFeesMinor = NSDecimalNumber(decimal: abs(feeSum) * 100).int64Value
+                    changed = true
+                }
+            } else {
+                if p.winningDays == nil {
+                    p.winningDays = 0
+                    changed = true
+                }
+                if p.currentTradingDays == nil {
+                    p.currentTradingDays = 0
+                    changed = true
+                }
+            }
+            if changed {
+                localProps[i] = p
+                propsModified = true
+            }
+        }
+        if propsModified {
+            propAccounts = localProps
         }
     }
     
