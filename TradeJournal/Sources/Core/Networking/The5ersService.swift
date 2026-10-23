@@ -2019,11 +2019,15 @@ public final class The5ersService: ObservableObject {
             let isClosedFlag = sourceBoolean(firstValue(in: row, keys: ["isclosed", "closed", "isclose"]))
             let st = String(describing: row["status"] ?? "").lowercased()
             
-            let openDateTuple = sourceInstant(firstValue(in: row, keys: ["opendate", "openedat", "opentime", "open_date", "open_time", "opendatetime"]))
-            let isOlderThan24h = (openDateTuple?.date.timeIntervalSinceNow ?? 0) < -86400
+            // Active open positions MUST remain open — never attempt to drill into them as incomplete closed trades:
+            let isExplicitlyOpen = (isClosedFlag == false) || st.contains("open") || st == "active"
+            if isExplicitlyOpen {
+                resolved.append(row)
+                continue
+            }
             
-            let appearsClosed = (isClosedFlag == true) || hasCloseDate || st.contains("close") || st == "filled" || st == "done" || isOlderThan24h
-            let isIncomplete = appearsClosed && ((rawExit == nil || rawExit == entry) || (rawPnl == nil || rawPnl == 0))
+            let isClosed = (isClosedFlag == true) || hasCloseDate || st.contains("close") || st == "filled" || st == "done"
+            let isIncomplete = isClosed && ((rawExit == nil || rawExit == entry) || (rawPnl == nil || rawPnl == 0))
             
             guard isIncomplete else {
                 resolved.append(row)
@@ -2424,26 +2428,34 @@ public final class The5ersService: ObservableObject {
             "realized_pnl", "net", "profit", "pnl"
         ]
         let rawPnlNum = sourceNumber(firstValue(in: row, keys: pnlKeys))
-        let hasRealizedPnl = (rawPnlNum != nil)
         
         // Generic Ghost / Dangling Position Detection:
-        // Position marked open by bridge flag, but opened > 24 hours ago AND has a close date recorded
-        // (even if adjacent to open date <= 5s, typical of scalp bridge artifacts), or has exit price or realized PnL.
+        // A ghost position is NOT an open position.
+        // A live open position has NO close date (parsedCloseInstant == nil).
+        // A bridge-stuck ghost position was opened > 24 hours ago AND has a close timestamp recorded (e.g. scalp deal artifact).
         let isGhostDangling: Bool = {
             guard openedAtDate.timeIntervalSinceNow < -86400 else { return false }
-            if let cl = parsedCloseInstant {
-                return abs(openedAtDate.timeIntervalSince(cl.date)) <= 5 || cl.date >= openedAtDate
-            }
-            return hasExitPrice || (hasRealizedPnl && rawPnlNum != 0)
+            guard let cl = parsedCloseInstant else { return false }
+            return abs(openedAtDate.timeIntervalSince(cl.date)) <= 10 || cl.date >= openedAtDate
         }()
         
         let isClosed: Bool = {
+            // Rule 1: Explicitly closed flags from broker
             if explicitClosedFlag == true { return true }
             if st.contains("close") || st == "filled" || st == "done" || st.contains("exit") || st.contains("history") { return true }
-            // If the position has a parsed close date, exit price, or explicit realized P&L, it is closed
-            if parsedCloseInstant != nil || hasExitPrice || (hasRealizedPnl && rawPnlNum != 0) { return true }
+            
+            // Rule 2: Detected ghost position (has close timestamp from past)
             if isGhostDangling { return true }
-            if explicitClosedFlag == false || st.contains("open") { return false }
+            
+            // Rule 3: If flagged open or status says open/active, it is genuinely an OPEN trade!
+            if explicitClosedFlag == false || st.contains("open") || st == "active" {
+                return false
+            }
+            
+            // Rule 4: Neutral record fallback requires both a close timestamp and exit price
+            if let cl = parsedCloseInstant, cl.date > openedAtDate, hasExitPrice {
+                return true
+            }
             return false
         }()
         
