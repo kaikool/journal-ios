@@ -276,7 +276,7 @@ extension PropFirmLedgerView {
     
     // MARK: - Apple HIG Helper Views
     
-    internal func cardContainer<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+    internal func cardContainer<Content: View>(isActive: Bool = false, @ViewBuilder content: () -> Content) -> some View {
         content()
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -284,9 +284,9 @@ extension PropFirmLedgerView {
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(AppColors.border.opacity(0.5), lineWidth: 0.5)
+                    .stroke(isActive ? AppColors.brand.opacity(0.4) : AppColors.border.opacity(0.5), lineWidth: isActive ? 1.0 : 0.5)
             )
-            .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 2)
+            .shadow(color: isActive ? AppColors.brand.opacity(0.08) : Color.black.opacity(0.04), radius: isActive ? 10 : 8, x: 0, y: 2)
     }
     
     internal func subMetricBlock(title: String, value: String, color: Color) -> some View {
@@ -339,7 +339,7 @@ extension PropFirmLedgerView {
                 )
             } else {
                 ForEach(filteredAccounts) { acc in
-                    cardContainer {
+                    cardContainer(isActive: acc.status == .active) {
                         VStack(alignment: .leading, spacing: 10) {
                             HStack {
                                 HStack(spacing: 6) {
@@ -459,116 +459,10 @@ extension PropFirmLedgerView {
                             .background(AppColors.secondaryBackground.opacity(0.6))
                             .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                             
-                            // Program Rules, Stop Loss & Progression (from the5ers_program / the5ers_consistency / the5ers_account)
+                            // Program Rules, Stop Loss & Progression (Visual Objective Charts & Risk Shields)
                             let hasProgramDetails = acc.profitTargetMinor != nil || acc.maxLossMinor != nil || acc.maxDailyLossMinor != nil || acc.winningDays != nil || acc.minTradingDays != nil || acc.currentStepName != nil || acc.totalTrades != nil
                             if acc.status == .active || hasProgramDetails {
-                                VStack(alignment: .leading, spacing: 8) {
-                                    HStack {
-                                        HStack(spacing: 5) {
-                                            Image(systemName: "target")
-                                                .font(.system(size: 11, weight: .semibold))
-                                                .foregroundColor(AppColors.brand)
-                                            Text(acc.currentStepName ?? "Program Rules & Objectives")
-                                                .font(.system(size: 11.5, weight: .bold))
-                                                .foregroundColor(AppColors.primaryText)
-                                                .lineLimit(1)
-                                        }
-                                        Spacer()
-                                        if let winDays = acc.winningDays {
-                                            let minDays = acc.minTradingDays ?? 0
-                                            HStack(spacing: 3) {
-                                                Image(systemName: "checkmark.seal.fill")
-                                                    .font(.system(size: 10))
-                                                Text(minDays > 0 ? "Winning Days: \(winDays)/\(minDays)" : "Winning Days: \(winDays)")
-                                                    .font(.system(size: 10.5, weight: .semibold))
-                                            }
-                                            .foregroundColor(AppColors.profit)
-                                            .padding(.horizontal, 7)
-                                            .padding(.vertical, 2.5)
-                                            .background(AppColors.profit.opacity(0.12))
-                                            .clipShape(Capsule())
-                                        }
-                                    }
-                                    
-                                    // Target & Risk Thresholds
-                                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 6) {
-                                        if let target = acc.profitTargetMinor {
-                                            VStack(alignment: .leading, spacing: 1) {
-                                                Text("Profit Target")
-                                                    .font(.system(size: 10))
-                                                    .foregroundColor(AppColors.secondaryText)
-                                                Text(Formatters.formatCurrency(Decimal(target) / 100, currency: acc.currency))
-                                                    .font(.system(size: 11, weight: .semibold))
-                                                    .monospacedDigit()
-                                                    .foregroundColor(AppColors.profit)
-                                            }
-                                        }
-                                        if let dailyLoss = acc.maxDailyLossMinor {
-                                            VStack(alignment: .leading, spacing: 1) {
-                                                Text("Daily Stop Loss")
-                                                    .font(.system(size: 10))
-                                                    .foregroundColor(AppColors.secondaryText)
-                                                Text(Formatters.formatCurrency(Decimal(dailyLoss) / 100, currency: acc.currency))
-                                                    .font(.system(size: 11, weight: .semibold))
-                                                    .monospacedDigit()
-                                                    .foregroundColor(AppColors.loss)
-                                            }
-                                        }
-                                        if let maxLoss = acc.maxLossMinor {
-                                            VStack(alignment: .leading, spacing: 1) {
-                                                Text("Max Stop Loss")
-                                                    .font(.system(size: 10))
-                                                    .foregroundColor(AppColors.secondaryText)
-                                                Text(Formatters.formatCurrency(Decimal(maxLoss) / 100, currency: acc.currency))
-                                                    .font(.system(size: 11, weight: .semibold))
-                                                    .monospacedDigit()
-                                                    .foregroundColor(AppColors.loss)
-                                            }
-                                        }
-                                        if let minDays = acc.minTradingDays {
-                                            VStack(alignment: .leading, spacing: 1) {
-                                                Text("Min Winning Days")
-                                                    .font(.system(size: 10))
-                                                    .foregroundColor(AppColors.secondaryText)
-                                                let wins = acc.winningDays ?? 0
-                                                Text("\(wins)/\(minDays) days")
-                                                    .font(.system(size: 11, weight: .semibold))
-                                                    .monospacedDigit()
-                                                    .foregroundColor(wins >= minDays ? AppColors.profit : AppColors.primaryText)
-                                            }
-                                        }
-                                        if let tradingDays = acc.currentTradingDays, tradingDays > 0 {
-                                            VStack(alignment: .leading, spacing: 1) {
-                                                Text("Active Trading Days")
-                                                    .font(.system(size: 10))
-                                                    .foregroundColor(AppColors.secondaryText)
-                                                Text("\(tradingDays) day\(tradingDays == 1 ? "" : "s")")
-                                                    .font(.system(size: 11, weight: .semibold))
-                                                    .monospacedDigit()
-                                                    .foregroundColor(AppColors.primaryText)
-                                            }
-                                        }
-                                        if let totalTrades = acc.totalTrades {
-                                            VStack(alignment: .leading, spacing: 1) {
-                                                Text("Trades / Fees")
-                                                    .font(.system(size: 10))
-                                                    .foregroundColor(AppColors.secondaryText)
-                                                let feeStr = acc.totalFeesMinor.map { Formatters.formatCurrency(Decimal($0) / 100, currency: acc.currency) } ?? "$0.00"
-                                                Text("\(totalTrades) trades • \(feeStr)")
-                                                    .font(.system(size: 11, weight: .semibold))
-                                                    .monospacedDigit()
-                                                    .foregroundColor(AppColors.primaryText)
-                                            }
-                                        }
-                                    }
-                                }
-                                .padding(9)
-                                .background(AppColors.brand.opacity(0.06))
-                                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                        .stroke(AppColors.brand.opacity(0.18), lineWidth: 1)
-                                )
+                                PropAccountObjectivesChartCard(acc: acc)
                             }
                             
                             Divider().background(AppColors.border.opacity(0.5))
@@ -957,5 +851,349 @@ extension PropFirmLedgerView {
                 }
             }
         }
+    }
+}
+
+// MARK: - Active Prop Account Visual Objectives & Risk Charts
+
+internal struct PropAccountObjectivesChartCard: View {
+    let acc: PropAccountItem
+    
+    private var balMinor: Int64 { acc.balanceMinor ?? acc.sizeMinor ?? 0 }
+    private var eqMinor: Int64 { acc.equityMinor ?? balMinor }
+    private var sizeMinor: Int64 { acc.sizeMinor ?? 0 }
+    private var netPnlMinor: Int64 {
+        if let np = acc.netPnlMinor { return np }
+        if sizeMinor > 0 { return balMinor - sizeMinor }
+        return 0
+    }
+    
+    // Max Drawdown: startBalance - equity (when sizeMinor > 0)
+    private var maxDrawdownUsedMinor: Int64 {
+        if sizeMinor > 0 {
+            return max(0, sizeMinor - eqMinor)
+        }
+        return netPnlMinor < 0 ? abs(netPnlMinor) : 0
+    }
+    
+    private var maxLossMinor: Int64 { acc.maxLossMinor ?? 0 }
+    private var dailyLossMinor: Int64 { acc.maxDailyLossMinor ?? 0 }
+    private var targetMinor: Int64 { acc.profitTargetMinor ?? 0 }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            // Header: Section title with Live indicator
+            HStack(spacing: 6) {
+                Image(systemName: "chart.bar.xaxis")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundColor(AppColors.brand)
+                Text(acc.currentStepName ?? "Program Objectives & Risk Model")
+                    .font(.system(size: 12.5, weight: .bold))
+                    .foregroundColor(AppColors.primaryText)
+                
+                Spacer()
+                
+                if acc.status == .active {
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(AppColors.profit)
+                            .frame(width: 6, height: 6)
+                        Text("Active Track")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(AppColors.profit)
+                    }
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .background(AppColors.profit.opacity(0.12))
+                    .clipShape(Capsule())
+                }
+            }
+            
+            // 1. PROFIT TARGET PROGRESS BAR
+            if targetMinor > 0 {
+                let targetDec = Decimal(targetMinor) / 100
+                let pnlDec = Decimal(netPnlMinor) / 100
+                let isProfit = netPnlMinor > 0
+                let progressRatio = isProfit ? min(1.0, Double(netPnlMinor) / Double(targetMinor)) : 0.0
+                let distanceToTargetDec = max(Decimal.zero, targetDec - pnlDec)
+                
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        HStack(spacing: 5) {
+                            Image(systemName: "flag.checkered")
+                                .font(.system(size: 11))
+                                .foregroundColor(AppColors.brand)
+                            Text("Profit Target")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundColor(AppColors.secondaryText)
+                        }
+                        Spacer()
+                        Text("Goal: +\(Formatters.formatCurrency(targetDec, currency: acc.currency))")
+                            .font(.system(size: 11, weight: .bold))
+                            .monospacedDigit()
+                            .foregroundColor(AppColors.profit)
+                    }
+                    
+                    // Visual progress bar track
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                .fill(AppColors.secondaryBackground)
+                                .frame(height: 10)
+                            
+                            if progressRatio > 0 {
+                                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [AppColors.profit.opacity(0.8), AppColors.profit],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
+                                    )
+                                    .frame(width: max(8, geo.size.width * CGFloat(progressRatio)), height: 10)
+                            }
+                        }
+                    }
+                    .frame(height: 10)
+                    
+                    HStack {
+                        if isProfit {
+                            Text("Progress: \(Formatters.formatCurrency(pnlDec, currency: acc.currency)) (\(String(format: "%.1f%%", progressRatio * 100)))")
+                                .font(.system(size: 10.5, weight: .medium))
+                                .foregroundColor(AppColors.profit)
+                        } else {
+                            Text("Current P&L: \(Formatters.formatCurrency(pnlDec, currency: acc.currency))")
+                                .font(.system(size: 10.5, weight: .medium))
+                                .foregroundColor(pnlDec == 0 ? AppColors.secondaryText : AppColors.loss)
+                        }
+                        Spacer()
+                        Text("\(Formatters.formatCurrency(distanceToTargetDec, currency: acc.currency)) to target")
+                            .font(.system(size: 10.5, weight: .medium))
+                            .monospacedDigit()
+                            .foregroundColor(AppColors.secondaryText)
+                    }
+                }
+                .padding(10)
+                .background(AppColors.secondaryBackground.opacity(0.5))
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            }
+            
+            // 2. DAILY LOSS SHIELD (Horizontal Protection Bar)
+            if dailyLossMinor > 0 {
+                let dailyLimitDec = Decimal(dailyLossMinor) / 100
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        HStack(spacing: 5) {
+                            Image(systemName: "shield.lefthalf.filled")
+                                .font(.system(size: 11))
+                                .foregroundColor(AppColors.profit)
+                            Text("Daily Stop Loss Shield")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundColor(AppColors.secondaryText)
+                        }
+                        Spacer()
+                        Text("Limit: -\(Formatters.formatCurrency(dailyLimitDec, currency: acc.currency))")
+                            .font(.system(size: 11, weight: .bold))
+                            .monospacedDigit()
+                            .foregroundColor(AppColors.loss)
+                    }
+                    
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                .fill(AppColors.secondaryBackground)
+                                .frame(height: 10)
+                            
+                            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                .fill(
+                                    LinearGradient(
+                                        colors: [AppColors.profit.opacity(0.85), AppColors.profit],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
+                                .frame(width: geo.size.width, height: 10)
+                        }
+                    }
+                    .frame(height: 10)
+                    
+                    HStack {
+                        Text("Safe Buffer: \(Formatters.formatCurrency(dailyLimitDec, currency: acc.currency)) remaining (100%)")
+                            .font(.system(size: 10.5, weight: .medium))
+                            .foregroundColor(AppColors.profit)
+                        Spacer()
+                        Text("Loss Used: $0.00")
+                            .font(.system(size: 10.5, weight: .medium))
+                            .monospacedDigit()
+                            .foregroundColor(AppColors.secondaryText)
+                    }
+                }
+                .padding(10)
+                .background(AppColors.secondaryBackground.opacity(0.5))
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            }
+            
+            // 3. MAX DRAWDOWN RISK GAUGE BAR
+            if maxLossMinor > 0 {
+                let maxLossDec = Decimal(maxLossMinor) / 100
+                let usedDec = Decimal(maxDrawdownUsedMinor) / 100
+                let remainingDec = max(Decimal.zero, maxLossDec - usedDec)
+                let usedRatio = min(1.0, Double(maxDrawdownUsedMinor) / Double(maxLossMinor))
+                let bufferRatio = max(0.0, 1.0 - usedRatio)
+                
+                let riskColor: Color = {
+                    if bufferRatio >= 0.5 { return AppColors.profit }
+                    if bufferRatio >= 0.25 { return AppColors.warning }
+                    return AppColors.loss
+                }()
+                
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        HStack(spacing: 5) {
+                            Image(systemName: "shield.fill")
+                                .font(.system(size: 11))
+                                .foregroundColor(riskColor)
+                            Text("Max Drawdown Shield")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundColor(AppColors.secondaryText)
+                        }
+                        Spacer()
+                        Text("Limit: -\(Formatters.formatCurrency(maxLossDec, currency: acc.currency))")
+                            .font(.system(size: 11, weight: .bold))
+                            .monospacedDigit()
+                            .foregroundColor(AppColors.loss)
+                    }
+                    
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                .fill(AppColors.secondaryBackground)
+                                .frame(height: 10)
+                            
+                            if usedRatio > 0 {
+                                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [riskColor.opacity(0.8), riskColor],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
+                                    )
+                                    .frame(width: max(8, geo.size.width * CGFloat(usedRatio)), height: 10)
+                            }
+                        }
+                    }
+                    .frame(height: 10)
+                    
+                    HStack {
+                        Text("Drawdown Used: \(Formatters.formatCurrency(usedDec, currency: acc.currency)) (\(String(format: "%.1f%%", usedRatio * 100)))")
+                            .font(.system(size: 10.5, weight: .medium))
+                            .monospacedDigit()
+                            .foregroundColor(riskColor)
+                        Spacer()
+                        Text("Buffer Left: \(Formatters.formatCurrency(remainingDec, currency: acc.currency)) (\(String(format: "%.1f%%", bufferRatio * 100)))")
+                            .font(.system(size: 10.5, weight: .semibold))
+                            .monospacedDigit()
+                            .foregroundColor(riskColor)
+                    }
+                }
+                .padding(10)
+                .background(AppColors.secondaryBackground.opacity(0.5))
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            }
+            
+            // 4. MILESTONES & PERFORMANCE PILLS
+            VStack(spacing: 6) {
+                HStack(spacing: 8) {
+                    // Winning Days Pill
+                    if let winDays = acc.winningDays {
+                        let minDays = acc.minTradingDays ?? 3
+                        let isComplete = winDays >= minDays
+                        HStack(spacing: 5) {
+                            Image(systemName: isComplete ? "checkmark.seal.fill" : "calendar.badge.clock")
+                                .font(.system(size: 11))
+                                .foregroundColor(isComplete ? AppColors.profit : AppColors.brand)
+                            Text("Winning Days: \(winDays)/\(minDays)")
+                                .font(.system(size: 11, weight: .semibold))
+                                .monospacedDigit()
+                                .foregroundColor(isComplete ? AppColors.profit : AppColors.primaryText)
+                        }
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 5)
+                        .background(isComplete ? AppColors.profit.opacity(0.12) : AppColors.secondaryBackground)
+                        .clipShape(Capsule())
+                    }
+                    
+                    // Active Trading Days
+                    if let activeDays = acc.currentTradingDays, activeDays > 0 {
+                        HStack(spacing: 5) {
+                            Image(systemName: "calendar")
+                                .font(.system(size: 11))
+                                .foregroundColor(AppColors.secondaryText)
+                            Text("\(activeDays) Active Day\(activeDays == 1 ? "" : "s")")
+                                .font(.system(size: 11, weight: .medium))
+                                .monospacedDigit()
+                                .foregroundColor(AppColors.primaryText)
+                        }
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 5)
+                        .background(AppColors.secondaryBackground)
+                        .clipShape(Capsule())
+                    }
+                    
+                    Spacer()
+                }
+                
+                HStack(spacing: 8) {
+                    // Win Rate & Profit Factor
+                    if let wr = acc.winRate {
+                        let wrPct = wr > 1.0 ? wr : wr * 100
+                        let pfStr = acc.profitFactor.map { String(format: "%.2f PF", $0) } ?? ""
+                        HStack(spacing: 5) {
+                            Image(systemName: "chart.line.uptrend.xyaxis")
+                                .font(.system(size: 11))
+                                .foregroundColor(AppColors.brand)
+                            Text("\(String(format: "%.1f%% WR", wrPct))\(pfStr.isEmpty ? "" : " • \(pfStr)")")
+                                .font(.system(size: 11, weight: .medium))
+                                .monospacedDigit()
+                                .foregroundColor(AppColors.primaryText)
+                        }
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 5)
+                        .background(AppColors.secondaryBackground)
+                        .clipShape(Capsule())
+                    }
+                    
+                    // Trades & Commissions
+                    if let trades = acc.totalTrades {
+                        let feeStr = acc.totalFeesMinor.map { Formatters.formatCurrency(Decimal($0) / 100, currency: acc.currency) } ?? "$0.00"
+                        HStack(spacing: 5) {
+                            Image(systemName: "tray.full")
+                                .font(.system(size: 11))
+                                .foregroundColor(AppColors.secondaryText)
+                            Text("\(trades) trades • \(feeStr)")
+                                .font(.system(size: 11, weight: .medium))
+                                .monospacedDigit()
+                                .foregroundColor(AppColors.secondaryText)
+                        }
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 5)
+                        .background(AppColors.secondaryBackground)
+                        .clipShape(Capsule())
+                    }
+                    
+                    Spacer()
+                }
+            }
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(AppColors.cardBackground)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(AppColors.brand.opacity(0.2), lineWidth: 1)
+        )
     }
 }

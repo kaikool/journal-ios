@@ -2698,30 +2698,46 @@ public final class The5ersService: ObservableObject {
         }()
         
         var nameComponents: [String] = [pkg]
-        if !phase.isEmpty {
+        if !phase.isEmpty && phase != pkg {
             nameComponents.append(phase)
         }
         
         if let sz = accountSize, sz > 0 {
             let szInt = NSDecimalNumber(decimal: sz).intValue
-            if szInt >= 1000 && szInt % 1000 == 0 {
-                nameComponents.append("$\(szInt / 1000)K")
-            } else {
-                let formatter = NumberFormatter()
-                formatter.numberStyle = .currency
-                formatter.currencyCode = "USD"
-                formatter.maximumFractionDigits = 0
-                if let formatted = formatter.string(from: sz as NSDecimalNumber) {
-                    nameComponents.append(formatted)
-                }
+            let sizeTag = szInt >= 1000 && szInt % 1000 == 0 ? "$\(szInt / 1000)K" : "$\(szInt)"
+            let sizeBare = sizeTag.replacingOccurrences(of: "$", with: "")
+            if !pkg.contains(sizeBare) {
+                nameComponents.append(sizeTag)
             }
         }
         
         if let s = suffix, !s.isEmpty {
-            nameComponents.append("#\(s)")
+            let sNorm = s.replacingOccurrences(of: "#", with: "")
+            if !nameComponents.contains(where: { $0.contains(sNorm) }) {
+                nameComponents.append("#\(sNorm)")
+            }
         }
         
-        return nameComponents.joined(separator: " - ")
+        // Final deduplication pass to ensure clean presentation without repetitive tokens
+        var finalComponents: [String] = []
+        for c in nameComponents {
+            let cNorm = c.lowercased()
+                .replacingOccurrences(of: "$", with: "")
+                .replacingOccurrences(of: "#", with: "")
+                .replacingOccurrences(of: " ", with: "")
+            let isDupe = finalComponents.contains {
+                let eNorm = $0.lowercased()
+                    .replacingOccurrences(of: "$", with: "")
+                    .replacingOccurrences(of: "#", with: "")
+                    .replacingOccurrences(of: " ", with: "")
+                return eNorm == cNorm || (eNorm.contains(cNorm) && cNorm.count >= 3)
+            }
+            if !isDupe {
+                finalComponents.append(c)
+            }
+        }
+        
+        return finalComponents.joined(separator: " · ")
     }
     
     private func isLikelyPurchaseDictionary(_ dict: [String: Any]) -> Bool {

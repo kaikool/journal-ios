@@ -283,11 +283,64 @@ public enum Formatters {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return "Trading Account" }
         
-        let lower = trimmed.lowercased()
+        // 1. Split existing delimited strings (' - ', ' · ', ' • ') and perform smart deduplication
+        let rawParts: [String] = {
+            if trimmed.contains(" - ") {
+                return trimmed.components(separatedBy: " - ")
+            } else if trimmed.contains(" · ") {
+                return trimmed.components(separatedBy: " · ")
+            } else if trimmed.contains(" • ") {
+                return trimmed.components(separatedBy: " • ")
+            }
+            return [trimmed]
+        }().map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
         
-        // If already well formatted with dashes or dots (e.g. "High Stakes - Phase 1 - $100K - #123456"), preserve it
-        if (trimmed.contains(" - ") || trimmed.contains(" · ")) && !lower.contains("meta-trader") && !lower.contains("c-trader") {
-            return trimmed
+        var deduplicatedParts: [String] = []
+        for part in rawParts {
+            let pLower = part.lowercased()
+            // Skip raw platform placeholders if they appear as separate segments
+            if (pLower.hasPrefix("meta-trader") || pLower.hasPrefix("c-trader") || pLower.hasPrefix("account the5ers_")) && rawParts.count > 1 {
+                continue
+            }
+            let pNorm = pLower.replacingOccurrences(of: "$", with: "")
+                .replacingOccurrences(of: "#", with: "")
+                .replacingOccurrences(of: " ", with: "")
+                .replacingOccurrences(of: ",", with: "")
+            
+            let isDupe = deduplicatedParts.contains { existing in
+                let eNorm = existing.lowercased()
+                    .replacingOccurrences(of: "$", with: "")
+                    .replacingOccurrences(of: "#", with: "")
+                    .replacingOccurrences(of: " ", with: "")
+                    .replacingOccurrences(of: ",", with: "")
+                if eNorm == pNorm { return true }
+                // If one contains the other (e.g. "highstakes50k" contains "highstakes" or "50k")
+                if pNorm.count >= 3 && eNorm.contains(pNorm) { return true }
+                return false
+            }
+            
+            if !isDupe {
+                deduplicatedParts.append(part)
+            } else {
+                // If the incoming part is more descriptive (e.g. "High Stakes 50K" vs "High Stakes"), upgrade it
+                if let idx = deduplicatedParts.firstIndex(where: { existing in
+                    let eNorm = existing.lowercased()
+                        .replacingOccurrences(of: "$", with: "")
+                        .replacingOccurrences(of: "#", with: "")
+                        .replacingOccurrences(of: " ", with: "")
+                    return pNorm.count > eNorm.count && pNorm.contains(eNorm)
+                }) {
+                    deduplicatedParts[idx] = part
+                }
+            }
+        }
+        
+        let candidate = deduplicatedParts.joined(separator: " · ")
+        let lower = candidate.lowercased()
+        
+        // If candidate is already clean, has 2+ distinct non-empty segments, and lacks raw broker junk, preserve it
+        if deduplicatedParts.count >= 2 && !lower.contains("meta-trader") && !lower.contains("c-trader") && !lower.hasPrefix("the5ers_") {
+            return candidate
         }
         
         let isRawIdOrPrefix = lower.hasPrefix("account the5ers_") ||
@@ -304,7 +357,7 @@ public enum Formatters {
                             isRawIdOrPrefix
         
         guard isRawPlatform || lower.contains("phase") || lower.contains("step") || lower.contains("stakes") || lower.contains("bootcamp") || lower.contains("growth") else {
-            return trimmed
+            return candidate
         }
         
         let platformTag: String
@@ -364,30 +417,36 @@ public enum Formatters {
         }()
         
         var components: [String] = [pkg]
-        if !phase.isEmpty {
+        if !phase.isEmpty && phase != pkg {
             components.append(phase)
         }
         
         if let b = balance, b > 0 {
             let bInt = NSDecimalNumber(decimal: b).intValue
+            let sizeLabel: String
             if bInt >= 1000 && bInt % 1000 == 0 {
-                components.append("$\(bInt / 1000)K")
+                sizeLabel = "$\(bInt / 1000)K"
             } else {
                 let formatter = NumberFormatter()
                 formatter.numberStyle = .currency
                 formatter.currencyCode = "USD"
                 formatter.maximumFractionDigits = 0
-                if let formatted = formatter.string(from: b as NSDecimalNumber) {
-                    components.append(formatted)
-                }
+                sizeLabel = formatter.string(from: b as NSDecimalNumber) ?? "$\(b)"
+            }
+            let sizeBare = sizeLabel.replacingOccurrences(of: "$", with: "")
+            if !pkg.contains(sizeBare) {
+                components.append(sizeLabel)
             }
         }
         
         if !suffix.isEmpty {
-            components.append("#\(suffix)")
+            let sNorm = suffix.replacingOccurrences(of: "#", with: "")
+            if !components.contains(where: { $0.contains(sNorm) }) {
+                components.append("#\(sNorm)")
+            }
         }
         
-        return components.joined(separator: " - ")
+        return components.joined(separator: " · ")
     }
     
     /// Produces a concise account label tailored for tight navigation bars (e.g. "HighStakes P1 · $50K" or "cTrader #7657")
