@@ -1257,7 +1257,11 @@ public final class The5ersService: ObservableObject {
                 }
                 
                 let defaultName: String = {
-                    if !needsProgramDetails, let cachedName = existingCachedProp?.name, !cachedName.hasPrefix("The5ers ") {
+                    if !needsProgramDetails,
+                       let cachedName = existingCachedProp?.name,
+                       cachedName.contains(" · "),
+                       !cachedName.contains(" - "),
+                       !cachedName.hasPrefix("The5ers ") {
                         return cachedName
                     }
                     return Self.the5ersDefaultName(
@@ -2843,7 +2847,7 @@ public final class The5ersService: ObservableObject {
                     return apn
                 }
             }
-            if rawCombined.contains("high stakes") || rawCombined.contains("highstakes") || rawCombined.contains("high-stakes") {
+            if rawCombined.contains("high stakes") || rawCombined.contains("highstakes") || rawCombined.contains("high-stakes") || rawCombined.contains("high steaks") || rawCombined.contains("highsteaks") {
                 return "High Stakes"
             }
             if rawCombined.contains("hyper growth") || rawCombined.contains("hypergrowth") || rawCombined.contains("hyper-growth") {
@@ -2873,17 +2877,20 @@ public final class The5ersService: ObservableObject {
             if let aat = authoritativeAccountType?.lowercased() {
                 if aat == "funded" { return "Funded" }
             }
-            if rawCombined.contains("step 2") || rawCombined.contains("step2") || rawCombined.contains("phase 2") || rawCombined.contains("phase2") || rawCombined.contains("verification") {
+            if rawCombined.contains("step 2") || rawCombined.contains("step2") || rawCombined.contains("phase 2") || rawCombined.contains("phase2") || rawCombined.contains("verification") ||
+               rawCombined.contains("- 2 -") || rawCombined.contains("- 2-") || rawCombined.contains("-2-") || rawCombined.contains(" - 2 ") || rawCombined.hasSuffix("- 2") {
                 return "Phase 2"
             }
-            if rawCombined.contains("step 3") || rawCombined.contains("step3") || rawCombined.contains("phase 3") || rawCombined.contains("phase3") {
+            if rawCombined.contains("step 3") || rawCombined.contains("step3") || rawCombined.contains("phase 3") || rawCombined.contains("phase3") ||
+               rawCombined.contains("- 3 -") || rawCombined.contains("- 3-") || rawCombined.contains("-3-") || rawCombined.contains(" - 3 ") || rawCombined.hasSuffix("- 3") {
                 return "Phase 3"
             }
-            if rawCombined.contains("funded") || rawCombined.contains("live") || rawCombined.contains("master") {
+            if rawCombined.contains("funded") || rawCombined.contains("live") || rawCombined.contains("master") || pkg == "Instant Funding" {
                 return "Funded"
             }
-            if pkg == "Instant Funding" {
-                return "Funded"
+            if rawCombined.contains("step 1") || rawCombined.contains("step1") || rawCombined.contains("phase 1") || rawCombined.contains("phase1") || rawCombined.contains("evaluation") ||
+               rawCombined.contains("- 1 -") || rawCombined.contains("- 1-") || rawCombined.contains("-1-") || rawCombined.contains(" - 1 ") || rawCombined.hasSuffix("- 1") {
+                return "Phase 1"
             }
             return "Phase 1"
         }()

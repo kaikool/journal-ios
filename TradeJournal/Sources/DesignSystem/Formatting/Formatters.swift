@@ -339,8 +339,9 @@ public enum Formatters {
         let candidate = deduplicatedParts.joined(separator: " · ")
         let lower = candidate.lowercased()
         
-        // If candidate is already clean, has 2+ distinct non-empty segments, and lacks raw broker junk, preserve it
-        if deduplicatedParts.count >= 2 && !lower.contains("meta-trader") && !lower.contains("c-trader") && !lower.hasPrefix("the5ers_") {
+        // Only preserve if candidate is already in standard " · " format and has no raw broker separators or junk
+        let isAlreadyClean = trimmed.contains(" · ") && !trimmed.contains(" - ") && !lower.contains("meta-trader") && !lower.contains("c-trader") && !lower.hasPrefix("the5ers_")
+        if isAlreadyClean && deduplicatedParts.count >= 2 {
             return candidate
         }
         
@@ -383,7 +384,7 @@ public enum Formatters {
         }
         
         let pkg: String = {
-            if lower.contains("high stakes") || lower.contains("highstakes") || lower.contains("high-stakes") {
+            if lower.contains("high stakes") || lower.contains("highstakes") || lower.contains("high-stakes") || lower.contains("high steaks") || lower.contains("highsteaks") {
                 return "High Stakes"
             }
             if lower.contains("hyper growth") || lower.contains("hypergrowth") || lower.contains("hyper-growth") {
@@ -402,17 +403,20 @@ public enum Formatters {
         }()
         
         let phase: String = {
-            if lower.contains("step 1") || lower.contains("step1") || lower.contains("phase 1") || lower.contains("phase1") || lower.contains("evaluation") {
-                return "Phase 1"
-            }
-            if lower.contains("step 2") || lower.contains("step2") || lower.contains("phase 2") || lower.contains("phase2") || lower.contains("verification") {
+            if lower.contains("step 2") || lower.contains("step2") || lower.contains("phase 2") || lower.contains("phase2") || lower.contains("verification") ||
+               lower.contains("- 2 -") || lower.contains("- 2-") || lower.contains("-2-") || lower.contains(" - 2 ") || lower.hasSuffix("- 2") || lower.hasSuffix("-2") {
                 return "Phase 2"
             }
-            if lower.contains("step 3") || lower.contains("step3") || lower.contains("phase 3") || lower.contains("phase3") {
+            if lower.contains("step 3") || lower.contains("step3") || lower.contains("phase 3") || lower.contains("phase3") ||
+               lower.contains("- 3 -") || lower.contains("- 3-") || lower.contains("-3-") || lower.contains(" - 3 ") || lower.hasSuffix("- 3") || lower.hasSuffix("-3") {
                 return "Phase 3"
             }
-            if lower.contains("funded") || lower.contains("live") || lower.contains("master") {
+            if lower.contains("funded") || lower.contains("live") || lower.contains("master") || pkg == "Instant Funding" {
                 return "Funded"
+            }
+            if lower.contains("step 1") || lower.contains("step1") || lower.contains("phase 1") || lower.contains("phase1") || lower.contains("evaluation") ||
+               lower.contains("- 1 -") || lower.contains("- 1-") || lower.contains("-1-") || lower.contains(" - 1 ") || lower.hasSuffix("- 1") || lower.hasSuffix("-1") {
+                return "Phase 1"
             }
             return ""
         }()
@@ -422,25 +426,29 @@ public enum Formatters {
             components.append(phase)
         }
         
-        if let b = balance, b > 0 {
-            let bInt = NSDecimalNumber(decimal: b).intValue
-            let sizeLabel: String
-            if bInt >= 1000 && bInt % 1000 == 0 {
-                sizeLabel = "$\(bInt / 1000)K"
-            } else {
-                let formatter = NumberFormatter()
-                formatter.numberStyle = .currency
-                formatter.currencyCode = "USD"
-                formatter.maximumFractionDigits = 0
-                sizeLabel = formatter.string(from: b as NSDecimalNumber) ?? "$\(b)"
+        // Extract size from balance or raw string e.g. "50K", "$100k"
+        let sizeCandidate: String? = {
+            if let b = balance, b > 0 {
+                let bInt = NSDecimalNumber(decimal: b).intValue
+                if bInt >= 1000 && bInt % 1000 == 0 {
+                    return "$\(bInt / 1000)K"
+                }
+                return "$\(bInt)"
             }
-            let sizeBare = sizeLabel.replacingOccurrences(of: "$", with: "")
+            if let regex = try? NSRegularExpression(pattern: #"(?i)\$?(\d{1,4})\s*k\b"#),
+               let match = regex.firstMatch(in: trimmed, range: NSRange(trimmed.startIndex..., in: trimmed)),
+               let range = Range(match.range(at: 1), in: trimmed) {
+                return "$\(trimmed[range].uppercased())K"
+            }
+            return nil
+        }()
+        if let sz = sizeCandidate {
+            let sizeBare = sz.replacingOccurrences(of: "$", with: "").lowercased()
             let alreadyHasSize = components.contains { c in
-                let cNorm = c.replacingOccurrences(of: "$", with: "").lowercased()
-                return cNorm.contains(sizeBare.lowercased())
-            } || trimmed.lowercased().contains(sizeBare.lowercased())
-            if !alreadyHasSize && !pkg.contains(sizeBare) {
-                components.append(sizeLabel)
+                c.replacingOccurrences(of: "$", with: "").lowercased().contains(sizeBare)
+            }
+            if !alreadyHasSize {
+                components.append(sz)
             }
         }
         
