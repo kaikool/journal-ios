@@ -1,12 +1,12 @@
 import Foundation
 
-public enum AIReflectionAction: String, Codable {
+public enum AIReflectionAction: String, Codable, Sendable {
     case ask = "ask"
     case critique = "critique"
     case recap = "recap"
 }
 
-public struct AIReflectionResponse: Codable {
+public struct AIReflectionResponse: Codable, Sendable {
     public let action: String
     public let reflection: String
 }
@@ -14,22 +14,348 @@ public struct AIReflectionResponse: Codable {
 public actor AIReflectionService {
     public static let shared = AIReflectionService()
     
+    private let openCodeModelsEndpoint = "https://opencode.ai/inference/v1/models"
+    private let openCodeInferenceEndpoint = "https://opencode.ai/inference/openai/v1/chat/completions"
+    
+    public static let fallbackFreeModels: [String] = [
+        "deepseek-v4.1-flash-free",
+        "big-pickle",
+        "glm-5.3-flash-free",
+        "mimo-v2.6-flash-free",
+        "nemotron-3.5-lightning-free",
+        "nemotron-3.5-super-vl-free",
+        "flint-40b-free",
+        "beam-free",
+        "jev-1.13-free"
+    ]
+    
+    private let systemPrompt = """
+    You are the reflection layer of a disciplined trader's journal.
+    You see only the trader's own recorded data — trades, stats, and notes. Ground every
+    statement in those numbers; never invent trades, prices, or market context you weren't given.
+    Be direct, specific, and objective like an elite prop trading coach: cite the numbers, identify behavioral patterns, and specify clear improvements. No generic platitudes, no disclaimers about trading risks. Keep it concise, structured, and actionable.
+    """
+    
     private init() {}
     
-    /// Requests AI reflection via Supabase Edge Function or offline coach heuristics
+    /// Fetches the live list of free models directly from the OpenCode source
+    public func fetchOpenCodeFreeModels() async -> [String] {
+        guard let url = URL(string: openCodeModelsEndpoint) else {
+            return Self.fallbackFreeModels
+        }
+        
+        do {
+            var request = URLRequest(url: url)
+            request.timeoutInterval = 8
+            request.cachePolicy = .reloadIgnoringLocalCacheData
+            
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+                return Self.fallbackFreeModels
+            }
+            
+            struct ModelsPayload: Decodable {
+                struct ModelEntry: Decodable {
+                    let id: String
+                }
+                let data: [ModelEntry]
+            }
+            
+            let decoded = try JSONDecoder().decode(ModelsPayload.self, from: data)
+            let freeModels = decoded.data
+                .map(\.id)
+                .filter { id in
+                    id.hasSuffix("-free") || id.contains("-free") || id == "big-pickle"
+                }
+            
+            if !freeModels.isEmpty {
+                var sortedList = freeModels
+                let priority = ["deepseek-v4.1-flash-free", "big-pickle", "glm-5.3-flash-free", "mimo-v2.6-flash-free"]
+                sortedList.sort { a, b in
+                    let indexA = priority.firstIndex(of: a) ?? Int.max
+                    let indexB = priority.firstIndex(of: b) ?? Int.max
+                    if indexA != indexB {
+                        return indexA < indexB
+                    }
+                    return a < b
+                }
+                return sortedList
+            }
+            return Self.fallbackFreeModels
+        } catch {
+            AppLogger.warning("Failed to fetch live OpenCode models list: \(error.localizedDescription). Using fallback.")
+            return Self.fallbackFreeModels
+        }
+    }
+    
+    /// Requests AI reflection via user-configured AI provider (OpenCode Zen / OpenAI / Anthropic)
+    /// Gracefully falls back to local coach heuristics if unconfigured or offline.
     public func requestReflection(
         action: AIReflectionAction,
         prompt: String? = nil,
         metrics: TradeMetrics? = nil,
         edgeScore: Double? = nil,
         supabaseUrl: String? = nil,
-        authToken: String? = nil
+        authToken: String? = nil,
+        overrideConfig: AiSettingsConfig? = nil
     ) async throws -> String {
-        guard let urlString = supabaseUrl, !urlString.isEmpty, let token = authToken, !token.isEmpty else {
-            // Offline / Local Development Fallback Coach Heuristic
+        let config = overrideConfig ?? (await MainActor.run { TradeDataStore.shared.aiSettings })
+        
+        switch config.provider {
+        case "opencode":
+            guard !config.opencodeKey.trimmingCharacters(in: .whitespaces).isEmpty else {
+                let local = generateLocalCoachReflection(action: action, metrics: metrics, edgeScore: edgeScore, prompt: prompt)
+                return "ℹ️ [OpenCode Key Not Configured] Go to Settings > AI to enter your free OpenCode API key for live AI coaching.\n\n" + local
+            }
+            do {
+                return try await callOpenAiCompatible(
+                    endpoint: openCodeInferenceEndpoint,
+                    apiKey: config.opencodeKey,
+                    model: config.model.isEmpty ? "deepseek-v4.1-flash-free" : config.model,
+                    action: action,
+                    prompt: prompt,
+                    metrics: metrics,
+                    edgeScore: edgeScore
+                )
+            } catch {
+                AppLogger.warning("OpenCode request failed: \(error.localizedDescription). Falling back to local coach.")
+                let local = generateLocalCoachReflection(action: action, metrics: metrics, edgeScore: edgeScore, prompt: prompt)
+                return "⚠️ [OpenCode Service Notice: \(error.localizedDescription)]\n\n" + local
+            }
+            
+        case "openai":
+            guard !config.openaiKey.trimmingCharacters(in: .whitespaces).isEmpty else {
+                let local = generateLocalCoachReflection(action: action, metrics: metrics, edgeScore: edgeScore, prompt: prompt)
+                return "ℹ️ [OpenAI Key Not Configured] Enter your API key in Settings > AI.\n\n" + local
+            }
+            do {
+                return try await callOpenAiCompatible(
+                    endpoint: "https://api.openai.com/v1/chat/completions",
+                    apiKey: config.openaiKey,
+                    model: config.model.isEmpty ? "gpt-4o-mini" : config.model,
+                    action: action,
+                    prompt: prompt,
+                    metrics: metrics,
+                    edgeScore: edgeScore
+                )
+            } catch {
+                let local = generateLocalCoachReflection(action: action, metrics: metrics, edgeScore: edgeScore, prompt: prompt)
+                return "⚠️ [OpenAI Error: \(error.localizedDescription)]\n\n" + local
+            }
+            
+        case "anthropic":
+            guard !config.anthropicKey.trimmingCharacters(in: .whitespaces).isEmpty else {
+                let local = generateLocalCoachReflection(action: action, metrics: metrics, edgeScore: edgeScore, prompt: prompt)
+                return "ℹ️ [Anthropic Key Not Configured] Enter your API key in Settings > AI.\n\n" + local
+            }
+            do {
+                return try await callAnthropic(
+                    apiKey: config.anthropicKey,
+                    model: config.model.isEmpty ? "claude-3-5-sonnet-20241022" : config.model,
+                    action: action,
+                    prompt: prompt,
+                    metrics: metrics,
+                    edgeScore: edgeScore
+                )
+            } catch {
+                let local = generateLocalCoachReflection(action: action, metrics: metrics, edgeScore: edgeScore, prompt: prompt)
+                return "⚠️ [Anthropic Error: \(error.localizedDescription)]\n\n" + local
+            }
+            
+        default:
+            if let urlString = supabaseUrl, !urlString.isEmpty, let token = authToken, !token.isEmpty {
+                return try await callSupabaseEdgeFunction(
+                    urlString: urlString,
+                    token: token,
+                    action: action,
+                    prompt: prompt,
+                    metrics: metrics,
+                    edgeScore: edgeScore
+                )
+            }
             return generateLocalCoachReflection(action: action, metrics: metrics, edgeScore: edgeScore, prompt: prompt)
         }
+    }
+    
+    /// Tests provider connectivity with a test prompt
+    public func testConnection(config: AiSettingsConfig) async throws -> String {
+        switch config.provider {
+        case "opencode":
+            guard !config.opencodeKey.trimmingCharacters(in: .whitespaces).isEmpty else {
+                throw NSError(domain: "OpenCode", code: 400, userInfo: [NSLocalizedDescriptionKey: "Please enter your OpenCode API key."])
+            }
+            return try await callOpenAiCompatible(
+                endpoint: openCodeInferenceEndpoint,
+                apiKey: config.opencodeKey,
+                model: config.model.isEmpty ? "deepseek-v4.1-flash-free" : config.model,
+                action: .ask,
+                prompt: "Say 'OpenCode connection verified successfully.' and identify your model name in one short sentence.",
+                metrics: nil,
+                edgeScore: nil
+            )
+            
+        case "openai":
+            guard !config.openaiKey.trimmingCharacters(in: .whitespaces).isEmpty else {
+                throw NSError(domain: "OpenAI", code: 400, userInfo: [NSLocalizedDescriptionKey: "Please enter your OpenAI API key."])
+            }
+            return try await callOpenAiCompatible(
+                endpoint: "https://api.openai.com/v1/chat/completions",
+                apiKey: config.openaiKey,
+                model: config.model.isEmpty ? "gpt-4o-mini" : config.model,
+                action: .ask,
+                prompt: "Say 'OpenAI connection verified successfully.' in one short sentence.",
+                metrics: nil,
+                edgeScore: nil
+            )
+            
+        case "anthropic":
+            guard !config.anthropicKey.trimmingCharacters(in: .whitespaces).isEmpty else {
+                throw NSError(domain: "Anthropic", code: 400, userInfo: [NSLocalizedDescriptionKey: "Please enter your Anthropic API key."])
+            }
+            return try await callAnthropic(
+                apiKey: config.anthropicKey,
+                model: config.model.isEmpty ? "claude-3-5-sonnet-20241022" : config.model,
+                action: .ask,
+                prompt: "Say 'Anthropic connection verified successfully.' in one short sentence.",
+                metrics: nil,
+                edgeScore: nil
+            )
+            
+        default:
+            throw NSError(domain: "AI", code: 400, userInfo: [NSLocalizedDescriptionKey: "Unknown AI provider: \(config.provider)"])
+        }
+    }
+    
+    // MARK: - OpenAI-Compatible Chat Completions (OpenCode & OpenAI)
+    
+    private func callOpenAiCompatible(
+        endpoint: String,
+        apiKey: String,
+        model: String,
+        action: AIReflectionAction,
+        prompt: String?,
+        metrics: TradeMetrics?,
+        edgeScore: Double?
+    ) async throws -> String {
+        guard let url = URL(string: endpoint) else {
+            throw URLError(.badURL)
+        }
         
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.addValue("Bearer \(apiKey.trimmingCharacters(in: .whitespaces))", forHTTPHeaderField: "Authorization")
+        request.timeoutInterval = 45
+        
+        let userContent = buildTraderContext(action: action, prompt: prompt, metrics: metrics, edgeScore: edgeScore)
+        let payload: [String: Any] = [
+            "model": model,
+            "messages": [
+                ["role": "system", "content": systemPrompt],
+                ["role": "user", "content": userContent]
+            ],
+            "temperature": 0.3
+        ]
+        
+        request.httpBody = try JSONSerialization.data(withJSONObject: payload)
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw URLError(.badServerResponse)
+        }
+        
+        if httpResponse.statusCode != 200 {
+            let errorDetails = parseApiErrorMessage(from: data, statusCode: httpResponse.statusCode)
+            throw NSError(domain: "AIInference", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: errorDetails])
+        }
+        
+        struct ChatCompletionResponse: Decodable {
+            struct Choice: Decodable {
+                struct Message: Decodable {
+                    let content: String
+                }
+                let message: Message
+            }
+            let choices: [Choice]
+        }
+        
+        let decoded = try JSONDecoder().decode(ChatCompletionResponse.self, from: data)
+        guard let text = decoded.choices.first?.message.content, !text.isEmpty else {
+            throw NSError(domain: "AIInference", code: 204, userInfo: [NSLocalizedDescriptionKey: "Model returned an empty response."])
+        }
+        
+        return text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    
+    // MARK: - Anthropic Messages API
+    
+    private func callAnthropic(
+        apiKey: String,
+        model: String,
+        action: AIReflectionAction,
+        prompt: String?,
+        metrics: TradeMetrics?,
+        edgeScore: Double?
+    ) async throws -> String {
+        guard let url = URL(string: "https://api.anthropic.com/v1/messages") else {
+            throw URLError(.badURL)
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.addValue(apiKey.trimmingCharacters(in: .whitespaces), forHTTPHeaderField: "x-api-key")
+        request.addValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
+        request.timeoutInterval = 45
+        
+        let userContent = buildTraderContext(action: action, prompt: prompt, metrics: metrics, edgeScore: edgeScore)
+        let payload: [String: Any] = [
+            "model": model,
+            "system": systemPrompt,
+            "messages": [
+                ["role": "user", "content": userContent]
+            ],
+            "max_tokens": 1024,
+            "temperature": 0.3
+        ]
+        
+        request.httpBody = try JSONSerialization.data(withJSONObject: payload)
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw URLError(.badServerResponse)
+        }
+        
+        if httpResponse.statusCode != 200 {
+            let errorDetails = parseApiErrorMessage(from: data, statusCode: httpResponse.statusCode)
+            throw NSError(domain: "Anthropic", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: errorDetails])
+        }
+        
+        struct AnthropicResponse: Decodable {
+            struct ContentBlock: Decodable {
+                let text: String?
+            }
+            let content: [ContentBlock]
+        }
+        
+        let decoded = try JSONDecoder().decode(AnthropicResponse.self, from: data)
+        guard let text = decoded.content.first?.text, !text.isEmpty else {
+            throw NSError(domain: "Anthropic", code: 204, userInfo: [NSLocalizedDescriptionKey: "Anthropic returned an empty response."])
+        }
+        
+        return text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    
+    // MARK: - Legacy Supabase Edge Function Fallback
+    
+    private func callSupabaseEdgeFunction(
+        urlString: String,
+        token: String,
+        action: AIReflectionAction,
+        prompt: String?,
+        metrics: TradeMetrics?,
+        edgeScore: Double?
+    ) async throws -> String {
         guard let endpoint = URL(string: "\(urlString)/functions/v1/ai-reflection") else {
             throw URLError(.badURL)
         }
@@ -63,6 +389,61 @@ public actor AIReflectionService {
         
         let decoded = try JSONDecoder().decode(AIReflectionResponse.self, from: data)
         return decoded.reflection
+    }
+    
+    // MARK: - Prompt & Error Builders
+    
+    private func buildTraderContext(action: AIReflectionAction, prompt: String?, metrics: TradeMetrics?, edgeScore: Double?) -> String {
+        var context = ""
+        if let m = metrics {
+            let wr = (m.winRate ?? 0.0) * 100
+            let pf = m.profitFactor.map { String(format: "%.2f", $0) } ?? "N/A"
+            let score = edgeScore.map { "\(Int($0))" } ?? "N/A"
+            let dd = m.maxDrawdownPct.map { String(format: "%.1f%%", $0) } ?? "N/A"
+            
+            context += """
+            TRADER PERFORMANCE CONTEXT:
+            - Total Closed Trades: \(m.totalTrades)
+            - Wins: \(m.wins) | Losses: \(m.losses) | Breakeven: \(m.breakevens)
+            - Win Rate: \(String(format: "%.1f%%", wr))
+            - Profit Factor: \(pf)
+            - Net Cumulative P&L: \(m.netPnl >= 0 ? "+" : "")\(m.netPnl)
+            - Max Drawdown: \(dd)
+            - Edge Score: \(score)/100
+            - Largest Win: \(m.largestWin) | Largest Loss: \(m.largestLoss)
+            - Max Win Streak: \(m.maxWinStreak) | Max Loss Streak: \(m.maxLossStreak)
+            - Total Fees: \(m.fees.map { "\($0)" } ?? "0")
+            
+            """
+        }
+        
+        switch action {
+        case .recap:
+            let userNote = prompt.map { "Trader's Note: \"\($0)\"\n" } ?? ""
+            return "\(context)\(userNote)TASK: Provide a concise, structured recap of the trading day. State: 1) Performance summary grounded strictly in the data. 2) Two key strengths observed. 3) One discipline / risk management improvement area. Be concise and actionable."
+            
+        case .critique:
+            let userNote = prompt.map { "Focus Area: \"\($0)\"\n" } ?? ""
+            return "\(context)\(userNote)TASK: Deliver a sharp, constructive coaching critique. Point out behavioral biases (e.g., loss tolerance, streak psychology, trade frequency) and state exact rule adjustments."
+            
+        case .ask:
+            return "\(context)USER QUESTION: \"\(prompt ?? "")\"\nTASK: Answer the trader's question directly using only the performance data provided. Cite the exact figures and give specific, actionable advice."
+        }
+    }
+    
+    private func parseApiErrorMessage(from data: Data, statusCode: Int) -> String {
+        if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            if let errorObj = json["error"] as? [String: Any], let msg = errorObj["message"] as? String {
+                return msg
+            }
+            if let msg = json["message"] as? String {
+                return msg
+            }
+        }
+        if let text = String(data: data, encoding: .utf8), !text.isEmpty {
+            return text.prefix(200) + (text.count > 200 ? "..." : "")
+        }
+        return "Server responded with HTTP \(statusCode)"
     }
     
     private func generateLocalCoachReflection(

@@ -40,6 +40,8 @@ public enum AppLogger {
         // Mask keys with sk-... or sb_... prefix
         result = result.replacingOccurrences(of: "(sk-[A-Za-z0-9]{20,})", with: "[SECRET_KEY_REDACTED]", options: .regularExpression)
         result = result.replacingOccurrences(of: "(sbp_[A-Za-z0-9]{20,})", with: "[SUPABASE_KEY_REDACTED]", options: .regularExpression)
+        result = result.replacingOccurrences(of: "(oc_sk_[A-Za-z0-9._-]+)", with: "[OPENCODE_KEY_REDACTED]", options: .regularExpression)
+        result = result.replacingOccurrences(of: "(zen-[A-Za-z0-9._-]+)", with: "[OPENCODE_KEY_REDACTED]", options: .regularExpression)
         return result
     }
 }

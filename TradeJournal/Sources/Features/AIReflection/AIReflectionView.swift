@@ -32,6 +32,10 @@ public struct AIReflectionView: View {
                                     .foregroundColor(AppColors.brand)
                                 Text("AI Trader Reflection")
                                     .font(AppTypography.headline)
+                                Spacer()
+                                Text(dataStore.aiSettings.provider == "opencode" ? "OpenCode: \(dataStore.aiSettings.model)" : dataStore.aiSettings.model)
+                                    .font(AppTypography.caption)
+                                    .foregroundColor(AppColors.secondaryText)
                             }
                             Text("Objective feedback grounded 100% in your actual trading journal data. No speculation, no generic advice.")
                                 .font(AppTypography.caption)

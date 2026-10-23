@@ -132,27 +132,67 @@ public struct MarketConnectionConfig: Codable, Equatable, Sendable {
 // MARK: - 6. AI Provider Settings
 // Core implementation detail
 public struct AiSettingsConfig: Codable, Equatable, Sendable {
-    public var provider: String // "anthropic" | "openai"
+    public var provider: String // "opencode" | "anthropic" | "openai"
     public var model: String
+    public var opencodeKey: String
     public var anthropicKey: String
     public var openaiKey: String
     
     public static let `default` = AiSettingsConfig(
-        provider: "anthropic",
-        model: "claude-opus-5",
+        provider: "opencode",
+        model: "deepseek-v4.1-flash-free",
+        opencodeKey: "",
         anthropicKey: "",
         openaiKey: ""
     )
     
     public init(
-        provider: String = "anthropic",
-        model: String = "claude-opus-5",
+        provider: String = "opencode",
+        model: String = "deepseek-v4.1-flash-free",
+        opencodeKey: String = "",
         anthropicKey: String = "",
         openaiKey: String = ""
     ) {
         self.provider = provider
         self.model = model
+        self.opencodeKey = opencodeKey
         self.anthropicKey = anthropicKey
         self.openaiKey = openaiKey
+    }
+    
+    enum CodingKeys: String, CodingKey {
+        case provider, model, opencodeKey, anthropicKey, openaiKey
+    }
+    
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        var prov = try container.decodeIfPresent(String.self, forKey: .provider) ?? "opencode"
+        var mdl = try container.decodeIfPresent(String.self, forKey: .model) ?? "deepseek-v4.1-flash-free"
+        let openKey = try container.decodeIfPresent(String.self, forKey: .opencodeKey) ?? ""
+        let antKey = try container.decodeIfPresent(String.self, forKey: .anthropicKey) ?? ""
+        let oaiKey = try container.decodeIfPresent(String.self, forKey: .openaiKey) ?? ""
+        
+        // If legacy default was unconfigured, upgrade to opencode free tier
+        if prov == "anthropic" && antKey.isEmpty {
+            prov = "opencode"
+            mdl = "deepseek-v4.1-flash-free"
+        } else if prov == "opencode" && (mdl.hasPrefix("claude-") || mdl.hasPrefix("gpt-")) {
+            mdl = "deepseek-v4.1-flash-free"
+        }
+        
+        self.provider = prov
+        self.model = mdl
+        self.opencodeKey = openKey
+        self.anthropicKey = antKey
+        self.openaiKey = oaiKey
+    }
+    
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(provider, forKey: .provider)
+        try container.encode(model, forKey: .model)
+        try container.encode(opencodeKey, forKey: .opencodeKey)
+        try container.encode(anthropicKey, forKey: .anthropicKey)
+        try container.encode(openaiKey, forKey: .openaiKey)
     }
 }

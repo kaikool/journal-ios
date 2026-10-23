@@ -889,6 +889,12 @@ public struct DailyJournalDetailView: View {
                     .disabled(isGeneratingAiRecap || dayTrades.isEmpty)
                 }
                 
+                if let err = aiErrorMessage {
+                    Text(err)
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.loss)
+                }
+                
                 Text("Notes are saved locally and synced automatically. Write your reflections, market observations, or generate an AI recap.")
                     .font(AppTypography.caption)
                     .foregroundColor(AppColors.secondaryText)
@@ -1080,14 +1086,21 @@ public struct DailyJournalDetailView: View {
         aiErrorMessage = nil
         
         Task {
-            let prompt = "Please summarize the trading day \(date) with \(metrics.closedTrades) trades, Net P&L: \(metrics.netPnl), Win rate: \(metrics.winRate?.description ?? "0"). Highlight 2 strengths and 1 area for discipline improvement."
-            let recap = (try? await AIReflectionService.shared.requestReflection(action: .recap, prompt: prompt, metrics: metrics)) ?? "Daily recap recorded for \(date)."
-            
-            await MainActor.run {
-                self.isGeneratingAiRecap = false
-                let section = "\n\n## AI Recap (\(self.date))\n\n\(recap)"
-                self.noteText += section
-                self.saveNoteImmediately()
+            do {
+                let prompt = "Please summarize the trading day \(date) with \(metrics.closedTrades) trades, Net P&L: \(metrics.netPnl), Win rate: \(metrics.winRate?.description ?? "0"). Highlight 2 strengths and 1 area for discipline improvement."
+                let recap = try await AIReflectionService.shared.requestReflection(action: .recap, prompt: prompt, metrics: metrics)
+                
+                await MainActor.run {
+                    self.isGeneratingAiRecap = false
+                    let section = "\n\n## AI Recap (\(self.date))\n\n\(recap)"
+                    self.noteText += section
+                    self.saveNoteImmediately()
+                }
+            } catch {
+                await MainActor.run {
+                    self.isGeneratingAiRecap = false
+                    self.aiErrorMessage = "AI Recap notice: \(error.localizedDescription)"
+                }
             }
         }
     }
