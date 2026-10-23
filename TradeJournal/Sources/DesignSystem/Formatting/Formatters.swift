@@ -316,6 +316,7 @@ public enum Formatters {
                 if eNorm == pNorm { return true }
                 // If one contains the other (e.g. "highstakes50k" contains "highstakes" or "50k")
                 if pNorm.count >= 3 && eNorm.contains(pNorm) { return true }
+                if eNorm.count >= 3 && pNorm.contains(eNorm) { return true }
                 return false
             }
             
@@ -434,7 +435,11 @@ public enum Formatters {
                 sizeLabel = formatter.string(from: b as NSDecimalNumber) ?? "$\(b)"
             }
             let sizeBare = sizeLabel.replacingOccurrences(of: "$", with: "")
-            if !pkg.contains(sizeBare) {
+            let alreadyHasSize = components.contains { c in
+                let cNorm = c.replacingOccurrences(of: "$", with: "").lowercased()
+                return cNorm.contains(sizeBare.lowercased())
+            } || trimmed.lowercased().contains(sizeBare.lowercased())
+            if !alreadyHasSize && !pkg.contains(sizeBare) {
                 components.append(sizeLabel)
             }
         }
@@ -446,7 +451,24 @@ public enum Formatters {
             }
         }
         
-        return components.joined(separator: " · ")
+        var finalCleaned: [String] = []
+        for c in components {
+            let cNorm = c.lowercased()
+                .replacingOccurrences(of: "$", with: "")
+                .replacingOccurrences(of: "#", with: "")
+                .replacingOccurrences(of: " ", with: "")
+            let exists = finalCleaned.contains { existing in
+                let eNorm = existing.lowercased()
+                    .replacingOccurrences(of: "$", with: "")
+                    .replacingOccurrences(of: "#", with: "")
+                    .replacingOccurrences(of: " ", with: "")
+                return eNorm == cNorm || (cNorm.count >= 4 && eNorm.contains(cNorm)) || (eNorm.count >= 4 && cNorm.contains(eNorm))
+            }
+            if !exists {
+                finalCleaned.append(c)
+            }
+        }
+        return finalCleaned.joined(separator: " · ")
     }
     
     /// Produces a concise account label tailored for tight navigation bars (e.g. "HighStakes P1 · $50K" or "cTrader #7657")

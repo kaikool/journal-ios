@@ -413,51 +413,54 @@ extension PropFirmLedgerView {
                                 if let b = acc.balanceMinor, let s = acc.sizeMinor, s > 0 { return b - s }
                                 return 0
                             }()
-                            HStack {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("Balance")
-                                        .font(AppTypography.caption)
+                            HStack(spacing: 0) {
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text("BALANCE")
+                                        .font(.system(size: 10, weight: .semibold))
                                         .foregroundColor(AppColors.secondaryText)
-                                        .lineLimit(1)
+                                        .tracking(0.5)
                                     Text(Formatters.formatCurrency(Decimal(balMinor) / 100, currency: acc.currency))
-                                        .font(AppTypography.captionBold)
+                                        .font(AppTypography.financialNumber(size: 16, weight: .bold))
                                         .monospacedDigit()
                                         .foregroundColor(AppColors.primaryText)
                                         .lineLimit(1)
                                         .minimumScaleFactor(0.8)
                                 }
-                                Spacer()
-                                VStack(alignment: .center, spacing: 2) {
-                                    Text("Equity")
-                                        .font(AppTypography.caption)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                
+                                VStack(alignment: .center, spacing: 3) {
+                                    Text("EQUITY")
+                                        .font(.system(size: 10, weight: .semibold))
                                         .foregroundColor(AppColors.secondaryText)
-                                        .lineLimit(1)
+                                        .tracking(0.5)
                                     Text(Formatters.formatCurrency(Decimal(eqMinor) / 100, currency: acc.currency))
-                                        .font(AppTypography.captionBold)
+                                        .font(AppTypography.financialNumber(size: 16, weight: .bold))
                                         .monospacedDigit()
                                         .foregroundColor(AppColors.primaryText)
                                         .lineLimit(1)
                                         .minimumScaleFactor(0.8)
                                 }
-                                Spacer()
-                                VStack(alignment: .trailing, spacing: 2) {
-                                    Text("Net P&L")
-                                        .font(AppTypography.caption)
+                                .frame(maxWidth: .infinity, alignment: .center)
+                                
+                                VStack(alignment: .trailing, spacing: 3) {
+                                    Text("NET P&L")
+                                        .font(.system(size: 10, weight: .semibold))
                                         .foregroundColor(AppColors.secondaryText)
-                                        .lineLimit(1)
+                                        .tracking(0.5)
                                     let isNetPos = pnlMinor >= 0
-                                    Text("\(isNetPos ? "+" : "")\(Formatters.formatCurrency(Decimal(pnlMinor) / 100, currency: acc.currency))")
-                                        .font(AppTypography.captionBold)
+                                    Text("\(isNetPos && pnlMinor > 0 ? "+" : "")\(Formatters.formatCurrency(Decimal(pnlMinor) / 100, currency: acc.currency))")
+                                        .font(AppTypography.financialNumber(size: 16, weight: .bold))
                                         .monospacedDigit()
                                         .foregroundColor(pnlMinor == 0 ? AppColors.primaryText : (isNetPos ? AppColors.profit : AppColors.loss))
                                         .lineLimit(1)
                                         .minimumScaleFactor(0.8)
                                 }
+                                .frame(maxWidth: .infinity, alignment: .trailing)
                             }
-                            .padding(.vertical, 6)
-                            .padding(.horizontal, 10)
-                            .background(AppColors.secondaryBackground.opacity(0.6))
-                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            .padding(.vertical, 8)
+                            .padding(.horizontal, 12)
+                            .background(AppColors.secondaryBackground.opacity(0.45))
+                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                             
                             // Program Rules, Stop Loss & Progression (Visual Objective Charts & Risk Shields)
                             let hasProgramDetails = acc.profitTargetMinor != nil || acc.maxLossMinor != nil || acc.maxDailyLossMinor != nil || acc.winningDays != nil || acc.minTradingDays != nil || acc.currentStepName != nil || acc.totalTrades != nil
@@ -890,75 +893,148 @@ internal struct PropAccountObjectivesChartCard: View {
     private var maxLossMinor: Int64 { acc.maxLossMinor ?? 0 }
     
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 10) {
+            HStack {
+                Text("PROGRAM OBJECTIVES & RISK LIMITS")
+                    .font(.system(size: 10.5, weight: .semibold))
+                    .foregroundColor(AppColors.secondaryText)
+                    .tracking(0.5)
+                Spacer()
+                Image(systemName: "shield.lefthalf.filled")
+                    .font(.system(size: 11))
+                    .foregroundColor(AppColors.secondaryText.opacity(0.7))
+            }
+            .padding(.top, 2)
+            
+            // 1. Profit Target Progress
             if targetMinor > 0 {
                 let targetDec = Decimal(targetMinor) / 100
-                let pnlDec = Decimal(netPnlMinor) / 100
+                let currentProfitDec = Decimal(max(0, netPnlMinor)) / 100
                 let isProfit = netPnlMinor > 0
                 let progressRatio = isProfit ? min(1.0, Double(netPnlMinor) / Double(targetMinor)) : 0.0
                 
-                HStack {
-                    Text("Profit Target")
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.secondaryText)
-                    Spacer()
-                    HStack(spacing: 6) {
-                        Text("+\(Formatters.formatCurrency(targetDec, currency: acc.currency))")
+                VStack(spacing: 4) {
+                    HStack {
+                        Text("Profit Target")
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.secondaryText)
+                        Spacer()
+                        HStack(spacing: 4) {
+                            Text("+\(Formatters.formatCurrency(currentProfitDec, currency: acc.currency)) / +\(Formatters.formatCurrency(targetDec, currency: acc.currency))")
+                                .font(AppTypography.captionBold)
+                                .monospacedDigit()
+                                .foregroundColor(isProfit ? AppColors.profit : AppColors.primaryText)
+                            
+                            if isProfit {
+                                Text("(\(Int(progressRatio * 100))%)")
+                                    .font(AppTypography.captionBold)
+                                    .foregroundColor(AppColors.profit)
+                            }
+                        }
+                    }
+                    
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            Capsule().fill(AppColors.secondaryBackground)
+                            Capsule()
+                                .fill(AppColors.profit)
+                                .frame(width: max(0, min(geo.size.width, geo.size.width * CGFloat(progressRatio))))
+                        }
+                    }
+                    .frame(height: 4)
+                }
+            }
+            
+            // 2. Max Drawdown Buffer
+            if maxLossMinor > 0 {
+                let maxLossDec = Decimal(maxLossMinor) / 100
+                let currentLossMinor = max(Int64(0), -netPnlMinor)
+                let bufferRemainingMinor = max(Int64(0), maxLossMinor - currentLossMinor)
+                let bufferRemainingDec = Decimal(bufferRemainingMinor) / 100
+                let bufferRatio = max(0.0, min(1.0, Double(bufferRemainingMinor) / Double(maxLossMinor)))
+                
+                VStack(spacing: 4) {
+                    HStack {
+                        Text("Max Drawdown Buffer")
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.secondaryText)
+                        Spacer()
+                        Text("\(Formatters.formatCurrency(bufferRemainingDec, currency: acc.currency)) remaining (of \(Formatters.formatCurrency(maxLossDec, currency: acc.currency)))")
+                            .font(AppTypography.captionBold)
+                            .monospacedDigit()
+                            .foregroundColor(bufferRatio < 0.25 ? AppColors.loss : AppColors.primaryText)
+                    }
+                    
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            Capsule().fill(AppColors.secondaryBackground)
+                            Capsule()
+                                .fill(bufferRatio < 0.25 ? AppColors.loss : (bufferRatio < 0.5 ? Color.orange : AppColors.brand))
+                                .frame(width: max(0, min(geo.size.width, geo.size.width * CGFloat(bufferRatio))))
+                        }
+                    }
+                    .frame(height: 4)
+                }
+            }
+            
+            // 3. Daily Loss Limit
+            if dailyLossMinor > 0 {
+                let dailyLimitDec = Decimal(dailyLossMinor) / 100
+                VStack(spacing: 4) {
+                    HStack {
+                        Text("Daily Loss Limit")
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.secondaryText)
+                        Spacer()
+                        Text("-\(Formatters.formatCurrency(dailyLimitDec, currency: acc.currency)) cap")
                             .font(AppTypography.captionBold)
                             .monospacedDigit()
                             .foregroundColor(AppColors.primaryText)
-                        
-                        if isProfit {
-                            Text("(\(Int(progressRatio * 100))%)")
+                    }
+                    
+                    Capsule()
+                        .fill(AppColors.secondaryBackground)
+                        .overlay(
+                            Capsule().fill(Color.orange.opacity(0.85)),
+                            alignment: .leading
+                        )
+                        .frame(height: 4)
+                }
+            }
+            
+            // 4. Minimum Winning Days
+            if let winDays = acc.winningDays {
+                let minDays = acc.minTradingDays ?? 3
+                VStack(spacing: 4) {
+                    HStack {
+                        Text("Minimum Winning Days")
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.secondaryText)
+                        Spacer()
+                        HStack(spacing: 4) {
+                            Text("\(winDays) / \(minDays) days")
                                 .font(AppTypography.captionBold)
-                                .foregroundColor(AppColors.profit)
+                                .monospacedDigit()
+                                .foregroundColor(winDays >= minDays ? AppColors.profit : AppColors.primaryText)
+                            
+                            if winDays >= minDays {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundColor(AppColors.profit)
+                                    .font(.system(size: 11))
+                            }
+                        }
+                    }
+                    
+                    HStack(spacing: 4) {
+                        ForEach(1...max(1, minDays), id: \.self) { day in
+                            Capsule()
+                                .fill(day <= winDays ? AppColors.profit : AppColors.secondaryBackground)
+                                .frame(height: 4)
                         }
                     }
                 }
             }
-            
-            if dailyLossMinor > 0 {
-                let dailyLimitDec = Decimal(dailyLossMinor) / 100
-                HStack {
-                    Text("Daily Loss Limit")
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.secondaryText)
-                    Spacer()
-                    Text("-\(Formatters.formatCurrency(dailyLimitDec, currency: acc.currency))")
-                        .font(AppTypography.captionBold)
-                        .monospacedDigit()
-                        .foregroundColor(AppColors.primaryText)
-                }
-            }
-            
-            if maxLossMinor > 0 {
-                let maxLossDec = Decimal(maxLossMinor) / 100
-                HStack {
-                    Text("Max Drawdown Limit")
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.secondaryText)
-                    Spacer()
-                    Text("-\(Formatters.formatCurrency(maxLossDec, currency: acc.currency))")
-                        .font(AppTypography.captionBold)
-                        .monospacedDigit()
-                        .foregroundColor(AppColors.primaryText)
-                }
-            }
-            
-            if let winDays = acc.winningDays {
-                let minDays = acc.minTradingDays ?? 3
-                HStack {
-                    Text("Minimum Winning Days")
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.secondaryText)
-                    Spacer()
-                    Text("\(winDays) / \(minDays) days")
-                        .font(AppTypography.captionBold)
-                        .monospacedDigit()
-                        .foregroundColor(winDays >= minDays ? AppColors.profit : AppColors.primaryText)
-                }
-            }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 2)
     }
 }

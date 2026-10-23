@@ -852,6 +852,71 @@ public final class The5ersService: ObservableObject {
                 dataStore.accounts.removeAll(where: { $0.id == "default-acc" })
             }
             
+            // Immediately identify all candidate funded / live / instant accounts across the entire raw inventory
+            var allCandidatePayoutAccounts: [The5ersMcpAccount] = []
+            for item in rawAccountsList {
+                if item["contest_account_ref"] != nil && item["ref"] == nil { continue }
+                let ref = String(describing: item["ref"] ?? item["account_ref"] ?? item["id"] ?? "")
+                guard !ref.isEmpty else { continue }
+                let label = String(describing: item["label"] ?? item["name"] ?? "The5ers Account")
+                let bal = Decimal(string: String(describing: item["balance"] ?? item["effectiveBalance"] ?? "0")) ?? 0
+                let eq = Decimal(string: String(describing: item["equity"] ?? bal)) ?? bal
+                let curr = String(describing: item["currency"] ?? "USD")
+                let status = String(describing: item["status"] ?? "active")
+                let prog = String(describing: item["type"] ?? item["accountType"] ?? item["program"] ?? "")
+                let platform = String(describing: item["tradingPlatform"] ?? item["platform"] ?? item["tradingSystem"] ?? "MT5")
+                let createdAt = item["createdAt"] as? String ?? item["creationDate"] as? String ?? item["created_at"] as? String
+                
+                let isFunded = prog.lowercased().contains("fund") ||
+                               prog.lowercased().contains("instant") ||
+                               prog.lowercased().contains("live") ||
+                               label.lowercased().contains("fund") ||
+                               label.lowercased().contains("live")
+                
+                if isFunded {
+                    let stamp: String = {
+                        if let raw = createdAt, let d = FlexibleDateParser.parse(raw) {
+                            let iso = ISO8601DateFormatter()
+                            iso.formatOptions = [.withInternetDateTime]
+                            return iso.string(from: d)
+                        }
+                        return createdAt ?? ""
+                    }()
+                    let stableId = !stamp.isEmpty ? JournalIds.sha256Hex([label, platform, stamp]) : JournalIds.sha256Hex([label, platform])
+                    let mcpAcc = The5ersMcpAccount(
+                        id: stableId,
+                        ref: ref,
+                        label: label,
+                        platform: platform,
+                        balance: bal,
+                        equity: eq,
+                        currency: curr,
+                        status: status,
+                        program: prog.isEmpty ? "funded" : prog,
+                        startingBalance: bal,
+                        createdAt: createdAt,
+                        profitAndLoss: nil,
+                        dailyProfitAndLoss: nil,
+                        unrealized: 0,
+                        totalNetProfit: nil,
+                        totalFees: nil,
+                        totalTrades: nil,
+                        winRate: nil,
+                        profitFactor: nil,
+                        tradingBlocked: status.lowercased() == "disabled" || status.lowercased() == "closed",
+                        profitTarget: nil,
+                        maxLoss: nil,
+                        maxDailyLoss: nil,
+                        minTradingDays: nil,
+                        currentTradingDays: nil,
+                        winningDays: nil,
+                        currentStepName: nil
+                    )
+                    allCandidatePayoutAccounts.append(mcpAcc)
+                    upsertAccountIntoStore(mcpAcc, into: dataStore)
+                }
+            }
+            
             var accountsList: [The5ersMcpAccount] = []
             var importedPositionsCount = 0
             var didRunInitialPurchasesAndPayouts = false
@@ -879,7 +944,8 @@ public final class The5ersService: ObservableObject {
                 if !isRawActive && !didRunInitialPurchasesAndPayouts && !accountsList.isEmpty {
                     didRunInitialPurchasesAndPayouts = true
                     await syncPurchases(into: dataStore, targetAccounts: accountsList)
-                    await syncPayouts(into: dataStore, targetAccounts: accountsList)
+                    let payoutScanTargets = allCandidatePayoutAccounts.isEmpty ? accountsList : allCandidatePayoutAccounts
+                    await syncPayouts(into: dataStore, targetAccounts: payoutScanTargets)
                     dataStore.invalidatePerformanceCaches()
                     dataStore.objectWillChange.send()
                 }
@@ -1300,7 +1366,8 @@ public final class The5ersService: ObservableObject {
             
             if Task.isCancelled || isCancelledByUser { throw CancellationError() }
             
-            await syncPayouts(into: dataStore, targetAccounts: accountsList)
+            let finalPayoutTargets = allCandidatePayoutAccounts.isEmpty ? accountsList : allCandidatePayoutAccounts
+            await syncPayouts(into: dataStore, targetAccounts: finalPayoutTargets)
             
             lastSyncTime = Date()
             dataStore.rebuildAllAccounts()
@@ -3087,12 +3154,6 @@ public final class The5ersService: ObservableObject {
             }
         }
         
-        // 2. Filter candidate accounts to only those that can have payouts (funded/instant/passed or positive PnL)
-        // If `wallet.withdrawals` confirms 0 paid and 0 pending payouts customer-wide, skip per-account payout RPCs!
-        if let pc = walletPaidCount, let pend = walletPendingCount, pc == 0 && pend == 0 && (walletTotalPaidOut ?? 0) == 0 {
-            return
-        }
-        
         let fundedOrProfitableAccounts = targetAccounts.filter { acc in
             let l = "\(acc.program) \(acc.label) \(acc.status)".lowercased()
             return l.contains("fund") || l.contains("instant") || l.contains("live") || l.contains("master") ||
@@ -3152,37 +3213,44 @@ public final class The5ersService: ObservableObject {
                 }
             }
             
-            // C. Query 'history' for past payouts (limit: 50)
+            // C. Query 'history' for past payouts (paginated across pages 1...5)
             var historyPayouts: [[String: Any]] = []
-            let histArgs: [String: Any] = [
-                "operation": "history",
-                "account_ref": acc.ref,
-                "contract_version": "1.0",
-                "limit": 50
-            ]
-            if let histRes = try? await callMcpTool(name: "the5ers_payout", arguments: histArgs),
-               !(histRes["isError"] as? Bool ?? false) {
-                let unwrappedHist = unwrapMcpToolResult(histRes)
-                let rows = extractAnyPayoutCollection(from: unwrappedHist)
-                for var r in rows {
-                    if r["account_ref"] == nil { r["account_ref"] = acc.ref }
-                    if r["currency"] == nil { r["currency"] = acc.currency }
-                    if let s = accountSplitMap[acc.ref], r["split_percent"] == nil {
-                        r["split_percent"] = s
-                    }
-                    // If this history payout matches latestPayout, enrich with detailed breakdown
-                    if let latest = latestPayoutDict {
-                        let histReq = String(describing: r["requestedAt"] ?? r["requested_at"] ?? "")
-                        let latestReq = String(describing: latest["requestedAt"] ?? latest["requested_at"] ?? "")
-                        let histAmt = String(describing: r["amount"] ?? "")
-                        let latestAmt = String(describing: latest["amount"] ?? "")
-                        if (!histReq.isEmpty && histReq == latestReq) || (!histAmt.isEmpty && histAmt == latestAmt) {
-                            for (k, v) in latest {
-                                if r[k] == nil { r[k] = v }
+            for page in 1...5 {
+                let histArgs: [String: Any] = [
+                    "operation": "history",
+                    "account_ref": acc.ref,
+                    "page": page,
+                    "limit": 50,
+                    "contract_version": "1.0"
+                ]
+                if let histRes = try? await callMcpTool(name: "the5ers_payout", arguments: histArgs),
+                   !(histRes["isError"] as? Bool ?? false) {
+                    let unwrappedHist = unwrapMcpToolResult(histRes)
+                    let rows = extractAnyPayoutCollection(from: unwrappedHist)
+                    if rows.isEmpty { break }
+                    for var r in rows {
+                        if r["account_ref"] == nil { r["account_ref"] = acc.ref }
+                        if r["currency"] == nil { r["currency"] = acc.currency }
+                        if let s = accountSplitMap[acc.ref], r["split_percent"] == nil {
+                            r["split_percent"] = s
+                        }
+                        // If this history payout matches latestPayout, enrich with detailed breakdown
+                        if let latest = latestPayoutDict {
+                            let histReq = String(describing: r["requestedAt"] ?? r["requested_at"] ?? "")
+                            let latestReq = String(describing: latest["requestedAt"] ?? latest["requested_at"] ?? "")
+                            let histAmt = String(describing: r["amount"] ?? "")
+                            let latestAmt = String(describing: latest["amount"] ?? "")
+                            if (!histReq.isEmpty && histReq == latestReq) || (!histAmt.isEmpty && histAmt == latestAmt) {
+                                for (k, v) in latest {
+                                    if r[k] == nil { r[k] = v }
+                                }
                             }
                         }
+                        historyPayouts.append(r)
                     }
-                    historyPayouts.append(r)
+                    if rows.count < 50 { break }
+                } else {
+                    break
                 }
             }
             
@@ -3300,7 +3368,7 @@ public final class The5ersService: ObservableObject {
                 return nil
             }()
             
-            let effectiveSplit = splitPercentVal ?? 80.0
+            let effectiveSplit = splitPercentVal ?? 100.0
             let ratio = effectiveSplit > 1.0 ? (effectiveSplit / 100.0) : effectiveSplit
             let splitBps = Int(round(ratio * 10000.0))
             
@@ -3313,15 +3381,30 @@ public final class The5ersService: ObservableObject {
                     grossMinor = Int64(round(eg * 100))
                 } else if let ga = genericAmount, ga >= en {
                     grossMinor = Int64(round(ga * 100))
-                } else {
+                } else if splitPercentVal != nil && ratio > 0 {
                     grossMinor = Int64(round(Double(netReceivedMinor) / ratio))
+                } else {
+                    grossMinor = netReceivedMinor
                 }
             } else if let eg = explicitGross {
                 grossMinor = Int64(round(eg * 100))
-                netReceivedMinor = max(0, Int64((Double(grossMinor) * Double(splitBps) + 5000) / 10000) - feeMinor)
+                if splitPercentVal != nil && splitPercentVal! < 100.0 {
+                    netReceivedMinor = max(0, Int64((Double(grossMinor) * Double(splitBps) + 5000) / 10000) - feeMinor)
+                } else {
+                    netReceivedMinor = grossMinor
+                }
             } else if let ga = genericAmount {
-                grossMinor = Int64(round(ga * 100))
-                netReceivedMinor = max(0, Int64((Double(grossMinor) * Double(splitBps) + 5000) / 10000) - feeMinor)
+                // Per The5ers MCP spec (source-repo/apps/web/src/server/the5ers/data.ts:1840-1854):
+                // In payout history, reported amount represents received cash under owner confirmation.
+                // Do not invent artificial gross/split multipliers unless explicit split info exists.
+                let amtMinor = Int64(round(ga * 100))
+                if splitPercentVal != nil && splitPercentVal! < 100.0 {
+                    grossMinor = amtMinor
+                    netReceivedMinor = max(0, Int64((Double(grossMinor) * Double(splitBps) + 5000) / 10000) - feeMinor)
+                } else {
+                    netReceivedMinor = amtMinor
+                    grossMinor = amtMinor
+                }
             } else {
                 continue
             }
@@ -3345,27 +3428,21 @@ public final class The5ersService: ObservableObject {
                 if !payAccRef.isEmpty && !payAccRef.contains("opaque") {
                     return payAccRef.hasPrefix("the5ers_") ? payAccRef : "the5ers_\(payAccRef)"
                 }
-                if let firstFunded = candidateAccounts.first {
+                let fundedAccs = candidateAccounts.filter { $0.program.lowercased().contains("fund") || $0.label.lowercased().contains("fund") }
+                if let firstFunded = fundedAccs.first {
                     return firstFunded.id.hasPrefix("the5ers_") ? firstFunded.id : "the5ers_\(firstFunded.id)"
                 }
-                return targetAccounts.first.map { $0.id.hasPrefix("the5ers_") ? $0.id : "the5ers_\($0.id)" }
+                return candidateAccounts.first.map { $0.id.hasPrefix("the5ers_") ? $0.id : "the5ers_\($0.id)" }
             }()
             let currency = "USD"
             
             let cleanAcc = (primaryAccId ?? "the5ers").cleanAccountId
-            
-            let stablePayoutHash = JournalIds.sha256Hex([cleanAcc, dateStr, currency, grossMinor, rawId])
+            let identityKey = !rawId.isEmpty && !rawId.contains("opaque") ? rawId : "\(dateStr)_\(netReceivedMinor)"
+            let stablePayoutHash = JournalIds.sha256Hex([cleanAcc, identityKey])
             let payoutEntryId = "the5ers_payout_\(stablePayoutHash)"
             let rcptId = "the5ers_rcpt_\(stablePayoutHash)"
             let canonicalId = PropFirmEngine.canonicalPayoutId(stablePayoutHash)
             let shortRef = !rawId.isEmpty && !rawId.contains("opaque") ? "Payout #\(rawId.prefix(8))" : "Payout #\(stablePayoutHash.prefix(8))"
-            
-            // Mark the corresponding prop account as funded program
-            if let pAccIdx = dataStore.propAccounts.firstIndex(where: { $0.id == primaryAccId || TradeDataStore.isSameAccountId($0.id, primaryAccId ?? "") }) {
-                if dataStore.propAccounts[pAccIdx].program == .evaluation {
-                    dataStore.propAccounts[pAccIdx].program = .funded
-                }
-            }
             
             if let existingIdx = dataStore.propEntries.firstIndex(where: {
                 $0.id == payoutEntryId ||
@@ -3517,5 +3594,7 @@ public final class The5ersService: ObservableObject {
         
         dataStore.deduplicatePropEntries()
         dataStore.deduplicatePropReceipts()
+        dataStore.saveToDisk()
+        dataStore.objectWillChange.send()
     }
 }
