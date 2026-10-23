@@ -422,35 +422,25 @@ extension TradeDataStore {
             modified = true
         }
         for i in 0..<localTrades.count {
-            // Heal verified stuck ghost position from The5ers Hub (Ticket: 619412294 · Buy 0.5 XAUUSD @ 4128.68 on 2026-10-21)
-            let isStuckTicket = localTrades[i].key.contains("619412294") ||
-                (localTrades[i].symbol == "XAUUSD" && abs(localTrades[i].avgEntry - Decimal(string: "4128.68")!) < 0.01 && localTrades[i].quantity == Decimal(string: "0.5")!)
-            if isStuckTicket {
-                if localTrades[i].status != .win || localTrades[i].netPnl != Decimal(string: "9.88")! {
-                    localTrades[i].status = .win
-                    localTrades[i].avgExit = Decimal(string: "4128.96")!
-                    localTrades[i].grossPnl = Decimal(string: "14.00")!
-                    localTrades[i].fees = Decimal(string: "4.12")!
-                    localTrades[i].swap = Decimal.zero
-                    localTrades[i].netPnl = Decimal(string: "9.88")!
-                    localTrades[i].openQuantity = Decimal.zero
-                    if localTrades[i].closedAt == nil {
-                        localTrades[i].closedAt = localTrades[i].openedAt.addingTimeInterval(120)
-                    }
-                    if localTrades[i].notes?.hasPrefix("Position synced from") == true {
-                        localTrades[i].notes = nil
-                    }
-                    modified = true
-                }
-                continue
-            }
             if localTrades[i].notes?.hasPrefix("Position synced from") == true {
                 localTrades[i].notes = nil
                 modified = true
             }
-            if localTrades[i].status == .open || localTrades[i].closedAt == nil {
-                if localTrades[i].status != .open || localTrades[i].netPnl != 0 || localTrades[i].grossPnl != 0 || localTrades[i].fees != 0 || localTrades[i].openQuantity != localTrades[i].quantity {
-                    localTrades[i].status = .open
+            
+            // Generic healing for ghost/dangling positions:
+            // 1. If a trade has a closed status or non-zero PnL but missing closedAt, restore closedAt.
+            if localTrades[i].status != .open && localTrades[i].closedAt == nil {
+                localTrades[i].closedAt = localTrades[i].openedAt.addingTimeInterval(120)
+                localTrades[i].openQuantity = Decimal.zero
+                modified = true
+            } else if localTrades[i].status == .open && localTrades[i].closedAt != nil {
+                // 2. If it has closedAt, resolve status from netPnl.
+                localTrades[i].status = localTrades[i].netPnl > 0 ? .win : (localTrades[i].netPnl < 0 ? .loss : .breakeven)
+                localTrades[i].openQuantity = Decimal.zero
+                modified = true
+            } else if localTrades[i].status == .open && localTrades[i].closedAt == nil {
+                // 3. For active open trades, enforce zero realized PnL and full open quantity.
+                if localTrades[i].netPnl != 0 || localTrades[i].grossPnl != 0 || localTrades[i].fees != 0 || localTrades[i].openQuantity != localTrades[i].quantity {
                     localTrades[i].netPnl = 0
                     localTrades[i].grossPnl = 0
                     localTrades[i].fees = 0

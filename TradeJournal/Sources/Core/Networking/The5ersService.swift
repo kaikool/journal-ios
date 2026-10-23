@@ -2292,11 +2292,23 @@ public final class The5ersService: ObservableObject {
         let rawPnlNum = sourceNumber(firstValue(in: row, keys: pnlKeys))
         let hasRealizedPnl = (rawPnlNum != nil)
         
+        // Generic Ghost / Dangling Position Detection:
+        // Position marked open by bridge flag, but opened > 24 hours ago AND has a close date recorded
+        // (even if adjacent to open date <= 5s, typical of scalp bridge artifacts), or has exit price or realized PnL.
+        let isGhostDangling: Bool = {
+            guard openedAtDate.timeIntervalSinceNow < -86400 else { return false }
+            if let cl = parsedCloseInstant {
+                return abs(openedAtDate.timeIntervalSince(cl.date)) <= 5 || cl.date >= openedAtDate
+            }
+            return hasExitPrice || (hasRealizedPnl && rawPnlNum != 0)
+        }()
+        
         let isClosed: Bool = {
             if explicitClosedFlag == true { return true }
             if st.contains("close") || st == "filled" || st == "done" || st.contains("exit") || st.contains("history") { return true }
             // If the position has a parsed close date, exit price, or explicit realized P&L, it is closed
             if parsedCloseInstant != nil || hasExitPrice || (hasRealizedPnl && rawPnlNum != 0) { return true }
+            if isGhostDangling { return true }
             if explicitClosedFlag == false || st.contains("open") { return false }
             return false
         }()
@@ -2309,7 +2321,7 @@ public final class The5ersService: ObservableObject {
             if let cl = parsedCloseInstant {
                 closedAtTuple = cl.date >= openedAtDate ? cl : (openedAtIso, openedAtDate)
             } else {
-                closedAtTuple = (openedAtIso, openedAtDate)
+                closedAtTuple = (openedAtIso, openedAtDate.addingTimeInterval(120))
             }
             exit = rawExitNum ?? entry
             netPnl = rawPnlNum ?? 0
@@ -2524,15 +2536,20 @@ public final class The5ersService: ObservableObject {
                 usedExistingKeys.insert(existing.key)
                 existing.key = tradeKey
                 existing.accountId = targetAccId
-                existing.status = status
-                existing.closedAt = position.closedAtDate
-                existing.openQuantity = isClosed ? 0 : position.quantity
-                existing.avgExit = position.exit
-                existing.grossPnl = grossPnl
-                existing.fees = fees
-                existing.swap = swap
-                existing.netPnl = netPnl
-                existing.durationMs = durationMs
+                
+                // Protect already-closed trades from regressing to open if broker returns stale/incomplete record:
+                let shouldPreserveClosed = (existing.status != .open && existing.closedAt != nil) && !isClosed && position.openedAtDate.timeIntervalSinceNow < -86400
+                if !shouldPreserveClosed {
+                    existing.status = status
+                    existing.closedAt = position.closedAtDate
+                    existing.openQuantity = isClosed ? 0 : position.quantity
+                    existing.avgExit = position.exit
+                    existing.grossPnl = grossPnl
+                    existing.fees = fees
+                    existing.swap = swap
+                    existing.netPnl = netPnl
+                    existing.durationMs = durationMs
+                }
                 if existing.notes?.hasPrefix("Position synced from The5ers Hub") == true {
                     existing.notes = nil
                 }
