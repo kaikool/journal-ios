@@ -99,7 +99,12 @@ public actor AIReflectionService {
         authToken: String? = nil,
         overrideConfig: AiSettingsConfig? = nil
     ) async throws -> String {
-        let config = overrideConfig ?? (await MainActor.run { TradeDataStore.shared.aiSettings })
+        let config: AiSettingsConfig
+        if let override = overrideConfig {
+            config = override
+        } else {
+            config = await MainActor.run { TradeDataStore.shared.aiSettings }
+        }
         
         switch config.provider {
         case "opencode":

@@ -913,7 +913,6 @@ public final class The5ersService: ObservableObject {
                         currentStepName: nil
                     )
                     allCandidatePayoutAccounts.append(mcpAcc)
-                    upsertAccountIntoStore(mcpAcc, into: dataStore)
                 }
             }
             
@@ -983,8 +982,9 @@ public final class The5ersService: ObservableObject {
                     let expectedTrades = cachedProp.totalTrades ?? 0
                     let cachedPnlDec = Decimal(cachedPnlMinor) / 100
                     let tradesPnlSum = existingClosed.reduce(Decimal.zero) { $0 + $1.netPnl }
-                    let isReconciled = (expectedTrades == 0 && abs(cachedPnlMinor) == 0) ||
-                                       (!existingClosed.isEmpty && abs(tradesPnlSum - cachedPnlDec) <= 1.0)
+                    let isReconciled = !existingClosed.isEmpty &&
+                                       (expectedTrades == 0 || abs(existingClosed.count - expectedTrades) == 0) &&
+                                       abs(tradesPnlSum - cachedPnlDec) <= 1.0
                     if isReconciled {
                         let cachedAcc = The5ersMcpAccount(
                             id: stableId,
@@ -1341,8 +1341,14 @@ public final class The5ersService: ObservableObject {
                 // Immediately register/update this account in dataStore
                 upsertAccountIntoStore(mcpAcc, into: dataStore)
                 
-                // Stream positions immediately for this account (skip only if inactive with confirmed 0 trades and 0 PnL)
+                // Stream positions immediately for this account (never skip if account has 0 trades locally)
+                let existingTradesForAccount = dataStore.trades.filter {
+                    $0.accountId == mcpAcc.id ||
+                    TradeDataStore.isSameAccountId($0.accountId, mcpAcc.id) ||
+                    TradeDataStore.isSameAccountId($0.accountId, "the5ers_\(mcpAcc.id)")
+                }
                 let shouldFetchPositions = isRawActive ||
+                                           existingTradesForAccount.isEmpty ||
                                            (accTotalTrades == nil || (accTotalTrades ?? 0) > 0) ||
                                            abs(accProfitAndLoss ?? 0) > 0.005 ||
                                            (resolvedStartBal != nil && abs(bal - resolvedStartBal!) > 0.005)
@@ -1894,7 +1900,7 @@ public final class The5ersService: ObservableObject {
         lastStatus = "Syncing trades: \(acc.label)..."
         await Task.yield()
         
-        let pageLimit = 50
+        let pageLimit = 100
         let posArgs: [String: Any] = [
             "operation": "list",
             "account_ref": acc.ref,
@@ -2175,75 +2181,6 @@ public final class The5ersService: ObservableObject {
                 tradesModified = true
             }
             
-            // 2. Cross-verify sum of closed trades' netPnl against authoritative realized account P&L
-            let expectedRealizedPnl: Decimal = {
-                if let pnl = acc.profitAndLoss ?? acc.totalNetProfit {
-                    return toReporting(pnl)
-                }
-                if let sb = acc.startingBalance, sb > 0, acc.balance > 0 {
-                    let settledPayouts = dataStore.propEntries
-                        .filter { $0.firm == "The5ers" && $0.kind == "payout" && $0.status == .completed && !$0.voided && $0.accountId != nil && ($0.accountId == journalAccId || $0.accountId == targetAccId || TradeDataStore.isSameAccountId($0.accountId!, targetAccId)) }
-                        .reduce(Decimal.zero) { $0 + Decimal($1.amountMinor) / 100 }
-                    return toReporting((acc.balance - sb) + settledPayouts)
-                }
-                return Decimal.zero
-            }()
-            if expectedRealizedPnl != 0 {
-                let sumAsIs = closedIndices.reduce(Decimal.zero) { $0 + localTrades[$1].netPnl }
-                let diffAsIs = abs(sumAsIs - expectedRealizedPnl)
-                
-                if diffAsIs > 0.05 {
-                    let sumUndoDouble = closedIndices.reduce(Decimal.zero) { $0 + localTrades[$1].netPnl + localTrades[$1].fees - (localTrades[$1].swap ?? 0) }
-                    let sumRawIsGross = closedIndices.reduce(Decimal.zero) { $0 + localTrades[$1].netPnl - localTrades[$1].fees + (localTrades[$1].swap ?? 0) }
-                    let sumNeedsSwap = closedIndices.reduce(Decimal.zero) { $0 + localTrades[$1].netPnl + (localTrades[$1].swap ?? 0) }
-                    let sumNeedsFee = closedIndices.reduce(Decimal.zero) { $0 + localTrades[$1].netPnl - localTrades[$1].fees }
-                    
-                    let candidates: [(mode: Int, diff: Decimal)] = [
-                        (1, abs(sumUndoDouble - expectedRealizedPnl)),
-                        (2, abs(sumRawIsGross - expectedRealizedPnl)),
-                        (3, abs(sumNeedsSwap - expectedRealizedPnl)),
-                        (4, abs(sumNeedsFee - expectedRealizedPnl))
-                    ]
-                    if let best = candidates.min(by: { $0.diff < $1.diff }),
-                       best.diff <= 0.50 && best.diff < diffAsIs {
-                        for idx in closedIndices {
-                            let fee = localTrades[idx].fees
-                            let sw = localTrades[idx].swap ?? 0
-                            let oldNet = localTrades[idx].netPnl
-                            let newNet: Decimal
-                            switch best.mode {
-                            case 1:
-                                newNet = oldNet + fee - sw
-                            case 2:
-                                newNet = oldNet - fee + sw
-                            case 3:
-                                newNet = oldNet + sw
-                            default:
-                                newNet = oldNet - fee
-                            }
-                            localTrades[idx].netPnl = newNet
-                            localTrades[idx].grossPnl = newNet + fee - sw
-                            let breakevenBand = JournalDefaultsEngine.breakevenThreshold(
-                                defaults: dataStore.defaults,
-                                entryPrice: localTrades[idx].avgEntry,
-                                quantity: localTrades[idx].quantity,
-                                multiplier: AssetContractEngine.contractMultiplier(
-                                    for: localTrades[idx].symbol,
-                                    customMultipliers: dataStore.multipliers
-                                )
-                            )
-                            if abs(newNet) <= max(breakevenBand, TradeReconstructionEngine.flatEpsilon) {
-                                localTrades[idx].status = .breakeven
-                            } else {
-                                localTrades[idx].status = newNet > 0 ? .win : .loss
-                            }
-                        }
-                        tradesModified = true
-                    }
-                }
-            }
-        }
-        
         if tradesModified {
             dataStore.trades = localTrades
         }
