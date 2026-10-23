@@ -685,7 +685,7 @@ extension DashboardView {
                         }
                     }
                 } else {
-                    let openPos = dataStore.trades
+                    let openPos = dataStore.filteredTrades
                         .filter { $0.status == .open }
                         .sorted { $0.openedAt > $1.openedAt }
                     if openPos.isEmpty {

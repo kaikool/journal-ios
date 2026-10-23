@@ -315,18 +315,27 @@ extension TradeDataStore {
             canonicalMap["ctrader_\(clean)"] = acc.id
             canonicalMap[acc.id] = acc.id
         }
-        for i in 0..<trades.count {
-            if let canonical = canonicalMap[trades[i].accountId] {
-                trades[i].accountId = canonical
+        var updatedTrades = trades
+        var tradesChanged = false
+        for i in 0..<updatedTrades.count {
+            if let canonical = canonicalMap[updatedTrades[i].accountId] {
+                if updatedTrades[i].accountId != canonical {
+                    updatedTrades[i].accountId = canonical
+                    tradesChanged = true
+                }
             } else {
-                let clean = trades[i].accountId.cleanAccountId
-                if let canonical = canonicalMap[clean] {
-                    trades[i].accountId = canonical
+                let clean = updatedTrades[i].accountId.cleanAccountId
+                if let canonical = canonicalMap[clean], updatedTrades[i].accountId != canonical {
+                    updatedTrades[i].accountId = canonical
+                    tradesChanged = true
                 }
             }
         }
+        if tradesChanged {
+            self.trades = updatedTrades
+        }
         
-        if accounts.contains(where: { !$0.name.hasPrefix("Account ") }) {
+        if accounts.contains(where: { !$0.name.hasPrefix("Account ") }) && accounts.contains(where: { $0.name.hasPrefix("Account ") }) {
             accounts.removeAll(where: { $0.name.hasPrefix("Account ") })
         }
 
@@ -366,11 +375,9 @@ extension TradeDataStore {
             self.propAccounts = cleanedPropAccounts
         }
 
-        let the5ersAccountIds = Set(accounts.filter { $0.broker.lowercased() == "the5ers" || $0.id.hasPrefix("the5ers_") }.flatMap { [$0.id, $0.id.cleanAccountId, $0.id.the5ersCanonicalId] })
-        executions.removeAll(where: { $0.id.hasPrefix("the5ers_exec_") || $0.source == "the5ers" })
-        trades.removeAll(where: { trade in
-            (the5ersAccountIds.contains(trade.accountId) || trade.accountId.hasPrefix("the5ers_") || trade.tags.contains("the5ers")) && !trade.key.hasPrefix("the5ers_")
-        })
+        if executions.contains(where: { $0.id.hasPrefix("the5ers_exec_") || $0.source == "the5ers" }) {
+            executions.removeAll(where: { $0.id.hasPrefix("the5ers_exec_") || $0.source == "the5ers" })
+        }
 
         cleanupLegacyThe5ersCorruptions()
         deduplicateExecutions()
@@ -385,28 +392,42 @@ extension TradeDataStore {
     /// - Deduplicates and aligns all The5ers trades
     public func cleanupLegacyThe5ersCorruptions() {
         // 1. Remove ONLY invalid test records with "opaque" IDs from old buggy builds
-        propEntries.removeAll(where: { entry in
-            entry.firm == "The5ers" && (entry.id.contains("opaque") || entry.reference.contains("opaque"))
-        })
-        propReceipts.removeAll(where: { rcpt in
-            rcpt.id.contains("opaque") || rcpt.payoutId.contains("opaque") || rcpt.reference.contains("opaque")
-        })
+        if propEntries.contains(where: { $0.firm == "The5ers" && ($0.id.contains("opaque") || $0.reference.contains("opaque")) }) {
+            propEntries.removeAll(where: { entry in
+                entry.firm == "The5ers" && (entry.id.contains("opaque") || entry.reference.contains("opaque"))
+            })
+        }
+        if propReceipts.contains(where: { $0.id.contains("opaque") || $0.payoutId.contains("opaque") || $0.reference.contains("opaque") }) {
+            propReceipts.removeAll(where: { rcpt in
+                rcpt.id.contains("opaque") || rcpt.payoutId.contains("opaque") || rcpt.reference.contains("opaque")
+            })
+        }
         
         // 2. Remove orphaned receipts that don't match any active entry
         let activeEntryIds = Set(propEntries.map { $0.id })
-        propReceipts.removeAll(where: { rcpt in
-            rcpt.id.hasPrefix("the5ers_") && !activeEntryIds.contains(rcpt.payoutId)
-        })
+        if propReceipts.contains(where: { $0.id.hasPrefix("the5ers_") && !activeEntryIds.contains($0.payoutId) }) {
+            propReceipts.removeAll(where: { rcpt in
+                rcpt.id.hasPrefix("the5ers_") && !activeEntryIds.contains(rcpt.payoutId)
+            })
+        }
         
         // 3. Ensure open/unclosed trades strictly have zero Net P&L and are not counted in closed analytics
-        for i in 0..<trades.count {
-            if trades[i].status == .open || trades[i].closedAt == nil {
-                trades[i].status = .open
-                trades[i].netPnl = 0
-                trades[i].grossPnl = 0
-                trades[i].fees = 0
-                trades[i].openQuantity = trades[i].quantity
+        var localTrades = trades
+        var modified = false
+        for i in 0..<localTrades.count {
+            if localTrades[i].status == .open || localTrades[i].closedAt == nil {
+                if localTrades[i].status != .open || localTrades[i].netPnl != 0 || localTrades[i].grossPnl != 0 || localTrades[i].fees != 0 || localTrades[i].openQuantity != localTrades[i].quantity {
+                    localTrades[i].status = .open
+                    localTrades[i].netPnl = 0
+                    localTrades[i].grossPnl = 0
+                    localTrades[i].fees = 0
+                    localTrades[i].openQuantity = localTrades[i].quantity
+                    modified = true
+                }
             }
+        }
+        if modified {
+            trades = localTrades
         }
     }
     

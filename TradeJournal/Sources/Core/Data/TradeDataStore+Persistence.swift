@@ -41,18 +41,18 @@ extension TradeDataStore {
         if immediate {
             saveDebounceTask?.cancel()
             saveDebounceTask = nil
-            performSaveToDisk()
+            performSaveToDisk(asyncWrite: false)
         } else {
             saveDebounceTask?.cancel()
             saveDebounceTask = Task { @MainActor [weak self] in
                 try? await Task.sleep(nanoseconds: 350_000_000)
                 guard !Task.isCancelled, let self = self else { return }
-                self.performSaveToDisk()
+                self.performSaveToDisk(asyncWrite: true)
             }
         }
     }
     
-    internal func performSaveToDisk() {
+    internal func performSaveToDisk(asyncWrite: Bool = false) {
         guard isLoaded else { return }
         let store = PersistedStore(
             schemaVersion: 1,
@@ -82,16 +82,28 @@ extension TradeDataStore {
             aiSettings: aiSettings,
             deletedPlaybookIds: Array(deletedPlaybookIds)
         )
+        let primaryUrl = persistenceUrl
+        let backupUrl = backupPersistenceUrl
+        if asyncWrite {
+            Task.detached(priority: .utility) {
+                Self.writeStoreToDisk(store, primaryUrl: primaryUrl, backupUrl: backupUrl)
+            }
+        } else {
+            Self.writeStoreToDisk(store, primaryUrl: primaryUrl, backupUrl: backupUrl)
+        }
+    }
+    
+    nonisolated private static func writeStoreToDisk(_ store: PersistedStore, primaryUrl: URL, backupUrl: URL) {
         do {
             let data = try JSONEncoder().encode(store)
             
             // Maintain a backup copy of previous valid save if it exists
-            if FileManager.default.fileExists(atPath: persistenceUrl.path) {
-                try? FileManager.default.removeItem(at: backupPersistenceUrl)
-                try? FileManager.default.copyItem(at: persistenceUrl, to: backupPersistenceUrl)
+            if FileManager.default.fileExists(atPath: primaryUrl.path) {
+                try? FileManager.default.removeItem(at: backupUrl)
+                try? FileManager.default.copyItem(at: primaryUrl, to: backupUrl)
             }
             
-            try data.write(to: persistenceUrl, options: .atomic)
+            try data.write(to: primaryUrl, options: .atomic)
         } catch {
             AppLogger.error("Failed to save store to disk: \(error.localizedDescription)")
         }

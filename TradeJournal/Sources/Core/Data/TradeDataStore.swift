@@ -97,7 +97,7 @@ public final class TradeDataStore: ObservableObject {
     ///     layer. Used by tests that need an isolated store.
     ///   - loadSynchronously: When true the persisted state is loaded synchronously instead of
     ///     hydrating in the background.
-    public init(loadFromDisk: Bool = true, loadSynchronously: Bool = false) {
+    public init(loadFromDisk: Bool = true, loadSynchronously: Bool = true) {
         self.folders = NotebookEngine.defaultSystemFolders
         if !loadFromDisk {
             isLoaded = true

@@ -285,8 +285,8 @@ public enum Formatters {
         
         let lower = trimmed.lowercased()
         
-        // If already well formatted with dots (e.g. "HighStakes Phase 1 · $100K · #123456"), preserve it
-        if trimmed.contains(" · ") && !lower.contains("meta-trader") && !lower.contains("c-trader") {
+        // If already well formatted with dashes or dots (e.g. "High Stakes - Phase 1 - $100K - #123456"), preserve it
+        if (trimmed.contains(" - ") || trimmed.contains(" · ")) && !lower.contains("meta-trader") && !lower.contains("c-trader") {
             return trimmed
         }
         
@@ -353,6 +353,9 @@ public enum Formatters {
             }
             if lower.contains("step 2") || lower.contains("step2") || lower.contains("phase 2") || lower.contains("phase2") || lower.contains("verification") {
                 return "Phase 2"
+            }
+            if lower.contains("step 3") || lower.contains("step3") || lower.contains("phase 3") || lower.contains("phase3") {
+                return "Phase 3"
             }
             if lower.contains("funded") || lower.contains("live") || lower.contains("master") {
                 return "Funded"

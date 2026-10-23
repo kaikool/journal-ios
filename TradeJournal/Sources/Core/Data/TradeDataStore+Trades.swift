@@ -193,12 +193,30 @@ extension TradeDataStore {
         reconcileReceiptsToEntries()
         deduplicatePropEntries()
         deduplicatePropReceipts()
-        for i in 0..<accounts.count {
-            accounts[i].name = Formatters.cleanAccountName(accounts[i].name, balance: accounts[i].initialBalance)
+        var localAccounts = accounts
+        var accountsModified = false
+        for i in 0..<localAccounts.count {
+            let cleaned = Formatters.cleanAccountName(localAccounts[i].name, balance: localAccounts[i].initialBalance)
+            if localAccounts[i].name != cleaned {
+                localAccounts[i].name = cleaned
+                accountsModified = true
+            }
         }
-        for i in 0..<propAccounts.count {
-            let sizeBal = propAccounts[i].sizeMinor.map { Decimal($0) / 100 }
-            propAccounts[i].name = Formatters.cleanAccountName(propAccounts[i].name, balance: sizeBal)
+        if accountsModified {
+            accounts = localAccounts
+        }
+        var localPropAccounts = propAccounts
+        var propAccountsModified = false
+        for i in 0..<localPropAccounts.count {
+            let sizeBal = localPropAccounts[i].sizeMinor.map { Decimal($0) / 100 }
+            let cleaned = Formatters.cleanAccountName(localPropAccounts[i].name, balance: sizeBal)
+            if localPropAccounts[i].name != cleaned {
+                localPropAccounts[i].name = cleaned
+                propAccountsModified = true
+            }
+        }
+        if propAccountsModified {
+            propAccounts = localPropAccounts
         }
         let needsTradeRebuild = forceRebuildTrades || (trades.isEmpty && !executions.isEmpty) || accounts.contains(where: { acc in
             trades.filter({ $0.accountId == acc.id }).isEmpty && !executions.filter({ $0.accountId == acc.id }).isEmpty
@@ -210,7 +228,7 @@ extension TradeDataStore {
         }
         deduplicateTrades()
         invalidatePerformanceCaches()
-        saveToDisk(immediate: true)
+        saveToDisk()
         objectWillChange.send()
     }
     
