@@ -5,18 +5,12 @@ import SwiftUI
 extension TradeDataStore {
     
     public var filteredTrades: [Trade] {
-        let effectiveAccountId: String = {
-            if selectedAccountId == "all" || selectedAccountId == "default-acc" || selectedAccountId.isEmpty {
-                return selectedAccount?.id ?? selectedAccountId
-            }
-            return selectedAccountId
-        }()
         if let cached = _cachedFilteredTrades,
-           _cachedFilteredTradesAccountId == effectiveAccountId {
+           _cachedFilteredTradesAccountId == selectedAccountId {
             return cached
         }
         let result: [Trade]
-        if effectiveAccountId.isEmpty || effectiveAccountId == "all" {
+        if selectedAccountId == "all" || selectedAccountId == "default-acc" || selectedAccountId.isEmpty {
             let visibleIds = visibleAccountIds
             result = trades.filter { trade in
                 if trade.symbol == "ACCOUNT" { return false }
@@ -28,14 +22,14 @@ extension TradeDataStore {
                 return false
             }
         } else {
-            let selId = effectiveAccountId
+            let selId = selectedAccountId
             result = trades.filter { trade in
                 guard trade.symbol != "ACCOUNT" else { return false }
                 return trade.accountId == selId || TradeDataStore.isSameAccountId(trade.accountId, selId)
             }
         }
         _cachedFilteredTrades = result
-        _cachedFilteredTradesAccountId = effectiveAccountId
+        _cachedFilteredTradesAccountId = selectedAccountId
         return result
     }
     

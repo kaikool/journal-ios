@@ -463,15 +463,11 @@ extension TradeDataStore {
             trades = localTrades
         }
         
-        // 4. Keep The5ers purchase expenses strictly firm-wide (accountId = nil per docs/the5ers.md:52)
+        // 4. Clean and normalize The5ers purchase expenses
         var entriesModified = false
         var localEntries = propEntries
         for i in 0..<localEntries.count {
             if localEntries[i].firm == "The5ers" && localEntries[i].kind == "expense" {
-                if localEntries[i].accountId != nil {
-                    localEntries[i].accountId = nil
-                    entriesModified = true
-                }
                 if localEntries[i].category == "other" || localEntries[i].category.isEmpty {
                     localEntries[i].category = "evaluation"
                     entriesModified = true

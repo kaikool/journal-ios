@@ -1422,7 +1422,7 @@ public final class The5ersService: ObservableObject {
                 if absNum > 0 && absNum <= 25 {
                     return (absNum * sb) / 100
                 }
-                if absNum > sb * Decimal(string: "0.70")! && absNum < sb {
+                if absNum > (sb * 70) / 100 && absNum < sb {
                     return sb - absNum
                 }
             }
@@ -1437,7 +1437,7 @@ public final class The5ersService: ObservableObject {
                 if absNum >= 1 && absNum <= 25 {
                     return (absNum * sb) / 100
                 }
-                if absNum > sb * Decimal(string: "0.70")! && absNum < sb {
+                if absNum > (sb * 70) / 100 && absNum < sb {
                     return sb - absNum
                 }
             }
@@ -2267,29 +2267,37 @@ public final class The5ersService: ObservableObject {
             return nil
         }
         
-        // Robust closed status: boolean flag, status token, or presence of close date/exit price
+        // Robust closed status: boolean flag, status token, presence of close date, exit price, or realized P&L
+        let explicitClosedFlag = sourceBoolean(firstValue(in: row, keys: ["isclosed", "closed", "isclose"]))
+        let st = String(describing: row["status"] ?? "").lowercased()
+        let closeKeys = [
+            "closedate", "closedat", "closetime", "close_date", "close_time",
+            "closedatetime", "exittime", "exit_time", "exitdate", "timeclose",
+            "time_close", "outtime", "out_time"
+        ]
+        let closeVal = firstValue(in: row, keys: closeKeys)
+        let parsedCloseInstant = sourceInstant(closeVal)
+        
+        let exitKeys = [
+            "exit", "closeprice", "exitprice", "close_price", "exit_price",
+            "closedprice", "outprice", "out_price"
+        ]
+        let rawExitNum = sourceNumber(firstValue(in: row, keys: exitKeys))
+        let hasExitPrice = (rawExitNum != nil && rawExitNum != 0)
+        
+        let pnlKeys = [
+            "profitandloss", "profit_and_loss", "netpnl", "net_pnl", "realizedpnl",
+            "realized_pnl", "net", "profit", "pnl"
+        ]
+        let rawPnlNum = sourceNumber(firstValue(in: row, keys: pnlKeys))
+        let hasRealizedPnl = (rawPnlNum != nil)
+        
         let isClosed: Bool = {
-            if let b = sourceBoolean(firstValue(in: row, keys: ["isclosed", "closed", "isclose"])) {
-                return b
-            }
-            let st = String(describing: row["status"] ?? "").lowercased()
+            if explicitClosedFlag == true { return true }
             if st.contains("close") || st == "filled" || st == "done" || st.contains("exit") || st.contains("history") { return true }
-            if st.contains("open") { return false }
-            
-            // Check if any close date/time exists
-            let hasCloseDate = firstValue(in: row, keys: [
-                "closedate", "closedat", "closetime", "close_date", "close_time",
-                "closedatetime", "exittime", "exit_time", "exitdate", "timeclose",
-                "time_close", "outtime", "out_time"
-            ]) != nil
-            if hasCloseDate { return true }
-            
-            // Check if exit price is present
-            let hasExitPrice = sourceNumber(firstValue(in: row, keys: [
-                "exit", "closeprice", "exitprice", "close_price", "exit_price", "closedprice", "outprice", "out_price"
-            ])) != nil
-            if hasExitPrice { return true }
-            
+            // If the position has a parsed close date, exit price, or explicit realized P&L, it is closed
+            if parsedCloseInstant != nil || hasExitPrice || (hasRealizedPnl && rawPnlNum != 0) { return true }
+            if explicitClosedFlag == false || st.contains("open") { return false }
             return false
         }()
         
@@ -2298,31 +2306,13 @@ public final class The5ersService: ObservableObject {
         let netPnl: Decimal
         
         if isClosed {
-            let closeKeys = [
-                "closedate", "closedat", "closetime", "close_date", "close_time",
-                "closedatetime", "exittime", "exit_time", "exitdate", "timeclose",
-                "time_close", "outtime", "out_time"
-            ]
-            let closeVal = firstValue(in: row, keys: closeKeys)
-            if let cl = sourceInstant(closeVal) {
+            if let cl = parsedCloseInstant {
                 closedAtTuple = cl.date >= openedAtDate ? cl : (openedAtIso, openedAtDate)
             } else {
                 closedAtTuple = (openedAtIso, openedAtDate)
             }
-            
-            let exitKeys = [
-                "exit", "closeprice", "exitprice", "close_price", "exit_price",
-                "closedprice", "outprice", "out_price"
-            ]
-            let exitVal = firstValue(in: row, keys: exitKeys)
-            exit = sourceNumber(exitVal) ?? entry
-            
-            let pnlKeys = [
-                "profitandloss", "profit_and_loss", "netpnl", "net_pnl", "realizedpnl",
-                "realized_pnl", "net", "profit", "pnl"
-            ]
-            let pnlVal = firstValue(in: row, keys: pnlKeys)
-            netPnl = sourceNumber(pnlVal) ?? 0
+            exit = rawExitNum ?? entry
+            netPnl = rawPnlNum ?? 0
         } else {
             closedAtTuple = nil
             exit = nil
@@ -2370,24 +2360,6 @@ public final class The5ersService: ObservableObject {
         let swap = sourceNumber(swapVal)
         let isValid = sourceBoolean(row["isvalid"])
         
-        // Detect ghost/dangling positions stuck on The5ers Hub bridge:
-        // A position marked isClosed == false, but opened > 24 hours ago with openDate == closeDate and entry == exit.
-        // For verified ticket 619412294 (Buy 0.5 XAUUSD @ 4128.68 on 2026-10-21), MT5 recorded a scalp close of +$14.00 gross with $4.12 commission (+$9.88 net).
-        var resolvedIsClosed = isClosed
-        var resolvedExit = exit
-        var resolvedClosedAtTuple = closedAtTuple
-        var resolvedNetPnl = netPnl
-        
-        if !resolvedIsClosed && (providerId == "619412294" || (openedAtDate.timeIntervalSinceNow < -86400 && abs(openedAtDate.timeIntervalSince(closedAtTuple?.date ?? openedAtDate)) <= 2)) {
-            if providerId == "619412294" {
-                resolvedIsClosed = true
-                resolvedExit = entry + Decimal(string: "0.28")! // 4128.96 -> +$14.00 gross
-                resolvedNetPnl = Decimal(string: "9.88")!       // +$14.00 gross - $4.12 commission = +$9.88 net
-                fee = Decimal(string: "4.12")!
-                resolvedClosedAtTuple = (openedAtIso, openedAtDate.addingTimeInterval(120))
-            }
-        }
-        
         return SourcePosition(
             identityDiscriminator: nil,
             providerId: providerId,
@@ -2395,12 +2367,12 @@ public final class The5ersService: ObservableObject {
             direction: dir,
             openedAtIso: openedAtIso,
             openedAtDate: openedAtDate,
-            closedAtIso: resolvedClosedAtTuple?.iso,
-            closedAtDate: resolvedClosedAtTuple?.date,
+            closedAtIso: closedAtTuple?.iso,
+            closedAtDate: closedAtTuple?.date,
             quantity: quantity,
             entry: entry,
-            exit: resolvedExit,
-            netPnl: resolvedNetPnl,
+            exit: exit,
+            netPnl: netPnl,
             fee: fee,
             swap: swap,
             isValid: isValid
