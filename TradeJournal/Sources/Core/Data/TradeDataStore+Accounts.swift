@@ -467,8 +467,8 @@ extension TradeDataStore {
             var changed = false
             let sizeMinor = p.sizeMinor ?? 0
             let settledPayoutsMinor = propEntries
-                .filter { $0.firm == "The5ers" && $0.kind == "payout" && $0.status == "settled" && $0.accountId != nil && ($0.accountId == p.id || $0.accountId == p.journalAccountId || TradeDataStore.isSameAccountId($0.accountId!, p.id)) }
-                .reduce(Int64(0)) { $0 + $1.netMinor }
+                .filter { $0.firm == "The5ers" && $0.kind == "payout" && $0.status == .completed && !$0.voided && $0.accountId != nil && ($0.accountId == p.id || $0.accountId == p.journalAccountId || TradeDataStore.isSameAccountId($0.accountId!, p.id)) }
+                .reduce(Int64(0)) { $0 + $1.amountMinor }
             if sizeMinor > 0 {
                 let text = "\(p.name) \(p.currentStepName ?? "") \(p.program.rawValue)".lowercased()
                 let isStep2 = p.program == .verification || text.contains("- 2") || text.contains("step 2") || text.contains("phase 2")
