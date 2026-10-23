@@ -624,7 +624,7 @@ public struct CreateAccountSheet: View {
     @State private var name: String = ""
     @State private var broker: String = "IC Markets"
     @State private var currency: String = "USD"
-    @State private var initialBalanceText: String = "10000"
+    @State private var initialBalanceText: String = ""
     @State private var calcMethod: ProfitCalcMethod = .fifo
     
     private let commonBrokers = ["IC Markets", "Pepperstone", "The5ers", "FTMO", "FxPro", "FundingPips", "Topstep", "Oanda", "Binance", "Manual"]
@@ -654,7 +654,7 @@ public struct CreateAccountSheet: View {
                         titleFor: { $0 }
                     )
                     
-                    TextField("Initial balance", text: $initialBalanceText)
+                    TextField("Initial balance (e.g. 10000)", text: $initialBalanceText)
                         .keyboardType(.decimalPad)
                         .monospacedDigit()
                     
@@ -747,7 +747,7 @@ public struct EditAccountSheet: View {
                         titleFor: { $0 }
                     )
                     
-                    TextField("Initial balance", text: $initialBalanceText)
+                    TextField("Initial balance (e.g. 10000)", text: $initialBalanceText)
                         .keyboardType(.decimalPad)
                         .monospacedDigit()
                 }

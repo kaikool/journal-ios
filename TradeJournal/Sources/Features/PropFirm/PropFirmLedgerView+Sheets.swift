@@ -7,7 +7,7 @@ public struct NewPropAccountSheet: View {
     let defaultCurrency: String
     var initialFirm: String = "Topstep"
     var initialProgram: PropProgram = .evaluation
-    var initialSizeText: String = "50000"
+    var initialSizeText: String = ""
     var parentId: String? = nil
     
     @State private var firm: String
@@ -22,7 +22,7 @@ public struct NewPropAccountSheet: View {
         defaultCurrency: String,
         initialFirm: String = "Topstep",
         initialProgram: PropProgram = .evaluation,
-        initialSizeText: String = "50000",
+        initialSizeText: String = "",
         parentId: String? = nil,
         onSave: @escaping (PropAccountItem) -> Void
     ) {

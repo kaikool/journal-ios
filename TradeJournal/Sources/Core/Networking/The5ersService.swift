@@ -1131,20 +1131,26 @@ public final class The5ersService: ObservableObject {
                     }
                 }
                 
-                // Resolve standard prop tier from metadata (e.g. 50K evaluation account)
+                // Resolve standard prop tier from metadata dynamically (e.g. "$100K", "50K", "25,000")
                 var resolvedStartBal: Decimal? = {
                     if let ex = explicitStartBal, ex > 0 { return ex }
-                    let combined = "\(label.lowercased()) \(prog.lowercased())"
-                    if combined.contains("50k") || combined.contains("50,000") || combined.contains("50000") { return 50000 }
-                    if combined.contains("100k") || combined.contains("100,000") || combined.contains("100000") { return 100000 }
-                    if combined.contains("25k") || combined.contains("25,000") || combined.contains("25000") { return 25000 }
-                    if combined.contains("10k") || combined.contains("10,000") || combined.contains("10000") { return 10000 }
-                    if combined.contains("5k") || combined.contains("5,000") || combined.contains("5000") { return 5000 }
-                    if combined.contains("60k") || combined.contains("60,000") || combined.contains("60000") { return 60000 }
-                    if combined.contains("200k") || combined.contains("200,000") || combined.contains("200000") { return 200000 }
-                    if combined.contains("20k") || combined.contains("20,000") || combined.contains("20000") { return 20000 }
-                    if bal >= 40000 && bal <= 55000 { return 50000 }
-                    if bal >= 80000 && bal <= 110000 { return 100000 }
+                    let combined = "\(label) \(prog)"
+                    // Pattern 1: $100K, 50k, 25K
+                    if let regexK = try? NSRegularExpression(pattern: #"(?i)\$?(\d{1,4})\s*k\b"#),
+                       let match = regexK.firstMatch(in: combined, range: NSRange(combined.startIndex..., in: combined)),
+                       let range = Range(match.range(at: 1), in: combined),
+                       let val = Decimal(string: String(combined[range])), val > 0 {
+                        return val * 1000
+                    }
+                    // Pattern 2: $100,000, 50,000, 25000
+                    if let regexNum = try? NSRegularExpression(pattern: #"\$?(\d{1,3}(?:,\d{3})+|\d{4,7})\b"#),
+                       let match = regexNum.firstMatch(in: combined, range: NSRange(combined.startIndex..., in: combined)),
+                       let range = Range(match.range(at: 1), in: combined) {
+                        let cleaned = String(combined[range]).replacingOccurrences(of: ",", with: "")
+                        if let val = Decimal(string: cleaned), val >= 1000 {
+                            return val
+                        }
+                    }
                     return nil
                 }()
                 
@@ -1863,7 +1869,7 @@ public final class The5ersService: ObservableObject {
                 broker: "The5ers",
                 kind: .sync,
                 currency: acc.currency,
-                initialBalance: acc.startingBalance ?? (acc.balance > 0 ? acc.balance : 50000),
+                initialBalance: acc.startingBalance ?? (acc.balance > 0 ? acc.balance : Decimal.zero),
                 autoSync: isActive,
                 archivedAt: nil,
                 visibleInJournal: true,

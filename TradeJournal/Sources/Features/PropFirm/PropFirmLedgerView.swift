@@ -234,7 +234,7 @@ public struct PropFirmLedgerView: View {
                 defaultCurrency: parentAcc.currency,
                 initialFirm: parentAcc.firm,
                 initialProgram: parentAcc.program == .evaluation ? .verification : .funded,
-                initialSizeText: "\(parentAcc.sizeMinor.map { $0 / 100 } ?? 50000)",
+                initialSizeText: "\(parentAcc.sizeMinor.map { $0 / 100 } ?? (parentAcc.balanceMinor.map { $0 / 100 } ?? 0))",
                 parentId: parentAcc.id
             ) { nextAcc in
                 dataStore.savePropAccount(item: nextAcc, reason: "Next stage / phase")
