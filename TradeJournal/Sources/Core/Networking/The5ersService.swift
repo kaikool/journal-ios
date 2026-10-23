@@ -1332,10 +1332,12 @@ public final class The5ersService: ObservableObject {
         guard let val = val else { return nil }
         if let rawDict = val as? [String: Any] {
             let dict = sourceFields(rawDict)
-            if let amt = sourceNumber(dict["currencyvalue"] ?? dict["amountusd"] ?? dict["usd"] ?? dict["dollaramount"]), amt != 0 {
+            let usdCandidate = firstValue(in: dict, keys: ["currencyvalue", "amountusd", "usd", "dollaramount"])
+            if let amt = sourceNumber(usdCandidate), amt != 0 {
                 return abs(amt)
             }
-            guard let num = sourceNumber(dict["value"] ?? dict["amount"] ?? dict["limit"] ?? dict["threshold"] ?? dict["target"] ?? dict["goal"] ?? dict["max"] ?? dict["cap"] ?? dict["required"]), num != 0 else {
+            let numCandidate = firstValue(in: dict, keys: ["value", "amount", "limit", "threshold", "target", "goal", "max", "cap", "required"])
+            guard let num = sourceNumber(numCandidate), num != 0 else {
                 return nil
             }
             let absNum = abs(num)
@@ -1378,7 +1380,7 @@ public final class The5ersService: ObservableObject {
         guard let val = val else { return nil }
         if let rawDict = val as? [String: Any] {
             let dict = sourceFields(rawDict)
-            let candidate = dict["value"] ?? dict["currentvalue"] ?? dict["current"] ?? dict["completed"] ?? dict["count"] ?? dict["threshold"] ?? dict["target"] ?? dict["required"] ?? dict["min"] ?? dict["days"]
+            let candidate = firstValue(in: dict, keys: ["value", "currentvalue", "current", "completed", "count", "threshold", "target", "required", "min", "days"])
             if let i = candidate as? Int { return i }
             if let n = candidate as? NSNumber { return n.intValue }
             if let d = sourceNumber(candidate) { return NSDecimalNumber(decimal: d).intValue }
@@ -1409,43 +1411,47 @@ public final class The5ersService: ObservableObject {
         if let arr = raw as? [[String: Any]] {
             for item in arr {
                 let r = sourceFields(item)
-                let rName = String(describing: r["name"] ?? r["key"] ?? r["type"] ?? r["id"] ?? r["label"] ?? r["rule"] ?? "").lowercased()
+                let rNameVal = firstValue(in: r, keys: ["name", "key", "type", "id", "label", "rule"])
+                let rName = String(describing: rNameVal ?? "").lowercased()
                 if rName.contains("profitable") || rName.contains("winning") {
-                    if let cv = extractRequirementInt(r["currentvalue"] ?? r["current"] ?? r["completed"] ?? r["count"] ?? r["achieved"] ?? r["value"]) {
+                    let cvVal = firstValue(in: r, keys: ["currentvalue", "current", "completed", "count", "achieved", "value"])
+                    if let cv = extractRequirementInt(cvVal) {
                         winningDays = cv
                     }
-                    if minTradingDays == nil,
-                       let th = extractRequirementInt(r["threshold"] ?? r["target"] ?? r["required"] ?? r["min"] ?? r["minimum"] ?? r["limit"]), th > 0 {
+                    let thVal = firstValue(in: r, keys: ["threshold", "target", "required", "min", "minimum", "limit"])
+                    if minTradingDays == nil, let th = extractRequirementInt(thVal), th > 0 {
                         minTradingDays = th
                     }
                 } else if rName.contains("trading") && rName.contains("day") {
-                    if let cv = extractRequirementInt(r["currentvalue"] ?? r["current"] ?? r["completed"] ?? r["count"]) {
+                    let cvVal = firstValue(in: r, keys: ["currentvalue", "current", "completed", "count"])
+                    if let cv = extractRequirementInt(cvVal) {
                         currentTradingDays = cv
                     }
-                    if minTradingDays == nil,
-                       let th = extractRequirementInt(r["threshold"] ?? r["target"] ?? r["required"] ?? r["min"] ?? r["minimum"] ?? r["limit"] ?? r["value"]), th > 0 {
+                    let thVal = firstValue(in: r, keys: ["threshold", "target", "required", "min", "minimum", "limit", "value"])
+                    if minTradingDays == nil, let th = extractRequirementInt(thVal), th > 0 {
                         minTradingDays = th
                     }
                 } else if rName.contains("target") || rName.contains("profitgoal") || rName.contains("profit_goal") {
-                    if profitTarget == nil,
-                       let pt = extractRequirementDecimal(r["target"] ?? r["threshold"] ?? r["limit"] ?? r["value"] ?? r["amount"] ?? r["goal"], startingBalance: startingBalance) {
+                    let ptVal = firstValue(in: r, keys: ["target", "threshold", "limit", "value", "amount", "goal"])
+                    if profitTarget == nil, let pt = extractRequirementDecimal(ptVal, startingBalance: startingBalance) {
                         profitTarget = pt
                     }
                 } else if rName.contains("daily") && (rName.contains("loss") || rName.contains("drawdown") || rName.contains("pause") || rName.contains("stop") || rName.contains("cap")) {
-                    if maxDailyLoss == nil,
-                       let dl = extractRequirementDecimal(r["limit"] ?? r["threshold"] ?? r["max"] ?? r["value"] ?? r["amount"], startingBalance: startingBalance) {
+                    let dlVal = firstValue(in: r, keys: ["limit", "threshold", "max", "value", "amount"])
+                    if maxDailyLoss == nil, let dl = extractRequirementDecimal(dlVal, startingBalance: startingBalance) {
                         maxDailyLoss = dl
                     }
                 } else if (rName.contains("max") || rName.contains("total") || rName.contains("stopout")) && (rName.contains("loss") || rName.contains("drawdown") || rName.contains("stop")) {
-                    if maxLoss == nil,
-                       let ml = extractRequirementDecimal(r["limit"] ?? r["threshold"] ?? r["max"] ?? r["value"] ?? r["amount"], startingBalance: startingBalance) {
+                    let mlVal = firstValue(in: r, keys: ["limit", "threshold", "max", "value", "amount"])
+                    if maxLoss == nil, let ml = extractRequirementDecimal(mlVal, startingBalance: startingBalance) {
                         maxLoss = ml
                     }
                 }
                 // Check if this array item is an active step in a steps/phases list
                 let statusStr = String(describing: r["status"] ?? "").lowercased()
-                let isCurrStep = (r["iscurrent"] as? Bool == true) || (r["current"] as? Bool == true) || (r["active"] as? Bool == true) || statusStr == "active" || statusStr == "in_progress" || statusStr == "inprogress" || statusStr == "current"
-                if isCurrStep {
+                let isCurrBool = (r["iscurrent"] as? Bool == true) || (r["current"] as? Bool == true) || (r["active"] as? Bool == true)
+                let isCurrStatus = statusStr == "active" || statusStr == "in_progress" || statusStr == "inprogress" || statusStr == "current"
+                if isCurrBool || isCurrStatus {
                     parseProgramAndHealthPayload(
                         item,
                         startingBalance: &startingBalance,
@@ -1470,7 +1476,8 @@ public final class The5ersService: ObservableObject {
         
         // 1. Starting balance
         if startingBalance == nil {
-            if let sb = sourceNumber(d["startingbalance"] ?? d["initialbalance"] ?? d["basebalance"] ?? d["accountsize"] ?? d["nominalbalance"]), sb > 0 {
+            let sbVal = firstValue(in: d, keys: ["startingbalance", "initialbalance", "basebalance", "accountsize", "nominalbalance"])
+            if let sb = sourceNumber(sbVal), sb > 0 {
                 startingBalance = sb
             }
         }
