@@ -263,7 +263,6 @@ public actor AIReflectionService {
         // Final offline fallback: dynamic local coach
         return generateLocalCoachReflection(action: action, metrics: metrics, edgeScore: edgeScore, prompt: prompt)
     }
-    }
     
     /// Tests provider connectivity with a test prompt
     public func testConnection(config: AiSettingsConfig) async throws -> String {
