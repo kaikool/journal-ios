@@ -233,7 +233,8 @@ public actor AIReflectionService {
                     action: action,
                     prompt: prompt,
                     metrics: metrics,
-                    edgeScore: edgeScore
+                    edgeScore: edgeScore,
+                    language: activeLang
                 )
             } catch {
                 let local = generateLocalCoachReflection(action: action, metrics: metrics, edgeScore: edgeScore, prompt: prompt)
@@ -462,7 +463,8 @@ public actor AIReflectionService {
         action: AIReflectionAction,
         prompt: String?,
         metrics: TradeMetrics?,
-        edgeScore: Double?
+        edgeScore: Double?,
+        language: String = "vi"
     ) async throws -> String {
         guard let url = URL(string: "https://api.anthropic.com/v1/messages") else {
             throw URLError(.badURL)
@@ -475,10 +477,11 @@ public actor AIReflectionService {
         request.addValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
         request.timeoutInterval = 45
         
-        let userContent = buildTraderContext(action: action, prompt: prompt, metrics: metrics, edgeScore: edgeScore)
+        let userContent = buildTraderContext(action: action, prompt: prompt, metrics: metrics, edgeScore: edgeScore, language: language)
+        let activeSystemPrompt = getSystemPrompt(language: language)
         let payload: [String: Any] = [
             "model": model,
-            "system": systemPrompt,
+            "system": activeSystemPrompt,
             "messages": [
                 ["role": "user", "content": userContent]
             ],

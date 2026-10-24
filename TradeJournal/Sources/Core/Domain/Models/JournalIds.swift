@@ -19,6 +19,12 @@ public enum JournalIds {
         return f.string(from: Date())
     }
     
+    public static func todayDateString() -> String {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        return f.string(from: Date())
+    }
+    
     public static func toPrecision12(_ value: Decimal) -> String {
         let d = NSDecimalNumber(decimal: value).doubleValue
         return toPrecision12Double(d)
