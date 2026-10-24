@@ -1,9 +1,8 @@
 import SwiftUI
 
 // MARK: - 7. Your Data & Backups Settings View
-// Clean Apple HIG settings view with built-in zero-config cloud sync
+// Clean Apple HIG settings view: Built-in cloud sync, Wipe tools for dev, Export & Local reset
 public struct YourDataSettingsView: View {
-    @EnvironmentObject private var env: AppEnvironment
     @ObservedObject private var dataStore = TradeDataStore.shared
     
     @State private var showExportSheet: Bool = false
@@ -11,25 +10,20 @@ public struct YourDataSettingsView: View {
     @State private var showResetConfirmation: Bool = false
     @State private var showWipeConfirmation: Bool = false
     @State private var isWipingSupabase: Bool = false
-    @State private var showAdvancedDatabase: Bool = false
-    
-    // Supabase Cloud Configuration
-    @State private var supabaseUrl: String = SupabaseService.shared.supabaseUrl
-    @State private var supabaseAnonKey: String = SupabaseService.shared.supabaseAnonKey
     @State private var supabaseSyncStatus: String? = nil
     
     public init() {}
     
     public var body: some View {
         VStack(spacing: 20) {
-            // Card 1: Cloud Backup & Sync
-            SettingsCard(title: "Cloud Backup & Sync") {
+            // Card 1: Cloud Database
+            SettingsCard(title: "Cloud Database") {
                 VStack(alignment: .leading, spacing: 14) {
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Supabase Cloud Database")
+                            Text("Supabase Cloud Storage")
                                 .font(AppTypography.headline)
-                            Text("Automatic bi-directional sync for your trades, accounts, and journals.")
+                            Text("Trades, accounts, and journals automatically sync to your cloud database.")
                                 .font(AppTypography.caption)
                                 .foregroundColor(AppColors.secondaryText)
                         }
@@ -41,80 +35,21 @@ public struct YourDataSettingsView: View {
                     
                     Divider()
                     
-                    HStack(spacing: 8) {
-                        AppButton("Sync Cloud", icon: "arrow.triangle.2.circlepath", style: .primary, size: .compact, fullWidth: true, isLoading: dataStore.isSyncing) {
+                    HStack(spacing: 12) {
+                        AppButton("Sync now", icon: "arrow.triangle.2.circlepath", style: .primary, size: .compact, fullWidth: true, isLoading: dataStore.isSyncing) {
                             syncSupabase()
                         }
                         
-                        AppButton("Sync Center", icon: "slider.horizontal.3", style: .secondary, size: .compact, fullWidth: true) {
-                            env.showSyncCenter = true
+                        AppButton("Wipe cloud data", icon: "trash", style: .destructive, size: .compact, fullWidth: true, isLoading: isWipingSupabase) {
+                            showWipeConfirmation = true
                         }
-                        
-                        AppButton("Check Connection", icon: "network", style: .secondary, size: .compact, fullWidth: true) {
-                            checkSupabaseConnection()
-                        }
+                        .disabled(isWipingSupabase || dataStore.isSyncing)
                     }
                     
                     if let status = supabaseSyncStatus {
                         Text(status)
                             .font(AppTypography.caption)
                             .foregroundColor(status.contains("Error") || status.contains("error") ? AppColors.loss : AppColors.profit)
-                    }
-                    
-                    // Advanced Custom Database Disclosure (collapsed by default)
-                    DisclosureGroup(isExpanded: $showAdvancedDatabase) {
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text("The application connects automatically using built-in cloud credentials. You can override with a custom Supabase instance below.")
-                                .font(AppTypography.caption)
-                                .foregroundColor(AppColors.secondaryText)
-                                .padding(.top, 4)
-                            
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Project URL:")
-                                    .font(AppTypography.captionBold)
-                                    .foregroundColor(AppColors.secondaryText)
-                                TextField("https://your-project.supabase.co", text: $supabaseUrl)
-                                    .font(AppTypography.inputText)
-                                    .textFieldStyle(.roundedBorder)
-                                    .textInputAutocapitalization(.never)
-                                    .autocorrectionDisabled(true)
-                            }
-                            
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("API Key:")
-                                    .font(AppTypography.captionBold)
-                                    .foregroundColor(AppColors.secondaryText)
-                                SecureField("Paste API key (anon key)...", text: $supabaseAnonKey)
-                                    .font(AppTypography.inputText)
-                                    .textFieldStyle(.roundedBorder)
-                                    .textInputAutocapitalization(.never)
-                                    .autocorrectionDisabled(true)
-                            }
-                            
-                            HStack {
-                                Button("Reset to Default Cloud") {
-                                    supabaseUrl = SupabaseService.defaultSupabaseUrl
-                                    supabaseAnonKey = SupabaseService.defaultSupabaseAnonKey
-                                    SupabaseService.shared.configure(url: supabaseUrl, anonKey: supabaseAnonKey)
-                                    supabaseSyncStatus = "Reset to default cloud database."
-                                }
-                                .font(AppTypography.caption)
-                                .foregroundColor(AppColors.accent)
-                                
-                                Spacer()
-                                
-                                Button("Wipe Remote Data", role: .destructive) {
-                                    showWipeConfirmation = true
-                                }
-                                .font(AppTypography.caption)
-                                .foregroundColor(AppColors.loss)
-                            }
-                            .padding(.top, 4)
-                        }
-                    } label: {
-                        Text("Custom Database (Advanced)")
-                            .font(AppTypography.captionBold)
-                            .foregroundColor(AppColors.secondaryText)
                     }
                 }
             }
@@ -138,8 +73,8 @@ public struct YourDataSettingsView: View {
                 }
             }
             
-            // Card 3: Reset Database
-            SettingsCard(title: "Local Database Management") {
+            // Card 3: Local data
+            SettingsCard(title: "Local data") {
                 VStack(alignment: .leading, spacing: 14) {
                     Text("Manage on-device storage or reset your local database.")
                         .font(AppTypography.caption)
@@ -151,48 +86,43 @@ public struct YourDataSettingsView: View {
                 }
             }
         }
-        .onAppear {
-            supabaseUrl = SupabaseService.shared.supabaseUrl
-            supabaseAnonKey = SupabaseService.shared.supabaseAnonKey
-        }
-        .onChange(of: supabaseUrl) { val in
-            SupabaseService.shared.configure(url: val, anonKey: supabaseAnonKey)
-        }
-        .onChange(of: supabaseAnonKey) { val in
-            SupabaseService.shared.configure(url: supabaseUrl, anonKey: val)
-        }
         .sheet(isPresented: $showExportSheet) {
             if let fileUrl = exportedFileUrl {
                 ShareFileSheet(fileUrl: fileUrl)
             }
         }
         .alert("Reset all local data?", isPresented: $showResetConfirmation) {
-            Button("Delete all data", role: .destructive) {
+            Button("Delete all local data", role: .destructive) {
                 dataStore.resetAllData()
             }
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("All trades, journal logs, and notes will be permanently erased from this device.")
         }
-        .alert("Wipe All Supabase Remote Data?", isPresented: $showWipeConfirmation) {
-            Button("Wipe All Remote Data", role: .destructive) {
+        .alert("Wipe all cloud data on Supabase?", isPresented: $showWipeConfirmation) {
+            Button("Wipe cloud data", role: .destructive) {
                 wipeSupabaseData()
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This will delete all application records across all tables in your Supabase database and reset local cache. You can then perform a fresh sync.")
+            Text("This will permanently delete all records across all tables in your Supabase database. Use this to reset when developing or testing features.")
         }
     }
     
-    private func checkSupabaseConnection() {
-        SupabaseService.shared.configure(url: supabaseUrl, anonKey: supabaseAnonKey)
+    // MARK: - Actions
+    
+    private func syncSupabase() {
         Task {
-            supabaseSyncStatus = "Checking database connection..."
-            do {
-                let res = try await SupabaseService.shared.pingConnection()
-                supabaseSyncStatus = res.message
-            } catch {
-                supabaseSyncStatus = error.localizedDescription
+            supabaseSyncStatus = "Syncing with cloud database..."
+            await dataStore.syncWithSupabase()
+            await MainActor.run {
+                if let err = dataStore.lastSyncError {
+                    self.supabaseSyncStatus = "Sync error: \(err)"
+                } else if let summary = dataStore.lastSyncSummary {
+                    self.supabaseSyncStatus = summary
+                } else {
+                    self.supabaseSyncStatus = "Cloud sync completed successfully!"
+                }
             }
         }
     }
@@ -205,30 +135,12 @@ public struct YourDataSettingsView: View {
                 try await SupabaseService.shared.wipeAllRemoteData()
                 await MainActor.run {
                     self.isWipingSupabase = false
-                    self.dataStore.resetAllData()
-                    self.supabaseSyncStatus = "All Supabase tables and local data wiped successfully. You can sync again."
+                    self.supabaseSyncStatus = "Cloud database wiped successfully."
                 }
             } catch {
                 await MainActor.run {
                     self.isWipingSupabase = false
                     self.supabaseSyncStatus = "Wipe error: \(error.localizedDescription)"
-                }
-            }
-        }
-    }
-    
-    private func syncSupabase() {
-        SupabaseService.shared.configure(url: supabaseUrl, anonKey: supabaseAnonKey)
-        Task {
-            supabaseSyncStatus = "Performing bi-directional sync with Supabase..."
-            await dataStore.syncWithSupabase()
-            await MainActor.run {
-                if let err = dataStore.lastSyncError {
-                    self.supabaseSyncStatus = "Sync error: \(err)"
-                } else if let summary = dataStore.lastSyncSummary {
-                    self.supabaseSyncStatus = summary
-                } else {
-                    self.supabaseSyncStatus = "Bi-directional sync completed successfully!"
                 }
             }
         }
