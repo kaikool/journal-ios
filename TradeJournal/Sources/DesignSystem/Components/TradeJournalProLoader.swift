@@ -175,44 +175,23 @@ public struct RightPlayCandleWing: Shape {
 }
 
 // MARK: - Reusable Blur Overlay Loading Modifier
-// Displays TradeJournalProLoader centered while applying a smooth blur and touch shield to the underlying content
+// Displays TradeJournalProLoader centered with adaptive light/dark blur and NO unnecessary text
 public struct TradeJournalLoadingOverlay: View {
-    public let message: String?
     public let size: CGFloat
     
     public init(message: String? = nil, size: CGFloat = 64) {
-        self.message = message
         self.size = size
     }
     
     public var body: some View {
         ZStack(alignment: .center) {
-            // Soft dimming backdrop covering entire viewport
-            Color.black.opacity(0.35)
+            // Adaptive system blur responding to light/dark mode seamlessly
+            Rectangle()
+                .fill(.ultraThinMaterial)
                 .ignoresSafeArea()
             
-            VStack(spacing: 16) {
-                TradeJournalProLoader(size: size)
-                
-                if let msg = message, !msg.isEmpty {
-                    Text(msg)
-                        .font(AppTypography.captionBold)
-                        .foregroundColor(Color.white)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 18)
-                        .padding(.vertical, 10)
-                        .background(
-                            Capsule()
-                                .fill(Color(hex: "0A111E").opacity(0.85))
-                                .overlay(
-                                    Capsule()
-                                        .stroke(Color(hex: "38BDF8").opacity(0.35), lineWidth: 0.8)
-                                )
-                        )
-                        .shadow(color: Color.black.opacity(0.35), radius: 12, x: 0, y: 4)
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            // Clean centered animated loader, no distracting text
+            TradeJournalProLoader(size: size)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .ignoresSafeArea()
