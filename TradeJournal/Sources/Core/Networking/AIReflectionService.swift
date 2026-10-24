@@ -100,7 +100,7 @@ public actor AIReflectionService {
                 return try await callOpenAiCompatible(
                     endpoint: Self.groqEndpoint,
                     apiKey: config.groqKey,
-                    model: config.model.isEmpty ? "llama-3.3-70b-versatile" : config.model,
+                    model: config.model.isEmpty ? "llama-3.1-8b-instant" : config.model,
                     action: action,
                     prompt: prompt,
                     metrics: metrics,
@@ -121,7 +121,7 @@ public actor AIReflectionService {
                 return try await callOpenAiCompatible(
                     endpoint: Self.openRouterEndpoint,
                     apiKey: config.openrouterKey,
-                    model: config.model.isEmpty ? "deepseek/deepseek-r1:free" : config.model,
+                    model: config.model.isEmpty ? "openrouter/free" : config.model,
                     action: action,
                     prompt: prompt,
                     metrics: metrics,
@@ -245,7 +245,7 @@ public actor AIReflectionService {
             return try await callOpenAiCompatible(
                 endpoint: Self.groqEndpoint,
                 apiKey: config.groqKey,
-                model: config.model.isEmpty ? "llama-3.3-70b-versatile" : config.model,
+                model: config.model.isEmpty ? "llama-3.1-8b-instant" : config.model,
                 action: .ask,
                 prompt: "Say 'Groq connected successfully.' and state your model name in one sentence.",
                 metrics: nil,
@@ -259,7 +259,7 @@ public actor AIReflectionService {
             return try await callOpenAiCompatible(
                 endpoint: Self.openRouterEndpoint,
                 apiKey: config.openrouterKey,
-                model: config.model.isEmpty ? "deepseek/deepseek-r1:free" : config.model,
+                model: config.model.isEmpty ? "openrouter/free" : config.model,
                 action: .ask,
                 prompt: "Say 'OpenRouter connected successfully.' and state your model name in one sentence.",
                 metrics: nil,
@@ -333,6 +333,8 @@ public actor AIReflectionService {
         let trimmedKey = apiKey.trimmingCharacters(in: .whitespaces)
         request.addValue("Bearer \(trimmedKey)", forHTTPHeaderField: "Authorization")
         request.addValue(trimmedKey, forHTTPHeaderField: "x-goog-api-key")
+        request.addValue("https://tradejournal.app", forHTTPHeaderField: "HTTP-Referer")
+        request.addValue("TradeJournal", forHTTPHeaderField: "X-Title")
         request.timeoutInterval = 45
         
         let userContent = buildTraderContext(action: action, prompt: prompt, metrics: metrics, edgeScore: edgeScore)

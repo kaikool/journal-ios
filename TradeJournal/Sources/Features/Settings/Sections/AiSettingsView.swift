@@ -1,12 +1,12 @@
 import SwiftUI
 
 // MARK: - 6. AI Settings View
-// Clean Apple HIG settings view matching GeneralSettingsView and TradingSettingsView
+// Clean Apple HIG settings view supporting Groq, OpenRouter, Google Gemini, OpenAI, and Custom endpoints
 public struct AiSettingsView: View {
     @ObservedObject private var dataStore = TradeDataStore.shared
     
-    @State private var provider: String = "github"
-    @State private var model: String = "gpt-4o"
+    @State private var provider: String = "groq"
+    @State private var model: String = "llama-3.1-8b-instant"
     @State private var apiKey: String = ""
     @State private var customEndpoint: String = ""
     @State private var statusMessage: String = ""
@@ -18,9 +18,9 @@ public struct AiSettingsView: View {
     
     private var providerDisplayName: String {
         switch provider {
-        case "github": return "GitHub Models"
+        case "groq": return "Groq (Free & Ultra Fast)"
+        case "openrouter": return "OpenRouter (Free Models)"
         case "gemini": return "Google Gemini"
-        case "groq": return "Groq"
         case "openai": return "OpenAI"
         case "custom": return "Custom / Azure"
         default: return provider.capitalized
@@ -29,12 +29,12 @@ public struct AiSettingsView: View {
     
     private var providerModels: [String] {
         switch provider {
-        case "github":
-            return ["gpt-4o", "gpt-4o-mini", "o3-mini", "Meta-Llama-3.1-70B-Instruct", "Phi-4"]
+        case "groq":
+            return ["llama-3.1-8b-instant", "openai/gpt-oss-120b", "openai/gpt-oss-20b"]
+        case "openrouter":
+            return ["openrouter/free", "deepseek/deepseek-r1:free", "meta-llama/llama-3.2-3b-instruct:free"]
         case "gemini":
             return ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"]
-        case "groq":
-            return ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "deepseek-r1-distill-llama-70b"]
         case "openai":
             return ["gpt-4o", "gpt-4o-mini", "o3-mini"]
         default:
@@ -44,9 +44,9 @@ public struct AiSettingsView: View {
     
     private var keyFieldLabel: String {
         switch provider {
-        case "github": return "GitHub personal access token (PAT)"
-        case "gemini": return "Google Gemini API key"
         case "groq": return "Groq API key"
+        case "openrouter": return "OpenRouter API key"
+        case "gemini": return "Google Gemini API key"
         case "openai": return "OpenAI API key"
         case "custom": return "API key / Bearer token"
         default: return "API key"
@@ -55,9 +55,9 @@ public struct AiSettingsView: View {
     
     private var keyFieldPlaceholder: String {
         switch provider {
-        case "github": return "ghp_... or github_pat_..."
-        case "gemini": return "AIzaSy..."
         case "groq": return "gsk_..."
+        case "openrouter": return "sk-or-v1-..."
+        case "gemini": return "AIzaSy..."
         case "openai": return "sk-..."
         case "custom": return "API key or token..."
         default: return "Paste key..."
@@ -66,12 +66,12 @@ public struct AiSettingsView: View {
     
     private var keyFieldHint: String {
         switch provider {
-        case "github":
-            return "From github.com/settings/tokens (classic token with repo or fine-grained with models:read)."
+        case "groq":
+            return "Free API key from console.groq.com. Uses active models like llama-3.1-8b-instant."
+        case "openrouter":
+            return "Free API key from openrouter.ai/keys. Supports openrouter/free and :free models."
         case "gemini":
             return "Free tier from aistudio.google.com (15 RPM / 1,500 RPD, no credit card required)."
-        case "groq":
-            return "Free tier from console.groq.com. Active model: llama-3.3-70b-versatile."
         case "openai":
             return "Requires an OpenAI platform account with billing balance."
         case "custom":
@@ -91,9 +91,9 @@ public struct AiSettingsView: View {
                         .foregroundColor(AppColors.secondaryText)
                     
                     AppleMenuChip(title: "Provider", selectionText: providerDisplayName, icon: "cpu") {
-                        Button("GitHub Models") { selectProvider("github") }
+                        Button("Groq (Free & Fast)") { selectProvider("groq") }
+                        Button("OpenRouter (Free Models)") { selectProvider("openrouter") }
                         Button("Google Gemini") { selectProvider("gemini") }
-                        Button("Groq") { selectProvider("groq") }
                         Button("OpenAI") { selectProvider("openai") }
                         Button("Custom / Azure") { selectProvider("custom") }
                     }
@@ -209,7 +209,6 @@ public struct AiSettingsView: View {
     // MARK: - Actions
     
     private func selectProvider(_ newProvider: String) {
-        // Persist current key into memory before switching
         syncDraftToMemory()
         
         provider = newProvider
@@ -217,18 +216,17 @@ public struct AiSettingsView: View {
         statusMessage = ""
         isError = false
         
-        // Load saved key for newly selected provider
         let conf = dataStore.aiSettings
         switch newProvider {
-        case "github":
-            apiKey = conf.githubKey
-            if model.isEmpty || !providerModels.contains(model) { model = "gpt-4o" }
+        case "groq":
+            apiKey = conf.groqKey
+            if model.isEmpty || !providerModels.contains(model) { model = "llama-3.1-8b-instant" }
+        case "openrouter":
+            apiKey = conf.openrouterKey
+            if model.isEmpty || !providerModels.contains(model) { model = "openrouter/free" }
         case "gemini":
             apiKey = conf.geminiKey
             if model.isEmpty || !providerModels.contains(model) { model = "gemini-2.0-flash" }
-        case "groq":
-            apiKey = conf.groqKey
-            if model.isEmpty || !providerModels.contains(model) { model = "llama-3.3-70b-versatile" }
         case "openai":
             apiKey = conf.openaiKey
             if model.isEmpty || !providerModels.contains(model) { model = "gpt-4o-mini" }
@@ -242,14 +240,14 @@ public struct AiSettingsView: View {
     
     private func loadCurrentSettings() {
         let conf = dataStore.aiSettings
-        provider = conf.provider.isEmpty ? "github" : conf.provider
-        model = conf.model.isEmpty ? "gpt-4o" : conf.model
+        provider = conf.provider.isEmpty ? "groq" : conf.provider
+        model = conf.model.isEmpty ? "llama-3.1-8b-instant" : conf.model
         customEndpoint = conf.customEndpoint
         
         switch provider {
-        case "github": apiKey = conf.githubKey
-        case "gemini": apiKey = conf.geminiKey
         case "groq": apiKey = conf.groqKey
+        case "openrouter": apiKey = conf.openrouterKey
+        case "gemini": apiKey = conf.geminiKey
         case "openai": apiKey = conf.openaiKey
         case "custom": apiKey = conf.customKey
         default: apiKey = ""
@@ -263,9 +261,9 @@ public struct AiSettingsView: View {
     private func syncDraftToMemory() {
         var conf = dataStore.aiSettings
         switch provider {
-        case "github": conf.githubKey = apiKey
-        case "gemini": conf.geminiKey = apiKey
         case "groq": conf.groqKey = apiKey
+        case "openrouter": conf.openrouterKey = apiKey
+        case "gemini": conf.geminiKey = apiKey
         case "openai": conf.openaiKey = apiKey
         case "custom":
             conf.customKey = apiKey
@@ -283,12 +281,12 @@ public struct AiSettingsView: View {
         conf.model = model.trimmingCharacters(in: .whitespaces)
         
         switch provider {
-        case "github":
-            conf.githubKey = apiKey.trimmingCharacters(in: .whitespaces)
-        case "gemini":
-            conf.geminiKey = apiKey.trimmingCharacters(in: .whitespaces)
         case "groq":
             conf.groqKey = apiKey.trimmingCharacters(in: .whitespaces)
+        case "openrouter":
+            conf.openrouterKey = apiKey.trimmingCharacters(in: .whitespaces)
+        case "gemini":
+            conf.geminiKey = apiKey.trimmingCharacters(in: .whitespaces)
         case "openai":
             conf.openaiKey = apiKey.trimmingCharacters(in: .whitespaces)
         case "custom":
@@ -316,12 +314,12 @@ public struct AiSettingsView: View {
         draft.model = model.trimmingCharacters(in: .whitespaces)
         
         switch provider {
-        case "github":
-            draft.githubKey = apiKey.trimmingCharacters(in: .whitespaces)
-        case "gemini":
-            draft.geminiKey = apiKey.trimmingCharacters(in: .whitespaces)
         case "groq":
             draft.groqKey = apiKey.trimmingCharacters(in: .whitespaces)
+        case "openrouter":
+            draft.openrouterKey = apiKey.trimmingCharacters(in: .whitespaces)
+        case "gemini":
+            draft.geminiKey = apiKey.trimmingCharacters(in: .whitespaces)
         case "openai":
             draft.openaiKey = apiKey.trimmingCharacters(in: .whitespaces)
         case "custom":
