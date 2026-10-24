@@ -6,7 +6,7 @@ public struct AiSettingsView: View {
     @ObservedObject private var dataStore = TradeDataStore.shared
     
     @State private var provider: String = "groq"
-    @State private var model: String = "llama-3.1-8b-instant"
+    @State private var model: String = "openai/gpt-oss-120b"
     @State private var apiKey: String = ""
     @State private var customEndpoint: String = ""
     @State private var statusMessage: String = ""
@@ -30,7 +30,7 @@ public struct AiSettingsView: View {
     private var providerModels: [String] {
         switch provider {
         case "groq":
-            return ["llama-3.1-8b-instant", "openai/gpt-oss-120b", "openai/gpt-oss-20b"]
+            return ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.8-27b"]
         case "openrouter":
             return ["openrouter/free", "deepseek/deepseek-r1:free", "meta-llama/llama-3.2-3b-instruct:free"]
         case "gemini":
@@ -220,7 +220,7 @@ public struct AiSettingsView: View {
         switch newProvider {
         case "groq":
             apiKey = conf.groqKey
-            if model.isEmpty || !providerModels.contains(model) { model = "llama-3.1-8b-instant" }
+            if model.isEmpty || !providerModels.contains(model) { model = "openai/gpt-oss-120b" }
         case "openrouter":
             apiKey = conf.openrouterKey
             if model.isEmpty || !providerModels.contains(model) { model = "openrouter/free" }
@@ -241,7 +241,7 @@ public struct AiSettingsView: View {
     private func loadCurrentSettings() {
         let conf = dataStore.aiSettings
         provider = conf.provider.isEmpty ? "groq" : conf.provider
-        model = conf.model.isEmpty ? "llama-3.1-8b-instant" : conf.model
+        model = conf.model.isEmpty ? "openai/gpt-oss-120b" : conf.model
         customEndpoint = conf.customEndpoint
         
         switch provider {

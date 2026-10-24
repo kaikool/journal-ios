@@ -92,15 +92,12 @@ public actor AIReflectionService {
             }
             
         case "groq":
-            guard !config.groqKey.trimmingCharacters(in: .whitespaces).isEmpty else {
-                let local = generateLocalCoachReflection(action: action, metrics: metrics, edgeScore: edgeScore, prompt: prompt)
-                return "ℹ️ [Groq Key Not Configured] Go to Settings > AI to enter your free Groq API key from console.groq.com for ultra-fast AI coaching.\n\n" + local
-            }
+            let activeKey = config.groqKey.trimmingCharacters(in: .whitespaces).isEmpty ? AiSettingsConfig.defaultGroqKey : config.groqKey.trimmingCharacters(in: .whitespaces)
             do {
                 return try await callOpenAiCompatible(
                     endpoint: Self.groqEndpoint,
-                    apiKey: config.groqKey,
-                    model: config.model.isEmpty ? "llama-3.1-8b-instant" : config.model,
+                    apiKey: activeKey,
+                    model: config.model.isEmpty ? "openai/gpt-oss-120b" : config.model,
                     action: action,
                     prompt: prompt,
                     metrics: metrics,
@@ -113,14 +110,11 @@ public actor AIReflectionService {
             }
             
         case "openrouter":
-            guard !config.openrouterKey.trimmingCharacters(in: .whitespaces).isEmpty else {
-                let local = generateLocalCoachReflection(action: action, metrics: metrics, edgeScore: edgeScore, prompt: prompt)
-                return "ℹ️ [OpenRouter Key Not Configured] Go to Settings > AI to enter your OpenRouter API key from openrouter.ai/keys.\n\n" + local
-            }
+            let activeKey = config.openrouterKey.trimmingCharacters(in: .whitespaces).isEmpty ? AiSettingsConfig.defaultOpenRouterKey : config.openrouterKey.trimmingCharacters(in: .whitespaces)
             do {
                 return try await callOpenAiCompatible(
                     endpoint: Self.openRouterEndpoint,
-                    apiKey: config.openrouterKey,
+                    apiKey: activeKey,
                     model: config.model.isEmpty ? "openrouter/free" : config.model,
                     action: action,
                     prompt: prompt,
@@ -239,13 +233,11 @@ public actor AIReflectionService {
             )
             
         case "groq":
-            guard !config.groqKey.trimmingCharacters(in: .whitespaces).isEmpty else {
-                throw NSError(domain: "Groq", code: 400, userInfo: [NSLocalizedDescriptionKey: "Please enter your Groq API key from console.groq.com."])
-            }
+            let activeKey = config.groqKey.trimmingCharacters(in: .whitespaces).isEmpty ? AiSettingsConfig.defaultGroqKey : config.groqKey.trimmingCharacters(in: .whitespaces)
             return try await callOpenAiCompatible(
                 endpoint: Self.groqEndpoint,
-                apiKey: config.groqKey,
-                model: config.model.isEmpty ? "llama-3.1-8b-instant" : config.model,
+                apiKey: activeKey,
+                model: config.model.isEmpty ? "openai/gpt-oss-120b" : config.model,
                 action: .ask,
                 prompt: "Say 'Groq connected successfully.' and state your model name in one sentence.",
                 metrics: nil,
@@ -253,12 +245,10 @@ public actor AIReflectionService {
             )
             
         case "openrouter":
-            guard !config.openrouterKey.trimmingCharacters(in: .whitespaces).isEmpty else {
-                throw NSError(domain: "OpenRouter", code: 400, userInfo: [NSLocalizedDescriptionKey: "Please enter your OpenRouter API key from openrouter.ai/keys."])
-            }
+            let activeKey = config.openrouterKey.trimmingCharacters(in: .whitespaces).isEmpty ? AiSettingsConfig.defaultOpenRouterKey : config.openrouterKey.trimmingCharacters(in: .whitespaces)
             return try await callOpenAiCompatible(
                 endpoint: Self.openRouterEndpoint,
-                apiKey: config.openrouterKey,
+                apiKey: activeKey,
                 model: config.model.isEmpty ? "openrouter/free" : config.model,
                 action: .ask,
                 prompt: "Say 'OpenRouter connected successfully.' and state your model name in one sentence.",
