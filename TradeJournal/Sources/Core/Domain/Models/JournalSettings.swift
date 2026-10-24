@@ -146,6 +146,7 @@ public struct AiSettingsConfig: Codable, Equatable, Sendable {
     public var anthropicKey: String
     public var customEndpoint: String
     public var customKey: String
+    public var language: String // "vi" | "en"
     
     public static let `default` = AiSettingsConfig(
         provider: "groq",
@@ -157,7 +158,8 @@ public struct AiSettingsConfig: Codable, Equatable, Sendable {
         openaiKey: "",
         anthropicKey: "",
         customEndpoint: "",
-        customKey: ""
+        customKey: "",
+        language: "vi"
     )
     
     public init(
@@ -170,7 +172,8 @@ public struct AiSettingsConfig: Codable, Equatable, Sendable {
         openaiKey: String = "",
         anthropicKey: String = "",
         customEndpoint: String = "",
-        customKey: String = ""
+        customKey: String = "",
+        language: String = "vi"
     ) {
         self.provider = provider
         self.model = model
@@ -182,10 +185,11 @@ public struct AiSettingsConfig: Codable, Equatable, Sendable {
         self.anthropicKey = anthropicKey
         self.customEndpoint = customEndpoint
         self.customKey = customKey
+        self.language = language
     }
     
     enum CodingKeys: String, CodingKey {
-        case provider, model, githubKey, geminiKey, groqKey, openrouterKey, openaiKey, anthropicKey, customEndpoint, customKey, opencodeKey
+        case provider, model, githubKey, geminiKey, groqKey, openrouterKey, openaiKey, anthropicKey, customEndpoint, customKey, language, opencodeKey
     }
     
     public init(from decoder: Decoder) throws {
@@ -200,6 +204,7 @@ public struct AiSettingsConfig: Codable, Equatable, Sendable {
         let antKey = try container.decodeIfPresent(String.self, forKey: .anthropicKey) ?? ""
         let cEndpoint = try container.decodeIfPresent(String.self, forKey: .customEndpoint) ?? ""
         let cKey = try container.decodeIfPresent(String.self, forKey: .customKey) ?? ""
+        let lang = try container.decodeIfPresent(String.self, forKey: .language) ?? "vi"
         
         // Upgrade legacy default to working Groq / OpenRouter
         if grKey.isEmpty { grKey = Self.defaultGroqKey }
@@ -226,6 +231,7 @@ public struct AiSettingsConfig: Codable, Equatable, Sendable {
         self.anthropicKey = antKey
         self.customEndpoint = cEndpoint
         self.customKey = cKey
+        self.language = lang
     }
     
     public func encode(to encoder: Encoder) throws {
@@ -240,5 +246,6 @@ public struct AiSettingsConfig: Codable, Equatable, Sendable {
         try container.encode(anthropicKey, forKey: .anthropicKey)
         try container.encode(customEndpoint, forKey: .customEndpoint)
         try container.encode(customKey, forKey: .customKey)
+        try container.encode(language, forKey: .language)
     }
 }

@@ -7,6 +7,7 @@ public struct AiSettingsView: View {
     
     @State private var provider: String = "groq"
     @State private var model: String = "openai/gpt-oss-120b"
+    @State private var language: String = "vi"
     @State private var apiKey: String = ""
     @State private var customEndpoint: String = ""
     @State private var statusMessage: String = ""
@@ -99,6 +100,27 @@ public struct AiSettingsView: View {
                     }
                     
                     Text("Automated trade reviews, daily recaps, and journaling coach grounded in your trade data.")
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.secondaryText)
+                }
+                
+                // Response Language Selector
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("AI Response Language")
+                        .font(AppTypography.captionBold)
+                        .foregroundColor(AppColors.secondaryText)
+                    
+                    Picker("Language", selection: $language) {
+                        Text("Vietnamese").tag("vi")
+                        Text("English").tag("en")
+                    }
+                    .pickerStyle(.segmented)
+                    .onChange(of: language) {
+                        isSaved = false
+                        statusMessage = ""
+                    }
+                    
+                    Text("The AI coach will deliver all recaps, critiques, and answers in your selected language.")
                         .font(AppTypography.caption)
                         .foregroundColor(AppColors.secondaryText)
                 }
@@ -242,6 +264,7 @@ public struct AiSettingsView: View {
         let conf = dataStore.aiSettings
         provider = conf.provider.isEmpty ? "groq" : conf.provider
         model = conf.model.isEmpty ? "openai/gpt-oss-120b" : conf.model
+        language = conf.language.isEmpty ? "vi" : conf.language
         customEndpoint = conf.customEndpoint
         
         switch provider {
@@ -272,6 +295,7 @@ public struct AiSettingsView: View {
         }
         conf.provider = provider
         conf.model = model
+        conf.language = language
         dataStore.aiSettings = conf
     }
     
@@ -279,6 +303,7 @@ public struct AiSettingsView: View {
         var conf = dataStore.aiSettings
         conf.provider = provider
         conf.model = model.trimmingCharacters(in: .whitespaces)
+        conf.language = language
         
         switch provider {
         case "groq":

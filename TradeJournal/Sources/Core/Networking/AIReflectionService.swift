@@ -21,12 +21,41 @@ public actor AIReflectionService {
     public static let openRouterEndpoint = "https://openrouter.ai/api/v1/chat/completions"
     public static let openAiEndpoint = "https://api.openai.com/v1/chat/completions"
     
-    private let systemPrompt = """
-    You are the reflection layer of a disciplined trader's journal.
-    You see only the trader's own recorded data — trades, stats, and notes. Ground every
-    statement in those numbers; never invent trades, prices, or market context you weren't given.
-    Be direct, specific, and objective like an elite prop trading coach: cite the numbers, identify behavioral patterns, and specify clear improvements. No generic platitudes, no disclaimers about trading risks. Keep it concise, structured, and actionable.
-    """
+    private func getSystemPrompt(language: String) -> String {
+        if language == "vi" {
+            return """
+            Bạn là Trợ lý AI Huấn luyện viên Kỷ luật Giao dịch (Trading Discipline Coach) chuyên nghiệp.
+            NGUYÊN TẮC: Bạn chỉ phân tích dựa trên 100% dữ liệu thực tế được cung cấp; không bịa đặt thị trường hay đưa lời khuyên chung chung.
+            NGÔN NGỮ: Trả lời 100% bằng TIẾNG VIỆT, sử dụng thuật ngữ trading chuẩn xác (Stop Loss, Take Profit, Win Rate, Risk/Reward, Drawdown, Entry, Exit, FOMO, Revenge).
+            ĐỊNH DẠNG BẮT BUỘC (MARKDOWN THỊ GIÁC CHO MOBILE):
+            1. Sử dụng tiêu đề cấp 3 (###) kèm icon cho từng phân đoạn:
+               ### 📊 TỔNG QUAN HIỆU SUẤT
+               ### 💡 ĐIỂM SÁNG KỶ LUẬT
+               ### ⚠️ CẢNH BÁO RỦI RO & LỖ HỔNG
+               ### 🎯 QUY TẮC HÀNH ĐỘNG
+            2. Các con số và chỉ số then chốt PHẢI được in đậm trong các gạch đầu dòng (• **Tỷ lệ thắng:** 65.0% | **P&L:** +$350).
+            3. Luôn cô đọng 1 quy tắc kỷ luật quan trọng nhất vào khối trích dẫn:
+            > ⚠️ **Quy tắc vàng:** [Nội dung quy tắc cốt lõi]
+            4. Tuyệt đối KHÔNG viết một đoạn văn dài liên tục. Giữ câu văn súc tích, đanh thép, chuyên nghiệp.
+            """
+        } else {
+            return """
+            You are an elite, disciplined Prop Trading Coach embedded into a trader's journal.
+            PRINCIPLES: Ground every statement 100% in the actual trade statistics provided. Never invent data or assume unstated market context.
+            LANGUAGE: Respond 100% in professional English.
+            MANDATORY MOBILE-FRIENDLY MARKDOWN FORMATTING:
+            1. Use level-3 headers (###) with appropriate emojis for structured sections:
+               ### 📊 PERFORMANCE OVERVIEW
+               ### 💡 DISCIPLINE STRENGTHS
+               ### ⚠️ RISK & BEHAVIORAL WARNINGS
+               ### 🎯 ACTIONABLE PROTOCOL
+            2. Present key figures in bold inside clean bullet points (• **Win Rate:** 65.0% | **Net P&L:** +$350).
+            3. Always highlight the single most important rule inside a quote block:
+            > ⚠️ **Core Rule:** [Single non-negotiable rule]
+            4. Never write continuous walls of unformatted text. Keep paragraphs punchy and actionable.
+            """
+        }
+    }
     
     private init() {}
     
@@ -39,14 +68,19 @@ public actor AIReflectionService {
         edgeScore: Double? = nil,
         supabaseUrl: String? = nil,
         authToken: String? = nil,
-        overrideConfig: AiSettingsConfig? = nil
+        overrideConfig: AiSettingsConfig? = nil,
+        language: String? = nil
     ) async throws -> String {
-        let config: AiSettingsConfig
+        var config: AiSettingsConfig
         if let override = overrideConfig {
             config = override
         } else {
             config = await MainActor.run { TradeDataStore.shared.aiSettings }
         }
+        if let lang = language {
+            config.language = lang
+        }
+        let activeLang = config.language.isEmpty ? "vi" : config.language
         
         switch config.provider {
         case "github":
@@ -102,7 +136,8 @@ public actor AIReflectionService {
                     action: action,
                     prompt: prompt,
                     metrics: metrics,
-                    edgeScore: edgeScore
+                    edgeScore: edgeScore,
+                    language: activeLang
                 )
             } catch {
                 AppLogger.warning("Groq request with model '\(requestedModel)' failed: \(error.localizedDescription). Searching for active Groq models...")
@@ -118,7 +153,8 @@ public actor AIReflectionService {
                             action: action,
                             prompt: prompt,
                             metrics: metrics,
-                            edgeScore: edgeScore
+                            edgeScore: edgeScore,
+                            language: activeLang
                         )
                     } catch {
                         AppLogger.warning("Groq retry with dynamic model '\(freshModel)' failed: \(error.localizedDescription)")
@@ -135,7 +171,8 @@ public actor AIReflectionService {
                     action: action,
                     prompt: prompt,
                     metrics: metrics,
-                    edgeScore: edgeScore
+                    edgeScore: edgeScore,
+                    language: activeLang
                 ) {
                     return orResult
                 }
@@ -155,7 +192,8 @@ public actor AIReflectionService {
                     action: action,
                     prompt: prompt,
                     metrics: metrics,
-                    edgeScore: edgeScore
+                    edgeScore: edgeScore,
+                    language: activeLang
                 )
             } catch {
                 AppLogger.warning("OpenRouter request failed: \(error.localizedDescription). Falling back to local coach.")
@@ -347,7 +385,8 @@ public actor AIReflectionService {
         action: AIReflectionAction,
         prompt: String?,
         metrics: TradeMetrics?,
-        edgeScore: Double?
+        edgeScore: Double?,
+        language: String = "vi"
     ) async throws -> String {
         guard let url = URL(string: endpoint) else {
             throw URLError(.badURL)
@@ -363,11 +402,12 @@ public actor AIReflectionService {
         request.addValue("TradeJournal", forHTTPHeaderField: "X-Title")
         request.timeoutInterval = 45
         
-        let userContent = buildTraderContext(action: action, prompt: prompt, metrics: metrics, edgeScore: edgeScore)
+        let activeSystemPrompt = getSystemPrompt(language: language)
+        let userContent = buildTraderContext(action: action, prompt: prompt, metrics: metrics, edgeScore: edgeScore, language: language)
         let payload: [String: Any] = [
             "model": model,
             "messages": [
-                ["role": "system", "content": systemPrompt],
+                ["role": "system", "content": activeSystemPrompt],
                 ["role": "user", "content": userContent]
             ],
             "temperature": 0.3
@@ -581,7 +621,8 @@ public actor AIReflectionService {
     
     // MARK: - Prompt & Error Builders
     
-    private func buildTraderContext(action: AIReflectionAction, prompt: String?, metrics: TradeMetrics?, edgeScore: Double?) -> String {
+    private func buildTraderContext(action: AIReflectionAction, prompt: String?, metrics: TradeMetrics?, edgeScore: Double?, language: String = "vi") -> String {
+        let isVi = language == "vi"
         var context = ""
         if let m = metrics {
             let wr = (m.winRate ?? 0.0) * 100
@@ -589,33 +630,52 @@ public actor AIReflectionService {
             let score = edgeScore.map { "\(Int($0))" } ?? "N/A"
             let dd = m.maxDrawdownPct.map { String(format: "%.1f%%", $0) } ?? "N/A"
             
-            context += """
-            TRADER PERFORMANCE CONTEXT:
-            - Total Closed Trades: \(m.totalTrades)
-            - Wins: \(m.wins) | Losses: \(m.losses) | Breakeven: \(m.breakevens)
-            - Win Rate: \(String(format: "%.1f%%", wr))
-            - Profit Factor: \(pf)
-            - Net Cumulative P&L: \(m.netPnl >= 0 ? "+" : "")\(m.netPnl)
-            - Max Drawdown: \(dd)
-            - Edge Score: \(score)/100
-            - Largest Win: \(m.largestWin) | Largest Loss: \(m.largestLoss)
-            - Max Win Streak: \(m.maxWinStreak) | Max Loss Streak: \(m.maxLossStreak)
-            - Total Fees: \(m.fees.map { "\($0)" } ?? "0")
-            
-            """
+            if isVi {
+                context += """
+                DỮ LIỆU HIỆU SUẤT TRADER (TRADER PERFORMANCE CONTEXT):
+                - Tổng số lệnh đã đóng: \(m.totalTrades)
+                - Lệnh Thắng: \(m.wins) | Lệnh Thua: \(m.losses) | Hòa vốn: \(m.breakevens)
+                - Tỷ lệ thắng (Win Rate): \(String(format: "%.1f%%", wr))
+                - Hệ số lợi nhuận (Profit Factor): \(pf)
+                - Lợi nhuận ròng tích lũy (Net P&L): \(m.netPnl >= 0 ? "+" : "")\(m.netPnl)
+                - Sụt giảm vốn tối đa (Max Drawdown): \(dd)
+                - Điểm lợi thế (Edge Score): \(score)/100
+                - Lệnh thắng lớn nhất: \(m.largestWin) | Lệnh thua lớn nhất: \(m.largestLoss)
+                - Chuỗi thắng lớn nhất: \(m.maxWinStreak) | Chuỗi thua lớn nhất: \(m.maxLossStreak)
+                - Tổng chi phí/phí giao dịch: \(m.fees.map { "\($0)" } ?? "0")
+                
+                """
+            } else {
+                context += """
+                TRADER PERFORMANCE CONTEXT:
+                - Total Closed Trades: \(m.totalTrades)
+                - Wins: \(m.wins) | Losses: \(m.losses) | Breakeven: \(m.breakevens)
+                - Win Rate: \(String(format: "%.1f%%", wr))
+                - Profit Factor: \(pf)
+                - Net Cumulative P&L: \(m.netPnl >= 0 ? "+" : "")\(m.netPnl)
+                - Max Drawdown: \(dd)
+                - Edge Score: \(score)/100
+                - Largest Win: \(m.largestWin) | Largest Loss: \(m.largestLoss)
+                - Max Win Streak: \(m.maxWinStreak) | Max Loss Streak: \(m.maxLossStreak)
+                - Total Fees: \(m.fees.map { "\($0)" } ?? "0")
+                
+                """
+            }
+        }
+        
+        if let p = prompt, !p.trimmingCharacters(in: .whitespaces).isEmpty {
+            return "\(context)\(p)"
         }
         
         switch action {
         case .recap:
-            let userNote = prompt.map { "Trader's Note: \"\($0)\"\n" } ?? ""
-            return "\(context)\(userNote)TASK: Provide a concise, structured recap of the trading day. State: 1) Performance summary grounded strictly in the data. 2) Two key strengths observed. 3) One discipline / risk management improvement area. Be concise and actionable."
+            return isVi ? "\(context)YÊU CẦU: Hãy cung cấp một bản đúc kết ngày giao dịch súc tích: 1) Tóm tắt hiệu suất. 2) Hai điểm làm tốt. 3) Một bài học kỷ luật then chốt." : "\(context)TASK: Provide a concise, structured recap of the trading day. State: 1) Performance summary grounded strictly in the data. 2) Two key strengths observed. 3) One discipline / risk management improvement area. Be concise and actionable."
             
         case .critique:
-            let userNote = prompt.map { "Focus Area: \"\($0)\"\n" } ?? ""
-            return "\(context)\(userNote)TASK: Deliver a sharp, constructive coaching critique. Point out behavioral biases (e.g., loss tolerance, streak psychology, trade frequency) and state exact rule adjustments."
+            return isVi ? "\(context)YÊU CẦU: Đưa ra nhận xét huấn luyện nghiêm khắc và mang tính xây dựng. Chỉ ra các thiên kiến tâm lý (chịu lỗ quá đà, tâm lý chuỗi thua, tần suất giao dịch) và các quy tắc cần điều chỉnh." : "\(context)TASK: Deliver a sharp, constructive coaching critique. Point out behavioral biases (e.g., loss tolerance, streak psychology, trade frequency) and state exact rule adjustments."
             
         case .ask:
-            return "\(context)USER QUESTION: \"\(prompt ?? "")\"\nTASK: Answer the trader's question directly using only the performance data provided. Cite the exact figures and give specific, actionable advice."
+            return isVi ? "\(context)CÂU HỎI CỦA TRADER: \"\(prompt ?? "")\"\nYÊU CẦU: Trả lời trực diện câu hỏi dựa trên các con số hiệu suất thực tế được cung cấp." : "\(context)USER QUESTION: \"\(prompt ?? "")\"\nTASK: Answer the trader's question directly using only the performance data provided. Cite the exact figures and give specific, actionable advice."
         }
     }
     
