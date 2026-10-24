@@ -36,6 +36,10 @@ public actor AIReflectionService {
                > ⚠️ **Quy tắc kỷ luật:** [1 hành động bất di bất dịch cho phiên tới]
             4. Trả lời 100% bằng TIẾNG VIỆT, dùng các thuật ngữ trading chuẩn (Stop Loss, Take Profit, Win Rate, Risk/Reward, Drawdown, Entry, Exit).
             5. NHẬN DIỆN CHIỀU LỆNH CHUẨN XÁC: Luôn kiểm tra kỹ vị thế là BUY hay SELL/SHORT. Với lệnh SELL/SHORT: Lãi khi giá giảm, Lỗ khi giá tăng; TP nằm dưới giá vào, SL nằm trên giá vào. Tuyệt đối không bao giờ phân tích nhầm lẫn lệnh SELL thành lệnh BUY.
+            6. TUÂN THỦ TUYỆT ĐỐI HỒ SƠ TRADER & CHỐNG SUY DIỄN (ANTI-HALLUCINATION):
+               - BẮT BUỘC chỉ phân tích kỹ thuật dựa trên đúng chiến lược và chỉ báo có trong "HỒ SƠ GIAO DỊCH" (Trader Profile) hoặc ghi chú của lệnh. Ví dụ: Nếu Trader dùng RSI, chỉ phân tích theo RSI; nếu dùng Price Action / Kháng cự hỗ trợ, phân tích theo kháng cự hỗ trợ.
+               - TUYỆT ĐỐI KHÔNG tự động suy diễn hoặc gán ghép các thuật ngữ phương pháp khác (như Liquidity Sweeps, Order Blocks, FVG, SMC) nếu trong hồ sơ hoặc ghi chú KHÔNG đề cập.
+               - Nếu không có dữ liệu biểu đồ/chỉ báo chi tiết, chỉ đánh giá thuần túy dựa trên các thông số số liệu thực tế: Giá vào, Giá ra, SL, TP, Khối lượng, P&L, Thời gian giữ lệnh và Kỷ luật quản trị rủi ro. Tuyệt đối không phán đoán cấu trúc biểu đồ giả định.
             """
         } else {
             return """
@@ -51,6 +55,10 @@ public actor AIReflectionService {
                > ⚠️ **Core Discipline Rule:** [Single non-negotiable directive for the next session]
             4. Respond 100% in professional English.
             5. STRICT TRADE DIRECTION ACCURACY: Always strictly verify whether a position is BUY or SELL/SHORT. For SELL/SHORT trades: profit occurs when price drops (Entry > Exit = Profit), TP is strictly below Entry, and SL is strictly above Entry. Never invert or confuse trade direction.
+            6. STRICT ADHERENCE TO TRADER PROFILE (ANTI-HALLUCINATION):
+               - Critique tactical execution strictly within the framework of the trader's stated strategies and playbooks in "TRADER PROFILE" or trade notes (e.g., if the trader uses RSI, critique using RSI; if Trend Following, critique using trend principles).
+               - NEVER invent, assume, or inject unmentioned concepts or jargon (such as Liquidity Sweeps, Order Blocks, Fair Value Gaps, or SMC) unless explicitly specified in the trader's profile or notes.
+               - When chart or indicator data is not explicitly provided, ground all advice strictly in factual trade metrics: Entry, Exit, SL, TP, Volume, P&L, holding duration, and psychological risk control. Do not fabricate imaginary price patterns.
             """
         }
     }
@@ -663,16 +671,42 @@ public actor AIReflectionService {
         
         // 1. Persistent Trader Context & Memory
         if let prof = traderProfile {
-            context += """
-            TRADER PROFILE & STRATEGY MEMORY:
-            - Trading Style: \(prof.tradingStyle)
-            - Goal / Prop Firm: \(prof.accountObjective)
-            - Setups & Playbooks: \(prof.primaryPlaybooks)
-            - Risk Budget: \(prof.maxRiskPerTrade)
-            - Known Leaks & Biases: \(prof.knownPsychologicalLeaks)
-            - Personal Notes: \(prof.customMemoryNotes)
+            let playbooks = prof.primaryPlaybooks.trimmingCharacters(in: .whitespaces)
+            let style = prof.tradingStyle.trimmingCharacters(in: .whitespaces)
+            let objective = prof.accountObjective.trimmingCharacters(in: .whitespaces)
+            let risk = prof.maxRiskPerTrade.trimmingCharacters(in: .whitespaces)
+            let leaks = prof.knownPsychologicalLeaks.trimmingCharacters(in: .whitespaces)
+            let notes = prof.customMemoryNotes.trimmingCharacters(in: .whitespaces)
             
-            """
+            if isVi {
+                context += """
+                HỒ SƠ GIAO DỊCH & BỘ NHỚ CHIẾN THUẬT CỦA TRADER:
+                - Phong cách giao dịch: \(style.isEmpty ? "Chưa thiết lập" : style)
+                - Mục tiêu tài khoản: \(objective.isEmpty ? "Chưa thiết lập" : objective)
+                - Chiến thuật / Playbook áp dụng: \(playbooks.isEmpty ? "Hành động giá cơ bản & Quản trị rủi ro" : playbooks)
+                - Ngân sách rủi ro mỗi lệnh: \(risk.isEmpty ? "Chưa thiết lập" : risk)
+                - Lỗ hổng tâm lý nhận diện: \(leaks.isEmpty ? "Chưa thiết lập" : leaks)
+                - Ghi chú chiến thuật: \(notes.isEmpty ? "Chưa thiết lập" : notes)
+                
+                ⚠️ YÊU CẦU BẮT BUỘC VỀ CHIẾN THUẬT:
+                Đánh giá và tư vấn bám sát đúng chiến thuật "\(playbooks.isEmpty ? "Hành động giá & Quản trị rủi ro" : playbooks)". TUYỆT ĐỐI KHÔNG tự động gán ghép các thuật ngữ hay phương pháp ngoài hồ sơ (như Liquidity Sweeps, Order Blocks, SMC hay chỉ báo kỹ thuật khác) nếu Trader không yêu cầu.
+                
+                """
+            } else {
+                context += """
+                TRADER PROFILE & STRATEGY MEMORY:
+                - Trading Style: \(style.isEmpty ? "Not set" : style)
+                - Goal / Prop Firm: \(objective.isEmpty ? "Not set" : objective)
+                - Setups & Playbooks: \(playbooks.isEmpty ? "Price Action & Risk Control" : playbooks)
+                - Risk Budget: \(risk.isEmpty ? "Not set" : risk)
+                - Known Leaks & Biases: \(leaks.isEmpty ? "Not set" : leaks)
+                - Personal Notes: \(notes.isEmpty ? "Not set" : notes)
+                
+                ⚠️ MANDATORY STRATEGY DIRECTIVE:
+                Critique strictly according to the trader's stated playbook "\(playbooks.isEmpty ? "Price Action & Risk Control" : playbooks)". DO NOT invent or assume unmentioned concepts (such as Liquidity Sweeps, Order Blocks, or SMC) unless explicitly specified in the profile.
+                
+                """
+            }
         }
         
         // 2. Performance Metrics (Strictly 2 Decimal Places)
@@ -768,7 +802,7 @@ public actor AIReflectionService {
             ? "CRITICAL DIRECTION DIRECTIVE: THIS IS A SHORT / SELL TRADE. Profit occurs strictly when the price DROPS (Current/Exit price < Entry price = Profit). Take Profit (TP) is BELOW Entry; Stop Loss (SL) is ABOVE Entry. NEVER evaluate this as a BUY trade."
             : "CRITICAL DIRECTION DIRECTIVE: THIS IS A LONG / BUY TRADE. Profit occurs strictly when the price RISES. Take Profit (TP) is ABOVE Entry; Stop Loss (SL) is BELOW Entry."
         
-        let candleInfo = recentCandlesSummary ?? (isVi ? "Không có dữ liệu nến ngoài" : "No external candle feed")
+        let candleInfo = recentCandlesSummary ?? (isVi ? "Không có dữ liệu nến ngoài (Đánh giá thuần túy theo Entry, Exit, SL, TP, P&L. Không bịa đặt mô hình nến)." : "No external candle feed (Ground critique purely on Entry, Exit, SL, TP, P&L. Do not fabricate chart patterns).")
         
         let prompt: String
         if isOpen {

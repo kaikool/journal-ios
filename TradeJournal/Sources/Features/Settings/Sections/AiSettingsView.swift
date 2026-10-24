@@ -151,7 +151,7 @@ public struct AiSettingsView: View {
                         Text("Primary Playbooks & Setups")
                             .font(AppTypography.captionBold)
                             .foregroundColor(AppColors.secondaryText)
-                        TextField("e.g. Liquidity Sweeps, Order Blocks, London Breakouts", text: $primaryPlaybooks)
+                        TextField("e.g. Breakout, RSI Pullback, Trend Following, Support & Resistance", text: $primaryPlaybooks)
                             .font(AppTypography.inputText)
                             .textFieldStyle(.roundedBorder)
                     }

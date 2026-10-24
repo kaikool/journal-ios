@@ -431,10 +431,24 @@ public struct TradeAICoachSheet: View {
                 let maxH = highs.max() ?? 0
                 let minL = lows.min() ?? 0
                 let lastClose = NSDecimalNumber(decimal: res.bars.last?.close ?? 0).doubleValue
-                candleSummary = "Sampled \(count) x 15m bars (\(res.provider)). High: \(String(format: "%.4f", maxH)) | Low: \(String(format: "%.4f", minL)) | Last Close: \(String(format: "%.4f", lastClose))"
+                
+                // Format the last 12 bars into a concise OHLC progression stream
+                let sampleSlice = res.bars.suffix(12)
+                let timeFormatter = DateFormatter()
+                timeFormatter.dateFormat = "HH:mm"
+                let barFlow = sampleSlice.map { b in
+                    let t = timeFormatter.string(from: b.time)
+                    let o = String(format: "%.2f", NSDecimalNumber(decimal: b.open).doubleValue)
+                    let h = String(format: "%.2f", NSDecimalNumber(decimal: b.high).doubleValue)
+                    let l = String(format: "%.2f", NSDecimalNumber(decimal: b.low).doubleValue)
+                    let c = String(format: "%.2f", NSDecimalNumber(decimal: b.close).doubleValue)
+                    return "[\(t)] O:\(o) H:\(h) L:\(l) C:\(c)"
+                }.joined(separator: " -> ")
+                
+                candleSummary = "\(count) x 15m bars (\(res.provider)). High: \(String(format: "%.2f", maxH)) | Low: \(String(format: "%.2f", minL)) | Last Close: \(String(format: "%.2f", lastClose)). Flow: \(barFlow)"
             }
         } catch {
-            candleSummary = "Real-time feed unavailable (\(error.localizedDescription)). Utilizing execution timestamps and price action span."
+            candleSummary = "Feed unavailable / Not connected. Ground all critique purely on recorded Entry, Exit, SL, TP, duration and P&L. Do not guess or invent chart patterns."
         }
         
         // 2. Request AI Trade Coaching

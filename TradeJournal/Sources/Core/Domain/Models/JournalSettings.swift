@@ -140,8 +140,8 @@ public struct TraderProfileConfig: Codable, Equatable, Sendable {
     
     public static let `default` = TraderProfileConfig(
         tradingStyle: "Day Trader / Intraday Scalper",
-        accountObjective: "The5ers / Prop Firm High Stakes Evaluation & Sustainable Compounding",
-        primaryPlaybooks: "Liquidity Sweeps, Order Blocks, Market Structure Breaks, Fair Value Gaps",
+        accountObjective: "Sustainable Compounding & Capital Preservation",
+        primaryPlaybooks: "Price Action, Trend Following, Support & Resistance",
         maxRiskPerTrade: "0.5% - 1.0% per trade (Strict Stop Loss)",
         knownPsychologicalLeaks: "Moving Stop Loss, Premature Profit Taking, FOMO re-entry after taking a loss",
         customMemoryNotes: "Focus on risk-to-reward ratio >= 2:1. Protect capital during consolidation. Never revenge trade."
@@ -244,7 +244,10 @@ public struct AiSettingsConfig: Codable, Equatable, Sendable {
         let cEndpoint = try container.decodeIfPresent(String.self, forKey: .customEndpoint) ?? ""
         let cKey = try container.decodeIfPresent(String.self, forKey: .customKey) ?? ""
         let lang = try container.decodeIfPresent(String.self, forKey: .language) ?? "vi"
-        let profile = try container.decodeIfPresent(TraderProfileConfig.self, forKey: .traderProfile) ?? .default
+        var profile = try container.decodeIfPresent(TraderProfileConfig.self, forKey: .traderProfile) ?? .default
+        if profile.primaryPlaybooks == "Liquidity Sweeps, Order Blocks, Market Structure Breaks, Fair Value Gaps" {
+            profile.primaryPlaybooks = "Price Action, Trend Following, Support & Resistance"
+        }
         
         // Upgrade legacy default to working Groq / OpenRouter
         if grKey.isEmpty { grKey = Self.defaultGroqKey }
