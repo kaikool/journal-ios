@@ -1,5 +1,9 @@
 import Foundation
 
+#if canImport(UIKit)
+import UIKit
+#endif
+
 extension TradeDataStore {
     // MARK: - Local Persistence
     
@@ -32,29 +36,9 @@ extension TradeDataStore {
         let deletedPlaybookIds: [String]?
     }
     
-    public func saveToDisk(immediate: Bool = false) {
-        guard isLoaded else {
-            AppLogger.warning("Skipping saveToDisk because store is not yet loaded.")
-            return
-        }
-        
-        if immediate {
-            saveDebounceTask?.cancel()
-            saveDebounceTask = nil
-            performSaveToDisk(asyncWrite: false)
-        } else {
-            saveDebounceTask?.cancel()
-            saveDebounceTask = Task { @MainActor [weak self] in
-                try? await Task.sleep(nanoseconds: 350_000_000)
-                guard !Task.isCancelled, let self = self else { return }
-                self.performSaveToDisk(asyncWrite: true)
-            }
-        }
-    }
-    
-    internal func performSaveToDisk(asyncWrite: Bool = false) {
-        guard isLoaded else { return }
-        let store = PersistedStore(
+    /// Snapshots in-memory state into an immutable value-type instantly on the main actor (< 1ms).
+    private func snapshotStore() -> PersistedStore {
+        PersistedStore(
             schemaVersion: 1,
             accounts: accounts,
             executions: executions,
@@ -82,14 +66,57 @@ extension TradeDataStore {
             aiSettings: aiSettings,
             deletedPlaybookIds: Array(deletedPlaybookIds)
         )
+    }
+    
+    /// High-performance asynchronous persistence.
+    /// NEVER blocks the main runloop with synchronous JSON serialization or disk writes.
+    public func saveToDisk(immediate: Bool = false) {
+        guard isLoaded else {
+            AppLogger.warning("Skipping saveToDisk because store is not yet loaded.")
+            return
+        }
+        
+        saveDebounceTask?.cancel()
+        saveDebounceTask = nil
+        
+        if immediate {
+            performSaveToDiskAsync(isBackgroundTrigger: false)
+        } else {
+            saveDebounceTask = Task { @MainActor [weak self] in
+                try? await Task.sleep(nanoseconds: 350_000_000)
+                guard !Task.isCancelled, let self = self else { return }
+                self.performSaveToDiskAsync(isBackgroundTrigger: false)
+            }
+        }
+    }
+    
+    /// Snapshots in-memory state and offloads JSON encoding and atomic disk I/O to a background thread.
+    /// Uses iOS background task protection when triggered during app suspension.
+    public func performSaveToDiskAsync(isBackgroundTrigger: Bool = false) {
+        guard isLoaded else { return }
+        let store = snapshotStore()
         let primaryUrl = persistenceUrl
         let backupUrl = backupPersistenceUrl
-        if asyncWrite {
-            Task.detached(priority: .utility) {
-                Self.writeStoreToDisk(store, primaryUrl: primaryUrl, backupUrl: backupUrl)
+        
+        #if os(iOS)
+        var backgroundTaskId = UIBackgroundTaskIdentifier.invalid
+        if isBackgroundTrigger || UIApplication.shared.applicationState == .background {
+            backgroundTaskId = UIApplication.shared.beginBackgroundTask(withName: "SaveTradeJournalStore") {
+                if backgroundTaskId != .invalid {
+                    UIApplication.shared.endBackgroundTask(backgroundTaskId)
+                    backgroundTaskId = .invalid
+                }
             }
-        } else {
+        }
+        #endif
+        
+        Task.detached(priority: .utility) {
             Self.writeStoreToDisk(store, primaryUrl: primaryUrl, backupUrl: backupUrl)
+            #if os(iOS)
+            if backgroundTaskId != .invalid {
+                UIApplication.shared.endBackgroundTask(backgroundTaskId)
+            }
+            #endif
         }
     }
     
@@ -165,7 +192,7 @@ extension TradeDataStore {
     }
     
     public func loadFromDisk() {
-        loadFromDiskSync()
+        loadFromDiskAsync()
     }
     
     public func loadFromDiskSync() {
