@@ -130,10 +130,11 @@ public struct MarketConnectionConfig: Codable, Equatable, Sendable {
 }
 
 // MARK: - 6. AI Provider Settings
-// Multi-provider AI reflection layer supporting free tier models (Google Gemini, Groq, OpenRouter) and BYOK (OpenAI, Anthropic)
+// Multi-provider AI reflection layer supporting GitHub Models, Google Gemini, Groq, OpenAI, and Custom endpoints
 public struct AiSettingsConfig: Codable, Equatable, Sendable {
-    public var provider: String // "gemini" | "groq" | "openrouter" | "openai" | "anthropic" | "custom"
+    public var provider: String // "github" | "gemini" | "groq" | "openrouter" | "openai" | "anthropic" | "custom"
     public var model: String
+    public var githubKey: String
     public var geminiKey: String
     public var groqKey: String
     public var openrouterKey: String
@@ -143,8 +144,9 @@ public struct AiSettingsConfig: Codable, Equatable, Sendable {
     public var customKey: String
     
     public static let `default` = AiSettingsConfig(
-        provider: "gemini",
-        model: "gemini-2.0-flash",
+        provider: "github",
+        model: "gpt-4o",
+        githubKey: "",
         geminiKey: "",
         groqKey: "",
         openrouterKey: "",
@@ -155,8 +157,9 @@ public struct AiSettingsConfig: Codable, Equatable, Sendable {
     )
     
     public init(
-        provider: String = "gemini",
-        model: String = "gemini-2.0-flash",
+        provider: String = "github",
+        model: String = "gpt-4o",
+        githubKey: String = "",
         geminiKey: String = "",
         groqKey: String = "",
         openrouterKey: String = "",
@@ -167,6 +170,7 @@ public struct AiSettingsConfig: Codable, Equatable, Sendable {
     ) {
         self.provider = provider
         self.model = model
+        self.githubKey = githubKey
         self.geminiKey = geminiKey
         self.groqKey = groqKey
         self.openrouterKey = openrouterKey
@@ -177,13 +181,14 @@ public struct AiSettingsConfig: Codable, Equatable, Sendable {
     }
     
     enum CodingKeys: String, CodingKey {
-        case provider, model, geminiKey, groqKey, openrouterKey, openaiKey, anthropicKey, customEndpoint, customKey, opencodeKey
+        case provider, model, githubKey, geminiKey, groqKey, openrouterKey, openaiKey, anthropicKey, customEndpoint, customKey, opencodeKey
     }
     
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        var prov = try container.decodeIfPresent(String.self, forKey: .provider) ?? "gemini"
-        var mdl = try container.decodeIfPresent(String.self, forKey: .model) ?? "gemini-2.0-flash"
+        var prov = try container.decodeIfPresent(String.self, forKey: .provider) ?? "github"
+        var mdl = try container.decodeIfPresent(String.self, forKey: .model) ?? "gpt-4o"
+        let ghKey = try container.decodeIfPresent(String.self, forKey: .githubKey) ?? ""
         let gKey = try container.decodeIfPresent(String.self, forKey: .geminiKey) ?? ""
         let grKey = try container.decodeIfPresent(String.self, forKey: .groqKey) ?? ""
         let orKey = try container.decodeIfPresent(String.self, forKey: .openrouterKey) ?? ""
@@ -192,14 +197,15 @@ public struct AiSettingsConfig: Codable, Equatable, Sendable {
         let cEndpoint = try container.decodeIfPresent(String.self, forKey: .customEndpoint) ?? ""
         let cKey = try container.decodeIfPresent(String.self, forKey: .customKey) ?? ""
         
-        // Upgrade legacy opencode or unconfigured default to Google Gemini free tier
+        // Upgrade legacy opencode or unconfigured default
         if prov == "opencode" || prov.isEmpty {
-            prov = "gemini"
-            mdl = "gemini-2.0-flash"
+            prov = "github"
+            mdl = "gpt-4o"
         }
         
         self.provider = prov
         self.model = mdl
+        self.githubKey = ghKey
         self.geminiKey = gKey
         self.groqKey = grKey
         self.openrouterKey = orKey
@@ -213,6 +219,7 @@ public struct AiSettingsConfig: Codable, Equatable, Sendable {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(provider, forKey: .provider)
         try container.encode(model, forKey: .model)
+        try container.encode(githubKey, forKey: .githubKey)
         try container.encode(geminiKey, forKey: .geminiKey)
         try container.encode(groqKey, forKey: .groqKey)
         try container.encode(openrouterKey, forKey: .openrouterKey)

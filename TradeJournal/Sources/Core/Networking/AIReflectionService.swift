@@ -15,6 +15,7 @@ public actor AIReflectionService {
     public static let shared = AIReflectionService()
     
     // Official API endpoints
+    public static let githubEndpoint = "https://models.github.ai/inference/chat/completions"
     public static let geminiEndpoint = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
     public static let groqEndpoint = "https://api.groq.com/openai/v1/chat/completions"
     public static let openRouterEndpoint = "https://openrouter.ai/api/v1/chat/completions"
@@ -48,6 +49,27 @@ public actor AIReflectionService {
         }
         
         switch config.provider {
+        case "github":
+            guard !config.githubKey.trimmingCharacters(in: .whitespaces).isEmpty else {
+                let local = generateLocalCoachReflection(action: action, metrics: metrics, edgeScore: edgeScore, prompt: prompt)
+                return "ℹ️ [GitHub Token Not Configured] Go to Settings > AI to enter your GitHub Personal Access Token (PAT).\n\n" + local
+            }
+            do {
+                return try await callOpenAiCompatible(
+                    endpoint: Self.githubEndpoint,
+                    apiKey: config.githubKey,
+                    model: config.model.isEmpty ? "gpt-4o" : config.model,
+                    action: action,
+                    prompt: prompt,
+                    metrics: metrics,
+                    edgeScore: edgeScore
+                )
+            } catch {
+                AppLogger.warning("GitHub Models request failed: \(error.localizedDescription). Falling back to local coach.")
+                let local = generateLocalCoachReflection(action: action, metrics: metrics, edgeScore: edgeScore, prompt: prompt)
+                return "⚠️ [GitHub AI Notice: \(error.localizedDescription)]\n\n" + local
+            }
+            
         case "gemini":
             guard !config.geminiKey.trimmingCharacters(in: .whitespaces).isEmpty else {
                 let local = generateLocalCoachReflection(action: action, metrics: metrics, edgeScore: edgeScore, prompt: prompt)
@@ -188,6 +210,20 @@ public actor AIReflectionService {
     /// Tests provider connectivity with a test prompt
     public func testConnection(config: AiSettingsConfig) async throws -> String {
         switch config.provider {
+        case "github":
+            guard !config.githubKey.trimmingCharacters(in: .whitespaces).isEmpty else {
+                throw NSError(domain: "GitHub", code: 400, userInfo: [NSLocalizedDescriptionKey: "Please enter your GitHub Personal Access Token (PAT)."])
+            }
+            return try await callOpenAiCompatible(
+                endpoint: Self.githubEndpoint,
+                apiKey: config.githubKey,
+                model: config.model.isEmpty ? "gpt-4o" : config.model,
+                action: .ask,
+                prompt: "Say 'GitHub connected successfully.' and state your model name in one short sentence.",
+                metrics: nil,
+                edgeScore: nil
+            )
+            
         case "gemini":
             guard !config.geminiKey.trimmingCharacters(in: .whitespaces).isEmpty else {
                 throw NSError(domain: "Gemini", code: 400, userInfo: [NSLocalizedDescriptionKey: "Please enter your Google Gemini API key from aistudio.google.com."])
@@ -314,6 +350,10 @@ public actor AIReflectionService {
             throw URLError(.badServerResponse)
         }
         
+        if httpResponse.statusCode == 410 {
+            throw NSError(domain: "AIInference", code: 410, userInfo: [NSLocalizedDescriptionKey: "GitHub Models preview was retired on July 30, 2026. For GitHub/Microsoft models, use Azure AI Foundry or a custom endpoint."])
+        }
+        
         if httpResponse.statusCode != 200 {
             let errorDetails = parseApiErrorMessage(from: data, statusCode: httpResponse.statusCode)
             throw NSError(domain: "AIInference", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: errorDetails])
@@ -329,8 +369,15 @@ public actor AIReflectionService {
             let choices: [Choice]
         }
         
-        let decoded = try JSONDecoder().decode(ChatCompletionResponse.self, from: data)
-        guard let text = decoded.choices.first?.message.content, !text.isEmpty else {
+        guard let decoded = try? JSONDecoder().decode(ChatCompletionResponse.self, from: data),
+              let text = decoded.choices.first?.message.content, !text.isEmpty else {
+            if let rawText = String(data: data, encoding: .utf8), !rawText.isEmpty {
+                let trimmed = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
+                if trimmed == "OK" {
+                    throw NSError(domain: "AIInference", code: 204, userInfo: [NSLocalizedDescriptionKey: "Endpoint returned text 'OK' instead of chat payload. Note: GitHub Models preview was retired on July 30, 2026. Please configure an Azure AI Foundry or custom proxy endpoint."])
+                }
+                throw NSError(domain: "AIInference", code: 204, userInfo: [NSLocalizedDescriptionKey: "Invalid response format: \(trimmed.prefix(120))"])
+            }
             throw NSError(domain: "AIInference", code: 204, userInfo: [NSLocalizedDescriptionKey: "Model returned an empty response."])
         }
         
