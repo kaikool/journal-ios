@@ -101,13 +101,13 @@ public actor AIReflectionService {
             } catch {
                 AppLogger.warning("GitHub Models request failed: \(error.localizedDescription). Falling back to local coach.")
                 let local = generateLocalCoachReflection(action: action, metrics: metrics, edgeScore: edgeScore, prompt: prompt)
-                return "⚠️ [GitHub AI Notice: \(error.localizedDescription)]\n\n" + local
+                return "⚠️ [AI Reflection Notice: \(error.localizedDescription)]\n\n" + local
             }
             
         case "gemini":
             guard !config.geminiKey.trimmingCharacters(in: .whitespaces).isEmpty else {
                 let local = generateLocalCoachReflection(action: action, metrics: metrics, edgeScore: edgeScore, prompt: prompt)
-                return "ℹ️ [Google Gemini Key Not Configured] Go to Settings > AI to enter your free API key from aistudio.google.com for live AI coaching.\n\n" + local
+                return "ℹ️ [AI Coach Not Configured] Enter your API key in Settings > AI.\n\n" + local
             }
             do {
                 return try await callOpenAiCompatible(
@@ -122,7 +122,7 @@ public actor AIReflectionService {
             } catch {
                 AppLogger.warning("Google Gemini request failed: \(error.localizedDescription). Falling back to local coach.")
                 let local = generateLocalCoachReflection(action: action, metrics: metrics, edgeScore: edgeScore, prompt: prompt)
-                return "⚠️ [Google Gemini Notice: \(error.localizedDescription)]\n\n" + local
+                return "⚠️ [AI Reflection Notice: \(error.localizedDescription)]\n\n" + local
             }
             
         case "groq":
@@ -179,7 +179,7 @@ public actor AIReflectionService {
                 
                 AppLogger.warning("Groq & failover failed. Falling back to local coach.")
                 let local = generateLocalCoachReflection(action: action, metrics: metrics, edgeScore: edgeScore, prompt: prompt)
-                return "⚠️ [Groq Notice: \(error.localizedDescription)]\n\n" + local
+                return "⚠️ [AI Reflection Notice: \(error.localizedDescription)]\n\n" + local
             }
             
         case "openrouter":
@@ -198,13 +198,13 @@ public actor AIReflectionService {
             } catch {
                 AppLogger.warning("OpenRouter request failed: \(error.localizedDescription). Falling back to local coach.")
                 let local = generateLocalCoachReflection(action: action, metrics: metrics, edgeScore: edgeScore, prompt: prompt)
-                return "⚠️ [OpenRouter Notice: \(error.localizedDescription)]\n\n" + local
+                return "⚠️ [AI Reflection Notice: \(error.localizedDescription)]\n\n" + local
             }
             
         case "openai":
             guard !config.openaiKey.trimmingCharacters(in: .whitespaces).isEmpty else {
                 let local = generateLocalCoachReflection(action: action, metrics: metrics, edgeScore: edgeScore, prompt: prompt)
-                return "ℹ️ [OpenAI Key Not Configured] Enter your API key in Settings > AI.\n\n" + local
+                return "ℹ️ [AI Coach Not Configured] Enter your API key in Settings > AI.\n\n" + local
             }
             do {
                 return try await callOpenAiCompatible(
@@ -218,13 +218,13 @@ public actor AIReflectionService {
                 )
             } catch {
                 let local = generateLocalCoachReflection(action: action, metrics: metrics, edgeScore: edgeScore, prompt: prompt)
-                return "⚠️ [OpenAI Error: \(error.localizedDescription)]\n\n" + local
+                return "⚠️ [AI Reflection Notice: \(error.localizedDescription)]\n\n" + local
             }
             
         case "anthropic":
             guard !config.anthropicKey.trimmingCharacters(in: .whitespaces).isEmpty else {
                 let local = generateLocalCoachReflection(action: action, metrics: metrics, edgeScore: edgeScore, prompt: prompt)
-                return "ℹ️ [Anthropic Key Not Configured] Enter your API key in Settings > AI.\n\n" + local
+                return "ℹ️ [AI Coach Not Configured] Enter your API key in Settings > AI.\n\n" + local
             }
             do {
                 return try await callAnthropic(
@@ -237,13 +237,13 @@ public actor AIReflectionService {
                 )
             } catch {
                 let local = generateLocalCoachReflection(action: action, metrics: metrics, edgeScore: edgeScore, prompt: prompt)
-                return "⚠️ [Anthropic Error: \(error.localizedDescription)]\n\n" + local
+                return "⚠️ [AI Reflection Notice: \(error.localizedDescription)]\n\n" + local
             }
             
         case "custom":
             guard !config.customEndpoint.trimmingCharacters(in: .whitespaces).isEmpty else {
                 let local = generateLocalCoachReflection(action: action, metrics: metrics, edgeScore: edgeScore, prompt: prompt)
-                return "ℹ️ [Custom Endpoint Not Configured] Enter your custom API URL in Settings > AI.\n\n" + local
+                return "ℹ️ [AI Coach Not Configured] Enter your endpoint URL in Settings > AI.\n\n" + local
             }
             do {
                 return try await callOpenAiCompatible(

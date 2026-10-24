@@ -31,10 +31,6 @@ public struct AIReflectionView: View {
         return AIReflectionTemplates.all.filter { $0.category == selectedCategory }
     }
     
-    private var languageName: String {
-        dataStore.aiSettings.language == "vi" ? "Vietnamese" : "English"
-    }
-    
     public var body: some View {
         NavigationStack {
             ScrollView {
@@ -42,18 +38,15 @@ public struct AIReflectionView: View {
                     
                     // 1. Header Information Card
                     AppCard {
-                        VStack(alignment: .leading, spacing: 8) {
+                        VStack(alignment: .leading, spacing: 6) {
                             HStack {
                                 Image(systemName: "sparkles")
                                     .foregroundColor(AppColors.brand)
                                 Text("AI Trader Reflection")
                                     .font(AppTypography.headline)
                                 Spacer()
-                                Text("\(dataStore.aiSettings.provider.uppercased()) • \(languageName)")
-                                    .font(AppTypography.caption)
-                                    .foregroundColor(AppColors.secondaryText)
                             }
-                            Text("Objective, data-grounded performance coaching tailored to your trading journal. Response delivered in \(languageName).")
+                            Text("Objective, data-grounded performance coaching tailored to your trading journal.")
                                 .font(AppTypography.caption)
                                 .foregroundColor(AppColors.secondaryText)
                         }
