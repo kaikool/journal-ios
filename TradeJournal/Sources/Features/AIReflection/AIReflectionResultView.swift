@@ -37,11 +37,11 @@ public struct AIReflectionResultView: View {
             // Unified Clean Document Card
             AppCard {
                 VStack(alignment: .leading, spacing: 14) {
-                    // Document Header
+                    // Document Header with Live AI Verification Badge
                     HStack {
                         HStack(spacing: 6) {
                             Image(systemName: template?.icon ?? "sparkles")
-                                .foregroundColor(AppColors.brand)
+                                .foregroundColor(AppColors.primaryText)
                                 .font(.system(size: 14, weight: .semibold))
                             Text(template?.title ?? "AI Performance Reflection")
                                 .font(AppTypography.headline)
@@ -50,9 +50,18 @@ public struct AIReflectionResultView: View {
                         
                         Spacer()
                         
-                        Text(JournalIds.todayDateString())
-                            .font(.system(size: 11, weight: .medium, design: .monospaced))
-                            .foregroundColor(AppColors.secondaryText)
+                        HStack(spacing: 5) {
+                            Circle()
+                                .fill(AppColors.profit)
+                                .frame(width: 6, height: 6)
+                            Text("LIVE AI")
+                                .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                .foregroundColor(AppColors.secondaryText)
+                        }
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 3)
+                        .background(AppColors.secondaryBackground)
+                        .cornerRadius(6)
                     }
                     
                     Divider()
@@ -69,23 +78,24 @@ public struct AIReflectionResultView: View {
                 .padding(.vertical, 4)
             }
             
-            // Bottom Action Bar
-            HStack(spacing: 10) {
+            // Bottom Action Bar - Compact, Tidy, Minimalist
+            HStack(spacing: 8) {
                 // Save to Notebook
                 Button(action: saveToNotebook) {
                     HStack(spacing: 6) {
-                        Image(systemName: isSavedToNotebook ? "checkmark.circle.fill" : "bookmark.fill")
-                        Text(isSavedToNotebook ? "Saved to Notebook" : "Save to Notebook")
-                            .font(AppTypography.captionBold)
+                        Image(systemName: isSavedToNotebook ? "checkmark" : "bookmark")
+                            .font(.system(size: 12, weight: .semibold))
+                        Text(isSavedToNotebook ? "Saved" : "Save to Notebook")
+                            .font(.system(size: 12, weight: .medium))
                     }
-                    .foregroundColor(isSavedToNotebook ? AppColors.profit : AppColors.brand)
+                    .foregroundColor(isSavedToNotebook ? AppColors.profit : AppColors.primaryText)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 11)
-                    .background(isSavedToNotebook ? AppColors.profit.opacity(0.12) : AppColors.brand.opacity(0.12))
-                    .cornerRadius(10)
+                    .frame(height: 36)
+                    .background(AppColors.secondaryBackground)
+                    .cornerRadius(8)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 10)
-                            .stroke(isSavedToNotebook ? AppColors.profit.opacity(0.3) : AppColors.brand.opacity(0.3), lineWidth: 0.8)
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(AppColors.border.opacity(0.7), lineWidth: 0.8)
                     )
                 }
                 .disabled(isSavedToNotebook)
@@ -94,14 +104,19 @@ public struct AIReflectionResultView: View {
                 Button(action: copyToClipboard) {
                     HStack(spacing: 5) {
                         Image(systemName: showCopiedAlert ? "checkmark" : "doc.on.doc")
+                            .font(.system(size: 11, weight: .semibold))
                         Text(showCopiedAlert ? "Copied" : "Copy")
-                            .font(AppTypography.captionBold)
+                            .font(.system(size: 12, weight: .medium))
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 11)
-                    .background(AppColors.secondaryBackground)
                     .foregroundColor(AppColors.primaryText)
-                    .cornerRadius(10)
+                    .padding(.horizontal, 14)
+                    .frame(height: 36)
+                    .background(AppColors.secondaryBackground)
+                    .cornerRadius(8)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(AppColors.border.opacity(0.7), lineWidth: 0.8)
+                    )
                 }
                 
                 // Regenerate
@@ -110,20 +125,23 @@ public struct AIReflectionResultView: View {
                     onRegenerate()
                 }) {
                     Image(systemName: "arrow.clockwise")
-                        .font(AppTypography.captionBold)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 11)
-                        .background(AppColors.secondaryBackground)
+                        .font(.system(size: 12, weight: .semibold))
                         .foregroundColor(AppColors.primaryText)
-                        .cornerRadius(10)
+                        .frame(width: 36, height: 36)
+                        .background(AppColors.secondaryBackground)
+                        .cornerRadius(8)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(AppColors.border.opacity(0.7), lineWidth: 0.8)
+                        )
                 }
             }
             
             if isSavedToNotebook && !savedNoteTitle.isEmpty {
                 HStack(spacing: 4) {
-                    Image(systemName: "folder.badge.gearshape")
-                        .font(.caption2)
-                    Text("Saved to Notebook in 'AI Reflections'")
+                    Image(systemName: "folder")
+                        .font(.system(size: 11))
+                    Text("Saved to Notebook under 'AI Reflections'")
                         .font(AppTypography.caption)
                 }
                 .foregroundColor(AppColors.secondaryText)
@@ -137,8 +155,8 @@ public struct AIReflectionResultView: View {
         switch block.kind {
         case .header:
             Text(LocalizedStringKey(block.content))
-                .font(.system(size: 15, weight: .bold, design: .rounded))
-                .foregroundColor(AppColors.brand)
+                .font(.system(size: 14, weight: .bold, design: .rounded))
+                .foregroundColor(AppColors.primaryText)
                 .padding(.top, 4)
             
         case .quote:
@@ -156,14 +174,28 @@ public struct AIReflectionResultView: View {
             }
             .padding(10)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(AppColors.brand.opacity(0.06))
+            .background(AppColors.secondaryBackground.opacity(0.6))
             .cornerRadius(8)
+            
+        case .numbered(let num):
+            HStack(alignment: .top, spacing: 6) {
+                Text("\(num).")
+                    .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                    .foregroundColor(AppColors.secondaryText)
+                    .frame(width: 20, alignment: .leading)
+                
+                Text(LocalizedStringKey(block.content))
+                    .font(AppTypography.body)
+                    .foregroundColor(AppColors.primaryText)
+                    .lineSpacing(3)
+            }
+            .padding(.leading, 2)
             
         case .bullet:
             HStack(alignment: .top, spacing: 8) {
                 Text("•")
                     .font(.system(size: 14, weight: .bold))
-                    .foregroundColor(AppColors.brand)
+                    .foregroundColor(AppColors.secondaryText)
                     .padding(.top, 1)
                 
                 Text(LocalizedStringKey(block.content))
@@ -184,9 +216,16 @@ public struct AIReflectionResultView: View {
     // MARK: - Document Block Structure & Parser
     private struct DocumentBlock: Identifiable {
         let id = UUID()
-        enum Kind { case header, quote, bullet, paragraph }
+        enum Kind { case header, quote, numbered(Int), bullet, paragraph }
         let kind: Kind
         let content: String
+    }
+    
+    private func sanitizeMarkdown(_ str: String) -> String {
+        var s = str.replacingOccurrences(of: "* *", with: "*")
+        s = s.replacingOccurrences(of: "• •", with: "•")
+        s = s.replacingOccurrences(of: "- -", with: "-")
+        return s
     }
     
     private func parseDocumentBlocks(_ text: String) -> [DocumentBlock] {
@@ -197,7 +236,7 @@ public struct AIReflectionResultView: View {
         func flushParagraph() {
             if !paragraphBuffer.isEmpty {
                 let joined = paragraphBuffer.joined(separator: " ")
-                blocks.append(DocumentBlock(kind: .paragraph, content: joined))
+                blocks.append(DocumentBlock(kind: .paragraph, content: sanitizeMarkdown(joined)))
                 paragraphBuffer = []
             }
         }
@@ -214,14 +253,26 @@ public struct AIReflectionResultView: View {
                 let clean = trimmed.replacingOccurrences(of: "### ", with: "")
                     .replacingOccurrences(of: "## ", with: "")
                     .replacingOccurrences(of: "# ", with: "")
-                blocks.append(DocumentBlock(kind: .header, content: clean))
+                blocks.append(DocumentBlock(kind: .header, content: sanitizeMarkdown(clean)))
             } else if trimmed.hasPrefix("> ") {
                 flushParagraph()
                 let clean = trimmed.replacingOccurrences(of: "> ", with: "")
-                blocks.append(DocumentBlock(kind: .quote, content: clean))
+                blocks.append(DocumentBlock(kind: .quote, content: sanitizeMarkdown(clean)))
+            } else if let match = trimmed.range(of: #"^\d+[\.\)]\s+"#, options: .regularExpression) {
+                flushParagraph()
+                let prefix = String(trimmed[match])
+                let digits = prefix.filter { $0.isNumber }
+                let num = Int(digits) ?? 1
+                var clean = String(trimmed[match.upperBound...]).trimmingCharacters(in: .whitespaces)
+                clean = sanitizeMarkdown(clean)
+                blocks.append(DocumentBlock(kind: .numbered(num), content: clean))
             } else if trimmed.hasPrefix("• ") || trimmed.hasPrefix("- ") || trimmed.hasPrefix("* ") {
                 flushParagraph()
-                let clean = String(trimmed.dropFirst(2))
+                var clean = String(trimmed.dropFirst(2)).trimmingCharacters(in: .whitespaces)
+                while clean.hasPrefix("* ") || clean.hasPrefix("• ") || clean.hasPrefix("- ") {
+                    clean = String(clean.dropFirst(2)).trimmingCharacters(in: .whitespaces)
+                }
+                clean = sanitizeMarkdown(clean)
                 blocks.append(DocumentBlock(kind: .bullet, content: clean))
             } else {
                 paragraphBuffer.append(trimmed)
@@ -229,7 +280,7 @@ public struct AIReflectionResultView: View {
         }
         flushParagraph()
         
-        return blocks.isEmpty ? [DocumentBlock(kind: .paragraph, content: text)] : blocks
+        return blocks.isEmpty ? [DocumentBlock(kind: .paragraph, content: sanitizeMarkdown(text))] : blocks
     }
     
     // MARK: - Actions

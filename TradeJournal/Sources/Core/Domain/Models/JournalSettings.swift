@@ -129,6 +129,41 @@ public struct MarketConnectionConfig: Codable, Equatable, Sendable {
     }
 }
 
+// MARK: - Trader Profile & AI Memory Configuration
+public struct TraderProfileConfig: Codable, Equatable, Sendable {
+    public var tradingStyle: String
+    public var accountObjective: String
+    public var primaryPlaybooks: String
+    public var maxRiskPerTrade: String
+    public var knownPsychologicalLeaks: String
+    public var customMemoryNotes: String
+    
+    public static let `default` = TraderProfileConfig(
+        tradingStyle: "Day Trader / Intraday Scalper",
+        accountObjective: "The5ers / Prop Firm High Stakes Evaluation & Sustainable Compounding",
+        primaryPlaybooks: "Liquidity Sweeps, Order Blocks, Market Structure Breaks, Fair Value Gaps",
+        maxRiskPerTrade: "0.5% - 1.0% per trade (Strict Stop Loss)",
+        knownPsychologicalLeaks: "Moving Stop Loss, Premature Profit Taking, FOMO re-entry after taking a loss",
+        customMemoryNotes: "Focus on risk-to-reward ratio >= 2:1. Protect capital during consolidation. Never revenge trade."
+    )
+    
+    public init(
+        tradingStyle: String = "Day Trader / Intraday Scalper",
+        accountObjective: String = "The5ers / Prop Firm High Stakes Evaluation & Sustainable Compounding",
+        primaryPlaybooks: String = "Liquidity Sweeps, Order Blocks, Market Structure Breaks, Fair Value Gaps",
+        maxRiskPerTrade: String = "0.5% - 1.0% per trade (Strict Stop Loss)",
+        knownPsychologicalLeaks: String = "Moving Stop Loss, Premature Profit Taking, FOMO re-entry after taking a loss",
+        customMemoryNotes: String = "Focus on risk-to-reward ratio >= 2:1. Protect capital during consolidation. Never revenge trade."
+    ) {
+        self.tradingStyle = tradingStyle
+        self.accountObjective = accountObjective
+        self.primaryPlaybooks = primaryPlaybooks
+        self.maxRiskPerTrade = maxRiskPerTrade
+        self.knownPsychologicalLeaks = knownPsychologicalLeaks
+        self.customMemoryNotes = customMemoryNotes
+    }
+}
+
 // MARK: - 6. AI Provider Settings
 // Multi-provider AI reflection layer supporting Groq, OpenRouter, Google Gemini, and OpenAI
 public struct AiSettingsConfig: Codable, Equatable, Sendable {
@@ -147,6 +182,7 @@ public struct AiSettingsConfig: Codable, Equatable, Sendable {
     public var customEndpoint: String
     public var customKey: String
     public var language: String // "vi" | "en"
+    public var traderProfile: TraderProfileConfig
     
     public static let `default` = AiSettingsConfig(
         provider: "groq",
@@ -159,7 +195,8 @@ public struct AiSettingsConfig: Codable, Equatable, Sendable {
         anthropicKey: "",
         customEndpoint: "",
         customKey: "",
-        language: "vi"
+        language: "vi",
+        traderProfile: .default
     )
     
     public init(
@@ -173,7 +210,8 @@ public struct AiSettingsConfig: Codable, Equatable, Sendable {
         anthropicKey: String = "",
         customEndpoint: String = "",
         customKey: String = "",
-        language: String = "vi"
+        language: String = "vi",
+        traderProfile: TraderProfileConfig = .default
     ) {
         self.provider = provider
         self.model = model
@@ -186,10 +224,11 @@ public struct AiSettingsConfig: Codable, Equatable, Sendable {
         self.customEndpoint = customEndpoint
         self.customKey = customKey
         self.language = language
+        self.traderProfile = traderProfile
     }
     
     enum CodingKeys: String, CodingKey {
-        case provider, model, githubKey, geminiKey, groqKey, openrouterKey, openaiKey, anthropicKey, customEndpoint, customKey, language, opencodeKey
+        case provider, model, githubKey, geminiKey, groqKey, openrouterKey, openaiKey, anthropicKey, customEndpoint, customKey, language, traderProfile, opencodeKey
     }
     
     public init(from decoder: Decoder) throws {
@@ -205,6 +244,7 @@ public struct AiSettingsConfig: Codable, Equatable, Sendable {
         let cEndpoint = try container.decodeIfPresent(String.self, forKey: .customEndpoint) ?? ""
         let cKey = try container.decodeIfPresent(String.self, forKey: .customKey) ?? ""
         let lang = try container.decodeIfPresent(String.self, forKey: .language) ?? "vi"
+        let profile = try container.decodeIfPresent(TraderProfileConfig.self, forKey: .traderProfile) ?? .default
         
         // Upgrade legacy default to working Groq / OpenRouter
         if grKey.isEmpty { grKey = Self.defaultGroqKey }
@@ -232,6 +272,7 @@ public struct AiSettingsConfig: Codable, Equatable, Sendable {
         self.customEndpoint = cEndpoint
         self.customKey = cKey
         self.language = lang
+        self.traderProfile = profile
     }
     
     public func encode(to encoder: Encoder) throws {
@@ -247,5 +288,6 @@ public struct AiSettingsConfig: Codable, Equatable, Sendable {
         try container.encode(customEndpoint, forKey: .customEndpoint)
         try container.encode(customKey, forKey: .customKey)
         try container.encode(language, forKey: .language)
+        try container.encode(traderProfile, forKey: .traderProfile)
     }
 }

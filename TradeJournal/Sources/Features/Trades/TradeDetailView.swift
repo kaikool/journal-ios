@@ -12,6 +12,7 @@ public struct TradeDetailView: View {
     @State var trade: Trade
     @State private var showReplayView: Bool = false
     @State private var showEditTradeSheet: Bool = false
+    @State private var showAICoachSheet: Bool = false
     @State private var showDeleteAlert: Bool = false
     @State private var newTag: String = ""
     @State private var newMistake: String = ""
@@ -228,20 +229,26 @@ public struct TradeDetailView: View {
                 showFilters: false,
                 onBack: { dismiss() },
                 isModal: isModal
-            ) {
-                AppActionPill("Edit", icon: "pencil") {
-                    showEditTradeSheet = true
-                }
-                AppActionPill("Replay", icon: "play.fill") {
-                    showReplayView = true
-                }
-            }
+            )
         }
         .background(AppColors.background)
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
         .interactiveEdgeBack(onBack: isModal ? nil : { dismiss() })
         .enableNativePopGesture()
+        .sheet(isPresented: $showAICoachSheet) {
+            TradeAICoachSheet(trade: trade) { updated in
+                self.trade = updated
+                let cleanNote: String = {
+                    guard let notes = updated.notes else { return "" }
+                    if notes.hasPrefix("Position synced from") { return "" }
+                    return notes
+                }()
+                self.noteContent = cleanNote
+            }
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+        }
         .sheet(isPresented: $showReplayView) {
             TradeReplayView(trade: trade, executions: fills, isModal: true)
                 .presentationDetents([.large])
@@ -791,43 +798,97 @@ public struct TradeDetailView: View {
         }
     }
     
-    // MARK: - 7. Bottom Actions (Replay & Delete)
+    // MARK: - 7. Bottom Actions (AI Coach, Replay, Edit & Delete)
     private var bottomActionsSection: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 8) {
+            // Row 1: AI Trade Coach
             Button {
-                showReplayView = true
+                #if canImport(UIKit)
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                #endif
+                showAICoachSheet = true
             } label: {
                 HStack(spacing: 6) {
-                    Image(systemName: "play.fill")
-                        .font(.system(size: 12))
-                    Text("Launch Interactive Replay")
-                        .font(AppTypography.subheadlineBold)
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 13, weight: .semibold))
+                    Text(trade.status == .open || trade.closedAt == nil ? "AI Trade Coach • Live Advisory" : "AI Trade Coach • Post-Mortem")
+                        .font(.system(size: 13, weight: .semibold))
                 }
+                .foregroundColor(AppColors.primaryText)
                 .frame(maxWidth: .infinity)
-                .frame(height: 44)
-                .background(AppColors.brand)
-                .foregroundColor(.white)
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .frame(height: 38)
+                .background(AppColors.secondaryBackground)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(AppColors.border.opacity(0.8), lineWidth: 0.8)
+                )
             }
             .buttonStyle(ApplePressableButtonStyle())
             
+            // Row 2: Side-by-side Replay & Edit
+            HStack(spacing: 8) {
+                Button {
+                    showReplayView = true
+                } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: "play.fill")
+                            .font(.system(size: 11))
+                        Text("Replay")
+                            .font(.system(size: 12, weight: .medium))
+                    }
+                    .foregroundColor(AppColors.primaryText)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 36)
+                    .background(AppColors.secondaryBackground)
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
+                    )
+                }
+                .buttonStyle(ApplePressableButtonStyle())
+                
+                Button {
+                    showEditTradeSheet = true
+                } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: "pencil")
+                            .font(.system(size: 11))
+                        Text("Edit Trade")
+                            .font(.system(size: 12, weight: .medium))
+                    }
+                    .foregroundColor(AppColors.primaryText)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 36)
+                    .background(AppColors.secondaryBackground)
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
+                    )
+                }
+                .buttonStyle(ApplePressableButtonStyle())
+            }
+            
+            // Row 3: Delete Trade
             Button {
                 #if canImport(UIKit)
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 #endif
                 showDeleteAlert = true
             } label: {
-                HStack(spacing: 6) {
+                HStack(spacing: 5) {
                     Image(systemName: "trash")
-                        .font(.system(size: 12))
+                        .font(.system(size: 11))
                     Text("Delete Trade")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: 12, weight: .medium))
                 }
+                .foregroundColor(AppColors.loss.opacity(0.85))
                 .frame(maxWidth: .infinity)
-                .frame(height: 40)
-                .background(AppColors.loss.opacity(0.1))
-                .foregroundColor(AppColors.loss)
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .frame(height: 34)
+                .background(AppColors.loss.opacity(0.06))
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             }
             .buttonStyle(ApplePressableButtonStyle())
         }

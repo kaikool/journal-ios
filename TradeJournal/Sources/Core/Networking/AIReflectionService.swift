@@ -24,35 +24,31 @@ public actor AIReflectionService {
     private func getSystemPrompt(language: String) -> String {
         if language == "vi" {
             return """
-            Bạn là Trợ lý AI Huấn luyện viên Kỷ luật Giao dịch (Trading Discipline Coach) chuyên nghiệp.
-            NGUYÊN TẮC: Bạn chỉ phân tích dựa trên 100% dữ liệu thực tế được cung cấp; không bịa đặt thị trường hay đưa lời khuyên chung chung.
-            NGÔN NGỮ: Trả lời 100% bằng TIẾNG VIỆT, sử dụng thuật ngữ trading chuẩn xác (Stop Loss, Take Profit, Win Rate, Risk/Reward, Drawdown, Entry, Exit, FOMO, Revenge).
-            ĐỊNH DẠNG BẮT BUỘC (MARKDOWN THỊ GIÁC CHO MOBILE):
-            1. Sử dụng tiêu đề cấp 3 (###) kèm icon cho từng phân đoạn:
-               ### 📊 TỔNG QUAN HIỆU SUẤT
-               ### 💡 ĐIỂM SÁNG KỶ LUẬT
-               ### ⚠️ CẢNH BÁO RỦI RO & LỖ HỔNG
-               ### 🎯 QUY TẮC HÀNH ĐỘNG
-            2. Các con số và chỉ số then chốt PHẢI được in đậm trong các gạch đầu dòng (• **Tỷ lệ thắng:** 65.0% | **P&L:** +$350).
-            3. Luôn cô đọng 1 quy tắc kỷ luật quan trọng nhất vào khối trích dẫn:
-            > ⚠️ **Quy tắc vàng:** [Nội dung quy tắc cốt lõi]
-            4. Tuyệt đối KHÔNG viết một đoạn văn dài liên tục. Giữ câu văn súc tích, đanh thép, chuyên nghiệp.
+            Bạn là Trợ lý Huấn luyện viên Kỷ luật Giao dịch (Professional Trading Discipline & Risk Coach).
+            NGUYÊN TẮC CỐT LÕI:
+            1. PHÂN TÍCH CHUYÊN SÂU HÀNH VI & KỶ LUẬT: Đi sâu vào phản xạ tâm lý (FOMO, sợ thua, gồng lỗ, chốt non, trả thù thị trường), chiến thuật thực tế và bảo vệ vốn bền vững cho tài khoản/quỹ Prop Firm. Không bao giờ nhận xét chung chung, sáo rỗng.
+            2. QUY TẮC ĐỊNH DẠNG SỐ CHUẨN XÁC: Mọi con số tính toán (P&L, tỷ lệ %, drawdown, số lot, chi phí) BẮT BUỘC chỉ hiển thị TỐI ĐA 2 CHỮ SỐ THẬP PHÂN (ví dụ: +$350.25, 62.50%, 0.50 lots, drawdown 1.85%). Không bao giờ để số thập phân dài dòng. (Tỷ giá FX có thể giữ 4-5 số thập phân).
+            3. ĐỊNH DẠNG MARKDOWN GỌN GÀNG CHO MOBILE:
+               - Tiêu đề từng phần dùng ### kèm icon (ví dụ: ### 📊 ĐÁNH GIÁ THỰC CHIẾN)
+               - Gạch đầu dòng rõ ràng: dùng dấu • duy nhất, in đậm chỉ số then chốt (• **P&L:** +$350.00 | **Khối lượng:** 0.50 lots)
+               - Tuyệt đối KHÔNG sử dụng hai dấu hoa thị liền nhau như "* *" hoặc lặp lại dấu bullet.
+               - Trích dẫn 1 quy tắc kỷ luật hành động quan trọng nhất vào khối:
+               > ⚠️ **Quy tắc kỷ luật:** [1 hành động bất di bất dịch cho phiên tới]
+            4. Trả lời 100% bằng TIẾNG VIỆT, dùng các thuật ngữ trading chuẩn (Stop Loss, Take Profit, Win Rate, Risk/Reward, Drawdown, Entry, Exit).
             """
         } else {
             return """
-            You are an elite, disciplined Prop Trading Coach embedded into a trader's journal.
-            PRINCIPLES: Ground every statement 100% in the actual trade statistics provided. Never invent data or assume unstated market context.
-            LANGUAGE: Respond 100% in professional English.
-            MANDATORY MOBILE-FRIENDLY MARKDOWN FORMATTING:
-            1. Use level-3 headers (###) with appropriate emojis for structured sections:
-               ### 📊 PERFORMANCE OVERVIEW
-               ### 💡 DISCIPLINE STRENGTHS
-               ### ⚠️ RISK & BEHAVIORAL WARNINGS
-               ### 🎯 ACTIONABLE PROTOCOL
-            2. Present key figures in bold inside clean bullet points (• **Win Rate:** 65.0% | **Net P&L:** +$350).
-            3. Always highlight the single most important rule inside a quote block:
-            > ⚠️ **Core Rule:** [Single non-negotiable rule]
-            4. Never write continuous walls of unformatted text. Keep paragraphs punchy and actionable.
+            You are an elite Prop Firm Trading Discipline & Risk Management Coach.
+            CORE PRINCIPLES:
+            1. DEEP BEHAVIORAL & PSYCHOLOGICAL CRITIQUE: Analyze emotional reactions (FOMO, revenge trading, holding losers, premature profit taking), trade execution quality, and sustainable capital preservation. Never give generic, empty platitudes.
+            2. STRICT 2-DECIMAL PLACES RULE: All calculated figures (P&L, percentages, drawdown, volume lots, commissions) MUST be formatted to AT MOST 2 DECIMAL PLACES (e.g. +$350.25, 62.50%, 0.50 lots, -1.85% drawdown). Never output long raw decimals. (FX exchange rates may retain 4-5 decimals).
+            3. CLEAN MOBILE MARKDOWN FORMATTING:
+               - Section headers using ### with emojis (e.g. ### 📊 EXECUTION AUDIT)
+               - Clean bullet points using a single • with bold figures (• **Net P&L:** +$350.00 | **Size:** 0.50 lots)
+               - Never output doubled asterisks like "* *" or duplicate bullets.
+               - Highlight the single most critical discipline rule in a blockquote:
+               > ⚠️ **Core Discipline Rule:** [Single non-negotiable directive for the next session]
+            4. Respond 100% in professional English.
             """
         }
     }
@@ -82,6 +78,8 @@ public actor AIReflectionService {
         }
         let activeLang = config.language.isEmpty ? "vi" : config.language
         
+        let profile = config.traderProfile
+        
         switch config.provider {
         case "github":
             if !config.githubKey.trimmingCharacters(in: .whitespaces).isEmpty {
@@ -94,13 +92,14 @@ public actor AIReflectionService {
                         prompt: prompt,
                         metrics: metrics,
                         edgeScore: edgeScore,
-                        language: activeLang
+                        language: activeLang,
+                        traderProfile: profile
                     )
                 } catch {
                     AppLogger.warning("GitHub Models failed: \(error.localizedDescription). Falling back to default AI provider...")
                 }
             }
-            return try await callDefaultProvider(action: action, prompt: prompt, metrics: metrics, edgeScore: edgeScore, language: activeLang)
+            return try await callDefaultProvider(action: action, prompt: prompt, metrics: metrics, edgeScore: edgeScore, language: activeLang, traderProfile: profile)
             
         case "gemini":
             if !config.geminiKey.trimmingCharacters(in: .whitespaces).isEmpty {
@@ -113,13 +112,14 @@ public actor AIReflectionService {
                         prompt: prompt,
                         metrics: metrics,
                         edgeScore: edgeScore,
-                        language: activeLang
+                        language: activeLang,
+                        traderProfile: profile
                     )
                 } catch {
                     AppLogger.warning("Gemini failed: \(error.localizedDescription). Falling back to default AI provider...")
                 }
             }
-            return try await callDefaultProvider(action: action, prompt: prompt, metrics: metrics, edgeScore: edgeScore, language: activeLang)
+            return try await callDefaultProvider(action: action, prompt: prompt, metrics: metrics, edgeScore: edgeScore, language: activeLang, traderProfile: profile)
             
         case "groq":
             let activeKey = config.groqKey.trimmingCharacters(in: .whitespaces).isEmpty ? AiSettingsConfig.defaultGroqKey : config.groqKey.trimmingCharacters(in: .whitespaces)
@@ -133,11 +133,12 @@ public actor AIReflectionService {
                     prompt: prompt,
                     metrics: metrics,
                     edgeScore: edgeScore,
-                    language: activeLang
+                    language: activeLang,
+                    traderProfile: profile
                 )
             } catch {
                 AppLogger.warning("Groq request with model '\(requestedModel)' failed: \(error.localizedDescription). Retrying with active discovery and failover...")
-                return try await callDefaultProvider(action: action, prompt: prompt, metrics: metrics, edgeScore: edgeScore, language: activeLang)
+                return try await callDefaultProvider(action: action, prompt: prompt, metrics: metrics, edgeScore: edgeScore, language: activeLang, traderProfile: profile)
             }
             
         case "openrouter":
@@ -152,11 +153,12 @@ public actor AIReflectionService {
                     prompt: prompt,
                     metrics: metrics,
                     edgeScore: edgeScore,
-                    language: activeLang
+                    language: activeLang,
+                    traderProfile: profile
                 )
             } catch {
                 AppLogger.warning("OpenRouter request failed: \(error.localizedDescription). Falling back to default AI provider...")
-                return try await callDefaultProvider(action: action, prompt: prompt, metrics: metrics, edgeScore: edgeScore, language: activeLang)
+                return try await callDefaultProvider(action: action, prompt: prompt, metrics: metrics, edgeScore: edgeScore, language: activeLang, traderProfile: profile)
             }
             
         case "openai":
@@ -170,13 +172,14 @@ public actor AIReflectionService {
                         prompt: prompt,
                         metrics: metrics,
                         edgeScore: edgeScore,
-                        language: activeLang
+                        language: activeLang,
+                        traderProfile: profile
                     )
                 } catch {
                     AppLogger.warning("OpenAI failed: \(error.localizedDescription). Falling back to default AI provider...")
                 }
             }
-            return try await callDefaultProvider(action: action, prompt: prompt, metrics: metrics, edgeScore: edgeScore, language: activeLang)
+            return try await callDefaultProvider(action: action, prompt: prompt, metrics: metrics, edgeScore: edgeScore, language: activeLang, traderProfile: profile)
             
         case "anthropic":
             if !config.anthropicKey.trimmingCharacters(in: .whitespaces).isEmpty {
@@ -194,7 +197,7 @@ public actor AIReflectionService {
                     AppLogger.warning("Anthropic failed: \(error.localizedDescription). Falling back to default AI provider...")
                 }
             }
-            return try await callDefaultProvider(action: action, prompt: prompt, metrics: metrics, edgeScore: edgeScore, language: activeLang)
+            return try await callDefaultProvider(action: action, prompt: prompt, metrics: metrics, edgeScore: edgeScore, language: activeLang, traderProfile: profile)
             
         case "custom":
             if !config.customEndpoint.trimmingCharacters(in: .whitespaces).isEmpty {
@@ -207,16 +210,17 @@ public actor AIReflectionService {
                         prompt: prompt,
                         metrics: metrics,
                         edgeScore: edgeScore,
-                        language: activeLang
+                        language: activeLang,
+                        traderProfile: profile
                     )
                 } catch {
                     AppLogger.warning("Custom endpoint failed: \(error.localizedDescription). Falling back to default AI provider...")
                 }
             }
-            return try await callDefaultProvider(action: action, prompt: prompt, metrics: metrics, edgeScore: edgeScore, language: activeLang)
+            return try await callDefaultProvider(action: action, prompt: prompt, metrics: metrics, edgeScore: edgeScore, language: activeLang, traderProfile: profile)
             
         default:
-            return try await callDefaultProvider(action: action, prompt: prompt, metrics: metrics, edgeScore: edgeScore, language: activeLang)
+            return try await callDefaultProvider(action: action, prompt: prompt, metrics: metrics, edgeScore: edgeScore, language: activeLang, traderProfile: profile)
         }
     }
     
@@ -226,7 +230,8 @@ public actor AIReflectionService {
         prompt: String?,
         metrics: TradeMetrics?,
         edgeScore: Double?,
-        language: String
+        language: String,
+        traderProfile: TraderProfileConfig? = nil
     ) async throws -> String {
         // Attempt 1: Fast High-Quality Groq
         do {
@@ -238,7 +243,8 @@ public actor AIReflectionService {
                 prompt: prompt,
                 metrics: metrics,
                 edgeScore: edgeScore,
-                language: language
+                language: language,
+                traderProfile: traderProfile
             )
         } catch {
             AppLogger.warning("Default Groq attempt failed: \(error.localizedDescription). Attempting OpenRouter free tier...")
@@ -254,14 +260,18 @@ public actor AIReflectionService {
                 prompt: prompt,
                 metrics: metrics,
                 edgeScore: edgeScore,
-                language: language
+                language: language,
+                traderProfile: traderProfile
             )
         } catch {
-            AppLogger.warning("Default OpenRouter attempt failed: \(error.localizedDescription). Falling back to local heuristics.")
+            AppLogger.warning("Default OpenRouter attempt failed: \(error.localizedDescription).")
         }
         
-        // Final offline fallback: dynamic local coach
-        return generateLocalCoachReflection(action: action, metrics: metrics, edgeScore: edgeScore, prompt: prompt)
+        throw NSError(
+            domain: "AIReflectionService",
+            code: 503,
+            userInfo: [NSLocalizedDescriptionKey: "AI inference service is currently unreachable. Please check your internet connection or verify your API keys in Settings > AI Assistant."]
+        )
     }
     
     /// Tests provider connectivity with a test prompt
@@ -375,7 +385,8 @@ public actor AIReflectionService {
         prompt: String?,
         metrics: TradeMetrics?,
         edgeScore: Double?,
-        language: String = "vi"
+        language: String = "vi",
+        traderProfile: TraderProfileConfig? = nil
     ) async throws -> String {
         guard let url = URL(string: endpoint) else {
             throw URLError(.badURL)
@@ -392,7 +403,14 @@ public actor AIReflectionService {
         request.timeoutInterval = 45
         
         let activeSystemPrompt = getSystemPrompt(language: language)
-        let userContent = buildTraderContext(action: action, prompt: prompt, metrics: metrics, edgeScore: edgeScore, language: language)
+        let userContent = buildTraderContext(
+            action: action,
+            prompt: prompt,
+            metrics: metrics,
+            edgeScore: edgeScore,
+            language: language,
+            traderProfile: traderProfile
+        )
         let payload: [String: Any] = [
             "model": model,
             "messages": [
@@ -630,28 +648,55 @@ public actor AIReflectionService {
     
     // MARK: - Prompt & Error Builders
     
-    private func buildTraderContext(action: AIReflectionAction, prompt: String?, metrics: TradeMetrics?, edgeScore: Double?, language: String = "vi") -> String {
+    private func buildTraderContext(
+        action: AIReflectionAction,
+        prompt: String?,
+        metrics: TradeMetrics?,
+        edgeScore: Double?,
+        language: String = "vi",
+        traderProfile: TraderProfileConfig? = nil
+    ) -> String {
         let isVi = language == "vi"
         var context = ""
+        
+        // 1. Persistent Trader Context & Memory
+        if let prof = traderProfile {
+            context += """
+            TRADER PROFILE & STRATEGY MEMORY:
+            - Trading Style: \(prof.tradingStyle)
+            - Goal / Prop Firm: \(prof.accountObjective)
+            - Setups & Playbooks: \(prof.primaryPlaybooks)
+            - Risk Budget: \(prof.maxRiskPerTrade)
+            - Known Leaks & Biases: \(prof.knownPsychologicalLeaks)
+            - Personal Notes: \(prof.customMemoryNotes)
+            
+            """
+        }
+        
+        // 2. Performance Metrics (Strictly 2 Decimal Places)
         if let m = metrics {
-            let wr = (m.winRate ?? 0.0) * 100
+            let wr = String(format: "%.2f%%", (m.winRate ?? 0.0) * 100)
             let pf = m.profitFactor.map { String(format: "%.2f", $0) } ?? "N/A"
-            let score = edgeScore.map { "\(Int($0))" } ?? "N/A"
-            let dd = m.maxDrawdownPct.map { String(format: "%.1f%%", $0) } ?? "N/A"
+            let score = edgeScore.map { String(format: "%.2f", $0) } ?? "N/A"
+            let dd = m.maxDrawdownPct.map { String(format: "%.2f%%", $0) } ?? "N/A"
+            let netPnl = String(format: "%.2f", NSDecimalNumber(decimal: m.netPnl).doubleValue)
+            let largestWin = String(format: "%.2f", NSDecimalNumber(decimal: m.largestWin).doubleValue)
+            let largestLoss = String(format: "%.2f", NSDecimalNumber(decimal: m.largestLoss).doubleValue)
+            let fees = String(format: "%.2f", NSDecimalNumber(decimal: m.fees ?? Decimal.zero).doubleValue)
             
             if isVi {
                 context += """
                 DỮ LIỆU HIỆU SUẤT TRADER (TRADER PERFORMANCE CONTEXT):
                 - Tổng số lệnh đã đóng: \(m.totalTrades)
                 - Lệnh Thắng: \(m.wins) | Lệnh Thua: \(m.losses) | Hòa vốn: \(m.breakevens)
-                - Tỷ lệ thắng (Win Rate): \(String(format: "%.1f%%", wr))
+                - Tỷ lệ thắng (Win Rate): \(wr)
                 - Hệ số lợi nhuận (Profit Factor): \(pf)
-                - Lợi nhuận ròng tích lũy (Net P&L): \(m.netPnl >= 0 ? "+" : "")\(m.netPnl)
+                - Lợi nhuận ròng tích lũy (Net P&L): \(m.netPnl >= 0 ? "+" : "")$\(netPnl)
                 - Sụt giảm vốn tối đa (Max Drawdown): \(dd)
                 - Điểm lợi thế (Edge Score): \(score)/100
-                - Lệnh thắng lớn nhất: \(m.largestWin) | Lệnh thua lớn nhất: \(m.largestLoss)
+                - Lệnh thắng lớn nhất: +$\(largestWin) | Lệnh thua lớn nhất: -$\(largestLoss)
                 - Chuỗi thắng lớn nhất: \(m.maxWinStreak) | Chuỗi thua lớn nhất: \(m.maxLossStreak)
-                - Tổng chi phí/phí giao dịch: \(m.fees.map { "\($0)" } ?? "0")
+                - Tổng chi phí/phí giao dịch: $\(fees)
                 
                 """
             } else {
@@ -659,14 +704,14 @@ public actor AIReflectionService {
                 TRADER PERFORMANCE CONTEXT:
                 - Total Closed Trades: \(m.totalTrades)
                 - Wins: \(m.wins) | Losses: \(m.losses) | Breakeven: \(m.breakevens)
-                - Win Rate: \(String(format: "%.1f%%", wr))
+                - Win Rate: \(wr)
                 - Profit Factor: \(pf)
-                - Net Cumulative P&L: \(m.netPnl >= 0 ? "+" : "")\(m.netPnl)
+                - Net Cumulative P&L: \(m.netPnl >= 0 ? "+" : "")$\(netPnl)
                 - Max Drawdown: \(dd)
                 - Edge Score: \(score)/100
-                - Largest Win: \(m.largestWin) | Largest Loss: \(m.largestLoss)
+                - Largest Win: +$\(largestWin) | Largest Loss: -$\(largestLoss)
                 - Max Win Streak: \(m.maxWinStreak) | Max Loss Streak: \(m.maxLossStreak)
-                - Total Fees: \(m.fees.map { "\($0)" } ?? "0")
+                - Total Fees: $\(fees)
                 
                 """
             }
@@ -686,6 +731,99 @@ public actor AIReflectionService {
         case .ask:
             return isVi ? "\(context)CÂU HỎI CỦA TRADER: \"\(prompt ?? "")\"\nYÊU CẦU: Trả lời trực diện câu hỏi dựa trên các con số hiệu suất thực tế được cung cấp." : "\(context)USER QUESTION: \"\(prompt ?? "")\"\nTASK: Answer the trader's question directly using only the performance data provided. Cite the exact figures and give specific, actionable advice."
         }
+    }
+    
+    // MARK: - Dedicated Single Trade AI Coaching
+    public func requestTradeCoaching(
+        trade: Trade,
+        language: String? = nil,
+        recentCandlesSummary: String? = nil
+    ) async throws -> String {
+        let config = await MainActor.run { TradeDataStore.shared.aiSettings }
+        let activeLang = language ?? config.language
+        let isVi = activeLang == "vi"
+        
+        let isOpen = trade.status == .open || trade.closedAt == nil
+        let pnlVal = NSDecimalNumber(decimal: trade.netPnl).doubleValue
+        let pnlStr = (trade.netPnl >= 0 ? "+$" : "-$") + String(format: "%.2f", abs(pnlVal))
+        let volumeStr = String(format: "%.2f", NSDecimalNumber(decimal: trade.quantity).doubleValue)
+        let entryStr = Formatters.price(trade.avgEntry)
+        let exitStr = trade.avgExit.map { Formatters.price($0) } ?? (isOpen ? "Open / Market" : "N/A")
+        let slStr = trade.stopLoss.map { Formatters.price($0) } ?? (isVi ? "Chưa cài SL" : "Not Set")
+        let tpStr = trade.profitTarget.map { Formatters.price($0) } ?? (isVi ? "Chưa cài TP" : "Not Set")
+        let mistakes = trade.mistakes.isEmpty ? (isVi ? "Không ghi nhận" : "None") : trade.mistakes.joined(separator: ", ")
+        let notes = (trade.notes?.isEmpty ?? true) ? (isVi ? "Không có ghi chú" : "None") : trade.notes!
+        
+        let candleInfo = recentCandlesSummary ?? (isVi ? "Không có dữ liệu nến ngoài" : "No external candle feed")
+        
+        let prompt: String
+        if isOpen {
+            prompt = isVi ? """
+            LỆNH ĐANG MỞ CẦN TƯ VẤN (LIVE OPEN POSITION):
+            - Cặp tiền: \(trade.symbol) | Loại lệnh: \(trade.side.uppercased()) | Khối lượng: \(volumeStr) lots
+            - Giá vào: \(entryStr) | Giá hiện tại: \(exitStr)
+            - Lợi nhuận tạm tính: \(pnlStr)
+            - Cắt lỗ (SL): \(slStr) | Chốt lời (TP): \(tpStr)
+            - Ghi chú trader: \(notes)
+            - Tóm tắt nến 12h qua: \(candleInfo)
+            
+            NHIỆM VỤ TƯ VẤN LỆNH MỞ (LIVE POSITION ADVISORY):
+            1. Trạng thái vị thế & Cấu trúc thị trường: Đánh giá vị thế hiện tại dựa trên giá vào và kế hoạch.
+            2. Chiến lược Chốt lời (TP) & Dời SL: Tư vấn cụ thể nên chốt lời ở đâu, khi nào, có nên chốt non 1 phần hay dời SL về hòa vốn (Breakeven).
+            3. Quản trị rủi ro: Đưa ra lời khuyên bảo vệ vốn trước các biến động phiên tiếp theo.
+            """ : """
+            LIVE OPEN POSITION ADVISORY:
+            - Symbol: \(trade.symbol) | Direction: \(trade.side.uppercased()) | Volume: \(volumeStr) lots
+            - Entry Price: \(entryStr) | Current Price: \(exitStr)
+            - Unrealized P&L: \(pnlStr)
+            - Stop Loss: \(slStr) | Take Profit: \(tpStr)
+            - Trader Notes: \(notes)
+            - 12h Candlestick Context: \(candleInfo)
+            
+            TASK: OPEN TRADE MANAGEMENT & RISK PROTOCOL
+            1. Position Health & Market Structure: Evaluate open position relative to entry and targets.
+            2. Take Profit & Trailing Stop Strategy: Advise exactly where and when to take partial or full TP, and whether to trail SL to breakeven.
+            3. Risk Control & Preservation: Prescribe non-negotiable rules to avoid turning a winning trade into a loss.
+            """
+        } else {
+            prompt = isVi ? """
+            LỆNH ĐÃ ĐÓNG CẦN MỔ XẺ (COMPLETED TRADE AUDIT):
+            - Cặp tiền: \(trade.symbol) | Loại lệnh: \(trade.side.uppercased()) | Khối lượng: \(volumeStr) lots
+            - Giá vào: \(entryStr) -> Giá thoát: \(exitStr)
+            - Lợi nhuận thực tế: \(pnlStr)
+            - Kế hoạch SL: \(slStr) | Kế hoạch TP: \(tpStr)
+            - Lỗi ghi nhận: \(mistakes)
+            - Ghi chú trader: \(notes)
+            - Tóm tắt nến thị trường: \(candleInfo)
+            
+            NHIỆM VỤ MỔ XẺ LỆNH & BÀI HỌC KỶ LUẬT (POST-MORTEM & LESSONS):
+            1. Đánh giá Khớp lệnh vs Kế hoạch: Phân tích điểm vào và điểm ra (thoát non, gồng lỗ hay tuân thủ kế hoạch).
+            2. Thiên kiến tâm lý & Sai lầm: Chỉ rõ tâm lý chi phối trong lệnh này (FOMO, sợ thua, thiếu kiên nhẫn).
+            3. Bài học cốt lõi: Đưa ra 1 quy tắc hành động duy nhất để không lặp lại sai lầm trong các lệnh tương tự.
+            """ : """
+            COMPLETED TRADE POST-MORTEM & AUDIT:
+            - Symbol: \(trade.symbol) | Direction: \(trade.side.uppercased()) | Volume: \(volumeStr) lots
+            - Entry Price: \(entryStr) -> Exit Price: \(exitStr)
+            - Realized Net P&L: \(pnlStr)
+            - Planned SL: \(slStr) | Planned TP: \(tpStr)
+            - Logged Mistakes: \(mistakes)
+            - Trader Notes: \(notes)
+            - Candlestick Context: \(candleInfo)
+            
+            TASK: FORENSIC POST-MORTEM & ACTIONABLE LESSONS
+            1. Execution vs Plan: Evaluate entry timing and exit quality.
+            2. Psychological & Discipline Breakdown: Pinpoint the exact behavioral bias at play.
+            3. Non-Negotiable Rule: Formulate 1 core rule to avoid repeating this mistake on future setups.
+            """
+        }
+        
+        return try await requestReflection(
+            action: .critique,
+            prompt: prompt,
+            metrics: nil,
+            edgeScore: nil,
+            language: activeLang
+        )
     }
     
     private func parseApiErrorMessage(from data: Data, statusCode: Int) -> String {

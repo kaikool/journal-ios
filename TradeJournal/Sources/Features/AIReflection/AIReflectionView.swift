@@ -107,9 +107,10 @@ public struct AIReflectionView: View {
     
     private var scopeSummaryText: String {
         let count = metrics.totalTrades
-        let wr = String(format: "%.0f%%", (metrics.winRate ?? 0) * 100)
+        let wr = String(format: "%.2f%%", (metrics.winRate ?? 0) * 100)
         let pnl = metrics.netPnl
-        let pnlStr = (pnl >= 0 ? "+$" : "-$") + "\(abs(NSDecimalNumber(decimal: pnl).doubleValue))"
+        let pnlVal = NSDecimalNumber(decimal: pnl).doubleValue
+        let pnlStr = (pnl >= 0 ? "+$" : "-$") + String(format: "%.2f", abs(pnlVal))
         return "\(count) Trades Analyzed • WR: \(wr) • P&L: \(pnlStr)"
     }
     

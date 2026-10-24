@@ -125,6 +125,22 @@ public struct AIReflectionTemplates {
         )
     ]
     
+    // MARK: - Format Numbers (Strictly at most 2 Decimals)
+    private static func formatPnl(_ decimal: Decimal) -> String {
+        let val = NSDecimalNumber(decimal: decimal).doubleValue
+        return (decimal >= 0 ? "+$" : "-$") + String(format: "%.2f", abs(val))
+    }
+    
+    private static func format2Dec(_ decimal: Decimal) -> String {
+        let val = NSDecimalNumber(decimal: decimal).doubleValue
+        return String(format: "%.2f", val)
+    }
+    
+    private static func formatPrice(_ decimal: Decimal) -> String {
+        let val = NSDecimalNumber(decimal: decimal).doubleValue
+        return String(format: "%g", val)
+    }
+    
     // MARK: - Format Recent Trades for Rich Prompt Injection
     public static func buildRecentTradesSnippet(trades: [Trade], limit: Int = 10) -> String {
         let sorted = trades.filter { $0.closedAt != nil }.sorted { ($0.closedAt ?? Date.distantPast) > ($1.closedAt ?? Date.distantPast) }
@@ -136,7 +152,7 @@ public struct AIReflectionTemplates {
         f.dateFormat = "MM-dd HH:mm"
         
         for (idx, t) in slice.enumerated() {
-            let pnlStr = (t.netPnl >= 0 ? "+" : "") + "\(t.netPnl)"
+            let pnlStr = formatPnl(t.netPnl)
             let dateStr = t.closedAt.map { f.string(from: $0) } ?? "N/A"
             let durationStr: String
             if let ms = t.durationMs {
@@ -145,13 +161,15 @@ public struct AIReflectionTemplates {
             } else {
                 durationStr = "N/A"
             }
-            let exitStr = t.avgExit.map { "\($0)" } ?? "N/A"
-            let slStr = t.stopLoss.map { " | SL: \($0)" } ?? ""
-            let tpStr = t.profitTarget.map { " | TP: \($0)" } ?? ""
+            let exitStr = t.avgExit.map { formatPrice($0) } ?? "N/A"
+            let slStr = t.stopLoss.map { " | SL: \(formatPrice($0))" } ?? ""
+            let tpStr = t.profitTarget.map { " | TP: \(formatPrice($0))" } ?? ""
             let mistakesStr = t.mistakes.isEmpty ? "" : " | Mistakes: \(t.mistakes.joined(separator: ", "))"
             let notesStr = (t.notes?.isEmpty ?? true) ? "" : " | Note: \(t.notes!)"
+            let volStr = format2Dec(t.quantity)
+            let entryStr = formatPrice(t.avgEntry)
             
-            lines.append("Trade #\(idx + 1) [\(dateStr)] \(t.symbol) \(t.side) \(t.quantity) lots | In: \(t.avgEntry) -> Out: \(exitStr)\(slStr)\(tpStr) | P&L: \(pnlStr) (Hold: \(durationStr))\(mistakesStr)\(notesStr)")
+            lines.append("Trade #\(idx + 1) [\(dateStr)] \(t.symbol) \(t.side) \(volStr) lots | In: \(entryStr) -> Out: \(exitStr)\(slStr)\(tpStr) | P&L: \(pnlStr) (Hold: \(durationStr))\(mistakesStr)\(notesStr)")
         }
         return lines.joined(separator: "\n")
     }
@@ -202,7 +220,7 @@ public struct AIReflectionTemplates {
             return """
             TRADING SESSION ANALYZED: \(sessionLabel)
             - Total Closed Trades in Session: \(count) (Wins: \(wins) | Losses: \(losses))
-            - Net Session P&L: \(pnl >= 0 ? "+" : "")\(pnl)
+            - Net Session P&L: \(formatPnl(pnl))
             
             SESSION TRADES BREAKDOWN:
             \(tradeDetails)
@@ -220,9 +238,9 @@ public struct AIReflectionTemplates {
             let pnl = lastTrade?.netPnl ?? Decimal.zero
             let side = lastTrade?.side.uppercased() ?? "N/A"
             let entry = lastTrade?.entryPrice ?? Decimal.zero
-            let exit = lastTrade?.avgExit.map { "\($0)" } ?? "N/A"
-            let sl = lastTrade?.stopLoss.map { "\($0)" } ?? "Not Set"
-            let tp = lastTrade?.profitTarget.map { "\($0)" } ?? "Not Set"
+            let exit = lastTrade?.avgExit.map { formatPrice($0) } ?? "N/A"
+            let sl = lastTrade?.stopLoss.map { formatPrice($0) } ?? "Not Set"
+            let tp = lastTrade?.profitTarget.map { formatPrice($0) } ?? "Not Set"
             let quantity = lastTrade?.quantity ?? Decimal.zero
             let mistakes = lastTrade?.mistakes.joined(separator: ", ") ?? ""
             let notes = lastTrade?.notes ?? ""
@@ -230,10 +248,10 @@ public struct AIReflectionTemplates {
             
             return """
             TARGET TRADE TO AUDIT (LATEST CLOSED POSITION):
-            - Symbol: \(symbol) | Side: \(side) | Volume: \(quantity) lots
-            - Entry Price: \(entry) -> Exit Price: \(exit)
+            - Symbol: \(symbol) | Side: \(side) | Volume: \(format2Dec(quantity)) lots
+            - Entry Price: \(formatPrice(entry)) -> Exit Price: \(exit)
             - Planned Stop Loss: \(sl) | Planned Take Profit: \(tp)
-            - Realized P&L: \(pnl >= 0 ? "+" : "")\(pnl)
+            - Realized P&L: \(formatPnl(pnl))
             - Logged Mistakes: \(mistakes.isEmpty ? "None" : mistakes)
             - Trader Notes: \(notes.isEmpty ? "None" : notes)
             
@@ -255,7 +273,7 @@ public struct AIReflectionTemplates {
             
             // Extract largest losing trades
             let bigLosses = sorted.filter { $0.netPnl < 0 }.sorted { $0.netPnl < $1.netPnl }.prefix(5)
-            let lossSummary = bigLosses.map { "#\($0.symbol) \($0.side) \($0.quantity) lots: \($0.netPnl) (Mistakes: \($0.mistakes.joined(separator: ", ")))" }.joined(separator: "\n")
+            let lossSummary = bigLosses.map { "#\($0.symbol) \($0.side) \(format2Dec($0.quantity)) lots: \(formatPnl($0.netPnl)) (Mistakes: \($0.mistakes.joined(separator: ", ")))" }.joined(separator: "\n")
             
             return """
             RECORDED MISTAKE FREQUENCY:
@@ -272,16 +290,16 @@ public struct AIReflectionTemplates {
             """
             
         case "prop_drawdown_guard":
-            let dd = metrics?.maxDrawdownPct.map { String(format: "%.1f%%", $0) } ?? "0%"
+            let dd = metrics?.maxDrawdownPct.map { String(format: "%.2f%%", $0) } ?? "0.00%"
             let pnl = metrics?.netPnl ?? Decimal.zero
             let totalLosses = sorted.filter { $0.netPnl < 0 }.count
             let lossStreak = metrics?.maxLossStreak ?? 0
-            let recentLosses = sorted.filter { $0.netPnl < 0 }.prefix(4).map { "\($0.symbol) \($0.side) \($0.quantity)L: \($0.netPnl)" }.joined(separator: ", ")
+            let recentLosses = sorted.filter { $0.netPnl < 0 }.prefix(4).map { "\($0.symbol) \($0.side) \(format2Dec($0.quantity))L: \(formatPnl($0.netPnl))" }.joined(separator: ", ")
             
             return """
             ACCOUNT RISK & CAPITAL METRICS:
             - Max Cumulative Drawdown: \(dd)
-            - Net Cumulative P&L: \(pnl >= 0 ? "+" : "")\(pnl)
+            - Net Cumulative P&L: \(formatPnl(pnl))
             - Max Losing Streak: \(lossStreak) consecutive trades
             - Total Losing Trades: \(totalLosses)
             - Recent Loss Sample: \(recentLosses.isEmpty ? "None" : recentLosses)
@@ -303,10 +321,10 @@ public struct AIReflectionTemplates {
             
             return """
             PAYOFF ASYMMETRY METRICS:
-            - Win Rate: \(String(format: "%.1f%%", wr))
-            - Average Winning Trade: +$\(avgWin)
-            - Average Losing Trade: -$\(avgLoss)
-            - Largest Win: \(metrics?.largestWin ?? Decimal.zero) | Largest Loss: \(metrics?.largestLoss ?? Decimal.zero)
+            - Win Rate: \(String(format: "%.2f%%", wr))
+            - Average Winning Trade: +$\(format2Dec(avgWin))
+            - Average Losing Trade: -$\(format2Dec(avgLoss))
+            - Largest Win: \(formatPnl(metrics?.largestWin ?? Decimal.zero)) | Largest Loss: \(formatPnl(metrics?.largestLoss ?? Decimal.zero))
             
             SAMPLE OF RECENT TRADES:
             \(recentBreakdown)
@@ -319,7 +337,7 @@ public struct AIReflectionTemplates {
             """
             
         case "lot_size_consistency":
-            let recentLots = sorted.prefix(8).map { "\($0.symbol): \($0.quantity) lots (P&L: \($0.netPnl >= 0 ? "+" : "")\($0.netPnl))" }.joined(separator: ", ")
+            let recentLots = sorted.prefix(8).map { "\($0.symbol): \(format2Dec($0.quantity)) lots (P&L: \(formatPnl($0.netPnl)))" }.joined(separator: ", ")
             
             return """
             POSITION SIZING SAMPLE (LAST 8 TRADES):
@@ -348,12 +366,11 @@ public struct AIReflectionTemplates {
         let pnlStr: String
         let wrStr: String
         if let m = metrics {
-            let pnl = m.netPnl
-            pnlStr = (pnl >= 0 ? "+" : "") + "\(pnl)"
-            wrStr = String(format: "%.0f%%", (m.winRate ?? 0.0) * 100)
+            pnlStr = formatPnl(m.netPnl)
+            wrStr = String(format: "%.2f%%", (m.winRate ?? 0.0) * 100)
         } else {
-            pnlStr = "0"
-            wrStr = "0%"
+            pnlStr = "$0.00"
+            wrStr = "0.00%"
         }
         
         switch template.id {

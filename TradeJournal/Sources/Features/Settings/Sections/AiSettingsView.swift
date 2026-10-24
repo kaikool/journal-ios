@@ -1,7 +1,7 @@
 import SwiftUI
 
 // MARK: - 6. AI Settings View
-// Clean Apple HIG settings view supporting Groq, OpenRouter, Google Gemini, OpenAI, and Custom endpoints
+// Clean Apple HIG settings view supporting Groq, OpenRouter, Google Gemini, OpenAI, and Trader Profile Context Memory
 public struct AiSettingsView: View {
     @ObservedObject private var dataStore = TradeDataStore.shared
     
@@ -10,6 +10,15 @@ public struct AiSettingsView: View {
     @State private var language: String = "vi"
     @State private var apiKey: String = ""
     @State private var customEndpoint: String = ""
+    
+    // Trader Profile & Memory
+    @State private var tradingStyle: String = ""
+    @State private var accountObjective: String = ""
+    @State private var primaryPlaybooks: String = ""
+    @State private var maxRiskPerTrade: String = ""
+    @State private var knownPsychologicalLeaks: String = ""
+    @State private var customMemoryNotes: String = ""
+    
     @State private var statusMessage: String = ""
     @State private var isError: Bool = false
     @State private var isTesting: Bool = false
@@ -19,7 +28,7 @@ public struct AiSettingsView: View {
     
     private var providerDisplayName: String {
         switch provider {
-        case "groq": return "Groq (Free & Ultra Fast)"
+        case "groq": return "Groq (Free & Fast)"
         case "openrouter": return "OpenRouter (Free Models)"
         case "gemini": return "Google Gemini"
         case "openai": return "OpenAI"
@@ -33,7 +42,7 @@ public struct AiSettingsView: View {
         case "groq":
             return ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.8-27b"]
         case "openrouter":
-            return ["openrouter/free", "deepseek/deepseek-r1:free", "meta-llama/llama-3.2-3b-instruct:free"]
+            return ["openrouter/free", "meta-llama/llama-3.2-3b-instruct:free"]
         case "gemini":
             return ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"]
         case "openai":
@@ -43,162 +52,141 @@ public struct AiSettingsView: View {
         }
     }
     
-    private var keyFieldLabel: String {
-        switch provider {
-        case "groq": return "Groq API key"
-        case "openrouter": return "OpenRouter API key"
-        case "gemini": return "Google Gemini API key"
-        case "openai": return "OpenAI API key"
-        case "custom": return "API key / Bearer token"
-        default: return "API key"
-        }
-    }
-    
-    private var keyFieldPlaceholder: String {
-        switch provider {
-        case "groq": return "gsk_..."
-        case "openrouter": return "sk-or-v1-..."
-        case "gemini": return "AIzaSy..."
-        case "openai": return "sk-..."
-        case "custom": return "API key or token..."
-        default: return "Paste key..."
-        }
-    }
-    
-    private var keyFieldHint: String {
-        switch provider {
-        case "groq":
-            return "Free API key from console.groq.com. Uses active models like llama-3.1-8b-instant."
-        case "openrouter":
-            return "Free API key from openrouter.ai/keys. Supports openrouter/free and :free models."
-        case "gemini":
-            return "Free tier from aistudio.google.com (15 RPM / 1,500 RPD, no credit card required)."
-        case "openai":
-            return "Requires an OpenAI platform account with billing balance."
-        case "custom":
-            return "OpenAI-compatible /chat/completions endpoint (e.g. Azure AI Foundry, self-hosted proxy)."
-        default:
-            return ""
-        }
-    }
-    
     public var body: some View {
-        SettingsCard(title: "AI reflection") {
-            VStack(alignment: .leading, spacing: 16) {
-                // Provider Selection
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("AI Provider")
-                        .font(AppTypography.captionBold)
-                        .foregroundColor(AppColors.secondaryText)
-                    
-                    AppleMenuChip(title: "Provider", selectionText: providerDisplayName, icon: "cpu") {
-                        Button("Groq (Free & Fast)") { selectProvider("groq") }
-                        Button("OpenRouter (Free Models)") { selectProvider("openrouter") }
-                        Button("Google Gemini") { selectProvider("gemini") }
-                        Button("OpenAI") { selectProvider("openai") }
-                        Button("Custom / Azure") { selectProvider("custom") }
-                    }
-                    
-                    Text("Automated trade reviews, daily recaps, and journaling coach grounded in your trade data.")
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.secondaryText)
-                }
-                
-                // Response Language Selector
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("AI Response Language")
-                        .font(AppTypography.captionBold)
-                        .foregroundColor(AppColors.secondaryText)
-                    
-                    Picker("Language", selection: $language) {
-                        Text("Vietnamese").tag("vi")
-                        Text("English").tag("en")
-                    }
-                    .pickerStyle(.segmented)
-                    .onChange(of: language) {
-                        isSaved = false
-                        statusMessage = ""
-                    }
-                    
-                    Text("The AI coach will deliver all recaps, critiques, and answers in your selected language.")
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.secondaryText)
-                }
-                
-                Divider()
-                
-                // API Key / Token Field
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(keyFieldLabel)
-                        .font(AppTypography.captionBold)
-                        .foregroundColor(AppColors.secondaryText)
-                    
-                    SecureField(keyFieldPlaceholder, text: $apiKey)
-                        .font(AppTypography.inputText)
-                        .textFieldStyle(.roundedBorder)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled(true)
-                        .onChange(of: apiKey) {
-                            isSaved = false
-                            statusMessage = ""
-                        }
-                    
-                    Text(keyFieldHint)
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.secondaryText)
-                }
-                
-                // Custom Endpoint Field (if custom selected)
-                if provider == "custom" {
+        VStack(spacing: 16) {
+            // Card 1: AI Provider & Engine
+            SettingsCard(title: "AI Engine Configuration") {
+                VStack(alignment: .leading, spacing: 14) {
+                    // Provider Selection
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("Custom endpoint URL")
+                        Text("Provider")
                             .font(AppTypography.captionBold)
                             .foregroundColor(AppColors.secondaryText)
                         
-                        TextField("https://your-endpoint.com/v1/chat/completions", text: $customEndpoint)
+                        AppleMenuChip(title: "Provider", selectionText: providerDisplayName, icon: "cpu") {
+                            Button("Groq (Free & Fast)") { selectProvider("groq") }
+                            Button("OpenRouter (Free Models)") { selectProvider("openrouter") }
+                            Button("Google Gemini") { selectProvider("gemini") }
+                            Button("OpenAI") { selectProvider("openai") }
+                            Button("Custom / Azure") { selectProvider("custom") }
+                        }
+                    }
+                    
+                    // Response Language Selector
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("AI Response Language")
+                            .font(AppTypography.captionBold)
+                            .foregroundColor(AppColors.secondaryText)
+                        
+                        Picker("Language", selection: $language) {
+                            Text("Vietnamese").tag("vi")
+                            Text("English").tag("en")
+                        }
+                        .pickerStyle(.segmented)
+                        .onChange(of: language) {
+                            isSaved = false
+                            statusMessage = ""
+                        }
+                    }
+                    
+                    // Optional API Key
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("API Key (Optional - Built-in key active)")
+                            .font(AppTypography.captionBold)
+                            .foregroundColor(AppColors.secondaryText)
+                        
+                        SecureField("Optional custom key...", text: $apiKey)
                             .font(AppTypography.inputText)
                             .textFieldStyle(.roundedBorder)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled(true)
-                            .onChange(of: customEndpoint) {
+                            .onChange(of: apiKey) {
                                 isSaved = false
                                 statusMessage = ""
                             }
                     }
-                }
-                
-                // Model ID Field
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Model ID")
-                        .font(AppTypography.captionBold)
-                        .foregroundColor(AppColors.secondaryText)
                     
-                    if !providerModels.isEmpty {
-                        AppleMenuChip(title: "Preset", selectionText: model, icon: "sparkles") {
-                            ForEach(providerModels, id: \.self) { m in
-                                Button(m) {
-                                    model = m
-                                    isSaved = false
-                                    statusMessage = ""
-                                }
-                            }
+                    if provider == "custom" {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Endpoint URL")
+                                .font(AppTypography.captionBold)
+                                .foregroundColor(AppColors.secondaryText)
+                            
+                            TextField("https://...", text: $customEndpoint)
+                                .font(AppTypography.inputText)
+                                .textFieldStyle(.roundedBorder)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled(true)
                         }
                     }
-                    
-                    TextField("Model ID", text: $model)
-                        .font(AppTypography.inputText)
-                        .textFieldStyle(.roundedBorder)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled(true)
-                        .onChange(of: model) {
-                            isSaved = false
-                            statusMessage = ""
-                        }
                 }
-                
-                Divider()
-                
-                // Action Buttons
+            }
+            
+            // Card 2: Persistent Trader Profile & AI Context Memory
+            SettingsCard(title: "Trader Profile & Context Memory") {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("The AI coach uses this persistent context on every trade review and reflection to tailor psychological, tactical, and risk advice.")
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.secondaryText)
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Trading Style & Timeframe")
+                            .font(AppTypography.captionBold)
+                            .foregroundColor(AppColors.secondaryText)
+                        TextField("e.g. Day Trader / Intraday Scalper (M5, M15)", text: $tradingStyle)
+                            .font(AppTypography.inputText)
+                            .textFieldStyle(.roundedBorder)
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Account Objective / Prop Firm Target")
+                            .font(AppTypography.captionBold)
+                            .foregroundColor(AppColors.secondaryText)
+                        TextField("e.g. The5ers 100K High Stakes (Max 5% Daily Loss)", text: $accountObjective)
+                            .font(AppTypography.inputText)
+                            .textFieldStyle(.roundedBorder)
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Primary Playbooks & Setups")
+                            .font(AppTypography.captionBold)
+                            .foregroundColor(AppColors.secondaryText)
+                        TextField("e.g. Liquidity Sweeps, Order Blocks, London Breakouts", text: $primaryPlaybooks)
+                            .font(AppTypography.inputText)
+                            .textFieldStyle(.roundedBorder)
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Max Risk Budget Per Trade")
+                            .font(AppTypography.captionBold)
+                            .foregroundColor(AppColors.secondaryText)
+                        TextField("e.g. 0.5% - 1.0% ($500 - $1,000)", text: $maxRiskPerTrade)
+                            .font(AppTypography.inputText)
+                            .textFieldStyle(.roundedBorder)
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Known Psychological Pitfalls & Leaks")
+                            .font(AppTypography.captionBold)
+                            .foregroundColor(AppColors.secondaryText)
+                        TextField("e.g. Moving Stop Loss, Early Exit on Winners, FOMO re-entry", text: $knownPsychologicalLeaks)
+                            .font(AppTypography.inputText)
+                            .textFieldStyle(.roundedBorder)
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Custom Coaching Directives & Personal Notes")
+                            .font(AppTypography.captionBold)
+                            .foregroundColor(AppColors.secondaryText)
+                        TextField("e.g. Strictly demand minimum 2:1 R:R. Stop trading after 2 losses.", text: $customMemoryNotes)
+                            .font(AppTypography.inputText)
+                            .textFieldStyle(.roundedBorder)
+                    }
+                }
+            }
+            
+            // Clean Bottom Action Row
+            VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 12) {
                     AppButton("Save settings", icon: "checkmark", style: .primary, size: .compact) {
                         saveSettings()
@@ -207,19 +195,12 @@ public struct AiSettingsView: View {
                     AppButton("Test connection", icon: "network", style: .secondary, size: .compact, isLoading: isTesting) {
                         testConnection()
                     }
-                    .disabled(apiKey.trimmingCharacters(in: .whitespaces).isEmpty || isTesting)
-                    
-                    if isSaved && !statusMessage.isEmpty && !isError {
-                        Text(statusMessage)
-                            .font(AppTypography.caption)
-                            .foregroundColor(AppColors.profit)
-                    }
                 }
                 
-                if isError && !statusMessage.isEmpty {
+                if !statusMessage.isEmpty {
                     Text(statusMessage)
                         .font(AppTypography.caption)
-                        .foregroundColor(AppColors.loss)
+                        .foregroundColor(isError ? AppColors.loss : AppColors.profit)
                 }
             }
         }
@@ -231,8 +212,6 @@ public struct AiSettingsView: View {
     // MARK: - Actions
     
     private func selectProvider(_ newProvider: String) {
-        syncDraftToMemory()
-        
         provider = newProvider
         isSaved = false
         statusMessage = ""
@@ -242,16 +221,16 @@ public struct AiSettingsView: View {
         switch newProvider {
         case "groq":
             apiKey = conf.groqKey
-            if model.isEmpty || !providerModels.contains(model) { model = "openai/gpt-oss-120b" }
+            model = "openai/gpt-oss-120b"
         case "openrouter":
             apiKey = conf.openrouterKey
-            if model.isEmpty || !providerModels.contains(model) { model = "openrouter/free" }
+            model = "openrouter/free"
         case "gemini":
             apiKey = conf.geminiKey
-            if model.isEmpty || !providerModels.contains(model) { model = "gemini-2.0-flash" }
+            model = "gemini-2.0-flash"
         case "openai":
             apiKey = conf.openaiKey
-            if model.isEmpty || !providerModels.contains(model) { model = "gpt-4o-mini" }
+            model = "gpt-4o-mini"
         case "custom":
             apiKey = conf.customKey
             customEndpoint = conf.customEndpoint
@@ -276,27 +255,17 @@ public struct AiSettingsView: View {
         default: apiKey = ""
         }
         
+        let prof = conf.traderProfile
+        tradingStyle = prof.tradingStyle
+        accountObjective = prof.accountObjective
+        primaryPlaybooks = prof.primaryPlaybooks
+        maxRiskPerTrade = prof.maxRiskPerTrade
+        knownPsychologicalLeaks = prof.knownPsychologicalLeaks
+        customMemoryNotes = prof.customMemoryNotes
+        
         isSaved = false
         statusMessage = ""
         isError = false
-    }
-    
-    private func syncDraftToMemory() {
-        var conf = dataStore.aiSettings
-        switch provider {
-        case "groq": conf.groqKey = apiKey
-        case "openrouter": conf.openrouterKey = apiKey
-        case "gemini": conf.geminiKey = apiKey
-        case "openai": conf.openaiKey = apiKey
-        case "custom":
-            conf.customKey = apiKey
-            conf.customEndpoint = customEndpoint
-        default: break
-        }
-        conf.provider = provider
-        conf.model = model
-        conf.language = language
-        dataStore.aiSettings = conf
     }
     
     private func saveSettings() {
@@ -321,12 +290,21 @@ public struct AiSettingsView: View {
             break
         }
         
+        conf.traderProfile = TraderProfileConfig(
+            tradingStyle: tradingStyle.trimmingCharacters(in: .whitespaces),
+            accountObjective: accountObjective.trimmingCharacters(in: .whitespaces),
+            primaryPlaybooks: primaryPlaybooks.trimmingCharacters(in: .whitespaces),
+            maxRiskPerTrade: maxRiskPerTrade.trimmingCharacters(in: .whitespaces),
+            knownPsychologicalLeaks: knownPsychologicalLeaks.trimmingCharacters(in: .whitespaces),
+            customMemoryNotes: customMemoryNotes.trimmingCharacters(in: .whitespaces)
+        )
+        
         dataStore.aiSettings = conf
         dataStore.saveToDisk()
         
         isSaved = true
         isError = false
-        statusMessage = "AI settings saved."
+        statusMessage = "AI settings and Trader Profile saved."
     }
     
     private func testConnection() {
@@ -356,18 +334,17 @@ public struct AiSettingsView: View {
         
         Task {
             do {
-                let response = try await AIReflectionService.shared.testConnection(config: draft)
+                let testOutput = try await AIReflectionService.shared.testConnection(config: draft)
                 await MainActor.run {
-                    isTesting = false
-                    isError = false
-                    isSaved = true
-                    statusMessage = "Connected: \(response.prefix(80))"
+                    self.isTesting = false
+                    self.isError = false
+                    self.statusMessage = "Connected: \(testOutput.prefix(80))"
                 }
             } catch {
                 await MainActor.run {
-                    isTesting = false
-                    isError = true
-                    statusMessage = error.localizedDescription
+                    self.isTesting = false
+                    self.isError = true
+                    self.statusMessage = error.localizedDescription
                 }
             }
         }
