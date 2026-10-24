@@ -18,17 +18,9 @@ public struct TradeJournalApp: App {
                     .preferredColorScheme(env.colorScheme)
                 
                 if !dataStore.isLoaded {
-                    ZStack {
-                        AppColors.background.ignoresSafeArea()
-                        VStack(spacing: 16) {
-                            Image(systemName: "chart.line.uptrend.xyaxis")
-                                .font(.system(size: 40, weight: .bold))
-                                .foregroundColor(AppColors.brand)
-                            ProgressView()
-                                .tint(AppColors.brand)
-                        }
-                    }
-                    .transition(.opacity)
+                    SplashScreenView()
+                        .transition(.opacity)
+                        .zIndex(999)
                 }
             }
             .animation(.easeInOut(duration: 0.22), value: dataStore.isLoaded)

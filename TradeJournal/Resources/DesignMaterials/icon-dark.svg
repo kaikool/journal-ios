@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="1024" height="1024" fill="none">
+  <defs>
+    <!-- Nền Full-bleed chuyển màu sâu hơn (Deep Navy + Radial Glow nhẹ ở tâm) -->
+    <linearGradient id="bgDarkFull" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#132238" />
+      <stop offset="50%" stop-color="#0B1322" />
+      <stop offset="100%" stop-color="#050811" />
+    </linearGradient>
+    <radialGradient id="centerAmbient" cx="256" cy="256" r="240" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0EA5E9" stop-opacity="0.16" />
+      <stop offset="100%" stop-color="#050811" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- Màu khối Emerald -> Cyan chuẩn ảnh 3 (Không viền) -->
+    <linearGradient id="gradLeft" x1="110" y1="120" x2="246" y2="392" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#34D399" />
+      <stop offset="100%" stop-color="#0284C7" />
+    </linearGradient>
+    <linearGradient id="gradRight" x1="266" y1="120" x2="402" y2="392" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#38BDF8" />
+      <stop offset="100%" stop-color="#10B981" />
+    </linearGradient>
+
+    <filter id="softGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Nền Full vuông 100% không bo góc -->
+  <rect width="512" height="512" fill="url(#bgDarkFull)" />
+  <rect width="512" height="512" fill="url(#centerAmbient)" />
+
+  <!-- 2 khối đặc tạo hình cây nến ẩn ở giữa -->
+  <g filter="url(#softGlow)">
+    <path d="M 238 118 C 243 118 246 121 246 126 V 168 H 232 C 223 168 216 175 216 184 V 328 C 216 337 223 344 232 344 H 246 V 386 C 246 391 243 394 238 394 C 235 394 232 393 229 390 L 114 275 C 103 264 103 248 114 237 L 229 122 C 232 119 235 118 238 118 Z" fill="url(#gradLeft)" />
+    <path d="M 274 118 C 269 118 266 121 266 126 V 168 H 280 C 289 168 296 175 296 184 V 328 C 296 337 289 344 280 344 H 266 V 386 C 266 391 269 394 274 394 C 277 394 280 393 283 390 L 398 275 C 409 264 409 248 398 237 L 283 122 C 280 119 277 118 274 118 Z" fill="url(#gradRight)" />
+  </g>
+</svg>
