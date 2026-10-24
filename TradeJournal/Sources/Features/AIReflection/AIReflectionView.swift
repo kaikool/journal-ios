@@ -138,22 +138,8 @@ public struct AIReflectionView: View {
                         }
                     }
                     
-                    // 4. Loading State Card
-                    if isLoading {
-                        AppCard {
-                            VStack(spacing: 12) {
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: AppColors.brand))
-                                Text("Analyzing trade metrics and generating structured reflection...")
-                                    .font(AppTypography.caption)
-                                    .foregroundColor(AppColors.secondaryText)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 32)
-                        }
-                    }
-                    // 5. Rich Result Card
-                    else if !reflectionResult.isEmpty {
+                    // 4. Rich Result Card or Placeholder
+                    if !reflectionResult.isEmpty {
                         AIReflectionResultView(
                             resultText: reflectionResult,
                             template: selectedTemplate,
@@ -164,6 +150,20 @@ public struct AIReflectionView: View {
                                 executeTemplate(selectedTemplate)
                             }
                         )
+                    } else if !isLoading {
+                        AppCard {
+                            VStack(spacing: 12) {
+                                Image(systemName: "sparkles")
+                                    .font(.system(size: 30))
+                                    .foregroundColor(AppColors.brand)
+                                Text("Select a prompt template above to generate an AI reflection.")
+                                    .font(AppTypography.caption)
+                                    .foregroundColor(AppColors.secondaryText)
+                                    .multilineTextAlignment(.center)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 32)
+                        }
                     }
                 }
                 .padding(16)
@@ -182,6 +182,11 @@ public struct AIReflectionView: View {
                 }
             }
         }
+        .tradeJournalLoading(
+            isLoading,
+            message: "Analyzing trade metrics and generating structured reflection...",
+            size: 64
+        )
         .onAppear {
             if reflectionResult.isEmpty {
                 executeTemplate(selectedTemplate)
