@@ -111,7 +111,7 @@ public struct NavigationDrawerView: View {
         VStack(spacing: 0) {
             HStack(spacing: 12) {
                 // Standalone Brand Vector Mark (Zero enclosing background box)
-                TradeJournalBrandMark(size: 28)
+                LogoMarkView(size: 30)
                 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Trade Journal")

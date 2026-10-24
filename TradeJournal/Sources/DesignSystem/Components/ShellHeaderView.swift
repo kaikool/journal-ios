@@ -59,15 +59,9 @@ public struct ShellHeaderView: View {
                     env.isDrawerOpen.toggle()
                 }
             } label: {
-                TradeJournalMarkView(size: 24)
+                LogoMarkView(size: 28)
                     .frame(width: 38, height: 38)
-                    .background(AppColors.cardBackground.opacity(0.85))
-                    .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 11, style: .continuous)
-                            .stroke(AppColors.border.opacity(0.55), lineWidth: 0.8)
-                    )
-                    .shadow(color: Color.black.opacity(0.08), radius: 3, x: 0, y: 1)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(ApplePressableButtonStyle())
             .accessibilityLabel("Open navigation menu")
