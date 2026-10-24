@@ -50,6 +50,10 @@ private struct PostgrestErrorPayload: Decodable {
 public final class SupabaseService {
     public static let shared = SupabaseService()
     
+    // Default bundled Supabase configuration for out-of-the-box cloud backup
+    public static let defaultSupabaseUrl = "https://ojggrdfhkqxsvfahqkru.supabase.co"
+    public static let defaultSupabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9qZ2dyZGZoa3F4c3ZmYWhxa3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE3Mjk1NzEsImV4cCI6MjEwNzMwNTU3MX0.83OZF3I2zHzo0Y1P0EeDprjo2Kwjf31aCJjVSKkWpcY"
+    
     public var supabaseUrl: String = ""
     public var supabaseAnonKey: String = ""
     public var accessToken: String? = nil
@@ -62,8 +66,12 @@ public final class SupabaseService {
     }
     
     private init() {
-        self.supabaseUrl = UserDefaults.standard.string(forKey: "supabase_url") ?? ""
-        self.supabaseAnonKey = UserDefaults.standard.string(forKey: "supabase_anon_key") ?? ""
+        let savedUrl = UserDefaults.standard.string(forKey: "supabase_url") ?? ""
+        let savedKey = UserDefaults.standard.string(forKey: "supabase_anon_key") ?? ""
+        
+        // Fall back to default bundled credentials if not customized by user
+        self.supabaseUrl = savedUrl.isEmpty ? Self.defaultSupabaseUrl : savedUrl
+        self.supabaseAnonKey = savedKey.isEmpty ? Self.defaultSupabaseAnonKey : savedKey
         self.accessToken = UserDefaults.standard.string(forKey: "supabase_access_token")
     }
     
