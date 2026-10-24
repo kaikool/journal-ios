@@ -437,7 +437,7 @@ public struct TradeAICoachSheet: View {
                 let timeFormatter = DateFormatter()
                 timeFormatter.dateFormat = "HH:mm"
                 let barFlow = sampleSlice.map { b in
-                    let t = timeFormatter.string(from: b.time)
+                    let t = timeFormatter.string(from: b.date)
                     let o = String(format: "%.2f", NSDecimalNumber(decimal: b.open).doubleValue)
                     let h = String(format: "%.2f", NSDecimalNumber(decimal: b.high).doubleValue)
                     let l = String(format: "%.2f", NSDecimalNumber(decimal: b.low).doubleValue)
