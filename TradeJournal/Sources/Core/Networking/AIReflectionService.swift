@@ -35,6 +35,7 @@ public actor AIReflectionService {
                - Trích dẫn 1 quy tắc kỷ luật hành động quan trọng nhất vào khối:
                > ⚠️ **Quy tắc kỷ luật:** [1 hành động bất di bất dịch cho phiên tới]
             4. Trả lời 100% bằng TIẾNG VIỆT, dùng các thuật ngữ trading chuẩn (Stop Loss, Take Profit, Win Rate, Risk/Reward, Drawdown, Entry, Exit).
+            5. NHẬN DIỆN CHIỀU LỆNH CHUẨN XÁC: Luôn kiểm tra kỹ vị thế là BUY hay SELL/SHORT. Với lệnh SELL/SHORT: Lãi khi giá giảm, Lỗ khi giá tăng; TP nằm dưới giá vào, SL nằm trên giá vào. Tuyệt đối không bao giờ phân tích nhầm lẫn lệnh SELL thành lệnh BUY.
             """
         } else {
             return """
@@ -49,6 +50,7 @@ public actor AIReflectionService {
                - Highlight the single most critical discipline rule in a blockquote:
                > ⚠️ **Core Discipline Rule:** [Single non-negotiable directive for the next session]
             4. Respond 100% in professional English.
+            5. STRICT TRADE DIRECTION ACCURACY: Always strictly verify whether a position is BUY or SELL/SHORT. For SELL/SHORT trades: profit occurs when price drops (Entry > Exit = Profit), TP is strictly below Entry, and SL is strictly above Entry. Never invert or confuse trade direction.
             """
         }
     }
@@ -754,18 +756,32 @@ public actor AIReflectionService {
         let mistakes = trade.mistakes.isEmpty ? (isVi ? "Không ghi nhận" : "None") : trade.mistakes.joined(separator: ", ")
         let notes = (trade.notes?.isEmpty ?? true) ? (isVi ? "Không có ghi chú" : "None") : trade.notes!
         
+        let isShort = trade.direction == .short
+        let directionStrVi = isShort ? "SELL / SHORT (BÁN KHỐNG - Kỳ vọng giá GIẢM)" : "BUY / LONG (MUA - Kỳ vọng giá TĂNG)"
+        let directionStrEn = isShort ? "SELL / SHORT (Short position - Expects price to FALL)" : "BUY / LONG (Long position - Expects price to RISE)"
+        
+        let directionWarningVi = isShort
+            ? "⚠️ CẢNH BÁO QUAN TRỌNG VỀ CHIỀU LỆNH: Đây là lệnh BÁN (SELL / SHORT). Lợi nhuận sinh ra khi giá GIẢM (Giá hiện tại hoặc Giá ra < Giá vào = CÓ LÃI). Take Profit (TP) phải nằm DƯỚI giá vào, Stop Loss (SL) phải nằm TRÊN giá vào. Tuyệt đối KHÔNG ĐƯỢC phân tích nhầm thành lệnh MUA (BUY)."
+            : "⚠️ CẢNH BÁO QUAN TRỌNG VỀ CHIỀU LỆNH: Đây là lệnh MUA (BUY / LONG). Lợi nhuận sinh ra khi giá TĂNG (Giá hiện tại hoặc Giá ra > Giá vào = CÓ LÃI). Take Profit (TP) nằm TRÊN giá vào, Stop Loss (SL) nằm DƯỚI giá vào."
+        
+        let directionWarningEn = isShort
+            ? "CRITICAL DIRECTION DIRECTIVE: THIS IS A SHORT / SELL TRADE. Profit occurs strictly when the price DROPS (Current/Exit price < Entry price = Profit). Take Profit (TP) is BELOW Entry; Stop Loss (SL) is ABOVE Entry. NEVER evaluate this as a BUY trade."
+            : "CRITICAL DIRECTION DIRECTIVE: THIS IS A LONG / BUY TRADE. Profit occurs strictly when the price RISES. Take Profit (TP) is ABOVE Entry; Stop Loss (SL) is BELOW Entry."
+        
         let candleInfo = recentCandlesSummary ?? (isVi ? "Không có dữ liệu nến ngoài" : "No external candle feed")
         
         let prompt: String
         if isOpen {
             prompt = isVi ? """
             LỆNH ĐANG MỞ CẦN TƯ VẤN (LIVE OPEN POSITION):
-            - Cặp tiền: \(trade.symbol) | Loại lệnh: \(trade.side.uppercased()) | Khối lượng: \(volumeStr) lots
-            - Giá vào: \(entryStr) | Giá hiện tại: \(exitStr)
+            - Cặp tiền: \(trade.symbol) | Vị thế: \(directionStrVi) | Khối lượng: \(volumeStr) lots
+            - Giá vào (Entry): \(entryStr) | Giá thị trường hiện tại: \(exitStr)
             - Lợi nhuận tạm tính: \(pnlStr)
             - Cắt lỗ (SL): \(slStr) | Chốt lời (TP): \(tpStr)
             - Ghi chú trader: \(notes)
             - Tóm tắt nến 12h qua: \(candleInfo)
+            
+            \(directionWarningVi)
             
             NHIỆM VỤ TƯ VẤN LỆNH MỞ (LIVE POSITION ADVISORY):
             1. Trạng thái vị thế & Cấu trúc thị trường: Đánh giá vị thế hiện tại dựa trên giá vào và kế hoạch.
@@ -773,12 +789,14 @@ public actor AIReflectionService {
             3. Quản trị rủi ro: Đưa ra lời khuyên bảo vệ vốn trước các biến động phiên tiếp theo.
             """ : """
             LIVE OPEN POSITION ADVISORY:
-            - Symbol: \(trade.symbol) | Direction: \(trade.side.uppercased()) | Volume: \(volumeStr) lots
+            - Symbol: \(trade.symbol) | Direction: \(directionStrEn) | Volume: \(volumeStr) lots
             - Entry Price: \(entryStr) | Current Price: \(exitStr)
             - Unrealized P&L: \(pnlStr)
             - Stop Loss: \(slStr) | Take Profit: \(tpStr)
             - Trader Notes: \(notes)
             - 12h Candlestick Context: \(candleInfo)
+            
+            \(directionWarningEn)
             
             TASK: OPEN TRADE MANAGEMENT & RISK PROTOCOL
             1. Position Health & Market Structure: Evaluate open position relative to entry and targets.
@@ -788,13 +806,15 @@ public actor AIReflectionService {
         } else {
             prompt = isVi ? """
             LỆNH ĐÃ ĐÓNG CẦN MỔ XẺ (COMPLETED TRADE AUDIT):
-            - Cặp tiền: \(trade.symbol) | Loại lệnh: \(trade.side.uppercased()) | Khối lượng: \(volumeStr) lots
-            - Giá vào: \(entryStr) -> Giá thoát: \(exitStr)
+            - Cặp tiền: \(trade.symbol) | Vị thế: \(directionStrVi) | Khối lượng: \(volumeStr) lots
+            - Giá vào (Entry): \(entryStr) -> Giá thoát (Exit): \(exitStr)
             - Lợi nhuận thực tế: \(pnlStr)
             - Kế hoạch SL: \(slStr) | Kế hoạch TP: \(tpStr)
             - Lỗi ghi nhận: \(mistakes)
             - Ghi chú trader: \(notes)
             - Tóm tắt nến thị trường: \(candleInfo)
+            
+            \(directionWarningVi)
             
             NHIỆM VỤ MỔ XẺ LỆNH & BÀI HỌC KỶ LUẬT (POST-MORTEM & LESSONS):
             1. Đánh giá Khớp lệnh vs Kế hoạch: Phân tích điểm vào và điểm ra (thoát non, gồng lỗ hay tuân thủ kế hoạch).
@@ -802,13 +822,15 @@ public actor AIReflectionService {
             3. Bài học cốt lõi: Đưa ra 1 quy tắc hành động duy nhất để không lặp lại sai lầm trong các lệnh tương tự.
             """ : """
             COMPLETED TRADE POST-MORTEM & AUDIT:
-            - Symbol: \(trade.symbol) | Direction: \(trade.side.uppercased()) | Volume: \(volumeStr) lots
+            - Symbol: \(trade.symbol) | Direction: \(directionStrEn) | Volume: \(volumeStr) lots
             - Entry Price: \(entryStr) -> Exit Price: \(exitStr)
             - Realized Net P&L: \(pnlStr)
             - Planned SL: \(slStr) | Planned TP: \(tpStr)
             - Logged Mistakes: \(mistakes)
             - Trader Notes: \(notes)
             - Candlestick Context: \(candleInfo)
+            
+            \(directionWarningEn)
             
             TASK: FORENSIC POST-MORTEM & ACTIONABLE LESSONS
             1. Execution vs Plan: Evaluate entry timing and exit quality.

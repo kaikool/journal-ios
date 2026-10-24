@@ -79,12 +79,13 @@ public struct TradeAICoachSheet: View {
                             .font(.system(size: 15, weight: .bold))
                             .foregroundColor(AppColors.primaryText)
                         
-                        Text(trade.side.uppercased())
+                        let isShort = trade.direction == .short
+                        Text(isShort ? "SELL" : "BUY")
                             .font(.system(size: 10, weight: .bold))
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
-                            .background(trade.side.uppercased() == "BUY" || trade.side.uppercased() == "LONG" ? AppColors.profit.opacity(0.12) : AppColors.loss.opacity(0.12))
-                            .foregroundColor(trade.side.uppercased() == "BUY" || trade.side.uppercased() == "LONG" ? AppColors.profit : AppColors.loss)
+                            .background(isShort ? AppColors.warning.opacity(0.12) : AppColors.brand.opacity(0.12))
+                            .foregroundColor(isShort ? AppColors.warning : AppColors.brand)
                             .cornerRadius(4)
                         
                         Text(isOpen ? "OPEN POSITION" : "CLOSED")

@@ -92,7 +92,8 @@ public struct NotebookView: View {
                 initialTitle: note.title,
                 initialContent: note.content,
                 initialFolderId: note.folderId,
-                activeFolders: activeFolders
+                activeFolders: activeFolders,
+                initialPreviewMode: !note.content.isEmpty
             )
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
@@ -454,7 +455,7 @@ public struct NotebookEditorSheet: View {
     @State private var title: String
     @State private var content: String
     @State private var selectedFolderId: String
-    @State private var isPreviewMode: Bool = false
+    @State private var isPreviewMode: Bool
     @State private var showDeleteConfirmation: Bool = false
     @State private var autoSaveTask: Task<Void, Never>? = nil
     @State private var hasPendingChanges: Bool = false
@@ -464,13 +465,15 @@ public struct NotebookEditorSheet: View {
         initialTitle: String,
         initialContent: String,
         initialFolderId: String,
-        activeFolders: [NotebookFolder]
+        activeFolders: [NotebookFolder],
+        initialPreviewMode: Bool = true
     ) {
         self.noteId = noteId
         self.activeFolders = activeFolders
-        _title = State(initialValue: initialTitle)
-        _content = State(initialValue: initialContent)
-        _selectedFolderId = State(initialValue: initialFolderId)
+        self._title = State(initialValue: initialTitle)
+        self._content = State(initialValue: initialContent)
+        self._selectedFolderId = State(initialValue: initialFolderId)
+        self._isPreviewMode = State(initialValue: initialPreviewMode)
     }
     
     public var body: some View {
@@ -485,31 +488,58 @@ public struct NotebookEditorSheet: View {
                         .padding(.top, 14)
                         .onChange(of: title) { _ in scheduleAutoSave() }
                     
-                    HStack {
-                        // Folder selector
+                    HStack(spacing: 8) {
+                        // Folder selector matching segmented picker height (32pt)
                         let folderOptions = activeFolders.filter { $0.id != NotebookEngine.systemFolderAll }.map { $0.id }
-                        AppDropdownField(
-                            selection: $selectedFolderId,
-                            options: folderOptions,
-                            titleFor: { id in
-                                activeFolders.first(where: { $0.id == id })?.name ?? id
-                            },
-                            iconFor: { _ in "folder" }
-                        )
-                        .onChange(of: selectedFolderId) { _ in
-                            hasPendingChanges = true
-                            flushSave()
+                        Menu {
+                            ForEach(folderOptions, id: \.self) { id in
+                                Button {
+                                    selectedFolderId = id
+                                    hasPendingChanges = true
+                                    flushSave()
+                                } label: {
+                                    HStack {
+                                        Image(systemName: "folder")
+                                        Text(activeFolders.first(where: { $0.id == id })?.name ?? id)
+                                        if selectedFolderId == id {
+                                            Image(systemName: "checkmark")
+                                        }
+                                    }
+                                }
+                            }
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "folder")
+                                    .font(.system(size: 11, weight: .medium))
+                                    .foregroundColor(AppColors.secondaryText)
+                                Text(activeFolders.first(where: { $0.id == selectedFolderId })?.name ?? "Folder")
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundColor(AppColors.primaryText)
+                                    .lineLimit(1)
+                                Image(systemName: "chevron.up.chevron.down")
+                                    .font(.system(size: 9, weight: .semibold))
+                                    .foregroundColor(AppColors.secondaryText)
+                            }
+                            .padding(.horizontal, 10)
+                            .frame(height: 32)
+                            .background(AppColors.secondaryBackground)
+                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .stroke(AppColors.border.opacity(0.7), lineWidth: 0.8)
+                            )
                         }
                         
                         Spacer()
                         
-                        // Mode toggle: Edit / Preview
+                        // Mode toggle: Preview prioritized over Edit
                         Picker("Mode", selection: $isPreviewMode) {
-                            Text("Edit").tag(false)
                             Text("Preview").tag(true)
+                            Text("Edit").tag(false)
                         }
                         .pickerStyle(.segmented)
-                        .frame(width: 170)
+                        .frame(width: 160)
+                        .frame(height: 32)
                         .onChange(of: isPreviewMode) { _ in
                             flushSave()
                         }

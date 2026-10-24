@@ -168,8 +168,9 @@ public struct AIReflectionTemplates {
             let notesStr = (t.notes?.isEmpty ?? true) ? "" : " | Note: \(t.notes!)"
             let volStr = format2Dec(t.quantity)
             let entryStr = formatPrice(t.avgEntry)
+            let sideStr = t.direction == .short ? "SELL" : "BUY"
             
-            lines.append("Trade #\(idx + 1) [\(dateStr)] \(t.symbol) \(t.side) \(volStr) lots | In: \(entryStr) -> Out: \(exitStr)\(slStr)\(tpStr) | P&L: \(pnlStr) (Hold: \(durationStr))\(mistakesStr)\(notesStr)")
+            lines.append("Trade #\(idx + 1) [\(dateStr)] \(t.symbol) \(sideStr) \(volStr) lots | In: \(entryStr) -> Out: \(exitStr)\(slStr)\(tpStr) | P&L: \(pnlStr) (Hold: \(durationStr))\(mistakesStr)\(notesStr)")
         }
         return lines.joined(separator: "\n")
     }
@@ -236,7 +237,11 @@ public struct AIReflectionTemplates {
             let lastTrade = sorted.first
             let symbol = lastTrade?.symbol ?? "N/A"
             let pnl = lastTrade?.netPnl ?? Decimal.zero
-            let side = lastTrade?.side.uppercased() ?? "N/A"
+            let isShort = lastTrade?.direction == .short
+            let side = isShort ? "SELL / SHORT (BÁN KHỐNG - Kỳ vọng giá GIẢM)" : "BUY / LONG (MUA - Kỳ vọng giá TĂNG)"
+            let directionRule = isShort
+                ? "⚠️ LƯU Ý QUAN TRỌNG: Đây là lệnh BÁN (SELL/SHORT). Trader có LÃI khi giá GIẢM (Giá thoát < Giá vào). TP nằm DƯỚI giá vào, SL nằm TRÊN giá vào. Tuyệt đối KHÔNG phân tích nhầm thành lệnh Mua."
+                : "⚠️ LƯU Ý QUAN TRỌNG: Đây là lệnh MUA (BUY/LONG). Trader có LÃI khi giá TĂNG (Giá thoát > Giá vào). TP nằm TRÊN giá vào, SL nằm DƯỚI giá vào."
             let entry = lastTrade?.entryPrice ?? Decimal.zero
             let exit = lastTrade?.avgExit.map { formatPrice($0) } ?? "N/A"
             let sl = lastTrade?.stopLoss.map { formatPrice($0) } ?? "Not Set"
@@ -254,6 +259,8 @@ public struct AIReflectionTemplates {
             - Realized P&L: \(formatPnl(pnl))
             - Logged Mistakes: \(mistakes.isEmpty ? "None" : mistakes)
             - Trader Notes: \(notes.isEmpty ? "None" : notes)
+            
+            \(directionRule)
             
             PRIOR CONTEXT TRADES:
             \(recentList)

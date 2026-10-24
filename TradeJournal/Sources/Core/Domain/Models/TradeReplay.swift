@@ -330,11 +330,14 @@ public enum TradeReplayEngine {
         
         let entryPrice = (trade.avgEntry as NSDecimalNumber).doubleValue
         let exitPrice: Double
+        let isShort = trade.direction == .short
         if trade.status == .open {
-            // For open trades, estimate current price from unrealized PnL direction
-            exitPrice = entryPrice + (trade.netPnl > 0 ? 0.003 : -0.003) * entryPrice
+            // For open trades, estimate current price from unrealized PnL and trade direction
+            let mult = (trade.netPnl > 0) ? (isShort ? -0.003 : 0.003) : (isShort ? 0.003 : -0.003)
+            exitPrice = entryPrice + mult * entryPrice
         } else {
-            exitPrice = trade.avgExit.map { ($0 as NSDecimalNumber).doubleValue } ?? (entryPrice + (trade.netPnl > 0 ? 0.005 : -0.005) * entryPrice)
+            let mult = (trade.netPnl > 0) ? (isShort ? -0.005 : 0.005) : (isShort ? 0.005 : -0.005)
+            exitPrice = trade.avgExit.map { ($0 as NSDecimalNumber).doubleValue } ?? (entryPrice + mult * entryPrice)
         }
         let priceSpan = exitPrice - entryPrice
         
