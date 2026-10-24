@@ -420,7 +420,7 @@ public struct TradeAICoachSheet: View {
         do {
             let res = try await MarketDataService.shared.fetchBarsForTrade(
                 trade: trade,
-                config: dataStore.marketConfig,
+                config: dataStore.marketConnections,
                 resolution: "15m"
             )
             if !res.bars.isEmpty {
