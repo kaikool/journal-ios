@@ -93,18 +93,54 @@ public actor AIReflectionService {
             
         case "groq":
             let activeKey = config.groqKey.trimmingCharacters(in: .whitespaces).isEmpty ? AiSettingsConfig.defaultGroqKey : config.groqKey.trimmingCharacters(in: .whitespaces)
+            let requestedModel = config.model.isEmpty ? "openai/gpt-oss-120b" : config.model
             do {
                 return try await callOpenAiCompatible(
                     endpoint: Self.groqEndpoint,
                     apiKey: activeKey,
-                    model: config.model.isEmpty ? "openai/gpt-oss-120b" : config.model,
+                    model: requestedModel,
                     action: action,
                     prompt: prompt,
                     metrics: metrics,
                     edgeScore: edgeScore
                 )
             } catch {
-                AppLogger.warning("Groq request failed: \(error.localizedDescription). Falling back to local coach.")
+                AppLogger.warning("Groq request with model '\(requestedModel)' failed: \(error.localizedDescription). Searching for active Groq models...")
+                
+                // 1. Dynamic Discovery: If model was decommissioned, renamed or not found, query Groq /models
+                if let freshModel = await fetchBestActiveGroqModel(apiKey: activeKey), freshModel != requestedModel {
+                    do {
+                        AppLogger.info("Retrying Groq with dynamically discovered active model: \(freshModel)")
+                        return try await callOpenAiCompatible(
+                            endpoint: Self.groqEndpoint,
+                            apiKey: activeKey,
+                            model: freshModel,
+                            action: action,
+                            prompt: prompt,
+                            metrics: metrics,
+                            edgeScore: edgeScore
+                        )
+                    } catch {
+                        AppLogger.warning("Groq retry with dynamic model '\(freshModel)' failed: \(error.localizedDescription)")
+                    }
+                }
+                
+                // 2. High Availability Failover: Automatically route to OpenRouter free tier before falling back to local
+                AppLogger.info("Failing over from Groq to OpenRouter dynamic free router...")
+                let orKey = config.openrouterKey.trimmingCharacters(in: .whitespaces).isEmpty ? AiSettingsConfig.defaultOpenRouterKey : config.openrouterKey.trimmingCharacters(in: .whitespaces)
+                if let orResult = try? await callOpenAiCompatible(
+                    endpoint: Self.openRouterEndpoint,
+                    apiKey: orKey,
+                    model: "openrouter/free",
+                    action: action,
+                    prompt: prompt,
+                    metrics: metrics,
+                    edgeScore: edgeScore
+                ) {
+                    return orResult
+                }
+                
+                AppLogger.warning("Groq & failover failed. Falling back to local coach.")
                 let local = generateLocalCoachReflection(action: action, metrics: metrics, edgeScore: edgeScore, prompt: prompt)
                 return "⚠️ [Groq Notice: \(error.localizedDescription)]\n\n" + local
             }
@@ -435,6 +471,67 @@ public actor AIReflectionService {
         }
         
         return text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    
+    // MARK: - Dynamic Groq Model Discovery & Auto-Healing
+    
+    private func fetchBestActiveGroqModel(apiKey: String) async -> String? {
+        guard let url = URL(string: "https://api.groq.com/openai/v1/models") else { return nil }
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.addValue("Bearer \(apiKey.trimmingCharacters(in: .whitespaces))", forHTTPHeaderField: "Authorization")
+        request.timeoutInterval = 8
+        
+        struct GroqModelItem: Decodable {
+            let id: String
+            let active: Bool?
+            let context_window: Int?
+        }
+        struct GroqModelList: Decodable {
+            let data: [GroqModelItem]
+        }
+        
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else { return nil }
+            let list = try JSONDecoder().decode(GroqModelList.self, from: data)
+            
+            // Filter active chat/text completion models (exclude audio, guard, speech models)
+            let candidates = list.data.filter { item in
+                let lower = item.id.lowercased()
+                let isActive = item.active ?? true
+                guard isActive else { return false }
+                guard !lower.contains("whisper"),
+                      !lower.contains("guard"),
+                      !lower.contains("orpheus"),
+                      !lower.contains("embedding"),
+                      !lower.contains("tts"),
+                      !lower.contains("stt") else { return false }
+                return true
+            }
+            
+            // Score candidates based on capability and context window
+            let sorted = candidates.sorted { a, b in
+                scoreGroqCandidate(a.id, context: a.context_window ?? 0) > scoreGroqCandidate(b.id, context: b.context_window ?? 0)
+            }
+            
+            return sorted.first?.id
+        } catch {
+            AppLogger.warning("Failed to auto-discover Groq models: \(error.localizedDescription)")
+            return nil
+        }
+    }
+    
+    private func scoreGroqCandidate(_ id: String, context: Int) -> Int {
+        var score = context / 1000
+        let lower = id.lowercased()
+        if lower.contains("120b") { score += 500 }
+        else if lower.contains("70b") { score += 400 }
+        else if lower.contains("27b") { score += 300 }
+        else if lower.contains("20b") { score += 200 }
+        else if lower.contains("8b") { score += 100 }
+        if lower.contains("gpt-oss") || lower.contains("qwen") || lower.contains("llama") { score += 50 }
+        return score
     }
     
     // MARK: - Legacy Supabase Edge Function Fallback
