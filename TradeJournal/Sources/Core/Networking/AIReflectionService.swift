@@ -330,7 +330,9 @@ public actor AIReflectionService {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.addValue("Bearer \(apiKey.trimmingCharacters(in: .whitespaces))", forHTTPHeaderField: "Authorization")
+        let trimmedKey = apiKey.trimmingCharacters(in: .whitespaces)
+        request.addValue("Bearer \(trimmedKey)", forHTTPHeaderField: "Authorization")
+        request.addValue(trimmedKey, forHTTPHeaderField: "x-goog-api-key")
         request.timeoutInterval = 45
         
         let userContent = buildTraderContext(action: action, prompt: prompt, metrics: metrics, edgeScore: edgeScore)
@@ -529,6 +531,15 @@ public actor AIReflectionService {
     }
     
     private func parseApiErrorMessage(from data: Data, statusCode: Int) -> String {
+        if let jsonArray = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]],
+           let first = jsonArray.first {
+            if let errorObj = first["error"] as? [String: Any], let msg = errorObj["message"] as? String {
+                return msg
+            }
+            if let msg = first["message"] as? String {
+                return msg
+            }
+        }
         if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
             if let errorObj = json["error"] as? [String: Any], let msg = errorObj["message"] as? String {
                 return msg

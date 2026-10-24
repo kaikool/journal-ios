@@ -1,7 +1,7 @@
 import SwiftUI
 
 // MARK: - 7. Your Data & Backups Settings View
-// Ported 1:1 from `your-data` in `settings/page.tsx` & `api/export/route.ts`
+// Clean Apple HIG settings view with built-in zero-config cloud sync
 public struct YourDataSettingsView: View {
     @EnvironmentObject private var env: AppEnvironment
     @ObservedObject private var dataStore = TradeDataStore.shared
@@ -9,77 +9,112 @@ public struct YourDataSettingsView: View {
     @State private var showExportSheet: Bool = false
     @State private var exportedFileUrl: URL? = nil
     @State private var showResetConfirmation: Bool = false
-    @State private var seedMessage: String = ""
+    @State private var showWipeConfirmation: Bool = false
+    @State private var isWipingSupabase: Bool = false
+    @State private var showAdvancedDatabase: Bool = false
     
     // Supabase Cloud Configuration
     @State private var supabaseUrl: String = SupabaseService.shared.supabaseUrl
     @State private var supabaseAnonKey: String = SupabaseService.shared.supabaseAnonKey
     @State private var supabaseSyncStatus: String? = nil
-    @State private var showWipeConfirmation: Bool = false
-    @State private var isWipingSupabase: Bool = false
     
     public init() {}
     
     public var body: some View {
         VStack(spacing: 20) {
-            // Card 1: Cloud Backup (Supabase)
-            SettingsCard(title: "Cloud Backup (Supabase)") {
+            // Card 1: Cloud Backup & Sync
+            SettingsCard(title: "Cloud Backup & Sync") {
                 VStack(alignment: .leading, spacing: 14) {
-                    Text("Back up your trades, journals, and accounts to your private cloud database to keep your data safe and sync across devices.")
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.secondaryText)
-                    
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Project URL:")
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Supabase Cloud Database")
+                                .font(AppTypography.headline)
+                            Text("Automatic bi-directional sync for your trades, accounts, and journals.")
+                                .font(AppTypography.caption)
+                                .foregroundColor(AppColors.secondaryText)
+                        }
+                        Spacer()
+                        Text(SupabaseService.shared.isConfigured ? "Connected" : "Disconnected")
                             .font(AppTypography.captionBold)
-                            .foregroundColor(AppColors.secondaryText)
-                        TextField("https://your-project.supabase.co", text: $supabaseUrl)
-                            .font(AppTypography.inputText)
-                            .textFieldStyle(.roundedBorder)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled(true)
+                            .foregroundColor(SupabaseService.shared.isConfigured ? AppColors.profit : AppColors.secondaryText)
                     }
                     
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("API Key:")
-                            .font(AppTypography.captionBold)
-                            .foregroundColor(AppColors.secondaryText)
-                        SecureField("Paste API key (anon or service role)...", text: $supabaseAnonKey)
-                            .font(AppTypography.inputText)
-                            .textFieldStyle(.roundedBorder)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled(true)
-                        
-                        Text("Found in your Supabase Dashboard → Project Settings → API.")
-                            .font(AppTypography.caption)
-                            .foregroundColor(AppColors.secondaryText)
-                    }
+                    Divider()
                     
                     HStack(spacing: 8) {
-                        AppButton("Backup Now", icon: "arrow.triangle.2.circlepath", style: .primary, size: .compact, fullWidth: true, isLoading: dataStore.isSyncing) {
+                        AppButton("Sync Cloud", icon: "arrow.triangle.2.circlepath", style: .primary, size: .compact, fullWidth: true, isLoading: dataStore.isSyncing) {
                             syncSupabase()
                         }
-                        .disabled(supabaseUrl.trimmingCharacters(in: .whitespaces).isEmpty || supabaseAnonKey.trimmingCharacters(in: .whitespaces).isEmpty)
                         
                         AppButton("Sync Center", icon: "slider.horizontal.3", style: .secondary, size: .compact, fullWidth: true) {
                             env.showSyncCenter = true
                         }
                         
-                        AppButton("Test", icon: "network", style: .secondary, size: .compact, fullWidth: true) {
+                        AppButton("Check Connection", icon: "network", style: .secondary, size: .compact, fullWidth: true) {
                             checkSupabaseConnection()
                         }
-                        .disabled(supabaseUrl.trimmingCharacters(in: .whitespaces).isEmpty || supabaseAnonKey.trimmingCharacters(in: .whitespaces).isEmpty)
-                        
-                        AppButton("Wipe", icon: "trash", style: .destructive, size: .compact, fullWidth: true, isLoading: isWipingSupabase) {
-                            showWipeConfirmation = true
-                        }
-                        .disabled(supabaseUrl.trimmingCharacters(in: .whitespaces).isEmpty || supabaseAnonKey.trimmingCharacters(in: .whitespaces).isEmpty || isWipingSupabase)
                     }
                     
                     if let status = supabaseSyncStatus {
                         Text(status)
                             .font(AppTypography.caption)
-                            .foregroundColor(status.contains("Error") || status.contains("missing") ? AppColors.loss : AppColors.profit)
+                            .foregroundColor(status.contains("Error") || status.contains("error") ? AppColors.loss : AppColors.profit)
+                    }
+                    
+                    // Advanced Custom Database Disclosure (collapsed by default)
+                    DisclosureGroup(isExpanded: $showAdvancedDatabase) {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("The application connects automatically using built-in cloud credentials. You can override with a custom Supabase instance below.")
+                                .font(AppTypography.caption)
+                                .foregroundColor(AppColors.secondaryText)
+                                .padding(.top, 4)
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Project URL:")
+                                    .font(AppTypography.captionBold)
+                                    .foregroundColor(AppColors.secondaryText)
+                                TextField("https://your-project.supabase.co", text: $supabaseUrl)
+                                    .font(AppTypography.inputText)
+                                    .textFieldStyle(.roundedBorder)
+                                    .textInputAutocapitalization(.never)
+                                    .autocorrectionDisabled(true)
+                            }
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("API Key:")
+                                    .font(AppTypography.captionBold)
+                                    .foregroundColor(AppColors.secondaryText)
+                                SecureField("Paste API key (anon key)...", text: $supabaseAnonKey)
+                                    .font(AppTypography.inputText)
+                                    .textFieldStyle(.roundedBorder)
+                                    .textInputAutocapitalization(.never)
+                                    .autocorrectionDisabled(true)
+                            }
+                            
+                            HStack {
+                                Button("Reset to Default Cloud") {
+                                    supabaseUrl = SupabaseService.defaultSupabaseUrl
+                                    supabaseAnonKey = SupabaseService.defaultSupabaseAnonKey
+                                    SupabaseService.shared.configure(url: supabaseUrl, anonKey: supabaseAnonKey)
+                                    supabaseSyncStatus = "Reset to default cloud database."
+                                }
+                                .font(AppTypography.caption)
+                                .foregroundColor(AppColors.accent)
+                                
+                                Spacer()
+                                
+                                Button("Wipe Remote Data", role: .destructive) {
+                                    showWipeConfirmation = true
+                                }
+                                .font(AppTypography.caption)
+                                .foregroundColor(AppColors.loss)
+                            }
+                            .padding(.top, 4)
+                        }
+                    } label: {
+                        Text("Custom Database (Advanced)")
+                            .font(AppTypography.captionBold)
+                            .foregroundColor(AppColors.secondaryText)
                     }
                 }
             }
@@ -152,7 +187,7 @@ public struct YourDataSettingsView: View {
     private func checkSupabaseConnection() {
         SupabaseService.shared.configure(url: supabaseUrl, anonKey: supabaseAnonKey)
         Task {
-            supabaseSyncStatus = "Validating Project URL and Anon Key..."
+            supabaseSyncStatus = "Checking database connection..."
             do {
                 let res = try await SupabaseService.shared.pingConnection()
                 supabaseSyncStatus = res.message
