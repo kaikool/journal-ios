@@ -1,18 +1,16 @@
 import SwiftUI
 
-// MARK: - AI Trader Reflection View (100% English UI)
-// Integrates 11 specialized templates, structured visual Markdown results, and 1-tap Notebook saving
+// MARK: - AI Trader Reflection View (Apple HIG Standard)
+// Clean, simple performance coaching interface with rich trade data injection and 1-tap Notebook saving
 public struct AIReflectionView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var env: AppEnvironment
     @ObservedObject private var dataStore = TradeDataStore.shared
     
-    @State private var selectedCategory: AIReflectionCategory = .all
     @State private var selectedTemplate: AIReflectionTemplate = AIReflectionTemplates.all[0]
     @State private var userPrompt: String = ""
     @State private var reflectionResult: String = ""
     @State private var isLoading: Bool = false
-    @State private var showCustomAsk: Bool = false
     
     public init() {}
     
@@ -24,121 +22,21 @@ public struct AIReflectionView: View {
         EdgeScoreEngine.computeEdgeScore(metrics: metrics).score
     }
     
-    private var filteredTemplates: [AIReflectionTemplate] {
-        if selectedCategory == .all {
-            return AIReflectionTemplates.all
-        }
-        return AIReflectionTemplates.all.filter { $0.category == selectedCategory }
-    }
-    
     public var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 16) {
+                VStack(spacing: 14) {
                     
-                    // 1. Header Information Card
-                    AppCard {
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack {
-                                Image(systemName: "sparkles")
-                                    .foregroundColor(AppColors.brand)
-                                Text("AI Trader Reflection")
-                                    .font(AppTypography.headline)
-                                Spacer()
-                            }
-                            Text("Objective, data-grounded performance coaching tailored to your trading journal.")
-                                .font(AppTypography.caption)
-                                .foregroundColor(AppColors.secondaryText)
-                        }
-                    }
+                    // 1. Data Scope Header Badge
+                    scopeHeaderBadge
                     
-                    // 2. Category Selector Pills
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            ForEach(AIReflectionCategory.allCases) { cat in
-                                Button(action: {
-                                    selectedCategory = cat
-                                }) {
-                                    HStack(spacing: 4) {
-                                        Image(systemName: cat.icon)
-                                            .font(.caption2)
-                                        Text(cat.rawValue)
-                                            .font(AppTypography.captionBold)
-                                    }
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 8)
-                                    .background(selectedCategory == cat ? AppColors.brand : AppColors.surface)
-                                    .foregroundColor(selectedCategory == cat ? AppColors.brandTextOnDark : AppColors.primaryText)
-                                    .cornerRadius(20)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 20)
-                                            .stroke(selectedCategory == cat ? AppColors.brand : AppColors.border, lineWidth: 1)
-                                    )
-                                }
-                            }
-                        }
-                        .padding(.horizontal, 2)
-                    }
+                    // 2. Streamlined Topic Chips
+                    topicChipsSelector
                     
-                    // 3. Template Cards Carousel / List
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text("Specialized Coaching Templates")
-                                .font(AppTypography.captionBold)
-                                .foregroundColor(AppColors.secondaryText)
-                            Spacer()
-                            Button(action: {
-                                showCustomAsk.toggle()
-                            }) {
-                                HStack(spacing: 4) {
-                                    Image(systemName: showCustomAsk ? "chevron.up" : "questionmark.bubble")
-                                    Text(showCustomAsk ? "Hide Custom Ask" : "Ask Custom Question")
-                                }
-                                .font(AppTypography.captionBold)
-                                .foregroundColor(AppColors.brand)
-                            }
-                        }
-                        
-                        // Custom Ask Section if toggled
-                        if showCustomAsk {
-                            AppCard {
-                                VStack(alignment: .leading, spacing: 8) {
-                                    Text("Free-form Journal Inquiry")
-                                        .font(AppTypography.caption)
-                                        .foregroundColor(AppColors.secondaryText)
-                                    
-                                    HStack {
-                                        TextField("e.g. Which pair costs me the most on Thursdays?", text: $userPrompt)
-                                            .font(AppTypography.inputText)
-                                            .textFieldStyle(.roundedBorder)
-                                        
-                                        Button("Ask") {
-                                            executeCustomPrompt()
-                                        }
-                                        .font(AppTypography.captionBold)
-                                        .padding(.horizontal, 16)
-                                        .padding(.vertical, 8)
-                                        .background(AppColors.brand)
-                                        .foregroundColor(AppColors.brandTextOnDark)
-                                        .cornerRadius(8)
-                                        .disabled(userPrompt.trimmingCharacters(in: .whitespaces).isEmpty || isLoading)
-                                    }
-                                }
-                            }
-                        }
-                        
-                        // Templates Horizontal Scroll
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 10) {
-                                ForEach(filteredTemplates) { t in
-                                    templateCard(t)
-                                }
-                            }
-                            .padding(.horizontal, 2)
-                        }
-                    }
+                    // 3. Compact Inquiry Input Bar
+                    customInquiryBar
                     
-                    // 4. Rich Result Card or Placeholder
+                    // 4. Unified Result Document Card or Placeholder
                     if !reflectionResult.isEmpty {
                         AIReflectionResultView(
                             resultText: reflectionResult,
@@ -151,23 +49,12 @@ public struct AIReflectionView: View {
                             }
                         )
                     } else if !isLoading {
-                        AppCard {
-                            VStack(spacing: 12) {
-                                Image(systemName: "sparkles")
-                                    .font(.system(size: 30))
-                                    .foregroundColor(AppColors.brand)
-                                Text("Select a prompt template above to generate an AI reflection.")
-                                    .font(AppTypography.caption)
-                                    .foregroundColor(AppColors.secondaryText)
-                                    .multilineTextAlignment(.center)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 32)
-                        }
+                        emptyStateCard
                     }
                 }
-                .padding(16)
-                .padding(.bottom, 32)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .padding(.bottom, 24)
             }
             .background(AppColors.background)
             .navigationTitle("AI Trader Reflection")
@@ -184,7 +71,7 @@ public struct AIReflectionView: View {
         }
         .tradeJournalLoading(
             isLoading,
-            message: "Analyzing trade metrics and generating structured reflection...",
+            message: "Analyzing trade metrics and generating reflection...",
             size: 64
         )
         .onAppear {
@@ -194,47 +81,125 @@ public struct AIReflectionView: View {
         }
     }
     
-    // MARK: - Template Chip Card
-    private func templateCard(_ t: AIReflectionTemplate) -> some View {
-        let isSelected = selectedTemplate.id == t.id
-        return Button(action: {
-            selectedTemplate = t
-            executeTemplate(t)
-        }) {
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Image(systemName: t.icon)
-                        .font(.subheadline)
-                        .foregroundColor(isSelected ? AppColors.brandTextOnDark : AppColors.brand)
-                    Spacer()
-                    if isSelected {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.caption)
-                            .foregroundColor(AppColors.brandTextOnDark)
-                    }
-                }
-                
-                Text(t.title)
-                    .font(AppTypography.bodyBold)
-                    .foregroundColor(isSelected ? AppColors.brandTextOnDark : AppColors.primaryText)
-                    .lineLimit(1)
-                
-                Text(t.subtitle)
-                    .font(AppTypography.caption)
-                    .foregroundColor(isSelected ? AppColors.brandTextOnDark.opacity(0.85) : AppColors.secondaryText)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
-            }
-            .padding(12)
-            .frame(width: 220, height: 105, alignment: .topLeading)
-            .background(isSelected ? AppColors.brand : AppColors.surface)
-            .cornerRadius(12)
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(isSelected ? AppColors.brand : AppColors.border, lineWidth: 1)
-            )
+    // MARK: - 1. Data Scope Header Badge
+    private var scopeHeaderBadge: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "chart.line.uptrend.xyaxis")
+                .foregroundColor(AppColors.brand)
+                .font(.system(size: 13, weight: .semibold))
+            
+            Text(scopeSummaryText)
+                .font(.system(size: 12, weight: .medium, design: .rounded))
+                .foregroundColor(AppColors.primaryText)
+                .lineLimit(1)
+            
+            Spacer()
         }
-        .buttonStyle(.plain)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 9)
+        .background(AppColors.surface)
+        .cornerRadius(10)
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(AppColors.border.opacity(0.8), lineWidth: 0.8)
+        )
+    }
+    
+    private var scopeSummaryText: String {
+        let count = metrics.totalTrades
+        let wr = String(format: "%.0f%%", (metrics.winRate ?? 0) * 100)
+        let pnl = metrics.netPnl
+        let pnlStr = (pnl >= 0 ? "+$" : "-$") + "\(abs(NSDecimalNumber(decimal: pnl).doubleValue))"
+        return "\(count) Trades Analyzed • WR: \(wr) • P&L: \(pnlStr)"
+    }
+    
+    // MARK: - 2. Streamlined Topic Chips
+    private var topicChipsSelector: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(AIReflectionTemplates.all) { t in
+                    let isSelected = selectedTemplate.id == t.id
+                    Button(action: {
+                        selectedTemplate = t
+                        executeTemplate(t)
+                    }) {
+                        HStack(spacing: 6) {
+                            Image(systemName: t.icon)
+                                .font(.system(size: 12, weight: .semibold))
+                            Text(t.title)
+                                .font(AppTypography.captionBold)
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(isSelected ? AppColors.brand : AppColors.surface)
+                        .foregroundColor(isSelected ? AppColors.brandTextOnDark : AppColors.primaryText)
+                        .cornerRadius(20)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 20)
+                                .stroke(isSelected ? AppColors.brand : AppColors.border, lineWidth: 0.8)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 2)
+        }
+    }
+    
+    // MARK: - 3. Compact Inquiry Input Bar
+    private var customInquiryBar: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "sparkle.magnifyingglass")
+                .foregroundColor(AppColors.secondaryText)
+                .font(.system(size: 14))
+                .padding(.leading, 10)
+            
+            TextField("Ask custom question about your trades...", text: $userPrompt)
+                .font(AppTypography.inputText)
+                .foregroundColor(AppColors.primaryText)
+                .padding(.vertical, 8)
+            
+            if !userPrompt.isEmpty {
+                Button(action: { userPrompt = "" }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(AppColors.secondaryText)
+                        .font(.system(size: 14))
+                }
+            }
+            
+            Button(action: executeCustomPrompt) {
+                Image(systemName: "arrow.up.circle.fill")
+                    .font(.system(size: 26))
+                    .foregroundColor(userPrompt.trimmingCharacters(in: .whitespaces).isEmpty || isLoading ? AppColors.secondaryText.opacity(0.4) : AppColors.brand)
+            }
+            .disabled(userPrompt.trimmingCharacters(in: .whitespaces).isEmpty || isLoading)
+            .padding(.trailing, 4)
+        }
+        .padding(.vertical, 4)
+        .padding(.horizontal, 6)
+        .background(AppColors.surface)
+        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(AppColors.border, lineWidth: 0.8)
+        )
+    }
+    
+    // MARK: - Empty State Placeholder
+    private var emptyStateCard: some View {
+        AppCard {
+            VStack(spacing: 12) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 32))
+                    .foregroundColor(AppColors.brand)
+                Text("Select a topic above or ask a question to generate an AI reflection.")
+                    .font(AppTypography.caption)
+                    .foregroundColor(AppColors.secondaryText)
+                    .multilineTextAlignment(.center)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 36)
+        }
     }
     
     // MARK: - Execution Handlers
@@ -275,11 +240,24 @@ public struct AIReflectionView: View {
         isLoading = true
         let query = userPrompt
         
+        // Build rich trader trades context so custom inquiry can analyze specific symbols & trades
+        let recentSummary = AIReflectionTemplates.buildRecentTradesSnippet(trades: dataStore.filteredTrades, limit: 12)
+        let fullCustomPrompt = """
+        USER CUSTOM INQUIRY:
+        "\(query)"
+        
+        RECENT TRADES IN JOURNAL:
+        \(recentSummary)
+        
+        TASK:
+        Answer the trader's specific question directly using the actual performance figures and real trade details provided above. Cite specific symbols, prices, and outcomes.
+        """
+        
         Task {
             do {
                 let response = try await AIReflectionService.shared.requestReflection(
                     action: .ask,
-                    prompt: query,
+                    prompt: fullCustomPrompt,
                     metrics: metrics,
                     edgeScore: edgeScore,
                     language: dataStore.aiSettings.language

@@ -3,10 +3,10 @@ import Foundation
 // MARK: - AI Reflection Categories (100% English UI)
 public enum AIReflectionCategory: String, CaseIterable, Identifiable, Sendable {
     case all = "All"
-    case cadence = "Cadence & Review"
-    case execution = "Trade & Execution"
-    case psychology = "Psychology & Leaks"
-    case risk = "Risk & Prop Firm"
+    case cadence = "Session Recap"
+    case execution = "Trade Audit"
+    case psychology = "Leaks & Discipline"
+    case risk = "Risk & Prop Guard"
     
     public var id: String { rawValue }
     
@@ -14,14 +14,14 @@ public enum AIReflectionCategory: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .all: return "sparkles"
         case .cadence: return "calendar.badge.clock"
-        case .execution: return "chart.bar.xaxis"
+        case .execution: return "scope"
         case .psychology: return "brain.head.profile"
         case .risk: return "shield.checkered"
         }
     }
 }
 
-// MARK: - AI Reflection Template Definition (100% English UI)
+// MARK: - AI Reflection Template Definition
 public struct AIReflectionTemplate: Identifiable, Sendable {
     public let id: String
     public let title: String
@@ -53,130 +53,110 @@ public struct AIReflectionTemplate: Identifiable, Sendable {
     }
 }
 
-// MARK: - Pre-built 11 Specialized Templates
+// MARK: - Specialized Coaching Templates
 public struct AIReflectionTemplates {
     
     public static let all: [AIReflectionTemplate] = [
-        // 1. Cadence & Reviews
+        // 1. Session Recap
         AIReflectionTemplate(
             id: "daily_recap",
-            title: "Daily Trading Recap",
-            subtitle: "Structured day review: 2 key strengths & 1 primary discipline takeaway",
+            title: "Session Recap",
+            subtitle: "Review execution, profit & loss, and discipline on your latest trades",
             icon: "doc.text.magnifyingglass",
             category: .cadence,
             action: .recap,
-            tag: "#ai-daily-recap",
-            notePrefix: "[AI Daily Recap]"
+            tag: "#ai-session-recap",
+            notePrefix: "[AI Session Recap]"
         ),
-        AIReflectionTemplate(
-            id: "weekly_audit",
-            title: "Weekly Performance Audit",
-            subtitle: "Diagnose overall weekly rhythm, profit factor trend, best vs worst day",
-            icon: "calendar",
-            category: .cadence,
-            action: .recap,
-            tag: "#ai-weekly-audit",
-            notePrefix: "[AI Weekly Audit]"
-        ),
-        AIReflectionTemplate(
-            id: "pre_market_prep",
-            title: "Pre-Market Mindset & Prep",
-            subtitle: "Review previous session leaks to establish 2 non-negotiable rules for today",
-            icon: "sunrise.fill",
-            category: .cadence,
-            action: .critique,
-            tag: "#ai-pre-market",
-            notePrefix: "[AI Pre-Market Prep]"
-        ),
-        
-        // 2. Execution & Setups
+        // 2. Single Trade Critique
         AIReflectionTemplate(
             id: "trade_post_mortem",
-            title: "Single Trade Post-Mortem",
-            subtitle: "Anatomical audit of latest trade: entry, exit, planned vs realized R:R",
+            title: "Trade Post-Mortem",
+            subtitle: "Deep-dive into your latest closed trade: entry quality, exit, and R:R",
             icon: "scope",
             category: .execution,
             action: .critique,
-            tag: "#ai-trade-critique",
-            notePrefix: "[AI Trade Critique]"
+            tag: "#ai-trade-audit",
+            notePrefix: "[AI Trade Post-Mortem]"
         ),
-        AIReflectionTemplate(
-            id: "risk_reward_audit",
-            title: "Realized Risk/Reward Audit",
-            subtitle: "Audit average win vs loss ratio and mathematical expectancy",
-            icon: "scalemass.fill",
-            category: .execution,
-            action: .critique,
-            tag: "#ai-rr-audit",
-            notePrefix: "[AI R:R Audit]"
-        ),
-        AIReflectionTemplate(
-            id: "playbook_edge",
-            title: "Playbook & Setup Edge Evaluation",
-            subtitle: "Evaluate setup profitability to identify your true mathematical edge",
-            icon: "book.pages.fill",
-            category: .execution,
-            action: .critique,
-            tag: "#ai-playbook-edge",
-            notePrefix: "[AI Playbook Edge]"
-        ),
-        
-        // 3. Psychology & Leaks
+        // 3. Leaks & Psychology
         AIReflectionTemplate(
             id: "leak_detector",
-            title: "Capital Leak Detector",
-            subtitle: "Pinpoint top behavioral mistake categories draining your account balance",
-            icon: "exclamationmark.triangle.fill",
+            title: "Leaks & Psychology",
+            subtitle: "Diagnose top loss drivers, tilt vulnerability, and rule breaks",
+            icon: "exclamationmark.shield",
             category: .psychology,
             action: .critique,
-            tag: "#ai-leak-detector",
+            tag: "#ai-leaks-audit",
             notePrefix: "[AI Leak Audit]"
         ),
-        AIReflectionTemplate(
-            id: "revenge_tilt_check",
-            title: "Revenge & Tilt Diagnostic",
-            subtitle: "Scan for emotional revenge entries, rapid-fire trading, or lot size surges after losses",
-            icon: "flame.fill",
-            category: .psychology,
-            action: .critique,
-            tag: "#ai-tilt-diagnostic",
-            notePrefix: "[AI Tilt Diagnostic]"
-        ),
-        AIReflectionTemplate(
-            id: "session_vulnerability",
-            title: "Session & Time Vulnerability",
-            subtitle: "Identify your most profitable sessions vs leak-prone hours to avoid overtrading",
-            icon: "clock.badge.exclamationmark",
-            category: .psychology,
-            action: .ask,
-            tag: "#ai-session-leak",
-            notePrefix: "[AI Session Vulnerability]"
-        ),
-        
-        // 4. Risk & Prop Firm
+        // 4. Prop Firm & Risk Guard
         AIReflectionTemplate(
             id: "prop_drawdown_guard",
-            title: "Prop Firm Drawdown Guard",
-            subtitle: "Calculate safety buffer against daily & overall drawdown limits (The5ers/FTMO)",
-            icon: "shield.lefthalf.filled",
+            title: "Risk & Prop Guard",
+            subtitle: "Drawdown defense, position sizing limits, and capital preservation",
+            icon: "shield.checkered",
             category: .risk,
             action: .critique,
             tag: "#ai-prop-guard",
             notePrefix: "[AI Prop Guard]"
         ),
+        // 5. Risk / Reward Optimization
+        AIReflectionTemplate(
+            id: "risk_reward_audit",
+            title: "R:R & Expectancy",
+            subtitle: "Assess payoff asymmetry: are big losses eroding consecutive winning trades?",
+            icon: "chart.bar.xaxis",
+            category: .execution,
+            action: .critique,
+            tag: "#ai-rr-audit",
+            notePrefix: "[AI RR Audit]"
+        ),
+        // 6. Lot Size Consistency
         AIReflectionTemplate(
             id: "lot_size_consistency",
-            title: "Position Sizing Consistency",
-            subtitle: "Ensure risk per trade and lot sizing remains disciplined between winners and losers",
+            title: "Lot Sizing Audit",
+            subtitle: "Verify uniform risk sizing vs arbitrary lot spikes on losing trades",
             icon: "chart.pie.fill",
             category: .risk,
             action: .critique,
-            tag: "#ai-size-consistency",
-            notePrefix: "[AI Size Consistency]"
+            tag: "#ai-sizing-audit",
+            notePrefix: "[AI Sizing Audit]"
         )
     ]
     
-    // MARK: - Prompt Builder
+    // MARK: - Format Recent Trades for Rich Prompt Injection
+    public static func buildRecentTradesSnippet(trades: [Trade], limit: Int = 10) -> String {
+        let sorted = trades.filter { $0.closedAt != nil }.sorted { ($0.closedAt ?? Date.distantPast) > ($1.closedAt ?? Date.distantPast) }
+        guard !sorted.isEmpty else { return "No closed trades recorded in this scope." }
+        
+        let slice = sorted.prefix(limit)
+        var lines: [String] = []
+        let f = DateFormatter()
+        f.dateFormat = "MM-dd HH:mm"
+        
+        for (idx, t) in slice.enumerated() {
+            let pnlStr = (t.netPnl >= 0 ? "+" : "") + "\(t.netPnl)"
+            let dateStr = t.closedAt.map { f.string(from: $0) } ?? "N/A"
+            let durationStr: String
+            if let ms = t.durationMs {
+                let mins = ms / 60000
+                durationStr = mins >= 60 ? "\(mins/60)h \(mins%60)m" : "\(mins)m"
+            } else {
+                durationStr = "N/A"
+            }
+            let exitStr = t.avgExit.map { "\($0)" } ?? "N/A"
+            let slStr = t.stopLoss.map { " | SL: \($0)" } ?? ""
+            let tpStr = t.profitTarget.map { " | TP: \($0)" } ?? ""
+            let mistakesStr = t.mistakes.isEmpty ? "" : " | Mistakes: \(t.mistakes.joined(separator: ", "))"
+            let notesStr = (t.notes?.isEmpty ?? true) ? "" : " | Note: \(t.notes!)"
+            
+            lines.append("Trade #\(idx + 1) [\(dateStr)] \(t.symbol) \(t.side) \(t.quantity) lots | In: \(t.avgEntry) -> Out: \(exitStr)\(slStr)\(tpStr) | P&L: \(pnlStr) (Hold: \(durationStr))\(mistakesStr)\(notesStr)")
+        }
+        return lines.joined(separator: "\n")
+    }
+    
+    // MARK: - Smart Prompt Builder with Real Data Injection
     public static func buildTemplatePrompt(
         template: AIReflectionTemplate,
         metrics: TradeMetrics?,
@@ -185,152 +165,170 @@ public struct AIReflectionTemplates {
         language: String
     ) -> String {
         let isVi = language == "vi"
-        let langInstruction = isVi ? "\nLƯU Ý QUAN TRỌNG: Hãy trả lời 100% bằng TIẾNG VIỆT, dùng các thuật ngữ trading chuẩn xác (Stop Loss, Take Profit, Win Rate, Risk/Reward, Drawdown, Entry, Exit)." : "\nIMPORTANT: Respond 100% in English using professional trading terminology."
+        let langInstruction = isVi
+            ? "\nLƯU Ý QUAN TRỌNG: Hãy phân tích dựa trên 100% dữ liệu thực tế ở trên. Trả lời bằng TIẾNG VIỆT, dùng các thuật ngữ trading chuẩn (Stop Loss, Take Profit, Win Rate, Risk/Reward, Drawdown, Entry, Exit). Đưa ra nhận xét cụ thể cho từng cặp tiền/mã lệnh thực tế."
+            : "\nIMPORTANT: Ground all critique 100% in the real trade data above. Cite specific symbols, prices, and outcomes in professional trading terminology."
+        
+        let sorted = trades.filter { $0.closedAt != nil }.sorted { ($0.closedAt ?? Date.distantPast) > ($1.closedAt ?? Date.distantPast) }
         
         switch template.id {
         case "daily_recap":
+            let f = DateFormatter()
+            f.dateFormat = "yyyy-MM-dd"
             let todayStr = JournalIds.todayDateString()
-            let todayTrades = trades.filter { t in
+            
+            // Check if there are trades closed today; if not, automatically analyze the most recent session with trades
+            var sessionTrades = sorted.filter { t in
                 guard let close = t.closedAt else { return false }
-                let f = DateFormatter()
-                f.dateFormat = "yyyy-MM-dd"
                 return f.string(from: close) == todayStr
             }
-            let count = todayTrades.count
-            let pnl = todayTrades.reduce(Decimal.zero) { $0 + $1.netPnl }
-            let wins = todayTrades.filter { $0.netPnl > 0 }.count
-            let losses = todayTrades.filter { $0.netPnl < 0 }.count
+            var sessionLabel = "Today (\(todayStr))"
+            
+            if sessionTrades.isEmpty, let latest = sorted.first, let close = latest.closedAt {
+                let latestDateStr = f.string(from: close)
+                sessionTrades = sorted.filter { t in
+                    guard let c = t.closedAt else { return false }
+                    return f.string(from: c) == latestDateStr
+                }
+                sessionLabel = "Latest Active Session (\(latestDateStr))"
+            }
+            
+            let count = sessionTrades.count
+            let pnl = sessionTrades.reduce(Decimal.zero) { $0 + $1.netPnl }
+            let wins = sessionTrades.filter { $0.netPnl > 0 }.count
+            let losses = sessionTrades.filter { $0.netPnl < 0 }.count
+            let tradeDetails = buildRecentTradesSnippet(trades: sessionTrades, limit: 10)
             
             return """
-            TODAY'S RECORDED TRADING DATA (\(todayStr)):
-            - Closed Trades Today: \(count) (Wins: \(wins) | Losses: \(losses))
-            - Net Daily P&L: \(pnl >= 0 ? "+" : "")\(pnl)
+            TRADING SESSION ANALYZED: \(sessionLabel)
+            - Total Closed Trades in Session: \(count) (Wins: \(wins) | Losses: \(losses))
+            - Net Session P&L: \(pnl >= 0 ? "+" : "")\(pnl)
             
-            TASK: DAILY TRADING RECAP
-            1. Performance & Execution Summary: Assess discipline and adherence to rules today.
-            2. Two Key Strengths: Highlight 2 execution or risk strengths grounded strictly in the data.
-            3. One Discipline Improvement: Define 1 non-negotiable rule or risk adjustment for tomorrow.
-            \(langInstruction)
-            """
+            SESSION TRADES BREAKDOWN:
+            \(tradeDetails)
             
-        case "weekly_audit":
-            return """
-            TASK: WEEKLY PERFORMANCE AUDIT
-            Review overall performance metrics (Total Trades, Win Rate, Profit Factor, Edge Score, Max Drawdown):
-            1. Trajectory Trend: Diagnose whether current performance is improving, consolidating, or deteriorating.
-            2. Risk/Reward Symmetry: Evaluate payoff balance between winners and losers.
-            3. Actionable Goal: Prescribe 1 specific behavioral goal to boost mathematical expectancy for next week.
-            \(langInstruction)
-            """
-            
-        case "pre_market_prep":
-            return """
-            TASK: PRE-MARKET MINDSET & PROTOCOL PREPARATION
-            Review recent session context, streaks, and current drawdown:
-            1. Psychological Hazards: Warn against emotional biases entering the upcoming session.
-            2. Core Directives: Establish exactly 2 Non-negotiable Rules for today's trading.
-            3. Circuit Breaker: Specify a strict daily max loss threshold where the trader must stop trading.
+            TASK: SESSION RECAP & DISCIPLINE AUDIT
+            1. Execution Assessment: Evaluate how well entries and exits matched discipline on the specific trades listed above.
+            2. Strengths Observed: Identify 2 concrete execution or risk management actions that were executed well.
+            3. Discipline Takeaway: Identify the primary leak or vulnerability and prescribe 1 non-negotiable rule for the next session.
             \(langInstruction)
             """
             
         case "trade_post_mortem":
-            let lastTrade = trades.first(where: { $0.closedAt != nil })
+            let lastTrade = sorted.first
             let symbol = lastTrade?.symbol ?? "N/A"
             let pnl = lastTrade?.netPnl ?? Decimal.zero
             let side = lastTrade?.side.uppercased() ?? "N/A"
             let entry = lastTrade?.entryPrice ?? Decimal.zero
             let exit = lastTrade?.avgExit.map { "\($0)" } ?? "N/A"
+            let sl = lastTrade?.stopLoss.map { "\($0)" } ?? "Not Set"
+            let tp = lastTrade?.profitTarget.map { "\($0)" } ?? "Not Set"
+            let quantity = lastTrade?.quantity ?? Decimal.zero
             let mistakes = lastTrade?.mistakes.joined(separator: ", ") ?? ""
+            let notes = lastTrade?.notes ?? ""
+            let recentList = buildRecentTradesSnippet(trades: sorted, limit: 5)
             
             return """
-            LATEST CLOSED TRADE DETAILS:
-            - Symbol: \(symbol) | Side: \(side) | P&L: \(pnl >= 0 ? "+" : "")\(pnl)
-            - Entry Price: \(entry) | Exit Price: \(exit)
+            TARGET TRADE TO AUDIT (LATEST CLOSED POSITION):
+            - Symbol: \(symbol) | Side: \(side) | Volume: \(quantity) lots
+            - Entry Price: \(entry) -> Exit Price: \(exit)
+            - Planned Stop Loss: \(sl) | Planned Take Profit: \(tp)
+            - Realized P&L: \(pnl >= 0 ? "+" : "")\(pnl)
             - Logged Mistakes: \(mistakes.isEmpty ? "None" : mistakes)
+            - Trader Notes: \(notes.isEmpty ? "None" : notes)
             
-            TASK: SINGLE TRADE POST-MORTEM
-            1. Entry & Exit Assessment: Analyze execution quality at market entry and exit.
-            2. Discipline Audit: Check for early profit-taking or excessive holding of losses beyond planned parameters.
-            3. Takeaway: Provide 1 objective coaching rule for executing similar setups in the future.
-            \(langInstruction)
-            """
+            PRIOR CONTEXT TRADES:
+            \(recentList)
             
-        case "risk_reward_audit":
-            return """
-            TASK: RISK/REWARD & EXPECTANCY AUDIT
-            Analyze current Win Rate, Largest Win, Largest Loss, and Net P&L:
-            1. System Dependency: Determine if profitability relies on high win-rate or positive payout ratio.
-            2. Payoff Asymmetry: Check if rare large losses are canceling out consecutive winning trades.
-            3. Optimization: Recommend the minimum target realized R:R for consistent capital compounding.
-            \(langInstruction)
-            """
-            
-        case "playbook_edge":
-            return """
-            TASK: PLAYBOOK & STATISTICAL EDGE EVALUATION
-            Based on trade history and Edge Score v2:
-            1. Edge Verification: Evaluate whether trade history demonstrates a statistically verifiable edge.
-            2. Performance Drag: Identify the single biggest leak dragging down the Edge Score.
-            3. Refinement: Provide 1 actionable step to filter out low-probability trades.
+            TASK: ANATOMICAL POST-MORTEM OF TARGET TRADE
+            1. Entry Timing & Sizing: Evaluate if the entry was well-timed or chased, and whether volume matched risk tolerance.
+            2. Trade Management: Analyze exit execution—did the trader hold through drawdown, move SL, or exit prematurely?
+            3. Actionable Rule: State 1 precise rule for executing this specific setup in the future.
             \(langInstruction)
             """
             
         case "leak_detector":
-            let allMistakes = trades.flatMap { $0.mistakes }
+            let allMistakes = sorted.flatMap { $0.mistakes }
             let mistakeCounts = Dictionary(grouping: allMistakes, by: { $0 }).mapValues { $0.count }
-            let sortedMistakes = mistakeCounts.sorted { $0.value > $1.value }.prefix(3)
-            let mistakeSummary = sortedMistakes.isEmpty ? "No mistake tags logged yet" : sortedMistakes.map { "\($0.key): \($0.value) times" }.joined(separator: ", ")
+            let sortedMistakes = mistakeCounts.sorted { $0.value > $1.value }
+            let mistakeSummary = sortedMistakes.isEmpty ? "No manual mistake tags logged" : sortedMistakes.map { "\($0.key): \($0.value) times" }.joined(separator: ", ")
+            
+            // Extract largest losing trades
+            let bigLosses = sorted.filter { $0.netPnl < 0 }.sorted { $0.netPnl < $1.netPnl }.prefix(5)
+            let lossSummary = bigLosses.map { "#\($0.symbol) \($0.side) \($0.quantity) lots: \($0.netPnl) (Mistakes: \($0.mistakes.joined(separator: ", ")))" }.joined(separator: "\n")
             
             return """
             RECORDED MISTAKE FREQUENCY:
-            - Top logged mistakes: \(mistakeSummary)
+            - Top logged mistake tags: \(mistakeSummary)
             
-            TASK: CAPITAL LEAK DETECTION
-            1. Root Cause: Diagnose the underlying psychological driver (FOMO, fear of losing, impatience).
-            2. Equity Impact: Quantify the behavioral drag on trading capital.
-            3. Barrier Protocol: Prescribe a concrete rule to eliminate this recurring error.
-            \(langInstruction)
-            """
+            BIGGEST DRAWDOWN TRADES (LARGEST LOSSES):
+            \(lossSummary.isEmpty ? "No losing trades found in journal" : lossSummary)
             
-        case "revenge_tilt_check":
-            return """
-            TASK: REVENGE TRADING & TILT DIAGNOSTIC
-            Using Max Loss Streak and Max Drawdown:
-            1. Vulnerability Assessment: Check for signs of emotional escalation following losing trades.
-            2. Compounding Risks: Warn against sizing inflation or rapid-fire re-entries.
-            3. Protocol: Formulate an exact 3-step circuit breaker when suffering 2 consecutive losses.
-            \(langInstruction)
-            """
-            
-        case "session_vulnerability":
-            return """
-            TASK: SESSION & TIME MANAGEMENT ANALYSIS
-            1. Session Focus: Analyze execution during peak liquidity sessions (London/NY overlaps) vs off-hours.
-            2. Overtrading Prevention: Warn against low-probability consolidation trading during dead hours.
-            3. Recommended Window: Recommend an optimal 2-3 hour window of maximum mental acuity.
+            TASK: CAPITAL LEAK & BEHAVIORAL DETECTION
+            1. Core Leak Identification: Pinpoint the behavioral trigger (FOMO, fear of losing, moving SL, revenge) behind the biggest losses.
+            2. Expectancy Impact: Quantify how these specific errors disproportionately damage overall account expectancy.
+            3. Circuit Breaker Rule: Formulate 1 strict non-negotiable rule to eliminate this leak.
             \(langInstruction)
             """
             
         case "prop_drawdown_guard":
             let dd = metrics?.maxDrawdownPct.map { String(format: "%.1f%%", $0) } ?? "0%"
             let pnl = metrics?.netPnl ?? Decimal.zero
-            return """
-            CURRENT RISK & CAPITAL BUFFER:
-            - Max Drawdown: \(dd) | Net Cumulative P&L: \(pnl >= 0 ? "+" : "")\(pnl)
+            let totalLosses = sorted.filter { $0.netPnl < 0 }.count
+            let lossStreak = metrics?.maxLossStreak ?? 0
+            let recentLosses = sorted.filter { $0.netPnl < 0 }.prefix(4).map { "\($0.symbol) \($0.side) \($0.quantity)L: \($0.netPnl)" }.joined(separator: ", ")
             
-            TASK: PROP FIRM DRAWDOWN GUARD (THE5ERS / FTMO)
-            1. Buffer Status: Evaluate distance to daily limit (typically 5%) and maximum limit (typically 10%).
-            2. Sizing Recommendation: Prescribe maximum recommended risk percentage on the next trade to ensure survival.
-            3. Drawdown Protocol: Outline a defensive step-down plan if drawdown exceeds 3%.
+            return """
+            ACCOUNT RISK & CAPITAL METRICS:
+            - Max Cumulative Drawdown: \(dd)
+            - Net Cumulative P&L: \(pnl >= 0 ? "+" : "")\(pnl)
+            - Max Losing Streak: \(lossStreak) consecutive trades
+            - Total Losing Trades: \(totalLosses)
+            - Recent Loss Sample: \(recentLosses.isEmpty ? "None" : recentLosses)
+            
+            TASK: PROP FIRM DRAWDOWN DEFENSE (THE5ERS / FTMO PROTOCOL)
+            1. Drawdown Safety Buffer: Evaluate current risk distance to the 5% daily limit and 10% maximum drawdown ceiling.
+            2. Lot Sizing Cap: Prescribe the exact recommended risk percentage per trade (e.g. 0.25% - 0.50%) to withstand a 4-loss streak.
+            3. Emergency Step-Down: Define an automatic pause rule if the account incurs 2 consecutive losses in one session.
+            \(langInstruction)
+            """
+            
+        case "risk_reward_audit":
+            let wins = sorted.filter { $0.netPnl > 0 }
+            let losses = sorted.filter { $0.netPnl < 0 }
+            let avgWin = wins.isEmpty ? Decimal.zero : wins.reduce(Decimal.zero) { $0 + $1.netPnl } / Decimal(wins.count)
+            let avgLoss = losses.isEmpty ? Decimal.zero : abs(losses.reduce(Decimal.zero) { $0 + $1.netPnl } / Decimal(losses.count))
+            let wr = (metrics?.winRate ?? 0.0) * 100
+            let recentBreakdown = buildRecentTradesSnippet(trades: sorted, limit: 6)
+            
+            return """
+            PAYOFF ASYMMETRY METRICS:
+            - Win Rate: \(String(format: "%.1f%%", wr))
+            - Average Winning Trade: +$\(avgWin)
+            - Average Losing Trade: -$\(avgLoss)
+            - Largest Win: \(metrics?.largestWin ?? Decimal.zero) | Largest Loss: \(metrics?.largestLoss ?? Decimal.zero)
+            
+            SAMPLE OF RECENT TRADES:
+            \(recentBreakdown)
+            
+            TASK: RISK/REWARD & EXPECTANCY AUDIT
+            1. Payoff Ratio Assessment: Determine if average winners sufficiently outweigh average losers.
+            2. Outlier Drag: Check if rare large losses are canceling out multiple disciplined winning trades.
+            3. Target R:R Guideline: Prescribe the minimum target realized R:R for consistent capital compounding.
             \(langInstruction)
             """
             
         case "lot_size_consistency":
+            let recentLots = sorted.prefix(8).map { "\($0.symbol): \($0.quantity) lots (P&L: \($0.netPnl >= 0 ? "+" : "")\($0.netPnl))" }.joined(separator: ", ")
+            
             return """
+            POSITION SIZING SAMPLE (LAST 8 TRADES):
+            \(recentLots)
+            
             TASK: POSITION SIZING & RISK CONSISTENCY AUDIT
-            1. Risk Uniformity: Evaluate the necessity of uniform risk per trade vs arbitrary lot sizes.
-            2. Fatal Pitfall: Check for the classic pitfall: micro lots on winners, inflated lots when trying to break even.
-            3. Standard Formula: Outline a strict position sizing formula based on distance to Stop Loss.
+            1. Lot Uniformity Check: Identify whether position size fluctuates arbitrarily between setups.
+            2. Fatal Pitfall Warning: Warn against the classic trap of trading small on winners and sizing up on losers.
+            3. Standard Formula: Outline a strict SL-distance based sizing formula to ensure uniform account risk.
             \(langInstruction)
             """
             

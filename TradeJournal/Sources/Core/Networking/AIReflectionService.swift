@@ -84,46 +84,42 @@ public actor AIReflectionService {
         
         switch config.provider {
         case "github":
-            guard !config.githubKey.trimmingCharacters(in: .whitespaces).isEmpty else {
-                let local = generateLocalCoachReflection(action: action, metrics: metrics, edgeScore: edgeScore, prompt: prompt)
-                return "ℹ️ [GitHub Token Not Configured] Go to Settings > AI to enter your GitHub Personal Access Token (PAT).\n\n" + local
+            if !config.githubKey.trimmingCharacters(in: .whitespaces).isEmpty {
+                do {
+                    return try await callOpenAiCompatible(
+                        endpoint: Self.githubEndpoint,
+                        apiKey: config.githubKey,
+                        model: config.model.isEmpty ? "gpt-4o" : config.model,
+                        action: action,
+                        prompt: prompt,
+                        metrics: metrics,
+                        edgeScore: edgeScore,
+                        language: activeLang
+                    )
+                } catch {
+                    AppLogger.warning("GitHub Models failed: \(error.localizedDescription). Falling back to default AI provider...")
+                }
             }
-            do {
-                return try await callOpenAiCompatible(
-                    endpoint: Self.githubEndpoint,
-                    apiKey: config.githubKey,
-                    model: config.model.isEmpty ? "gpt-4o" : config.model,
-                    action: action,
-                    prompt: prompt,
-                    metrics: metrics,
-                    edgeScore: edgeScore
-                )
-            } catch {
-                AppLogger.warning("GitHub Models request failed: \(error.localizedDescription). Falling back to local coach.")
-                let local = generateLocalCoachReflection(action: action, metrics: metrics, edgeScore: edgeScore, prompt: prompt)
-                return "⚠️ [AI Reflection Notice: \(error.localizedDescription)]\n\n" + local
-            }
+            return try await callDefaultProvider(action: action, prompt: prompt, metrics: metrics, edgeScore: edgeScore, language: activeLang)
             
         case "gemini":
-            guard !config.geminiKey.trimmingCharacters(in: .whitespaces).isEmpty else {
-                let local = generateLocalCoachReflection(action: action, metrics: metrics, edgeScore: edgeScore, prompt: prompt)
-                return "ℹ️ [AI Coach Not Configured] Enter your API key in Settings > AI.\n\n" + local
+            if !config.geminiKey.trimmingCharacters(in: .whitespaces).isEmpty {
+                do {
+                    return try await callOpenAiCompatible(
+                        endpoint: Self.geminiEndpoint,
+                        apiKey: config.geminiKey,
+                        model: config.model.isEmpty ? "gemini-2.0-flash" : config.model,
+                        action: action,
+                        prompt: prompt,
+                        metrics: metrics,
+                        edgeScore: edgeScore,
+                        language: activeLang
+                    )
+                } catch {
+                    AppLogger.warning("Gemini failed: \(error.localizedDescription). Falling back to default AI provider...")
+                }
             }
-            do {
-                return try await callOpenAiCompatible(
-                    endpoint: Self.geminiEndpoint,
-                    apiKey: config.geminiKey,
-                    model: config.model.isEmpty ? "gemini-2.0-flash" : config.model,
-                    action: action,
-                    prompt: prompt,
-                    metrics: metrics,
-                    edgeScore: edgeScore
-                )
-            } catch {
-                AppLogger.warning("Google Gemini request failed: \(error.localizedDescription). Falling back to local coach.")
-                let local = generateLocalCoachReflection(action: action, metrics: metrics, edgeScore: edgeScore, prompt: prompt)
-                return "⚠️ [AI Reflection Notice: \(error.localizedDescription)]\n\n" + local
-            }
+            return try await callDefaultProvider(action: action, prompt: prompt, metrics: metrics, edgeScore: edgeScore, language: activeLang)
             
         case "groq":
             let activeKey = config.groqKey.trimmingCharacters(in: .whitespaces).isEmpty ? AiSettingsConfig.defaultGroqKey : config.groqKey.trimmingCharacters(in: .whitespaces)
@@ -140,55 +136,18 @@ public actor AIReflectionService {
                     language: activeLang
                 )
             } catch {
-                AppLogger.warning("Groq request with model '\(requestedModel)' failed: \(error.localizedDescription). Searching for active Groq models...")
-                
-                // 1. Dynamic Discovery: If model was decommissioned, renamed or not found, query Groq /models
-                if let freshModel = await fetchBestActiveGroqModel(apiKey: activeKey), freshModel != requestedModel {
-                    do {
-                        AppLogger.info("Retrying Groq with dynamically discovered active model: \(freshModel)")
-                        return try await callOpenAiCompatible(
-                            endpoint: Self.groqEndpoint,
-                            apiKey: activeKey,
-                            model: freshModel,
-                            action: action,
-                            prompt: prompt,
-                            metrics: metrics,
-                            edgeScore: edgeScore,
-                            language: activeLang
-                        )
-                    } catch {
-                        AppLogger.warning("Groq retry with dynamic model '\(freshModel)' failed: \(error.localizedDescription)")
-                    }
-                }
-                
-                // 2. High Availability Failover: Automatically route to OpenRouter free tier before falling back to local
-                AppLogger.info("Failing over from Groq to OpenRouter dynamic free router...")
-                let orKey = config.openrouterKey.trimmingCharacters(in: .whitespaces).isEmpty ? AiSettingsConfig.defaultOpenRouterKey : config.openrouterKey.trimmingCharacters(in: .whitespaces)
-                if let orResult = try? await callOpenAiCompatible(
-                    endpoint: Self.openRouterEndpoint,
-                    apiKey: orKey,
-                    model: "openrouter/free",
-                    action: action,
-                    prompt: prompt,
-                    metrics: metrics,
-                    edgeScore: edgeScore,
-                    language: activeLang
-                ) {
-                    return orResult
-                }
-                
-                AppLogger.warning("Groq & failover failed. Falling back to local coach.")
-                let local = generateLocalCoachReflection(action: action, metrics: metrics, edgeScore: edgeScore, prompt: prompt)
-                return "⚠️ [AI Reflection Notice: \(error.localizedDescription)]\n\n" + local
+                AppLogger.warning("Groq request with model '\(requestedModel)' failed: \(error.localizedDescription). Retrying with active discovery and failover...")
+                return try await callDefaultProvider(action: action, prompt: prompt, metrics: metrics, edgeScore: edgeScore, language: activeLang)
             }
             
         case "openrouter":
             let activeKey = config.openrouterKey.trimmingCharacters(in: .whitespaces).isEmpty ? AiSettingsConfig.defaultOpenRouterKey : config.openrouterKey.trimmingCharacters(in: .whitespaces)
+            let requestedModel = config.model.isEmpty ? "openrouter/free" : config.model
             do {
                 return try await callOpenAiCompatible(
                     endpoint: Self.openRouterEndpoint,
                     apiKey: activeKey,
-                    model: config.model.isEmpty ? "openrouter/free" : config.model,
+                    model: requestedModel,
                     action: action,
                     prompt: prompt,
                     metrics: metrics,
@@ -196,84 +155,114 @@ public actor AIReflectionService {
                     language: activeLang
                 )
             } catch {
-                AppLogger.warning("OpenRouter request failed: \(error.localizedDescription). Falling back to local coach.")
-                let local = generateLocalCoachReflection(action: action, metrics: metrics, edgeScore: edgeScore, prompt: prompt)
-                return "⚠️ [AI Reflection Notice: \(error.localizedDescription)]\n\n" + local
+                AppLogger.warning("OpenRouter request failed: \(error.localizedDescription). Falling back to default AI provider...")
+                return try await callDefaultProvider(action: action, prompt: prompt, metrics: metrics, edgeScore: edgeScore, language: activeLang)
             }
             
         case "openai":
-            guard !config.openaiKey.trimmingCharacters(in: .whitespaces).isEmpty else {
-                let local = generateLocalCoachReflection(action: action, metrics: metrics, edgeScore: edgeScore, prompt: prompt)
-                return "ℹ️ [AI Coach Not Configured] Enter your API key in Settings > AI.\n\n" + local
+            if !config.openaiKey.trimmingCharacters(in: .whitespaces).isEmpty {
+                do {
+                    return try await callOpenAiCompatible(
+                        endpoint: Self.openAiEndpoint,
+                        apiKey: config.openaiKey,
+                        model: config.model.isEmpty ? "gpt-4o-mini" : config.model,
+                        action: action,
+                        prompt: prompt,
+                        metrics: metrics,
+                        edgeScore: edgeScore,
+                        language: activeLang
+                    )
+                } catch {
+                    AppLogger.warning("OpenAI failed: \(error.localizedDescription). Falling back to default AI provider...")
+                }
             }
-            do {
-                return try await callOpenAiCompatible(
-                    endpoint: Self.openAiEndpoint,
-                    apiKey: config.openaiKey,
-                    model: config.model.isEmpty ? "gpt-4o-mini" : config.model,
-                    action: action,
-                    prompt: prompt,
-                    metrics: metrics,
-                    edgeScore: edgeScore
-                )
-            } catch {
-                let local = generateLocalCoachReflection(action: action, metrics: metrics, edgeScore: edgeScore, prompt: prompt)
-                return "⚠️ [AI Reflection Notice: \(error.localizedDescription)]\n\n" + local
-            }
+            return try await callDefaultProvider(action: action, prompt: prompt, metrics: metrics, edgeScore: edgeScore, language: activeLang)
             
         case "anthropic":
-            guard !config.anthropicKey.trimmingCharacters(in: .whitespaces).isEmpty else {
-                let local = generateLocalCoachReflection(action: action, metrics: metrics, edgeScore: edgeScore, prompt: prompt)
-                return "ℹ️ [AI Coach Not Configured] Enter your API key in Settings > AI.\n\n" + local
+            if !config.anthropicKey.trimmingCharacters(in: .whitespaces).isEmpty {
+                do {
+                    return try await callAnthropic(
+                        apiKey: config.anthropicKey,
+                        model: config.model.isEmpty ? "claude-3-5-sonnet-20241022" : config.model,
+                        action: action,
+                        prompt: prompt,
+                        metrics: metrics,
+                        edgeScore: edgeScore,
+                        language: activeLang
+                    )
+                } catch {
+                    AppLogger.warning("Anthropic failed: \(error.localizedDescription). Falling back to default AI provider...")
+                }
             }
-            do {
-                return try await callAnthropic(
-                    apiKey: config.anthropicKey,
-                    model: config.model.isEmpty ? "claude-3-5-sonnet-20241022" : config.model,
-                    action: action,
-                    prompt: prompt,
-                    metrics: metrics,
-                    edgeScore: edgeScore,
-                    language: activeLang
-                )
-            } catch {
-                let local = generateLocalCoachReflection(action: action, metrics: metrics, edgeScore: edgeScore, prompt: prompt)
-                return "⚠️ [AI Reflection Notice: \(error.localizedDescription)]\n\n" + local
-            }
+            return try await callDefaultProvider(action: action, prompt: prompt, metrics: metrics, edgeScore: edgeScore, language: activeLang)
             
         case "custom":
-            guard !config.customEndpoint.trimmingCharacters(in: .whitespaces).isEmpty else {
-                let local = generateLocalCoachReflection(action: action, metrics: metrics, edgeScore: edgeScore, prompt: prompt)
-                return "ℹ️ [AI Coach Not Configured] Enter your endpoint URL in Settings > AI.\n\n" + local
+            if !config.customEndpoint.trimmingCharacters(in: .whitespaces).isEmpty {
+                do {
+                    return try await callOpenAiCompatible(
+                        endpoint: config.customEndpoint,
+                        apiKey: config.customKey,
+                        model: config.model.isEmpty ? "default" : config.model,
+                        action: action,
+                        prompt: prompt,
+                        metrics: metrics,
+                        edgeScore: edgeScore,
+                        language: activeLang
+                    )
+                } catch {
+                    AppLogger.warning("Custom endpoint failed: \(error.localizedDescription). Falling back to default AI provider...")
+                }
             }
-            do {
-                return try await callOpenAiCompatible(
-                    endpoint: config.customEndpoint,
-                    apiKey: config.customKey,
-                    model: config.model.isEmpty ? "default" : config.model,
-                    action: action,
-                    prompt: prompt,
-                    metrics: metrics,
-                    edgeScore: edgeScore
-                )
-            } catch {
-                let local = generateLocalCoachReflection(action: action, metrics: metrics, edgeScore: edgeScore, prompt: prompt)
-                return "⚠️ [Custom Model Error: \(error.localizedDescription)]\n\n" + local
-            }
+            return try await callDefaultProvider(action: action, prompt: prompt, metrics: metrics, edgeScore: edgeScore, language: activeLang)
             
         default:
-            if let urlString = supabaseUrl, !urlString.isEmpty, let token = authToken, !token.isEmpty {
-                return try await callSupabaseEdgeFunction(
-                    urlString: urlString,
-                    token: token,
-                    action: action,
-                    prompt: prompt,
-                    metrics: metrics,
-                    edgeScore: edgeScore
-                )
-            }
-            return generateLocalCoachReflection(action: action, metrics: metrics, edgeScore: edgeScore, prompt: prompt)
+            return try await callDefaultProvider(action: action, prompt: prompt, metrics: metrics, edgeScore: edgeScore, language: activeLang)
         }
+    }
+    
+    // MARK: - Bulletproof Default High-Availability Pipeline
+    private func callDefaultProvider(
+        action: AIReflectionAction,
+        prompt: String?,
+        metrics: TradeMetrics?,
+        edgeScore: Double?,
+        language: String
+    ) async throws -> String {
+        // Attempt 1: Fast High-Quality Groq
+        do {
+            return try await callOpenAiCompatible(
+                endpoint: Self.groqEndpoint,
+                apiKey: AiSettingsConfig.defaultGroqKey,
+                model: "openai/gpt-oss-120b",
+                action: action,
+                prompt: prompt,
+                metrics: metrics,
+                edgeScore: edgeScore,
+                language: language
+            )
+        } catch {
+            AppLogger.warning("Default Groq attempt failed: \(error.localizedDescription). Attempting OpenRouter free tier...")
+        }
+        
+        // Attempt 2: OpenRouter Dynamic Free Models
+        do {
+            return try await callOpenAiCompatible(
+                endpoint: Self.openRouterEndpoint,
+                apiKey: AiSettingsConfig.defaultOpenRouterKey,
+                model: "openrouter/free",
+                action: action,
+                prompt: prompt,
+                metrics: metrics,
+                edgeScore: edgeScore,
+                language: language
+            )
+        } catch {
+            AppLogger.warning("Default OpenRouter attempt failed: \(error.localizedDescription). Falling back to local heuristics.")
+        }
+        
+        // Final offline fallback: dynamic local coach
+        return generateLocalCoachReflection(action: action, metrics: metrics, edgeScore: edgeScore, prompt: prompt)
+    }
     }
     
     /// Tests provider connectivity with a test prompt
@@ -433,26 +422,44 @@ public actor AIReflectionService {
         struct ChatCompletionResponse: Decodable {
             struct Choice: Decodable {
                 struct Message: Decodable {
-                    let content: String
+                    let role: String?
+                    let content: String?
+                    let reasoning: String?
                 }
                 let message: Message
             }
-            let choices: [Choice]
+            let choices: [Choice]?
         }
         
-        guard let decoded = try? JSONDecoder().decode(ChatCompletionResponse.self, from: data),
-              let text = decoded.choices.first?.message.content, !text.isEmpty else {
-            if let rawText = String(data: data, encoding: .utf8), !rawText.isEmpty {
-                let trimmed = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
-                if trimmed == "OK" {
-                    throw NSError(domain: "AIInference", code: 204, userInfo: [NSLocalizedDescriptionKey: "Endpoint returned text 'OK' instead of chat payload. Note: GitHub Models preview was retired on July 30, 2026. Please configure an Azure AI Foundry or custom proxy endpoint."])
-                }
-                throw NSError(domain: "AIInference", code: 204, userInfo: [NSLocalizedDescriptionKey: "Invalid response format: \(trimmed.prefix(120))"])
+        if let decoded = try? JSONDecoder().decode(ChatCompletionResponse.self, from: data),
+           let firstChoice = decoded.choices?.first {
+            let candidateText = firstChoice.message.content ?? firstChoice.message.reasoning
+            if let valid = candidateText?.trimmingCharacters(in: .whitespacesAndNewlines), !valid.isEmpty {
+                return valid
             }
-            throw NSError(domain: "AIInference", code: 204, userInfo: [NSLocalizedDescriptionKey: "Model returned an empty response."])
         }
         
-        return text.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Dynamic JSON Dictionary Fallback
+        if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let choices = json["choices"] as? [[String: Any]],
+           let first = choices.first,
+           let msg = first["message"] as? [String: Any] {
+            if let content = msg["content"] as? String, !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                return content.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+            if let reasoning = msg["reasoning"] as? String, !reasoning.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                return reasoning.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+        }
+        
+        if let rawText = String(data: data, encoding: .utf8), !rawText.isEmpty {
+            let trimmed = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed == "OK" {
+                throw NSError(domain: "AIInference", code: 204, userInfo: [NSLocalizedDescriptionKey: "Endpoint returned text 'OK' instead of chat payload. Please verify your AI provider endpoint."])
+            }
+            throw NSError(domain: "AIInference", code: 204, userInfo: [NSLocalizedDescriptionKey: "Invalid response format: \(trimmed.prefix(120))"])
+        }
+        throw NSError(domain: "AIInference", code: 204, userInfo: [NSLocalizedDescriptionKey: "Model returned an empty response."])
     }
     
     // MARK: - Anthropic Messages API
