@@ -260,74 +260,79 @@ public struct DailyJournalListView: View {
     @ViewBuilder
     private func dayRowCard(_ day: JournalDaySummary) -> some View {
         AppCard {
-            HStack(alignment: .center, spacing: 12) {
-                // Date & Weekday column
+            HStack(alignment: .center, spacing: 10) {
+                // Date & Weekday column (compact & non-wrapping)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(day.date)
-                        .font(AppTypography.bodyBold)
-                        .foregroundColor(day.date == todayKey ? AppColors.accent : AppColors.primaryText)
+                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .foregroundColor(day.date == todayKey ? AppColors.brand : AppColors.primaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.85)
-                    Text(day.weekday)
-                        .font(AppTypography.caption)
+                    Text(day.weekday.uppercased())
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
                         .foregroundColor(AppColors.secondaryText)
                         .lineLimit(1)
                 }
                 .fixedSize(horizontal: true, vertical: false)
                 
                 Divider()
-                    .frame(height: 36)
+                    .frame(height: 32)
                 
-                // PnL & stats column
+                // PnL & stats column (tightly fitted with line limits)
                 if day.tradesCount > 0 {
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: 8) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack(spacing: 6) {
                             Text(day.netPnl >= 0 ? "+\(Formatters.currency(day.netPnl))" : Formatters.currency(day.netPnl))
-                                .font(AppTypography.bodyBold)
+                                .font(.system(size: 13, weight: .bold, design: .monospaced))
                                 .foregroundColor(day.netPnl >= 0 ? AppColors.profit : AppColors.loss)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
                             
-                            Text("(\(day.tradesCount) trade\(day.tradesCount == 1 ? "" : "s"))")
-                                .font(AppTypography.caption)
+                            Text("• \(day.tradesCount)T")
+                                .font(.system(size: 11, weight: .medium))
                                 .foregroundColor(AppColors.secondaryText)
+                                .lineLimit(1)
                         }
                         
-                        HStack(spacing: 8) {
+                        HStack(spacing: 6) {
                             if let wr = day.winRate {
                                 Text("\(Int(wr * 100))% win")
-                                    .font(AppTypography.captionBold)
+                                    .font(.system(size: 11, weight: .semibold))
                                     .foregroundColor(AppColors.primaryText)
+                                    .lineLimit(1)
                             }
-                            Text("\(day.winsCount)W / \(day.lossesCount)L")
-                                .font(AppTypography.caption)
+                            Text("(\(day.winsCount)W / \(day.lossesCount)L)")
+                                .font(.system(size: 11))
                                 .foregroundColor(AppColors.secondaryText)
+                                .lineLimit(1)
                         }
                     }
                 } else {
                     Text("No trades")
-                        .font(AppTypography.caption)
+                        .font(.system(size: 12))
                         .foregroundColor(AppColors.secondaryText)
+                        .lineLimit(1)
                 }
                 
                 Spacer()
                 
-                // Note badge indicator
+                // Compact Note badge indicator (circular icon only, preventing overflow)
                 if day.hasNote {
-                    HStack(spacing: 4) {
-                        Image(systemName: "note.text")
-                            .font(.system(size: 11))
-                        Text("note")
-                            .font(AppTypography.caption)
-                    }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(AppColors.accent.opacity(0.12))
-                    .foregroundColor(AppColors.accent)
-                    .clipShape(Capsule())
+                    Image(systemName: "note.text")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(AppColors.secondaryText)
+                        .frame(width: 22, height: 22)
+                        .background(AppColors.secondaryBackground)
+                        .clipShape(Circle())
+                        .overlay(
+                            Circle()
+                                .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
+                        )
                 }
                 
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(AppColors.secondaryText.opacity(0.5))
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(AppColors.secondaryText.opacity(0.4))
             }
         }
     }
