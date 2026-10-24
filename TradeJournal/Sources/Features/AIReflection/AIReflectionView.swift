@@ -33,7 +33,7 @@ public struct AIReflectionView: View {
                                 Text("AI Trader Reflection")
                                     .font(AppTypography.headline)
                                 Spacer()
-                                Text(dataStore.aiSettings.provider == "opencode" ? "OpenCode: \(dataStore.aiSettings.model)" : dataStore.aiSettings.model)
+                                Text("\(dataStore.aiSettings.provider.uppercased()): \(dataStore.aiSettings.model)")
                                     .font(AppTypography.caption)
                                     .foregroundColor(AppColors.secondaryText)
                             }

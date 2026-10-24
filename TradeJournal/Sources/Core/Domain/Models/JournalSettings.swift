@@ -130,69 +130,95 @@ public struct MarketConnectionConfig: Codable, Equatable, Sendable {
 }
 
 // MARK: - 6. AI Provider Settings
-// Core implementation detail
+// Multi-provider AI reflection layer supporting free tier models (Google Gemini, Groq, OpenRouter) and BYOK (OpenAI, Anthropic)
 public struct AiSettingsConfig: Codable, Equatable, Sendable {
-    public var provider: String // "opencode" | "anthropic" | "openai"
+    public var provider: String // "gemini" | "groq" | "openrouter" | "openai" | "anthropic" | "custom"
     public var model: String
-    public var opencodeKey: String
-    public var anthropicKey: String
+    public var geminiKey: String
+    public var groqKey: String
+    public var openrouterKey: String
     public var openaiKey: String
+    public var anthropicKey: String
+    public var customEndpoint: String
+    public var customKey: String
     
     public static let `default` = AiSettingsConfig(
-        provider: "opencode",
-        model: "deepseek-v4.1-flash-free",
-        opencodeKey: "",
+        provider: "gemini",
+        model: "gemini-2.0-flash",
+        geminiKey: "",
+        groqKey: "",
+        openrouterKey: "",
+        openaiKey: "",
         anthropicKey: "",
-        openaiKey: ""
+        customEndpoint: "",
+        customKey: ""
     )
     
     public init(
-        provider: String = "opencode",
-        model: String = "deepseek-v4.1-flash-free",
-        opencodeKey: String = "",
+        provider: String = "gemini",
+        model: String = "gemini-2.0-flash",
+        geminiKey: String = "",
+        groqKey: String = "",
+        openrouterKey: String = "",
+        openaiKey: String = "",
         anthropicKey: String = "",
-        openaiKey: String = ""
+        customEndpoint: String = "",
+        customKey: String = ""
     ) {
         self.provider = provider
         self.model = model
-        self.opencodeKey = opencodeKey
-        self.anthropicKey = anthropicKey
+        self.geminiKey = geminiKey
+        self.groqKey = groqKey
+        self.openrouterKey = openrouterKey
         self.openaiKey = openaiKey
+        self.anthropicKey = anthropicKey
+        self.customEndpoint = customEndpoint
+        self.customKey = customKey
     }
     
     enum CodingKeys: String, CodingKey {
-        case provider, model, opencodeKey, anthropicKey, openaiKey
+        case provider, model, geminiKey, groqKey, openrouterKey, openaiKey, anthropicKey, customEndpoint, customKey, opencodeKey
     }
     
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        var prov = try container.decodeIfPresent(String.self, forKey: .provider) ?? "opencode"
-        var mdl = try container.decodeIfPresent(String.self, forKey: .model) ?? "deepseek-v4.1-flash-free"
-        let openKey = try container.decodeIfPresent(String.self, forKey: .opencodeKey) ?? ""
-        let antKey = try container.decodeIfPresent(String.self, forKey: .anthropicKey) ?? ""
+        var prov = try container.decodeIfPresent(String.self, forKey: .provider) ?? "gemini"
+        var mdl = try container.decodeIfPresent(String.self, forKey: .model) ?? "gemini-2.0-flash"
+        let gKey = try container.decodeIfPresent(String.self, forKey: .geminiKey) ?? ""
+        let grKey = try container.decodeIfPresent(String.self, forKey: .groqKey) ?? ""
+        let orKey = try container.decodeIfPresent(String.self, forKey: .openrouterKey) ?? ""
         let oaiKey = try container.decodeIfPresent(String.self, forKey: .openaiKey) ?? ""
+        let antKey = try container.decodeIfPresent(String.self, forKey: .anthropicKey) ?? ""
+        let cEndpoint = try container.decodeIfPresent(String.self, forKey: .customEndpoint) ?? ""
+        let cKey = try container.decodeIfPresent(String.self, forKey: .customKey) ?? ""
         
-        // If legacy default was unconfigured, upgrade to opencode free tier
-        if prov == "anthropic" && antKey.isEmpty {
-            prov = "opencode"
-            mdl = "deepseek-v4.1-flash-free"
-        } else if prov == "opencode" && (mdl.hasPrefix("claude-") || mdl.hasPrefix("gpt-")) {
-            mdl = "deepseek-v4.1-flash-free"
+        // Upgrade legacy opencode or unconfigured default to Google Gemini free tier
+        if prov == "opencode" || prov.isEmpty {
+            prov = "gemini"
+            mdl = "gemini-2.0-flash"
         }
         
         self.provider = prov
         self.model = mdl
-        self.opencodeKey = openKey
-        self.anthropicKey = antKey
+        self.geminiKey = gKey
+        self.groqKey = grKey
+        self.openrouterKey = orKey
         self.openaiKey = oaiKey
+        self.anthropicKey = antKey
+        self.customEndpoint = cEndpoint
+        self.customKey = cKey
     }
     
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(provider, forKey: .provider)
         try container.encode(model, forKey: .model)
-        try container.encode(opencodeKey, forKey: .opencodeKey)
-        try container.encode(anthropicKey, forKey: .anthropicKey)
+        try container.encode(geminiKey, forKey: .geminiKey)
+        try container.encode(groqKey, forKey: .groqKey)
+        try container.encode(openrouterKey, forKey: .openrouterKey)
         try container.encode(openaiKey, forKey: .openaiKey)
+        try container.encode(anthropicKey, forKey: .anthropicKey)
+        try container.encode(customEndpoint, forKey: .customEndpoint)
+        try container.encode(customKey, forKey: .customKey)
     }
 }

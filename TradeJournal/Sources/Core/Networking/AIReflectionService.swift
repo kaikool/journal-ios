@@ -14,20 +14,11 @@ public struct AIReflectionResponse: Codable, Sendable {
 public actor AIReflectionService {
     public static let shared = AIReflectionService()
     
-    private let openCodeModelsEndpoint = "https://opencode.ai/inference/v1/models"
-    private let openCodeInferenceEndpoint = "https://opencode.ai/inference/openai/v1/chat/completions"
-    
-    public static let fallbackFreeModels: [String] = [
-        "deepseek-v4.1-flash-free",
-        "big-pickle",
-        "glm-5.3-flash-free",
-        "mimo-v2.6-flash-free",
-        "nemotron-3.5-lightning-free",
-        "nemotron-3.5-super-vl-free",
-        "flint-40b-free",
-        "beam-free",
-        "jev-1.13-free"
-    ]
+    // Official API endpoints
+    public static let geminiEndpoint = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+    public static let groqEndpoint = "https://api.groq.com/openai/v1/chat/completions"
+    public static let openRouterEndpoint = "https://openrouter.ai/api/v1/chat/completions"
+    public static let openAiEndpoint = "https://api.openai.com/v1/chat/completions"
     
     private let systemPrompt = """
     You are the reflection layer of a disciplined trader's journal.
@@ -38,57 +29,7 @@ public actor AIReflectionService {
     
     private init() {}
     
-    /// Fetches the live list of free models directly from the OpenCode source
-    public func fetchOpenCodeFreeModels() async -> [String] {
-        guard let url = URL(string: openCodeModelsEndpoint) else {
-            return Self.fallbackFreeModels
-        }
-        
-        do {
-            var request = URLRequest(url: url)
-            request.timeoutInterval = 8
-            request.cachePolicy = .reloadIgnoringLocalCacheData
-            
-            let (data, response) = try await URLSession.shared.data(for: request)
-            guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-                return Self.fallbackFreeModels
-            }
-            
-            struct ModelsPayload: Decodable {
-                struct ModelEntry: Decodable {
-                    let id: String
-                }
-                let data: [ModelEntry]
-            }
-            
-            let decoded = try JSONDecoder().decode(ModelsPayload.self, from: data)
-            let freeModels = decoded.data
-                .map(\.id)
-                .filter { id in
-                    id.hasSuffix("-free") || id.contains("-free") || id == "big-pickle"
-                }
-            
-            if !freeModels.isEmpty {
-                var sortedList = freeModels
-                let priority = ["deepseek-v4.1-flash-free", "big-pickle", "glm-5.3-flash-free", "mimo-v2.6-flash-free"]
-                sortedList.sort { a, b in
-                    let indexA = priority.firstIndex(of: a) ?? Int.max
-                    let indexB = priority.firstIndex(of: b) ?? Int.max
-                    if indexA != indexB {
-                        return indexA < indexB
-                    }
-                    return a < b
-                }
-                return sortedList
-            }
-            return Self.fallbackFreeModels
-        } catch {
-            AppLogger.warning("Failed to fetch live OpenCode models list: \(error.localizedDescription). Using fallback.")
-            return Self.fallbackFreeModels
-        }
-    }
-    
-    /// Requests AI reflection via user-configured AI provider (OpenCode Zen / OpenAI / Anthropic)
+    /// Requests AI reflection via user-configured AI provider (Gemini, Groq, OpenRouter, OpenAI, Anthropic, Custom)
     /// Gracefully falls back to local coach heuristics if unconfigured or offline.
     public func requestReflection(
         action: AIReflectionAction,
@@ -107,25 +48,67 @@ public actor AIReflectionService {
         }
         
         switch config.provider {
-        case "opencode":
-            guard !config.opencodeKey.trimmingCharacters(in: .whitespaces).isEmpty else {
+        case "gemini":
+            guard !config.geminiKey.trimmingCharacters(in: .whitespaces).isEmpty else {
                 let local = generateLocalCoachReflection(action: action, metrics: metrics, edgeScore: edgeScore, prompt: prompt)
-                return "ℹ️ [OpenCode Key Not Configured] Go to Settings > AI to enter your free OpenCode API key for live AI coaching.\n\n" + local
+                return "ℹ️ [Google Gemini Key Not Configured] Go to Settings > AI to enter your free API key from aistudio.google.com for live AI coaching.\n\n" + local
             }
             do {
                 return try await callOpenAiCompatible(
-                    endpoint: openCodeInferenceEndpoint,
-                    apiKey: config.opencodeKey,
-                    model: config.model.isEmpty ? "deepseek-v4.1-flash-free" : config.model,
+                    endpoint: Self.geminiEndpoint,
+                    apiKey: config.geminiKey,
+                    model: config.model.isEmpty ? "gemini-2.0-flash" : config.model,
                     action: action,
                     prompt: prompt,
                     metrics: metrics,
                     edgeScore: edgeScore
                 )
             } catch {
-                AppLogger.warning("OpenCode request failed: \(error.localizedDescription). Falling back to local coach.")
+                AppLogger.warning("Google Gemini request failed: \(error.localizedDescription). Falling back to local coach.")
                 let local = generateLocalCoachReflection(action: action, metrics: metrics, edgeScore: edgeScore, prompt: prompt)
-                return "⚠️ [OpenCode Service Notice: \(error.localizedDescription)]\n\n" + local
+                return "⚠️ [Google Gemini Notice: \(error.localizedDescription)]\n\n" + local
+            }
+            
+        case "groq":
+            guard !config.groqKey.trimmingCharacters(in: .whitespaces).isEmpty else {
+                let local = generateLocalCoachReflection(action: action, metrics: metrics, edgeScore: edgeScore, prompt: prompt)
+                return "ℹ️ [Groq Key Not Configured] Go to Settings > AI to enter your free Groq API key from console.groq.com for ultra-fast AI coaching.\n\n" + local
+            }
+            do {
+                return try await callOpenAiCompatible(
+                    endpoint: Self.groqEndpoint,
+                    apiKey: config.groqKey,
+                    model: config.model.isEmpty ? "llama-3.3-70b-versatile" : config.model,
+                    action: action,
+                    prompt: prompt,
+                    metrics: metrics,
+                    edgeScore: edgeScore
+                )
+            } catch {
+                AppLogger.warning("Groq request failed: \(error.localizedDescription). Falling back to local coach.")
+                let local = generateLocalCoachReflection(action: action, metrics: metrics, edgeScore: edgeScore, prompt: prompt)
+                return "⚠️ [Groq Notice: \(error.localizedDescription)]\n\n" + local
+            }
+            
+        case "openrouter":
+            guard !config.openrouterKey.trimmingCharacters(in: .whitespaces).isEmpty else {
+                let local = generateLocalCoachReflection(action: action, metrics: metrics, edgeScore: edgeScore, prompt: prompt)
+                return "ℹ️ [OpenRouter Key Not Configured] Go to Settings > AI to enter your OpenRouter API key from openrouter.ai/keys.\n\n" + local
+            }
+            do {
+                return try await callOpenAiCompatible(
+                    endpoint: Self.openRouterEndpoint,
+                    apiKey: config.openrouterKey,
+                    model: config.model.isEmpty ? "deepseek/deepseek-r1:free" : config.model,
+                    action: action,
+                    prompt: prompt,
+                    metrics: metrics,
+                    edgeScore: edgeScore
+                )
+            } catch {
+                AppLogger.warning("OpenRouter request failed: \(error.localizedDescription). Falling back to local coach.")
+                let local = generateLocalCoachReflection(action: action, metrics: metrics, edgeScore: edgeScore, prompt: prompt)
+                return "⚠️ [OpenRouter Notice: \(error.localizedDescription)]\n\n" + local
             }
             
         case "openai":
@@ -135,7 +118,7 @@ public actor AIReflectionService {
             }
             do {
                 return try await callOpenAiCompatible(
-                    endpoint: "https://api.openai.com/v1/chat/completions",
+                    endpoint: Self.openAiEndpoint,
                     apiKey: config.openaiKey,
                     model: config.model.isEmpty ? "gpt-4o-mini" : config.model,
                     action: action,
@@ -167,6 +150,26 @@ public actor AIReflectionService {
                 return "⚠️ [Anthropic Error: \(error.localizedDescription)]\n\n" + local
             }
             
+        case "custom":
+            guard !config.customEndpoint.trimmingCharacters(in: .whitespaces).isEmpty else {
+                let local = generateLocalCoachReflection(action: action, metrics: metrics, edgeScore: edgeScore, prompt: prompt)
+                return "ℹ️ [Custom Endpoint Not Configured] Enter your custom API URL in Settings > AI.\n\n" + local
+            }
+            do {
+                return try await callOpenAiCompatible(
+                    endpoint: config.customEndpoint,
+                    apiKey: config.customKey,
+                    model: config.model.isEmpty ? "default" : config.model,
+                    action: action,
+                    prompt: prompt,
+                    metrics: metrics,
+                    edgeScore: edgeScore
+                )
+            } catch {
+                let local = generateLocalCoachReflection(action: action, metrics: metrics, edgeScore: edgeScore, prompt: prompt)
+                return "⚠️ [Custom Model Error: \(error.localizedDescription)]\n\n" + local
+            }
+            
         default:
             if let urlString = supabaseUrl, !urlString.isEmpty, let token = authToken, !token.isEmpty {
                 return try await callSupabaseEdgeFunction(
@@ -185,16 +188,44 @@ public actor AIReflectionService {
     /// Tests provider connectivity with a test prompt
     public func testConnection(config: AiSettingsConfig) async throws -> String {
         switch config.provider {
-        case "opencode":
-            guard !config.opencodeKey.trimmingCharacters(in: .whitespaces).isEmpty else {
-                throw NSError(domain: "OpenCode", code: 400, userInfo: [NSLocalizedDescriptionKey: "Please enter your OpenCode API key."])
+        case "gemini":
+            guard !config.geminiKey.trimmingCharacters(in: .whitespaces).isEmpty else {
+                throw NSError(domain: "Gemini", code: 400, userInfo: [NSLocalizedDescriptionKey: "Please enter your Google Gemini API key from aistudio.google.com."])
             }
             return try await callOpenAiCompatible(
-                endpoint: openCodeInferenceEndpoint,
-                apiKey: config.opencodeKey,
-                model: config.model.isEmpty ? "deepseek-v4.1-flash-free" : config.model,
+                endpoint: Self.geminiEndpoint,
+                apiKey: config.geminiKey,
+                model: config.model.isEmpty ? "gemini-2.0-flash" : config.model,
                 action: .ask,
-                prompt: "Say 'OpenCode connection verified successfully.' and identify your model name in one short sentence.",
+                prompt: "Say 'Google Gemini connected successfully.' and state your model name in one sentence.",
+                metrics: nil,
+                edgeScore: nil
+            )
+            
+        case "groq":
+            guard !config.groqKey.trimmingCharacters(in: .whitespaces).isEmpty else {
+                throw NSError(domain: "Groq", code: 400, userInfo: [NSLocalizedDescriptionKey: "Please enter your Groq API key from console.groq.com."])
+            }
+            return try await callOpenAiCompatible(
+                endpoint: Self.groqEndpoint,
+                apiKey: config.groqKey,
+                model: config.model.isEmpty ? "llama-3.3-70b-versatile" : config.model,
+                action: .ask,
+                prompt: "Say 'Groq connected successfully.' and state your model name in one sentence.",
+                metrics: nil,
+                edgeScore: nil
+            )
+            
+        case "openrouter":
+            guard !config.openrouterKey.trimmingCharacters(in: .whitespaces).isEmpty else {
+                throw NSError(domain: "OpenRouter", code: 400, userInfo: [NSLocalizedDescriptionKey: "Please enter your OpenRouter API key from openrouter.ai/keys."])
+            }
+            return try await callOpenAiCompatible(
+                endpoint: Self.openRouterEndpoint,
+                apiKey: config.openrouterKey,
+                model: config.model.isEmpty ? "deepseek/deepseek-r1:free" : config.model,
+                action: .ask,
+                prompt: "Say 'OpenRouter connected successfully.' and state your model name in one sentence.",
                 metrics: nil,
                 edgeScore: nil
             )
@@ -204,7 +235,7 @@ public actor AIReflectionService {
                 throw NSError(domain: "OpenAI", code: 400, userInfo: [NSLocalizedDescriptionKey: "Please enter your OpenAI API key."])
             }
             return try await callOpenAiCompatible(
-                endpoint: "https://api.openai.com/v1/chat/completions",
+                endpoint: Self.openAiEndpoint,
                 apiKey: config.openaiKey,
                 model: config.model.isEmpty ? "gpt-4o-mini" : config.model,
                 action: .ask,
@@ -226,12 +257,26 @@ public actor AIReflectionService {
                 edgeScore: nil
             )
             
+        case "custom":
+            guard !config.customEndpoint.trimmingCharacters(in: .whitespaces).isEmpty else {
+                throw NSError(domain: "CustomAI", code: 400, userInfo: [NSLocalizedDescriptionKey: "Please enter your custom API Endpoint URL."])
+            }
+            return try await callOpenAiCompatible(
+                endpoint: config.customEndpoint,
+                apiKey: config.customKey,
+                model: config.model.isEmpty ? "default" : config.model,
+                action: .ask,
+                prompt: "Say 'Custom endpoint connected successfully.' in one short sentence.",
+                metrics: nil,
+                edgeScore: nil
+            )
+            
         default:
             throw NSError(domain: "AI", code: 400, userInfo: [NSLocalizedDescriptionKey: "Unknown AI provider: \(config.provider)"])
         }
     }
     
-    // MARK: - OpenAI-Compatible Chat Completions (OpenCode & OpenAI)
+    // MARK: - OpenAI-Compatible Chat Completions (Gemini, Groq, OpenRouter, OpenAI, Custom)
     
     private func callOpenAiCompatible(
         endpoint: String,
