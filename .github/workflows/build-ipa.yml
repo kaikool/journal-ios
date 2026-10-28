@@ -31,6 +31,8 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Select Xcode Version
         run: |
@@ -156,7 +158,7 @@ jobs:
             build/TradeJournal.ipa.sha256
           retention-days: 14
 
-      - name: Prepare Release Metadata
+      - name: Prepare Release Metadata & Changelog
         if: (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch') && github.event_name != 'pull_request'
         run: |
           if [[ "${{ github.ref }}" == refs/tags/* ]]; then
@@ -169,6 +171,21 @@ jobs:
           echo "RELEASE_TAG=$RELEASE_TAG" >> $GITHUB_ENV
           echo "RELEASE_NAME=$RELEASE_NAME" >> $GITHUB_ENV
           
+          # Fetch all tags for accurate changelog extraction
+          git fetch --tags --force || true
+          
+          # Extract commit history since previous release tag or recent commits
+          PREV_TAG=$(git tag --sort=-creatordate | head -n 2 | tail -n 1 2>/dev/null || echo "")
+          if [ -n "$PREV_TAG" ] && [ "$PREV_TAG" != "$RELEASE_TAG" ]; then
+            COMMIT_LOG=$(git log "${PREV_TAG}..HEAD" --pretty=format:"- %s (\`%h\`)" --no-merges)
+          else
+            COMMIT_LOG=$(git log -10 --pretty=format:"- %s (\`%h\`)" --no-merges)
+          fi
+          
+          if [ -z "$COMMIT_LOG" ]; then
+            COMMIT_LOG="- $(git log -1 --pretty=format:"%s (\`%h\`)")"
+          fi
+          
           cat << EOF > build/release_notes.md
           ### 📱 TradeJournal iOS - Direct IPA Download
           
@@ -177,6 +194,12 @@ jobs:
           - **File:** \`TradeJournal.ipa\`
           - **Phiên bản:** Native iOS 17.0+ (SwiftUI, Swift Charts)
           - **Build:** $BUILD_NUMBER (${{ github.sha }})
+          
+          ---
+          
+          ### 📝 Những điểm thay đổi mới (What's New in this Build):
+          
+          $COMMIT_LOG
           EOF
 
       - name: Prune Previous Legacy Releases
@@ -200,6 +223,7 @@ jobs:
           tag_name: ${{ env.RELEASE_TAG }}
           name: ${{ env.RELEASE_NAME }}
           body_path: build/release_notes.md
+          generate_release_notes: true
           files: |
             build/TradeJournal.ipa
             build/TradeJournal.ipa.sha256
