@@ -10,6 +10,17 @@ public enum MarketResolution: String, CaseIterable, Identifiable, Sendable {
     
     public var id: String { rawValue }
     
+    public var label: String {
+        switch self {
+        case .m1: return "M1"
+        case .m5: return "M5"
+        case .m15: return "M15"
+        case .h1: return "H1"
+        case .h4: return "H4"
+        case .d1: return "D1"
+        }
+    }
+    
     public var durationMs: Int64 {
         switch self {
         case .m1: return 60_000
