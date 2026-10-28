@@ -10,7 +10,7 @@ public struct TradeReplayView: View {
     let trade: Trade
     let executions: [Execution]
     
-    public static let replayResolutions: [MarketResolution] = [.m1, .m5, .m15, .h1, .h4, .d1]
+    public static let replayResolutions: [MarketResolution] = [.m15, .h1, .h4, .d1]
     
     @State private var bars: [MarketBar] = []
     @State private var rawSourceBars: [MarketBar] = []
@@ -34,10 +34,9 @@ public struct TradeReplayView: View {
         let durationMs = trade.durationMs ?? (trade.closedAt.map { Int64($0.timeIntervalSince(trade.openedAt) * 1000) } ?? 3_600_000)
         let minutes = Double(max(60_000, durationMs)) / 60_000.0
         let res: MarketResolution = {
-            if minutes <= 90 { return .m1 }
-            if minutes <= 60 * 8 { return .m5 }
             if minutes <= 60 * 48 { return .m15 }
-            if minutes <= 60 * 24 * 10 { return .h1 }
+            if minutes <= 60 * 24 * 7 { return .h1 }
+            if minutes <= 60 * 24 * 30 { return .h4 }
             return .d1
         }()
         
@@ -87,13 +86,10 @@ public struct TradeReplayView: View {
                     reportingCurrency: env.currentCurrency
                 )
                 
-                // Timeframe Selector: 1m, 5m, 15m, 1h, 1d
+                // Timeframe Selector: 15m, 1h, 4h, 1D
                 resolutionSelectorBar
                 
-                // Indicators Toggle: Market Structure, RSI (14)
-                indicatorsSelectorBar
-                
-                // Professional Candlestick Chart
+                // Professional Candlestick Chart (with sleek minimalist legend and pure gesture pinch-zoom)
                 chartCard
                 
                 // Replay Playback Controls (Play/Pause, Step, Speed, Fullscreen)
@@ -186,12 +182,11 @@ public struct TradeReplayView: View {
                 let isSelected = res == selectedResolution
                 let title: String = {
                     switch res {
-                    case .m1: return "1m"
-                    case .m5: return "5m"
                     case .m15: return "15m"
                     case .h1: return "1h"
                     case .h4: return "4h"
                     case .d1: return "1D"
+                    default: return res.rawValue.uppercased()
                     }
                 }()
                 Button {
@@ -210,65 +205,6 @@ public struct TradeReplayView: View {
                 }
                 .buttonStyle(.plain)
             }
-            
-            Spacer()
-        }
-        .padding(.horizontal, 4)
-    }
-    
-    // MARK: - Indicators Selector Bar
-    private var indicatorsSelectorBar: some View {
-        HStack(spacing: 8) {
-            Text("Trend:")
-                .font(AppTypography.caption)
-                .foregroundColor(AppColors.secondaryText)
-                .lineLimit(1)
-                .fixedSize()
-            
-            Button {
-                showMarketStructure.toggle()
-            } label: {
-                Text("EMA 21/50")
-                    .font(AppTypography.pill)
-                    .lineLimit(1)
-                    .fixedSize()
-                    .padding(.horizontal, 9)
-                    .padding(.vertical, 4)
-                    .background(showMarketStructure ? AppColors.accent : AppColors.secondaryBackground)
-                    .foregroundColor(showMarketStructure ? .white : AppColors.secondaryText)
-                    .cornerRadius(6)
-            }
-            .buttonStyle(.plain)
-            
-            Button {
-                showLiquidity.toggle()
-            } label: {
-                Text("Liquidity")
-                    .font(AppTypography.pill)
-                    .lineLimit(1)
-                    .fixedSize()
-                    .padding(.horizontal, 9)
-                    .padding(.vertical, 4)
-                    .background(showLiquidity ? AppColors.accent : AppColors.secondaryBackground)
-                    .foregroundColor(showLiquidity ? .white : AppColors.secondaryText)
-                    .cornerRadius(6)
-            }
-            .buttonStyle(.plain)
-            
-            Button {
-                showRSI.toggle()
-            } label: {
-                Text("RSI (14)")
-                    .font(AppTypography.pill)
-                    .lineLimit(1)
-                    .fixedSize()
-                    .padding(.horizontal, 9)
-                    .padding(.vertical, 4)
-                    .background(showRSI ? AppColors.accent : AppColors.secondaryBackground)
-                    .foregroundColor(showRSI ? .white : AppColors.secondaryText)
-                    .cornerRadius(6)
-            }
-            .buttonStyle(.plain)
             
             Spacer()
         }
@@ -345,9 +281,9 @@ public struct TradeReplayView: View {
                         timeZone: env.currentTimeZone,
                         currency: env.currentCurrency,
                         resolution: selectedResolution,
-                        showMarketStructure: showMarketStructure,
-                        showLiquidity: showLiquidity,
-                        showRSI: showRSI
+                        showMarketStructure: true,
+                        showLiquidity: true,
+                        showRSI: true
                     )
                     
                     // Floating Updating Pill (Replaces the cramped loading indicator in Resolution bar)

@@ -21,6 +21,10 @@ public struct CandleChartView: View {
     @State private var activeRSIMAType: MomentumEngine.RSIMAType
     
     @State private var hoveredBarIndex: Int? = nil
+    @State private var zoomScale: CGFloat = 1.0
+    @State private var lastMagnification: CGFloat = 1.0
+    @State private var panOffset: CGFloat = 0.0
+    @State private var lastDragX: CGFloat = 0.0
     
     public init(
         visibleBars: [MarketBar],
@@ -62,8 +66,10 @@ public struct CandleChartView: View {
     
     public var body: some View {
         VStack(spacing: 4) {
-            // HUD Information Bar: shows detailed OHLC values for selected candle
-            hudHeaderView
+            // HUD Information Bar: Sleek, Minimalist (No OHLC, No numeric EMA values, Minimal Legends)
+            if !isLandscape {
+                hudHeaderView
+            }
             
             // Unified Canvas Card: Candlesticks + optional RSI Sub-Window
             VStack(spacing: 0) {
@@ -71,29 +77,11 @@ public struct CandleChartView: View {
                 if isLandscape {
                     GeometryReader { geo in
                         candlestickPlotView(size: geo.size)
-                            .gesture(
-                                DragGesture(minimumDistance: 0)
-                                    .onChanged { value in
-                                        updateHoveredBar(at: value.location.x, totalWidth: geo.size.width - 55)
-                                    }
-                                    .onEnded { _ in
-                                        hoveredBarIndex = nil
-                                    }
-                            )
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     GeometryReader { geo in
                         candlestickPlotView(size: geo.size)
-                            .gesture(
-                                DragGesture(minimumDistance: 0)
-                                    .onChanged { value in
-                                        updateHoveredBar(at: value.location.x, totalWidth: geo.size.width - 55)
-                                    }
-                                    .onEnded { _ in
-                                        hoveredBarIndex = nil
-                                    }
-                            )
                     }
                     .frame(height: showRSI ? 205 : 240)
                 }
@@ -103,8 +91,73 @@ public struct CandleChartView: View {
                     Divider()
                         .background(AppColors.border.opacity(0.4))
                     
-                    rsiSubWindowView
-                        .frame(height: 85)
+                    GeometryReader { geo in
+                        let rightAxisWidth: CGFloat = 55
+                        let plotWidth = max(10, geo.size.width - rightAxisWidth)
+                        let baseCount = max(visibleBars.count, min(totalBarsCount, 50))
+                        let effectiveZoom = max(0.5, min(4.0, zoomScale))
+                        let slotCount = max(8, Double(baseCount) / Double(effectiveZoom))
+                        let stepX = plotWidth / CGFloat(max(1, slotCount))
+                        let totalW = CGFloat(visibleBars.count) * stepX
+                        let minPan = min(0, plotWidth - totalW)
+                        let clampedPan = totalW > plotWidth ? min(0, max(minPan, panOffset)) : 0
+                        
+                        rsiPlotView(size: geo.size, stepX: stepX, panOffset: clampedPan)
+                    }
+                    .frame(height: isLandscape ? 60 : 75)
+                }
+            }
+            .contentShape(Rectangle())
+            .gesture(
+                MagnificationGesture()
+                    .onChanged { value in
+                        let delta = value / lastMagnification
+                        lastMagnification = value
+                        zoomScale = max(0.6, min(4.0, zoomScale * delta))
+                    }
+                    .onEnded { _ in
+                        lastMagnification = 1.0
+                    }
+            )
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 1)
+                    .onChanged { value in
+                        let baseCount = max(visibleBars.count, min(totalBarsCount, 50))
+                        let effectiveZoom = max(0.5, min(4.0, zoomScale))
+                        let slotCount = max(8, Double(baseCount) / Double(effectiveZoom))
+                        let approxPlotWidth: CGFloat = isLandscape ? 600 : 300
+                        let stepX = approxPlotWidth / CGFloat(max(1, slotCount))
+                        let totalW = CGFloat(visibleBars.count) * stepX
+                        
+                        if zoomScale > 1.05 && abs(value.translation.width) > 4 && totalW > approxPlotWidth {
+                            let delta = value.translation.width - lastDragX
+                            lastDragX = value.translation.width
+                            panOffset += delta
+                        } else {
+                            updateHoveredBar(at: value.location.x, totalWidth: approxPlotWidth, stepX: stepX, panOffset: panOffset)
+                        }
+                    }
+                    .onEnded { _ in
+                        lastDragX = 0
+                        hoveredBarIndex = nil
+                        let baseCount = max(visibleBars.count, min(totalBarsCount, 50))
+                        let effectiveZoom = max(0.5, min(4.0, zoomScale))
+                        let slotCount = max(8, Double(baseCount) / Double(effectiveZoom))
+                        let approxPlotWidth: CGFloat = isLandscape ? 600 : 300
+                        let stepX = approxPlotWidth / CGFloat(max(1, slotCount))
+                        let totalW = CGFloat(visibleBars.count) * stepX
+                        if totalW > approxPlotWidth {
+                            let minOffset = approxPlotWidth - totalW
+                            panOffset = min(0, max(minOffset, panOffset))
+                        } else {
+                            panOffset = 0
+                        }
+                    }
+            )
+            .onTapGesture(count: 2) {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                    zoomScale = 1.0
+                    panOffset = 0.0
                 }
             }
             .background(AppColors.cardBackground)
@@ -114,12 +167,11 @@ public struct CandleChartView: View {
                     .stroke(AppColors.border.opacity(0.6), lineWidth: 1)
             )
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Candlestick chart for \(trade.symbol), \(visibleBars.count) bars visible. Entry price \(Formatters.price(trade.avgEntry)).")
-            .accessibilityValue(activeHoveredBar != nil ? "Bar at \(formatBarTime(activeHoveredBar!.timestamp)): Open \(Formatters.price(activeHoveredBar!.open)), High \(Formatters.price(activeHoveredBar!.high)), Low \(Formatters.price(activeHoveredBar!.low)), Close \(Formatters.price(activeHoveredBar!.close))" : "")
+            .accessibilityLabel("Candlestick chart for \(trade.symbol), \(visibleBars.count) bars visible.")
         }
     }
     
-    // MARK: - 1. HUD Header
+    // MARK: - 1. HUD Header Bar (Sleek, Minimalist, Pre-Trade Aligned)
     
     private var activeHoveredBar: MarketBar? {
         guard let idx = hoveredBarIndex, idx >= 0, idx < visibleBars.count else {
@@ -136,112 +188,102 @@ public struct CandleChartView: View {
     }
     
     private var currentTrendBias: TrendBias? {
-        guard showMarketStructure && visibleBars.count >= 10 else { return nil }
+        guard visibleBars.count >= 10 else { return nil }
         return MovingAverageEngine.analyzeTimeframe(bars: visibleBars, timeframe: resolution.rawValue)?.trend
     }
     
     private var hudHeaderView: some View {
-        let ema21Series = showMarketStructure ? MovingAverageEngine.calculateEMA(period: 21, bars: visibleBars) : []
-        let ema50Series = showMarketStructure ? MovingAverageEngine.calculateEMA(period: 50, bars: visibleBars) : []
-        let activeEMA21 = activeHoveredIndex.flatMap { $0 < ema21Series.count ? ema21Series[$0] : nil }
-        let activeEMA50 = activeHoveredIndex.flatMap { $0 < ema50Series.count ? ema50Series[$0] : nil }
+        let trend = currentTrendBias
+        let hoveredTimeStr: String? = hoveredBarIndex != nil ? activeHoveredBar.map { formatBarTime($0.timestamp) } : nil
         
-        return VStack(alignment: .leading, spacing: 3) {
-            if let bar = activeHoveredBar {
-                // Row 1: Timestamp + Trend Regime badge + Price change %
-                HStack(spacing: 6) {
-                    Text(formatBarTime(bar.timestamp))
-                        .font(AppTypography.monoCaption)
-                        .foregroundColor(AppColors.primaryText)
-                    
-                    if let bias = currentTrendBias, bias != .neutral {
-                        let isBull = bias == .bullish || bias == .strongBullish
-                        Text(bias.rawValue)
-                            .font(.system(size: 8, weight: .bold))
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 1)
-                            .background(isBull ? AppColors.profit.opacity(0.18) : AppColors.loss.opacity(0.18))
-                            .foregroundColor(isBull ? AppColors.profit : AppColors.loss)
-                            .cornerRadius(3)
-                    }
-                    
-                    Spacer()
-                    
-                    let change = (bar.close as NSDecimalNumber).doubleValue - (bar.open as NSDecimalNumber).doubleValue
-                    let pct = bar.open > 0 ? (change / (bar.open as NSDecimalNumber).doubleValue) * 100.0 : 0
-                    Text(String(format: "%+.2f%%", pct))
-                        .font(AppTypography.number(10, weight: .semibold))
-                        .foregroundColor(bar.isUp ? AppColors.profit : AppColors.loss)
-                }
+        return HStack(alignment: .center, spacing: 8) {
+            // 1. Symbol
+            Text(trade.symbol)
+                .font(.system(size: 12, weight: .bold))
+                .foregroundColor(AppColors.primaryText)
+            
+            // 2. Trend Capsule Pill (▲ Bullish, ▼ Bearish, ⇄ Pullback)
+            if let t = trend {
+                let isBull = t == .bullish || t == .strongBullish
+                let isBear = t == .bearish || t == .strongBearish
+                let color = isBull ? AppColors.profit : (isBear ? AppColors.loss : AppColors.warning)
                 
-                // Row 2: O H L C cleanly distributed across width without wrapping
-                HStack(spacing: 8) {
-                    HStack(spacing: 2) {
-                        Text("O")
-                            .foregroundColor(AppColors.secondaryText)
-                        Text(Formatters.price(bar.open))
-                            .foregroundColor(AppColors.primaryText)
-                    }
-                    Spacer()
-                    HStack(spacing: 2) {
-                        Text("H")
-                            .foregroundColor(AppColors.secondaryText)
-                        Text(Formatters.price(bar.high))
-                            .foregroundColor(AppColors.profit)
-                    }
-                    Spacer()
-                    HStack(spacing: 2) {
-                        Text("L")
-                            .foregroundColor(AppColors.secondaryText)
-                        Text(Formatters.price(bar.low))
-                            .foregroundColor(AppColors.loss)
-                    }
-                    Spacer()
-                    HStack(spacing: 2) {
-                        Text("C")
-                            .foregroundColor(AppColors.secondaryText)
-                        Text(Formatters.price(bar.close))
-                            .foregroundColor(bar.isUp ? AppColors.profit : AppColors.loss)
-                    }
+                HStack(spacing: 4) {
+                    Text(isBull ? "▲" : (isBear ? "▼" : "⇄"))
+                        .font(.system(size: 8.5, weight: .bold))
+                    Text(t.label.replacingOccurrences(of: " ▲▲", with: "")
+                                .replacingOccurrences(of: " ▲", with: "")
+                                .replacingOccurrences(of: " ▼▼", with: "")
+                                .replacingOccurrences(of: " ▼", with: "")
+                                .replacingOccurrences(of: " ⇄", with: "")
+                                .replacingOccurrences(of: " ▬", with: ""))
+                        .font(.system(size: 9.5, weight: .bold))
                 }
-                .font(AppTypography.number(10, weight: .medium))
-                .lineLimit(1)
-                .minimumScaleFactor(0.85)
-                
-                // Row 3: EMA 21 & EMA 50 dynamic numeric values (Causal, Zero Lookahead)
-                if showMarketStructure, activeEMA21 != nil || activeEMA50 != nil {
-                    HStack(spacing: 8) {
-                        if let e21 = activeEMA21 {
-                            HStack(spacing: 3) {
-                                Circle()
-                                    .fill(Color(red: 0.0, green: 0.85, blue: 1.0))
-                                    .frame(width: 5, height: 5)
-                                Text("EMA 21: \(Formatters.price(e21, symbol: trade.symbol))")
-                                    .font(AppTypography.number(9, weight: .semibold))
-                                    .foregroundColor(Color(red: 0.0, green: 0.85, blue: 1.0))
-                            }
-                        }
-                        if let e50 = activeEMA50 {
-                            HStack(spacing: 3) {
-                                Circle()
-                                    .fill(Color.orange)
-                                    .frame(width: 5, height: 5)
-                                Text("EMA 50: \(Formatters.price(e50, symbol: trade.symbol))")
-                                    .font(AppTypography.number(9, weight: .semibold))
-                                    .foregroundColor(Color.orange)
-                            }
-                        }
-                        Spacer()
-                    }
-                }
-            } else {
-                Text("No candle data available")
-                    .font(AppTypography.caption)
+                .padding(.horizontal, 7)
+                .padding(.vertical, 2.5)
+                .background(color.opacity(0.12))
+                .foregroundColor(color)
+                .clipShape(Capsule())
+            }
+            
+            // 3. Hovered Time (if touching/scrubbing candle)
+            if let timeStr = hoveredTimeStr {
+                Text(timeStr)
+                    .font(AppTypography.monoCaption)
                     .foregroundColor(AppColors.secondaryText)
             }
+            
+            Spacer()
+            
+            // 4. Zoom Indicator (if user pinched)
+            if abs(zoomScale - 1.0) > 0.05 {
+                Text(String(format: "%.1fx", zoomScale))
+                    .font(.system(size: 8.5, weight: .bold))
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 1.5)
+                    .background(AppColors.brand.opacity(0.15))
+                    .foregroundColor(AppColors.brand)
+                    .clipShape(Capsule())
+            }
+            
+            // 5. Minimalist Legend Dots (EMA 21 cyan, EMA 50 orange, BSL amber, SSL mint)
+            HStack(spacing: 8) {
+                HStack(spacing: 3) {
+                    Circle()
+                        .fill(Color(red: 0.0, green: 0.85, blue: 1.0))
+                        .frame(width: 5, height: 5)
+                    Text("EMA 21")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundColor(AppColors.secondaryText)
+                }
+                HStack(spacing: 3) {
+                    Circle()
+                        .fill(Color.orange)
+                        .frame(width: 5, height: 5)
+                    Text("EMA 50")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundColor(AppColors.secondaryText)
+                }
+                HStack(spacing: 3) {
+                    Circle()
+                        .fill(Color(red: 1.0, green: 0.62, blue: 0.2))
+                        .frame(width: 5, height: 5)
+                    Text("BSL")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundColor(AppColors.secondaryText)
+                }
+                HStack(spacing: 3) {
+                    Circle()
+                        .fill(Color(red: 0.2, green: 0.82, blue: 0.95))
+                        .frame(width: 5, height: 5)
+                    Text("SSL")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundColor(AppColors.secondaryText)
+                }
+            }
         }
-        .padding(.horizontal, 4)
-        .padding(.vertical, 2)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
     }
     
     // MARK: - 2. Candlestick Main Plot
@@ -257,10 +299,16 @@ public struct CandleChartView: View {
         let maxP = bounds.maxPrice
         let priceSpan = max(0.00001, maxP - minP)
         
-        // Number of visible slots: minimum 15 to prevent oversized candles
-        let slotCount = max(visibleBars.count, min(totalBarsCount, 50))
+        // Base slot count scaled by pinch zoom:
+        let baseCount = max(visibleBars.count, min(totalBarsCount, 50))
+        let effectiveZoom = max(0.5, min(4.0, zoomScale))
+        let slotCount = max(8, Double(baseCount) / Double(effectiveZoom))
         let stepX = plotWidth / CGFloat(max(1, slotCount))
-        let candleWidth = max(2.5, min(12.0, stepX * 0.7))
+        let candleWidth = max(2.5, min(24.0, stepX * 0.7))
+        
+        let totalContentWidth = CGFloat(visibleBars.count) * stepX
+        let minPan = min(0, plotWidth - totalContentWidth)
+        let clampedPan = totalContentWidth > plotWidth ? min(0, max(minPan, panOffset)) : 0
         
         return ZStack(alignment: .topLeading) {
             // Grid lines and right price axis
@@ -268,16 +316,16 @@ public struct CandleChartView: View {
             
             // Time axis (bottom) - only shown on candlestick canvas if RSI sub-window is hidden
             if !showRSI {
-                timeAxis(width: plotWidth, height: plotHeight, stepX: stepX, fullHeight: size.height)
+                timeAxis(width: plotWidth, height: plotHeight, stepX: stepX, fullHeight: size.height, panOffset: clampedPan)
             }
             
-// Core implementation detail
-            volumeHistogram(plotWidth: plotWidth, plotHeight: plotHeight, stepX: stepX, candleWidth: candleWidth)
+            volumeHistogram(plotWidth: plotWidth, plotHeight: plotHeight, stepX: stepX, candleWidth: candleWidth, panOffset: clampedPan)
             
-// Render candlesticks (wick + body) (Wick + Body)
+            // Render candlesticks (Wick + Body)
             Canvas { context, _ in
                 for (i, bar) in visibleBars.enumerated() {
-                    let centerX = CGFloat(i) * stepX + (stepX / 2.0)
+                    let centerX = CGFloat(i) * stepX + (stepX / 2.0) + clampedPan
+                    guard centerX >= -candleWidth && centerX <= (plotWidth + candleWidth) else { continue }
                     
                     let highD = (bar.high as NSDecimalNumber).doubleValue
                     let lowD = (bar.low as NSDecimalNumber).doubleValue
@@ -296,13 +344,11 @@ public struct CandleChartView: View {
                     
                     let color = bar.isUp ? AppColors.profit : AppColors.loss
                     
-// Draw candle wicks (Wick)
                     var wickPath = Path()
                     wickPath.move(to: CGPoint(x: centerX, y: yHigh))
                     wickPath.addLine(to: CGPoint(x: centerX, y: yLow))
                     context.stroke(wickPath, with: .color(color), lineWidth: 1.5)
                     
-// Draw candle bodies (Body)
                     let bodyTop = min(yOpen, yClose)
                     let bodyHeight = max(2.5, abs(yClose - yOpen))
                     let bodyRect = CGRect(
@@ -318,24 +364,37 @@ public struct CandleChartView: View {
             
             // Dynamic EMA 21 & EMA 50 Overlay
             if showMarketStructure {
-                emaOverlay(plotWidth: plotWidth, plotHeight: plotHeight, stepX: stepX, minP: minP, span: priceSpan)
+                emaOverlay(plotWidth: plotWidth, plotHeight: plotHeight, stepX: stepX, minP: minP, span: priceSpan, panOffset: clampedPan)
             }
             
             // Liquidity Overlay (EQH / EQL Pools, Sweeps / SFPs)
             if showLiquidity {
-                liquidityOverlay(plotWidth: plotWidth, plotHeight: plotHeight, stepX: stepX, minP: minP, span: priceSpan)
+                liquidityOverlay(plotWidth: plotWidth, plotHeight: plotHeight, stepX: stepX, minP: minP, span: priceSpan, panOffset: clampedPan)
             }
             
             // Unified trade overlay (entry/exit lines, arrows, connecting line)
-            tradeOverlay(plotWidth: plotWidth, plotHeight: plotHeight, stepX: stepX, minP: minP, span: priceSpan)
+            tradeOverlay(plotWidth: plotWidth, plotHeight: plotHeight, stepX: stepX, minP: minP, span: priceSpan, panOffset: clampedPan)
             
-// Core implementation detail
             if let hIdx = hoveredBarIndex, hIdx < visibleBars.count {
-                let hX = CGFloat(hIdx) * stepX + (stepX / 2.0)
-                Rectangle()
-                    .fill(AppColors.primaryText.opacity(0.4))
-                    .frame(width: 1, height: plotHeight)
-                    .position(x: hX, y: plotHeight / 2.0)
+                let hX = CGFloat(hIdx) * stepX + (stepX / 2.0) + clampedPan
+                if hX >= 0 && hX <= plotWidth {
+                    Rectangle()
+                        .fill(AppColors.primaryText.opacity(0.4))
+                        .frame(width: 1, height: plotHeight)
+                        .position(x: hX, y: plotHeight / 2.0)
+                }
+            }
+            
+            // Zoom scale pill indicator (shows dynamically during pinch zoom in landscape)
+            if isLandscape && abs(zoomScale - 1.0) > 0.05 {
+                Text(String(format: "%.1fx", zoomScale))
+                    .font(.system(size: 9, weight: .bold))
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(AppColors.brand.opacity(0.2))
+                    .foregroundColor(AppColors.brand)
+                    .clipShape(Capsule())
+                    .position(x: 32, y: 16)
             }
         }
     }
@@ -364,26 +423,27 @@ public struct CandleChartView: View {
         }
     }
     
-    private func timeAxis(width: CGFloat, height: CGFloat, stepX: CGFloat, fullHeight: CGFloat) -> some View {
+    private func timeAxis(width: CGFloat, height: CGFloat, stepX: CGFloat, fullHeight: CGFloat, panOffset: CGFloat = 0) -> some View {
         let count = visibleBars.count
         let markInterval = max(1, count / 4)
         
         return ForEach(0..<count, id: \.self) { i in
             if i % markInterval == 0 || i == count - 1 {
-                let x = CGFloat(i) * stepX + (stepX / 2.0)
-                let timeStr = formatBarTime(visibleBars[i].timestamp)
-                
-                Text(timeStr)
-                    .font(AppTypography.number(9, weight: .regular))
-                    .foregroundColor(AppColors.secondaryText)
-                    .position(x: x, y: height + 10)
+                let x = CGFloat(i) * stepX + (stepX / 2.0) + panOffset
+                if x >= 0 && x <= width {
+                    let timeStr = formatBarTime(visibleBars[i].timestamp)
+                    Text(timeStr)
+                        .font(AppTypography.number(9, weight: .regular))
+                        .foregroundColor(AppColors.secondaryText)
+                        .position(x: x, y: height + 10)
+                }
             }
         }
     }
     
     // MARK: - 4. Volume Histogram
     
-    private func volumeHistogram(plotWidth: CGFloat, plotHeight: CGFloat, stepX: CGFloat, candleWidth: CGFloat) -> some View {
+    private func volumeHistogram(plotWidth: CGFloat, plotHeight: CGFloat, stepX: CGFloat, candleWidth: CGFloat, panOffset: CGFloat = 0) -> some View {
         let maxVol = visibleBars.map { ($0.volume as NSDecimalNumber).doubleValue }.max() ?? 1.0
         let safeMaxVol = max(1.0, maxVol)
         let volAreaHeight = plotHeight * 0.18
@@ -392,19 +452,20 @@ public struct CandleChartView: View {
             let bar = visibleBars[i]
             let v = (bar.volume as NSDecimalNumber).doubleValue
             let barH = CGFloat(v / safeMaxVol) * volAreaHeight
-            let x = CGFloat(i) * stepX + (stepX / 2.0)
-            let y = plotHeight - barH
-            
-            Rectangle()
-                .fill((bar.isUp ? AppColors.profit : AppColors.loss).opacity(0.25))
-                .frame(width: max(1.5, candleWidth * 0.8), height: barH)
-                .position(x: x, y: y + barH / 2.0)
+            let x = CGFloat(i) * stepX + (stepX / 2.0) + panOffset
+            if x >= -candleWidth && x <= (plotWidth + candleWidth) {
+                let y = plotHeight - barH
+                Rectangle()
+                    .fill((bar.isUp ? AppColors.profit : AppColors.loss).opacity(0.25))
+                    .frame(width: max(1.5, candleWidth * 0.8), height: barH)
+                    .position(x: x, y: y + barH / 2.0)
+            }
         }
     }
     
     // MARK: - 5. Unified Trade Overlay (Entry/Exit Lines, Fill Markers, Connecting Line)
     
-    private func tradeOverlay(plotWidth: CGFloat, plotHeight: CGFloat, stepX: CGFloat, minP: Double, span: Double) -> some View {
+    private func tradeOverlay(plotWidth: CGFloat, plotHeight: CGFloat, stepX: CGFloat, minP: Double, span: Double, panOffset: CGFloat = 0) -> some View {
         let entryD = (trade.avgEntry as NSDecimalNumber).doubleValue
         let yEntry = plotHeight - CGFloat((entryD - minP) / span) * plotHeight
         let openMs = Int64(trade.openedAt.timeIntervalSince1970 * 1000)
@@ -442,7 +503,7 @@ public struct CandleChartView: View {
             return visibleBars.firstIndex { $0.timestamp >= openMs }
         }()
         let hasReachedOpen = (visibleBars.last.map { ($0.timestamp + barDur) >= openMs } ?? false) || entryBarIdx != nil
-        let entryX = CGFloat(entryBarIdx ?? 0) * stepX + (stepX / 2.0)
+        let entryX = CGFloat(entryBarIdx ?? 0) * stepX + (stepX / 2.0) + panOffset
         
         let hasReachedExit = (trade.status != .open) && ((visibleBars.last?.timestamp ?? 0) >= closeMs || visibleBars.count >= totalBarsCount)
         
@@ -505,7 +566,7 @@ public struct CandleChartView: View {
                     }
                     return visibleBars.firstIndex { $0.timestamp >= closeMs } ?? (visibleBars.count - 1)
                 }()
-                let exitX = CGFloat(exitBarIdx) * stepX + (stepX / 2.0)
+                let exitX = CGFloat(exitBarIdx) * stepX + (stepX / 2.0) + panOffset
                 let pnlColor = Formatters.pnlColor(trade.netPnl)
                 
                 // Exit horizontal dashed line
@@ -543,7 +604,7 @@ public struct CandleChartView: View {
                 // 4. In-progress trade tracking line: tracks current bar during replay or for open trades
                 let curPrice = (curBar.close as NSDecimalNumber).doubleValue
                 let yCur = plotHeight - CGFloat((curPrice - minP) / span) * plotHeight
-                let curX = CGFloat(visibleBars.count - 1) * stepX + (stepX / 2.0)
+                let curX = CGFloat(visibleBars.count - 1) * stepX + (stepX / 2.0) + panOffset
                 let curPnl = TradeReplayEngine.computeUnrealizedPnl(trade: trade, currentPrice: curBar.close, isLastBar: false)
                 let curColor = Formatters.pnlColor(curPnl)
                 
@@ -595,11 +656,17 @@ public struct CandleChartView: View {
         return (minPrice: minVal - margin, maxPrice: maxVal + margin)
     }
     
-    private func updateHoveredBar(at x: CGFloat, totalWidth: CGFloat) {
+    private func updateHoveredBar(at x: CGFloat, totalWidth: CGFloat, stepX: CGFloat? = nil, panOffset: CGFloat = 0) {
         guard !visibleBars.isEmpty, totalWidth > 0 else { return }
-        let slotCount = max(visibleBars.count, min(totalBarsCount, 50))
-        let stepX = totalWidth / CGFloat(max(1, slotCount))
-        let index = Int(x / stepX)
+        let stX: CGFloat = {
+            if let s = stepX, s > 0 { return s }
+            let baseCount = max(visibleBars.count, min(totalBarsCount, 50))
+            let effectiveZoom = max(0.5, min(4.0, zoomScale))
+            let slotCount = max(8, Double(baseCount) / Double(effectiveZoom))
+            return totalWidth / CGFloat(max(1, slotCount))
+        }()
+        let adjustedX = x - panOffset
+        let index = Int(adjustedX / stX)
         if index >= 0 && index < visibleBars.count && self.hoveredBarIndex != index {
             self.hoveredBarIndex = index
             #if os(iOS)
@@ -633,7 +700,8 @@ public struct CandleChartView: View {
         plotHeight: CGFloat,
         stepX: CGFloat,
         minP: Double,
-        span: Double
+        span: Double,
+        panOffset: CGFloat = 0
     ) -> some View {
         if visibleBars.count >= 10 {
             let ema21 = MovingAverageEngine.calculateEMA(period: 21, bars: visibleBars)
@@ -644,7 +712,7 @@ public struct CandleChartView: View {
                 if ema50.count == visibleBars.count {
                     Path { path in
                         for (idx, val) in ema50.enumerated() {
-                            let x = CGFloat(idx) * stepX + (stepX / 2.0)
+                            let x = CGFloat(idx) * stepX + (stepX / 2.0) + panOffset
                             let pD = (val as NSDecimalNumber).doubleValue
                             let y = plotHeight - CGFloat((pD - minP) / span) * plotHeight
                             let clampedY = max(2, min(plotHeight - 2, y))
@@ -659,7 +727,7 @@ public struct CandleChartView: View {
                 if ema21.count == visibleBars.count {
                     Path { path in
                         for (idx, val) in ema21.enumerated() {
-                            let x = CGFloat(idx) * stepX + (stepX / 2.0)
+                            let x = CGFloat(idx) * stepX + (stepX / 2.0) + panOffset
                             let pD = (val as NSDecimalNumber).doubleValue
                             let y = plotHeight - CGFloat((pD - minP) / span) * plotHeight
                             let clampedY = max(2, min(plotHeight - 2, y))
@@ -681,7 +749,8 @@ public struct CandleChartView: View {
         plotHeight: CGFloat,
         stepX: CGFloat,
         minP: Double,
-        span: Double
+        span: Double,
+        panOffset: CGFloat = 0
     ) -> some View {
         if visibleBars.count >= 5 {
             let curPrice = visibleBars.last?.close ?? 0
@@ -744,40 +813,42 @@ public struct CandleChartView: View {
                 // 2. Liquidity Sweeps (Discrete SFP Markers)
                 ForEach(Array(simResult.sweeps.prefix(6))) { sweep in
                     if sweep.barIndex < visibleBars.count {
-                        let x = CGFloat(sweep.barIndex) * stepX + (stepX / 2.0)
-                        let isHighSweep = sweep.sweepType == .buySideSwept
-                        let wickD = (sweep.wickExtreme as NSDecimalNumber).doubleValue
-                        let rawY = plotHeight - CGFloat((wickD - minP) / span) * plotHeight
-                        let clampedY = max(8, min(plotHeight - 8, rawY))
-                        
-                        let sweepColor = isHighSweep ? Color(red: 1.0, green: 0.55, blue: 0.2) : Color(red: 0.2, green: 0.85, blue: 0.6)
-                        
-                        VStack(spacing: 1) {
-                            if isHighSweep {
-                                Text("SWEEP")
-                                    .font(.system(size: 6, weight: .black))
-                                    .padding(.horizontal, 3)
-                                    .padding(.vertical, 1)
-                                    .background(sweepColor)
-                                    .foregroundColor(.white)
-                                    .cornerRadius(2)
-                                Image(systemName: "arrowtriangle.down.fill")
-                                    .font(.system(size: 5))
-                                    .foregroundColor(sweepColor)
-                            } else {
-                                Image(systemName: "arrowtriangle.up.fill")
-                                    .font(.system(size: 5))
-                                    .foregroundColor(sweepColor)
-                                Text("SWEEP")
-                                    .font(.system(size: 6, weight: .black))
-                                    .padding(.horizontal, 3)
-                                    .padding(.vertical, 1)
-                                    .background(sweepColor)
-                                    .foregroundColor(.white)
-                                    .cornerRadius(2)
+                        let x = CGFloat(sweep.barIndex) * stepX + (stepX / 2.0) + panOffset
+                        if x >= 0 && x <= plotWidth {
+                            let isHighSweep = sweep.sweepType == .buySideSwept
+                            let wickD = (sweep.wickExtreme as NSDecimalNumber).doubleValue
+                            let rawY = plotHeight - CGFloat((wickD - minP) / span) * plotHeight
+                            let clampedY = max(8, min(plotHeight - 8, rawY))
+                            
+                            let sweepColor = isHighSweep ? Color(red: 1.0, green: 0.55, blue: 0.2) : Color(red: 0.2, green: 0.85, blue: 0.6)
+                            
+                            VStack(spacing: 1) {
+                                if isHighSweep {
+                                    Text("SWEEP")
+                                        .font(.system(size: 6, weight: .black))
+                                        .padding(.horizontal, 3)
+                                        .padding(.vertical, 1)
+                                        .background(sweepColor)
+                                        .foregroundColor(.white)
+                                        .cornerRadius(2)
+                                    Image(systemName: "arrowtriangle.down.fill")
+                                        .font(.system(size: 5))
+                                        .foregroundColor(sweepColor)
+                                } else {
+                                    Image(systemName: "arrowtriangle.up.fill")
+                                        .font(.system(size: 5))
+                                        .foregroundColor(sweepColor)
+                                    Text("SWEEP")
+                                        .font(.system(size: 6, weight: .black))
+                                        .padding(.horizontal, 3)
+                                        .padding(.vertical, 1)
+                                        .background(sweepColor)
+                                        .foregroundColor(.white)
+                                        .cornerRadius(2)
+                                }
                             }
+                            .position(x: x, y: isHighSweep ? max(10, clampedY - 12) : min(plotHeight - 10, clampedY + 12))
                         }
-                        .position(x: x, y: isHighSweep ? max(10, clampedY - 12) : min(plotHeight - 10, clampedY + 12))
                     }
                 }
             }
@@ -920,14 +991,19 @@ public struct CandleChartView: View {
         .padding(.top, 4)
     }
     
-    private func rsiPlotView(size: CGSize) -> some View {
+    private func rsiPlotView(size: CGSize, stepX: CGFloat? = nil, panOffset: CGFloat = 0) -> some View {
         let rightAxisWidth: CGFloat = 55
         let bottomAxisHeight: CGFloat = 18
         let plotWidth = max(10, size.width - rightAxisWidth)
         let plotHeight = max(10, size.height - bottomAxisHeight)
         
-        let slotCount = max(visibleBars.count, min(totalBarsCount, 50))
-        let stepX = plotWidth / CGFloat(max(1, slotCount))
+        let stX: CGFloat = {
+            if let s = stepX, s > 0 { return s }
+            let baseCount = max(visibleBars.count, min(totalBarsCount, 50))
+            let effectiveZoom = max(0.5, min(4.0, zoomScale))
+            let slotCount = max(8, Double(baseCount) / Double(effectiveZoom))
+            return plotWidth / CGFloat(max(1, slotCount))
+        }()
         
         let y70 = plotHeight * 0.30
         let y50 = plotHeight * 0.50
@@ -985,7 +1061,7 @@ public struct CandleChartView: View {
                 var isFirst = true
                 for (i, rsiOpt) in visibleRsi.enumerated() {
                     guard let rsi = rsiOpt else { continue }
-                    let x = CGFloat(i) * stepX + (stepX / 2.0)
+                    let x = CGFloat(i) * stX + (stX / 2.0) + panOffset
                     let y = plotHeight - CGFloat(rsi / 100.0) * plotHeight
                     let clampedY = max(2, min(plotHeight - 2, y))
                     if isFirst {
@@ -997,6 +1073,7 @@ public struct CandleChartView: View {
                 }
             }
             .stroke(Color(red: 0.65, green: 0.45, blue: 0.95), style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
+            .clipped()
             
             // RSI Moving Average Curve (EMA / WMA - Gold/Amber)
             if activeRSIMAType != .none {
@@ -1004,7 +1081,7 @@ public struct CandleChartView: View {
                     var isFirst = true
                     for (i, maOpt) in visibleRsiMA.enumerated() {
                         guard let ma = maOpt else { continue }
-                        let x = CGFloat(i) * stepX + (stepX / 2.0)
+                        let x = CGFloat(i) * stX + (stX / 2.0) + panOffset
                         let y = plotHeight - CGFloat(ma / 100.0) * plotHeight
                         let clampedY = max(2, min(plotHeight - 2, y))
                         if isFirst {
@@ -1016,39 +1093,42 @@ public struct CandleChartView: View {
                     }
                 }
                 .stroke(Color(red: 1.0, green: 0.82, blue: 0.2), style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
+                .clipped()
             }
             
             // Active / Hovered dot and cursor line
             if let hIdx = hoveredBarIndex, hIdx < visibleBars.count {
-                let hX = CGFloat(hIdx) * stepX + (stepX / 2.0)
-                Rectangle()
-                    .fill(AppColors.primaryText.opacity(0.4))
-                    .frame(width: 1, height: plotHeight)
-                    .position(x: hX, y: plotHeight / 2.0)
-                
-                // RSI dot
-                if hIdx < visibleRsi.count, let rsi = visibleRsi[hIdx] {
-                    let rsiY = plotHeight - CGFloat(rsi / 100.0) * plotHeight
-                    let clampedY = max(2, min(plotHeight - 2, rsiY))
-                    Circle()
-                        .fill(Color(red: 0.65, green: 0.45, blue: 0.95))
-                        .frame(width: 5, height: 5)
-                        .position(x: hX, y: clampedY)
-                }
-                
-                // MA dot
-                if activeRSIMAType != .none, hIdx < visibleRsiMA.count, let ma = visibleRsiMA[hIdx] {
-                    let maY = plotHeight - CGFloat(ma / 100.0) * plotHeight
-                    let clampedY = max(2, min(plotHeight - 2, maY))
-                    Circle()
-                        .fill(Color(red: 1.0, green: 0.82, blue: 0.2))
-                        .frame(width: 5, height: 5)
-                        .position(x: hX, y: clampedY)
+                let hX = CGFloat(hIdx) * stX + (stX / 2.0) + panOffset
+                if hX >= 0 && hX <= plotWidth {
+                    Rectangle()
+                        .fill(AppColors.primaryText.opacity(0.4))
+                        .frame(width: 1, height: plotHeight)
+                        .position(x: hX, y: plotHeight / 2.0)
+                    
+                    // RSI dot
+                    if hIdx < visibleRsi.count, let rsi = visibleRsi[hIdx] {
+                        let rsiY = plotHeight - CGFloat(rsi / 100.0) * plotHeight
+                        let clampedY = max(2, min(plotHeight - 2, rsiY))
+                        Circle()
+                            .fill(Color(red: 0.65, green: 0.45, blue: 0.95))
+                            .frame(width: 5, height: 5)
+                            .position(x: hX, y: clampedY)
+                    }
+                    
+                    // MA dot
+                    if activeRSIMAType != .none, hIdx < visibleRsiMA.count, let ma = visibleRsiMA[hIdx] {
+                        let maY = plotHeight - CGFloat(ma / 100.0) * plotHeight
+                        let clampedY = max(2, min(plotHeight - 2, maY))
+                        Circle()
+                            .fill(Color(red: 1.0, green: 0.82, blue: 0.2))
+                            .frame(width: 5, height: 5)
+                            .position(x: hX, y: clampedY)
+                    }
                 }
             }
             
             // Time Axis at bottom of RSI
-            timeAxis(width: plotWidth, height: plotHeight, stepX: stepX, fullHeight: size.height)
+            timeAxis(width: plotWidth, height: plotHeight, stepX: stX, fullHeight: size.height, panOffset: panOffset)
         }
     }
 }

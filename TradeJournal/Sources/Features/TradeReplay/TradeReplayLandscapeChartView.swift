@@ -191,6 +191,11 @@ public struct TradeReplayLandscapeChartView: View {
     }
     
     // MARK: - 2. Timeframes & Indicators Bar
+    private var currentTrendBias: TrendBias? {
+        guard !bars.isEmpty else { return nil }
+        return MovingAverageEngine.analyzeTimeframe(bars: frame.visibleBars, timeframe: selectedResolution.rawValue)?.trend
+    }
+    
     private var controlsBar: some View {
         HStack(spacing: 8) {
             // Timeframe Resolution Selector
@@ -204,12 +209,11 @@ public struct TradeReplayLandscapeChartView: View {
                 let isSelected = res == selectedResolution
                 let title: String = {
                     switch res {
-                    case .m1: return "1m"
-                    case .m5: return "5m"
                     case .m15: return "15m"
                     case .h1: return "1h"
                     case .h4: return "4h"
                     case .d1: return "1D"
+                    default: return res.rawValue.uppercased()
                     }
                 }()
                 Button {
@@ -231,57 +235,73 @@ public struct TradeReplayLandscapeChartView: View {
             
             Spacer()
             
-            // Indicators Selector (SMC & Momentum)
-            Text("Trend:")
-                .font(AppTypography.caption)
-                .foregroundColor(AppColors.secondaryText)
-                .lineLimit(1)
-                .fixedSize()
-            
-            Button {
-                showMarketStructure.toggle()
-            } label: {
-                Text("EMA 21/50")
-                    .font(AppTypography.pill)
-                    .lineLimit(1)
-                    .fixedSize()
-                    .padding(.horizontal, 9)
-                    .padding(.vertical, 4)
-                    .background(showMarketStructure ? AppColors.accent : AppColors.secondaryBackground)
-                    .foregroundColor(showMarketStructure ? .white : AppColors.secondaryText)
-                    .cornerRadius(6)
+            // Trend Regime Pill
+            if let t = currentTrendBias {
+                let isBull = t == .bullish || t == .strongBullish
+                let isBear = t == .bearish || t == .strongBearish
+                let color = isBull ? AppColors.profit : (isBear ? AppColors.loss : AppColors.warning)
+                
+                HStack(spacing: 4) {
+                    Text(isBull ? "▲" : (isBear ? "▼" : "⇄"))
+                        .font(.system(size: 8.5, weight: .bold))
+                    Text(t.label.replacingOccurrences(of: " ▲▲", with: "")
+                                .replacingOccurrences(of: " ▲", with: "")
+                                .replacingOccurrences(of: " ▼▼", with: "")
+                                .replacingOccurrences(of: " ▼", with: "")
+                                .replacingOccurrences(of: " ⇄", with: "")
+                                .replacingOccurrences(of: " ▬", with: ""))
+                        .font(.system(size: 9.5, weight: .bold))
+                }
+                .padding(.horizontal, 7)
+                .padding(.vertical, 2.5)
+                .background(color.opacity(0.12))
+                .foregroundColor(color)
+                .clipShape(Capsule())
             }
-            .buttonStyle(.plain)
             
-            Button {
-                showLiquidity.toggle()
-            } label: {
-                Text("Liquidity")
-                    .font(AppTypography.pill)
-                    .lineLimit(1)
-                    .fixedSize()
-                    .padding(.horizontal, 9)
-                    .padding(.vertical, 4)
-                    .background(showLiquidity ? AppColors.accent : AppColors.secondaryBackground)
-                    .foregroundColor(showLiquidity ? .white : AppColors.secondaryText)
-                    .cornerRadius(6)
+            // Minimalist Legend Dots (EMA 21, EMA 50, BSL, SSL, RSI 14)
+            HStack(spacing: 8) {
+                HStack(spacing: 3) {
+                    Circle()
+                        .fill(Color(red: 0.0, green: 0.85, blue: 1.0))
+                        .frame(width: 5, height: 5)
+                    Text("EMA 21")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundColor(AppColors.secondaryText)
+                }
+                HStack(spacing: 3) {
+                    Circle()
+                        .fill(Color.orange)
+                        .frame(width: 5, height: 5)
+                    Text("EMA 50")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundColor(AppColors.secondaryText)
+                }
+                HStack(spacing: 3) {
+                    Circle()
+                        .fill(Color(red: 1.0, green: 0.62, blue: 0.2))
+                        .frame(width: 5, height: 5)
+                    Text("BSL")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundColor(AppColors.secondaryText)
+                }
+                HStack(spacing: 3) {
+                    Circle()
+                        .fill(Color(red: 0.2, green: 0.82, blue: 0.95))
+                        .frame(width: 5, height: 5)
+                    Text("SSL")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundColor(AppColors.secondaryText)
+                }
+                HStack(spacing: 3) {
+                    Circle()
+                        .fill(Color(red: 0.65, green: 0.45, blue: 0.95))
+                        .frame(width: 5, height: 5)
+                    Text("RSI 14")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundColor(AppColors.secondaryText)
+                }
             }
-            .buttonStyle(.plain)
-            
-            Button {
-                showRSI.toggle()
-            } label: {
-                Text("RSI (14)")
-                    .font(AppTypography.pill)
-                    .lineLimit(1)
-                    .fixedSize()
-                    .padding(.horizontal, 9)
-                    .padding(.vertical, 4)
-                    .background(showRSI ? AppColors.accent : AppColors.secondaryBackground)
-                    .foregroundColor(showRSI ? .white : AppColors.secondaryText)
-                    .cornerRadius(6)
-            }
-            .buttonStyle(.plain)
         }
     }
     
@@ -311,9 +331,9 @@ public struct TradeReplayLandscapeChartView: View {
                     timeZone: timeZone,
                     currency: reportingCurrency,
                     resolution: selectedResolution,
-                    showMarketStructure: showMarketStructure,
-                    showLiquidity: showLiquidity,
-                    showRSI: showRSI,
+                    showMarketStructure: true,
+                    showLiquidity: true,
+                    showRSI: true,
                     isLandscape: true
                 )
             }

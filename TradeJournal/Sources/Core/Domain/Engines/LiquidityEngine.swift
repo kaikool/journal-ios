@@ -951,10 +951,9 @@ public enum LiquidityEngine: Sendable {
     
     /// Comprehensive multi-timeframe liquidity analysis strictly abiding by institutional role separation:
     /// - H4/H1: Primary & Supplementary Liquidity Map
-    /// - M15/M5: Real-time Event Tracking & SFP Detection
+    /// - M15: Real-time Execution Event Tracking & SFP Detection
     public static func analyzeLiquidity(
         symbol: String,
-        barsM5: [MarketBar] = [],
         barsM15: [MarketBar],
         barsH1: [MarketBar] = [],
         barsH4: [MarketBar] = [],
@@ -973,15 +972,12 @@ public enum LiquidityEngine: Sendable {
             upToTimestamp: refTimestamp
         )
         
-        // 2. Track events on execution timeframe (M15 by default, M5 if provided)
-        let execBars = !barsM5.isEmpty ? barsM5 : barsM15
-        let execTf = !barsM5.isEmpty ? "M5" : "M15"
-        
+        // 2. Track events strictly on execution timeframe (M15)
         let sim = simulate(
-            bars: execBars,
+            bars: barsM15,
             pools: mapPools,
             symbol: symbol,
-            timeframe: execTf,
+            timeframe: "M15",
             minRejectionWickRatio: 0.15
         )
         
@@ -999,7 +995,7 @@ public enum LiquidityEngine: Sendable {
         
         return LiquidityAnalysisResult(
             symbol: symbol,
-            timeframe: execTf,
+            timeframe: "M15",
             currentPrice: curPrice,
             pdh: pdh,
             pdl: pdl,
@@ -1016,23 +1012,6 @@ public enum LiquidityEngine: Sendable {
             latestSweep: sim.sweeps.first,
             activeH4Pools: h4Pools,
             activeH1Pools: h1Pools
-        )
-    }
-    
-    /// Backward-compatible overload without M5 / H1.
-    public static func analyzeLiquidity(
-        symbol: String,
-        barsM15: [MarketBar],
-        barsH4: [MarketBar] = [],
-        barsD1: [MarketBar] = []
-    ) -> LiquidityAnalysisResult {
-        return analyzeLiquidity(
-            symbol: symbol,
-            barsM5: [],
-            barsM15: barsM15,
-            barsH1: [],
-            barsH4: barsH4,
-            barsD1: barsD1
         )
     }
 }
