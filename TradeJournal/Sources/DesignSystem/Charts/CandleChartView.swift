@@ -83,7 +83,7 @@ public struct CandleChartView: View {
                     GeometryReader { geo in
                         candlestickPlotView(size: geo.size)
                     }
-                    .frame(height: showRSI ? 205 : 240)
+                    .frame(height: showRSI ? 220 : 260)
                 }
                 
                 // 2. RSI Sub-Window (Underneath)
@@ -104,7 +104,7 @@ public struct CandleChartView: View {
                         
                         rsiPlotView(size: geo.size, stepX: stepX, panOffset: clampedPan)
                     }
-                    .frame(height: isLandscape ? 60 : 75)
+                    .frame(height: isLandscape ? 85 : 110)
                 }
             }
             .contentShape(Rectangle())
@@ -268,7 +268,7 @@ public struct CandleChartView: View {
                     Circle()
                         .fill(Color(red: 1.0, green: 0.62, blue: 0.2))
                         .frame(width: 5, height: 5)
-                    Text("BSL")
+                    Text("BSL-H")
                         .font(.system(size: 9, weight: .medium))
                         .foregroundColor(AppColors.secondaryText)
                 }
@@ -276,9 +276,27 @@ public struct CandleChartView: View {
                     Circle()
                         .fill(Color(red: 0.2, green: 0.82, blue: 0.95))
                         .frame(width: 5, height: 5)
-                    Text("SSL")
+                    Text("BSL-L")
                         .font(.system(size: 9, weight: .medium))
                         .foregroundColor(AppColors.secondaryText)
+                }
+                if showRSI {
+                    HStack(spacing: 3) {
+                        Circle()
+                            .fill(Color(red: 0.65, green: 0.45, blue: 0.95))
+                            .frame(width: 5, height: 5)
+                        Text("RSI")
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundColor(AppColors.secondaryText)
+                    }
+                    HStack(spacing: 3) {
+                        Circle()
+                            .fill(Color(red: 1.0, green: 0.82, blue: 0.2))
+                            .frame(width: 5, height: 5)
+                        Text("WMA 45")
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundColor(AppColors.secondaryText)
+                    }
                 }
             }
         }
@@ -465,47 +483,27 @@ public struct CandleChartView: View {
     
     // MARK: - 5. Unified Trade Overlay (Entry/Exit Lines, Fill Markers, Connecting Line)
     
+    private func findBarIndex(for timestampMs: Int64) -> Int? {
+        guard !visibleBars.isEmpty else { return nil }
+        let dur = resolution.durationMs
+        for i in stride(from: visibleBars.count - 1, through: 0, by: -1) {
+            let barStart = visibleBars[i].timestamp
+            let barEnd = (i + 1 < visibleBars.count) ? visibleBars[i + 1].timestamp : (barStart + dur)
+            if timestampMs >= barStart && timestampMs < barEnd {
+                return i
+            }
+        }
+        return nil
+    }
+    
     private func tradeOverlay(plotWidth: CGFloat, plotHeight: CGFloat, stepX: CGFloat, minP: Double, span: Double, panOffset: CGFloat = 0) -> some View {
         let entryD = (trade.avgEntry as NSDecimalNumber).doubleValue
         let yEntry = plotHeight - CGFloat((entryD - minP) / span) * plotHeight
         let openMs = Int64(trade.openedAt.timeIntervalSince1970 * 1000)
         let closeMs = Int64((trade.closedAt ?? Date()).timeIntervalSince1970 * 1000)
-        let barDur = resolution.durationMs
         
-        let entryBarIdx: Int? = {
-            if let idx = visibleBars.firstIndex(where: { openMs >= $0.timestamp && openMs < ($0.timestamp + barDur) }) {
-                let bar = visibleBars[idx]
-                let l = (bar.low as NSDecimalNumber).doubleValue
-                let h = (bar.high as NSDecimalNumber).doubleValue
-                if entryD >= (l - 0.0001) && entryD <= (h + 0.0001) {
-                    return idx
-                }
-                for offset in [-1, 1, -2, 2] {
-                    let neighborIdx = idx + offset
-                    if neighborIdx >= 0 && neighborIdx < visibleBars.count {
-                        let nb = visibleBars[neighborIdx]
-                        let nl = (nb.low as NSDecimalNumber).doubleValue
-                        let nh = (nb.high as NSDecimalNumber).doubleValue
-                        if entryD >= (nl - 0.0001) && entryD <= (nh + 0.0001) {
-                            return neighborIdx
-                        }
-                    }
-                }
-                return idx
-            }
-            if let idx = visibleBars.firstIndex(where: {
-                let l = ($0.low as NSDecimalNumber).doubleValue
-                let h = ($0.high as NSDecimalNumber).doubleValue
-                return entryD >= (l - 0.0001) && entryD <= (h + 0.0001)
-            }) {
-                return idx
-            }
-            return visibleBars.firstIndex { $0.timestamp >= openMs }
-        }()
-        let hasReachedOpen = (visibleBars.last.map { ($0.timestamp + barDur) >= openMs } ?? false) || entryBarIdx != nil
-        let entryX = CGFloat(entryBarIdx ?? 0) * stepX + (stepX / 2.0) + panOffset
-        
-        let hasReachedExit = (trade.status != .open) && ((visibleBars.last?.timestamp ?? 0) >= closeMs || visibleBars.count >= totalBarsCount)
+        let entryBarIdx = findBarIndex(for: openMs)
+        let exitBarIdx = findBarIndex(for: closeMs)
         
         return ZStack {
             // 1. Entry horizontal dashed reference line (always visible)
@@ -515,93 +513,67 @@ public struct CandleChartView: View {
             }
             .stroke(AppColors.accent.opacity(0.85), style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
             
-            // 2. Entry marker & label (shown once replay reaches open time)
-            if hasReachedOpen {
-                Text("ENTRY \(Formatters.price(trade.avgEntry))")
-                    .font(.system(size: 8, weight: .bold))
+            // 2. Entry marker & label: "EN" xanh không cần giá
+            if let entryIdx = entryBarIdx {
+                let entryX = CGFloat(entryIdx) * stepX + (stepX / 2.0) + panOffset
+                
+                Text("EN")
+                    .font(.system(size: 8, weight: .black))
                     .padding(.horizontal, 4)
                     .padding(.vertical, 1.5)
-                    .background(AppColors.accent)
+                    .background(AppColors.profit)
                     .foregroundColor(.white)
-                    .cornerRadius(4)
-                    .position(x: min(plotWidth - 40, max(40, entryX)), y: max(10, yEntry - 12))
+                    .cornerRadius(3)
+                    .position(x: min(plotWidth - 20, max(20, entryX)), y: max(8, yEntry - 10))
                 
                 Image(systemName: trade.direction == .long ? "arrowtriangle.up.fill" : "arrowtriangle.down.fill")
-                    .font(.system(size: 10))
-                    .foregroundColor(AppColors.accent)
-                    .position(x: entryX, y: trade.direction == .long ? yEntry + 10 : yEntry - 10)
+                    .font(.system(size: 8))
+                    .foregroundColor(AppColors.profit)
+                    .position(x: entryX, y: trade.direction == .long ? yEntry + 8 : yEntry - 8)
             }
             
-            // 3. Exit line + label + final connecting line (shown once replay reaches exit time)
-            if let avgExit = trade.avgExit, hasReachedExit {
-                let exitD = (avgExit as NSDecimalNumber).doubleValue
+            // 3. Exit line + label: "EX" đỏ không cần giá + connecting line
+            if let exitIdx = exitBarIdx, trade.status != .open {
+                let exitD = ((trade.avgExit ?? trade.avgEntry) as NSDecimalNumber).doubleValue
                 let yExit = plotHeight - CGFloat((exitD - minP) / span) * plotHeight
-                let exitBarIdx: Int = {
-                    if let idx = visibleBars.firstIndex(where: { closeMs >= $0.timestamp && closeMs < ($0.timestamp + barDur) }) {
-                        let bar = visibleBars[idx]
-                        let l = (bar.low as NSDecimalNumber).doubleValue
-                        let h = (bar.high as NSDecimalNumber).doubleValue
-                        if exitD >= (l - 0.0001) && exitD <= (h + 0.0001) {
-                            return idx
-                        }
-                        for offset in [-1, 1, -2, 2] {
-                            let neighborIdx = idx + offset
-                            if neighborIdx >= 0 && neighborIdx < visibleBars.count {
-                                let nb = visibleBars[neighborIdx]
-                                let nl = (nb.low as NSDecimalNumber).doubleValue
-                                let nh = (nb.high as NSDecimalNumber).doubleValue
-                                if exitD >= (nl - 0.0001) && exitD <= (nh + 0.0001) {
-                                    return neighborIdx
-                                }
-                            }
-                        }
-                        return idx
-                    }
-                    if let idx = visibleBars.firstIndex(where: {
-                        let l = ($0.low as NSDecimalNumber).doubleValue
-                        let h = ($0.high as NSDecimalNumber).doubleValue
-                        return exitD >= (l - 0.0001) && exitD <= (h + 0.0001)
-                    }) {
-                        return idx
-                    }
-                    return visibleBars.firstIndex { $0.timestamp >= closeMs } ?? (visibleBars.count - 1)
-                }()
-                let exitX = CGFloat(exitBarIdx) * stepX + (stepX / 2.0) + panOffset
-                let pnlColor = Formatters.pnlColor(trade.netPnl)
+                let exitX = CGFloat(exitIdx) * stepX + (stepX / 2.0) + panOffset
+                let exitColor = AppColors.loss
                 
                 // Exit horizontal dashed line
                 Path { path in
                     path.move(to: CGPoint(x: 0, y: yExit))
                     path.addLine(to: CGPoint(x: plotWidth, y: yExit))
                 }
-                .stroke(pnlColor.opacity(0.85), style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
+                .stroke(exitColor.opacity(0.85), style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
                 
                 // Connecting line from Entry to Exit
-                if hasReachedOpen {
+                if let entryIdx = entryBarIdx {
+                    let entryX = CGFloat(entryIdx) * stepX + (stepX / 2.0) + panOffset
                     Path { path in
                         path.move(to: CGPoint(x: entryX, y: yEntry))
                         path.addLine(to: CGPoint(x: exitX, y: yExit))
                     }
-                    .stroke(pnlColor.opacity(0.6), style: StrokeStyle(lineWidth: 1.5, dash: [5, 3]))
+                    .stroke(exitColor.opacity(0.6), style: StrokeStyle(lineWidth: 1.5, dash: [5, 3]))
                 }
                 
-                // Exit label
-                Text("EXIT \(Formatters.price(avgExit)) (\(Formatters.formatPnL(trade.netPnl, currency: currency)))")
-                    .font(.system(size: 8, weight: .bold))
+                // Exit badge: "EX" đỏ
+                Text("EX")
+                    .font(.system(size: 8, weight: .black))
                     .padding(.horizontal, 4)
                     .padding(.vertical, 1.5)
-                    .background(pnlColor)
+                    .background(exitColor)
                     .foregroundColor(.white)
-                    .cornerRadius(4)
-                    .position(x: min(plotWidth - 55, max(55, exitX)), y: max(10, yExit - 12))
+                    .cornerRadius(3)
+                    .position(x: min(plotWidth - 20, max(20, exitX)), y: max(8, yExit - 10))
                 
                 // Exit arrow marker
                 Image(systemName: trade.direction == .long ? "arrowtriangle.down.fill" : "arrowtriangle.up.fill")
-                    .font(.system(size: 10))
-                    .foregroundColor(pnlColor)
-                    .position(x: exitX, y: trade.direction == .long ? yExit - 10 : yExit + 10)
-            } else if hasReachedOpen, let curBar = visibleBars.last {
+                    .font(.system(size: 8))
+                    .foregroundColor(exitColor)
+                    .position(x: exitX, y: trade.direction == .long ? yExit - 8 : yExit + 8)
+            } else if let entryIdx = entryBarIdx, let curBar = visibleBars.last {
                 // 4. In-progress trade tracking line: tracks current bar during replay or for open trades
+                let entryX = CGFloat(entryIdx) * stepX + (stepX / 2.0) + panOffset
                 let curPrice = (curBar.close as NSDecimalNumber).doubleValue
                 let yCur = plotHeight - CGFloat((curPrice - minP) / span) * plotHeight
                 let curX = CGFloat(visibleBars.count - 1) * stepX + (stepX / 2.0) + panOffset
@@ -613,17 +585,6 @@ public struct CandleChartView: View {
                     path.addLine(to: CGPoint(x: curX, y: yCur))
                 }
                 .stroke(curColor.opacity(0.5), style: StrokeStyle(lineWidth: 1.5, dash: [5, 3]))
-                
-                if trade.status == .open {
-                    Text("LIVE \(Formatters.price(curBar.close))")
-                        .font(.system(size: 8, weight: .bold))
-                        .padding(.horizontal, 4)
-                        .padding(.vertical, 1.5)
-                        .background(curColor)
-                        .foregroundColor(.white)
-                        .cornerRadius(4)
-                        .position(x: min(plotWidth - 40, max(40, curX)), y: max(10, yCur - 12))
-                }
             }
         }
     }
@@ -775,7 +736,7 @@ public struct CandleChartView: View {
                     
                     let isBuySide = pool.type == .buySide
                     let poolColor = isBuySide ? Color(red: 1.0, green: 0.62, blue: 0.2) : Color(red: 0.2, green: 0.82, blue: 0.95)
-                    let poolLabel = isBuySide ? "BSL • \(pool.label)" : "SSL • \(pool.label)"
+                    let poolLabel = isBuySide ? "BSL-H" : "BSL-L"
                     
                     // Zone rectangle if rangeMin != rangeMax (e.g. EQH/EQL clusters)
                     if pool.rangeMin != pool.rangeMax {
@@ -824,8 +785,8 @@ public struct CandleChartView: View {
                             
                             VStack(spacing: 1) {
                                 if isHighSweep {
-                                    Text("SWEEP")
-                                        .font(.system(size: 6, weight: .black))
+                                    Text("SW")
+                                        .font(.system(size: 6.5, weight: .black))
                                         .padding(.horizontal, 3)
                                         .padding(.vertical, 1)
                                         .background(sweepColor)
@@ -838,8 +799,8 @@ public struct CandleChartView: View {
                                     Image(systemName: "arrowtriangle.up.fill")
                                         .font(.system(size: 5))
                                         .foregroundColor(sweepColor)
-                                    Text("SWEEP")
-                                        .font(.system(size: 6, weight: .black))
+                                    Text("SW")
+                                        .font(.system(size: 6.5, weight: .black))
                                         .padding(.horizontal, 3)
                                         .padding(.vertical, 1)
                                         .background(sweepColor)
@@ -866,129 +827,13 @@ public struct CandleChartView: View {
         Array(rsiSeries.prefix(visibleBars.count))
     }
     
-    private var rsiMASeries: [Double?] {
-        switch activeRSIMAType {
-        case .ema:
-            return MomentumEngine.computeEMA(series: rsiSeries, period: 14)
-        case .wma:
-            return MomentumEngine.computeWMA(series: rsiSeries, period: 14)
-        case .none:
-            return Array(repeating: nil, count: rsiSeries.count)
-        }
+    // WMA 45 of RSI 14
+    private var rsiWma45Series: [Double?] {
+        MomentumEngine.computeWMA(series: rsiSeries, period: 45)
     }
     
-    private var visibleRsiMA: [Double?] {
-        Array(rsiMASeries.prefix(visibleBars.count))
-    }
-    
-    private var activeRsi: Double? {
-        if let idx = hoveredBarIndex, idx >= 0, idx < visibleRsi.count {
-            return visibleRsi[idx]
-        }
-        return visibleRsi.compactMap { $0 }.last
-    }
-    
-    private var activeRsiMA: Double? {
-        guard activeRSIMAType != .none else { return nil }
-        if let idx = hoveredBarIndex, idx >= 0, idx < visibleRsiMA.count {
-            return visibleRsiMA[idx]
-        }
-        return visibleRsiMA.compactMap { $0 }.last
-    }
-    
-    private var rsiSubWindowView: some View {
-        VStack(spacing: 2) {
-            // RSI Header HUD
-            rsiHeaderHUD
-            
-            // RSI Plot Canvas
-            GeometryReader { geo in
-                rsiPlotView(size: geo.size)
-                    .gesture(
-                        DragGesture(minimumDistance: 0)
-                            .onChanged { value in
-                                updateHoveredBar(at: value.location.x, totalWidth: geo.size.width - 55)
-                            }
-                            .onEnded { _ in
-                                hoveredBarIndex = nil
-                            }
-                    )
-            }
-        }
-        .padding(.horizontal, 4)
-        .padding(.bottom, 2)
-    }
-    
-    private var rsiHeaderHUD: some View {
-        HStack(spacing: 6) {
-            Text("RSI (14)")
-                .font(AppTypography.monoCaption)
-                .foregroundColor(Color(red: 0.65, green: 0.45, blue: 0.95))
-            
-            if let rsi = activeRsi {
-                let rsiColor: Color = {
-                    if rsi >= 70 { return AppColors.loss }
-                    if rsi <= 30 { return AppColors.profit }
-                    return Color(red: 0.65, green: 0.45, blue: 0.95)
-                }()
-                
-                Text(String(format: "%.1f", rsi))
-                    .font(AppTypography.number(10, weight: .bold))
-                    .foregroundColor(rsiColor)
-            } else {
-                Text("—")
-                    .font(AppTypography.caption)
-                    .foregroundColor(AppColors.secondaryText.opacity(0.6))
-            }
-            
-            // MA Type button & value (cycles EMA -> WMA -> OFF)
-            Button {
-                switch activeRSIMAType {
-                case .ema: activeRSIMAType = .wma
-                case .wma: activeRSIMAType = .none
-                case .none: activeRSIMAType = .ema
-                }
-            } label: {
-                HStack(spacing: 3) {
-                    Text(activeRSIMAType.rawValue)
-                        .font(.system(size: 8, weight: .bold))
-                    if let ma = activeRsiMA {
-                        Text(String(format: "%.1f", ma))
-                            .font(AppTypography.number(9, weight: .bold))
-                    }
-                }
-                .padding(.horizontal, 4)
-                .padding(.vertical, 1)
-                .background(activeRSIMAType != .none ? Color(red: 1.0, green: 0.82, blue: 0.2).opacity(0.18) : AppColors.secondaryBackground)
-                .foregroundColor(activeRSIMAType != .none ? Color(red: 1.0, green: 0.82, blue: 0.2) : AppColors.secondaryText)
-                .cornerRadius(3)
-            }
-            .buttonStyle(.plain)
-            
-            if let rsi = activeRsi {
-                if rsi >= 70 {
-                    Text("OB")
-                        .font(.system(size: 7, weight: .bold))
-                        .padding(.horizontal, 3)
-                        .padding(.vertical, 1)
-                        .background(AppColors.loss.opacity(0.18))
-                        .foregroundColor(AppColors.loss)
-                        .cornerRadius(3)
-                } else if rsi <= 30 {
-                    Text("OS")
-                        .font(.system(size: 7, weight: .bold))
-                        .padding(.horizontal, 3)
-                        .padding(.vertical, 1)
-                        .background(AppColors.profit.opacity(0.18))
-                        .foregroundColor(AppColors.profit)
-                        .cornerRadius(3)
-                }
-            }
-            
-            Spacer()
-        }
-        .padding(.horizontal, 4)
-        .padding(.top, 4)
+    private var visibleRsiWma45: [Double?] {
+        Array(rsiWma45Series.prefix(visibleBars.count))
     }
     
     private func rsiPlotView(size: CGSize, stepX: CGFloat? = nil, panOffset: CGFloat = 0) -> some View {
@@ -1056,7 +901,7 @@ public struct CandleChartView: View {
                 .frame(width: 50, alignment: .leading)
                 .position(x: plotWidth + 28, y: y30)
             
-            // RSI Curve (Wilder's RSI 14 - Purple)
+            // 1. RSI Curve (Wilder's RSI 14 - Purple)
             Path { path in
                 var isFirst = true
                 for (i, rsiOpt) in visibleRsi.enumerated() {
@@ -1075,28 +920,26 @@ public struct CandleChartView: View {
             .stroke(Color(red: 0.65, green: 0.45, blue: 0.95), style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
             .clipped()
             
-            // RSI Moving Average Curve (EMA / WMA - Gold/Amber)
-            if activeRSIMAType != .none {
-                Path { path in
-                    var isFirst = true
-                    for (i, maOpt) in visibleRsiMA.enumerated() {
-                        guard let ma = maOpt else { continue }
-                        let x = CGFloat(i) * stX + (stX / 2.0) + panOffset
-                        let y = plotHeight - CGFloat(ma / 100.0) * plotHeight
-                        let clampedY = max(2, min(plotHeight - 2, y))
-                        if isFirst {
-                            path.move(to: CGPoint(x: x, y: clampedY))
-                            isFirst = false
-                        } else {
-                            path.addLine(to: CGPoint(x: x, y: clampedY))
-                        }
+            // 2. WMA 45 Curve of RSI 14 (Gold / Amber)
+            Path { path in
+                var isFirst = true
+                for (i, maOpt) in visibleRsiWma45.enumerated() {
+                    guard let ma = maOpt else { continue }
+                    let x = CGFloat(i) * stX + (stX / 2.0) + panOffset
+                    let y = plotHeight - CGFloat(ma / 100.0) * plotHeight
+                    let clampedY = max(2, min(plotHeight - 2, y))
+                    if isFirst {
+                        path.move(to: CGPoint(x: x, y: clampedY))
+                        isFirst = false
+                    } else {
+                        path.addLine(to: CGPoint(x: x, y: clampedY))
                     }
                 }
-                .stroke(Color(red: 1.0, green: 0.82, blue: 0.2), style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
-                .clipped()
             }
+            .stroke(Color(red: 1.0, green: 0.82, blue: 0.2), style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
+            .clipped()
             
-            // Active / Hovered dot and cursor line
+            // 3. Active / Hovered dot and cursor line
             if let hIdx = hoveredBarIndex, hIdx < visibleBars.count {
                 let hX = CGFloat(hIdx) * stX + (stX / 2.0) + panOffset
                 if hX >= 0 && hX <= plotWidth {
@@ -1115,8 +958,8 @@ public struct CandleChartView: View {
                             .position(x: hX, y: clampedY)
                     }
                     
-                    // MA dot
-                    if activeRSIMAType != .none, hIdx < visibleRsiMA.count, let ma = visibleRsiMA[hIdx] {
+                    // WMA 45 dot
+                    if hIdx < visibleRsiWma45.count, let ma = visibleRsiWma45[hIdx] {
                         let maY = plotHeight - CGFloat(ma / 100.0) * plotHeight
                         let clampedY = max(2, min(plotHeight - 2, maY))
                         Circle()

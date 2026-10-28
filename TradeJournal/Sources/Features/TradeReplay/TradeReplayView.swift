@@ -10,7 +10,7 @@ public struct TradeReplayView: View {
     let trade: Trade
     let executions: [Execution]
     
-    public static let replayResolutions: [MarketResolution] = [.m15, .h1, .h4, .d1]
+    public static let replayResolutions: [MarketResolution] = [.m15, .h1, .h4]
     
     @State private var bars: [MarketBar] = []
     @State private var rawSourceBars: [MarketBar] = []
@@ -35,9 +35,8 @@ public struct TradeReplayView: View {
         let minutes = Double(max(60_000, durationMs)) / 60_000.0
         let res: MarketResolution = {
             if minutes <= 60 * 48 { return .m15 }
-            if minutes <= 60 * 24 * 7 { return .h1 }
-            if minutes <= 60 * 24 * 30 { return .h4 }
-            return .d1
+            if minutes <= 60 * 24 * 14 { return .h1 }
+            return .h4
         }()
         
         let cached = TradeReplayCacheStore.shared.getBars(for: trade.id, resolution: res.rawValue) ?? []
@@ -185,7 +184,6 @@ public struct TradeReplayView: View {
                     case .m15: return "15m"
                     case .h1: return "1h"
                     case .h4: return "4h"
-                    case .d1: return "1D"
                     default: return res.rawValue.uppercased()
                     }
                 }()

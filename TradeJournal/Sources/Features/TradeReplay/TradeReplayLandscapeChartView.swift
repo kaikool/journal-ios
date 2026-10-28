@@ -212,7 +212,6 @@ public struct TradeReplayLandscapeChartView: View {
                     case .m15: return "15m"
                     case .h1: return "1h"
                     case .h4: return "4h"
-                    case .d1: return "1D"
                     default: return res.rawValue.uppercased()
                     }
                 }()
@@ -281,7 +280,7 @@ public struct TradeReplayLandscapeChartView: View {
                     Circle()
                         .fill(Color(red: 1.0, green: 0.62, blue: 0.2))
                         .frame(width: 5, height: 5)
-                    Text("BSL")
+                    Text("BSL-H")
                         .font(.system(size: 9, weight: .medium))
                         .foregroundColor(AppColors.secondaryText)
                 }
@@ -289,7 +288,7 @@ public struct TradeReplayLandscapeChartView: View {
                     Circle()
                         .fill(Color(red: 0.2, green: 0.82, blue: 0.95))
                         .frame(width: 5, height: 5)
-                    Text("SSL")
+                    Text("BSL-L")
                         .font(.system(size: 9, weight: .medium))
                         .foregroundColor(AppColors.secondaryText)
                 }
@@ -297,7 +296,15 @@ public struct TradeReplayLandscapeChartView: View {
                     Circle()
                         .fill(Color(red: 0.65, green: 0.45, blue: 0.95))
                         .frame(width: 5, height: 5)
-                    Text("RSI 14")
+                    Text("RSI")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundColor(AppColors.secondaryText)
+                }
+                HStack(spacing: 3) {
+                    Circle()
+                        .fill(Color(red: 1.0, green: 0.82, blue: 0.2))
+                        .frame(width: 5, height: 5)
+                    Text("WMA 45")
                         .font(.system(size: 9, weight: .medium))
                         .foregroundColor(AppColors.secondaryText)
                 }
