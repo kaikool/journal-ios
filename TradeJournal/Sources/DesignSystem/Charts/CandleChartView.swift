@@ -684,46 +684,65 @@ public struct CandleChartView: View {
         span: Double
     ) -> some View {
         if visibleBars.count >= 5 {
-            let pivots = LiquidityEngine.identifyPivots(bars: visibleBars, window: 2)
+            let curPrice = visibleBars.last?.close ?? 0
+            let pivots = LiquidityEngine.identifyPivots(bars: visibleBars, window: 2, timeframe: resolution.label)
             let simResult = LiquidityEngine.simulate(
                 bars: visibleBars,
                 pivots: pivots,
                 sessionBarsCount: visibleBars.count
             )
             
+            // Priority filtering: active pools, limit to top 2 closest BSL and top 2 closest SSL
+            let topBSL = Array(simResult.restingBuySide.filter { $0.price > curPrice }.prefix(2))
+            let topSSL = Array(simResult.restingSellSide.filter { $0.price < curPrice }.prefix(2))
+            let displayPools = topBSL + topSSL
+            
             ZStack {
-                // 1. Resting Liquidity Pools (BSL / SSL Dotted Levels)
-                ForEach(simResult.restingBuySide + simResult.restingSellSide) { pool in
+                // 1. Resting Liquidity Pools (Bounded Levels & Clustered Zones)
+                ForEach(displayPools) { pool in
                     let pD = (pool.price as NSDecimalNumber).doubleValue
                     let rawY = plotHeight - CGFloat((pD - minP) / span) * plotHeight
                     let clampedY = max(8, min(plotHeight - 8, rawY))
-                    let startX: CGFloat = 0
-                    let endX = plotWidth
                     
                     let isBuySide = pool.type == .buySide
-                    let poolColor = isBuySide ? Color.orange : Color.blue
-                    let poolLabel = isBuySide ? "BSL (\(pool.label))" : "SSL (\(pool.label))"
+                    let poolColor = isBuySide ? Color(red: 1.0, green: 0.62, blue: 0.2) : Color(red: 0.2, green: 0.82, blue: 0.95)
+                    let poolLabel = isBuySide ? "BSL • \(pool.label)" : "SSL • \(pool.label)"
                     
-                    // Horizontal dotted pool line
-                    Path { path in
-                        path.move(to: CGPoint(x: startX, y: clampedY))
-                        path.addLine(to: CGPoint(x: endX, y: clampedY))
+                    // Zone rectangle if rangeMin != rangeMax (e.g. EQH/EQL clusters)
+                    if pool.rangeMin != pool.rangeMax {
+                        let topD = (pool.topPrice as NSDecimalNumber).doubleValue
+                        let botD = (pool.bottomPrice as NSDecimalNumber).doubleValue
+                        let topY = plotHeight - CGFloat((topD - minP) / span) * plotHeight
+                        let botY = plotHeight - CGFloat((botD - minP) / span) * plotHeight
+                        let zoneH = max(2, abs(botY - topY))
+                        let zoneMinY = min(topY, botY)
+                        
+                        Rectangle()
+                            .fill(poolColor.opacity(0.10))
+                            .frame(width: plotWidth, height: zoneH)
+                            .position(x: plotWidth / 2.0, y: zoneMinY + zoneH / 2.0)
                     }
-                    .stroke(poolColor.opacity(0.75), style: StrokeStyle(lineWidth: 1.0, dash: [2, 3]))
+                    
+                    // Horizontal dashed pool line
+                    Path { path in
+                        path.move(to: CGPoint(x: 0, y: clampedY))
+                        path.addLine(to: CGPoint(x: plotWidth, y: clampedY))
+                    }
+                    .stroke(poolColor.opacity(0.85), style: StrokeStyle(lineWidth: 1.0, dash: [4, 4]))
                     
                     // Pool tag badge
                     Text(poolLabel)
-                        .font(.system(size: 7, weight: .bold))
-                        .padding(.horizontal, 3)
-                        .padding(.vertical, 1)
+                        .font(.system(size: 7.5, weight: .bold))
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 1.5)
                         .background(poolColor.opacity(0.18))
                         .foregroundColor(poolColor)
                         .cornerRadius(3)
-                        .position(x: min(plotWidth - 40, max(40, plotWidth - 45)), y: max(10, clampedY - 7))
+                        .position(x: min(plotWidth - 50, max(50, plotWidth - 55)), y: max(10, clampedY - 8))
                 }
                 
-                // 2. Liquidity Sweeps (SFPs / Rejection Grabs)
-                ForEach(simResult.sweeps) { sweep in
+                // 2. Liquidity Sweeps (Discrete SFP Markers)
+                ForEach(Array(simResult.sweeps.prefix(6))) { sweep in
                     if sweep.barIndex < visibleBars.count {
                         let x = CGFloat(sweep.barIndex) * stepX + (stepX / 2.0)
                         let isHighSweep = sweep.sweepType == .buySideSwept
@@ -731,7 +750,7 @@ public struct CandleChartView: View {
                         let rawY = plotHeight - CGFloat((wickD - minP) / span) * plotHeight
                         let clampedY = max(8, min(plotHeight - 8, rawY))
                         
-                        let sweepColor = isHighSweep ? Color.orange : Color(red: 0.2, green: 0.85, blue: 0.6)
+                        let sweepColor = isHighSweep ? Color(red: 1.0, green: 0.55, blue: 0.2) : Color(red: 0.2, green: 0.85, blue: 0.6)
                         
                         VStack(spacing: 1) {
                             if isHighSweep {

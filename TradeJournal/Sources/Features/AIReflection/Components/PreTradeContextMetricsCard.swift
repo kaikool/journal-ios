@@ -38,6 +38,7 @@ public struct PreTradeContextMetricsCard: View {
         LiquidityEngine.analyzeLiquidity(
             symbol: symbol,
             barsM15: m15Bars,
+            barsH1: h1Bars,
             barsH4: h4Bars,
             barsD1: d1Bars
         )

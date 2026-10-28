@@ -28,13 +28,12 @@ public enum MarketStateSnapshotBuilder {
         let m15StateDesc = m15Ema?.summary
         let triggerLvl = m15Ema?.ema21
         
-        let m15Pivots = LiquidityEngine.identifyPivots(bars: barsM15, window: 2)
-        let m15Simulation = LiquidityEngine.simulate(bars: barsM15, pivots: m15Pivots)
-        let lastSweep = m15Simulation.sweeps.first
+        let m15Analysis = LiquidityEngine.analyzeLiquidity(symbol: cleanSymbol, barsM15: barsM15, barsH4: barsH4)
+        let lastSweep = m15Analysis.latestSweep
         let sweepDesc: String? = lastSweep.map { s in
-            "\(s.sweepType.rawValue.uppercased()) tại \(Formatters.price(s.sweptPrice, symbol: cleanSymbol))"
+            "\(s.sweepType.rawValue.uppercased()) at \(Formatters.price(s.sweptPrice, symbol: cleanSymbol))"
         }
-        let nearestUnswept = m15Simulation.restingBuySide.first?.price ?? m15Simulation.restingSellSide.first?.price
+        let nearestUnswept = m15Analysis.nearestBSL?.price ?? m15Analysis.nearestSSL?.price
         
         // 3. Technical Momentum (M15 Wilder RSI 14 / EMA 9 / WMA 45)
         var rsiVal: Double? = nil
