@@ -1,0 +1,209 @@
+name: Build & Package iOS IPA
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+    inputs:
+      configuration:
+        description: 'Build Configuration (Release / Debug)'
+        required: true
+        default: 'Release'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-ipa:
+    name: Build iOS IPA
+    runs-on: macos-14
+    timeout-minutes: 30
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Select Xcode Version
+        run: |
+          echo "==> Available Xcode versions:"
+          ls -d /Applications/Xcode* || true
+          if [ -d "/Applications/Xcode_16.2.app" ]; then
+            XCODE_DIR="/Applications/Xcode_16.2.app"
+          elif [ -d "/Applications/Xcode_16.1.app" ]; then
+            XCODE_DIR="/Applications/Xcode_16.1.app"
+          elif [ -d "/Applications/Xcode_16.0.app" ]; then
+            XCODE_DIR="/Applications/Xcode_16.0.app"
+          else
+            XCODE_DIR="/Applications/Xcode.app"
+          fi
+          echo "==> Activating Xcode: $XCODE_DIR"
+          sudo xcode-select -s "$XCODE_DIR/Contents/Developer"
+          echo "DEVELOPER_DIR=$XCODE_DIR/Contents/Developer" >> $GITHUB_ENV
+          export DEVELOPER_DIR="$XCODE_DIR/Contents/Developer"
+          xcodebuild -version
+
+      - name: Install XcodeGen
+        run: |
+          echo "==> Installing XcodeGen via Homebrew..."
+          brew install xcodegen
+
+      - name: Generate Xcode Project
+        run: |
+          echo "==> Generating TradeJournal.xcodeproj from project.yml..."
+          xcodegen generate
+          ls -la TradeJournal.xcodeproj
+
+      - name: Inspect Xcode Project
+        id: inspect_project
+        run: |
+          mkdir -p build
+          set -o pipefail
+          echo "==> Listing targets and schemes:"
+          xcodebuild -list -project TradeJournal.xcodeproj 2>&1 | tee build/list.log
+
+      - name: Report Inspect Error via Workflow Annotation
+        if: failure() && steps.inspect_project.outcome == 'failure'
+        run: |
+          cat build/list.log || true
+          ERROR_MSG=$(cat build/list.log | head -n 5 | tr '\n' ' ' | cut -c 1-250)
+          echo "::error title=XcodeListError::$ERROR_MSG"
+
+      - name: Build iOS App Binary
+        id: build_app
+        run: |
+          echo "==> Computing Build Version..."
+          OFFSET=426
+          RAW_RUN="${{ github.run_number }}"
+          BUILD_NUM=$(( RAW_RUN - OFFSET ))
+          if [ "$BUILD_NUM" -lt 1 ]; then
+            BUILD_NUM=1
+          fi
+          echo "BUILD_NUMBER=$BUILD_NUM" >> $GITHUB_ENV
+          echo "Computed build number: $BUILD_NUM"
+
+          echo "==> Building Release Binary for iOS..."
+          CONFIG="${{ github.event.inputs.configuration || 'Release' }}"
+          mkdir -p build
+          set -o pipefail
+          xcodebuild build \
+            -project TradeJournal.xcodeproj \
+            -scheme TradeJournal \
+            -destination "generic/platform=iOS" \
+            -configuration "$CONFIG" \
+            -derivedDataPath build/DerivedData \
+            CURRENT_PROJECT_VERSION="$BUILD_NUM" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGN_ENTITLEMENTS="" \
+            CODE_SIGNING_INJECT_BASE_ENTITLEMENTS=NO \
+            COMPILER_INDEX_STORE_ENABLE=NO 2>&1 | tee build/xcodebuild.log
+
+      - name: Report Build Error via Workflow Annotation
+        if: failure() && steps.build_app.outcome == 'failure'
+        run: |
+          echo "==> Full build log:"
+          cat build/xcodebuild.log || true
+          ERROR_SUMMARY=$(grep -E -i "(error:|fatal error:)" build/xcodebuild.log | head -n 10 | tr '\n' ' ' | cut -c 1-2000)
+          if [ -z "$ERROR_SUMMARY" ]; then
+            ERROR_SUMMARY=$(tail -n 20 build/xcodebuild.log | tr '\n' ' ' | cut -c 1-2000)
+          fi
+          echo "::error title=XcodeBuildError::$ERROR_SUMMARY"
+
+      - name: Package IPA
+        run: |
+          echo "==> Packaging .app into .ipa..."
+          rm -rf build/Payload build/TradeJournal.ipa
+          mkdir -p build/Payload
+          APP_PATH=$(find build/DerivedData/Build/Products -name "TradeJournal.app" -type d | head -n 1)
+          if [ -z "$APP_PATH" ]; then
+            APP_PATH=$(find build/DerivedData -name "TradeJournal.app" -type d | head -n 1)
+          fi
+          echo "Found app at: $APP_PATH"
+          if [ -z "$APP_PATH" ]; then
+            echo "::error::TradeJournal.app not found in build/DerivedData"
+            exit 1
+          fi
+          echo "==> Stripping extended attributes..."
+          xattr -cr "$APP_PATH" || true
+          echo "==> Removing existing code signature (ESign will re-sign from scratch)..."
+          rm -rf "$APP_PATH/_CodeSignature" || true
+          codesign --remove-signature "$APP_PATH" 2>/dev/null || true
+          echo "==> Copying clean unsigned bundle..."
+          cp -R "$APP_PATH" build/Payload/
+          cd build
+          zip -qry -9 -X TradeJournal.ipa Payload
+          ls -lh TradeJournal.ipa
+          shasum -a 256 TradeJournal.ipa > TradeJournal.ipa.sha256
+          echo "SHA256 Checksum:"
+          cat TradeJournal.ipa.sha256
+
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TradeJournal-iOS-IPA
+          path: |
+            build/TradeJournal.ipa
+            build/TradeJournal.ipa.sha256
+          retention-days: 14
+
+      - name: Prepare Release Metadata
+        if: (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch') && github.event_name != 'pull_request'
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            RELEASE_TAG="${{ github.ref_name }}"
+            RELEASE_NAME="TradeJournal iOS ${{ github.ref_name }}"
+          else
+            RELEASE_TAG="v1.0.0-b$BUILD_NUMBER"
+            RELEASE_NAME="TradeJournal iOS v1.0.0 (Build $BUILD_NUMBER)"
+          fi
+          echo "RELEASE_TAG=$RELEASE_TAG" >> $GITHUB_ENV
+          echo "RELEASE_NAME=$RELEASE_NAME" >> $GITHUB_ENV
+          
+          cat << EOF > build/release_notes.md
+          ### 📱 TradeJournal iOS - Direct IPA Download
+          
+          > Tải trực tiếp file \`.ipa\` bên dưới để cài đặt qua **TrollStore**, **AltStore**, **Scarlet**, hoặc **Sideloadly** (không cần giải nén file zip).
+          
+          - **File:** \`TradeJournal.ipa\`
+          - **Phiên bản:** Native iOS 17.0+ (SwiftUI, Swift Charts)
+          - **Build:** $BUILD_NUMBER (${{ github.sha }})
+          EOF
+
+      - name: Prune Previous Legacy Releases
+        if: (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch') && github.event_name != 'pull_request'
+        run: |
+          echo "==> Pruning previous legacy releases..."
+          RELEASES_JSON=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/releases?per_page=100")
+          echo "$RELEASES_JSON" | jq -r '.[].id' | while read -r rel_id; do
+            if [ -n "$rel_id" ] && [ "$rel_id" != "null" ]; then
+              echo "Deleting old release ID: $rel_id"
+              curl -s -X DELETE -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+                "https://api.github.com/repos/${{ github.repository }}/releases/$rel_id" || true
+            fi
+          done
+
+      - name: Publish Direct IPA to GitHub Releases
+        if: (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch') && github.event_name != 'pull_request'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: ${{ env.RELEASE_NAME }}
+          body_path: build/release_notes.md
+          files: |
+            build/TradeJournal.ipa
+            build/TradeJournal.ipa.sha256
+          prerelease: false
+          make_latest: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

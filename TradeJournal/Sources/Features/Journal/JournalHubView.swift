@@ -1,0 +1,60 @@
+import SwiftUI
+
+public enum JournalSubTab: String, CaseIterable, Identifiable {
+    case daily = "Daily"
+    case calendar = "Calendar"
+    case notebook = "Notebook"
+    case routines = "Routines"
+    
+    public var id: String { rawValue }
+    
+    public var iconName: String {
+        switch self {
+        case .daily: return "calendar.day.timeline.left"
+        case .calendar: return "calendar"
+        case .notebook: return "book.closed"
+        case .routines: return "checklist"
+        }
+    }
+}
+
+/// Journal hub navigation view providing access to:
+/// - Daily journal logs
+/// - Monthly P&L calendar
+/// - Trading notebook & folders
+/// - Discipline routines & progress checklist
+public struct JournalHubView: View {
+    @State private var selectedSubTab: JournalSubTab = .daily
+    
+    public init() {}
+    
+    public var body: some View {
+        VStack(spacing: 0) {
+            // Apple HIG iOS 27 Sliding Segmented Bar
+            AppleSlidingSegmentedBar(
+                selection: $selectedSubTab,
+                items: JournalSubTab.allCases,
+                titleFor: { $0.rawValue },
+                iconFor: { $0.iconName }
+            )
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(AppColors.background)
+            
+            Divider()
+            
+            // Sub-view presentation
+            switch selectedSubTab {
+            case .daily:
+                DailyJournalListView()
+            case .calendar:
+                JournalCalendarView()
+            case .notebook:
+                NotebookView()
+            case .routines:
+                ProgressRoutinesView()
+            }
+        }
+        .background(AppColors.background)
+    }
+}
