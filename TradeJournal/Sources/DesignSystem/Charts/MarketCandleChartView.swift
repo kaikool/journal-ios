@@ -38,94 +38,64 @@ public struct MarketCandleChartView: View {
     
     // MARK: - 1. HUD Header Bar
     private var hudHeaderView: some View {
-        let activeIdx: Int? = {
-            if let idx = hoveredBarIndex, idx < bars.count {
-                return idx
-            }
-            return bars.isEmpty ? nil : (bars.count - 1)
-        }()
-        let activeBar: MarketBar? = activeIdx.map { bars[$0] }
-        
-        let ema21Series = MovingAverageEngine.calculateEMA(period: 21, bars: bars)
-        let ema50Series = MovingAverageEngine.calculateEMA(period: 50, bars: bars)
-        let activeEMA21 = activeIdx.flatMap { $0 < ema21Series.count ? ema21Series[$0] : nil }
-        let activeEMA50 = activeIdx.flatMap { $0 < ema50Series.count ? ema50Series[$0] : nil }
-        
         let trend = MovingAverageEngine.analyzeTimeframe(bars: bars, timeframe: timeframe, symbol: symbol)?.trend
         
-        return VStack(spacing: 3) {
-            HStack(spacing: 8) {
+        return HStack(alignment: .center, spacing: 8) {
+            // Symbol (without redundant timeframe, as tab is active right above)
+            Text(symbol)
+                .font(.system(size: 12, weight: .bold))
+                .foregroundColor(AppColors.primaryText)
+            
+            // Trend Regime Pill
+            if let t = trend {
+                let isBull = t == .bullish || t == .strongBullish
+                let isBear = t == .bearish || t == .strongBearish
+                let color = isBull ? AppColors.profit : (isBear ? AppColors.loss : AppColors.warning)
+                
                 HStack(spacing: 4) {
-                    Text(symbol)
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundColor(AppColors.primaryText)
-                    Text("•")
-                        .foregroundColor(AppColors.secondaryText.opacity(0.5))
-                    Text(timeframe)
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundColor(AppColors.brand)
+                    Text(isBull ? "▲" : (isBear ? "▼" : "⇄"))
+                        .font(.system(size: 8.5, weight: .bold))
+                    Text(t.label.replacingOccurrences(of: " ▲▲", with: "")
+                                .replacingOccurrences(of: " ▲", with: "")
+                                .replacingOccurrences(of: " ▼▼", with: "")
+                                .replacingOccurrences(of: " ▼", with: "")
+                                .replacingOccurrences(of: " ⇄", with: "")
+                                .replacingOccurrences(of: " ▬", with: ""))
+                        .font(.system(size: 9.5, weight: .bold))
                 }
-                
-                if let t = trend {
-                    let isBull = t == .bullish || t == .strongBullish
-                    let isBear = t == .bearish || t == .strongBearish
-                    let c = isBull ? AppColors.profit : (isBear ? AppColors.loss : AppColors.warning)
-                    Text(t.rawValue)
-                        .font(.system(size: 8, weight: .bold))
-                        .padding(.horizontal, 4)
-                        .padding(.vertical, 1)
-                        .background(c.opacity(0.15))
-                        .foregroundColor(c)
-                        .cornerRadius(3)
-                }
-                
-                Spacer()
-                
-                if let bar = activeBar {
-                    let isUp = bar.isUp
-                    let color = isUp ? AppColors.profit : AppColors.loss
-                    HStack(spacing: 6) {
-                        Text("O \(formatPrice(bar.open))")
-                        Text("H \(formatPrice(bar.high))")
-                        Text("L \(formatPrice(bar.low))")
-                        Text("C \(formatPrice(bar.close))")
-                            .foregroundColor(color)
-                            .fontWeight(.semibold)
-                    }
-                    .font(AppTypography.number(9, weight: .medium))
-                    .foregroundColor(AppColors.secondaryText)
-                }
+                .padding(.horizontal, 7)
+                .padding(.vertical, 2.5)
+                .background(color.opacity(0.12))
+                .foregroundColor(color)
+                .clipShape(Capsule())
             }
             
-            // Sub-row: Dynamic Causal EMA 21 & 50 numeric display
-            if showEMA, activeEMA21 != nil || activeEMA50 != nil {
-                HStack(spacing: 8) {
-                    if let e21 = activeEMA21 {
-                        HStack(spacing: 3) {
-                            Circle()
-                                .fill(Color(red: 0.0, green: 0.85, blue: 1.0))
-                                .frame(width: 5, height: 5)
-                            Text("EMA 21: \(formatPrice(e21))")
-                                .font(AppTypography.number(8.5, weight: .semibold))
-                                .foregroundColor(Color(red: 0.0, green: 0.85, blue: 1.0))
-                        }
+            Spacer()
+            
+            // Minimalist EMA Curve Legend (Cyan 21 / Orange 50) - without bulky numbers
+            if showEMA {
+                HStack(spacing: 10) {
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(Color(red: 0.0, green: 0.85, blue: 1.0))
+                            .frame(width: 5, height: 5)
+                        Text("EMA 21")
+                            .font(.system(size: 9.5, weight: .medium))
+                            .foregroundColor(AppColors.secondaryText)
                     }
-                    if let e50 = activeEMA50 {
-                        HStack(spacing: 3) {
-                            Circle()
-                                .fill(Color.orange)
-                                .frame(width: 5, height: 5)
-                            Text("EMA 50: \(formatPrice(e50))")
-                                .font(AppTypography.number(8.5, weight: .semibold))
-                                .foregroundColor(Color.orange)
-                        }
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(Color.orange)
+                            .frame(width: 5, height: 5)
+                        Text("EMA 50")
+                            .font(.system(size: 9.5, weight: .medium))
+                            .foregroundColor(AppColors.secondaryText)
                     }
-                    Spacer()
                 }
             }
         }
         .padding(.horizontal, 8)
-        .padding(.vertical, 3)
+        .padding(.vertical, 4)
     }
     
     // MARK: - 2. Candlestick Canvas Plot
