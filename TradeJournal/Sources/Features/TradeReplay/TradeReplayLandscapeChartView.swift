@@ -288,7 +288,7 @@ public struct TradeReplayLandscapeChartView: View {
                     Circle()
                         .fill(Color(red: 0.2, green: 0.82, blue: 0.95))
                         .frame(width: 5, height: 5)
-                    Text("BSL-L")
+                    Text("SSL-L")
                         .font(.system(size: 9, weight: .medium))
                         .foregroundColor(AppColors.secondaryText)
                 }

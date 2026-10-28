@@ -276,7 +276,7 @@ public struct CandleChartView: View {
                     Circle()
                         .fill(Color(red: 0.2, green: 0.82, blue: 0.95))
                         .frame(width: 5, height: 5)
-                    Text("BSL-L")
+                    Text("SSL-L")
                         .font(.system(size: 9, weight: .medium))
                         .foregroundColor(AppColors.secondaryText)
                 }
@@ -736,7 +736,7 @@ public struct CandleChartView: View {
                     
                     let isBuySide = pool.type == .buySide
                     let poolColor = isBuySide ? Color(red: 1.0, green: 0.62, blue: 0.2) : Color(red: 0.2, green: 0.82, blue: 0.95)
-                    let poolLabel = isBuySide ? "BSL-H" : "BSL-L"
+                    let poolLabel = isBuySide ? "BSL-H" : "SSL-L"
                     
                     // Zone rectangle if rangeMin != rangeMax (e.g. EQH/EQL clusters)
                     if pool.rangeMin != pool.rangeMax {
