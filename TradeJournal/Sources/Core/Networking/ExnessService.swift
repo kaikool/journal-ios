@@ -401,19 +401,24 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
             targetDict = dataDict
         } else if let accDict = json["account"] as? [String: Any] {
             targetDict = accDict
+        } else if let resDict = json["result"] as? [String: Any] {
+            targetDict = resDict
+        } else if let accs = (json["accounts"] as? [[String: Any]]) ?? (json["items"] as? [[String: Any]]), let first = accs.first {
+            targetDict = first
         }
         
         var foundCur: String? = nil
-        if let cur = targetDict["currency"] as? String ?? json["currency"] as? String {
+        let rawCur = targetDict["currency"] as? String ?? json["currency"] as? String ?? targetDict["account_currency"] as? String
+        if let cur = rawCur {
             let cleanCur = cur.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
             // Exness Cent account: USC is micro-lot account, treated strictly as USD without altering calculations
             foundCur = (cleanCur == "USC" || cleanCur == "USCENT" || cleanCur == "CENT") ? "USD" : cleanCur
         }
         
-        let rawBal = targetDict["balance"] ?? targetDict["current_balance"] ?? targetDict["available_balance"] ?? json["balance"]
+        let rawBal = targetDict["balance"] ?? targetDict["current_balance"] ?? targetDict["available_balance"] ?? targetDict["amount"] ?? targetDict["funds"] ?? targetDict["cash"] ?? targetDict["margin_free"] ?? json["balance"]
         let foundBal = parseDecimal(rawBal)
         
-        let rawEq = targetDict["equity"] ?? targetDict["current_equity"] ?? json["equity"] ?? rawBal
+        let rawEq = targetDict["equity"] ?? targetDict["current_equity"] ?? targetDict["net_equity"] ?? json["equity"] ?? rawBal
         let foundEq = parseDecimal(rawEq)
         
         return (foundBal, foundEq, foundCur)
@@ -470,63 +475,86 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
     
     /// Tests authentication and connectivity to Exness REST API
     public func testConnection() async throws -> (success: Bool, message: String) {
-        guard !accountId.isEmpty else {
+        let cleanId = accountId.cleanAccountId
+        guard !cleanId.isEmpty else {
             return (false, "Please configure Exness Account ID.")
         }
         
-        let candidateHosts = [
-            "https://api.exness-api.com",
-            "https://api.exness.com"
+        let accessPointHost = await resolveAccessPoint()
+        var candidateHosts: [String] = []
+        if !accessPointHost.isEmpty {
+            candidateHosts.append(accessPointHost)
+        }
+        if !candidateHosts.contains(self.apiHost) {
+            candidateHosts.append(self.apiHost)
+        }
+        if !candidateHosts.contains("https://api.exness-api.com") {
+            candidateHosts.append("https://api.exness-api.com")
+        }
+        if !candidateHosts.contains("https://api.exness.com") {
+            candidateHosts.append("https://api.exness.com")
+        }
+        
+        let candidateBalancePaths = [
+            "/v1/trading/accounts/\(cleanId)/balance",
+            "/v1/accounts/\(cleanId)/balance",
+            "/v1/trading/accounts/\(cleanId)",
+            "/v1/accounts/\(cleanId)",
+            "/v1/trading/balance?account_id=\(cleanId)",
+            "/v1/accounts/balance?account_id=\(cleanId)"
         ]
         
         var lastErrorMsg = "Unable to connect to Exness API."
         
         for host in candidateHosts {
-            let path = "/v1/accounts/\(accountId)/balance"
-            guard let url = URL(string: "\(host)\(path)") else { continue }
-            
-            var request = URLRequest(url: url)
-            request.httpMethod = "GET"
-            request.timeoutInterval = 15
-            
-            guard let headers = try? signRequest(method: "GET", path: path, bodyData: nil) else {
-                continue
-            }
-            headers.forEach { request.setValue($1, forHTTPHeaderField: $0) }
-            
-            guard let (data, response) = try? await URLSession.shared.data(for: request),
-                  let httpResponse = response as? HTTPURLResponse else {
-                continue
-            }
-            
-            if httpResponse.statusCode == 200 {
-                if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                    let parsed = parseBalanceResponse(json)
-                    
-                    await MainActor.run {
-                        if let c = parsed.currency {
-                            let cleanC = c.uppercased()
-                            self.currency = (cleanC == "USC" || cleanC == "USCENT" || cleanC == "CENT") ? "USD" : cleanC
-                        }
-                        if let b = parsed.balance {
-                            self.balance = b
-                        }
-                        if let eq = parsed.equity {
-                            self.equity = eq
-                        }
-                        self.isConnected = true
-                        self.syncAccountWithDataStore()
-                    }
+            for path in candidateBalancePaths {
+                let cleanHost = host.hasSuffix("/") ? String(host.dropLast()) : host
+                let cleanPath = path.hasPrefix("/") ? path : "/\(path)"
+                guard let url = URL(string: "\(cleanHost)\(cleanPath)") else { continue }
+                
+                var request = URLRequest(url: url)
+                request.httpMethod = "GET"
+                request.timeoutInterval = 10
+                
+                guard let headers = try? signRequest(method: "GET", path: cleanPath, bodyData: nil) else {
+                    continue
+                }
+                headers.forEach { request.setValue($1, forHTTPHeaderField: $0) }
+                
+                guard let (data, response) = try? await URLSession.shared.data(for: request),
+                      let httpResponse = response as? HTTPURLResponse else {
+                    continue
                 }
                 
-                let formattedBal = Formatters.formatCurrency(self.balance, currency: self.currency)
-                return (true, "Exness connected • Balance: \(formattedBal)")
-            } else if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
-                let errorMsg = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["description"] as? String ?? (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["message"] as? String ?? "Invalid API key or Ed25519 signature."
-                lastErrorMsg = "Authentication failed (HTTP \(httpResponse.statusCode)): \(errorMsg)"
-            } else {
-                let errorMsg = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["description"] as? String ?? String(data: data, encoding: .utf8) ?? "HTTP \(httpResponse.statusCode)"
-                lastErrorMsg = "Connection error: \(errorMsg)"
+                if httpResponse.statusCode == 200 {
+                    if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                        let parsed = parseBalanceResponse(json)
+                        
+                        await MainActor.run {
+                            if let c = parsed.currency {
+                                let cleanC = c.uppercased()
+                                self.currency = (cleanC == "USC" || cleanC == "USCENT" || cleanC == "CENT") ? "USD" : cleanC
+                            }
+                            if let b = parsed.balance {
+                                self.balance = b
+                            }
+                            if let eq = parsed.equity {
+                                self.equity = eq
+                            }
+                            self.isConnected = true
+                            self.syncAccountWithDataStore()
+                        }
+                    }
+                    
+                    let formattedBal = Formatters.formatCurrency(self.balance, currency: self.currency)
+                    return (true, "Exness connected • Balance: \(formattedBal)")
+                } else if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
+                    let errorMsg = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["description"] as? String ?? (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["message"] as? String ?? "Invalid API key or Ed25519 signature."
+                    lastErrorMsg = "Authentication failed (HTTP \(httpResponse.statusCode)): \(errorMsg)"
+                } else {
+                    let errorMsg = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["description"] as? String ?? String(data: data, encoding: .utf8) ?? "HTTP \(httpResponse.statusCode)"
+                    lastErrorMsg = "Connection error: \(errorMsg)"
+                }
             }
         }
         
@@ -614,7 +642,7 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
     }
     
     private func parseExnessRecord(_ raw: [String: Any], journalAccId: String) -> (executions: [Execution], directTrade: Trade?) {
-        let ticketKeys = ["ticket", "id", "order_id", "deal_id", "position_id", "trade_id", "ticket_id", "orderId", "dealId", "positionId"]
+        let ticketKeys = ["ticket", "id", "order_id", "deal_id", "position_id", "trade_id", "ticket_id", "orderId", "dealId", "positionId", "pos_id"]
         var ticketVal: Any? = nil
         for k in ticketKeys {
             if let v = raw[k] {
@@ -626,7 +654,7 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
         let ticketStr = String(describing: tVal).trimmingCharacters(in: .whitespacesAndNewlines)
         guard !ticketStr.isEmpty, ticketStr != "0" else { return ([], nil) }
         
-        let symbolKeys = ["symbol", "instrument", "symbolName", "symbol_name", "code"]
+        let symbolKeys = ["symbol", "instrument", "symbolName", "symbol_name", "code", "pair", "currency_pair", "ticker"]
         var symbolVal: String? = nil
         for k in symbolKeys {
             if let s = raw[k] as? String, !s.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -644,12 +672,17 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
         let side: ExecutionSide = isSell ? .sell : .buy
         let exitSide: ExecutionSide = isSell ? .buy : .sell
         
-        let rawOpenPrice = raw["open_price"] ?? raw["openPrice"] ?? raw["price"] ?? raw["executionPrice"] ?? raw["entry_price"] ?? raw["price_open"] ?? raw["open_rate"]
-        let openPriceVal = parseDouble(rawOpenPrice) ?? 0.0
+        let rawOpenPrice = raw["open_price"] ?? raw["openPrice"] ?? raw["price"] ?? raw["executionPrice"] ?? raw["entry_price"] ?? raw["price_open"] ?? raw["open_rate"] ?? raw["rate"] ?? raw["deal_price"] ?? raw["fill_price"]
+        var openPriceVal = parseDouble(rawOpenPrice) ?? 0.0
+        
+        let rawClosePrice = raw["close_price"] ?? raw["closePrice"] ?? raw["exit_price"] ?? raw["exitPrice"] ?? raw["price_close"] ?? raw["close_rate"] ?? raw["exit_rate"]
+        let closePriceVal = parseDouble(rawClosePrice)
+        
+        if openPriceVal == 0 && (closePriceVal ?? 0) > 0 {
+            openPriceVal = closePriceVal!
+        }
         guard openPriceVal > 0 else { return ([], nil) }
         let openPrice = Decimal(openPriceVal)
-        
-        let rawClosePrice = raw["close_price"] ?? raw["closePrice"] ?? raw["exit_price"] ?? raw["exitPrice"] ?? raw["price_close"] ?? raw["close_rate"]
         let closePriceVal = parseDouble(rawClosePrice)
         
         let rawOpenDate = raw["open_time"] ?? raw["openTime"] ?? raw["time_create"] ?? raw["create_time"] ?? raw["time_setup"] ?? raw["timestamp"] ?? raw["time"] ?? raw["opened_at"]
@@ -797,7 +830,8 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
     
     /// Synchronizes trades, orders, positions, and history from Exness REST API
     public func syncTrades() async throws -> Int {
-        guard !accountId.isEmpty else {
+        let cleanId = accountId.cleanAccountId
+        guard !cleanId.isEmpty else {
             throw NSError(domain: "ExnessService", code: 400, userInfo: [NSLocalizedDescriptionKey: "Please configure Exness Account ID."])
         }
         
@@ -814,7 +848,7 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
         _ = try? await testConnection()
         
         let accessPointHost = await resolveAccessPoint()
-        let journalAccId = "exness_\(accountId)"
+        let journalAccId = "exness_\(cleanId)"
         
         await MainActor.run {
             self.syncAccountWithDataStore()
@@ -838,25 +872,25 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
         // 3. Candidate endpoints for history, deals, positions, and orders
         let candidatePaths = [
             // Standard Trading API History & Deals routes
-            "/v1/trading/accounts/\(accountId)/history",
-            "/v1/trading/accounts/\(accountId)/deals",
-            "/v1/trading/accounts/\(accountId)/trades",
-            "/v1/trading/accounts/\(accountId)/orders",
-            "/v1/trading/accounts/\(accountId)/positions",
+            "/v1/trading/accounts/\(cleanId)/history",
+            "/v1/trading/accounts/\(cleanId)/deals",
+            "/v1/trading/accounts/\(cleanId)/trades",
+            "/v1/trading/accounts/\(cleanId)/orders",
+            "/v1/trading/accounts/\(cleanId)/positions",
             
             // Standard Gateway routes
-            "/v1/accounts/\(accountId)/history",
-            "/v1/accounts/\(accountId)/deals",
-            "/v1/accounts/\(accountId)/trades",
-            "/v1/accounts/\(accountId)/orders",
-            "/v1/accounts/\(accountId)/positions",
+            "/v1/accounts/\(cleanId)/history",
+            "/v1/accounts/\(cleanId)/deals",
+            "/v1/accounts/\(cleanId)/trades",
+            "/v1/accounts/\(cleanId)/orders",
+            "/v1/accounts/\(cleanId)/positions",
             
             // Query parameter variants
-            "/v1/trading/history?account_id=\(accountId)",
-            "/v1/trading/deals?account_id=\(accountId)",
-            "/v1/trading/trades?account_id=\(accountId)",
-            "/v1/trading/orders?account_id=\(accountId)",
-            "/v1/trading/positions?account_id=\(accountId)"
+            "/v1/trading/history?account_id=\(cleanId)",
+            "/v1/trading/deals?account_id=\(cleanId)",
+            "/v1/trading/trades?account_id=\(cleanId)",
+            "/v1/trading/orders?account_id=\(cleanId)",
+            "/v1/trading/positions?account_id=\(cleanId)"
         ]
         
         var allRawRecords: [[String: Any]] = []

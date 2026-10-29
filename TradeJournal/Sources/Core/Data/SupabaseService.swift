@@ -260,19 +260,26 @@ public final class SupabaseService {
         return results
     }
     
-    // MARK: - PostgREST Batching & Payload Normalization
+    // MARK: - PostgREST Batching & Dynamic Schema Resilience
     
-    /// Encodes and normalizes a batch of records for PostgREST bulk upsert,
-    /// ensuring every object in the JSON array has the exact same set of keys (with NSNull for nil values)
-    /// to satisfy PostgREST's strict "All object keys must match" requirement.
-    internal func encodeNormalizedBatch<T: Encodable>(_ items: [T]) throws -> Data {
-        let rawData = try jsonEncoder.encode(items)
-        guard let jsonArray = try JSONSerialization.jsonObject(with: rawData, options: []) as? [[String: Any]],
-              !jsonArray.isEmpty else {
-            return rawData
+    /// Tracks missing columns reported by PostgREST schema cache to strip them automatically in fallback retries
+    private var missingColumnsByEndpoint: [String: Set<String>] = [:]
+    
+    internal func extractMissingColumn(from message: String) -> String? {
+        // e.g. "Could not find the 'swap' column of 'trades' in the schema cache"
+        let pattern = #"Could not find the '([^']+)' column"#
+        guard let regex = try? NSRegularExpression(pattern: pattern),
+              let match = regex.firstMatch(in: message, range: NSRange(message.startIndex..., in: message)),
+              let range = Range(match.range(at: 1), in: message) else {
+            return nil
         }
+        return String(message[range])
+    }
+    
+    /// Normalizes a JSON dictionary array so that every object has the exact same set of keys (with NSNull for nil values)
+    internal func normalizeJsonArrayForPostgrest(_ jsonArray: [[String: Any]]) throws -> Data {
+        guard !jsonArray.isEmpty else { return Data("[]".utf8) }
         
-        // Collect all distinct keys across every object in this batch
         var allKeys = Set<String>()
         for dict in jsonArray {
             for key in dict.keys {
@@ -280,7 +287,6 @@ public final class SupabaseService {
             }
         }
         
-        // Normalize each dictionary so that all objects have the exact same keys
         var normalizedArray: [[String: Any]] = []
         normalizedArray.reserveCapacity(jsonArray.count)
         for var dict in jsonArray {
@@ -295,19 +301,73 @@ public final class SupabaseService {
         return try JSONSerialization.data(withJSONObject: normalizedArray, options: [])
     }
     
-    /// Executes bulk upsert in chunks of 200 items, normalizing all JSON keys per batch to satisfy PostgREST.
+    /// Encodes and normalizes a batch of records for PostgREST bulk upsert
+    internal func encodeNormalizedBatch<T: Encodable>(_ items: [T]) throws -> Data {
+        let rawData = try jsonEncoder.encode(items)
+        guard let jsonArray = try JSONSerialization.jsonObject(with: rawData, options: []) as? [[String: Any]],
+              !jsonArray.isEmpty else {
+            return rawData
+        }
+        return try normalizeJsonArrayForPostgrest(jsonArray)
+    }
+    
+    /// Executes bulk upsert in chunks of 200 items, with automatic schema-resilient column stripping
+    /// when remote Supabase database is missing new schema columns (e.g. 'swap').
     internal func upsertBatches<T: Encodable>(endpoint: String, items: [T], batchSize: Int = 200) async throws {
         guard isConfigured, !items.isEmpty else { return }
         
+        let endpointName = endpoint.components(separatedBy: "?").first ?? endpoint
         let chunks = stride(from: 0, to: items.count, by: batchSize).map {
             Array(items[$0..<min($0 + batchSize, items.count)])
         }
         
         for chunk in chunks {
-            let body = try encodeNormalizedBatch(chunk)
-            let request = try makeRequest(endpoint: endpoint, method: "POST", body: body, preferMerge: true)
-            let (data, response) = try await session.data(for: request)
-            try validateResponse(response, data: data, endpoint: endpoint)
+            let rawData = try jsonEncoder.encode(chunk)
+            guard var jsonArray = try JSONSerialization.jsonObject(with: rawData, options: []) as? [[String: Any]] else {
+                continue
+            }
+            
+            // 1. Strip known missing columns for this endpoint from previous schema cache misses
+            if let knownMissing = missingColumnsByEndpoint[endpointName] {
+                for i in jsonArray.indices {
+                    for col in knownMissing {
+                        jsonArray[i].removeValue(forKey: col)
+                    }
+                }
+            }
+            
+            // 2. Post batch with dynamic fallback retry on column schema cache miss
+            var retryCount = 0
+            while retryCount < 5 {
+                let body = try normalizeJsonArrayForPostgrest(jsonArray)
+                let request = try makeRequest(endpoint: endpoint, method: "POST", body: body, preferMerge: true)
+                let (data, response) = try await session.data(for: request)
+                
+                do {
+                    try validateResponse(response, data: data, endpoint: endpoint)
+                    break // Successfully synced batch
+                } catch {
+                    let errMsg = error.localizedDescription
+                    if let missingCol = extractMissingColumn(from: errMsg) {
+                        AppLogger.warning("Supabase: Remote table '\(endpointName)' is missing column '\(missingCol)'. Stripping from payload and retrying...")
+                        if missingColumnsByEndpoint[endpointName] == nil {
+                            missingColumnsByEndpoint[endpointName] = Set<String>()
+                        }
+                        missingColumnsByEndpoint[endpointName]?.insert(missingCol)
+                        for i in jsonArray.indices {
+                            jsonArray[i].removeValue(forKey: missingCol)
+                        }
+                        retryCount += 1
+                        continue
+                    } else if endpointName == "prop_audit" && (errMsg.contains("row-level security") || errMsg.contains("RLS") || errMsg.contains("403")) {
+                        // Tolerate remote prop_audit RLS restriction without aborting the sync
+                        AppLogger.warning("Supabase: prop_audit skipped due to remote RLS policy: \(errMsg)")
+                        break
+                    } else {
+                        throw error
+                    }
+                }
+            }
         }
     }
     

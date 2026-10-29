@@ -36,6 +36,10 @@ public struct YourDataSettingsView: View {
                             }
                             .disabled(!SupabaseService.shared.isConfigured)
                             
+                            AppButton("Copy SQL Fix", icon: "doc.on.doc", style: .secondary, size: .compact) {
+                                copySqlPatch()
+                            }
+                            
                             AppButton("Wipe", icon: "trash", style: .destructive, size: .compact, isLoading: isWipingSupabase) {
                                 showWipeConfirmation = true
                             }
@@ -124,6 +128,14 @@ public struct YourDataSettingsView: View {
                 }
             }
         }
+    }
+    
+    private func copySqlPatch() {
+        let sql = SupabaseService.shared.generateQuickFixPatchSql()
+        #if canImport(UIKit)
+        UIPasteboard.general.string = sql
+        #endif
+        supabaseSyncStatus = "SQL patch copied to clipboard! Paste and Run in Supabase SQL Editor."
     }
     
     private func wipeSupabaseData() {

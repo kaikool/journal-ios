@@ -506,4 +506,52 @@ extension SupabaseService {
         """
     }
     
+    /// Generates quick hotfix SQL script resolving missing columns (e.g. 'swap') and RLS violations
+    public func generateQuickFixPatchSql() -> String {
+        return """
+        -- ========================================================
+        -- Trade Journal: Hotfix Migration for Missing Columns & RLS
+        -- Paste into Supabase SQL Editor and click 'Run'
+        -- ========================================================
+
+        -- 1. Ensure 'swap' column exists in trades and executions
+        ALTER TABLE IF EXISTS trades ADD COLUMN IF NOT EXISTS swap numeric(38,10) DEFAULT 0 NOT NULL;
+        ALTER TABLE IF EXISTS executions ADD COLUMN IF NOT EXISTS swap numeric(38,10) DEFAULT 0 NOT NULL;
+        ALTER TABLE IF EXISTS trades ADD COLUMN IF NOT EXISTS asset_class text;
+        ALTER TABLE IF EXISTS executions ADD COLUMN IF NOT EXISTS asset_class text;
+
+        -- 2. Ensure 'prop_audit' table exists
+        CREATE TABLE IF NOT EXISTS "prop_audit" (
+            "id" text PRIMARY KEY NOT NULL,
+            "entity_type" text NOT NULL,
+            "entity_id" text NOT NULL,
+            "before_json" text,
+            "after_json" text NOT NULL,
+            "reason" text NOT NULL,
+            "created_at" text
+        );
+
+        -- 3. Fix Row Level Security (RLS) policies for anon and authenticated
+        ALTER TABLE prop_audit ENABLE ROW LEVEL SECURITY;
+        DROP POLICY IF EXISTS "Allow All For Anon" ON prop_audit;
+        CREATE POLICY "Allow All For Anon" ON prop_audit FOR ALL USING (true) WITH CHECK (true);
+
+        ALTER TABLE trades ENABLE ROW LEVEL SECURITY;
+        DROP POLICY IF EXISTS "Allow All For Anon" ON trades;
+        CREATE POLICY "Allow All For Anon" ON trades FOR ALL USING (true) WITH CHECK (true);
+
+        ALTER TABLE executions ENABLE ROW LEVEL SECURITY;
+        DROP POLICY IF EXISTS "Allow All For Anon" ON executions;
+        CREATE POLICY "Allow All For Anon" ON executions FOR ALL USING (true) WITH CHECK (true);
+
+        -- 4. Grant table access to anon, authenticated, and service_role
+        GRANT ALL ON TABLE prop_audit TO anon, authenticated, service_role;
+        GRANT ALL ON TABLE trades TO anon, authenticated, service_role;
+        GRANT ALL ON TABLE executions TO anon, authenticated, service_role;
+        GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
+
+        -- 5. Reload PostgREST schema cache immediately
+        NOTIFY pgrst, 'reload schema';
+        """
+    }
 }

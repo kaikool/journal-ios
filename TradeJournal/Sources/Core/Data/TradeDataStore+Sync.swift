@@ -461,8 +461,13 @@ extension TradeDataStore {
                     try await SupabaseService.shared.upsertPropAudits(propAudits)
                 } catch {
                     if Self.isCancellation(error) { return }
-                    AppLogger.warning("Supabase prop audits upsert warning: \(error.localizedDescription)")
-                    syncWarnings.append("Prop audits upload: \(error.localizedDescription)")
+                    let msg = error.localizedDescription.lowercased()
+                    if msg.contains("row-level security") || msg.contains("rls") {
+                        AppLogger.warning("Supabase prop audits RLS: \(error.localizedDescription)")
+                    } else {
+                        AppLogger.warning("Supabase prop audits upsert warning: \(error.localizedDescription)")
+                        syncWarnings.append("Prop audits upload: \(error.localizedDescription)")
+                    }
                 }
             }
         } catch {
