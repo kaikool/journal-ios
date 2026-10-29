@@ -28,10 +28,10 @@ public struct ConnectionsSettingsView: View {
     @State private var currentThe5ersSyncTask: Task<Void, Never>? = nil
     @State private var currentCTraderSyncTask: Task<Void, Never>? = nil
     
-    @State private var exnessAccount: String = ""
-    @State private var exnessServer: String = "Exness-MT5Real8"
-    @State private var exnessPlatform: String = "MT5"
-    @State private var exnessInvestorPwd: String = ""
+    @State private var exnessHost: String = "https://api.exness.com"
+    @State private var exnessAccountId: String = ""
+    @State private var exnessApiKey: String = ""
+    @State private var exnessPrivateKey: String = ""
     @State private var exnessStatus: String = ""
     @State private var isTestingExness: Bool = false
     @State private var isSyncingExness: Bool = false
@@ -374,11 +374,11 @@ public struct ConnectionsSettingsView: View {
                 }
             }
             
-            // Card 4: Exness Broker Connection
+            // Card 4: Exness REST API Connection (exness-api.com)
             SettingsCard(title: "Exness") {
                 VStack(alignment: .leading, spacing: 14) {
                     HStack {
-                        Text("Exness Account Sync")
+                        Text("Exness REST API (exness-api.com)")
                             .font(AppTypography.headline)
                         Spacer()
                         Text(exness.isConnected ? "Connected · Active" : "Not configured")
@@ -386,60 +386,30 @@ public struct ConnectionsSettingsView: View {
                             .foregroundColor(exness.isConnected ? AppColors.profit : AppColors.secondaryText)
                     }
                     
-                    Text("Đồng bộ lệnh và lịch sử giao dịch từ tài khoản Exness MT4 / MT5 qua Quyền chỉ đọc (Read-only / Investor Password) bảo đảm an toàn 100%.")
+                    Text("Đồng bộ trực tiếp qua chuẩn Exness REST API & chữ ký Ed25519 (không cần Cloud Bridge trung gian). API Key và Private Key được mã hóa phần cứng an toàn trong Apple Keychain.")
                         .font(AppTypography.caption)
                         .foregroundColor(AppColors.secondaryText)
                     
-                    // Platform Selector
+                    // API Host Field
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("Nền tảng Exness:")
+                        Text("API Host URL:")
                             .font(AppTypography.captionBold)
                             .foregroundColor(AppColors.secondaryText)
                         
-                        Picker("Nền tảng", selection: $exnessPlatform) {
-                            Text("MetaTrader 5 (MT5)").tag("MT5")
-                            Text("MetaTrader 4 (MT4)").tag("MT4")
-                        }
-                        .pickerStyle(.segmented)
-                    }
-                    
-                    // Server Name Field with Quick Presets
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Tên Máy Chủ (Server Name):")
-                            .font(AppTypography.captionBold)
-                            .foregroundColor(AppColors.secondaryText)
-                        
-                        TextField("ví dụ: Exness-MT5Real8", text: $exnessServer)
+                        TextField("https://api.exness.com hoặc node được cấp", text: $exnessHost)
                             .font(AppTypography.inputText)
                             .textFieldStyle(.roundedBorder)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled(true)
-                        
-                        // Server chips
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 6) {
-                                ForEach(ExnessService.popularServers.prefix(6), id: \.self) { srv in
-                                    Button(srv) {
-                                        exnessServer = srv
-                                    }
-                                    .font(AppTypography.caption)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 4)
-                                    .background(exnessServer == srv ? AppColors.brand.opacity(0.2) : AppColors.secondaryBackground)
-                                    .foregroundColor(exnessServer == srv ? AppColors.brand : AppColors.secondaryText)
-                                    .cornerRadius(6)
-                                }
-                            }
-                        }
                     }
                     
-                    // Account Number / Login ID
+                    // Account ID
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("Số Tài Khoản (Login ID):")
+                        Text("Account ID (Số tài khoản Exness):")
                             .font(AppTypography.captionBold)
                             .foregroundColor(AppColors.secondaryText)
                         
-                        TextField("Nhập số tài khoản Exness (ví dụ: 12345678)", text: $exnessAccount)
+                        TextField("Nhập số tài khoản Exness (ví dụ: 12345678)", text: $exnessAccountId)
                             .font(AppTypography.inputText)
                             .textFieldStyle(.roundedBorder)
                             .keyboardType(.numberPad)
@@ -447,17 +417,17 @@ public struct ConnectionsSettingsView: View {
                             .autocorrectionDisabled(true)
                     }
                     
-                    // Investor Password (Read-Only)
+                    // Public API Key (EXN-API-KEY)
                     VStack(alignment: .leading, spacing: 6) {
                         HStack {
-                            Text("Mật Khẩu Xem Lệnh (Investor Password):")
+                            Text("Public API Key (EXN-API-KEY):")
                                 .font(AppTypography.captionBold)
                                 .foregroundColor(AppColors.secondaryText)
                             Spacer()
                             #if canImport(UIKit)
                             Button("Dán") {
                                 if let str = UIPasteboard.general.string {
-                                    exnessInvestorPwd = str.trimmingCharacters(in: .whitespacesAndNewlines)
+                                    exnessApiKey = str.trimmingCharacters(in: .whitespacesAndNewlines)
                                 }
                             }
                             .font(AppTypography.captionBold)
@@ -465,50 +435,61 @@ public struct ConnectionsSettingsView: View {
                             #endif
                         }
                         
-                        SecureField("Nhập mật khẩu quyền chỉ đọc (Read-only)...", text: $exnessInvestorPwd)
+                        TextField("exnsk_...", text: $exnessApiKey)
                             .font(AppTypography.inputText)
                             .textFieldStyle(.roundedBorder)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled(true)
                     }
                     
-                    // Exness Official Security Notice
+                    // Private Key (Ed25519)
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Text("Private Key (Khóa ký Ed25519):")
+                                .font(AppTypography.captionBold)
+                                .foregroundColor(AppColors.secondaryText)
+                            Spacer()
+                            #if canImport(UIKit)
+                            Button("Dán") {
+                                if let str = UIPasteboard.general.string {
+                                    exnessPrivateKey = str.trimmingCharacters(in: .whitespacesAndNewlines)
+                                }
+                            }
+                            .font(AppTypography.captionBold)
+                            .foregroundColor(AppColors.brand)
+                            #endif
+                        }
+                        
+                        SecureField("Dán Private Key (Hex / Base64)...", text: $exnessPrivateKey)
+                            .font(AppTypography.inputText)
+                            .textFieldStyle(.roundedBorder)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled(true)
+                    }
+                    
+                    // Cryptographic signing security badge
                     HStack(alignment: .top, spacing: 8) {
-                        Image(systemName: "checkmark.shield.fill")
-                            .foregroundColor(AppColors.profit)
+                        Image(systemName: "lock.shield.fill")
+                            .foregroundColor(AppColors.brand)
                             .font(.system(size: 16))
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Bảo mật phần cứng Keychain & Quyền chỉ đọc:")
+                            Text("Ký số Ed25519 cục bộ & Bảo mật Keychain:")
                                 .font(AppTypography.captionBold)
                                 .foregroundColor(AppColors.primaryText)
-                            Text("Mật khẩu được mã hóa phần cứng qua Apple Keychain. Quyền chỉ đọc theo quy định Exness chỉ cho phép xem lịch sử và vị thế, hoàn toàn KHÔNG THỂ đặt lệnh, sửa lệnh hay rút tiền.")
+                            Text("Ứng dụng tự động sinh header EXN-SIGN và EXN-DATA bằng Apple CryptoKit ngay trên máy. Private Key được khóa trong chip Secure Enclave, không bao giờ gửi khóa bí mật lên internet.")
                                 .font(AppTypography.caption)
                                 .foregroundColor(AppColors.secondaryText)
                         }
                     }
                     .padding(10)
-                    .background(AppColors.profit.opacity(0.08))
+                    .background(AppColors.brand.opacity(0.08))
                     .cornerRadius(8)
-                    
-                    // Guide link to Exness official Help Center
-                    if let url = URL(string: "https://exness.help/hc/en-us/articles/360007271452") {
-                        Link(destination: url) {
-                            HStack {
-                                Image(systemName: "questionmark.circle")
-                                Text("Hướng dẫn lấy mật khẩu Read-Only trên Exness Personal Area")
-                                Spacer()
-                                Image(systemName: "arrow.up.right")
-                            }
-                            .font(AppTypography.caption)
-                            .foregroundColor(AppColors.brand)
-                        }
-                    }
                     
                     // Buttons
                     HStack(spacing: 8) {
                         AppButton(
-                            "Kết nối Exness",
-                            icon: "checkmark.circle",
+                            "Kết nối Exness API",
+                            icon: "bolt.fill",
                             style: .primary,
                             size: .compact,
                             fullWidth: true,
@@ -516,7 +497,7 @@ public struct ConnectionsSettingsView: View {
                         ) {
                             saveAndTestExness()
                         }
-                        .disabled(exnessAccount.isEmpty || (exnessInvestorPwd.isEmpty && !exness.isConnected) || isTestingExness)
+                        .disabled(exnessAccountId.isEmpty || exnessApiKey.isEmpty || (exnessPrivateKey.isEmpty && !exness.isConnected) || isTestingExness)
                         
                         if exness.isConnected {
                             AppButton("Đồng bộ", icon: "arrow.triangle.2.circlepath", style: .secondary, size: .compact, fullWidth: true, isLoading: isSyncingExness) {
@@ -549,10 +530,10 @@ public struct ConnectionsSettingsView: View {
             ctraderClientId = ctrader.clientId
             ctraderClientSecret = ctrader.clientSecret
             ctraderIsLive = ctrader.isLive
-            exnessAccount = exness.accountNumber
-            exnessServer = exness.serverName
-            exnessPlatform = exness.platform
-            exnessInvestorPwd = exness.getStoredInvestorPassword()
+            exnessHost = exness.apiHost
+            exnessAccountId = exness.accountId
+            exnessApiKey = exness.apiKey
+            exnessPrivateKey = exness.getStoredPrivateKey()
         }
         .onChange(of: ctraderToken) { val in
             ctrader.accessToken = val
@@ -733,13 +714,13 @@ public struct ConnectionsSettingsView: View {
     
     private func saveAndTestExness() {
         isTestingExness = true
-        exnessStatus = "Đang kiểm tra kết nối tới Exness..."
+        exnessStatus = "Đang xác thực chữ ký Ed25519 và kết nối Exness API..."
         
         exness.saveCredentials(
-            account: exnessAccount,
-            server: exnessServer,
-            platform: exnessPlatform,
-            investorPassword: exnessInvestorPwd
+            host: exnessHost,
+            accountId: exnessAccountId,
+            apiKey: exnessApiKey,
+            privateKey: exnessPrivateKey
         )
         
         Task {
@@ -760,14 +741,14 @@ public struct ConnectionsSettingsView: View {
     
     private func syncExnessNow() {
         isSyncingExness = true
-        exnessStatus = "Đang đồng bộ dữ liệu giao dịch từ Exness..."
+        exnessStatus = "Đang đồng bộ dữ liệu giao dịch từ Exness API..."
         
         Task {
             do {
                 let count = try await exness.syncTrades()
                 await MainActor.run {
                     self.isSyncingExness = false
-                    self.exnessStatus = "Đồng bộ hoàn tất! Cập nhật trạng thái tài khoản Exness."
+                    self.exnessStatus = "Đồng bộ hoàn tất qua Exness API! Cập nhật trạng thái tài khoản."
                 }
             } catch {
                 await MainActor.run {
@@ -780,8 +761,9 @@ public struct ConnectionsSettingsView: View {
     
     private func disconnectExness() {
         exness.disconnect()
-        exnessAccount = ""
-        exnessInvestorPwd = ""
-        exnessStatus = "Đã ngắt kết nối Exness và xóa mật khẩu khỏi Keychain an toàn."
+        exnessAccountId = ""
+        exnessApiKey = ""
+        exnessPrivateKey = ""
+        exnessStatus = "Đã ngắt kết nối Exness API và xóa Private Key khỏi Keychain."
     }
 }
