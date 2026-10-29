@@ -54,6 +54,7 @@ public final class TradeDataStore: ObservableObject {
     @Published public var isSyncing: Bool = false
     @Published public var lastSyncError: String? = nil
     @Published public var lastSyncSummary: String? = nil
+    @Published public var lastSyncDate: Date? = nil
     @Published public internal(set) var isLoaded: Bool = false
     
     internal var executionHashes: Set<String> = []

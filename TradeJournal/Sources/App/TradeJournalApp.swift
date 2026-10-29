@@ -89,9 +89,6 @@ public struct RootTabView: View {
             InteractiveDrawerOverlay()
         }
         .preferredColorScheme(env.colorScheme)
-        .sheet(isPresented: $env.showSyncCenter) {
-            SyncCenterSheet()
-        }
         .onAppear {
             env.applyReportingCurrency(TradeDataStore.shared.currencyConversion.reportingCurrency)
         }

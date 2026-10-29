@@ -29,39 +29,40 @@ public struct ConnectionsSettingsView: View {
     
     public var body: some View {
         VStack(spacing: 16) {
-            // Card 1: Sync Center
-            SettingsCard(title: "Sync Center", footer: "Manage multi-source broker synchronization and horizon filters.") {
-                HStack(spacing: 8) {
-                    AppButton(
-                        "Open Sync Center",
-                        icon: "slider.horizontal.3",
-                        style: .primary,
-                        size: .compact,
-                        fullWidth: true
-                    ) {
-                        env.showSyncCenter = true
+            // Card 1: Automatic Synchronization
+            SettingsCard(title: "Automatic Synchronization", footer: "Brokers and cloud database automatically synchronize in the background and on pull-to-refresh.") {
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Cloud & Broker Sync")
+                            .font(AppTypography.bodyBold)
+                            .foregroundColor(AppColors.primaryText)
+                        
+                        Text(SyncManager.shared.isSyncing ? "Syncing..." : SyncManager.shared.formattedLastSyncTime)
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.secondaryText)
                     }
+                    
+                    Spacer()
                     
                     if SyncManager.shared.isSyncing {
                         AppButton(
-                            "Stop Sync",
+                            "Stop",
                             icon: "stop.fill",
                             style: .destructive,
-                            size: .compact,
-                            fullWidth: true
+                            size: .compact
                         ) {
                             SyncManager.shared.cancelSync()
                         }
                     } else {
                         AppButton(
-                            "Quick Sync",
+                            "Sync Now",
                             icon: "arrow.triangle.2.circlepath",
-                            style: .secondary,
+                            style: .primary,
                             size: .compact,
-                            fullWidth: true
+                            isLoading: SyncManager.shared.isSyncing
                         ) {
                             Task {
-                                await SyncManager.shared.performQuickSync()
+                                await dataStore.performGlobalSync()
                             }
                         }
                     }

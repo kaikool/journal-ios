@@ -13,6 +13,26 @@ public final class SyncManager: ObservableObject {
     @Published public private(set) var lastSyncDate: Date? = nil
     @Published public private(set) var isCancelledByUser: Bool = false
     
+    /// Minimalist, 100% English relative last sync timestamp (e.g. "Last sync: just now", "Last sync: 6m ago")
+    public var formattedLastSyncTime: String {
+        guard let date = lastSyncDate ?? TradeDataStore.shared.lastSyncDate else {
+            return "Last sync: never"
+        }
+        let diff = Int(Date().timeIntervalSince(date))
+        if diff < 60 {
+            return "Last sync: just now"
+        } else if diff < 3600 {
+            let mins = max(1, diff / 60)
+            return "Last sync: \(mins)m ago"
+        } else if diff < 86400 {
+            let hours = diff / 3600
+            return "Last sync: \(hours)h ago"
+        } else {
+            let days = diff / 86400
+            return days == 1 ? "Last sync: yesterday" : "Last sync: \(days)d ago"
+        }
+    }
+    
     @Published public var savedQuickSyncOptions: SyncOptions {
         didSet {
             saveQuickSyncOptions()
@@ -66,13 +86,13 @@ public final class SyncManager: ObservableObject {
     private var lastAutoSyncDate: Date? = nil
     private var autoSyncTimer: AnyCancellable? = nil
     
-    /// Starts periodic gentle background auto-sync every 5 minutes while the app is active
+    /// Starts periodic gentle background auto-sync every 60 seconds while the app is active
     public func startPeriodicAutoSync() {
         stopPeriodicAutoSync()
-        autoSyncTimer = Timer.publish(every: 300, on: .main, in: .common)
+        autoSyncTimer = Timer.publish(every: 60, on: .main, in: .common)
             .autoconnect()
             .sink { [weak self] _ in
-                self?.autoSyncIfNeeded(cooldownSeconds: 240, delaySeconds: 0)
+                self?.autoSyncIfNeeded(cooldownSeconds: 45, delaySeconds: 0)
             }
     }
     
@@ -170,27 +190,14 @@ public final class SyncManager: ObservableObject {
         }
     }
     
-    /// Executes the saved Quick Sync strategy (typically last 30 days for active accounts).
-    /// Used for foreground swipe-to-refresh: strictly fetches fresh broker data and triggers
-    /// background cloud backup if updates are found.
+    /// Executes unified quick sync across all configured brokers and Supabase Cloud.
+    /// Used for foreground swipe-to-refresh: strictly fetches fresh broker data and triggers cloud backup.
     @discardableResult
     public func performQuickSync() async -> [SyncResult] {
         var options = savedQuickSyncOptions
-        
-        // If broker providers are configured, sync them. If only Supabase is configured, enable Cloud sync so pull-to-refresh syncs data.
-        let activeBrokers = providers.filter { $0.id != "supabase" && options.enabledProviderIds.contains($0.id) && $0.isConfigured }
-        if activeBrokers.isEmpty, let supabase = provider(for: "supabase"), supabase.isConfigured {
-            options.backupToCloud = true
-        } else {
-            options.backupToCloud = false
-        }
-        
-        let results = await performSync(with: options)
-        let hasSuccess = results.contains { $0.success }
-        if hasSuccess && !options.backupToCloud {
-            scheduleBackgroundCloudBackup(delaySeconds: 5)
-        }
-        return results
+        options.enabledProviderIds = Set(["exness", "ctrader", "the5ers", "supabase"])
+        options.backupToCloud = true
+        return await performSync(with: options)
     }
     
     /// Executes a synchronization run with specified options.
@@ -338,6 +345,7 @@ public final class SyncManager: ObservableObject {
         
         let now = Date()
         self.lastSyncDate = now
+        TradeDataStore.shared.lastSyncDate = now
         
         if self.isCancelledByUser || !self.isSyncing {
             TradeDataStore.shared.lastSyncSummary = "Synchronization cancelled."
@@ -345,19 +353,17 @@ public final class SyncManager: ObservableObject {
             return results
         }
         
-        // Construct user-facing summary report
-        let successCount = results.filter { $0.success }.count
+        // Minimalist status report: "Last sync: 6m ago" without cluttering trade counts
         let actualErrors = results.filter { !$0.success && !($0.error?.lowercased().contains("cancel") ?? false) }
-        let totalExecs = results.reduce(0) { $0 + $1.importedExecutionsCount }
         
         if actualErrors.isEmpty {
-            let summary = "Sync completed: \(successCount) source(s) updated, \(totalExecs) executions imported."
+            let summary = self.formattedLastSyncTime
             TradeDataStore.shared.lastSyncSummary = summary
             TradeDataStore.shared.lastSyncError = nil
         } else {
             let errs = actualErrors.compactMap { $0.error }.joined(separator: " · ")
             TradeDataStore.shared.lastSyncError = errs
-            TradeDataStore.shared.lastSyncSummary = "Sync finished with \(actualErrors.count) warning(s)."
+            TradeDataStore.shared.lastSyncSummary = self.formattedLastSyncTime
         }
         
         return results

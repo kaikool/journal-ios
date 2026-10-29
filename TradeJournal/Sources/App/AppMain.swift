@@ -26,7 +26,7 @@ public struct TradeJournalApp: App {
             .animation(.easeInOut(duration: 0.22), value: dataStore.isLoaded)
             .onAppear {
                 SyncManager.shared.startPeriodicAutoSync()
-                SyncManager.shared.autoSyncIfNeeded(cooldownSeconds: 60, delaySeconds: 3)
+                SyncManager.shared.autoSyncIfNeeded(cooldownSeconds: 30, delaySeconds: 1)
             }
             .onChange(of: scenePhase) { newPhase in
                 if newPhase == .background {
@@ -35,7 +35,7 @@ public struct TradeJournalApp: App {
                     SyncManager.shared.stopPeriodicAutoSync()
                 } else if newPhase == .active {
                     SyncManager.shared.startPeriodicAutoSync()
-                    SyncManager.shared.autoSyncIfNeeded(cooldownSeconds: 90, delaySeconds: 3)
+                    SyncManager.shared.autoSyncIfNeeded(cooldownSeconds: 30, delaySeconds: 1)
                 }
             }
         }

@@ -371,13 +371,12 @@ public struct NavigationDrawerView: View {
             Divider().background(AppColors.border.opacity(0.35))
             
             VStack(spacing: 8) {
-                // Global Sync Center Row
+                // Global Quick Sync Row
                 Button {
                     triggerHaptic()
-                    withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
-                        env.isDrawerOpen = false
+                    Task {
+                        await dataStore.performGlobalSync()
                     }
-                    env.showSyncCenter = true
                 } label: {
                     HStack(spacing: 10) {
                         Image(systemName: "arrow.triangle.2.circlepath")
@@ -387,12 +386,12 @@ public struct NavigationDrawerView: View {
                             .animation(dataStore.isSyncing ? Animation.linear(duration: 1).repeatForever(autoreverses: false) : .default, value: dataStore.isSyncing)
                         
                         VStack(alignment: .leading, spacing: 1) {
-                            Text("Sync Center")
+                            Text("Cloud & Broker Sync")
                                 .font(.system(size: 13, weight: .semibold))
                                 .foregroundColor(AppColors.primaryText)
                             
-                            Text(dataStore.isSyncing ? "Synchronizing..." : "Multi-source sync & filters")
-                                .font(.system(size: 10))
+                            Text(dataStore.isSyncing ? "Syncing..." : SyncManager.shared.formattedLastSyncTime)
+                                .font(.system(size: 11))
                                 .foregroundColor(AppColors.secondaryText)
                         }
                         
@@ -408,6 +407,7 @@ public struct NavigationDrawerView: View {
                     )
                 }
                 .buttonStyle(ApplePressableButtonStyle())
+                .disabled(dataStore.isSyncing)
                 
                 // Inline Side-by-Side Controls (Theme + Privacy)
                 HStack(spacing: 8) {

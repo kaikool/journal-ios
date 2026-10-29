@@ -737,8 +737,10 @@ public struct DashboardView: View {
                     .padding(.horizontal, 16)
                 
                 HStack(spacing: 8) {
-                    AppButton("Sync Center", icon: "arrow.triangle.2.circlepath", style: .primary) {
-                        env.showSyncCenter = true
+                    AppButton("Sync now", icon: "arrow.triangle.2.circlepath", style: .primary) {
+                        Task {
+                            await dataStore.performGlobalSync()
+                        }
                     }
                     
                     AppButton("Import file", icon: "square.and.arrow.down", style: .secondary) {
