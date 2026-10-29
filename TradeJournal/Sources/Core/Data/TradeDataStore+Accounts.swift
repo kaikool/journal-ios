@@ -523,7 +523,6 @@ extension TradeDataStore {
         
         // 5. Ensure all The5ers PropAccountItems have complete program rules, realized Net P&L, & reconciled trade stats
         var propsModified = false
-        var tradesReconciled = false
         var currentTrades = trades
         var localProps = propAccounts
         let dayFmt = DateFormatter()
@@ -617,10 +616,6 @@ extension TradeDataStore {
                 localProps[i] = p
                 propsModified = true
             }
-        }
-        if tradesReconciled {
-            trades = currentTrades
-            invalidatePerformanceCaches()
         }
         if propsModified {
             propAccounts = localProps

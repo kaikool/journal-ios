@@ -698,11 +698,13 @@ public final class MarketDataService: Sendable {
                         code: 404,
                         userInfo: [NSLocalizedDescriptionKey: "No candlestick data available on Binance for \(cleanSymbol)."]
                     )
-                } else if !config.oandaApiKey.isEmpty {
+                } else if !config.oandaApiKey.isEmpty || KeychainManager.get(forKey: "oanda_api_key") != nil || AppSecretsLoader.loadSecret(named: "OANDA_API_KEY") != nil {
+                    let effectiveKey = KeychainManager.get(forKey: "oanda_api_key") ?? AppSecretsLoader.loadSecret(named: "OANDA_API_KEY") ?? config.oandaApiKey
+                    let effectiveAcc = UserDefaults.standard.string(forKey: "oanda_account_id") ?? AppSecretsLoader.loadSecret(named: "OANDA_ACCOUNT_ID") ?? config.oandaAccountId
                     let bars = try await fetchRecentOandaBars(
                         symbol: cleanSymbol,
-                        apiKey: config.oandaApiKey,
-                        accountId: config.oandaAccountId,
+                        apiKey: effectiveKey,
+                        accountId: effectiveAcc,
                         environment: config.oandaEnvironment,
                         resolution: resolution,
                         count: count

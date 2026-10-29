@@ -12,7 +12,7 @@ public struct MarketDataSettingsView: View {
     public init() {}
     
     private var isOandaConfigured: Bool {
-        let key = KeychainManager.get(forKey: "oanda_api_key") ?? dataStore.marketConnections.oandaApiKey
+        let key = KeychainManager.get(forKey: "oanda_api_key") ?? AppSecretsLoader.loadSecret(named: "OANDA_API_KEY") ?? dataStore.marketConnections.oandaApiKey
         return !key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
     
@@ -80,10 +80,11 @@ public struct MarketDataSettingsView: View {
                             AppButton("Ping", icon: "bolt.fill", style: .secondary, size: .compact) {
                                 oandaStatus = "Đang ping..."
                                 Task {
-                                    let key = KeychainManager.get(forKey: "oanda_api_key") ?? dataStore.marketConnections.oandaApiKey
+                                    let key = KeychainManager.get(forKey: "oanda_api_key") ?? AppSecretsLoader.loadSecret(named: "OANDA_API_KEY") ?? dataStore.marketConnections.oandaApiKey
+                                    let acc = UserDefaults.standard.string(forKey: "oanda_account_id") ?? AppSecretsLoader.loadSecret(named: "OANDA_ACCOUNT_ID") ?? dataStore.marketConnections.oandaAccountId
                                     let res = await MarketDataService.shared.testOandaConnection(
                                         apiKey: key,
-                                        accountId: dataStore.marketConnections.oandaAccountId,
+                                        accountId: acc,
                                         environment: dataStore.marketConnections.oandaEnvironment
                                     )
                                     oandaStatus = res.message

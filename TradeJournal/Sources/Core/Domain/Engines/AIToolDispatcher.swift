@@ -54,16 +54,13 @@ public enum AIToolDispatcher {
             }
         }
         
-        let limit = args?.limit ?? 20
-        let capped = Array(filtered.prefix(limit))
-        
         let totalCount = filtered.count
         let wins = filtered.filter { $0.netPnl > 0 }.count
         let losses = filtered.filter { $0.netPnl < 0 }.count
         let winRate = totalCount > 0 ? (Double(wins) / Double(totalCount)) * 100.0 : 0.0
         let totalPnl = filtered.reduce(Decimal.zero) { $0 + $1.netPnl }
         
-        var summaryDict: [String: Any] = [
+        let summaryDict: [String: Any] = [
             "totalCount": totalCount,
             "wins": wins,
             "losses": losses,
