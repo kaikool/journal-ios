@@ -31,6 +31,7 @@ public final class SyncManager: ObservableObject {
         }
         
         // Register core built-in providers
+        register(provider: ExnessSyncProvider())
         register(provider: CTraderSyncProvider())
         register(provider: The5ersSyncProvider())
         register(provider: SupabaseSyncProvider())
@@ -96,6 +97,16 @@ public final class SyncManager: ObservableObject {
             guard !Task.isCancelled else { return }
             
             AppLogger.info("Initiating quiet automatic background cloud sync...")
+            
+            // Auto-sync Exness if configured
+            if ExnessService.shared.isConnected {
+                _ = try? await ExnessService.shared.syncTrades()
+            }
+            
+            // Auto-sync The5ers if configured
+            if The5ersService.shared.isConfigured {
+                _ = try? await The5ersService.shared.syncWithTradeStore(dataStore: TradeDataStore.shared)
+            }
             
             // Pull fresh cloud data from Supabase quietly in background without freezing UI
             if SupabaseService.shared.isConfigured {
