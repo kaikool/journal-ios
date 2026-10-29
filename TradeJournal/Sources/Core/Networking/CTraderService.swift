@@ -170,14 +170,14 @@ public final class CTraderService: ObservableObject {
     
     // MARK: - Initialization
     public init() {
-        let kcToken = KeychainManager.get(forKey: Self.keyAccessToken) ?? ""
-        let kcSecret = KeychainManager.get(forKey: Self.keyClientSecret) ?? ""
+        let kcToken = KeychainManager.get(forKey: Self.keyAccessToken) ?? AppSecretsLoader.loadSecret(named: "CTRADER_TOKEN") ?? ""
+        let kcSecret = KeychainManager.get(forKey: Self.keyClientSecret) ?? AppSecretsLoader.loadSecret(named: "CTRADER_CLIENT_SECRET") ?? ""
         
         let udToken = UserDefaults.standard.string(forKey: Self.keyAccessToken) ?? ""
         let udSecret = UserDefaults.standard.string(forKey: Self.keyClientSecret) ?? ""
         
-        let resolvedToken = kcToken.isEmpty ? udToken : kcToken
-        let resolvedSecret = kcSecret.isEmpty ? udSecret : kcSecret
+        let resolvedToken = !kcToken.isEmpty ? kcToken : udToken
+        let resolvedSecret = !kcSecret.isEmpty ? kcSecret : udSecret
         
         // Migrate legacy plain text to Keychain
         if !udToken.isEmpty && kcToken.isEmpty {

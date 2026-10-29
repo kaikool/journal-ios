@@ -72,14 +72,9 @@ public struct SettingsView: View {
             VStack(alignment: .leading, spacing: 16) {
                 // Section Header
                 VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 6) {
-                        Image(systemName: activeSection.iconName)
-                            .foregroundColor(AppColors.brand)
-                            .font(.system(size: 14))
-                        Text(activeSection.label)
-                            .font(AppTypography.pageTitle)
-                            .foregroundColor(AppColors.primaryText)
-                    }
+                    Text(activeSection.label)
+                        .font(AppTypography.pageTitle)
+                        .foregroundColor(AppColors.primaryText)
                     Text(activeSection.description)
                         .font(AppTypography.caption)
                         .foregroundColor(AppColors.secondaryText)

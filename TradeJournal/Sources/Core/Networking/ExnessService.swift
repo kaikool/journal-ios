@@ -194,13 +194,42 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
             .replacingOccurrences(of: "\n", with: "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
         
-        // Parse Ed25519 raw 32-byte seed from PKCS#8 DER (48 bytes) or raw Base64/Hex
+        // Parse Ed25519 raw 32-byte seed from PKCS#8 DER (48 bytes), Libsodium (64 bytes), URL-safe Base64, or Hex
         let rawKeyData: Data = {
+            // 1. Standard base64
             if let d = Data(base64Encoded: cleanKeyStr) {
                 if d.count == 32 { return d }
                 if d.count == 48 { return d.subdata(in: 16..<48) } // Standard PKCS#8 Ed25519 offset
+                if d.count == 64 { return d.subdata(in: 0..<32) }  // Libsodium 64-byte seed+pubkey
             }
+            // 2. URL-safe base64 fallback
+            let standardB64 = cleanKeyStr
+                .replacingOccurrences(of: "-", with: "+")
+                .replacingOccurrences(of: "_", with: "/")
+            let paddedB64 = standardB64.padding(
+                toLength: ((standardB64.count + 3) / 4) * 4,
+                withPad: "=",
+                startingAt: 0
+            )
+            if let d = Data(base64Encoded: paddedB64) {
+                if d.count == 32 { return d }
+                if d.count == 48 { return d.subdata(in: 16..<48) }
+                if d.count == 64 { return d.subdata(in: 0..<32) }
+            }
+            // 3. Hex 64 chars (32 bytes)
             if cleanKeyStr.count == 64 {
+                var d = Data()
+                var idx = cleanKeyStr.startIndex
+                for _ in 0..<32 {
+                    let nextIdx = cleanKeyStr.index(idx, offsetBy: 2)
+                    let byteStr = String(cleanKeyStr[idx..<nextIdx])
+                    if let byte = UInt8(byteStr, radix: 16) { d.append(byte) }
+                    idx = nextIdx
+                }
+                if d.count == 32 { return d }
+            }
+            // 4. Hex 128 chars (64 bytes libsodium hex)
+            if cleanKeyStr.count == 128 {
                 var d = Data()
                 var idx = cleanKeyStr.startIndex
                 for _ in 0..<32 {
