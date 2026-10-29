@@ -10,6 +10,7 @@ public struct ConnectionsSettingsView: View {
     @ObservedObject private var dataStore = TradeDataStore.shared
     @ObservedObject private var the5ers = The5ersService.shared
     @ObservedObject private var ctrader = CTraderService.shared
+    @ObservedObject private var exness = ExnessService.shared
     
     @State private var the5ersStatus: String = ""
     @State private var isConnectingThe5ers: Bool = false
@@ -26,6 +27,14 @@ public struct ConnectionsSettingsView: View {
     @State private var showAdvancedCTrader: Bool = false
     @State private var currentThe5ersSyncTask: Task<Void, Never>? = nil
     @State private var currentCTraderSyncTask: Task<Void, Never>? = nil
+    
+    @State private var exnessAccount: String = ""
+    @State private var exnessServer: String = "Exness-MT5Real8"
+    @State private var exnessPlatform: String = "MT5"
+    @State private var exnessInvestorPwd: String = ""
+    @State private var exnessStatus: String = ""
+    @State private var isTestingExness: Bool = false
+    @State private var isSyncingExness: Bool = false
     
     public init() {}
     
@@ -364,6 +373,175 @@ public struct ConnectionsSettingsView: View {
                     }
                 }
             }
+            
+            // Card 4: Exness Broker Connection
+            SettingsCard(title: "Exness") {
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack {
+                        Text("Exness Account Sync")
+                            .font(AppTypography.headline)
+                        Spacer()
+                        Text(exness.isConnected ? "Connected · Active" : "Not configured")
+                            .font(AppTypography.captionBold)
+                            .foregroundColor(exness.isConnected ? AppColors.profit : AppColors.secondaryText)
+                    }
+                    
+                    Text("Đồng bộ lệnh và lịch sử giao dịch từ tài khoản Exness MT4 / MT5 qua Quyền chỉ đọc (Read-only / Investor Password) bảo đảm an toàn 100%.")
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.secondaryText)
+                    
+                    // Platform Selector
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Nền tảng Exness:")
+                            .font(AppTypography.captionBold)
+                            .foregroundColor(AppColors.secondaryText)
+                        
+                        Picker("Nền tảng", selection: $exnessPlatform) {
+                            Text("MetaTrader 5 (MT5)").tag("MT5")
+                            Text("MetaTrader 4 (MT4)").tag("MT4")
+                        }
+                        .pickerStyle(.segmented)
+                    }
+                    
+                    // Server Name Field with Quick Presets
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Tên Máy Chủ (Server Name):")
+                            .font(AppTypography.captionBold)
+                            .foregroundColor(AppColors.secondaryText)
+                        
+                        TextField("ví dụ: Exness-MT5Real8", text: $exnessServer)
+                            .font(AppTypography.inputText)
+                            .textFieldStyle(.roundedBorder)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled(true)
+                        
+                        // Server chips
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 6) {
+                                ForEach(ExnessService.popularServers.prefix(6), id: \.self) { srv in
+                                    Button(srv) {
+                                        exnessServer = srv
+                                    }
+                                    .font(AppTypography.caption)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(exnessServer == srv ? AppColors.brand.opacity(0.2) : AppColors.secondaryBackground)
+                                    .foregroundColor(exnessServer == srv ? AppColors.brand : AppColors.secondaryText)
+                                    .cornerRadius(6)
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Account Number / Login ID
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Số Tài Khoản (Login ID):")
+                            .font(AppTypography.captionBold)
+                            .foregroundColor(AppColors.secondaryText)
+                        
+                        TextField("Nhập số tài khoản Exness (ví dụ: 12345678)", text: $exnessAccount)
+                            .font(AppTypography.inputText)
+                            .textFieldStyle(.roundedBorder)
+                            .keyboardType(.numberPad)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled(true)
+                    }
+                    
+                    // Investor Password (Read-Only)
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Text("Mật Khẩu Xem Lệnh (Investor Password):")
+                                .font(AppTypography.captionBold)
+                                .foregroundColor(AppColors.secondaryText)
+                            Spacer()
+                            #if canImport(UIKit)
+                            Button("Dán") {
+                                if let str = UIPasteboard.general.string {
+                                    exnessInvestorPwd = str.trimmingCharacters(in: .whitespacesAndNewlines)
+                                }
+                            }
+                            .font(AppTypography.captionBold)
+                            .foregroundColor(AppColors.brand)
+                            #endif
+                        }
+                        
+                        SecureField("Nhập mật khẩu quyền chỉ đọc (Read-only)...", text: $exnessInvestorPwd)
+                            .font(AppTypography.inputText)
+                            .textFieldStyle(.roundedBorder)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled(true)
+                    }
+                    
+                    // Exness Official Security Notice
+                    HStack(alignment: .top, spacing: 8) {
+                        Image(systemName: "checkmark.shield.fill")
+                            .foregroundColor(AppColors.profit)
+                            .font(.system(size: 16))
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Bảo mật phần cứng Keychain & Quyền chỉ đọc:")
+                                .font(AppTypography.captionBold)
+                                .foregroundColor(AppColors.primaryText)
+                            Text("Mật khẩu được mã hóa phần cứng qua Apple Keychain. Quyền chỉ đọc theo quy định Exness chỉ cho phép xem lịch sử và vị thế, hoàn toàn KHÔNG THỂ đặt lệnh, sửa lệnh hay rút tiền.")
+                                .font(AppTypography.caption)
+                                .foregroundColor(AppColors.secondaryText)
+                        }
+                    }
+                    .padding(10)
+                    .background(AppColors.profit.opacity(0.08))
+                    .cornerRadius(8)
+                    
+                    // Guide link to Exness official Help Center
+                    if let url = URL(string: "https://exness.help/hc/en-us/articles/360007271452") {
+                        Link(destination: url) {
+                            HStack {
+                                Image(systemName: "questionmark.circle")
+                                Text("Hướng dẫn lấy mật khẩu Read-Only trên Exness Personal Area")
+                                Spacer()
+                                Image(systemName: "arrow.up.right")
+                            }
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.brand)
+                        }
+                    }
+                    
+                    // Buttons
+                    HStack(spacing: 8) {
+                        AppButton(
+                            "Kết nối Exness",
+                            icon: "checkmark.circle",
+                            style: .primary,
+                            size: .compact,
+                            fullWidth: true,
+                            isLoading: isTestingExness
+                        ) {
+                            saveAndTestExness()
+                        }
+                        .disabled(exnessAccount.isEmpty || (exnessInvestorPwd.isEmpty && !exness.isConnected) || isTestingExness)
+                        
+                        if exness.isConnected {
+                            AppButton("Đồng bộ", icon: "arrow.triangle.2.circlepath", style: .secondary, size: .compact, fullWidth: true, isLoading: isSyncingExness) {
+                                syncExnessNow()
+                            }
+                            
+                            AppButton("Ngắt kết nối", icon: "xmark.circle", style: .destructive, size: .compact, fullWidth: true) {
+                                disconnectExness()
+                            }
+                        }
+                    }
+                    
+                    if !exnessStatus.isEmpty {
+                        Text(exnessStatus)
+                            .font(AppTypography.caption)
+                            .foregroundColor(exnessStatus.contains("Error") || exnessStatus.contains("thất bại") || exnessStatus.contains("lỗi") ? AppColors.loss : AppColors.profit)
+                    }
+                    
+                    if let lastSync = exness.lastSyncDate {
+                        Text("Đồng bộ lần cuối: \(Formatters.formatDateTime(lastSync))")
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.secondaryText)
+                    }
+                }
+            }
         }
         .onAppear {
             manualMcpToken = the5ers.mcpToken
@@ -371,6 +549,10 @@ public struct ConnectionsSettingsView: View {
             ctraderClientId = ctrader.clientId
             ctraderClientSecret = ctrader.clientSecret
             ctraderIsLive = ctrader.isLive
+            exnessAccount = exness.accountNumber
+            exnessServer = exness.serverName
+            exnessPlatform = exness.platform
+            exnessInvestorPwd = exness.getStoredInvestorPassword()
         }
         .onChange(of: ctraderToken) { val in
             ctrader.accessToken = val
@@ -545,5 +727,61 @@ public struct ConnectionsSettingsView: View {
                 }
             }
         }
+    }
+    
+    // MARK: - Exness Actions
+    
+    private func saveAndTestExness() {
+        isTestingExness = true
+        exnessStatus = "Đang kiểm tra kết nối tới Exness..."
+        
+        exness.saveCredentials(
+            account: exnessAccount,
+            server: exnessServer,
+            platform: exnessPlatform,
+            investorPassword: exnessInvestorPwd
+        )
+        
+        Task {
+            do {
+                let res = try await exness.testConnection()
+                await MainActor.run {
+                    self.isTestingExness = false
+                    self.exnessStatus = res.message
+                }
+            } catch {
+                await MainActor.run {
+                    self.isTestingExness = false
+                    self.exnessStatus = "Lỗi kết nối Exness: \(error.localizedDescription)"
+                }
+            }
+        }
+    }
+    
+    private func syncExnessNow() {
+        isSyncingExness = true
+        exnessStatus = "Đang đồng bộ dữ liệu giao dịch từ Exness..."
+        
+        Task {
+            do {
+                let count = try await exness.syncTrades()
+                await MainActor.run {
+                    self.isSyncingExness = false
+                    self.exnessStatus = "Đồng bộ hoàn tất! Cập nhật trạng thái tài khoản Exness."
+                }
+            } catch {
+                await MainActor.run {
+                    self.isSyncingExness = false
+                    self.exnessStatus = "Đồng bộ thất bại: \(error.localizedDescription)"
+                }
+            }
+        }
+    }
+    
+    private func disconnectExness() {
+        exness.disconnect()
+        exnessAccount = ""
+        exnessInvestorPwd = ""
+        exnessStatus = "Đã ngắt kết nối Exness và xóa mật khẩu khỏi Keychain an toàn."
     }
 }
