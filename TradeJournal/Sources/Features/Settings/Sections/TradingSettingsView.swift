@@ -95,7 +95,8 @@ public struct TradingSettingsView: View {
                     // Default Fees
                     VStack(alignment: .leading, spacing: 10) {
                         Text("Default fees")
-                            .font(AppTypography.headline)
+                            .font(AppTypography.captionBold)
+                            .foregroundColor(AppColors.secondaryText)
                         Text("Applied to new fills with a zero fee, including explicit zeroes. Nonzero imported fees and existing fills are kept. The first matching rule wins.")
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText)
@@ -159,7 +160,8 @@ public struct TradingSettingsView: View {
                     // Stop & Target Defaults
                     VStack(alignment: .leading, spacing: 10) {
                         Text("Stop and target defaults")
-                            .font(AppTypography.headline)
+                            .font(AppTypography.captionBold)
+                            .foregroundColor(AppColors.secondaryText)
                         Text("Distances from weighted entry, adjusted for long or short direction. Applied only when a new trade is first created. The first matching rule wins.")
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText)

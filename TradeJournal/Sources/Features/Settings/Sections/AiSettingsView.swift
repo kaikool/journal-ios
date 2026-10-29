@@ -1,14 +1,12 @@
 import SwiftUI
 
-// MARK: - 6. AI Engine Settings View
-// Ultra-clean Apple HIG settings view: Status (Đã kết nối / Chưa kết nối), Ping button, Provider & Language pickers.
-// All raw API keys are handled securely via GitHub Secrets / Hardware Keychain without cluttering UI.
+// MARK: - AI Settings View (Apple HIG Inset-Grouped Standard)
 public struct AiSettingsView: View {
     @ObservedObject private var dataStore = TradeDataStore.shared
     
     @State private var provider: String = "gemini"
     @State private var model: String = "gemini-3.5-flash-lite"
-    @State private var language: String = "vi"
+    @State private var language: String = "en"
     
     @State private var showTraderProfileSheet: Bool = false
     @State private var statusMessage: String = ""
@@ -42,29 +40,32 @@ public struct AiSettingsView: View {
     
     public var body: some View {
         VStack(spacing: 16) {
-            // Card 1: AI Engine & Connection Status
-            SettingsCard(title: "AI Engine") {
+            // Card 1: AI Engine
+            SettingsCard(title: "AI Engine", footer: "Powers automated trade journaling, reflection, and playbook audit.") {
                 VStack(alignment: .leading, spacing: 14) {
-                    HStack {
+                    HStack(spacing: 12) {
                         HStack(spacing: 6) {
                             Circle()
                                 .fill(isProviderConfigured ? AppColors.profit : AppColors.secondaryText)
-                                .frame(width: 8, height: 8)
-                            Text(isProviderConfigured ? "Đã kết nối" : "Chưa kết nối")
-                                .font(AppTypography.headline)
+                                .frame(width: 7, height: 7)
+                            Text(isProviderConfigured ? "Connected" : "Not configured")
+                                .font(AppTypography.captionBold)
                                 .foregroundColor(isProviderConfigured ? AppColors.profit : AppColors.secondaryText)
                         }
+                        
                         Spacer()
+                        
                         AppButton("Ping", icon: "bolt.fill", style: .secondary, size: .compact, isLoading: isTesting) {
                             testConnection()
                         }
                     }
                     
                     Divider()
+                        .background(AppColors.border.opacity(0.4))
                     
                     // Provider Selection
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("Nhà cung cấp")
+                        Text("Provider")
                             .font(AppTypography.captionBold)
                             .foregroundColor(AppColors.secondaryText)
                         
@@ -78,16 +79,16 @@ public struct AiSettingsView: View {
                     
                     // Response Language Selector
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("Ngôn ngữ phản hồi")
+                        Text("Response Language")
                             .font(AppTypography.captionBold)
                             .foregroundColor(AppColors.secondaryText)
                         
-                        Picker("Language", selection: $language) {
-                            Text("Tiếng Việt").tag("vi")
+                        Picker("Response Language", selection: $language) {
                             Text("English").tag("en")
+                            Text("Vietnamese").tag("vi")
                         }
                         .pickerStyle(.segmented)
-                        .onChange(of: language) {
+                        .onChange(of: language) { _ in
                             saveSettings()
                         }
                     }
@@ -101,39 +102,34 @@ public struct AiSettingsView: View {
             }
             
             // Card 2: Trader Profile
-            SettingsCard(title: "Hồ sơ Trader") {
-                VStack(alignment: .leading, spacing: 10) {
-                    Button(action: { showTraderProfileSheet = true }) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "person.text.rectangle")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundColor(AppColors.brand)
+            SettingsCard(title: "Trader Profile", footer: "Customize trading style, risk limits, and behavioral rules for AI audits.") {
+                Button(action: { showTraderProfileSheet = true }) {
+                    HStack(spacing: 10) {
+                        Image(systemName: "person.text.rectangle")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(AppColors.brand)
+                        
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Style & Discipline Rules")
+                                .font(AppTypography.bodyBold)
+                                .foregroundColor(AppColors.primaryText)
                             
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Chỉnh sửa phong cách & Kế hoạch")
-                                    .font(AppTypography.captionBold)
-                                    .foregroundColor(AppColors.primaryText)
-                                
-                                let prof = dataStore.aiSettings.traderProfile
-                                Text("\(prof.tradingStyle) • Rủi ro tối đa \(prof.maxRiskPerTrade)")
-                                    .font(.system(size: 11))
-                                    .foregroundColor(AppColors.secondaryText)
-                                    .lineLimit(1)
-                            }
-                            
-                            Spacer()
-                            
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 11))
+                            let prof = dataStore.aiSettings.traderProfile
+                            Text("\(prof.tradingStyle.isEmpty ? "Standard" : prof.tradingStyle) • Max risk \(prof.maxRiskPerTrade.isEmpty ? "1%" : prof.maxRiskPerTrade)")
+                                .font(AppTypography.caption)
                                 .foregroundColor(AppColors.secondaryText)
+                                .lineLimit(1)
                         }
-                        .padding(12)
-                        .background(AppColors.secondaryBackground)
-                        .cornerRadius(8)
-                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(AppColors.border.opacity(0.5), lineWidth: 0.8))
+                        
+                        Spacer()
+                        
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(AppColors.secondaryText)
                     }
-                    .buttonStyle(.plain)
+                    .padding(.vertical, 4)
                 }
+                .buttonStyle(.plain)
             }
         }
         .sheet(isPresented: $showTraderProfileSheet) {
@@ -170,7 +166,7 @@ public struct AiSettingsView: View {
         let conf = dataStore.aiSettings
         provider = conf.provider.isEmpty ? "gemini" : conf.provider
         model = conf.model.isEmpty ? "gemini-3.5-flash-lite" : conf.model
-        language = conf.language.isEmpty ? "vi" : conf.language
+        language = conf.language.isEmpty ? "en" : conf.language
         statusMessage = ""
         isError = false
     }
@@ -186,7 +182,7 @@ public struct AiSettingsView: View {
     
     private func testConnection() {
         isTesting = true
-        statusMessage = "Đang ping..."
+        statusMessage = "Pinging AI Engine..."
         isError = false
         
         var draft = dataStore.aiSettings
@@ -199,13 +195,13 @@ public struct AiSettingsView: View {
                 await MainActor.run {
                     self.isTesting = false
                     self.isError = false
-                    self.statusMessage = "Đã kết nối: \(testOutput.prefix(60))"
+                    self.statusMessage = "Connected: \(testOutput.prefix(60))"
                 }
             } catch {
                 await MainActor.run {
                     self.isTesting = false
                     self.isError = true
-                    self.statusMessage = "Lỗi: \(error.localizedDescription)"
+                    self.statusMessage = "Error: \(error.localizedDescription)"
                 }
             }
         }

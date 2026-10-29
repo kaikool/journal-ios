@@ -4,7 +4,7 @@ import AuthenticationServices
 import UIKit
 #endif
 
-// MARK: - 5. Connections Settings View
+// MARK: - Connections Settings View (Apple HIG Inset-Grouped Standard)
 public struct ConnectionsSettingsView: View {
     @EnvironmentObject private var env: AppEnvironment
     @ObservedObject private var dataStore = TradeDataStore.shared
@@ -12,11 +12,14 @@ public struct ConnectionsSettingsView: View {
     @ObservedObject private var ctrader = CTraderService.shared
     @ObservedObject private var exness = ExnessService.shared
     
+    // The5ers State
     @State private var the5ersStatus: String = ""
     @State private var isConnectingThe5ers: Bool = false
     @State private var showAdvancedThe5ers: Bool = false
     @State private var manualMcpToken: String = ""
+    @State private var currentThe5ersSyncTask: Task<Void, Never>? = nil
     
+    // cTrader State
     @State private var ctraderToken: String = CTraderService.shared.accessToken
     @State private var ctraderClientId: String = CTraderService.shared.clientId
     @State private var ctraderClientSecret: String = CTraderService.shared.clientSecret
@@ -25,28 +28,25 @@ public struct ConnectionsSettingsView: View {
     @State private var isTestingCTrader: Bool = false
     @State private var isSyncingCTrader: Bool = false
     @State private var showAdvancedCTrader: Bool = false
-    @State private var currentThe5ersSyncTask: Task<Void, Never>? = nil
     @State private var currentCTraderSyncTask: Task<Void, Never>? = nil
     
-    @State private var exnessHost: String = "https://api.exness.com"
+    // Exness State
+    @State private var exnessHost: String = "https://api.exness-api.com"
     @State private var exnessAccountId: String = ""
     @State private var exnessApiKey: String = ""
     @State private var exnessPrivateKey: String = ""
     @State private var exnessStatus: String = ""
     @State private var isTestingExness: Bool = false
     @State private var isSyncingExness: Bool = false
+    @State private var showExnessCredentials: Bool = false
     
     public init() {}
     
     public var body: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 16) {
             // Card 1: Sync Center Hub
-            SettingsCard(title: "Sync Center") {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Select time horizons, filter specific accounts, and manage multi-source synchronization.")
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.secondaryText)
-                    
+            SettingsCard(title: "Sync Center", footer: "Manage multi-source broker synchronization and horizon filters.") {
+                VStack(alignment: .leading, spacing: 10) {
                     HStack(spacing: 8) {
                         AppButton(
                             "Open Sync Center",
@@ -86,61 +86,66 @@ public struct ConnectionsSettingsView: View {
             }
             
             // Card 2: The5ers Prop Firm Connection
-            SettingsCard(title: "The5ers") {
-                VStack(alignment: .leading, spacing: 14) {
-                    HStack {
-                        Text("The5ers Account Sync")
-                            .font(AppTypography.headline)
+            SettingsCard(title: "The5ers", footer: "Automated account synchronization for The5ers challenges and funded accounts.") {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 12) {
+                        HStack(spacing: 6) {
+                            Circle()
+                                .fill(the5ers.isConnected ? AppColors.profit : AppColors.secondaryText)
+                                .frame(width: 7, height: 7)
+                            Text(the5ers.isConnected ? "Connected" : "Not connected")
+                                .font(AppTypography.captionBold)
+                                .foregroundColor(the5ers.isConnected ? AppColors.profit : AppColors.secondaryText)
+                        }
+                        
                         Spacer()
-                        Text(the5ers.isConnected ? "Connected · Active" : "Not connected")
-                            .font(AppTypography.captionBold)
-                            .foregroundColor(the5ers.isConnected ? AppColors.profit : AppColors.secondaryText)
+                        
+                        if !the5ers.isConnected {
+                            AppButton("Connect", icon: "person.badge.key.fill", style: .primary, size: .compact, isLoading: isConnectingThe5ers) {
+                                loginThe5ersOAuth()
+                            }
+                        } else if the5ers.isSyncing || dataStore.isSyncing {
+                            AppButton("Stop", icon: "stop.fill", style: .destructive, size: .compact) {
+                                currentThe5ersSyncTask?.cancel()
+                                currentThe5ersSyncTask = nil
+                                the5ers.cancelSync()
+                                dataStore.cancelSync()
+                                the5ersStatus = "Sync cancelled."
+                            }
+                        } else {
+                            HStack(spacing: 8) {
+                                AppButton("Sync", icon: "arrow.triangle.2.circlepath", style: .primary, size: .compact) {
+                                    syncThe5ers()
+                                }
+                                
+                                AppButton("Disconnect", icon: "xmark.circle", style: .destructive, size: .compact) {
+                                    the5ers.disconnect()
+                                    manualMcpToken = ""
+                                    the5ersStatus = "Disconnected from The5ers."
+                                }
+                            }
+                        }
                     }
                     
-                    Text("Connect your The5ers account to automatically sync challenges, funded accounts, trades, and payout history.")
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.secondaryText)
-                    
-                    if !the5ers.isConnected {
-                        AppButton("Connect The5ers", icon: "person.badge.key.fill", style: .primary, size: .compact, fullWidth: true, isLoading: isConnectingThe5ers) {
-                            loginThe5ersOAuth()
-                        }
-                    } else if the5ers.isSyncing || dataStore.isSyncing {
-                        AppButton("Stop Sync", icon: "stop.fill", style: .destructive, size: .compact, fullWidth: true) {
-                            currentThe5ersSyncTask?.cancel()
-                            currentThe5ersSyncTask = nil
-                            the5ers.cancelSync()
-                            dataStore.cancelSync()
-                            the5ersStatus = "Synchronization cancelled by user."
-                        }
-                    } else {
-                        HStack(spacing: 8) {
-                            AppButton("Sync Now", icon: "arrow.triangle.2.circlepath", style: .primary, size: .compact, fullWidth: true) {
-                                syncThe5ers()
-                            }
-                            
-                            AppButton("Disconnect", icon: "xmark.circle", style: .destructive, size: .compact, fullWidth: true) {
-                                the5ers.disconnect()
-                                manualMcpToken = ""
-                                the5ersStatus = "Disconnected from The5ers."
-                            }
-                        }
+                    // Account & Trade Summary Pill
+                    HStack(spacing: 6) {
+                        Text("\(dataStore.propAccounts.filter { $0.firm.contains("The5ers") }.count) accounts • \(dataStore.trades.filter { $0.tags.contains("the5ers") }.count) trades synced")
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.secondaryText)
+                        Spacer()
                     }
                     
                     DisclosureGroup(isExpanded: $showAdvancedThe5ers) {
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text("If OAuth login is unavailable, paste your Bearer token directly:")
-                                .font(AppTypography.caption)
-                                .foregroundColor(AppColors.secondaryText)
-                            
-                            SecureField("The5ers MCP Bearer Token", text: $manualMcpToken)
+                        VStack(alignment: .leading, spacing: 8) {
+                            SecureField("The5ers Bearer Token", text: $manualMcpToken)
+                                .font(AppTypography.inputText)
                                 .textFieldStyle(.plain)
-                                .padding(10)
+                                .padding(8)
                                 .background(AppColors.secondaryBackground)
                                 .cornerRadius(8)
                             
                             HStack(spacing: 8) {
-                                AppButton("Save & Ping", icon: "checkmark.circle", style: .secondary, size: .compact, fullWidth: true) {
+                                AppButton("Save & Ping", icon: "checkmark", style: .secondary, size: .compact, fullWidth: true) {
                                     saveManualTokenAndPing()
                                 }
                                 
@@ -149,7 +154,7 @@ public struct ConnectionsSettingsView: View {
                                 }
                             }
                         }
-                        .padding(.top, 8)
+                        .padding(.top, 4)
                     } label: {
                         Text("Manual Token (Advanced)")
                             .font(AppTypography.caption)
@@ -161,55 +166,72 @@ public struct ConnectionsSettingsView: View {
                             .font(AppTypography.caption)
                             .foregroundColor(the5ersStatus.contains("Error") || the5ersStatus.contains("failed") ? AppColors.loss : AppColors.profit)
                     }
-                    
-                    HStack {
-                        Text("The5ers accounts: \(dataStore.propAccounts.filter { $0.firm.contains("The5ers") }.count)")
-                            .font(AppTypography.caption)
-                            .foregroundColor(AppColors.secondaryText)
-                        Spacer()
-                        Text("Synced trades: \(dataStore.trades.filter { $0.tags.contains("the5ers") }.count)")
-                            .font(AppTypography.caption)
-                            .foregroundColor(AppColors.secondaryText)
-                    }
-                    .padding(12)
-                    .background(AppColors.secondaryBackground)
-                    .cornerRadius(8)
                 }
             }
             
             // Card 3: cTrader Connection
-            SettingsCard(title: "cTrader") {
-                VStack(alignment: .leading, spacing: 14) {
-                    HStack {
-                        Text("cTrader Account Sync")
-                            .font(AppTypography.headline)
-                        Spacer()
-                        Text(ctrader.isConfigured ? (ctrader.isConnected ? "Connected · Active" : "Configured") : "Not configured")
-                            .font(AppTypography.captionBold)
-                            .foregroundColor(ctrader.isConfigured ? AppColors.profit : AppColors.secondaryText)
-                    }
-                    
-                    Text("Sync trading accounts, historical orders, and open positions directly from cTrader.")
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.secondaryText)
-                    
-                    // Account Type (Live vs Demo)
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Account Type:")
-                            .font(AppTypography.captionBold)
-                            .foregroundColor(AppColors.secondaryText)
-                        
-                        Picker("Environment", selection: $ctraderIsLive) {
-                            Text("Live Accounts").tag(true)
-                            Text("Demo Accounts").tag(false)
+            SettingsCard(title: "cTrader", footer: "Sync trading accounts, historical orders, and open positions directly from cTrader.") {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 12) {
+                        HStack(spacing: 6) {
+                            let isOnline = ctrader.isConfigured && ctrader.isConnected
+                            Circle()
+                                .fill(isOnline ? AppColors.profit : (ctrader.isConfigured ? AppColors.brand : AppColors.secondaryText))
+                                .frame(width: 7, height: 7)
+                            Text(isOnline ? "Connected" : (ctrader.isConfigured ? "Configured" : "Not configured"))
+                                .font(AppTypography.captionBold)
+                                .foregroundColor(isOnline ? AppColors.profit : (ctrader.isConfigured ? AppColors.brand : AppColors.secondaryText))
                         }
-                        .pickerStyle(.segmented)
+                        
+                        Spacer()
+                        
+                        HStack(spacing: 8) {
+                            if isSyncingCTrader || ctrader.isSyncing {
+                                AppButton("Stop", icon: "stop.fill", style: .destructive, size: .compact) {
+                                    currentCTraderSyncTask?.cancel()
+                                    currentCTraderSyncTask = nil
+                                    ctrader.cancelSync()
+                                    isSyncingCTrader = false
+                                    ctraderStatus = "Sync cancelled."
+                                }
+                            } else {
+                                AppButton("Sync", icon: "arrow.triangle.2.circlepath", style: .primary, size: .compact) {
+                                    syncCTrader()
+                                }
+                                .disabled(ctraderToken.trimmingCharacters(in: .whitespaces).isEmpty || isSyncingCTrader)
+                            }
+                            
+                            AppButton("Fetch", icon: "arrow.down.circle", style: .secondary, size: .compact, isLoading: isTestingCTrader) {
+                                testCTraderConnection()
+                            }
+                            .disabled(ctraderToken.trimmingCharacters(in: .whitespaces).isEmpty || isTestingCTrader || isSyncingCTrader || ctrader.isSyncing)
+                            
+                            if !ctraderToken.isEmpty {
+                                AppButton("Disconnect", icon: "xmark.circle", style: .destructive, size: .compact) {
+                                    ctraderToken = ""
+                                    ctraderClientId = ""
+                                    ctraderClientSecret = ""
+                                    ctrader.accessToken = ""
+                                    ctrader.clientId = ""
+                                    ctrader.clientSecret = ""
+                                    ctrader.disconnect()
+                                    ctraderStatus = "cTrader disconnected."
+                                }
+                            }
+                        }
                     }
+                    
+                    // Environment Segmented
+                    Picker("Environment", selection: $ctraderIsLive) {
+                        Text("Live Accounts").tag(true)
+                        Text("Demo Accounts").tag(false)
+                    }
+                    .pickerStyle(.segmented)
                     
                     // Access Token Field
-                    VStack(alignment: .leading, spacing: 6) {
+                    VStack(alignment: .leading, spacing: 4) {
                         HStack {
-                            Text("Access Token:")
+                            Text("Access Token")
                                 .font(AppTypography.captionBold)
                                 .foregroundColor(AppColors.secondaryText)
                             Spacer()
@@ -229,47 +251,11 @@ public struct ConnectionsSettingsView: View {
                             .textFieldStyle(.roundedBorder)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled(true)
-                        
-                        Text("Obtain your Access Token from openapi.ctrader.com → Applications.")
-                            .font(AppTypography.caption)
-                            .foregroundColor(AppColors.secondaryText)
-                    }
-                    
-                    // Optional Advanced App Credentials
-                    DisclosureGroup(isExpanded: $showAdvancedCTrader) {
-                        VStack(alignment: .leading, spacing: 10) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Client ID:")
-                                    .font(AppTypography.captionBold)
-                                    .foregroundColor(AppColors.secondaryText)
-                                TextField("Enter Client ID", text: $ctraderClientId)
-                                    .font(AppTypography.inputText)
-                                    .textFieldStyle(.roundedBorder)
-                                    .textInputAutocapitalization(.never)
-                                    .autocorrectionDisabled(true)
-                            }
-                            
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Client Secret:")
-                                    .font(AppTypography.captionBold)
-                                    .foregroundColor(AppColors.secondaryText)
-                                SecureField("Enter Client Secret", text: $ctraderClientSecret)
-                                    .font(AppTypography.inputText)
-                                    .textFieldStyle(.roundedBorder)
-                                    .textInputAutocapitalization(.never)
-                                    .autocorrectionDisabled(true)
-                            }
-                        }
-                        .padding(.top, 6)
-                    } label: {
-                        Text("Custom App Credentials (Optional)")
-                            .font(AppTypography.captionBold)
-                            .foregroundColor(AppColors.brand)
                     }
                     
                     // Discovered Accounts List
                     if !ctrader.discoveredAccounts.isEmpty {
-                        VStack(alignment: .leading, spacing: 8) {
+                        VStack(alignment: .leading, spacing: 6) {
                             Text("Linked Trading Accounts (\(ctrader.discoveredAccounts.count)):")
                                 .font(AppTypography.captionBold)
                                 .foregroundColor(AppColors.secondaryText)
@@ -297,7 +283,7 @@ public struct ConnectionsSettingsView: View {
                                         Spacer()
                                     }
                                     .padding(8)
-                                    .background(AppColors.cardBackground)
+                                    .background(AppColors.secondaryBackground)
                                     .cornerRadius(8)
                                 }
                                 .buttonStyle(.plain)
@@ -305,59 +291,35 @@ public struct ConnectionsSettingsView: View {
                         }
                     }
                     
-                    // Action Buttons
-                    HStack(spacing: 8) {
-                        if isSyncingCTrader || ctrader.isSyncing {
-                            AppButton(
-                                "Stop Sync",
-                                icon: "stop.fill",
-                                style: .destructive,
-                                size: .compact,
-                                fullWidth: true
-                            ) {
-                                currentCTraderSyncTask?.cancel()
-                                currentCTraderSyncTask = nil
-                                ctrader.cancelSync()
-                                isSyncingCTrader = false
-                                ctraderStatus = "Synchronization cancelled."
+                    DisclosureGroup(isExpanded: $showAdvancedCTrader) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Client ID")
+                                    .font(AppTypography.captionBold)
+                                    .foregroundColor(AppColors.secondaryText)
+                                TextField("Enter Client ID", text: $ctraderClientId)
+                                    .font(AppTypography.inputText)
+                                    .textFieldStyle(.roundedBorder)
+                                    .textInputAutocapitalization(.never)
+                                    .autocorrectionDisabled(true)
                             }
-                        } else {
-                            AppButton(
-                                "Sync cTrader",
-                                icon: "arrow.triangle.2.circlepath",
-                                style: .primary,
-                                size: .compact,
-                                fullWidth: true
-                            ) {
-                                syncCTrader()
-                            }
-                            .disabled(ctraderToken.trimmingCharacters(in: .whitespaces).isEmpty || isSyncingCTrader)
-                        }
-                        
-                        AppButton(
-                            "Fetch Accounts",
-                            icon: "person.crop.circle.badge.checkmark",
-                            style: .secondary,
-                            size: .compact,
-                            fullWidth: true,
-                            isLoading: isTestingCTrader
-                        ) {
-                            testCTraderConnection()
-                        }
-                        .disabled(ctraderToken.trimmingCharacters(in: .whitespaces).isEmpty || isTestingCTrader || isSyncingCTrader || ctrader.isSyncing)
-                        
-                        if !ctraderToken.isEmpty {
-                            AppButton("Disconnect", icon: "xmark.circle", style: .destructive, size: .compact, fullWidth: true) {
-                                ctraderToken = ""
-                                ctraderClientId = ""
-                                ctraderClientSecret = ""
-                                ctrader.accessToken = ""
-                                ctrader.clientId = ""
-                                ctrader.clientSecret = ""
-                                ctrader.disconnect()
-                                ctraderStatus = "cTrader disconnected."
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Client Secret")
+                                    .font(AppTypography.captionBold)
+                                    .foregroundColor(AppColors.secondaryText)
+                                SecureField("Enter Client Secret", text: $ctraderClientSecret)
+                                    .font(AppTypography.inputText)
+                                    .textFieldStyle(.roundedBorder)
+                                    .textInputAutocapitalization(.never)
+                                    .autocorrectionDisabled(true)
                             }
                         }
+                        .padding(.top, 4)
+                    } label: {
+                        Text("Custom App Credentials (Optional)")
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.brand)
                     }
                     
                     if !ctraderStatus.isEmpty {
@@ -365,32 +327,24 @@ public struct ConnectionsSettingsView: View {
                             .font(AppTypography.caption)
                             .foregroundColor(ctraderStatus.contains("Error") || ctraderStatus.contains("failed") ? AppColors.loss : AppColors.profit)
                     }
-                    
-                    if let lastSync = ctrader.lastSyncDate {
-                        Text("Last synchronized: \(Formatters.formatDateTime(lastSync))")
-                            .font(AppTypography.caption)
-                            .foregroundColor(AppColors.secondaryText)
-                    }
                 }
             }
             
             // Card 4: Exness REST API Connection
-            SettingsCard(title: "Exness") {
-                VStack(alignment: .leading, spacing: 14) {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Exness REST API")
-                                .font(AppTypography.headline)
-                            HStack(spacing: 6) {
-                                Circle()
-                                    .fill(exness.isConnected ? AppColors.profit : AppColors.secondaryText)
-                                    .frame(width: 8, height: 8)
-                                Text(exness.isConnected ? "Đã kết nối" : "Chưa kết nối")
-                                    .font(AppTypography.captionBold)
-                                    .foregroundColor(exness.isConnected ? AppColors.profit : AppColors.secondaryText)
-                            }
+            SettingsCard(title: "Exness", footer: "Direct REST API synchronization with Ed25519 signature verification.") {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 12) {
+                        HStack(spacing: 6) {
+                            Circle()
+                                .fill(exness.isConnected ? AppColors.profit : (exness.isConfigured ? AppColors.brand : AppColors.secondaryText))
+                                .frame(width: 7, height: 7)
+                            Text(exness.isConnected ? "Connected" : (exness.isConfigured ? "Configured" : "Not configured"))
+                                .font(AppTypography.captionBold)
+                                .foregroundColor(exness.isConnected ? AppColors.profit : (exness.isConfigured ? AppColors.brand : AppColors.secondaryText))
                         }
+                        
                         Spacer()
+                        
                         HStack(spacing: 8) {
                             AppButton("Ping", icon: "bolt.fill", style: .secondary, size: .compact, isLoading: isTestingExness) {
                                 saveAndTestExness()
@@ -399,51 +353,73 @@ public struct ConnectionsSettingsView: View {
                             AppButton("Sync", icon: "arrow.triangle.2.circlepath", style: .primary, size: .compact, isLoading: isSyncingExness) {
                                 syncExnessNow()
                             }
-                            .disabled(!exness.isConnected)
+                            .disabled(!exness.isConfigured && !exness.isConnected)
                         }
                     }
                     
-                    if exness.isConnected {
-                        HStack(spacing: 16) {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Số dư")
-                                    .font(AppTypography.caption)
+                    DisclosureGroup(isExpanded: $showExnessCredentials) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Account ID")
+                                    .font(AppTypography.captionBold)
                                     .foregroundColor(AppColors.secondaryText)
-                                Text("$\(exness.balance.description)")
-                                    .font(AppTypography.subheadlineBold)
-                                    .foregroundColor(AppColors.primaryText)
+                                TextField("e.g. 12345678", text: $exnessAccountId)
+                                    .font(AppTypography.inputText)
+                                    .textFieldStyle(.roundedBorder)
+                                    .keyboardType(.numberPad)
+                                    .textInputAutocapitalization(.never)
+                                    .autocorrectionDisabled(true)
                             }
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Equity")
-                                    .font(AppTypography.caption)
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("API Key")
+                                    .font(AppTypography.captionBold)
                                     .foregroundColor(AppColors.secondaryText)
-                                Text("$\(exness.equity.description)")
-                                    .font(AppTypography.subheadlineBold)
-                                    .foregroundColor(AppColors.primaryText)
+                                TextField("Enter Exness API Key", text: $exnessApiKey)
+                                    .font(AppTypography.inputText)
+                                    .textFieldStyle(.roundedBorder)
+                                    .textInputAutocapitalization(.never)
+                                    .autocorrectionDisabled(true)
                             }
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Đòn bẩy")
-                                    .font(AppTypography.caption)
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Ed25519 Private Key")
+                                    .font(AppTypography.captionBold)
                                     .foregroundColor(AppColors.secondaryText)
-                                Text("1:\(exness.leverage)")
-                                    .font(AppTypography.subheadlineBold)
-                                    .foregroundColor(AppColors.primaryText)
+                                SecureField("Paste Ed25519 Private Key", text: $exnessPrivateKey)
+                                    .font(AppTypography.inputText)
+                                    .textFieldStyle(.roundedBorder)
+                                    .textInputAutocapitalization(.never)
+                                    .autocorrectionDisabled(true)
+                            }
+                            
+                            HStack(spacing: 8) {
+                                AppButton("Save Credentials", icon: "checkmark", style: .secondary, size: .compact, fullWidth: true) {
+                                    saveExnessCredentials()
+                                }
+                                
+                                if exness.isConfigured || exness.isConnected {
+                                    AppButton("Disconnect", icon: "xmark.circle", style: .destructive, size: .compact, fullWidth: true) {
+                                        disconnectExness()
+                                    }
+                                }
                             }
                         }
-                        .padding(10)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(AppColors.secondaryBackground)
-                        .cornerRadius(8)
+                        .padding(.top, 4)
+                    } label: {
+                        Text("API Credentials (Optional)")
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.brand)
                     }
                     
                     if !exnessStatus.isEmpty {
                         Text(exnessStatus)
                             .font(AppTypography.caption)
-                            .foregroundColor(exnessStatus.contains("Lỗi") || exnessStatus.contains("thất bại") ? AppColors.loss : AppColors.secondaryText)
+                            .foregroundColor(exnessStatus.contains("Error") || exnessStatus.contains("failed") || exnessStatus.contains("Failed") ? AppColors.loss : AppColors.profit)
                     }
                     
                     if let lastSync = exness.lastSyncDate {
-                        Text("Sync lần cuối: \(Formatters.formatDateTime(lastSync))")
+                        Text("Last synchronized: \(Formatters.formatDateTime(lastSync))")
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText)
                     }
@@ -486,7 +462,7 @@ public struct ConnectionsSettingsView: View {
                 await MainActor.run {
                     self.manualMcpToken = token
                     self.isConnectingThe5ers = false
-                    self.the5ersStatus = "The5ers Hub authorization successful! Connected to MCP Server."
+                    self.the5ersStatus = "The5ers authorization successful."
                 }
             } catch {
                 await MainActor.run {
@@ -494,7 +470,7 @@ public struct ConnectionsSettingsView: View {
                     let nsError = error as NSError
                     if (error as? ASWebAuthenticationSessionError)?.code == .canceledLogin ||
                        (nsError.domain == ASWebAuthenticationSessionErrorDomain && nsError.code == 1) {
-                        self.the5ersStatus = "Login cancelled by user."
+                        self.the5ersStatus = "Login cancelled."
                     } else {
                         self.the5ersStatus = "OAuth error: \(error.localizedDescription)"
                     }
@@ -519,7 +495,7 @@ public struct ConnectionsSettingsView: View {
             the5ersStatus = "The5ers MCP is not configured. Please log in or enter a token."
             return
         }
-        the5ersStatus = "Sending tools/list request to The5ers MCP Server..."
+        the5ersStatus = "Pinging The5ers MCP Server..."
         Task {
             do {
                 let res = try await the5ers.pingMcpConnection()
@@ -539,7 +515,7 @@ public struct ConnectionsSettingsView: View {
             the5ersStatus = "Not connected to The5ers. Please connect first."
             return
         }
-        the5ersStatus = "Starting synchronization with The5ers MCP Hub..."
+        the5ersStatus = "Starting synchronization with The5ers..."
         currentThe5ersSyncTask?.cancel()
         currentThe5ersSyncTask = Task {
             do {
@@ -547,9 +523,9 @@ public struct ConnectionsSettingsView: View {
                 guard !Task.isCancelled else { return }
                 await MainActor.run {
                     if self.the5ers.isCancelledByUser {
-                        self.the5ersStatus = "Synchronization cancelled by user."
+                        self.the5ersStatus = "Synchronization cancelled."
                     } else if count > 0 {
-                        self.the5ersStatus = "Successfully synced \(count) accounts, expenses & payouts from The5ers!"
+                        self.the5ersStatus = "Successfully synced \(count) accounts & trades from The5ers."
                     } else {
                         self.the5ersStatus = self.the5ers.lastStatus
                     }
@@ -561,7 +537,7 @@ public struct ConnectionsSettingsView: View {
                 guard !Task.isCancelled else { return }
                 await MainActor.run {
                     if TradeDataStore.isCancellation(error) {
-                        self.the5ersStatus = "Synchronization cancelled by user."
+                        self.the5ersStatus = "Synchronization cancelled."
                     } else {
                         self.the5ersStatus = "Sync failed: \(error.localizedDescription)"
                     }
@@ -638,10 +614,28 @@ public struct ConnectionsSettingsView: View {
     
     // MARK: - Exness Actions
     
+    private func saveExnessCredentials() {
+        exness.saveCredentials(
+            host: exnessHost,
+            accountId: exnessAccountId,
+            apiKey: exnessApiKey,
+            privateKey: exnessPrivateKey
+        )
+        exnessStatus = "Credentials saved. Tap Ping to test connection."
+    }
+    
     private func saveAndTestExness() {
+        if !exnessAccountId.isEmpty || !exnessApiKey.isEmpty || !exnessPrivateKey.isEmpty {
+            exness.saveCredentials(
+                host: exnessHost,
+                accountId: exnessAccountId,
+                apiKey: exnessApiKey,
+                privateKey: exnessPrivateKey
+            )
+        }
         exness.loadSettings()
         isTestingExness = true
-        exnessStatus = "Đang ping Exness API..."
+        exnessStatus = "Pinging Exness API..."
         
         Task {
             do {
@@ -653,7 +647,7 @@ public struct ConnectionsSettingsView: View {
             } catch {
                 await MainActor.run {
                     self.isTestingExness = false
-                    self.exnessStatus = "Lỗi: \(error.localizedDescription)"
+                    self.exnessStatus = "Error: \(error.localizedDescription)"
                 }
             }
         }
@@ -662,19 +656,19 @@ public struct ConnectionsSettingsView: View {
     private func syncExnessNow() {
         exness.loadSettings()
         isSyncingExness = true
-        exnessStatus = "Đang đồng bộ dữ liệu giao dịch từ Exness API..."
+        exnessStatus = "Syncing trade data from Exness API..."
         
         Task {
             do {
                 let count = try await exness.syncTrades()
                 await MainActor.run {
                     self.isSyncingExness = false
-                    self.exnessStatus = "Đồng bộ hoàn tất qua Exness API! Cập nhật trạng thái tài khoản."
+                    self.exnessStatus = "Sync complete: \(count) trades imported."
                 }
             } catch {
                 await MainActor.run {
                     self.isSyncingExness = false
-                    self.exnessStatus = "Đồng bộ thất bại: \(error.localizedDescription)"
+                    self.exnessStatus = "Sync failed: \(error.localizedDescription)"
                 }
             }
         }
@@ -685,6 +679,6 @@ public struct ConnectionsSettingsView: View {
         exnessAccountId = ""
         exnessApiKey = ""
         exnessPrivateKey = ""
-        exnessStatus = "Đã ngắt kết nối Exness API và xóa Private Key khỏi Keychain."
+        exnessStatus = "Disconnected from Exness API."
     }
 }

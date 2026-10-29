@@ -11,6 +11,7 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
     // MARK: - Published State
     
     @Published public var isConnected: Bool = false
+    @Published public var isConfigured: Bool = false
     @Published public var isSyncing: Bool = false
     @Published public var lastSyncDate: Date? = nil
     
@@ -70,7 +71,7 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
         }
         
         let hasPrivateKey = KeychainManager.get(forKey: kExnessPrivateKey) != nil || (AppSecretsLoader.loadSecret(named: "EXNESS_PRIVATE_KEY") != nil)
-        self.isConnected = !accountId.isEmpty && !apiKey.isEmpty && hasPrivateKey
+        self.isConfigured = !accountId.isEmpty && !apiKey.isEmpty && hasPrivateKey
     }
     
     public func saveCredentials(
@@ -103,7 +104,7 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
             self.apiHost = finalHost
             self.accountId = cleanAccountId
             self.apiKey = cleanApiKey
-            self.isConnected = !cleanAccountId.isEmpty && !cleanApiKey.isEmpty && (!cleanPrivateKey.isEmpty || KeychainManager.get(forKey: self.kExnessPrivateKey) != nil)
+            self.isConfigured = !cleanAccountId.isEmpty && !cleanApiKey.isEmpty && (!cleanPrivateKey.isEmpty || KeychainManager.get(forKey: self.kExnessPrivateKey) != nil)
         }
     }
     
@@ -125,6 +126,7 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
         DispatchQueue.main.async {
             self.accountId = ""
             self.apiKey = ""
+            self.isConfigured = false
             self.isConnected = false
             self.lastSyncDate = nil
             self.balance = 0
@@ -153,7 +155,7 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
         let privKeyStr = getStoredPrivateKey()
         
         guard !cleanKey.isEmpty, !privKeyStr.isEmpty else {
-            throw NSError(domain: "ExnessService", code: 401, userInfo: [NSLocalizedDescriptionKey: "Chưa có EXN-API-KEY hoặc Private Key ký Ed25519 trong Keychain/Secrets."])
+            throw NSError(domain: "ExnessService", code: 401, userInfo: [NSLocalizedDescriptionKey: "Missing EXN-API-KEY or Ed25519 Private Key in Keychain/Secrets."])
         }
         
         let timestamp = Int64(Date().timeIntervalSince1970 * 1000)
@@ -251,7 +253,7 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
         }
         
         guard !accountId.isEmpty else {
-            throw NSError(domain: "ExnessService", code: 400, userInfo: [NSLocalizedDescriptionKey: "Chưa có Account ID Exness."])
+            throw NSError(domain: "ExnessService", code: 400, userInfo: [NSLocalizedDescriptionKey: "Please configure Exness Account ID."])
         }
         
         // Official Gateway host exclusively handles dynamic access point routing
@@ -287,19 +289,19 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
                 AppLogger.info("Exness: Access Point discovered -> \(cleanAp)")
                 return cleanAp
             } else {
-                throw NSError(domain: "ExnessService", code: 200, userInfo: [NSLocalizedDescriptionKey: "Phản hồi Access Point không đúng định dạng."])
+                throw NSError(domain: "ExnessService", code: 200, userInfo: [NSLocalizedDescriptionKey: "Invalid Access Point response format."])
             }
         } else if http.statusCode == 400 {
-            let desc = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["description"] as? String ?? "Tham số không hợp lệ."
+            let desc = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["description"] as? String ?? "Invalid parameters."
             throw NSError(domain: "ExnessService", code: 400, userInfo: [NSLocalizedDescriptionKey: "Exness Gateway: \(desc)"])
         } else if http.statusCode == 401 || http.statusCode == 403 {
-            let desc = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["description"] as? String ?? (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["error_message"] as? String ?? "Khóa API hoặc chữ ký Ed25519 không khớp."
-            throw NSError(domain: "ExnessService", code: http.statusCode, userInfo: [NSLocalizedDescriptionKey: "Lỗi xác thực (HTTP \(http.statusCode)): \(desc)"])
+            let desc = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["description"] as? String ?? (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["error_message"] as? String ?? "Invalid API key or Ed25519 signature."
+            throw NSError(domain: "ExnessService", code: http.statusCode, userInfo: [NSLocalizedDescriptionKey: "Authentication failed (HTTP \(http.statusCode)): \(desc)"])
         } else if http.statusCode == 429 {
-            throw NSError(domain: "ExnessService", code: 429, userInfo: [NSLocalizedDescriptionKey: "Rate limit Exness. Vui lòng đợi vài giây."])
+            throw NSError(domain: "ExnessService", code: 429, userInfo: [NSLocalizedDescriptionKey: "Exness rate limit exceeded. Please wait a moment."])
         } else {
             let desc = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["description"] as? String ?? String(data: data, encoding: .utf8) ?? "HTTP \(http.statusCode)"
-            throw NSError(domain: "ExnessService", code: http.statusCode, userInfo: [NSLocalizedDescriptionKey: "Không thể lấy Access Point (HTTP \(http.statusCode)): \(desc)"])
+            throw NSError(domain: "ExnessService", code: http.statusCode, userInfo: [NSLocalizedDescriptionKey: "Unable to resolve Access Point (HTTP \(http.statusCode)): \(desc)"])
         }
     }
     
@@ -308,25 +310,12 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
     /// Tests authentication and connectivity to Exness REST API
     public func testConnection() async throws -> (success: Bool, message: String) {
         guard !accountId.isEmpty else {
-            return (false, "Vui lòng nhập Account ID Exness.")
+            return (false, "Please configure Exness Account ID.")
         }
         
-        // 1. Resolve Access Point via Discovery
-        let accessPointHost: String
-        do {
-            accessPointHost = try await resolveAccessPoint()
-        } catch {
-            return (false, "Không thể xác định Access Point: \(error.localizedDescription)")
-        }
-        
-        guard let hostUrl = URL(string: accessPointHost) else {
-            return (false, "Địa chỉ Access Point không hợp lệ.")
-        }
-        
-        // 2. Fetch Account Configuration on the discovered Access Point
-        let path = "/v1/configuration/accounts/\(accountId)/account"
-        guard let url = URL(string: path, relativeTo: hostUrl) else {
-            return (false, "Không thể tạo URL request.")
+        let path = "/v1/accounts/\(accountId)/balance"
+        guard let url = URL(string: "https://api.exness-api.com\(path)") else {
+            return (false, "Invalid Exness API URL.")
         }
         
         var request = URLRequest(url: url)
@@ -360,23 +349,19 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
                 } else if let eqStr = json["equity"] as? String, let d = Double(eqStr) {
                     await MainActor.run { self.equity = Decimal(d) }
                 }
-                if let lev = json["leverage"] as? Int {
-                    await MainActor.run { self.leverage = lev }
-                } else if let levStr = json["leverage"] as? String {
-                    let num = levStr.replacingOccurrences(of: "1:", with: "")
-                    if let l = Int(num) { await MainActor.run { self.leverage = l } }
-                }
             }
             await MainActor.run {
                 self.isConnected = true
             }
-            return (true, "Đã kết nối Exness API! (Chữ ký Ed25519 hợp lệ)")
+            return (true, "Connected to Exness API (Ed25519 signature verified)")
         } else if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
-            let errorMsg = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["description"] as? String ?? (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["message"] as? String ?? "Khóa API hoặc chữ ký Ed25519 không hợp lệ."
-            return (false, "Lỗi xác thực (HTTP \(httpResponse.statusCode)): \(errorMsg)")
+            await MainActor.run { self.isConnected = false }
+            let errorMsg = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["description"] as? String ?? (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["message"] as? String ?? "Invalid API key or Ed25519 signature."
+            return (false, "Authentication failed (HTTP \(httpResponse.statusCode)): \(errorMsg)")
         } else {
+            await MainActor.run { self.isConnected = false }
             let errorMsg = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["description"] as? String ?? String(data: data, encoding: .utf8) ?? "HTTP \(httpResponse.statusCode)"
-            return (false, "Không thể kết nối (HTTP \(httpResponse.statusCode)): \(errorMsg)")
+            return (false, "Connection error (HTTP \(httpResponse.statusCode)): \(errorMsg)")
         }
     }
     
@@ -534,7 +519,7 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
     /// Synchronizes trades and order history from Exness REST API
     public func syncTrades() async throws -> Int {
         guard !accountId.isEmpty else {
-            throw NSError(domain: "ExnessService", code: 400, userInfo: [NSLocalizedDescriptionKey: "Chưa cấu hình tài khoản Exness."])
+            throw NSError(domain: "ExnessService", code: 400, userInfo: [NSLocalizedDescriptionKey: "Please configure Exness Account ID."])
         }
         
         await MainActor.run {

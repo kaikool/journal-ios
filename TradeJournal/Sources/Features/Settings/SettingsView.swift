@@ -48,13 +48,13 @@ public enum SettingsSection: String, CaseIterable, Identifiable {
         case .currencyConversion:
             return "Set a reporting currency and saved exchange rates for combined performance."
         case .marketData:
-            return "Connect price history or upload candles for replay and trade analysis."
+            return "Connect price history and market data feeds for replay and trade analysis."
         case .connections:
-            return "Connect broker APIs, cTrader accounts, and prop firm read-only feeds."
+            return "Connect broker APIs, cTrader accounts, and prop firm feeds."
         case .aiSettings:
-            return "Choose your AI provider and manage your model and API key."
+            return "Configure AI provider, language, and trader profile rules."
         case .yourData:
-            return "Manage Supabase Cloud PostgreSQL database, local storage, and export backups."
+            return "Manage cloud sync, export backups, and local storage."
         }
     }
 }

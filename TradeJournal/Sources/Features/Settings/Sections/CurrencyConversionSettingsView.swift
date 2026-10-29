@@ -16,14 +16,13 @@ public struct CurrencyConversionSettingsView: View {
     public init() {}
     
     public var body: some View {
-        SettingsCard(title: "Currency conversion") {
-            VStack(alignment: .leading, spacing: 16) {
-                Text("Set your reporting currency (USD or VND) and exchange rate for account balances and analytics.")
-                    .font(AppTypography.caption)
-                    .foregroundColor(AppColors.secondaryText)
+        SettingsCard(title: "Currency conversion", footer: "Set reporting currency and exchange rates for combined analytics.") {
+            VStack(alignment: .leading, spacing: 14) {
+                Toggle("Convert dashboard and calendar to reporting currency", isOn: $enabled)
+                    .font(AppTypography.bodyBold)
                 
-                Toggle("Convert dashboard and calendar to the reporting currency", isOn: $enabled)
-                    .font(AppTypography.subheadlineBold)
+                Divider()
+                    .background(AppColors.border.opacity(0.4))
                 
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Reporting currency")
@@ -39,9 +38,13 @@ public struct CurrencyConversionSettingsView: View {
                     }
                 }
                 
-                VStack(alignment: .leading, spacing: 10) {
+                Divider()
+                    .background(AppColors.border.opacity(0.4))
+                
+                VStack(alignment: .leading, spacing: 8) {
                     Text("Exchange rates")
-                        .font(AppTypography.headline)
+                        .font(AppTypography.captionBold)
+                        .foregroundColor(AppColors.secondaryText)
                     
                     ForEach(allCurrencies, id: \.self) { code in
                         HStack(spacing: 8) {

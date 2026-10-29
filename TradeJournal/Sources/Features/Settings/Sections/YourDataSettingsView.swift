@@ -1,7 +1,6 @@
 import SwiftUI
 
-// MARK: - 7. Your Data & Backups Settings View
-// Clean Apple HIG settings view: Cloud Database sync, Export tools, and local data management.
+// MARK: - Your Data & Backups Settings View (Apple HIG Inset-Grouped Standard)
 public struct YourDataSettingsView: View {
     @ObservedObject private var dataStore = TradeDataStore.shared
     
@@ -15,24 +14,22 @@ public struct YourDataSettingsView: View {
     public init() {}
     
     public var body: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 16) {
             // Card 1: Cloud Database
-            SettingsCard(title: "Cloud Database") {
-                VStack(alignment: .leading, spacing: 14) {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Supabase Cloud")
-                                .font(AppTypography.headline)
-                            HStack(spacing: 6) {
-                                Circle()
-                                    .fill(SupabaseService.shared.isConfigured ? AppColors.profit : AppColors.secondaryText)
-                                    .frame(width: 8, height: 8)
-                                Text(SupabaseService.shared.isConfigured ? "Đã kết nối" : "Chưa kết nối")
-                                    .font(AppTypography.captionBold)
-                                    .foregroundColor(SupabaseService.shared.isConfigured ? AppColors.profit : AppColors.secondaryText)
-                            }
+            SettingsCard(title: "Cloud Database", footer: "Multi-device synchronization and automatic cloud storage.") {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 12) {
+                        HStack(spacing: 6) {
+                            Circle()
+                                .fill(SupabaseService.shared.isConfigured ? AppColors.profit : AppColors.secondaryText)
+                                .frame(width: 7, height: 7)
+                            Text(SupabaseService.shared.isConfigured ? "Connected" : "Not configured")
+                                .font(AppTypography.captionBold)
+                                .foregroundColor(SupabaseService.shared.isConfigured ? AppColors.profit : AppColors.secondaryText)
                         }
+                        
                         Spacer()
+                        
                         HStack(spacing: 8) {
                             AppButton("Sync", icon: "arrow.triangle.2.circlepath", style: .primary, size: .compact, isLoading: dataStore.isSyncing) {
                                 syncSupabase()
@@ -49,39 +46,41 @@ public struct YourDataSettingsView: View {
                     if let status = supabaseSyncStatus {
                         Text(status)
                             .font(AppTypography.caption)
-                            .foregroundColor(status.contains("Error") || status.contains("error") || status.contains("Lỗi") ? AppColors.loss : AppColors.profit)
+                            .foregroundColor(status.contains("Error") || status.contains("error") || status.contains("Failed") ? AppColors.loss : AppColors.profit)
                     }
                 }
             }
             
-            // Card 2: Export your data
-            SettingsCard(title: "Export your data") {
-                VStack(alignment: .leading, spacing: 14) {
-                    Text("Save a full journal backup, or export your trades as a CSV.")
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.secondaryText)
+            // Card 2: Data Export
+            SettingsCard(title: "Data Export", footer: "Export your complete trade journal or raw trade executions.") {
+                HStack(spacing: 10) {
+                    AppButton("Export JSON", icon: "square.and.arrow.up", style: .secondary, size: .compact, fullWidth: true) {
+                        exportFullJsonBackup()
+                    }
                     
-                    HStack(spacing: 12) {
-                        AppButton("Export JSON", icon: "square.and.arrow.up", style: .secondary, size: .compact) {
-                            exportFullJsonBackup()
-                        }
+                    AppButton("Export CSV", icon: "square.and.arrow.up", style: .secondary, size: .compact, fullWidth: true) {
+                        exportTradesCsv()
+                    }
+                }
+            }
+            
+            // Card 3: Local Storage
+            SettingsCard(title: "Local Storage", footer: "On-device database storage. Resetting permanently deletes local records.") {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "internaldrive")
+                            .font(.system(size: 13))
+                            .foregroundColor(AppColors.secondaryText)
                         
-                        AppButton("Export CSV", icon: "square.and.arrow.up", style: .secondary, size: .compact) {
-                            exportTradesCsv()
+                        Text("\(dataStore.trades.count) trades • \(dataStore.executions.count) executions • \(dataStore.accounts.count) accounts")
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.secondaryText)
+                        
+                        Spacer()
+                        
+                        AppButton("Reset", icon: "trash", style: .destructive, size: .compact) {
+                            showResetConfirmation = true
                         }
-                    }
-                }
-            }
-            
-            // Card 3: Local data
-            SettingsCard(title: "Local data") {
-                VStack(alignment: .leading, spacing: 14) {
-                    Text("Manage on-device storage or reset your local database.")
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.secondaryText)
-                    
-                    AppButton("Reset and delete all local data", icon: "trash", style: .destructive, size: .compact) {
-                        showResetConfirmation = true
                     }
                 }
             }
@@ -92,20 +91,20 @@ public struct YourDataSettingsView: View {
             }
         }
         .alert("Reset all local data?", isPresented: $showResetConfirmation) {
-            Button("Delete all local data", role: .destructive) {
+            Button("Delete All Data", role: .destructive) {
                 dataStore.resetAllData()
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("All trades, journal logs, and notes will be permanently erased from this device.")
+            Text("All trades, executions, journal logs, and notes will be permanently erased from this device.")
         }
-        .alert("Wipe all cloud data on Supabase?", isPresented: $showWipeConfirmation) {
-            Button("Wipe cloud data", role: .destructive) {
+        .alert("Wipe all cloud data?", isPresented: $showWipeConfirmation) {
+            Button("Wipe Remote Data", role: .destructive) {
                 wipeSupabaseData()
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This will permanently delete all records across all tables in your Supabase database. Use this to reset when developing or testing features.")
+            Text("This will permanently delete all records across all tables in your cloud database.")
         }
     }
     
@@ -113,15 +112,15 @@ public struct YourDataSettingsView: View {
     
     private func syncSupabase() {
         Task {
-            supabaseSyncStatus = "Đang đồng bộ..."
+            supabaseSyncStatus = "Syncing..."
             await dataStore.syncWithSupabase()
             await MainActor.run {
                 if let err = dataStore.lastSyncError {
-                    self.supabaseSyncStatus = "Lỗi sync: \(err)"
+                    self.supabaseSyncStatus = "Sync error: \(err)"
                 } else if let summary = dataStore.lastSyncSummary {
                     self.supabaseSyncStatus = summary
                 } else {
-                    self.supabaseSyncStatus = "Đồng bộ thành công!"
+                    self.supabaseSyncStatus = "Synchronized successfully."
                 }
             }
         }
@@ -129,18 +128,18 @@ public struct YourDataSettingsView: View {
     
     private func wipeSupabaseData() {
         isWipingSupabase = true
-        supabaseSyncStatus = "Đang xóa dữ liệu đám mây..."
+        supabaseSyncStatus = "Wiping cloud database..."
         Task {
             do {
                 try await SupabaseService.shared.wipeAllRemoteData()
                 await MainActor.run {
                     self.isWipingSupabase = false
-                    self.supabaseSyncStatus = "Đã xóa toàn bộ dữ liệu đám mây."
+                    self.supabaseSyncStatus = "Cloud database wiped successfully."
                 }
             } catch {
                 await MainActor.run {
                     self.isWipingSupabase = false
-                    self.supabaseSyncStatus = "Lỗi: \(error.localizedDescription)"
+                    self.supabaseSyncStatus = "Error: \(error.localizedDescription)"
                 }
             }
         }
