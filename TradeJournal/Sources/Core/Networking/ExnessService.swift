@@ -427,25 +427,31 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
     @MainActor
     public func syncAccountWithDataStore() {
         guard !accountId.isEmpty else { return }
-        let journalAccId = "exness_\(accountId)"
-        let accountName = "Exness (\(accountId))"
+        let cleanId = accountId.cleanAccountId
+        let journalAccId = "exness_\(cleanId)"
+        let accountName = "Exness (\(cleanId))"
         let dataStore = TradeDataStore.shared
+        var hasChanges = false
         
         if let existingIdx = dataStore.accounts.firstIndex(where: {
             $0.id == journalAccId ||
+            $0.id == cleanId ||
             $0.id == self.accountId ||
             $0.id.isEquivalentAccountId(to: journalAccId) ||
-            $0.name.contains(self.accountId)
+            $0.name.contains(cleanId)
         }) {
             var acc = dataStore.accounts[existingIdx]
-            acc.name = accountName
-            acc.broker = "Exness"
-            acc.currency = self.currency
-            acc.initialBalance = self.balance
-            acc.lastSyncAt = Date()
-            acc.visibleInJournal = true
-            dataStore.accounts[existingIdx] = acc
-            AppLogger.info("Exness: Synced account \(acc.id) balance -> \(self.balance) \(self.currency)")
+            if acc.initialBalance != self.balance || acc.currency != self.currency || acc.name != accountName {
+                acc.name = accountName
+                acc.broker = "Exness"
+                acc.currency = self.currency
+                acc.initialBalance = self.balance
+                acc.lastSyncAt = Date()
+                acc.visibleInJournal = true
+                dataStore.accounts[existingIdx] = acc
+                hasChanges = true
+                AppLogger.info("Exness: Synced account \(acc.id) balance -> \(self.balance) \(self.currency)")
+            }
         } else {
             let newAcc = Account(
                 id: journalAccId,
@@ -459,16 +465,21 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
                 visibleInJournal: true
             )
             dataStore.accounts.append(newAcc)
+            hasChanges = true
             AppLogger.info("Exness: Created new account \(journalAccId) balance -> \(self.balance) \(self.currency)")
         }
         
         if dataStore.selectedAccountId.isEmpty || dataStore.selectedAccountId == "default-acc" {
             dataStore.selectedAccountId = journalAccId
+            hasChanges = true
         }
         
-        dataStore.invalidatePerformanceCaches()
-        dataStore.saveToDisk(immediate: true)
-        dataStore.objectWillChange.send()
+        // Only trigger UI invalidation and disk write if data actually changed
+        if hasChanges {
+            dataStore.invalidatePerformanceCaches()
+            dataStore.saveToDisk(immediate: true)
+            dataStore.objectWillChange.send()
+        }
     }
     
     // MARK: - API Calls
@@ -949,13 +960,16 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
                 dataStore.importExecutions(accountId: journalAccId, newExecutions: newExecutions)
             }
             
-            // Ensure newly synced Exness account is selected if currently default or empty
-            if dataStore.selectedAccountId.isEmpty || dataStore.selectedAccountId == "default-acc" {
-                dataStore.selectedAccountId = journalAccId
+            // Only invalidate caches and write to disk if new trades or executions arrived
+            if !directTrades.isEmpty || !newExecutions.isEmpty {
+                // Ensure newly synced Exness account is selected if currently default or empty
+                if dataStore.selectedAccountId.isEmpty || dataStore.selectedAccountId == "default-acc" {
+                    dataStore.selectedAccountId = journalAccId
+                }
+                dataStore.invalidatePerformanceCaches()
+                dataStore.saveToDisk(immediate: true)
+                dataStore.objectWillChange.send()
             }
-            dataStore.invalidatePerformanceCaches()
-            dataStore.saveToDisk(immediate: true)
-            dataStore.objectWillChange.send()
             
             self.syncedTradesCount = directTrades.count > 0 ? directTrades.count : (newExecutions.count / 2)
         }

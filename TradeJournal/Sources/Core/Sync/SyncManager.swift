@@ -66,13 +66,13 @@ public final class SyncManager: ObservableObject {
     private var lastAutoSyncDate: Date? = nil
     private var autoSyncTimer: AnyCancellable? = nil
     
-    /// Starts periodic background auto-sync every 20 seconds while the app is active in foreground
+    /// Starts periodic gentle background auto-sync every 5 minutes while the app is active
     public func startPeriodicAutoSync() {
         stopPeriodicAutoSync()
-        autoSyncTimer = Timer.publish(every: 20, on: .main, in: .common)
+        autoSyncTimer = Timer.publish(every: 300, on: .main, in: .common)
             .autoconnect()
             .sink { [weak self] _ in
-                self?.autoSyncIfNeeded(cooldownSeconds: 15, delaySeconds: 0)
+                self?.autoSyncIfNeeded(cooldownSeconds: 240, delaySeconds: 0)
             }
     }
     
@@ -83,8 +83,8 @@ public final class SyncManager: ObservableObject {
     }
     
     /// Automatically synchronizes data in the background without blocking the UI.
-    /// Runs on app launch, foreground resume, and periodically every 20 seconds.
-    public func autoSyncIfNeeded(cooldownSeconds: Double = 20, delaySeconds: Double = 2, force: Bool = false) {
+    /// Runs gently on app launch, foreground resume, and periodically every 5 minutes.
+    public func autoSyncIfNeeded(cooldownSeconds: Double = 120, delaySeconds: Double = 3, force: Bool = false) {
         guard !isSyncing else { return }
         
         let now = Date()
@@ -93,14 +93,13 @@ public final class SyncManager: ObservableObject {
         }
         lastAutoSyncDate = now
         
-        Task.detached(priority: .utility) { [weak self] in
+        Task.detached(priority: .background) { [weak self] in
             // Wait for UI to finish loading completely and be 100% interactive
             if delaySeconds > 0 {
                 try? await Task.sleep(nanoseconds: UInt64(delaySeconds * 1_000_000_000))
             }
             guard !Task.isCancelled else { return }
             
-            AppLogger.info("Initiating quiet automatic background sync across brokers...")
             var brokerUpdatesCount = 0
             
             // 1. Auto-sync Exness if configured
@@ -129,13 +128,8 @@ public final class SyncManager: ObservableObject {
                     TradeDataStore.shared.saveToDisk(immediate: true)
                     TradeDataStore.shared.objectWillChange.send()
                 }
-                self?.scheduleBackgroundCloudBackup(delaySeconds: 3)
-            } else if SupabaseService.shared.isConfigured {
-                // Pull fresh cloud data from Supabase quietly in background without freezing UI
-                await TradeDataStore.shared.syncWithSupabase(isBackground: true)
+                self?.scheduleBackgroundCloudBackup(delaySeconds: 5)
             }
-            
-            AppLogger.info("Quiet automatic background sync completed. Updates=\(brokerUpdatesCount)")
         }
     }
     
