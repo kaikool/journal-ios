@@ -40,6 +40,10 @@ public final class AppEnvironment: ObservableObject {
     public init() {
         let savedTheme = UserDefaults.standard.string(forKey: "journal_theme_preference")
         self.appTheme = savedTheme.flatMap(AppTheme.init(rawValue:)) ?? .dark
+        
+        // Auto-bootstrap any uncommitted local secrets from AppSecrets.plist to Apple Keychain
+        AppSecretsLoader.bootstrapLocalSecretsToKeychain()
+        
         AppLogger.info("AppEnvironment initialized. PrivacyMode: \(isPrivacyModeEnabled), Currency: \(currentCurrency), Theme: \(appTheme.rawValue)")
     }
     

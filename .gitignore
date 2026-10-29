@@ -30,6 +30,9 @@ yarn-error.log*
 .env.*
 *.p12
 *.mobileprovision
+AppSecrets.plist
+Secrets.plist
+Secrets.xcconfig
 
 # Local scratch directory
 scratch/
