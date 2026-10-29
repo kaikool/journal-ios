@@ -347,14 +347,18 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
                     await MainActor.run { self.currency = cur }
                 }
                 if let bal = json["balance"] as? Double {
-                    await MainActor.run { self.balance = bal }
+                    await MainActor.run { self.balance = Decimal(bal) }
                 } else if let balNum = json["balance"] as? NSNumber {
-                    await MainActor.run { self.balance = balNum.doubleValue }
+                    await MainActor.run { self.balance = Decimal(balNum.doubleValue) }
+                } else if let balStr = json["balance"] as? String, let d = Double(balStr) {
+                    await MainActor.run { self.balance = Decimal(d) }
                 }
                 if let eq = json["equity"] as? Double {
-                    await MainActor.run { self.equity = eq }
+                    await MainActor.run { self.equity = Decimal(eq) }
                 } else if let eqNum = json["equity"] as? NSNumber {
-                    await MainActor.run { self.equity = eqNum.doubleValue }
+                    await MainActor.run { self.equity = Decimal(eqNum.doubleValue) }
+                } else if let eqStr = json["equity"] as? String, let d = Double(eqStr) {
+                    await MainActor.run { self.equity = Decimal(d) }
                 }
                 if let lev = json["leverage"] as? Int {
                     await MainActor.run { self.leverage = lev }

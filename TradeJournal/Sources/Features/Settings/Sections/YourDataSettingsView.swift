@@ -203,12 +203,7 @@ public struct YourDataSettingsView: View {
     }
     
     private func exportTradesCsv() {
-        var csv = "Trade ID,Account,Symbol,Direction,Entry Date,Exit Date,Entry Price,Exit Price,Size,Net P&L,Status,Playbook\n"
-        for trade in dataStore.trades {
-            let line = "\(trade.id),\(trade.accountId),\(trade.symbol),\(trade.direction.rawValue),\(trade.entryDate?.description ?? ""),\(trade.exitDate?.description ?? ""),\(trade.entryPrice ?? 0),\(trade.exitPrice ?? 0),\(trade.size ?? 0),\(trade.netPnl ?? 0),\(trade.status.rawValue),\"\(trade.playbookTag ?? "")\"\n"
-            csv += line
-        }
-        
+        let csv = dataStore.exportTradesCsv()
         let tempDir = FileManager.default.temporaryDirectory
         let fileUrl = tempDir.appendingPathComponent("TradeJournal_Trades_\(Date().timeIntervalSince1970).csv")
         do {
