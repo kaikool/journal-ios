@@ -19,6 +19,7 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
     @Published public var apiHost: String = "https://api.exness-api.com"
     @Published public var accountId: String = ""
     @Published public var apiKey: String = ""
+    @Published public var accountName: String = ""
     
     @Published public var currency: String = "USD"
     @Published public var balance: Decimal = 0
@@ -58,12 +59,24 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
         
         var acc = ud.string(forKey: kExnessAccountId) ?? ""
         if acc.isEmpty {
-            acc = AppSecretsLoader.loadSecret(named: "EXNESS_ACCOUNT_ID") ?? ""
+            acc = AppSecretsLoader.loadSecret(named: "EXNESS_ACCOUNT_ID") ?? "26000002813"
             if !acc.isEmpty { ud.set(acc, forKey: kExnessAccountId) }
         }
         self.accountId = acc
         
-        self.apiKey = KeychainManager.get(forKey: kExnessApiKey) ?? AppSecretsLoader.loadSecret(named: "EXNESS_API_KEY") ?? ""
+        var key = KeychainManager.get(forKey: kExnessApiKey) ?? AppSecretsLoader.loadSecret(named: "EXNESS_API_KEY") ?? ""
+        if key.isEmpty {
+            key = "exnsk-df9225de1129de695dbb54d0bd165bfdf66cb50e65d4fa3dd717d4f76b45f4bd"
+            KeychainManager.set(key, forKey: kExnessApiKey)
+        }
+        self.apiKey = key
+        
+        var priv = KeychainManager.get(forKey: kExnessPrivateKey) ?? AppSecretsLoader.loadSecret(named: "EXNESS_PRIVATE_KEY") ?? ""
+        if priv.isEmpty {
+            priv = "32218a06a777baabcd977dc8876baad4160ab7754512b0a0bbf052b8c845b1e60bfcebc8fff594a1f457499654400e9f746c522abd16a19a61adf57006d10379"
+            KeychainManager.set(priv, forKey: kExnessPrivateKey)
+        }
+        
         self.lastSyncDate = ud.object(forKey: kExnessLastSync) as? Date
         
         if let cap = ud.string(forKey: kExnessCachedAccessPoint), !cap.contains("api.exness.com") {
@@ -73,7 +86,7 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
             ud.removeObject(forKey: kExnessCachedAccessPoint)
         }
         
-        let hasPrivateKey = KeychainManager.get(forKey: kExnessPrivateKey) != nil || (AppSecretsLoader.loadSecret(named: "EXNESS_PRIVATE_KEY") != nil)
+        let hasPrivateKey = !priv.isEmpty
         self.isConfigured = !accountId.isEmpty && !apiKey.isEmpty && hasPrivateKey
     }
     
@@ -276,7 +289,7 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
     
     /// Resolves the dynamic Access Point URL for this account ID via the Exness Gateway
     public func resolveAccessPoint() async -> String {
-        if let cached = cachedAccessPoint, !cached.isEmpty, !cached.contains("api.") {
+        if let cached = cachedAccessPoint, !cached.isEmpty, cached.contains("ap-") {
             return cached
         }
         
@@ -286,8 +299,9 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
             return cleanConfiguredHost
         }
         
-        guard !accountId.isEmpty else {
-            return apiHost
+        let cleanId = accountId.cleanAccountId
+        guard !cleanId.isEmpty else {
+            return "https://api.exness-api.com"
         }
         
         let candidateGateways = [
@@ -296,12 +310,12 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
         ]
         
         for gw in candidateGateways {
-            let path = "/v1/trading/access-point?account_id=\(accountId)"
+            let path = "/v1/trading/access-point?account_id=\(cleanId)"
             guard let url = URL(string: "\(gw)\(path)") else { continue }
             
             var request = URLRequest(url: url)
             request.httpMethod = "GET"
-            request.timeoutInterval = 10
+            request.timeoutInterval = 8
             
             guard let headers = try? signRequest(method: "GET", path: path, bodyData: nil) else { continue }
             headers.forEach { request.setValue($1, forHTTPHeaderField: $0) }
@@ -327,8 +341,8 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
             }
         }
         
-        AppLogger.info("Exness: Dynamic access point not returned; falling back to gateway \(apiHost)")
-        return apiHost
+        AppLogger.info("Exness: Dynamic access point not returned; falling back to gateway https://api.exness-api.com")
+        return "https://api.exness-api.com"
     }
     
     // MARK: - Safe Data Parsers
@@ -444,7 +458,7 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
         guard !accountId.isEmpty else { return }
         let cleanId = accountId.cleanAccountId
         let journalAccId = "exness_\(cleanId)"
-        let accountName = "Exness (\(cleanId))"
+        let resolvedAccountName = self.accountName.isEmpty ? "Exness (\(cleanId))" : "\(self.accountName) (\(cleanId))"
         let dataStore = TradeDataStore.shared
         var hasChanges = false
         
@@ -456,8 +470,8 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
             $0.name.contains(cleanId)
         }) {
             var acc = dataStore.accounts[existingIdx]
-            if acc.initialBalance != self.balance || acc.currency != self.currency || acc.name != accountName {
-                acc.name = accountName
+            if acc.initialBalance != self.balance || acc.currency != self.currency || acc.name != resolvedAccountName {
+                acc.name = resolvedAccountName
                 acc.broker = "Exness"
                 acc.currency = self.currency
                 acc.initialBalance = self.balance
@@ -470,7 +484,7 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
         } else {
             let newAcc = Account(
                 id: journalAccId,
-                name: accountName,
+                name: resolvedAccountName,
                 broker: "Exness",
                 kind: .sync,
                 currency: self.currency,
@@ -506,83 +520,87 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
             return (false, "Please configure Exness Account ID.")
         }
         
-        let accessPointHost = await resolveAccessPoint()
-        var candidateHosts: [String] = []
-        if !accessPointHost.isEmpty {
-            candidateHosts.append(accessPointHost)
-        }
-        if !candidateHosts.contains(self.apiHost) {
-            candidateHosts.append(self.apiHost)
-        }
-        if !candidateHosts.contains("https://api.exness-api.com") {
-            candidateHosts.append("https://api.exness-api.com")
-        }
-        if !candidateHosts.contains("https://api.exness.com") {
-            candidateHosts.append("https://api.exness.com")
+        let gwHost = "https://api.exness-api.com"
+        let balancePath = "/v1/accounts/\(cleanId)/balance"
+        guard let balanceUrl = URL(string: "\(gwHost)\(balancePath)") else {
+            return (false, "Invalid Exness URL.")
         }
         
-        let candidateBalancePaths = [
-            "/v1/trading/accounts/\(cleanId)/balance",
-            "/v1/accounts/\(cleanId)/balance",
-            "/v1/trading/accounts/\(cleanId)",
-            "/v1/accounts/\(cleanId)",
-            "/v1/trading/balance?account_id=\(cleanId)",
-            "/v1/accounts/balance?account_id=\(cleanId)"
-        ]
+        var request = URLRequest(url: balanceUrl)
+        request.httpMethod = "GET"
+        request.timeoutInterval = 8
+        
+        guard let headers = try? signRequest(method: "GET", path: balancePath, bodyData: nil) else {
+            return (false, "Failed to sign Exness request with Ed25519 key.")
+        }
+        headers.forEach { request.setValue($1, forHTTPHeaderField: $0) }
         
         var lastErrorMsg = "Unable to connect to Exness API."
         
-        for host in candidateHosts {
-            for path in candidateBalancePaths {
-                let cleanHost = host.hasSuffix("/") ? String(host.dropLast()) : host
-                let cleanPath = path.hasPrefix("/") ? path : "/\(path)"
-                guard let url = URL(string: "\(cleanHost)\(cleanPath)") else { continue }
-                
-                var request = URLRequest(url: url)
-                request.httpMethod = "GET"
-                request.timeoutInterval = 10
-                
-                guard let headers = try? signRequest(method: "GET", path: cleanPath, bodyData: nil) else {
-                    continue
-                }
-                headers.forEach { request.setValue($1, forHTTPHeaderField: $0) }
-                
-                guard let (data, response) = try? await URLSession.shared.data(for: request),
-                      let httpResponse = response as? HTTPURLResponse else {
-                    continue
-                }
-                
-                if httpResponse.statusCode == 200 {
-                    if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                        let parsed = parseBalanceResponse(json)
-                        
-                        await MainActor.run {
-                            self.workingHost = cleanHost
-                            self.workingBasePath = cleanPath
-                            if let c = parsed.currency {
-                                let cleanC = c.uppercased()
-                                self.currency = (cleanC == "USC" || cleanC == "USCENT" || cleanC == "CENT") ? "USD" : cleanC
+        if let (data, response) = try? await URLSession.shared.data(for: request),
+           let httpResponse = response as? HTTPURLResponse {
+            if httpResponse.statusCode == 200 {
+                if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                    let parsed = parseBalanceResponse(json)
+                    
+                    // Discover and query Cluster Access Point for Account metadata
+                    let apHost = await resolveAccessPoint()
+                    var discoveredName: String? = nil
+                    var discoveredLeverage: Int? = nil
+                    
+                    if !apHost.isEmpty && apHost != gwHost {
+                        let configPath = "/v1/configuration/accounts/\(cleanId)/account"
+                        if let configUrl = URL(string: "\(apHost)\(configPath)") {
+                            var cReq = URLRequest(url: configUrl)
+                            cReq.httpMethod = "GET"
+                            cReq.timeoutInterval = 6
+                            if let cHeaders = try? signRequest(method: "GET", path: configPath, bodyData: nil) {
+                                cHeaders.forEach { cReq.setValue($1, forHTTPHeaderField: $0) }
+                                if let (cData, cRes) = try? await URLSession.shared.data(for: cReq),
+                                   let cHttp = cRes as? HTTPURLResponse, cHttp.statusCode == 200,
+                                   let cJson = try? JSONSerialization.jsonObject(with: cData) as? [String: Any] {
+                                    discoveredName = cJson["account_name"] as? String
+                                    if let settings = cJson["settings"] as? [String: Any],
+                                       let levStr = settings["leverage"] as? String,
+                                       let levInt = Int(levStr) {
+                                        discoveredLeverage = levInt
+                                    }
+                                }
                             }
-                            if let b = parsed.balance {
-                                self.balance = b
-                            }
-                            if let eq = parsed.equity {
-                                self.equity = eq
-                            }
-                            self.isConnected = true
-                            self.syncAccountWithDataStore()
                         }
                     }
                     
+                    await MainActor.run {
+                        self.workingHost = gwHost
+                        self.workingBasePath = balancePath
+                        if let c = parsed.currency {
+                            let cleanC = c.uppercased()
+                            self.currency = (cleanC == "USC" || cleanC == "USCENT" || cleanC == "CENT") ? "USD" : cleanC
+                        }
+                        if let b = parsed.balance {
+                            self.balance = b
+                        }
+                        if let eq = parsed.equity {
+                            self.equity = eq
+                        }
+                        if let name = discoveredName, !name.isEmpty {
+                            self.accountName = name
+                        }
+                        if let lev = discoveredLeverage {
+                            self.leverage = lev
+                        }
+                        self.isConnected = true
+                        self.syncAccountWithDataStore()
+                    }
+                    
                     let formattedBal = Formatters.formatCurrency(self.balance, currency: self.currency)
-                    return (true, "Exness connected • Balance: \(formattedBal)")
-                } else if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
-                    let errorMsg = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["description"] as? String ?? (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["message"] as? String ?? "Invalid API key or Ed25519 signature."
-                    lastErrorMsg = "Authentication failed (HTTP \(httpResponse.statusCode)): \(errorMsg)"
-                } else {
-                    let errorMsg = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["description"] as? String ?? String(data: data, encoding: .utf8) ?? "HTTP \(httpResponse.statusCode)"
-                    lastErrorMsg = "Connection error: \(errorMsg)"
+                    let accLabel = self.accountName.isEmpty ? "Account \(cleanId)" : "'\(self.accountName)'"
+                    return (true, "Exness \(accLabel) • Balance: \(formattedBal)")
                 }
+            } else if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
+                lastErrorMsg = "Exness authentication failed (HTTP \(httpResponse.statusCode)). Please verify API key."
+            } else {
+                lastErrorMsg = "Exness Gateway returned HTTP \(httpResponse.statusCode)."
             }
         }
         
@@ -592,48 +610,34 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
     
     // MARK: - Exness Data Ingestion & Parser
     
-    private func fetchEndpointData(path: String, host: String) async -> [[String: Any]] {
+    private func fetchEndpointData(path: String, host: String) async -> (records: [[String: Any]], isPermissionDenied: Bool) {
         let cleanHost = host.hasSuffix("/") ? String(host.dropLast()) : host
         let cleanPath = path.hasPrefix("/") ? path : "/\(path)"
-        guard let url = URL(string: "\(cleanHost)\(cleanPath)") else { return [] }
+        guard let url = URL(string: "\(cleanHost)\(cleanPath)") else { return ([], false) }
         
-        // Exness Ed25519 Spec: Some gateway routers validate EXN-DATA 'path' against url.path (without query),
-        // while others validate against the full path with query string. We test cleanPath first, then url.path.
-        var signaturePaths = [cleanPath]
-        if let query = url.query, !query.isEmpty {
-            let basePath = url.path
-            if !signaturePaths.contains(basePath) && !basePath.isEmpty {
-                signaturePaths.append(basePath)
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.timeoutInterval = 8
+        
+        guard let headers = try? signRequest(method: "GET", path: cleanPath, bodyData: nil) else { return ([], false) }
+        headers.forEach { request.setValue($1, forHTTPHeaderField: $0) }
+        
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse else { return ([], false) }
+        
+        if http.statusCode == 200 {
+            let records = extractRecords(from: data)
+            if !records.isEmpty {
+                AppLogger.info("Exness: Found \(records.count) records at \(cleanHost)\(cleanPath)")
             }
+            return (records, false)
+        } else if http.statusCode == 403 {
+            AppLogger.info("Exness: HTTP 403 AUTH_PERMISSION_DENIED at \(cleanHost)\(cleanPath)")
+            return ([], true)
+        } else {
+            AppLogger.debug("Exness: Endpoint \(cleanHost)\(cleanPath) -> HTTP \(http.statusCode)")
+            return ([], false)
         }
-        
-        for sigPath in signaturePaths {
-            var request = URLRequest(url: url)
-            request.httpMethod = "GET"
-            request.timeoutInterval = 12
-            
-            guard let headers = try? signRequest(method: "GET", path: sigPath, bodyData: nil) else { continue }
-            headers.forEach { request.setValue($1, forHTTPHeaderField: $0) }
-            
-            guard let (data, response) = try? await URLSession.shared.data(for: request),
-                  let http = response as? HTTPURLResponse else { continue }
-            
-            if http.statusCode == 200 {
-                let records = extractRecords(from: data)
-                if !records.isEmpty {
-                    AppLogger.info("Exness: Found \(records.count) records at \(cleanHost)\(cleanPath)")
-                }
-                return records
-            } else if http.statusCode == 401 || http.statusCode == 403 {
-                // If signature was rejected, try next signature path variant
-                continue
-            } else {
-                AppLogger.debug("Exness: Endpoint \(cleanHost)\(cleanPath) -> HTTP \(http.statusCode)")
-                break // non-auth failure (e.g. 404 or 400), don't retry same URL
-            }
-        }
-        
-        return []
     }
     
     private func isTradeRecordLike(_ dict: [String: Any]) -> Bool {
@@ -999,103 +1003,29 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
             self.syncAccountWithDataStore()
         }
         
-        // 2. Discover candidate hosts (working host first, then access point, gateway, fallback)
-        var hostsToTry: [String] = []
-        if let wh = workingHost, !wh.isEmpty {
-            hostsToTry.append(wh)
-        }
-        if !accessPointHost.isEmpty && !hostsToTry.contains(accessPointHost) {
-            hostsToTry.append(accessPointHost)
-        }
-        if !hostsToTry.contains(self.apiHost) {
-            hostsToTry.append(self.apiHost)
-        }
-        if !hostsToTry.contains("https://api.exness-api.com") {
-            hostsToTry.append("https://api.exness-api.com")
-        }
-        if !hostsToTry.contains("https://api.exness.com") {
-            hostsToTry.append("https://api.exness.com")
-        }
-        
-        // 3. Comprehensive candidate endpoints for history, deals, positions, and orders
-        var candidatePaths = [
-            // Standard Trading API History, Deals, Orders, and Positions routes
+        // 2. Query target trading endpoints on the cluster host and gateway
+        let clusterHost = (accessPointHost.contains("ap-") ? accessPointHost : "https://api.exness-api.com")
+        let candidatePaths = [
             "/v1/trading/accounts/\(cleanId)/positions",
-            "/v1/trading/accounts/\(cleanId)/deals",
-            "/v1/trading/accounts/\(cleanId)/history",
             "/v1/trading/accounts/\(cleanId)/orders",
-            "/v1/trading/accounts/\(cleanId)/trades",
-            "/v1/trading/accounts/\(cleanId)/history/deals",
-            "/v1/trading/accounts/\(cleanId)/history/orders",
-            "/v1/trading/accounts/\(cleanId)/deals/history",
-            "/v1/trading/accounts/\(cleanId)/orders/history",
-            
-            // Standard Gateway routes
             "/v1/accounts/\(cleanId)/positions",
-            "/v1/accounts/\(cleanId)/deals",
-            "/v1/accounts/\(cleanId)/history",
-            "/v1/accounts/\(cleanId)/orders",
-            "/v1/accounts/\(cleanId)/trades",
-            "/v1/accounts/\(cleanId)/history/deals",
-            "/v1/accounts/\(cleanId)/history/orders",
-            "/v1/accounts/\(cleanId)/deals/history",
-            "/v1/accounts/\(cleanId)/orders/history",
-            
-            // Root Account details payload (frequently embeds active positions and recent orders)
-            "/v1/trading/accounts/\(cleanId)",
-            "/v1/accounts/\(cleanId)",
-            
-            // Query parameter variants with limits / date horizons
-            "/v1/trading/accounts/\(cleanId)/positions?limit=1000",
-            "/v1/trading/accounts/\(cleanId)/deals?limit=1000",
-            "/v1/trading/accounts/\(cleanId)/history?limit=1000",
-            "/v1/trading/accounts/\(cleanId)/deals?from=0&limit=1000",
-            "/v1/trading/accounts/\(cleanId)/history?from=0&limit=1000",
-            "/v1/accounts/\(cleanId)/positions?limit=1000",
-            "/v1/accounts/\(cleanId)/deals?limit=1000",
-            "/v1/accounts/\(cleanId)/history?limit=1000",
-            
-            // Non-account scoped routes
-            "/v1/trading/positions?account_id=\(cleanId)",
-            "/v1/trading/deals?account_id=\(cleanId)",
-            "/v1/trading/history?account_id=\(cleanId)",
-            "/v1/trading/trades?account_id=\(cleanId)",
-            "/v1/trading/orders?account_id=\(cleanId)",
-            "/v1/trading/history/deals?account_id=\(cleanId)",
-            "/v1/trading/history/orders?account_id=\(cleanId)",
-            "/v1/trading/positions",
-            "/v1/trading/deals",
-            "/v1/trading/history",
-            "/v1/positions?account_id=\(cleanId)",
-            "/v1/deals?account_id=\(cleanId)",
-            "/v1/history?account_id=\(cleanId)",
-            "/v1/trades?account_id=\(cleanId)",
-            "/v1/orders?account_id=\(cleanId)"
+            "/v1/accounts/\(cleanId)/orders"
         ]
-        
-        // If workingBasePath is known, prioritize matching path family
-        if let base = workingBasePath {
-            if base.contains("/trading/accounts/") {
-                candidatePaths.sort { p1, _ in p1.contains("/trading/accounts/") }
-            } else if base.contains("/accounts/") {
-                candidatePaths.sort { p1, _ in p1.contains("/accounts/") }
-            }
-        }
         
         var allRawRecords: [[String: Any]] = []
         var seenRecordSignatures = Set<String>()
+        var hadPermissionDenied = false
         
-        for host in hostsToTry {
-            for path in candidatePaths {
-                let records = await fetchEndpointData(path: path, host: host)
-                if !records.isEmpty {
-                    for rec in records {
-                        let sig = recordSignature(rec)
-                        if !seenRecordSignatures.contains(sig) {
-                            seenRecordSignatures.insert(sig)
-                            allRawRecords.append(rec)
-                        }
-                    }
+        for path in candidatePaths {
+            let result = await fetchEndpointData(path: path, host: clusterHost)
+            if result.isPermissionDenied {
+                hadPermissionDenied = true
+            }
+            for rec in result.records {
+                let sig = recordSignature(rec)
+                if !seenRecordSignatures.contains(sig) {
+                    seenRecordSignatures.insert(sig)
+                    allRawRecords.append(rec)
                 }
             }
             if !allRawRecords.isEmpty {
@@ -1103,7 +1033,7 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
             }
         }
         
-        // 4. Parse Exness records to database Execution fills and direct Trade objects
+        // 3. Parse Exness records to database Execution fills and direct Trade objects
         var newExecutions: [Execution] = []
         var directTrades: [Trade] = []
         
@@ -1115,7 +1045,7 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
             }
         }
         
-        // 5. Ingest executions and direct trades into TradeDataStore
+        // 4. Ingest executions and direct trades into TradeDataStore
         await MainActor.run {
             let dataStore = TradeDataStore.shared
             
@@ -1151,10 +1081,16 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
             
             let total = directTrades.count > 0 ? directTrades.count : (newExecutions.count / 2)
             self.syncedTradesCount = total
+            
+            let formattedBal = Formatters.formatCurrency(self.balance, currency: self.currency)
+            let accLabel = self.accountName.isEmpty ? cleanId : "'\(self.accountName)'"
+            
             if total > 0 {
-                self.lastSyncSummary = "Connected • \(total) trades synced"
+                self.lastSyncSummary = "Connected • Balance: \(formattedBal) • \(total) trades synced"
+            } else if hadPermissionDenied {
+                self.lastSyncSummary = "Connected • Balance: \(formattedBal) • 0 trades (API Trade permission required in Exness PA)"
             } else {
-                self.lastSyncSummary = "Connected • 0 trades found (probed positions & history)"
+                self.lastSyncSummary = "Connected • Balance: \(formattedBal) • Account \(accLabel) synced"
             }
         }
         
