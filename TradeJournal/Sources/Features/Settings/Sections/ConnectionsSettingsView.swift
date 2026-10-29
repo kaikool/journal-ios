@@ -319,6 +319,8 @@ public struct ConnectionsSettingsView: View {
                     self.isTestingExness = false
                     if syncedCount > 0 {
                         self.exnessStatus = "\(res.message) • \(syncedCount) trades synced"
+                    } else if !self.exness.lastSyncSummary.isEmpty {
+                        self.exnessStatus = self.exness.lastSyncSummary
                     } else {
                         self.exnessStatus = res.message
                     }

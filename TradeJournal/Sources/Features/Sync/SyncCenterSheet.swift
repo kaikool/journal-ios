@@ -137,6 +137,9 @@ public struct SyncCenterSheet: View {
                     }
                     if exness.isConnected {
                         let formattedBal = Formatters.formatCurrency(exness.balance, currency: exness.currency)
+                        if exness.syncedTradesCount > 0 {
+                            return "Connected · Balance: \(formattedBal) · \(exness.syncedTradesCount) trades"
+                        }
                         return "Connected · Balance: \(formattedBal)"
                     }
                     return "Configured · Ready to sync"
