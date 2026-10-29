@@ -639,6 +639,7 @@ public struct ConnectionsSettingsView: View {
     // MARK: - Exness Actions
     
     private func saveAndTestExness() {
+        exness.loadSettings()
         isTestingExness = true
         exnessStatus = "Đang ping Exness API..."
         
@@ -659,6 +660,7 @@ public struct ConnectionsSettingsView: View {
     }
     
     private func syncExnessNow() {
+        exness.loadSettings()
         isSyncingExness = true
         exnessStatus = "Đang đồng bộ dữ liệu giao dịch từ Exness API..."
         

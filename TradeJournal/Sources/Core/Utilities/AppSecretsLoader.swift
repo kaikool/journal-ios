@@ -51,25 +51,31 @@ public enum AppSecretsLoader {
         ]
         
         for item in mappings {
-            let existingInKeychain = KeychainManager.get(forKey: item.kcKey)
-            if existingInKeychain == nil || existingInKeychain?.isEmpty == true {
-                if let localSecret = loadSecret(named: item.envKey, keychainKey: nil), !localSecret.isEmpty {
+            if let localSecret = loadSecret(named: item.envKey, keychainKey: nil), !localSecret.isEmpty {
+                let existingInKeychain = KeychainManager.get(forKey: item.kcKey)
+                if existingInKeychain != localSecret {
                     KeychainManager.set(localSecret, forKey: item.kcKey, syncAcrossDevices: true)
-                    AppLogger.info("Bootstrap: Synced secret for '\(item.kcKey)' to Apple Keychain.")
+                    AppLogger.info("Bootstrap: Synced updated secret for '\(item.kcKey)' to Apple Keychain.")
                 }
             }
         }
         
-        // Bootstrap non-secret identifiers if not set
+        // Bootstrap non-secret identifiers
         if let oandaAcc = loadSecret(named: "OANDA_ACCOUNT_ID"), !oandaAcc.isEmpty {
-            if UserDefaults.standard.string(forKey: "oanda_account_id") == nil {
-                UserDefaults.standard.set(oandaAcc, forKey: "oanda_account_id")
-            }
+            UserDefaults.standard.set(oandaAcc, forKey: "oanda_account_id")
         }
         if let exnAcc = loadSecret(named: "EXNESS_ACCOUNT_ID"), !exnAcc.isEmpty {
-            if UserDefaults.standard.string(forKey: "exness_account_id") == nil {
-                UserDefaults.standard.set(exnAcc, forKey: "exness_account_id")
+            UserDefaults.standard.set(exnAcc, forKey: "exness_account_id")
+        }
+        if let exnHost = loadSecret(named: "EXNESS_HOST"), !exnHost.isEmpty {
+            UserDefaults.standard.set(exnHost, forKey: "exness_api_host")
+        } else {
+            let current = UserDefaults.standard.string(forKey: "exness_api_host")
+            if current == nil || current == "https://api.exness.com" {
+                UserDefaults.standard.set("https://api.exness-api.com", forKey: "exness_api_host")
             }
         }
+        
+        ExnessService.shared.loadSettings()
     }
 }

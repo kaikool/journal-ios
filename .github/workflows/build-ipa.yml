@@ -71,6 +71,7 @@ jobs:
           EXNESS_ACCOUNT_ID: ${{ secrets.EXNESS_ACCOUNT_ID }}
           EXNESS_API_KEY: ${{ secrets.EXNESS_API_KEY }}
           EXNESS_PRIVATE_KEY: ${{ secrets.EXNESS_PRIVATE_KEY }}
+          EXNESS_HOST: ${{ secrets.EXNESS_HOST }}
         run: |
           mkdir -p TradeJournal/Resources
           python3 -c "
@@ -86,7 +87,8 @@ jobs:
               'OANDA_ACCOUNT_ID': os.environ.get('OANDA_ACCOUNT_ID', '').strip(),
               'EXNESS_ACCOUNT_ID': os.environ.get('EXNESS_ACCOUNT_ID', '').strip(),
               'EXNESS_API_KEY': os.environ.get('EXNESS_API_KEY', '').strip(),
-              'EXNESS_PRIVATE_KEY': os.environ.get('EXNESS_PRIVATE_KEY', '').strip()
+              'EXNESS_PRIVATE_KEY': os.environ.get('EXNESS_PRIVATE_KEY', '').strip(),
+              'EXNESS_HOST': os.environ.get('EXNESS_HOST', '').strip()
           }
           with open('TradeJournal/Resources/AppSecrets.plist', 'wb') as f:
               plistlib.dump(data, f)
