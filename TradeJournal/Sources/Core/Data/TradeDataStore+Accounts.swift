@@ -585,11 +585,11 @@ extension TradeDataStore {
                 }
                 let td = dailyMap.count
                 let wd = dailyMap.values.filter { $0 > 0 }.count
-                if p.currentTradingDays == nil || (p.currentTradingDays == 0 && td > 0) || tradesReconciled {
+                if p.currentTradingDays == nil || (p.currentTradingDays == 0 && td > 0) {
                     p.currentTradingDays = td
                     changed = true
                 }
-                if p.winningDays == nil || (p.winningDays == 0 && wd > 0) || tradesReconciled {
+                if p.winningDays == nil || (p.winningDays == 0 && wd > 0) {
                     p.winningDays = wd
                     changed = true
                 }
