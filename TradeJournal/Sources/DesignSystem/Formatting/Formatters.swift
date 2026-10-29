@@ -55,8 +55,9 @@ public enum Formatters {
     /// Formats currency with optional Privacy Mode masking
     public static func currency(_ amount: Decimal, currencyCode: String = "USD", isPrivate: Bool = false) -> String {
         if isPrivate { return "••••••" }
-        currencyFormatter.currencyCode = currencyCode
-        currencyFormatter.currencySymbol = currencySymbol(for: currencyCode)
+        let cleanCode = (currencyCode.uppercased() == "USC" || currencyCode.uppercased() == "USCENT" || currencyCode.uppercased() == "CENT") ? "USD" : currencyCode
+        currencyFormatter.currencyCode = cleanCode
+        currencyFormatter.currencySymbol = currencySymbol(for: cleanCode)
         let formatted = currencyFormatter.string(from: amount as NSDecimalNumber) ?? "$\(amount)"
         return formatted.replacingOccurrences(of: "US$", with: "$")
     }
@@ -89,7 +90,7 @@ public enum Formatters {
     /// Returns symbol for given ISO currency code (e.g. "USD" -> "$", "EUR" -> "€", "GBP" -> "£", "VND" -> "₫")
     public static func currencySymbol(for code: String) -> String {
         switch code.uppercased() {
-        case "USD": return "$"
+        case "USD", "USC", "USCENT", "CENT": return "$"
         case "EUR": return "€"
         case "GBP": return "£"
         case "JPY": return "¥"

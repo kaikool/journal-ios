@@ -140,6 +140,10 @@ extension TradeDataStore {
         if accountId.hasPrefix("the5ers_") && !accountId.hasPrefix("ctrader_") {
             return
         }
+        // Direct Exness broker-synced trades (with authoritative broker-reported profit) take precedence:
+        if accountId.hasPrefix("exness_") && trades.contains(where: { $0.accountId == accountId && $0.key.hasPrefix("exness_") }) {
+            return
+        }
         
         let reconstructed = TradeReconstructionEngine.buildRoundTrips(
             executions: accountFills,
@@ -189,6 +193,7 @@ extension TradeDataStore {
         let brokerSyncedTrades = trades.filter { trade in
             trade.accountId == accountId && (
                 trade.key.hasPrefix("the5ers_") ||
+                trade.key.hasPrefix("exness_") ||
                 trade.executionIds.isEmpty ||
                 !trade.executionIds.contains(where: { fillIds.contains($0) })
             )

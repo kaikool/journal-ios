@@ -29,7 +29,8 @@ public struct CurrencyContext: Sendable, Equatable {
     /// Rate converting 1 unit of `currency` into the reporting currency.
     /// Returns `nil` when no usable rate is configured.
     public func rateToReporting(currency: String) -> Decimal? {
-        let code = currency.uppercased()
+        let raw = currency.uppercased()
+        let code = (raw == "USC" || raw == "USCENT" || raw == "CENT") ? "USD" : raw
         guard code != reportingCurrency else { return 1 }
         if let rate = rates[code], rate > 0 { return rate }
         // Pair fallback: rates["USDJPY"] = 157.5 means 1 USD = 157.5 JPY => 1 JPY = 1/157.5 reporting
@@ -39,8 +40,10 @@ public struct CurrencyContext: Sendable, Equatable {
 
     /// Rate converting 1 unit of `currency` into `target`.
     public func rate(from currency: String, to target: String) -> Decimal? {
-        let from = currency.uppercased()
-        let to = target.uppercased()
+        let rawFrom = currency.uppercased()
+        let from = (rawFrom == "USC" || rawFrom == "USCENT" || rawFrom == "CENT") ? "USD" : rawFrom
+        let rawTo = target.uppercased()
+        let to = (rawTo == "USC" || rawTo == "USCENT" || rawTo == "CENT") ? "USD" : rawTo
         if from == to { return 1 }
         guard let forward = rateToReporting(currency: from),
               let backward = rateToReporting(currency: to), backward > 0 else { return nil }

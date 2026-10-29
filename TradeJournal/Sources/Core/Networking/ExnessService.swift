@@ -269,68 +269,194 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
     // MARK: - Access Point / Host Discovery (Official exness-api.com Spec)
     
     /// Resolves the dynamic Access Point URL for this account ID via the Exness Gateway
-    public func resolveAccessPoint() async throws -> String {
+    public func resolveAccessPoint() async -> String {
         if let cached = cachedAccessPoint, !cached.isEmpty, !cached.contains("api.") {
             return cached
         }
         
         let cleanConfiguredHost = apiHost.trimmingCharacters(in: .whitespacesAndNewlines)
-        // If the user configured an explicit cluster access point (e.g. https://ap-xxx.exness.com)
         if cleanConfiguredHost.contains("ap-") {
             self.cachedAccessPoint = cleanConfiguredHost
             return cleanConfiguredHost
         }
         
         guard !accountId.isEmpty else {
-            throw NSError(domain: "ExnessService", code: 400, userInfo: [NSLocalizedDescriptionKey: "Please configure Exness Account ID."])
+            return apiHost
         }
         
-        // Official Gateway host exclusively handles dynamic access point routing
-        let gatewayHost = "https://api.exness-api.com"
-        let path = "/v1/trading/access-point?account_id=\(accountId)"
+        let candidateGateways = [
+            "https://api.exness-api.com",
+            "https://api.exness.com"
+        ]
         
-        guard let hostUrl = URL(string: gatewayHost),
-              let url = URL(string: path, relativeTo: hostUrl) else {
-            throw URLError(.badURL)
-        }
-        
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.timeoutInterval = 15
-        
-        let headers = try signRequest(method: "GET", path: path, bodyData: nil)
-        headers.forEach { request.setValue($1, forHTTPHeaderField: $0) }
-        
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse else {
-            throw URLError(.badServerResponse)
-        }
-        
-        if http.statusCode == 200 {
-            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let ap = json["access_point"] as? String, !ap.isEmpty {
-                var cleanAp = ap.trimmingCharacters(in: .whitespacesAndNewlines)
-                if !cleanAp.hasPrefix("http://") && !cleanAp.hasPrefix("https://") {
-                    cleanAp = "https://" + cleanAp
+        for gw in candidateGateways {
+            let path = "/v1/trading/access-point?account_id=\(accountId)"
+            guard let url = URL(string: "\(gw)\(path)") else { continue }
+            
+            var request = URLRequest(url: url)
+            request.httpMethod = "GET"
+            request.timeoutInterval = 10
+            
+            guard let headers = try? signRequest(method: "GET", path: path, bodyData: nil) else { continue }
+            headers.forEach { request.setValue($1, forHTTPHeaderField: $0) }
+            
+            if let (data, response) = try? await URLSession.shared.data(for: request),
+               let http = response as? HTTPURLResponse, http.statusCode == 200 {
+                if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                    let ap = (json["access_point"] as? String) ??
+                             ((json["data"] as? [String: Any])?["access_point"] as? String) ??
+                             (json["cluster"] as? String) ??
+                             (json["host"] as? String)
+                    if let apStr = ap, !apStr.isEmpty {
+                        var cleanAp = apStr.trimmingCharacters(in: .whitespacesAndNewlines)
+                        if !cleanAp.hasPrefix("http://") && !cleanAp.hasPrefix("https://") {
+                            cleanAp = "https://" + cleanAp
+                        }
+                        self.cachedAccessPoint = cleanAp
+                        UserDefaults.standard.set(cleanAp, forKey: kExnessCachedAccessPoint)
+                        AppLogger.info("Exness: Access Point discovered -> \(cleanAp)")
+                        return cleanAp
+                    }
                 }
-                self.cachedAccessPoint = cleanAp
-                UserDefaults.standard.set(cleanAp, forKey: kExnessCachedAccessPoint)
-                AppLogger.info("Exness: Access Point discovered -> \(cleanAp)")
-                return cleanAp
-            } else {
-                throw NSError(domain: "ExnessService", code: 200, userInfo: [NSLocalizedDescriptionKey: "Invalid Access Point response format."])
             }
-        } else if http.statusCode == 400 {
-            let desc = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["description"] as? String ?? "Invalid parameters."
-            throw NSError(domain: "ExnessService", code: 400, userInfo: [NSLocalizedDescriptionKey: "Exness Gateway: \(desc)"])
-        } else if http.statusCode == 401 || http.statusCode == 403 {
-            let desc = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["description"] as? String ?? (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["error_message"] as? String ?? "Invalid API key or Ed25519 signature."
-            throw NSError(domain: "ExnessService", code: http.statusCode, userInfo: [NSLocalizedDescriptionKey: "Authentication failed (HTTP \(http.statusCode)): \(desc)"])
-        } else if http.statusCode == 429 {
-            throw NSError(domain: "ExnessService", code: 429, userInfo: [NSLocalizedDescriptionKey: "Exness rate limit exceeded. Please wait a moment."])
+        }
+        
+        AppLogger.info("Exness: Dynamic access point not returned; falling back to gateway \(apiHost)")
+        return apiHost
+    }
+    
+    // MARK: - Safe Data Parsers
+    
+    private func parseDecimal(_ val: Any?) -> Decimal? {
+        guard let v = val else { return nil }
+        if let d = v as? Decimal { return d }
+        if let num = v as? NSNumber {
+            return Decimal(string: num.stringValue) ?? Decimal(num.doubleValue)
+        }
+        if let str = v as? String {
+            let clean = str.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: ",", with: "")
+            return Decimal(string: clean)
+        }
+        if let d = v as? Double { return Decimal(d) }
+        if let i = v as? Int { return Decimal(i) }
+        if let i64 = v as? Int64 { return Decimal(i64) }
+        return nil
+    }
+    
+    private func parseDouble(_ val: Any?) -> Double? {
+        guard let v = val else { return nil }
+        if let d = v as? Double { return d }
+        if let num = v as? NSNumber { return num.doubleValue }
+        if let str = v as? String {
+            let clean = str.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: ",", with: "")
+            return Double(clean)
+        }
+        if let i = v as? Int { return Double(i) }
+        if let i64 = v as? Int64 { return Double(i64) }
+        return nil
+    }
+    
+    private func parseDate(_ val: Any?) -> Date? {
+        guard let v = val else { return nil }
+        if let d = v as? Date { return d }
+        if let ms = v as? Int64 {
+            return Date(timeIntervalSince1970: ms > 10_000_000_000 ? Double(ms) / 1000.0 : Double(ms))
+        }
+        if let sec = v as? Double {
+            return Date(timeIntervalSince1970: sec > 10_000_000_000 ? sec / 1000.0 : sec)
+        }
+        if let num = v as? NSNumber {
+            let d = num.doubleValue
+            return Date(timeIntervalSince1970: d > 10_000_000_000 ? d / 1000.0 : d)
+        }
+        if let str = v as? String {
+            let clean = str.trimmingCharacters(in: .whitespacesAndNewlines)
+            if let d = ISO8601DateFormatter().date(from: clean) {
+                return d
+            }
+            let df = DateFormatter()
+            df.locale = Locale(identifier: "en_US_POSIX")
+            df.timeZone = TimeZone(secondsFromGMT: 0)
+            let formats = [
+                "yyyy-MM-dd'T'HH:mm:ss.SSSZ",
+                "yyyy-MM-dd'T'HH:mm:ssZ",
+                "yyyy-MM-dd HH:mm:ss",
+                "yyyy.MM.dd HH:mm:ss",
+                "yyyy/MM/dd HH:mm:ss"
+            ]
+            for fmt in formats {
+                df.dateFormat = fmt
+                if let d = df.date(from: clean) { return d }
+            }
+            if let sec = Double(clean) {
+                return Date(timeIntervalSince1970: sec > 10_000_000_000 ? sec / 1000.0 : sec)
+            }
+        }
+        return nil
+    }
+    
+    private func parseBalanceResponse(_ json: [String: Any]) -> (balance: Decimal?, equity: Decimal?, currency: String?) {
+        var targetDict = json
+        if let dataDict = json["data"] as? [String: Any] {
+            targetDict = dataDict
+        } else if let accDict = json["account"] as? [String: Any] {
+            targetDict = accDict
+        }
+        
+        var foundCur: String? = nil
+        if let cur = targetDict["currency"] as? String ?? json["currency"] as? String {
+            let cleanCur = cur.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+            // Exness Cent account: USC is micro-lot account, treated strictly as USD without altering calculations
+            foundCur = (cleanCur == "USC" || cleanCur == "USCENT" || cleanCur == "CENT") ? "USD" : cleanCur
+        }
+        
+        let rawBal = targetDict["balance"] ?? targetDict["current_balance"] ?? targetDict["available_balance"] ?? json["balance"]
+        let foundBal = parseDecimal(rawBal)
+        
+        let rawEq = targetDict["equity"] ?? targetDict["current_equity"] ?? json["equity"] ?? rawBal
+        let foundEq = parseDecimal(rawEq)
+        
+        return (foundBal, foundEq, foundCur)
+    }
+    
+    @MainActor
+    public func syncAccountWithDataStore() {
+        guard !accountId.isEmpty else { return }
+        let journalAccId = "exness_\(accountId)"
+        let accountName = "Exness (\(accountId))"
+        let dataStore = TradeDataStore.shared
+        
+        if let existingIdx = dataStore.accounts.firstIndex(where: {
+            $0.id == journalAccId ||
+            $0.id == self.accountId ||
+            $0.name.contains(self.accountId)
+        }) {
+            var acc = dataStore.accounts[existingIdx]
+            acc.name = accountName
+            acc.broker = "Exness"
+            acc.currency = self.currency
+            acc.initialBalance = self.balance
+            acc.lastSyncAt = Date()
+            dataStore.accounts[existingIdx] = acc
+            dataStore.saveToDisk(immediate: true)
+            dataStore.objectWillChange.send()
+            AppLogger.info("Exness: Synced account \(acc.id) balance -> \(self.balance) \(self.currency)")
         } else {
-            let desc = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["description"] as? String ?? String(data: data, encoding: .utf8) ?? "HTTP \(http.statusCode)"
-            throw NSError(domain: "ExnessService", code: http.statusCode, userInfo: [NSLocalizedDescriptionKey: "Unable to resolve Access Point (HTTP \(http.statusCode)): \(desc)"])
+            let newAcc = Account(
+                id: journalAccId,
+                name: accountName,
+                broker: "Exness",
+                kind: .sync,
+                currency: self.currency,
+                initialBalance: self.balance,
+                profitCalcMethod: .fifo,
+                autoSync: true,
+                visibleInJournal: true
+            )
+            dataStore.accounts.append(newAcc)
+            dataStore.saveToDisk(immediate: true)
+            dataStore.objectWillChange.send()
+            AppLogger.info("Exness: Created new account \(journalAccId) balance -> \(self.balance) \(self.currency)")
         }
     }
     
@@ -342,150 +468,207 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
             return (false, "Please configure Exness Account ID.")
         }
         
-        let path = "/v1/accounts/\(accountId)/balance"
-        guard let url = URL(string: "https://api.exness-api.com\(path)") else {
-            return (false, "Invalid Exness API URL.")
+        let candidateHosts = [
+            "https://api.exness-api.com",
+            "https://api.exness.com"
+        ]
+        
+        var lastErrorMsg = "Unable to connect to Exness API."
+        
+        for host in candidateHosts {
+            let path = "/v1/accounts/\(accountId)/balance"
+            guard let url = URL(string: "\(host)\(path)") else { continue }
+            
+            var request = URLRequest(url: url)
+            request.httpMethod = "GET"
+            request.timeoutInterval = 15
+            
+            guard let headers = try? signRequest(method: "GET", path: path, bodyData: nil) else {
+                continue
+            }
+            headers.forEach { request.setValue($1, forHTTPHeaderField: $0) }
+            
+            guard let (data, response) = try? await URLSession.shared.data(for: request),
+                  let httpResponse = response as? HTTPURLResponse else {
+                continue
+            }
+            
+            if httpResponse.statusCode == 200 {
+                if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                    let parsed = parseBalanceResponse(json)
+                    
+                    await MainActor.run {
+                        if let c = parsed.currency {
+                            let cleanC = c.uppercased()
+                            self.currency = (cleanC == "USC" || cleanC == "USCENT" || cleanC == "CENT") ? "USD" : cleanC
+                        }
+                        if let b = parsed.balance {
+                            self.balance = b
+                        }
+                        if let eq = parsed.equity {
+                            self.equity = eq
+                        }
+                        self.isConnected = true
+                        self.syncAccountWithDataStore()
+                    }
+                }
+                
+                let formattedBal = Formatters.formatCurrency(self.balance, currency: self.currency)
+                return (true, "Exness connected • Balance: \(formattedBal)")
+            } else if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
+                let errorMsg = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["description"] as? String ?? (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["message"] as? String ?? "Invalid API key or Ed25519 signature."
+                lastErrorMsg = "Authentication failed (HTTP \(httpResponse.statusCode)): \(errorMsg)"
+            } else {
+                let errorMsg = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["description"] as? String ?? String(data: data, encoding: .utf8) ?? "HTTP \(httpResponse.statusCode)"
+                lastErrorMsg = "Connection error: \(errorMsg)"
+            }
         }
+        
+        await MainActor.run { self.isConnected = false }
+        return (false, lastErrorMsg)
+    }
+    
+    // MARK: - Exness Data Ingestion & Parser
+    
+    private func fetchEndpointData(path: String, host: String) async -> [[String: Any]] {
+        let cleanHost = host.hasSuffix("/") ? String(host.dropLast()) : host
+        let cleanPath = path.hasPrefix("/") ? path : "/\(path)"
+        guard let url = URL(string: "\(cleanHost)\(cleanPath)") else { return [] }
         
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.timeoutInterval = 15
         
-        let headers = try signRequest(method: "GET", path: path, bodyData: nil)
-        headers.forEach { request.setValue($1, forHTTPHeaderField: $0) }
-        
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw URLError(.badServerResponse)
-        }
-        
-        if httpResponse.statusCode == 200 {
-            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                if let cur = json["currency"] as? String {
-                    await MainActor.run { self.currency = cur }
-                }
-                if let bal = json["balance"] as? Double {
-                    await MainActor.run { self.balance = Decimal(bal) }
-                } else if let balNum = json["balance"] as? NSNumber {
-                    await MainActor.run { self.balance = Decimal(balNum.doubleValue) }
-                } else if let balStr = json["balance"] as? String, let d = Double(balStr) {
-                    await MainActor.run { self.balance = Decimal(d) }
-                }
-                if let eq = json["equity"] as? Double {
-                    await MainActor.run { self.equity = Decimal(eq) }
-                } else if let eqNum = json["equity"] as? NSNumber {
-                    await MainActor.run { self.equity = Decimal(eqNum.doubleValue) }
-                } else if let eqStr = json["equity"] as? String, let d = Double(eqStr) {
-                    await MainActor.run { self.equity = Decimal(d) }
-                }
-            }
-            await MainActor.run {
-                self.isConnected = true
-            }
-            return (true, "Connected to Exness API (Ed25519 signature verified)")
-        } else if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
-            await MainActor.run { self.isConnected = false }
-            let errorMsg = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["description"] as? String ?? (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["message"] as? String ?? "Invalid API key or Ed25519 signature."
-            return (false, "Authentication failed (HTTP \(httpResponse.statusCode)): \(errorMsg)")
-        } else {
-            await MainActor.run { self.isConnected = false }
-            let errorMsg = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["description"] as? String ?? String(data: data, encoding: .utf8) ?? "HTTP \(httpResponse.statusCode)"
-            return (false, "Connection error (HTTP \(httpResponse.statusCode)): \(errorMsg)")
-        }
-    }
-    
-    // MARK: - Exness Data Ingestion & Parser
-    
-    private func fetchEndpointData(path: String, accessPointHost: String) async -> [[String: Any]] {
-        guard let hostUrl = URL(string: accessPointHost),
-              let url = URL(string: path, relativeTo: hostUrl) else { return [] }
-        
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.timeoutInterval = 20
-        
-        guard let headers = try? signRequest(method: "GET", path: path, bodyData: nil) else { return [] }
+        guard let headers = try? signRequest(method: "GET", path: cleanPath, bodyData: nil) else { return [] }
         headers.forEach { request.setValue($1, forHTTPHeaderField: $0) }
         
         guard let (data, response) = try? await URLSession.shared.data(for: request),
-              let http = response as? HTTPURLResponse, http.statusCode == 200 else { return [] }
+              let http = response as? HTTPURLResponse else { return [] }
         
-        if let arr = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
-            return arr
+        if http.statusCode == 200 {
+            let records = extractRecords(from: data)
+            if !records.isEmpty {
+                AppLogger.info("Exness: Found \(records.count) records at \(cleanHost)\(cleanPath)")
+            }
+            return records
+        } else {
+            AppLogger.debug("Exness: Endpoint \(cleanHost)\(cleanPath) -> HTTP \(http.statusCode)")
+            return []
         }
-        if let dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-            if let arr = dict["orders"] as? [[String: Any]] { return arr }
-            if let arr = dict["data"] as? [[String: Any]] { return arr }
-            if let arr = dict["items"] as? [[String: Any]] { return arr }
-            if let arr = dict["trades"] as? [[String: Any]] { return arr }
-            if let arr = dict["positions"] as? [[String: Any]] { return arr }
-            if let arr = dict["history"] as? [[String: Any]] { return arr }
-        }
-        return []
     }
     
-    private func parseExnessRecordToExecutions(_ raw: [String: Any], journalAccId: String) -> [Execution] {
-        let ticket = raw["ticket"] ?? raw["id"] ?? raw["order_id"] ?? raw["deal_id"] ?? raw["position_id"]
-        guard let ticketVal = ticket else { return [] }
-        let ticketStr = String(describing: ticketVal)
+    private func extractRecords(from data: Data) -> [[String: Any]] {
+        guard let root = try? JSONSerialization.jsonObject(with: data) else { return [] }
         
-        let symbolRaw = (raw["symbol"] as? String) ?? (raw["instrument"] as? String) ?? (raw["symbolName"] as? String) ?? "UNKNOWN"
-        let cleanSymbol = symbolRaw.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let arr = root as? [[String: Any]] {
+            return arr
+        }
         
-        let volumeNum = (raw["volume"] as? Double) ?? (raw["lots"] as? Double) ?? (raw["quantity"] as? Double) ?? (raw["size"] as? Double) ?? (Double(String(describing: raw["volume"] ?? raw["lots"] ?? "0.01")) ?? 0.01)
-        let quantity = max(Decimal(0.01), Decimal(volumeNum))
+        guard let dict = root as? [String: Any] else { return [] }
         
-        let opStr = String(describing: raw["operation"] ?? raw["side"] ?? raw["type"] ?? raw["cmd"] ?? "BUY").uppercased()
-        let side: ExecutionSide = (opStr.contains("SELL") || opStr == "1") ? .sell : .buy
-        let exitSide: ExecutionSide = (side == .buy) ? .sell : .buy
+        var collected: [[String: Any]] = []
+        let candidateKeys = ["history", "deals", "trades", "orders", "positions", "items", "data", "records", "result", "rows"]
         
-        let openPriceVal = (raw["open_price"] as? Double) ?? (raw["openPrice"] as? Double) ?? (raw["price"] as? Double) ?? (raw["executionPrice"] as? Double) ?? 0.0
-        guard openPriceVal > 0 else { return [] }
+        for key in candidateKeys {
+            if let arr = dict[key] as? [[String: Any]] {
+                collected.append(contentsOf: arr)
+            } else if let subDict = dict[key] as? [String: Any] {
+                for subKey in candidateKeys {
+                    if let subArr = subDict[subKey] as? [[String: Any]] {
+                        collected.append(contentsOf: subArr)
+                    }
+                }
+            }
+        }
+        
+        return collected
+    }
+    
+    private func recordSignature(_ raw: [String: Any]) -> String {
+        let ticketKeys = ["ticket", "id", "order_id", "deal_id", "position_id", "trade_id", "ticket_id", "orderId", "dealId", "positionId"]
+        for k in ticketKeys {
+            if let v = raw[k] {
+                let str = String(describing: v).trimmingCharacters(in: .whitespacesAndNewlines)
+                if !str.isEmpty && str != "0" { return str }
+            }
+        }
+        let sym = String(describing: raw["symbol"] ?? "")
+        let openTime = String(describing: raw["open_time"] ?? raw["time_create"] ?? "")
+        let price = String(describing: raw["open_price"] ?? raw["price"] ?? "")
+        return "\(sym)|\(openTime)|\(price)"
+    }
+    
+    private func parseExnessRecord(_ raw: [String: Any], journalAccId: String) -> (executions: [Execution], directTrade: Trade?) {
+        let ticketKeys = ["ticket", "id", "order_id", "deal_id", "position_id", "trade_id", "ticket_id", "orderId", "dealId", "positionId"]
+        var ticketVal: Any? = nil
+        for k in ticketKeys {
+            if let v = raw[k] {
+                ticketVal = v
+                break
+            }
+        }
+        guard let tVal = ticketVal else { return ([], nil) }
+        let ticketStr = String(describing: tVal).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !ticketStr.isEmpty, ticketStr != "0" else { return ([], nil) }
+        
+        let symbolKeys = ["symbol", "instrument", "symbolName", "symbol_name", "code"]
+        var symbolVal: String? = nil
+        for k in symbolKeys {
+            if let s = raw[k] as? String, !s.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                symbolVal = s.trimmingCharacters(in: .whitespacesAndNewlines)
+                break
+            }
+        }
+        guard let cleanSymbol = symbolVal else { return ([], nil) }
+        
+        let volumeVal = parseDouble(raw["volume"] ?? raw["lots"] ?? raw["quantity"] ?? raw["size"] ?? raw["units"] ?? raw["amount"]) ?? 0.01
+        let quantity = max(Decimal(string: "0.0001") ?? 0.0001, Decimal(volumeVal))
+        
+        let opRaw = String(describing: raw["operation"] ?? raw["side"] ?? raw["type"] ?? raw["cmd"] ?? raw["direction"] ?? "BUY").uppercased()
+        let isSell = opRaw.contains("SELL") || opRaw == "1" || opRaw.contains("SHORT")
+        let side: ExecutionSide = isSell ? .sell : .buy
+        let exitSide: ExecutionSide = isSell ? .buy : .sell
+        
+        let rawOpenPrice = raw["open_price"] ?? raw["openPrice"] ?? raw["price"] ?? raw["executionPrice"] ?? raw["entry_price"] ?? raw["price_open"] ?? raw["open_rate"]
+        let openPriceVal = parseDouble(rawOpenPrice) ?? 0.0
+        guard openPriceVal > 0 else { return ([], nil) }
         let openPrice = Decimal(openPriceVal)
         
-        let openDate: Date = {
-            if let ms = raw["open_time"] as? Int64 ?? raw["openTime"] as? Int64 ?? raw["timestamp"] as? Int64 {
-                return Date(timeIntervalSince1970: Double(ms) > 10_000_000_000 ? Double(ms) / 1000.0 : Double(ms))
-            }
-            if let sec = raw["open_time"] as? Double ?? raw["openTime"] as? Double ?? raw["timestamp"] as? Double {
-                return Date(timeIntervalSince1970: sec > 10_000_000_000 ? sec / 1000.0 : sec)
-            }
-            if let str = raw["open_time"] as? String ?? raw["openTime"] as? String,
-               let d = ISO8601DateFormatter().date(from: str) {
-                return d
-            }
-            return Date()
-        }()
+        let rawClosePrice = raw["close_price"] ?? raw["closePrice"] ?? raw["exit_price"] ?? raw["exitPrice"] ?? raw["price_close"] ?? raw["close_rate"]
+        let closePriceVal = parseDouble(rawClosePrice)
         
-        let feeVal = abs((raw["commission"] as? Double) ?? (raw["fee"] as? Double) ?? 0.0)
+        let rawOpenDate = raw["open_time"] ?? raw["openTime"] ?? raw["time_create"] ?? raw["create_time"] ?? raw["time_setup"] ?? raw["timestamp"] ?? raw["time"] ?? raw["opened_at"]
+        let openDate = parseDate(rawOpenDate) ?? Date()
+        
+        let rawCloseDate = raw["close_time"] ?? raw["closeTime"] ?? raw["time_close"] ?? raw["time_done"] ?? raw["time_update"] ?? raw["closed_at"] ?? raw["timestamp"]
+        let closeDate = parseDate(rawCloseDate)
+        
+        let rawFee = raw["commission"] ?? raw["fee"] ?? raw["commission_amount"] ?? raw["fees"]
+        let feeVal = abs(parseDouble(rawFee) ?? 0.0)
         let fee = Decimal(feeVal)
         
-        let swapVal = (raw["swap"] as? Double) ?? (raw["rollover"] as? Double)
+        let rawSwap = raw["swap"] ?? raw["rollover"] ?? raw["swaps"]
+        let swapVal = parseDouble(rawSwap)
         let swap: Decimal? = swapVal != nil ? Decimal(swapVal!) : nil
         
-        let closePriceVal = (raw["close_price"] as? Double) ?? (raw["closePrice"] as? Double) ?? (raw["exit_price"] as? Double) ?? (raw["exitPrice"] as? Double)
-        let closeDate: Date? = {
-            if let ms = raw["close_time"] as? Int64 ?? raw["closeTime"] as? Int64 {
-                return Date(timeIntervalSince1970: Double(ms) > 10_000_000_000 ? Double(ms) / 1000.0 : Double(ms))
-            }
-            if let sec = raw["close_time"] as? Double ?? raw["closeTime"] as? Double {
-                return Date(timeIntervalSince1970: sec > 10_000_000_000 ? sec / 1000.0 : sec)
-            }
-            if let str = raw["close_time"] as? String ?? raw["closeTime"] as? String,
-               let d = ISO8601DateFormatter().date(from: str) {
-                return d
-            }
-            return nil
-        }()
+        let rawProfit = raw["profit"] ?? raw["net_profit"] ?? raw["pnl"] ?? raw["realized_pnl"]
+        let profitVal = parseDouble(rawProfit)
         
         let isMetals = cleanSymbol.hasPrefix("XAU") || cleanSymbol.hasPrefix("XAG") || cleanSymbol.hasPrefix("GOLD") || cleanSymbol.hasPrefix("SILVER")
-        let isCrypto = cleanSymbol.hasPrefix("BTC") || cleanSymbol.hasPrefix("ETH")
-        let assetClass = isMetals ? "commodity" : (isCrypto ? "crypto" : "forex")
+        let isCrypto = cleanSymbol.hasPrefix("BTC") || cleanSymbol.hasPrefix("ETH") || cleanSymbol.hasPrefix("SOL") || cleanSymbol.hasPrefix("XRP")
+        let isIndex = cleanSymbol.hasPrefix("US30") || cleanSymbol.hasPrefix("USTEC") || cleanSymbol.hasPrefix("NAS100") || cleanSymbol.hasPrefix("SPX") || cleanSymbol.hasPrefix("GER") || cleanSymbol.hasPrefix("UK100") || cleanSymbol.hasPrefix("WS30")
+        let assetClassStr = isMetals ? "commodity" : (isCrypto ? "crypto" : (isIndex ? "indices" : "forex"))
+        let assetClassEnum: AssetClass? = isMetals ? .commodity : (isCrypto ? .crypto : (isIndex ? .indices : .forex))
         
         var fills: [Execution] = []
+        var directTrade: Trade? = nil
         
-        if let cp = closePriceVal, cp > 0, let cDate = closeDate {
-            // Closed Trade: Create entry fill + exit fill
+        let isClosed = (closePriceVal != nil && closePriceVal! > 0) || closeDate != nil || (profitVal != nil && profitVal != 0)
+        
+        if isClosed {
+            let cp = closePriceVal ?? openPriceVal
+            let cDate = closeDate ?? openDate.addingTimeInterval(60)
+            
             let entryId = "exness_\(ticketStr)_in"
             let entryHash = "\(journalAccId)|\(cleanSymbol)|\(side.rawValue)|\(quantity)|\(openPriceVal)|\(Int64(openDate.timeIntervalSince1970 * 1000))"
             let entryFill = Execution(
@@ -498,7 +681,7 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
                 fee: fee / 2,
                 swap: nil,
                 executedAt: openDate,
-                assetClass: assetClass,
+                assetClass: assetClassStr,
                 source: "exness",
                 contentHash: entryHash
             )
@@ -515,14 +698,44 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
                 fee: fee / 2,
                 swap: swap,
                 executedAt: cDate,
-                assetClass: assetClass,
+                assetClass: assetClassStr,
                 source: "exness",
                 contentHash: exitHash
             )
             fills.append(entryFill)
             fills.append(exitFill)
+            
+            // Construct authoritative direct Trade using broker-reported profit
+            let tradeKey = "exness_\(ticketStr)"
+            let rawNetPnl: Decimal = profitVal != nil ? Decimal(profitVal!) : ((side == .buy ? Decimal(cp) - openPrice : openPrice - Decimal(cp)) * quantity * 1000 - fee + (swap ?? 0))
+            let grossPnl: Decimal = rawNetPnl + fee - (swap ?? 0)
+            
+            let tradeStatus: TradeStatus = rawNetPnl > 0 ? .win : (rawNetPnl < 0 ? .loss : .breakeven)
+            let durMs = Int64(max(0, cDate.timeIntervalSince(openDate) * 1000))
+            
+            directTrade = Trade(
+                key: tradeKey,
+                accountId: journalAccId,
+                symbol: cleanSymbol,
+                assetClass: assetClassEnum,
+                direction: side == .buy ? .long : .short,
+                status: tradeStatus,
+                openedAt: openDate,
+                closedAt: cDate,
+                quantity: quantity,
+                openQuantity: 0,
+                avgEntry: openPrice,
+                avgExit: Decimal(cp),
+                grossPnl: grossPnl,
+                fees: fee,
+                swap: swap,
+                netPnl: rawNetPnl,
+                executionCount: 2,
+                executionIds: [entryId, exitId],
+                durationMs: durMs
+            )
         } else {
-            // Open Position or Individual Fill
+            // Open Position
             let fillId = "exness_\(ticketStr)"
             let fillHash = "\(journalAccId)|\(cleanSymbol)|\(side.rawValue)|\(quantity)|\(openPriceVal)|\(Int64(openDate.timeIntervalSince1970 * 1000))"
             let fill = Execution(
@@ -535,17 +748,40 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
                 fee: fee,
                 swap: swap,
                 executedAt: openDate,
-                assetClass: assetClass,
+                assetClass: assetClassStr,
                 source: "exness",
                 contentHash: fillHash
             )
             fills.append(fill)
+            
+            let tradeKey = "exness_\(ticketStr)"
+            directTrade = Trade(
+                key: tradeKey,
+                accountId: journalAccId,
+                symbol: cleanSymbol,
+                assetClass: assetClassEnum,
+                direction: side == .buy ? .long : .short,
+                status: .open,
+                openedAt: openDate,
+                closedAt: nil,
+                quantity: quantity,
+                openQuantity: quantity,
+                avgEntry: openPrice,
+                avgExit: nil,
+                grossPnl: 0,
+                fees: fee,
+                swap: swap,
+                netPnl: 0,
+                executionCount: 1,
+                executionIds: [fillId],
+                durationMs: nil
+            )
         }
         
-        return fills
+        return (fills, directTrade)
     }
     
-    /// Synchronizes trades and order history from Exness REST API
+    /// Synchronizes trades, orders, positions, and history from Exness REST API
     public func syncTrades() async throws -> Int {
         guard !accountId.isEmpty else {
             throw NSError(domain: "ExnessService", code: 400, userInfo: [NSLocalizedDescriptionKey: "Please configure Exness Account ID."])
@@ -560,54 +796,115 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
             }
         }
         
-        let accessPointHost = try await resolveAccessPoint()
-        let journalAccId = "exness_\(accountId)"
-        let accountName = "Exness (\(accountId))"
+        // 1. Fetch live balance, equity, and normalized currency (USC -> USD)
+        _ = try? await testConnection()
         
-        // 1. Ensure linked trading account exists in TradeDataStore
+        let accessPointHost = await resolveAccessPoint()
+        let journalAccId = "exness_\(accountId)"
+        
+        await MainActor.run {
+            self.syncAccountWithDataStore()
+        }
+        
+        // 2. Discover candidate hosts (access point, gateway, fallback)
+        var hostsToTry: [String] = []
+        if !accessPointHost.isEmpty {
+            hostsToTry.append(accessPointHost)
+        }
+        if !hostsToTry.contains(self.apiHost) {
+            hostsToTry.append(self.apiHost)
+        }
+        if !hostsToTry.contains("https://api.exness-api.com") {
+            hostsToTry.append("https://api.exness-api.com")
+        }
+        if !hostsToTry.contains("https://api.exness.com") {
+            hostsToTry.append("https://api.exness.com")
+        }
+        
+        // 3. Candidate endpoints for history, deals, positions, and orders
+        let candidatePaths = [
+            // Standard Trading API History & Deals routes
+            "/v1/trading/accounts/\(accountId)/history",
+            "/v1/trading/accounts/\(accountId)/deals",
+            "/v1/trading/accounts/\(accountId)/trades",
+            "/v1/trading/accounts/\(accountId)/orders",
+            "/v1/trading/accounts/\(accountId)/positions",
+            
+            // Standard Gateway routes
+            "/v1/accounts/\(accountId)/history",
+            "/v1/accounts/\(accountId)/deals",
+            "/v1/accounts/\(accountId)/trades",
+            "/v1/accounts/\(accountId)/orders",
+            "/v1/accounts/\(accountId)/positions",
+            
+            // Query parameter variants
+            "/v1/trading/history?account_id=\(accountId)",
+            "/v1/trading/deals?account_id=\(accountId)",
+            "/v1/trading/trades?account_id=\(accountId)",
+            "/v1/trading/orders?account_id=\(accountId)",
+            "/v1/trading/positions?account_id=\(accountId)"
+        ]
+        
+        var allRawRecords: [[String: Any]] = []
+        var seenRecordSignatures = Set<String>()
+        
+        for host in hostsToTry {
+            for path in candidatePaths {
+                let records = await fetchEndpointData(path: path, host: host)
+                if !records.isEmpty {
+                    for rec in records {
+                        let sig = recordSignature(rec)
+                        if !seenRecordSignatures.contains(sig) {
+                            seenRecordSignatures.insert(sig)
+                            allRawRecords.append(rec)
+                        }
+                    }
+                }
+            }
+            if !allRawRecords.isEmpty {
+                break
+            }
+        }
+        
+        // 4. Parse Exness records to database Execution fills and direct Trade objects
+        var newExecutions: [Execution] = []
+        var directTrades: [Trade] = []
+        
+        for raw in allRawRecords {
+            let parsed = parseExnessRecord(raw, journalAccId: journalAccId)
+            newExecutions.append(contentsOf: parsed.executions)
+            if let dt = parsed.directTrade {
+                directTrades.append(dt)
+            }
+        }
+        
+        // 5. Ingest executions and direct trades into TradeDataStore
         await MainActor.run {
             let dataStore = TradeDataStore.shared
-            if let existingIdx = dataStore.accounts.firstIndex(where: { $0.id == journalAccId || $0.id == self.accountId }) {
-                var acc = dataStore.accounts[existingIdx]
-                acc.broker = "Exness"
-                acc.currency = self.currency
-                acc.lastSyncAt = Date()
-                dataStore.accounts[existingIdx] = acc
-            } else {
-                let newAcc = Account(
-                    id: journalAccId,
-                    name: accountName,
-                    broker: "Exness",
-                    kind: .sync,
-                    currency: self.currency,
-                    initialBalance: self.balance,
-                    profitCalcMethod: .fifo,
-                    autoSync: true,
-                    visibleInJournal: true
-                )
-                dataStore.accounts.append(newAcc)
-                dataStore.saveToDisk()
+            
+            // A. Import executions
+            if !newExecutions.isEmpty {
+                dataStore.importExecutions(accountId: journalAccId, newExecutions: newExecutions)
             }
-        }
-        
-        // 2. Fetch raw orders and positions across standard Exness routes
-        var rawOrders = await fetchEndpointData(path: "/v1/trading/accounts/\(accountId)/orders", accessPointHost: accessPointHost)
-        let rawPositions = await fetchEndpointData(path: "/v1/trading/accounts/\(accountId)/positions", accessPointHost: accessPointHost)
-        rawOrders.append(contentsOf: rawPositions)
-        
-        // 3. Parse Exness records to database Execution fills
-        var newExecutions: [Execution] = []
-        for raw in rawOrders {
-            let fills = parseExnessRecordToExecutions(raw, journalAccId: journalAccId)
-            newExecutions.append(contentsOf: fills)
-        }
-        
-        // 4. Ingest executions and trigger FIFO round-trip reconstruction
-        if !newExecutions.isEmpty {
-            await MainActor.run {
-                TradeDataStore.shared.importExecutions(accountId: journalAccId, newExecutions: newExecutions)
-                self.syncedTradesCount = newExecutions.count
+            
+            // B. Merge direct trades
+            if !directTrades.isEmpty {
+                var currentTrades = dataStore.trades
+                for t in directTrades {
+                    if let idx = currentTrades.firstIndex(where: { $0.key == t.key || $0.id == t.id }) {
+                        currentTrades[idx] = t
+                    } else {
+                        currentTrades.append(t)
+                    }
+                }
+                dataStore.trades = currentTrades
+                dataStore.deduplicateTrades()
+                dataStore.invalidatePerformanceCaches()
+                dataStore.saveToDisk(immediate: true)
+                dataStore.objectWillChange.send()
             }
+            
+            self.syncedTradesCount = directTrades.count > 0 ? directTrades.count : (newExecutions.count / 2)
         }
         
         let now = Date()
@@ -616,6 +913,7 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
             self.lastSyncDate = now
             self.isConnected = true
         }
-        return newExecutions.count
+        
+        return self.syncedTradesCount
     }
 }

@@ -301,14 +301,20 @@ public struct ConnectionsSettingsView: View {
             return
         }
         isTestingExness = true
-        exnessStatus = "Pinging Exness API..."
+        exnessStatus = "Connecting & syncing Exness..."
         
         Task {
             do {
                 let res = try await exness.testConnection()
+                let syncedCount = (try? await exness.syncTrades()) ?? 0
                 await MainActor.run {
                     self.isTestingExness = false
-                    self.exnessStatus = res.message
+                    if syncedCount > 0 {
+                        self.exnessStatus = "\(res.message) • \(syncedCount) trades synced"
+                    } else {
+                        self.exnessStatus = res.message
+                    }
+                    self.dataStore.objectWillChange.send()
                 }
             } catch {
                 await MainActor.run {

@@ -29,15 +29,15 @@ public final class ExnessSyncProvider: SyncProvider {
                 providerId: id,
                 providerName: displayName,
                 success: false,
-                message: "Tài khoản Exness chưa được cấu hình.",
+                message: "Exness account is not configured.",
                 error: "Not configured"
             )
         }
         
-        progressHandler(SyncProgressUpdate(providerId: id, providerName: displayName, message: "Đang kết nối Exness API..."))
+        progressHandler(SyncProgressUpdate(providerId: id, providerName: displayName, message: "Connecting to Exness API..."))
         
         let count = try await ExnessService.shared.syncTrades()
-        let msg = "Đã đồng bộ \(count) giao dịch từ Exness."
+        let msg = "Synced \(count) trades from Exness."
         
         progressHandler(SyncProgressUpdate(providerId: id, providerName: displayName, message: msg, isCompleted: true))
         
