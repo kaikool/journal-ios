@@ -657,8 +657,7 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
         let isMetals = cleanSymbol.hasPrefix("XAU") || cleanSymbol.hasPrefix("XAG") || cleanSymbol.hasPrefix("GOLD") || cleanSymbol.hasPrefix("SILVER")
         let isCrypto = cleanSymbol.hasPrefix("BTC") || cleanSymbol.hasPrefix("ETH") || cleanSymbol.hasPrefix("SOL") || cleanSymbol.hasPrefix("XRP")
         let isIndex = cleanSymbol.hasPrefix("US30") || cleanSymbol.hasPrefix("USTEC") || cleanSymbol.hasPrefix("NAS100") || cleanSymbol.hasPrefix("SPX") || cleanSymbol.hasPrefix("GER") || cleanSymbol.hasPrefix("UK100") || cleanSymbol.hasPrefix("WS30")
-        let assetClassStr = isMetals ? "commodity" : (isCrypto ? "crypto" : (isIndex ? "indices" : "forex"))
-        let assetClassEnum: AssetClass? = isMetals ? .commodity : (isCrypto ? .crypto : (isIndex ? .indices : .forex))
+        let assetClass: AssetClass = isMetals ? "commodity" : (isCrypto ? "crypto" : (isIndex ? "indices" : "forex"))
         
         var fills: [Execution] = []
         var directTrade: Trade? = nil
@@ -681,7 +680,7 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
                 fee: fee / 2,
                 swap: nil,
                 executedAt: openDate,
-                assetClass: assetClassStr,
+                assetClass: assetClass,
                 source: "exness",
                 contentHash: entryHash
             )
@@ -698,7 +697,7 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
                 fee: fee / 2,
                 swap: swap,
                 executedAt: cDate,
-                assetClass: assetClassStr,
+                assetClass: assetClass,
                 source: "exness",
                 contentHash: exitHash
             )
@@ -717,7 +716,7 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
                 key: tradeKey,
                 accountId: journalAccId,
                 symbol: cleanSymbol,
-                assetClass: assetClassEnum,
+                assetClass: assetClass,
                 direction: side == .buy ? .long : .short,
                 status: tradeStatus,
                 openedAt: openDate,
@@ -748,7 +747,7 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
                 fee: fee,
                 swap: swap,
                 executedAt: openDate,
-                assetClass: assetClassStr,
+                assetClass: assetClass,
                 source: "exness",
                 contentHash: fillHash
             )
@@ -759,7 +758,7 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
                 key: tradeKey,
                 accountId: journalAccId,
                 symbol: cleanSymbol,
-                assetClass: assetClassEnum,
+                assetClass: assetClass,
                 direction: side == .buy ? .long : .short,
                 status: .open,
                 openedAt: openDate,
@@ -882,12 +881,7 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
         await MainActor.run {
             let dataStore = TradeDataStore.shared
             
-            // A. Import executions
-            if !newExecutions.isEmpty {
-                dataStore.importExecutions(accountId: journalAccId, newExecutions: newExecutions)
-            }
-            
-            // B. Merge direct trades
+            // A. Merge direct trades first so authoritative broker trades are in place
             if !directTrades.isEmpty {
                 var currentTrades = dataStore.trades
                 for t in directTrades {
@@ -900,6 +894,12 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
                 dataStore.trades = currentTrades
                 dataStore.deduplicateTrades()
                 dataStore.invalidatePerformanceCaches()
+            }
+            
+            // B. Import executions for execution history audit log
+            if !newExecutions.isEmpty {
+                dataStore.importExecutions(accountId: journalAccId, newExecutions: newExecutions)
+            } else {
                 dataStore.saveToDisk(immediate: true)
                 dataStore.objectWillChange.send()
             }
