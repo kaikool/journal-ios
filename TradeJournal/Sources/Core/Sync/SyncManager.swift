@@ -111,7 +111,7 @@ public final class SyncManager: ObservableObject {
             // 2. Auto-sync cTrader if configured
             if CTraderService.shared.isConfigured {
                 let res = try? await CTraderService.shared.syncWithTradeStore(dataStore: TradeDataStore.shared)
-                let cCount = (res?.dealsImported ?? 0) + (res?.positionsUpdated ?? 0)
+                let cCount = (res?.dealsImported ?? 0) + (res?.tradesRebuilt ?? 0)
                 if cCount > 0 { brokerUpdatesCount += cCount }
             }
             

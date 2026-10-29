@@ -327,6 +327,13 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
     
     // MARK: - Safe Data Parsers
     
+    private func firstValue(in dict: [String: Any], keys: [String]) -> Any? {
+        for k in keys {
+            if let v = dict[k] { return v }
+        }
+        return nil
+    }
+
     private func parseDecimal(_ val: Any?) -> Decimal? {
         guard let v = val else { return nil }
         if let d = v as? Decimal { return d }
@@ -415,10 +422,12 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
             foundCur = (cleanCur == "USC" || cleanCur == "USCENT" || cleanCur == "CENT") ? "USD" : cleanCur
         }
         
-        let rawBal = targetDict["balance"] ?? targetDict["current_balance"] ?? targetDict["available_balance"] ?? targetDict["amount"] ?? targetDict["funds"] ?? targetDict["cash"] ?? targetDict["margin_free"] ?? json["balance"]
+        let balanceKeys = ["balance", "current_balance", "available_balance", "amount", "funds", "cash", "margin_free"]
+        let rawBal = firstValue(in: targetDict, keys: balanceKeys) ?? json["balance"]
         let foundBal = parseDecimal(rawBal)
         
-        let rawEq = targetDict["equity"] ?? targetDict["current_equity"] ?? targetDict["net_equity"] ?? json["equity"] ?? rawBal
+        let equityKeys = ["equity", "current_equity", "net_equity"]
+        let rawEq = firstValue(in: targetDict, keys: equityKeys) ?? json["equity"] ?? rawBal
         let foundEq = parseDecimal(rawEq)
         
         return (foundBal, foundEq, foundCur)
@@ -675,18 +684,20 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
         }
         guard let cleanSymbol = symbolVal else { return ([], nil) }
         
-        let volumeVal = parseDouble(raw["volume"] ?? raw["lots"] ?? raw["quantity"] ?? raw["size"] ?? raw["units"] ?? raw["amount"]) ?? 0.01
+        let rawVolume = firstValue(in: raw, keys: ["volume", "lots", "quantity", "size", "units", "amount"])
+        let volumeVal = parseDouble(rawVolume) ?? 0.01
         let quantity = max(Decimal(string: "0.0001") ?? 0.0001, Decimal(volumeVal))
         
-        let opRaw = String(describing: raw["operation"] ?? raw["side"] ?? raw["type"] ?? raw["cmd"] ?? raw["direction"] ?? "BUY").uppercased()
+        let rawOp = firstValue(in: raw, keys: ["operation", "side", "type", "cmd", "direction"])
+        let opRaw = String(describing: rawOp ?? "BUY").uppercased()
         let isSell = opRaw.contains("SELL") || opRaw == "1" || opRaw.contains("SHORT")
         let side: ExecutionSide = isSell ? .sell : .buy
         let exitSide: ExecutionSide = isSell ? .buy : .sell
         
-        let rawOpenPrice = raw["open_price"] ?? raw["openPrice"] ?? raw["price"] ?? raw["executionPrice"] ?? raw["entry_price"] ?? raw["price_open"] ?? raw["open_rate"] ?? raw["rate"] ?? raw["deal_price"] ?? raw["fill_price"]
+        let rawOpenPrice = firstValue(in: raw, keys: ["open_price", "openPrice", "price", "executionPrice", "entry_price", "price_open", "open_rate", "rate", "deal_price", "fill_price"])
         var openPriceVal = parseDouble(rawOpenPrice) ?? 0.0
         
-        let rawClosePrice = raw["close_price"] ?? raw["closePrice"] ?? raw["exit_price"] ?? raw["exitPrice"] ?? raw["price_close"] ?? raw["close_rate"] ?? raw["exit_rate"]
+        let rawClosePrice = firstValue(in: raw, keys: ["close_price", "closePrice", "exit_price", "exitPrice", "price_close", "close_rate", "exit_rate"])
         let closePriceVal = parseDouble(rawClosePrice)
         
         if openPriceVal == 0 && (closePriceVal ?? 0) > 0 {
@@ -694,23 +705,22 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
         }
         guard openPriceVal > 0 else { return ([], nil) }
         let openPrice = Decimal(openPriceVal)
-        let closePriceVal = parseDouble(rawClosePrice)
         
-        let rawOpenDate = raw["open_time"] ?? raw["openTime"] ?? raw["time_create"] ?? raw["create_time"] ?? raw["time_setup"] ?? raw["timestamp"] ?? raw["time"] ?? raw["opened_at"]
+        let rawOpenDate = firstValue(in: raw, keys: ["open_time", "openTime", "time_create", "create_time", "time_setup", "timestamp", "time", "opened_at"])
         let openDate = parseDate(rawOpenDate) ?? Date()
         
-        let rawCloseDate = raw["close_time"] ?? raw["closeTime"] ?? raw["time_close"] ?? raw["time_done"] ?? raw["time_update"] ?? raw["closed_at"] ?? raw["timestamp"]
+        let rawCloseDate = firstValue(in: raw, keys: ["close_time", "closeTime", "time_close", "time_done", "time_update", "closed_at", "timestamp"])
         let closeDate = parseDate(rawCloseDate)
         
-        let rawFee = raw["commission"] ?? raw["fee"] ?? raw["commission_amount"] ?? raw["fees"]
+        let rawFee = firstValue(in: raw, keys: ["commission", "fee", "commission_amount", "fees"])
         let feeVal = abs(parseDouble(rawFee) ?? 0.0)
         let fee = Decimal(feeVal)
         
-        let rawSwap = raw["swap"] ?? raw["rollover"] ?? raw["swaps"]
+        let rawSwap = firstValue(in: raw, keys: ["swap", "rollover", "swaps"])
         let swapVal = parseDouble(rawSwap)
         let swap: Decimal? = swapVal != nil ? Decimal(swapVal!) : nil
         
-        let rawProfit = raw["profit"] ?? raw["net_profit"] ?? raw["pnl"] ?? raw["realized_pnl"]
+        let rawProfit = firstValue(in: raw, keys: ["profit", "net_profit", "pnl", "realized_pnl"])
         let profitVal = parseDouble(rawProfit)
         
         let isMetals = cleanSymbol.hasPrefix("XAU") || cleanSymbol.hasPrefix("XAG") || cleanSymbol.hasPrefix("GOLD") || cleanSymbol.hasPrefix("SILVER")
