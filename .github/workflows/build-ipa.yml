@@ -58,6 +58,41 @@ jobs:
           echo "==> Installing XcodeGen via Homebrew..."
           brew install xcodegen
 
+      - name: Inject Production Secrets from GitHub Actions
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GROQ_BACKUP_KEY: ${{ secrets.GROQ_BACKUP_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          OANDA_API_KEY: ${{ secrets.OANDA_API_KEY }}
+          OANDA_ACCOUNT_ID: ${{ secrets.OANDA_ACCOUNT_ID }}
+          EXNESS_ACCOUNT_ID: ${{ secrets.EXNESS_ACCOUNT_ID }}
+          EXNESS_API_KEY: ${{ secrets.EXNESS_API_KEY }}
+          EXNESS_PRIVATE_KEY: ${{ secrets.EXNESS_PRIVATE_KEY }}
+        run: |
+          mkdir -p TradeJournal/Resources
+          python3 -c "
+          import os, plistlib
+          data = {
+              'GEMINI_API_KEY': os.environ.get('GEMINI_API_KEY', '').strip(),
+              'GROQ_API_KEY': os.environ.get('GROQ_API_KEY', '').strip(),
+              'GROQ_BACKUP_KEY': os.environ.get('GROQ_BACKUP_KEY', '').strip(),
+              'OPENROUTER_API_KEY': os.environ.get('OPENROUTER_API_KEY', '').strip(),
+              'SUPABASE_URL': os.environ.get('SUPABASE_URL', '').strip(),
+              'SUPABASE_ANON_KEY': os.environ.get('SUPABASE_ANON_KEY', '').strip(),
+              'OANDA_API_KEY': os.environ.get('OANDA_API_KEY', '').strip(),
+              'OANDA_ACCOUNT_ID': os.environ.get('OANDA_ACCOUNT_ID', '').strip(),
+              'EXNESS_ACCOUNT_ID': os.environ.get('EXNESS_ACCOUNT_ID', '').strip(),
+              'EXNESS_API_KEY': os.environ.get('EXNESS_API_KEY', '').strip(),
+              'EXNESS_PRIVATE_KEY': os.environ.get('EXNESS_PRIVATE_KEY', '').strip()
+          }
+          with open('TradeJournal/Resources/AppSecrets.plist', 'wb') as f:
+              plistlib.dump(data, f)
+          print('==> AppSecrets.plist generated successfully for target bundle')
+          "
+
       - name: Generate Xcode Project
         run: |
           echo "==> Generating TradeJournal.xcodeproj from project.yml..."

@@ -59,5 +59,17 @@ public enum AppSecretsLoader {
                 }
             }
         }
+        
+        // Bootstrap non-secret identifiers if not set
+        if let oandaAcc = loadSecret(named: "OANDA_ACCOUNT_ID"), !oandaAcc.isEmpty {
+            if UserDefaults.standard.string(forKey: "oanda_account_id") == nil {
+                UserDefaults.standard.set(oandaAcc, forKey: "oanda_account_id")
+            }
+        }
+        if let exnAcc = loadSecret(named: "EXNESS_ACCOUNT_ID"), !exnAcc.isEmpty {
+            if UserDefaults.standard.string(forKey: "exness_account_id") == nil {
+                UserDefaults.standard.set(exnAcc, forKey: "exness_account_id")
+            }
+        }
     }
 }

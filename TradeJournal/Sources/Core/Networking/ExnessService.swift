@@ -41,11 +41,16 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
     public func loadSettings() {
         let ud = UserDefaults.standard
         self.apiHost = ud.string(forKey: kExnessApiHost) ?? "https://api.exness.com"
-        self.accountId = ud.string(forKey: kExnessAccountId) ?? ""
-        self.apiKey = KeychainManager.get(forKey: kExnessApiKey) ?? ""
+        var acc = ud.string(forKey: kExnessAccountId) ?? ""
+        if acc.isEmpty {
+            acc = AppSecretsLoader.loadSecret(named: "EXNESS_ACCOUNT_ID") ?? ""
+            if !acc.isEmpty { ud.set(acc, forKey: kExnessAccountId) }
+        }
+        self.accountId = acc
+        self.apiKey = KeychainManager.get(forKey: kExnessApiKey) ?? AppSecretsLoader.loadSecret(named: "EXNESS_API_KEY") ?? ""
         self.lastSyncDate = ud.object(forKey: kExnessLastSync) as? Date
         
-        let hasPrivateKey = KeychainManager.get(forKey: kExnessPrivateKey) != nil
+        let hasPrivateKey = KeychainManager.get(forKey: kExnessPrivateKey) != nil || (AppSecretsLoader.loadSecret(named: "EXNESS_PRIVATE_KEY") != nil)
         self.isConnected = !accountId.isEmpty && !apiKey.isEmpty && hasPrivateKey
     }
     
