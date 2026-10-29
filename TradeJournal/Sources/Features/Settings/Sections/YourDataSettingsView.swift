@@ -12,6 +12,11 @@ public struct YourDataSettingsView: View {
     @State private var isWipingSupabase: Bool = false
     @State private var supabaseSyncStatus: String? = nil
     
+    @State private var supabaseUrl: String = SupabaseService.shared.supabaseUrl
+    @State private var supabaseAnonKey: String = SupabaseService.shared.supabaseAnonKey
+    @State private var showSupabaseConfig: Bool = false
+    @State private var configSaveStatus: String? = nil
+    
     public init() {}
     
     public var body: some View {
@@ -23,14 +28,70 @@ public struct YourDataSettingsView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Supabase Cloud Storage")
                                 .font(AppTypography.headline)
-                            Text("Trades, accounts, and journals automatically sync to your cloud database.")
+                            Text("Trades, accounts, and journals automatically sync to your private cloud database.")
                                 .font(AppTypography.caption)
                                 .foregroundColor(AppColors.secondaryText)
                         }
                         Spacer()
-                        Text(SupabaseService.shared.isConfigured ? "Connected" : "Disconnected")
+                        Text(SupabaseService.shared.isConfigured ? "Connected" : "Not configured")
                             .font(AppTypography.captionBold)
                             .foregroundColor(SupabaseService.shared.isConfigured ? AppColors.profit : AppColors.secondaryText)
+                    }
+                    
+                    DisclosureGroup(isExpanded: $showSupabaseConfig) {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Hardware-backed credentials (AES-256 Keychain). Leave empty to use environment variables.")
+                                .font(AppTypography.caption)
+                                .foregroundColor(AppColors.secondaryText)
+                                .padding(.top, 4)
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Project URL")
+                                    .font(AppTypography.captionBold)
+                                    .foregroundColor(AppColors.secondaryText)
+                                TextField("https://your-project.supabase.co", text: $supabaseUrl)
+                                    .textFieldStyle(.roundedBorder)
+                                    .textInputAutocapitalization(.never)
+                                    .autocorrectionDisabled()
+                            }
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Anon Public Key")
+                                    .font(AppTypography.captionBold)
+                                    .foregroundColor(AppColors.secondaryText)
+                                SecureField("Enter Supabase Anon Key", text: $supabaseAnonKey)
+                                    .textFieldStyle(.roundedBorder)
+                                    .textInputAutocapitalization(.never)
+                                    .autocorrectionDisabled()
+                            }
+                            
+                            HStack(spacing: 12) {
+                                AppButton("Save Credentials", icon: "checkmark.circle", style: .primary, size: .compact) {
+                                    saveSupabaseConfig()
+                                }
+                                
+                                if SupabaseService.shared.isConfigured {
+                                    AppButton("Disconnect", icon: "xmark.circle", style: .destructive, size: .compact) {
+                                        disconnectSupabase()
+                                    }
+                                }
+                            }
+                            
+                            if let saveStatus = configSaveStatus {
+                                Text(saveStatus)
+                                    .font(AppTypography.caption)
+                                    .foregroundColor(saveStatus.contains("error") ? AppColors.loss : AppColors.profit)
+                            }
+                        }
+                        .padding(.vertical, 8)
+                    } label: {
+                        HStack {
+                            Image(systemName: "key.fill")
+                                .foregroundColor(AppColors.brand)
+                            Text("Database Credentials & Connection")
+                                .font(AppTypography.subheadlineBold)
+                                .foregroundColor(AppColors.primaryText)
+                        }
                     }
                     
                     Divider()
@@ -39,11 +100,12 @@ public struct YourDataSettingsView: View {
                         AppButton("Sync now", icon: "arrow.triangle.2.circlepath", style: .primary, size: .compact, fullWidth: true, isLoading: dataStore.isSyncing) {
                             syncSupabase()
                         }
+                        .disabled(!SupabaseService.shared.isConfigured)
                         
                         AppButton("Wipe cloud data", icon: "trash", style: .destructive, size: .compact, fullWidth: true, isLoading: isWipingSupabase) {
                             showWipeConfirmation = true
                         }
-                        .disabled(isWipingSupabase || dataStore.isSyncing)
+                        .disabled(isWipingSupabase || dataStore.isSyncing || !SupabaseService.shared.isConfigured)
                     }
                     
                     if let status = supabaseSyncStatus {
@@ -110,6 +172,21 @@ public struct YourDataSettingsView: View {
     }
     
     // MARK: - Actions
+    
+    private func saveSupabaseConfig() {
+        let cleanUrl = supabaseUrl.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanKey = supabaseAnonKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        SupabaseService.shared.configure(url: cleanUrl, anonKey: cleanKey)
+        configSaveStatus = "Supabase configuration saved securely in Apple Keychain."
+    }
+    
+    private func disconnectSupabase() {
+        supabaseUrl = ""
+        supabaseAnonKey = ""
+        SupabaseService.shared.configure(url: "", anonKey: "")
+        configSaveStatus = "Disconnected from Supabase."
+    }
     
     private func syncSupabase() {
         Task {

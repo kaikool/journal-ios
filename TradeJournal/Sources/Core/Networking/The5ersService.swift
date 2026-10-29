@@ -121,7 +121,7 @@ public final class The5ersService: ObservableObject {
     
     public var isConfigured: Bool {
         if !mcpToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return true }
-        if let stored = UserDefaults.standard.string(forKey: "the5ers_mcp_token"),
+        if let stored = KeychainManager.get(forKey: "the5ers_mcp_token") ?? UserDefaults.standard.string(forKey: "the5ers_mcp_token"),
            !stored.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return true
         }
@@ -136,7 +136,14 @@ public final class The5ersService: ObservableObject {
     }
     
     private init() {
-        self.mcpToken = UserDefaults.standard.string(forKey: "the5ers_mcp_token") ?? ""
+        let kcToken = KeychainManager.get(forKey: "the5ers_mcp_token") ?? ""
+        let udToken = UserDefaults.standard.string(forKey: "the5ers_mcp_token") ?? ""
+        let resolved = kcToken.isEmpty ? udToken : kcToken
+        if !udToken.isEmpty && kcToken.isEmpty {
+            KeychainManager.set(udToken, forKey: "the5ers_mcp_token")
+            UserDefaults.standard.removeObject(forKey: "the5ers_mcp_token")
+        }
+        self.mcpToken = resolved
         self.isConnected = !mcpToken.isEmpty
     }
     
@@ -150,7 +157,8 @@ public final class The5ersService: ObservableObject {
         }
         self.mcpToken = clean
         self.isConnected = !self.mcpToken.isEmpty
-        UserDefaults.standard.set(self.mcpToken, forKey: "the5ers_mcp_token")
+        KeychainManager.set(self.mcpToken, forKey: "the5ers_mcp_token")
+        UserDefaults.standard.removeObject(forKey: "the5ers_mcp_token")
     }
     
     public func disconnect() {
@@ -160,6 +168,8 @@ public final class The5ersService: ObservableObject {
         self.isSessionInitialized = false
         self.cachedToolSchemas.removeAll()
         self.discoveredToolNames.removeAll()
+        KeychainManager.delete(forKey: "the5ers_mcp_token")
+        KeychainManager.delete(forKey: "the5ers_mcp_refresh_token")
         UserDefaults.standard.removeObject(forKey: "the5ers_mcp_token")
         UserDefaults.standard.removeObject(forKey: "the5ers_mcp_refresh_token")
         UserDefaults.standard.removeObject(forKey: "the5ers_mcp_client_id")

@@ -51,9 +51,26 @@ internal struct PostgrestErrorPayload: Decodable {
 public final class SupabaseService {
     public static let shared = SupabaseService()
     
-    // Default bundled Supabase configuration for out-of-the-box cloud backup
-    public static let defaultSupabaseUrl = "https://ojggrdfhkqxsvfahqkru.supabase.co"
-    public static let defaultSupabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9qZ2dyZGZoa3F4c3ZmYWhxa3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE3Mjk1NzEsImV4cCI6MjEwNzMwNTU3MX0.83OZF3I2zHzo0Y1P0EeDprjo2Kwjf31aCJjVSKkWpcY"
+    // Dynamic Supabase configuration loaded securely from Keychain, Environment, or Info.plist
+    public static var defaultSupabaseUrl: String {
+        if let envUrl = ProcessInfo.processInfo.environment["SUPABASE_URL"], !envUrl.isEmpty {
+            return envUrl
+        }
+        if let bundleUrl = Bundle.main.infoDictionary?["SUPABASE_URL"] as? String, !bundleUrl.isEmpty {
+            return bundleUrl
+        }
+        return ""
+    }
+    
+    public static var defaultSupabaseAnonKey: String {
+        if let envKey = ProcessInfo.processInfo.environment["SUPABASE_ANON_KEY"], !envKey.isEmpty {
+            return envKey
+        }
+        if let bundleKey = Bundle.main.infoDictionary?["SUPABASE_ANON_KEY"] as? String, !bundleKey.isEmpty {
+            return bundleKey
+        }
+        return ""
+    }
     
     public var supabaseUrl: String = ""
     public var supabaseAnonKey: String = ""
@@ -67,13 +84,32 @@ public final class SupabaseService {
     }
     
     private init() {
-        let savedUrl = UserDefaults.standard.string(forKey: "supabase_url") ?? ""
-        let savedKey = UserDefaults.standard.string(forKey: "supabase_anon_key") ?? ""
+        // Load credentials with preference for hardware-encrypted Keychain
+        let kcUrl = KeychainManager.get(forKey: "supabase_url") ?? ""
+        let kcKey = KeychainManager.get(forKey: "supabase_anon_key") ?? ""
+        let kcToken = KeychainManager.get(forKey: "supabase_access_token")
         
-        // Fall back to default bundled credentials if not customized by user
+        let savedUrl = kcUrl.isEmpty ? (UserDefaults.standard.string(forKey: "supabase_url") ?? "") : kcUrl
+        let savedKey = kcKey.isEmpty ? (UserDefaults.standard.string(forKey: "supabase_anon_key") ?? "") : kcKey
+        let savedToken = kcToken ?? UserDefaults.standard.string(forKey: "supabase_access_token")
+        
+        // Migrate legacy plain text to Keychain and remove from unencrypted UserDefaults
+        if !savedUrl.isEmpty && kcUrl.isEmpty {
+            KeychainManager.set(savedUrl, forKey: "supabase_url")
+            UserDefaults.standard.removeObject(forKey: "supabase_url")
+        }
+        if !savedKey.isEmpty && kcKey.isEmpty {
+            KeychainManager.set(savedKey, forKey: "supabase_anon_key")
+            UserDefaults.standard.removeObject(forKey: "supabase_anon_key")
+        }
+        if let t = savedToken, kcToken == nil {
+            KeychainManager.set(t, forKey: "supabase_access_token")
+            UserDefaults.standard.removeObject(forKey: "supabase_access_token")
+        }
+        
         self.supabaseUrl = savedUrl.isEmpty ? Self.defaultSupabaseUrl : savedUrl
         self.supabaseAnonKey = savedKey.isEmpty ? Self.defaultSupabaseAnonKey : savedKey
-        self.accessToken = UserDefaults.standard.string(forKey: "supabase_access_token")
+        self.accessToken = savedToken
     }
     
     public func configure(url: String, anonKey: String, token: String? = nil) {
@@ -87,13 +123,29 @@ public final class SupabaseService {
         self.supabaseAnonKey = cleanKey
         self.accessToken = token?.trimmingCharacters(in: .whitespacesAndNewlines)
         
-        UserDefaults.standard.set(self.supabaseUrl, forKey: "supabase_url")
-        UserDefaults.standard.set(self.supabaseAnonKey, forKey: "supabase_anon_key")
-        if let t = self.accessToken, !t.isEmpty {
-            UserDefaults.standard.set(t, forKey: "supabase_access_token")
+        // Save securely to Keychain
+        if !cleanUrl.isEmpty {
+            KeychainManager.set(cleanUrl, forKey: "supabase_url")
         } else {
-            UserDefaults.standard.removeObject(forKey: "supabase_access_token")
+            KeychainManager.delete(forKey: "supabase_url")
         }
+        
+        if !cleanKey.isEmpty {
+            KeychainManager.set(cleanKey, forKey: "supabase_anon_key")
+        } else {
+            KeychainManager.delete(forKey: "supabase_anon_key")
+        }
+        
+        if let t = self.accessToken, !t.isEmpty {
+            KeychainManager.set(t, forKey: "supabase_access_token")
+        } else {
+            KeychainManager.delete(forKey: "supabase_access_token")
+        }
+        
+        // Remove from unencrypted UserDefaults
+        UserDefaults.standard.removeObject(forKey: "supabase_url")
+        UserDefaults.standard.removeObject(forKey: "supabase_anon_key")
+        UserDefaults.standard.removeObject(forKey: "supabase_access_token")
     }
     
     internal func makeRequest(endpoint: String, method: String = "GET", body: Data? = nil, preferMerge: Bool = false) throws -> URLRequest {
@@ -385,12 +437,14 @@ public final class SupabaseService {
         }
         
         self.accessToken = token
-        UserDefaults.standard.set(token, forKey: "supabase_access_token")
+        KeychainManager.set(token, forKey: "supabase_access_token")
+        UserDefaults.standard.removeObject(forKey: "supabase_access_token")
         return token
     }
     
     public func logout() {
         self.accessToken = nil
+        KeychainManager.delete(forKey: "supabase_access_token")
         UserDefaults.standard.removeObject(forKey: "supabase_access_token")
     }
     
@@ -424,7 +478,8 @@ public final class SupabaseService {
         }
         
         self.accessToken = token
-        UserDefaults.standard.set(token, forKey: "supabase_access_token")
+        KeychainManager.set(token, forKey: "supabase_access_token")
+        UserDefaults.standard.removeObject(forKey: "supabase_access_token")
         return token
     }
 }

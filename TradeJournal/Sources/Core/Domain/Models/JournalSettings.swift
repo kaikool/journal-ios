@@ -167,10 +167,11 @@ public struct TraderProfileConfig: Codable, Equatable, Sendable {
 // MARK: - 6. AI Provider Settings
 // Multi-provider AI reflection layer supporting Groq, OpenRouter, Google Gemini, and OpenAI
 public struct AiSettingsConfig: Codable, Equatable, Sendable {
-    // Obfuscated key storage to avoid plain-text token scanner triggers while retaining out-of-the-box zero-config AI
-    public static let defaultGroqKey = String("1CRx6FTwdtqMr8UrFJa1N3oeYF3bydGWB8ZZTTWenZyULgl8PVaf_ksg".reversed())
-    public static let defaultGroqBackupKey = String("naDWWanC1q2rUrp1DRTgAF4jYF3bydGWeFOKL2Rlz3P5JdjiVmDs_ksg".reversed())
-    public static let defaultOpenRouterKey = String("a0efc60ba0a982e9ae97bf7451d67412bd1daf8fd0720090228eb1bc1e3cda65-1v-ro-ks".reversed())
+    // Environment or user-configured secret resolution (Zero hardcoding in binary)
+    public static let defaultGeminiKey = ProcessInfo.processInfo.environment["GEMINI_API_KEY"] ?? ""
+    public static let defaultGroqKey = ProcessInfo.processInfo.environment["GROQ_API_KEY"] ?? ""
+    public static let defaultGroqBackupKey = ProcessInfo.processInfo.environment["GROQ_BACKUP_KEY"] ?? ""
+    public static let defaultOpenRouterKey = ProcessInfo.processInfo.environment["OPENROUTER_API_KEY"] ?? ""
     
     public var provider: String // "groq" | "openrouter" | "gemini" | "openai" | "github" | "anthropic" | "custom"
     public var model: String
@@ -187,13 +188,13 @@ public struct AiSettingsConfig: Codable, Equatable, Sendable {
     public var traderProfile: TraderProfileConfig
     
     public static let `default` = AiSettingsConfig(
-        provider: "groq",
-        model: "auto",
+        provider: "gemini",
+        model: "gemini-3.5-flash-lite",
         githubKey: "",
         geminiKey: "",
-        groqKey: defaultGroqKey,
-        groqBackupKey: defaultGroqBackupKey,
-        openrouterKey: defaultOpenRouterKey,
+        groqKey: "",
+        groqBackupKey: "",
+        openrouterKey: "",
         openaiKey: "",
         anthropicKey: "",
         customEndpoint: "",
@@ -203,13 +204,13 @@ public struct AiSettingsConfig: Codable, Equatable, Sendable {
     )
     
     public init(
-        provider: String = "groq",
-        model: String = "auto",
+        provider: String = "gemini",
+        model: String = "gemini-3.5-flash-lite",
         githubKey: String = "",
         geminiKey: String = "",
-        groqKey: String = defaultGroqKey,
-        groqBackupKey: String = defaultGroqBackupKey,
-        openrouterKey: String = defaultOpenRouterKey,
+        groqKey: String = "",
+        groqBackupKey: String = "",
+        openrouterKey: String = "",
         openaiKey: String = "",
         anthropicKey: String = "",
         customEndpoint: String = "",
@@ -238,10 +239,10 @@ public struct AiSettingsConfig: Codable, Equatable, Sendable {
     
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        var prov = try container.decodeIfPresent(String.self, forKey: .provider) ?? "groq"
-        var mdl = try container.decodeIfPresent(String.self, forKey: .model) ?? "auto"
+        var prov = try container.decodeIfPresent(String.self, forKey: .provider) ?? "gemini"
+        var mdl = try container.decodeIfPresent(String.self, forKey: .model) ?? "gemini-3.5-flash-lite"
         let ghKey = try container.decodeIfPresent(String.self, forKey: .githubKey) ?? ""
-        let gKey = try container.decodeIfPresent(String.self, forKey: .geminiKey) ?? ""
+        var gKey = try container.decodeIfPresent(String.self, forKey: .geminiKey) ?? ""
         var grKey = try container.decodeIfPresent(String.self, forKey: .groqKey) ?? ""
         let grBackupKey = try container.decodeIfPresent(String.self, forKey: .groqBackupKey) ?? ""
         var orKey = try container.decodeIfPresent(String.self, forKey: .openrouterKey) ?? ""
@@ -255,15 +256,19 @@ public struct AiSettingsConfig: Codable, Equatable, Sendable {
             profile.primaryPlaybooks = "Price Action, Trend Following, Support & Resistance"
         }
         
-        // Upgrade legacy default to working Groq / OpenRouter
+        // Resolve keys from environment if not explicitly configured in storage
+        if gKey.isEmpty { gKey = Self.defaultGeminiKey }
         if grKey.isEmpty { grKey = Self.defaultGroqKey }
         var finalBackupKey = grBackupKey
         if finalBackupKey.isEmpty { finalBackupKey = Self.defaultGroqBackupKey }
         if orKey.isEmpty { orKey = Self.defaultOpenRouterKey }
         
         if prov == "opencode" || prov == "github" || prov.isEmpty {
-            prov = "groq"
-            mdl = "auto"
+            prov = "gemini"
+            mdl = "gemini-3.5-flash-lite"
+        }
+        if prov == "gemini" && (mdl.isEmpty || mdl == "auto" || mdl == "default") {
+            mdl = "gemini-3.5-flash-lite"
         }
         if prov == "groq" && (mdl.contains("llama-3.3") || mdl.contains("llama-3.1") || mdl.contains("llama-3.2") || mdl == "qwen/qwen3.8-27b" || mdl.isEmpty) {
             mdl = "auto"

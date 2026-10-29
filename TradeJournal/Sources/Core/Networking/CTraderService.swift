@@ -107,13 +107,29 @@ public final class CTraderService: ObservableObject {
     
     // MARK: - Published Properties
     @Published public var accessToken: String {
-        didSet { UserDefaults.standard.set(accessToken, forKey: Self.keyAccessToken) }
+        didSet {
+            let clean = accessToken.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !clean.isEmpty {
+                KeychainManager.set(clean, forKey: Self.keyAccessToken)
+            } else {
+                KeychainManager.delete(forKey: Self.keyAccessToken)
+            }
+            UserDefaults.standard.removeObject(forKey: Self.keyAccessToken)
+        }
     }
     @Published public var clientId: String {
         didSet { UserDefaults.standard.set(clientId, forKey: Self.keyClientId) }
     }
     @Published public var clientSecret: String {
-        didSet { UserDefaults.standard.set(clientSecret, forKey: Self.keyClientSecret) }
+        didSet {
+            let clean = clientSecret.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !clean.isEmpty {
+                KeychainManager.set(clean, forKey: Self.keyClientSecret)
+            } else {
+                KeychainManager.delete(forKey: Self.keyClientSecret)
+            }
+            UserDefaults.standard.removeObject(forKey: Self.keyClientSecret)
+        }
     }
     @Published public var isLive: Bool {
         didSet { UserDefaults.standard.set(isLive, forKey: Self.keyIsLive) }
@@ -154,9 +170,28 @@ public final class CTraderService: ObservableObject {
     
     // MARK: - Initialization
     public init() {
-        self.accessToken = UserDefaults.standard.string(forKey: Self.keyAccessToken) ?? ""
+        let kcToken = KeychainManager.get(forKey: Self.keyAccessToken) ?? ""
+        let kcSecret = KeychainManager.get(forKey: Self.keyClientSecret) ?? ""
+        
+        let udToken = UserDefaults.standard.string(forKey: Self.keyAccessToken) ?? ""
+        let udSecret = UserDefaults.standard.string(forKey: Self.keyClientSecret) ?? ""
+        
+        let resolvedToken = kcToken.isEmpty ? udToken : kcToken
+        let resolvedSecret = kcSecret.isEmpty ? udSecret : kcSecret
+        
+        // Migrate legacy plain text to Keychain
+        if !udToken.isEmpty && kcToken.isEmpty {
+            KeychainManager.set(udToken, forKey: Self.keyAccessToken)
+            UserDefaults.standard.removeObject(forKey: Self.keyAccessToken)
+        }
+        if !udSecret.isEmpty && kcSecret.isEmpty {
+            KeychainManager.set(udSecret, forKey: Self.keyClientSecret)
+            UserDefaults.standard.removeObject(forKey: Self.keyClientSecret)
+        }
+        
+        self.accessToken = resolvedToken
         self.clientId = UserDefaults.standard.string(forKey: Self.keyClientId) ?? ""
-        self.clientSecret = UserDefaults.standard.string(forKey: Self.keyClientSecret) ?? ""
+        self.clientSecret = resolvedSecret
         self.isLive = UserDefaults.standard.object(forKey: Self.keyIsLive) as? Bool ?? true
         self.lastSyncDate = UserDefaults.standard.object(forKey: Self.keyLastSyncDate) as? Date
         

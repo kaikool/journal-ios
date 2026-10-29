@@ -106,11 +106,14 @@ public struct MarketDataSettingsView: View {
                         
                         HStack(spacing: 8) {
                             AppButton(!dataStore.marketConnections.oandaApiKey.isEmpty ? "Save" : "Save credentials", icon: "checkmark", style: .primary, size: .compact) {
-                                dataStore.marketConnections.oandaApiKey = oandaToken
-                                dataStore.marketConnections.oandaAccountId = oandaAccountId
+                                let cleanToken = oandaToken.trimmingCharacters(in: .whitespacesAndNewlines)
+                                let cleanAccount = oandaAccountId.trimmingCharacters(in: .whitespacesAndNewlines)
+                                KeychainManager.set(cleanToken, forKey: "oanda_api_key")
+                                dataStore.marketConnections.oandaApiKey = cleanToken
+                                dataStore.marketConnections.oandaAccountId = cleanAccount
                                 dataStore.marketConnections.oandaEnvironment = oandaEnvironment
                                 dataStore.saveToDisk()
-                                oandaStatus = "Credentials saved. Test connection to verify access."
+                                oandaStatus = "Credentials saved securely to Keychain. Test connection to verify access."
                             }
                             
                             if !dataStore.marketConnections.oandaApiKey.isEmpty {
@@ -129,6 +132,7 @@ public struct MarketDataSettingsView: View {
                                 AppButton("Remove", icon: "trash", style: .destructive, size: .compact) {
                                     oandaToken = ""
                                     oandaAccountId = ""
+                                    KeychainManager.delete(forKey: "oanda_api_key")
                                     dataStore.marketConnections.oandaApiKey = ""
                                     dataStore.marketConnections.oandaAccountId = ""
                                     dataStore.saveToDisk()
@@ -151,7 +155,8 @@ public struct MarketDataSettingsView: View {
         }
         .onAppear {
             binanceEnabled = dataStore.marketConnections.binanceEnabled
-            oandaToken = dataStore.marketConnections.oandaApiKey
+            let kcOanda = KeychainManager.get(forKey: "oanda_api_key") ?? ""
+            oandaToken = kcOanda.isEmpty ? dataStore.marketConnections.oandaApiKey : kcOanda
             oandaAccountId = dataStore.marketConnections.oandaAccountId
             oandaEnvironment = dataStore.marketConnections.oandaEnvironment
         }

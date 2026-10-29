@@ -18,33 +18,61 @@ extension AIReflectionService {
     ) async throws -> String {
         var lastCapturedError: Error?
         
-        // Attempt 1: Groq High-Capability Multi-Model Pipeline (avoids 1,000 OTPM truncation)
-        let groqCandidates = ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.8-27b"]
-        
-        for gModel in groqCandidates {
+        // Attempt 0: Gemini High-Speed Engine (if key configured in env or keychain)
+        let geminiKey = (KeychainManager.get(forKey: "gemini_api_key") ?? AiSettingsConfig.defaultGeminiKey).trimmingCharacters(in: .whitespaces)
+        if !geminiKey.isEmpty {
             do {
                 return try await callOpenAiCompatible(
-                    endpoint: Self.groqEndpoint,
-                    apiKey: AiSettingsConfig.defaultGroqKey,
-                    model: gModel,
+                    endpoint: Self.geminiEndpoint,
+                    apiKey: geminiKey,
+                    model: "gemini-3.5-flash-lite",
                     action: action,
                     prompt: prompt,
                     metrics: metrics,
                     edgeScore: edgeScore,
                     language: language,
                     traderProfile: traderProfile,
-                    chartImageBase64: nil,
+                    chartImageBase64: chartImageBase64,
+                    chartImagesBase64: chartImagesBase64,
                     sessionSummary: sessionSummary,
                     conversationHistory: conversationHistory
                 )
             } catch {
                 lastCapturedError = error
-                AppLogger.warning("Groq default key model '\(gModel)' failed: \(error.localizedDescription)")
+                AppLogger.warning("Gemini default fallback failed: \(error.localizedDescription)")
+            }
+        }
+        
+        // Attempt 1: Groq High-Capability Multi-Model Pipeline (avoids 1,000 OTPM truncation)
+        let groqCandidates = ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.8-27b"]
+        let primaryGroqKey = (KeychainManager.get(forKey: "groq_api_key") ?? AiSettingsConfig.defaultGroqKey).trimmingCharacters(in: .whitespaces)
+        
+        if !primaryGroqKey.isEmpty {
+            for gModel in groqCandidates {
+                do {
+                    return try await callOpenAiCompatible(
+                        endpoint: Self.groqEndpoint,
+                        apiKey: primaryGroqKey,
+                        model: gModel,
+                        action: action,
+                        prompt: prompt,
+                        metrics: metrics,
+                        edgeScore: edgeScore,
+                        language: language,
+                        traderProfile: traderProfile,
+                        chartImageBase64: nil,
+                        sessionSummary: sessionSummary,
+                        conversationHistory: conversationHistory
+                    )
+                } catch {
+                    lastCapturedError = error
+                    AppLogger.warning("Groq default key model '\(gModel)' failed: \(error.localizedDescription)")
+                }
             }
         }
         
         // Attempt 2: Groq Backup Key with full model failover suite
-        let backupKey = AiSettingsConfig.defaultGroqBackupKey.trimmingCharacters(in: .whitespaces)
+        let backupKey = (KeychainManager.get(forKey: "groq_backup_key") ?? AiSettingsConfig.defaultGroqBackupKey).trimmingCharacters(in: .whitespaces)
         if !backupKey.isEmpty {
             for bModel in groqCandidates {
                 do {
@@ -70,7 +98,7 @@ extension AIReflectionService {
         }
         
         // Attempt 3: High-capacity OpenRouter Free Tier Fallback (up to 1,000,000 token context, no 7k TPM limit)
-        let orKey = AiSettingsConfig.defaultOpenRouterKey.trimmingCharacters(in: .whitespaces)
+        let orKey = (KeychainManager.get(forKey: "openrouter_api_key") ?? AiSettingsConfig.defaultOpenRouterKey).trimmingCharacters(in: .whitespaces)
         if !orKey.isEmpty {
             let freeModels = ["nvidia/nemotron-3.5-lightning:free", "nvidia/nemotron-3.5-super-vl:free", "liquid/lfm-2.5-2.6b:free"]
             for orModel in freeModels {
@@ -105,7 +133,7 @@ extension AIReflectionService {
         throw NSError(
             domain: "AIReflectionService",
             code: 503,
-            userInfo: [NSLocalizedDescriptionKey: "AI inference service is currently unreachable. Please verify your internet connection or Groq API keys in Settings > AI Assistant."]
+            userInfo: [NSLocalizedDescriptionKey: "AI inference service is not configured or currently unreachable. Please configure your API key in Settings > AI Assistant (Google Gemini, Groq, or OpenRouter)."]
         )
     }
     

@@ -234,19 +234,25 @@ public struct AiSettingsView: View {
     
     private func loadCurrentSettings() {
         let conf = dataStore.aiSettings
-        provider = conf.provider.isEmpty ? "groq" : conf.provider
-        model = conf.model.isEmpty ? "qwen/qwen3.8-27b" : conf.model
+        provider = conf.provider.isEmpty ? "gemini" : conf.provider
+        model = conf.model.isEmpty ? "gemini-3.5-flash-lite" : conf.model
         language = conf.language.isEmpty ? "vi" : conf.language
         customEndpoint = conf.customEndpoint
-        groqBackupKey = conf.groqBackupKey
+        groqBackupKey = conf.groqBackupKey.isEmpty ? (KeychainManager.get(forKey: "groq_backup_key") ?? "") : conf.groqBackupKey
         
         switch provider {
-        case "groq": apiKey = conf.groqKey
-        case "openrouter": apiKey = conf.openrouterKey
-        case "gemini": apiKey = conf.geminiKey
-        case "openai": apiKey = conf.openaiKey
-        case "custom": apiKey = conf.customKey
-        default: apiKey = ""
+        case "groq":
+            apiKey = conf.groqKey.isEmpty ? (KeychainManager.get(forKey: "groq_api_key") ?? "") : conf.groqKey
+        case "openrouter":
+            apiKey = conf.openrouterKey.isEmpty ? (KeychainManager.get(forKey: "openrouter_api_key") ?? "") : conf.openrouterKey
+        case "gemini":
+            apiKey = conf.geminiKey.isEmpty ? (KeychainManager.get(forKey: "gemini_api_key") ?? "") : conf.geminiKey
+        case "openai":
+            apiKey = conf.openaiKey.isEmpty ? (KeychainManager.get(forKey: "openai_api_key") ?? "") : conf.openaiKey
+        case "custom":
+            apiKey = conf.customKey.isEmpty ? (KeychainManager.get(forKey: "custom_api_key") ?? "") : conf.customKey
+        default:
+            apiKey = ""
         }
         
         isSaved = false
@@ -259,20 +265,28 @@ public struct AiSettingsView: View {
         conf.provider = provider
         conf.model = model.trimmingCharacters(in: .whitespaces)
         conf.language = language
+        let cleanApiKey = apiKey.trimmingCharacters(in: .whitespaces)
+        let cleanBackupKey = groqBackupKey.trimmingCharacters(in: .whitespaces)
         
         switch provider {
         case "groq":
-            conf.groqKey = apiKey.trimmingCharacters(in: .whitespaces)
-            conf.groqBackupKey = groqBackupKey.trimmingCharacters(in: .whitespaces)
+            conf.groqKey = cleanApiKey
+            conf.groqBackupKey = cleanBackupKey
+            KeychainManager.set(cleanApiKey, forKey: "groq_api_key")
+            KeychainManager.set(cleanBackupKey, forKey: "groq_backup_key")
         case "openrouter":
-            conf.openrouterKey = apiKey.trimmingCharacters(in: .whitespaces)
+            conf.openrouterKey = cleanApiKey
+            KeychainManager.set(cleanApiKey, forKey: "openrouter_api_key")
         case "gemini":
-            conf.geminiKey = apiKey.trimmingCharacters(in: .whitespaces)
+            conf.geminiKey = cleanApiKey
+            KeychainManager.set(cleanApiKey, forKey: "gemini_api_key")
         case "openai":
-            conf.openaiKey = apiKey.trimmingCharacters(in: .whitespaces)
+            conf.openaiKey = cleanApiKey
+            KeychainManager.set(cleanApiKey, forKey: "openai_api_key")
         case "custom":
-            conf.customKey = apiKey.trimmingCharacters(in: .whitespaces)
+            conf.customKey = cleanApiKey
             conf.customEndpoint = customEndpoint.trimmingCharacters(in: .whitespaces)
+            KeychainManager.set(cleanApiKey, forKey: "custom_api_key")
         default:
             break
         }
@@ -282,7 +296,7 @@ public struct AiSettingsView: View {
         
         isSaved = true
         isError = false
-        statusMessage = "AI engine settings saved successfully."
+        statusMessage = "AI engine settings saved securely (Keychain backed)."
     }
     
     private func testConnection() {
