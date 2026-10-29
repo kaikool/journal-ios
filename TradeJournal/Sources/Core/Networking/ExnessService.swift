@@ -57,25 +57,26 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
         }
         self.apiHost = storedHost
         
-        var acc = ud.string(forKey: kExnessAccountId) ?? ""
-        if acc.isEmpty {
-            acc = AppSecretsLoader.loadSecret(named: "EXNESS_ACCOUNT_ID") ?? "26000002813"
-            if !acc.isEmpty { ud.set(acc, forKey: kExnessAccountId) }
-        }
+        let plistAcc = AppSecretsLoader.loadSecret(named: "EXNESS_ACCOUNT_ID")
+        var acc = (plistAcc != nil && !plistAcc!.isEmpty) ? plistAcc! : (ud.string(forKey: kExnessAccountId) ?? "26000002813")
+        if acc.isEmpty { acc = "26000002813" }
+        ud.set(acc, forKey: kExnessAccountId)
         self.accountId = acc
         
-        var key = KeychainManager.get(forKey: kExnessApiKey) ?? AppSecretsLoader.loadSecret(named: "EXNESS_API_KEY") ?? ""
+        let plistKey = AppSecretsLoader.loadSecret(named: "EXNESS_API_KEY")
+        var key = (plistKey != nil && !plistKey!.isEmpty) ? plistKey! : (KeychainManager.get(forKey: kExnessApiKey) ?? "")
         if key.isEmpty {
-            key = "exnsk-df9225de1129de695dbb54d0bd165bfdf66cb50e65d4fa3dd717d4f76b45f4bd"
-            KeychainManager.set(key, forKey: kExnessApiKey)
+            key = "exnsk-e6c68d58e331f52f05f9713dc92a5122fda21bc5a6d00e8f71b1a1d3f4ad53ff"
         }
+        KeychainManager.set(key, forKey: kExnessApiKey)
         self.apiKey = key
         
-        var priv = KeychainManager.get(forKey: kExnessPrivateKey) ?? AppSecretsLoader.loadSecret(named: "EXNESS_PRIVATE_KEY") ?? ""
+        let plistPriv = AppSecretsLoader.loadSecret(named: "EXNESS_PRIVATE_KEY")
+        var priv = (plistPriv != nil && !plistPriv!.isEmpty) ? plistPriv! : (KeychainManager.get(forKey: kExnessPrivateKey) ?? "")
         if priv.isEmpty {
-            priv = "32218a06a777baabcd977dc8876baad4160ab7754512b0a0bbf052b8c845b1e60bfcebc8fff594a1f457499654400e9f746c522abd16a19a61adf57006d10379"
-            KeychainManager.set(priv, forKey: kExnessPrivateKey)
+            priv = "860dccd46c8b35da6ad52ee1dca843bab6a74f37f472883de157d7d1a42ae409f3c15773b888e6f28221b8bf27a6ad1003842074e1c37c121b7dd3083ca33e19"
         }
+        KeychainManager.set(priv, forKey: kExnessPrivateKey)
         
         self.lastSyncDate = ud.object(forKey: kExnessLastSync) as? Date
         
@@ -1090,7 +1091,7 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
             } else if hadPermissionDenied {
                 self.lastSyncSummary = "Connected • Balance: \(formattedBal) • 0 trades (API Trade permission required in Exness PA)"
             } else {
-                self.lastSyncSummary = "Connected • Balance: \(formattedBal) • Account \(accLabel) synced"
+                self.lastSyncSummary = "Connected • Balance: \(formattedBal) • Account \(accLabel) synced. Note: Exness trade history is hosted on MT4/MT5. Import your MT statement HTML/CSV or use cTrader/The5ers auto-sync."
             }
         }
         
