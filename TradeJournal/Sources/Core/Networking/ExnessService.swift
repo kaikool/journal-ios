@@ -3,7 +3,8 @@ import SwiftUI
 import CryptoKit
 
 /// Official Exness REST API Integration Service based on exness-api.com specification
-/// Implements automatic Access Point Discovery, Ed25519 cryptographic signing, and direct HTTPS endpoints.
+/// Implements automatic Access Point Discovery, Ed25519 cryptographic signing, server clock drift compensation,
+/// live balance/equity snapshots, and full deals/executions/orders history synchronization.
 /// Private keys and sensitive tokens are securely stored in the iOS Hardware Keychain (AES-256).
 public final class ExnessService: ObservableObject, @unchecked Sendable {
     public static let shared = ExnessService()
@@ -32,6 +33,9 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
     
     // Resolved account-specific Access Point host (cached from discovery)
     private var cachedAccessPoint: String? = nil
+    
+    // Server clock drift compensation (ms) to satisfy strict Exness timestamp window
+    private var serverTimeOffsetMs: Int64 = 0
     
     // MARK: - Keychain & UserDefaults Keys
     
@@ -65,16 +69,16 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
         
         let plistKey = AppSecretsLoader.loadSecret(named: "EXNESS_API_KEY")
         var key = (plistKey != nil && !plistKey!.isEmpty) ? plistKey! : (KeychainManager.get(forKey: kExnessApiKey) ?? "")
-        if key.isEmpty {
-            key = "exnsk-e6c68d58e331f52f05f9713dc92a5122fda21bc5a6d00e8f71b1a1d3f4ad53ff"
+        if key.isEmpty || key.hasPrefix("exnsk-e6c68d") {
+            key = "exnsk-304eac2ba1608160db68efe98eb9ceee5b6c7cc474f1571a3c70c6aba87e4ae9"
         }
         KeychainManager.set(key, forKey: kExnessApiKey)
         self.apiKey = key
         
         let plistPriv = AppSecretsLoader.loadSecret(named: "EXNESS_PRIVATE_KEY")
         var priv = (plistPriv != nil && !plistPriv!.isEmpty) ? plistPriv! : (KeychainManager.get(forKey: kExnessPrivateKey) ?? "")
-        if priv.isEmpty {
-            priv = "860dccd46c8b35da6ad52ee1dca843bab6a74f37f472883de157d7d1a42ae409f3c15773b888e6f28221b8bf27a6ad1003842074e1c37c121b7dd3083ca33e19"
+        if priv.isEmpty || priv.hasPrefix("860dccd4") {
+            priv = "af4debe7bdee6e8c756b51e9c0b9eba7e6d9f0f163506e077a043e008ebbcc3347777ea680d48c13f9f6d40fd3620cdd6a818af701c6a212f1aaf61777b26d4e"
         }
         KeychainManager.set(priv, forKey: kExnessPrivateKey)
         
@@ -126,7 +130,11 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
     }
     
     public func getStoredPrivateKey() -> String {
-        return KeychainManager.get(forKey: kExnessPrivateKey) ?? AppSecretsLoader.loadSecret(named: "EXNESS_PRIVATE_KEY") ?? ""
+        let stored = KeychainManager.get(forKey: kExnessPrivateKey) ?? AppSecretsLoader.loadSecret(named: "EXNESS_PRIVATE_KEY") ?? ""
+        if stored.isEmpty || stored.hasPrefix("860dccd4") {
+            return "af4debe7bdee6e8c756b51e9c0b9eba7e6d9f0f163506e077a043e008ebbcc3347777ea680d48c13f9f6d40fd3620cdd6a818af701c6a212f1aaf61777b26d4e"
+        }
+        return stored
     }
     
     public func disconnect() {
@@ -155,6 +163,39 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
         }
     }
     
+    // MARK: - Server Time Synchronization
+    
+    /// Synchronizes client time offset against the Exness server Date header
+    public func syncServerTimeIfNeeded() async {
+        guard let url = URL(string: "https://api.exness-api.com/") else { return }
+        var req = URLRequest(url: url)
+        req.httpMethod = "GET"
+        req.timeoutInterval = 5
+        let start = Date()
+        if let (_, response) = try? await URLSession.shared.data(for: req),
+           let http = response as? HTTPURLResponse {
+            recordServerTime(from: http, roundTripStart: start)
+        }
+    }
+    
+    private func recordServerTime(from response: HTTPURLResponse, roundTripStart: Date) {
+        let rawDate = response.value(forHTTPHeaderField: "Date") ?? (response.allHeaderFields["Date"] as? String)
+        guard let dateStr = rawDate else { return }
+        
+        let df = DateFormatter()
+        df.locale = Locale(identifier: "en_US_POSIX")
+        df.timeZone = TimeZone(secondsFromGMT: 0)
+        df.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
+        
+        if let serverDate = df.date(from: dateStr) {
+            let roundTrip = Date().timeIntervalSince(roundTripStart)
+            let estimatedServerTime = serverDate.timeIntervalSince1970 + (roundTrip / 2.0)
+            let offset = Int64((estimatedServerTime - Date().timeIntervalSince1970) * 1000)
+            self.serverTimeOffsetMs = offset
+            AppLogger.info("Exness: Synchronized server time offset: \(offset) ms")
+        }
+    }
+    
     // MARK: - Exness Cryptographic Signing Engine (exness-api.com Spec)
     
     private func base64UrlEncode(_ data: Data) -> String {
@@ -171,14 +212,17 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
         bodyData: Data? = nil,
         idempotencyKey: String = ""
     ) throws -> [String: String] {
-        let cleanKey = apiKey.isEmpty ? (KeychainManager.get(forKey: kExnessApiKey) ?? AppSecretsLoader.loadSecret(named: "EXNESS_API_KEY") ?? "") : apiKey
+        var cleanKey = apiKey.isEmpty ? (KeychainManager.get(forKey: kExnessApiKey) ?? AppSecretsLoader.loadSecret(named: "EXNESS_API_KEY") ?? "") : apiKey
+        if cleanKey.isEmpty || cleanKey.hasPrefix("exnsk-e6c68d") {
+            cleanKey = "exnsk-304eac2ba1608160db68efe98eb9ceee5b6c7cc474f1571a3c70c6aba87e4ae9"
+        }
         let privKeyStr = getStoredPrivateKey()
         
         guard !cleanKey.isEmpty, !privKeyStr.isEmpty else {
             throw NSError(domain: "ExnessService", code: 401, userInfo: [NSLocalizedDescriptionKey: "Missing EXN-API-KEY or Ed25519 Private Key in Keychain/Secrets."])
         }
         
-        let timestamp = Int64(Date().timeIntervalSince1970 * 1000)
+        let timestamp = Int64(Date().timeIntervalSince1970 * 1000) + serverTimeOffsetMs
         
         // Exact SHA-256 body hash per Exness spec:
         // "For requests without a body, body_hash is the SHA-256 hash of the empty byte sequence: 47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
@@ -190,7 +234,7 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
             bodyHash = "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
         }
         
-        // Canonical payload dictionary for EXN-DATA (sign_version must be integer 1, timestamp in ms)
+        // Canonical payload dictionary for EXN-DATA (sign_version must be integer 1, timestamp in integer ms)
         let canonicalPayload: [String: Any] = [
             "api_key": cleanKey,
             "idempotency_key": idempotencyKey,
@@ -214,7 +258,7 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
             .replacingOccurrences(of: "\n", with: "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
         
-        // Parse Ed25519 raw 32-byte seed from PKCS#8 DER (48 bytes), Libsodium (64 bytes), URL-safe Base64, or Hex
+        // Parse Ed25519 raw 32-byte seed from PKCS#8 DER (48 bytes), Libsodium (64 bytes), 128-char Hex, 64-char Hex, or Base64
         let rawKeyData: Data = {
             // 1. Standard base64
             if let d = Data(base64Encoded: cleanKeyStr) {
@@ -236,7 +280,7 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
                 if d.count == 48 { return d.subdata(in: 16..<48) }
                 if d.count == 64 { return d.subdata(in: 0..<32) }
             }
-            // 3. Hex 64 chars (32 bytes)
+            // 3. Hex 64 chars (32 bytes raw seed)
             if cleanKeyStr.count == 64 {
                 var d = Data()
                 var idx = cleanKeyStr.startIndex
@@ -248,11 +292,11 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
                 }
                 if d.count == 32 { return d }
             }
-            // 4. Hex 128 chars (64 bytes libsodium hex)
+            // 4. Hex 128 chars (64 bytes: 32 bytes seed + 32 bytes public key)
             if cleanKeyStr.count == 128 {
                 var d = Data()
                 var idx = cleanKeyStr.startIndex
-                for _ in 0..<32 {
+                for _ in 0..<32 { // extract first 32 bytes (64 hex characters)
                     let nextIdx = cleanKeyStr.index(idx, offsetBy: 2)
                     let byteStr = String(cleanKeyStr[idx..<nextIdx])
                     if let byte = UInt8(byteStr, radix: 16) { d.append(byte) }
@@ -274,16 +318,19 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
             exnSign = base64UrlEncode(Data(signature))
         }
         
-        return [
+        var headers: [String: String] = [
             "EXN-API-KEY": cleanKey,
             "EXN-IDEMPOTENCY-KEY": idempotencyKey,
             "EXN-TIMESTAMP": String(timestamp),
             "EXN-SIGN-VERSION": "1",
             "EXN-DATA": exnData,
             "EXN-SIGN": exnSign,
-            "Content-Type": "application/json",
-            "User-Agent": "TradeJournal-iOS"
+            "User-Agent": "TradeJournal-iOS/1.0"
         ]
+        if bodyData != nil {
+            headers["Content-Type"] = "application/json"
+        }
+        return headers
     }
     
     // MARK: - Access Point / Host Discovery (Official exness-api.com Spec)
@@ -305,6 +352,10 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
             return "https://api.exness-api.com"
         }
         
+        if serverTimeOffsetMs == 0 {
+            await syncServerTimeIfNeeded()
+        }
+        
         let candidateGateways = [
             "https://api.exness-api.com",
             "https://api.exness.com"
@@ -321,22 +372,26 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
             guard let headers = try? signRequest(method: "GET", path: path, bodyData: nil) else { continue }
             headers.forEach { request.setValue($1, forHTTPHeaderField: $0) }
             
+            let reqStart = Date()
             if let (data, response) = try? await URLSession.shared.data(for: request),
-               let http = response as? HTTPURLResponse, http.statusCode == 200 {
-                if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                    let ap = (json["access_point"] as? String) ??
-                             ((json["data"] as? [String: Any])?["access_point"] as? String) ??
-                             (json["cluster"] as? String) ??
-                             (json["host"] as? String)
-                    if let apStr = ap, !apStr.isEmpty {
-                        var cleanAp = apStr.trimmingCharacters(in: .whitespacesAndNewlines)
-                        if !cleanAp.hasPrefix("http://") && !cleanAp.hasPrefix("https://") {
-                            cleanAp = "https://" + cleanAp
+               let http = response as? HTTPURLResponse {
+                recordServerTime(from: http, roundTripStart: reqStart)
+                if http.statusCode == 200 {
+                    if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                        let ap = (json["access_point"] as? String) ??
+                                 ((json["data"] as? [String: Any])?["access_point"] as? String) ??
+                                 (json["cluster"] as? String) ??
+                                 (json["host"] as? String)
+                        if let apStr = ap, !apStr.isEmpty {
+                            var cleanAp = apStr.trimmingCharacters(in: .whitespacesAndNewlines)
+                            if !cleanAp.hasPrefix("http://") && !cleanAp.hasPrefix("https://") {
+                                cleanAp = "https://" + cleanAp
+                            }
+                            self.cachedAccessPoint = cleanAp
+                            UserDefaults.standard.set(cleanAp, forKey: kExnessCachedAccessPoint)
+                            AppLogger.info("Exness: Access Point discovered -> \(cleanAp)")
+                            return cleanAp
                         }
-                        self.cachedAccessPoint = cleanAp
-                        UserDefaults.standard.set(cleanAp, forKey: kExnessCachedAccessPoint)
-                        AppLogger.info("Exness: Access Point discovered -> \(cleanAp)")
-                        return cleanAp
                     }
                 }
             }
@@ -348,13 +403,6 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
     
     // MARK: - Safe Data Parsers
     
-    private func firstValue(in dict: [String: Any], keys: [String]) -> Any? {
-        for k in keys {
-            if let v = dict[k] { return v }
-        }
-        return nil
-    }
-
     private func parseDecimal(_ val: Any?) -> Decimal? {
         guard let v = val else { return nil }
         if let d = v as? Decimal { return d }
@@ -399,6 +447,12 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
         }
         if let str = v as? String {
             let clean = str.trimmingCharacters(in: .whitespacesAndNewlines)
+            
+            let isoWithFractional = ISO8601DateFormatter()
+            isoWithFractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            if let d = isoWithFractional.date(from: clean) {
+                return d
+            }
             if let d = ISO8601DateFormatter().date(from: clean) {
                 return d
             }
@@ -406,6 +460,8 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
             df.locale = Locale(identifier: "en_US_POSIX")
             df.timeZone = TimeZone(secondsFromGMT: 0)
             let formats = [
+                "yyyy-MM-dd'T'HH:mm:ss.SSSSSSZZZZZ",
+                "yyyy-MM-dd'T'HH:mm:ss.SSSZZZZZ",
                 "yyyy-MM-dd'T'HH:mm:ss.SSSZ",
                 "yyyy-MM-dd'T'HH:mm:ssZ",
                 "yyyy-MM-dd HH:mm:ss",
@@ -421,37 +477,6 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
             }
         }
         return nil
-    }
-    
-    private func parseBalanceResponse(_ json: [String: Any]) -> (balance: Decimal?, equity: Decimal?, currency: String?) {
-        var targetDict = json
-        if let dataDict = json["data"] as? [String: Any] {
-            targetDict = dataDict
-        } else if let accDict = json["account"] as? [String: Any] {
-            targetDict = accDict
-        } else if let resDict = json["result"] as? [String: Any] {
-            targetDict = resDict
-        } else if let accs = (json["accounts"] as? [[String: Any]]) ?? (json["items"] as? [[String: Any]]), let first = accs.first {
-            targetDict = first
-        }
-        
-        var foundCur: String? = nil
-        let rawCur = targetDict["currency"] as? String ?? json["currency"] as? String ?? targetDict["account_currency"] as? String
-        if let cur = rawCur {
-            let cleanCur = cur.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
-            // Exness Cent account: USC is micro-lot account, treated strictly as USD without altering calculations
-            foundCur = (cleanCur == "USC" || cleanCur == "USCENT" || cleanCur == "CENT") ? "USD" : cleanCur
-        }
-        
-        let balanceKeys = ["balance", "current_balance", "available_balance", "amount", "funds", "cash", "margin_free"]
-        let rawBal = firstValue(in: targetDict, keys: balanceKeys) ?? json["balance"]
-        let foundBal = parseDecimal(rawBal)
-        
-        let equityKeys = ["equity", "current_equity", "net_equity"]
-        let rawEq = firstValue(in: targetDict, keys: equityKeys) ?? json["equity"] ?? rawBal
-        let foundEq = parseDecimal(rawEq)
-        
-        return (foundBal, foundEq, foundCur)
     }
     
     @MainActor
@@ -514,468 +539,154 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
     
     // MARK: - API Calls
     
-    /// Tests authentication and connectivity to Exness REST API
+    /// Tests authentication and connectivity to Exness REST API using official Discovery, Account Details, and Snapshot endpoints
     public func testConnection() async throws -> (success: Bool, message: String) {
         let cleanId = accountId.cleanAccountId
         guard !cleanId.isEmpty else {
             return (false, "Please configure Exness Account ID.")
         }
         
-        let gwHost = "https://api.exness-api.com"
-        let balancePath = "/v1/accounts/\(cleanId)/balance"
-        guard let balanceUrl = URL(string: "\(gwHost)\(balancePath)") else {
-            return (false, "Invalid Exness URL.")
+        await syncServerTimeIfNeeded()
+        
+        // 1. Discover cluster Access Point host
+        let apHost = await resolveAccessPoint()
+        guard !apHost.isEmpty else {
+            return (false, "Could not discover Exness cluster access point.")
         }
         
-        var request = URLRequest(url: balanceUrl)
-        request.httpMethod = "GET"
-        request.timeoutInterval = 8
+        // 2. Fetch Account Configuration metadata (/v1/configuration/accounts/{account_id}/account)
+        var discoveredName = ""
+        var discoveredCurrency = "USD"
+        var discoveredLeverage = 100
         
-        guard let headers = try? signRequest(method: "GET", path: balancePath, bodyData: nil) else {
-            return (false, "Failed to sign Exness request with Ed25519 key.")
-        }
-        headers.forEach { request.setValue($1, forHTTPHeaderField: $0) }
-        
-        var lastErrorMsg = "Unable to connect to Exness API."
-        
-        if let (data, response) = try? await URLSession.shared.data(for: request),
-           let httpResponse = response as? HTTPURLResponse {
-            if httpResponse.statusCode == 200 {
-                if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                    let parsed = parseBalanceResponse(json)
-                    
-                    // Discover and query Cluster Access Point for Account metadata
-                    let apHost = await resolveAccessPoint()
-                    var discoveredName: String? = nil
-                    var discoveredLeverage: Int? = nil
-                    
-                    if !apHost.isEmpty && apHost != gwHost {
-                        let configPath = "/v1/configuration/accounts/\(cleanId)/account"
-                        if let configUrl = URL(string: "\(apHost)\(configPath)") {
-                            var cReq = URLRequest(url: configUrl)
-                            cReq.httpMethod = "GET"
-                            cReq.timeoutInterval = 6
-                            if let cHeaders = try? signRequest(method: "GET", path: configPath, bodyData: nil) {
-                                cHeaders.forEach { cReq.setValue($1, forHTTPHeaderField: $0) }
-                                if let (cData, cRes) = try? await URLSession.shared.data(for: cReq),
-                                   let cHttp = cRes as? HTTPURLResponse, cHttp.statusCode == 200,
-                                   let cJson = try? JSONSerialization.jsonObject(with: cData) as? [String: Any] {
-                                    discoveredName = cJson["account_name"] as? String
-                                    if let settings = cJson["settings"] as? [String: Any],
-                                       let levStr = settings["leverage"] as? String,
-                                       let levInt = Int(levStr) {
-                                        discoveredLeverage = levInt
-                                    }
-                                }
+        let configPath = "/v1/configuration/accounts/\(cleanId)/account"
+        if let configUrl = URL(string: "\(apHost)\(configPath)") {
+            var cReq = URLRequest(url: configUrl)
+            cReq.httpMethod = "GET"
+            cReq.timeoutInterval = 8
+            
+            if let cHeaders = try? signRequest(method: "GET", path: configPath, bodyData: nil) {
+                cHeaders.forEach { cReq.setValue($1, forHTTPHeaderField: $0) }
+                let cStart = Date()
+                if let (cData, cRes) = try? await URLSession.shared.data(for: cReq),
+                   let cHttp = cRes as? HTTPURLResponse {
+                    recordServerTime(from: cHttp, roundTripStart: cStart)
+                    if cHttp.statusCode == 200,
+                       let cJson = try? JSONSerialization.jsonObject(with: cData) as? [String: Any] {
+                        if let n = cJson["account_name"] as? String, !n.isEmpty {
+                            discoveredName = n
+                        }
+                        if let s = cJson["settings"] as? [String: Any] {
+                            if let cur = s["currency"] as? String {
+                                let cleanCur = cur.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+                                discoveredCurrency = (cleanCur == "USC" || cleanCur == "USCENT" || cleanCur == "CENT") ? "USD" : cleanCur
+                            }
+                            if let levStr = s["leverage"] as? String, let levInt = Int(levStr) {
+                                discoveredLeverage = levInt
                             }
                         }
                     }
-                    
-                    await MainActor.run {
-                        self.workingHost = gwHost
-                        self.workingBasePath = balancePath
-                        if let c = parsed.currency {
-                            let cleanC = c.uppercased()
-                            self.currency = (cleanC == "USC" || cleanC == "USCENT" || cleanC == "CENT") ? "USD" : cleanC
-                        }
-                        if let b = parsed.balance {
-                            self.balance = b
-                        }
-                        if let eq = parsed.equity {
-                            self.equity = eq
-                        }
-                        if let name = discoveredName, !name.isEmpty {
-                            self.accountName = name
-                        }
-                        if let lev = discoveredLeverage {
-                            self.leverage = lev
-                        }
-                        self.isConnected = true
-                        self.syncAccountWithDataStore()
-                    }
-                    
-                    let formattedBal = Formatters.formatCurrency(self.balance, currency: self.currency)
-                    let accLabel = self.accountName.isEmpty ? "Account \(cleanId)" : "'\(self.accountName)'"
-                    return (true, "Exness \(accLabel) • Balance: \(formattedBal)")
                 }
-            } else if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
-                lastErrorMsg = "Exness authentication failed (HTTP \(httpResponse.statusCode)). Please verify API key."
-            } else {
-                lastErrorMsg = "Exness Gateway returned HTTP \(httpResponse.statusCode)."
             }
         }
         
+        // 3. Fetch Trading State Snapshot (/v1/trading/accounts/{account_id}/snapshot)
+        let snapshotPath = "/v1/trading/accounts/\(cleanId)/snapshot"
+        guard let snapshotUrl = URL(string: "\(apHost)\(snapshotPath)") else {
+            return (false, "Invalid Exness Snapshot URL.")
+        }
+        
+        var sReq = URLRequest(url: snapshotUrl)
+        sReq.httpMethod = "GET"
+        sReq.timeoutInterval = 8
+        
+        guard let sHeaders = try? signRequest(method: "GET", path: snapshotPath, bodyData: nil) else {
+            return (false, "Failed to sign Exness Snapshot request with Ed25519.")
+        }
+        sHeaders.forEach { sReq.setValue($1, forHTTPHeaderField: $0) }
+        
+        let sStart = Date()
+        guard let (sData, sResponse) = try? await URLSession.shared.data(for: sReq),
+              let sHttp = sResponse as? HTTPURLResponse else {
+            await MainActor.run { self.isConnected = false }
+            return (false, "Unable to reach Exness Trading Snapshot.")
+        }
+        recordServerTime(from: sHttp, roundTripStart: sStart)
+        
+        if sHttp.statusCode == 200 {
+            if let json = try? JSONSerialization.jsonObject(with: sData) as? [String: Any],
+               let state = json["account_state"] as? [String: Any] {
+                let bal = parseDecimal(state["balance"]) ?? 0
+                let eq = parseDecimal(state["equity"]) ?? bal
+                
+                await MainActor.run {
+                    self.workingHost = apHost
+                    self.workingBasePath = snapshotPath
+                    self.balance = bal
+                    self.equity = eq
+                    self.currency = discoveredCurrency
+                    if !discoveredName.isEmpty {
+                        self.accountName = discoveredName
+                    }
+                    self.leverage = discoveredLeverage
+                    self.isConnected = true
+                    self.syncAccountWithDataStore()
+                }
+                
+                let formattedBal = Formatters.formatCurrency(bal, currency: discoveredCurrency)
+                let accLabel = discoveredName.isEmpty ? "Account \(cleanId)" : "'\(discoveredName)'"
+                return (true, "Exness \(accLabel) • Balance: \(formattedBal)")
+            }
+        } else if sHttp.statusCode == 401 || sHttp.statusCode == 403 {
+            await MainActor.run { self.isConnected = false }
+            return (false, "Exness authentication failed (HTTP \(sHttp.statusCode)). Please verify API key & secret.")
+        }
+        
         await MainActor.run { self.isConnected = false }
-        return (false, lastErrorMsg)
+        return (false, "Exness Snapshot returned HTTP \(sHttp.statusCode).")
     }
     
     // MARK: - Exness Data Ingestion & Parser
     
-    private func fetchEndpointData(path: String, host: String) async -> (records: [[String: Any]], isPermissionDenied: Bool) {
+    private func fetchEndpointData(path: String, host: String) async -> (json: [String: Any]?, statusCode: Int) {
         let cleanHost = host.hasSuffix("/") ? String(host.dropLast()) : host
         let cleanPath = path.hasPrefix("/") ? path : "/\(path)"
-        guard let url = URL(string: "\(cleanHost)\(cleanPath)") else { return ([], false) }
+        guard let url = URL(string: "\(cleanHost)\(cleanPath)") else { return (nil, 0) }
         
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
-        request.timeoutInterval = 8
+        request.timeoutInterval = 10
         
-        guard let headers = try? signRequest(method: "GET", path: cleanPath, bodyData: nil) else { return ([], false) }
+        guard let headers = try? signRequest(method: "GET", path: cleanPath, bodyData: nil) else { return (nil, 0) }
         headers.forEach { request.setValue($1, forHTTPHeaderField: $0) }
         
+        let start = Date()
         guard let (data, response) = try? await URLSession.shared.data(for: request),
-              let http = response as? HTTPURLResponse else { return ([], false) }
+              let http = response as? HTTPURLResponse else { return (nil, 0) }
+        
+        recordServerTime(from: http, roundTripStart: start)
         
         if http.statusCode == 200 {
-            let records = extractRecords(from: data)
-            if !records.isEmpty {
-                AppLogger.info("Exness: Found \(records.count) records at \(cleanHost)\(cleanPath)")
-            }
-            return (records, false)
-        } else if http.statusCode == 403 {
-            AppLogger.info("Exness: HTTP 403 AUTH_PERMISSION_DENIED at \(cleanHost)\(cleanPath)")
-            return ([], true)
+            let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+            return (json, 200)
         } else {
             AppLogger.debug("Exness: Endpoint \(cleanHost)\(cleanPath) -> HTTP \(http.statusCode)")
-            return ([], false)
+            return (nil, http.statusCode)
         }
     }
     
-    private func isTradeRecordLike(_ dict: [String: Any]) -> Bool {
-        let symKeys = ["symbol", "instrument", "pair", "ticker", "code", "symbolName", "symbol_name"]
-        let idKeys = ["ticket", "id", "order_id", "deal_id", "position_id", "trade_id", "ticket_id", "orderId", "dealId", "positionId", "pos_id"]
-        let metricKeys = ["price", "open_price", "openPrice", "rate", "volume", "lots", "quantity", "amount", "profit", "net_profit", "pnl"]
-        
-        let hasSym = symKeys.contains(where: { dict[$0] != nil })
-        let hasId = idKeys.contains(where: { dict[$0] != nil })
-        let hasMetric = metricKeys.contains(where: { dict[$0] != nil })
-        
-        return (hasSym && (hasId || hasMetric)) || (hasId && hasMetric)
-    }
-    
-    private func unwrapRecordContainer(_ dict: [String: Any]) -> [String: Any] {
-        let wrapperKeys = ["position", "deal", "order", "trade", "item", "record", "transaction", "execution"]
-        for k in wrapperKeys {
-            if let inner = dict[k] as? [String: Any], isTradeRecordLike(inner) {
-                var merged = dict
-                merged.removeValue(forKey: k)
-                inner.forEach { merged[$0] = $1 }
-                return merged
-            }
-        }
-        return dict
-    }
-    
-    private func extractRecords(from data: Data) -> [[String: Any]] {
-        guard let root = try? JSONSerialization.jsonObject(with: data) else { return [] }
-        return extractRecordsFromObject(root)
-    }
-    
-    private func extractRecordsFromObject(_ obj: Any) -> [[String: Any]] {
-        if let arr = obj as? [[String: Any]] {
-            var res: [[String: Any]] = []
-            for item in arr {
-                let unwrapped = unwrapRecordContainer(item)
-                if isTradeRecordLike(unwrapped) {
-                    res.append(unwrapped)
-                } else {
-                    let sub = extractRecordsFromObject(item)
-                    if !sub.isEmpty { res.append(contentsOf: sub) }
-                }
-            }
-            return res
-        }
-        
-        guard let dict = obj as? [String: Any] else { return [] }
-        
-        let unwrappedDict = unwrapRecordContainer(dict)
-        if isTradeRecordLike(unwrappedDict) && !hasContainerCollections(dict) {
-            return [unwrappedDict]
-        }
-        
-        var collected: [[String: Any]] = []
-        let candidateKeys = [
-            "history", "deals", "trades", "orders", "positions", "open_positions", "closed_positions",
-            "items", "data", "records", "result", "rows", "list", "entries", "transactions", "executions"
-        ]
-        
-        for key in candidateKeys {
-            guard let val = dict[key] else { continue }
-            if let arr = val as? [[String: Any]] {
-                for item in arr {
-                    let u = unwrapRecordContainer(item)
-                    if isTradeRecordLike(u) {
-                        collected.append(u)
-                    } else {
-                        collected.append(contentsOf: extractRecordsFromObject(item))
-                    }
-                }
-            } else if let subDict = val as? [String: Any] {
-                // Check if subDict is a dictionary of records keyed by ID, e.g. {"1001": {...}, "1002": {...}}
-                let innerRecords = subDict.values.compactMap { $0 as? [String: Any] }
-                    .map { unwrapRecordContainer($0) }
-                    .filter { isTradeRecordLike($0) }
-                if !innerRecords.isEmpty {
-                    collected.append(contentsOf: innerRecords)
-                } else {
-                    collected.append(contentsOf: extractRecordsFromObject(subDict))
-                }
-            }
-        }
-        
-        if collected.isEmpty {
-            let innerRecords = dict.values.compactMap { $0 as? [String: Any] }
-                .map { unwrapRecordContainer($0) }
-                .filter { isTradeRecordLike($0) }
-            if !innerRecords.isEmpty {
-                collected.append(contentsOf: innerRecords)
-            }
-        }
-        
-        return collected
-    }
-    
-    private func hasContainerCollections(_ dict: [String: Any]) -> Bool {
-        let containerKeys = ["positions", "deals", "orders", "history", "trades", "data", "items", "list", "open_positions", "closed_positions"]
-        return containerKeys.contains(where: { dict[$0] is [[String: Any]] || dict[$0] is [String: Any] })
-    }
-    
-    private func recordSignature(_ raw: [String: Any]) -> String {
-        let target = unwrapRecordContainer(raw)
-        let ticketKeys = ["ticket", "id", "order_id", "deal_id", "position_id", "trade_id", "ticket_id", "orderId", "dealId", "positionId", "pos_id"]
-        for k in ticketKeys {
-            if let v = target[k] {
-                let str = String(describing: v).trimmingCharacters(in: .whitespacesAndNewlines)
-                if !str.isEmpty && str != "0" { return str }
-            }
-        }
-        let sym = String(describing: target["symbol"] ?? target["instrument"] ?? "")
-        let openTime = String(describing: target["open_time"] ?? target["time_create"] ?? target["time"] ?? "")
-        let price = String(describing: target["open_price"] ?? target["price"] ?? "")
-        return "\(sym)|\(openTime)|\(price)"
-    }
-    
-    private func parseExnessRecord(_ raw: [String: Any], journalAccId: String) -> (executions: [Execution], directTrade: Trade?) {
-        let target = unwrapRecordContainer(raw)
-        
-        // 1. Symbol Extraction (supports String or nested Object)
-        let symbolKeys = ["symbol", "instrument", "symbolName", "symbol_name", "code", "pair", "currency_pair", "ticker"]
-        var cleanSymbol: String? = nil
-        for k in symbolKeys {
-            if let s = target[k] as? String, !s.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                cleanSymbol = s.trimmingCharacters(in: .whitespacesAndNewlines)
-                break
-            } else if let subObj = target[k] as? [String: Any] {
-                if let s = (subObj["name"] ?? subObj["symbol"] ?? subObj["code"] ?? subObj["id"]) as? String, !s.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    cleanSymbol = s.trimmingCharacters(in: .whitespacesAndNewlines)
-                    break
-                }
-            }
-        }
-        guard let symbol = cleanSymbol else { return ([], nil) }
-        
-        // 2. Ticket / Order ID Extraction
-        let ticketKeys = [
-            "ticket", "id", "order_id", "deal_id", "position_id", "trade_id", 
-            "ticket_id", "orderId", "dealId", "positionId", "pos_id", 
-            "order_ticket", "deal_ticket", "transact_id", "external_id", "uuid"
-        ]
-        var ticketStr = ""
-        for k in ticketKeys {
-            if let v = target[k] {
-                let s = String(describing: v).trimmingCharacters(in: .whitespacesAndNewlines)
-                if !s.isEmpty && s != "0" {
-                    ticketStr = s
-                    break
-                }
-            }
-        }
-        
-        // 3. Dates & Pricing
-        let rawOpenDate = firstValue(in: target, keys: ["open_time", "openTime", "time_create", "create_time", "time_setup", "timestamp", "time", "opened_at", "executed_at", "datetime"])
-        let openDate = parseDate(rawOpenDate) ?? Date()
-        
-        let rawOpenPrice = firstValue(in: target, keys: [
-            "open_price", "openPrice", "price", "executionPrice", "entry_price", "entryPrice",
-            "price_open", "open_rate", "rate", "deal_price", "fill_price", "execution_price",
-            "avg_price", "average_price", "trade_price", "open", "entry"
-        ])
-        var openPriceVal = parseDouble(rawOpenPrice) ?? 0.0
-        
-        let rawClosePrice = firstValue(in: target, keys: [
-            "close_price", "closePrice", "exit_price", "exitPrice", "price_close", 
-            "close_rate", "exit_rate", "close", "exit", "settle_price", "current_price"
-        ])
-        let closePriceVal = parseDouble(rawClosePrice)
-        
-        if openPriceVal == 0 && (closePriceVal ?? 0) > 0 {
-            openPriceVal = closePriceVal!
-        }
-        guard openPriceVal > 0 else { return ([], nil) }
-        let openPrice = Decimal(openPriceVal)
-        
-        // Deterministic ticket fallback if missing
-        if ticketStr.isEmpty {
-            ticketStr = "\(symbol)_\(Int(openDate.timeIntervalSince1970))_\(Int(openPriceVal * 100))"
-        }
-        
-        // 4. Volume / Lots
-        let rawVolume = firstValue(in: target, keys: ["volume", "lots", "quantity", "size", "units", "amount", "qty", "deal_volume"])
-        let volumeVal = parseDouble(rawVolume) ?? 0.01
-        let quantity = max(Decimal(string: "0.0001") ?? 0.0001, Decimal(volumeVal))
-        
-        // 5. Direction / Side
-        let rawOp = firstValue(in: target, keys: ["operation", "side", "type", "cmd", "direction", "action"])
-        let opRaw = String(describing: rawOp ?? "BUY").uppercased()
-        let isSell = opRaw.contains("SELL") || opRaw == "1" || opRaw.contains("SHORT")
-        let side: ExecutionSide = isSell ? .sell : .buy
-        let exitSide: ExecutionSide = isSell ? .buy : .sell
-        
-        let rawCloseDate = firstValue(in: target, keys: ["close_time", "closeTime", "time_close", "time_done", "time_update", "closed_at", "closedAt", "exit_time"])
-        let closeDate = parseDate(rawCloseDate)
-        
-        let rawFee = firstValue(in: target, keys: ["commission", "fee", "commission_amount", "fees", "comm"])
-        let feeVal = abs(parseDouble(rawFee) ?? 0.0)
-        let fee = Decimal(feeVal)
-        
-        let rawSwap = firstValue(in: target, keys: ["swap", "rollover", "swaps", "storage"])
-        let swapVal = parseDouble(rawSwap)
-        let swap: Decimal? = swapVal != nil ? Decimal(swapVal!) : nil
-        
-        let rawProfit = firstValue(in: target, keys: ["profit", "net_profit", "pnl", "realized_pnl", "net_pnl", "gross_pnl", "profit_loss", "pl"])
-        let profitVal = parseDouble(rawProfit)
-        
-        let rawStatus = String(describing: target["status"] ?? target["state"] ?? "").lowercased()
-        let isClosed = (closePriceVal != nil && closePriceVal! > 0) || 
-                       (closeDate != nil && closeDate != openDate) || 
-                       (profitVal != nil && profitVal != 0) ||
-                       rawStatus.contains("closed") || rawStatus.contains("filled") ||
-                       (target["closed"] as? Bool) == true
-        
+    private func assetClassForSymbol(_ symbol: String) -> AssetClass {
         let symUpper = symbol.uppercased()
-        let isMetals = symUpper.hasPrefix("XAU") || symUpper.hasPrefix("XAG") || symUpper.contains("GOLD") || symUpper.contains("SILVER")
-        let isCrypto = symUpper.hasPrefix("BTC") || symUpper.hasPrefix("ETH") || symUpper.hasPrefix("SOL") || symUpper.hasPrefix("XRP")
-        let isIndex = symUpper.hasPrefix("US30") || symUpper.hasPrefix("USTEC") || symUpper.hasPrefix("NAS") || symUpper.hasPrefix("SPX") || symUpper.hasPrefix("GER") || symUpper.hasPrefix("UK100") || symUpper.hasPrefix("WS30")
-        let assetClass: AssetClass = isMetals ? "commodity" : (isCrypto ? "crypto" : (isIndex ? "indices" : "forex"))
-        
-        var fills: [Execution] = []
-        var directTrade: Trade? = nil
-        
-        if isClosed {
-            let cp = closePriceVal ?? openPriceVal
-            let cDate = closeDate ?? openDate.addingTimeInterval(60)
-            
-            let entryId = "exness_\(ticketStr)_in"
-            let entryHash = "\(journalAccId)|\(symbol)|\(side.rawValue)|\(quantity)|\(openPriceVal)|\(Int64(openDate.timeIntervalSince1970 * 1000))"
-            let entryFill = Execution(
-                id: entryId,
-                accountId: journalAccId,
-                symbol: symbol,
-                side: side,
-                quantity: quantity,
-                price: openPrice,
-                fee: fee / 2,
-                swap: nil,
-                executedAt: openDate,
-                assetClass: assetClass,
-                source: "exness",
-                contentHash: entryHash
-            )
-            
-            let exitId = "exness_\(ticketStr)_out"
-            let exitHash = "\(journalAccId)|\(symbol)|\(exitSide.rawValue)|\(quantity)|\(cp)|\(Int64(cDate.timeIntervalSince1970 * 1000))"
-            let exitFill = Execution(
-                id: exitId,
-                accountId: journalAccId,
-                symbol: symbol,
-                side: exitSide,
-                quantity: quantity,
-                price: Decimal(cp),
-                fee: fee / 2,
-                swap: swap,
-                executedAt: cDate,
-                assetClass: assetClass,
-                source: "exness",
-                contentHash: exitHash
-            )
-            fills.append(entryFill)
-            fills.append(exitFill)
-            
-            // Construct authoritative direct Trade using broker-reported profit
-            let tradeKey = "exness_\(ticketStr)"
-            let rawNetPnl: Decimal = profitVal != nil ? Decimal(profitVal!) : ((side == .buy ? Decimal(cp) - openPrice : openPrice - Decimal(cp)) * quantity * 1000 - fee + (swap ?? 0))
-            let grossPnl: Decimal = rawNetPnl + fee - (swap ?? 0)
-            
-            let tradeStatus: TradeStatus = rawNetPnl > 0 ? .win : (rawNetPnl < 0 ? .loss : .breakeven)
-            let durMs = Int64(max(0, cDate.timeIntervalSince(openDate) * 1000))
-            
-            directTrade = Trade(
-                key: tradeKey,
-                accountId: journalAccId,
-                symbol: symbol,
-                assetClass: assetClass,
-                direction: side == .buy ? .long : .short,
-                status: tradeStatus,
-                openedAt: openDate,
-                closedAt: cDate,
-                quantity: quantity,
-                openQuantity: 0,
-                avgEntry: openPrice,
-                avgExit: Decimal(cp),
-                grossPnl: grossPnl,
-                fees: fee,
-                swap: swap,
-                netPnl: rawNetPnl,
-                executionCount: 2,
-                executionIds: [entryId, exitId],
-                durationMs: durMs
-            )
-        } else {
-            // Open Position
-            let fillId = "exness_\(ticketStr)"
-            let fillHash = "\(journalAccId)|\(symbol)|\(side.rawValue)|\(quantity)|\(openPriceVal)|\(Int64(openDate.timeIntervalSince1970 * 1000))"
-            let fill = Execution(
-                id: fillId,
-                accountId: journalAccId,
-                symbol: symbol,
-                side: side,
-                quantity: quantity,
-                price: openPrice,
-                fee: fee,
-                swap: swap,
-                executedAt: openDate,
-                assetClass: assetClass,
-                source: "exness",
-                contentHash: fillHash
-            )
-            fills.append(fill)
-            
-            let tradeKey = "exness_\(ticketStr)"
-            let rawNetPnl: Decimal = profitVal != nil ? Decimal(profitVal!) : 0
-            directTrade = Trade(
-                key: tradeKey,
-                accountId: journalAccId,
-                symbol: symbol,
-                assetClass: assetClass,
-                direction: side == .buy ? .long : .short,
-                status: .open,
-                openedAt: openDate,
-                closedAt: nil,
-                quantity: quantity,
-                openQuantity: quantity,
-                avgEntry: openPrice,
-                avgExit: nil,
-                grossPnl: 0,
-                fees: fee,
-                swap: swap,
-                netPnl: rawNetPnl,
-                executionCount: 1,
-                executionIds: [fillId],
-                durationMs: nil
-            )
+        if symUpper.hasPrefix("XAU") || symUpper.hasPrefix("XAG") || symUpper.contains("GOLD") || symUpper.contains("SILVER") {
+            return "commodity"
         }
-        
-        return (fills, directTrade)
+        if symUpper.hasPrefix("BTC") || symUpper.hasPrefix("ETH") || symUpper.hasPrefix("SOL") || symUpper.hasPrefix("XRP") {
+            return "crypto"
+        }
+        if symUpper.hasPrefix("US30") || symUpper.hasPrefix("USTEC") || symUpper.hasPrefix("NAS") || symUpper.hasPrefix("SPX") || symUpper.hasPrefix("GER") || symUpper.hasPrefix("UK100") || symUpper.hasPrefix("WS30") {
+            return "indices"
+        }
+        return "forex"
     }
     
     /// Synchronizes trades, orders, positions, and history from Exness REST API
@@ -994,63 +705,307 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
             }
         }
         
-        // 1. Fetch live balance, equity, and normalized currency (USC -> USD)
+        // 1. Fetch live balance, equity, and normalized currency
         _ = try? await testConnection()
         
         let accessPointHost = await resolveAccessPoint()
+        let clusterHost = accessPointHost.contains("ap-") ? accessPointHost : "https://api.exness-api.com"
         let journalAccId = "exness_\(cleanId)"
         
         await MainActor.run {
             self.syncAccountWithDataStore()
         }
         
-        // 2. Query target trading endpoints on the cluster host and gateway
-        let clusterHost = (accessPointHost.contains("ap-") ? accessPointHost : "https://api.exness-api.com")
-        let candidatePaths = [
-            "/v1/trading/accounts/\(cleanId)/positions",
-            "/v1/trading/accounts/\(cleanId)/orders",
-            "/v1/accounts/\(cleanId)/positions",
-            "/v1/accounts/\(cleanId)/orders"
+        // 2. Fetch live snapshot positions and orders
+        let snapshotResult = await fetchEndpointData(path: "/v1/trading/accounts/\(cleanId)/snapshot", host: clusterHost)
+        var snapshotPositions: [[String: Any]] = []
+        if let sJson = snapshotResult.json, let posArr = sJson["positions"] as? [[String: Any]] {
+            snapshotPositions = posArr
+        }
+        
+        // 3. Query Deals and Orders History in safe 14-day chunks (Exness limit: max 30 days per request)
+        // Backfill up to 28 days back
+        let nowServer = Date().addingTimeInterval(Double(serverTimeOffsetMs) / 1000.0)
+        let isoFormatter = ISO8601DateFormatter()
+        isoFormatter.formatOptions = [.withInternetDateTime]
+        
+        let chunkWindows: [(from: Date, to: Date)] = [
+            (nowServer.addingTimeInterval(-14 * 24 * 3600), nowServer),
+            (nowServer.addingTimeInterval(-28 * 24 * 3600), nowServer.addingTimeInterval(-14 * 24 * 3600))
         ]
         
-        var allRawRecords: [[String: Any]] = []
-        var seenRecordSignatures = Set<String>()
-        var hadPermissionDenied = false
+        var allDeals: [[String: Any]] = []
+        var allOrders: [[String: Any]] = []
+        var seenDealIds = Set<String>()
+        var seenOrderIds = Set<String>()
         
-        for path in candidatePaths {
-            let result = await fetchEndpointData(path: path, host: clusterHost)
-            if result.isPermissionDenied {
-                hadPermissionDenied = true
-            }
-            for rec in result.records {
-                let sig = recordSignature(rec)
-                if !seenRecordSignatures.contains(sig) {
-                    seenRecordSignatures.insert(sig)
-                    allRawRecords.append(rec)
+        for w in chunkWindows {
+            let fromStr = isoFormatter.string(from: w.from)
+            let toStr = isoFormatter.string(from: w.to)
+            
+            // A. Fetch Deals
+            let dealsPath = "/v1/history/accounts/\(cleanId)/deals?from=\(fromStr.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? fromStr)&to=\(toStr.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? toStr)"
+            let dRes = await fetchEndpointData(path: dealsPath, host: clusterHost)
+            if let dJson = dRes.json, let items = dJson["items"] as? [[String: Any]] {
+                for it in items {
+                    if let deal = it["deal"] as? [String: Any],
+                       let dId = deal["deal_id"] as? String,
+                       !seenDealIds.contains(dId) {
+                        seenDealIds.insert(dId)
+                        allDeals.append(deal)
+                    }
                 }
             }
-            if !allRawRecords.isEmpty {
-                break
+            
+            // B. Fetch Orders
+            let ordersPath = "/v1/history/accounts/\(cleanId)/orders?from=\(fromStr.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? fromStr)&to=\(toStr.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? toStr)"
+            let oRes = await fetchEndpointData(path: ordersPath, host: clusterHost)
+            if let oJson = oRes.json, let items = oJson["items"] as? [[String: Any]] {
+                for it in items {
+                    if let order = it["order"] as? [String: Any],
+                       let oId = order["order_id"] as? String,
+                       !seenOrderIds.contains(oId) {
+                        seenOrderIds.insert(oId)
+                        allOrders.append(order)
+                    }
+                }
             }
         }
         
-        // 3. Parse Exness records to database Execution fills and direct Trade objects
-        var newExecutions: [Execution] = []
+        // 4. Map Orders to SL / TP by position_id
+        var positionSltpMap: [String: (sl: Decimal?, tp: Decimal?)] = [:]
+        for o in allOrders {
+            guard let posId = o["position_id"] as? String, !posId.isEmpty else { continue }
+            let sl = parseDecimal(o["stop_loss_price"])
+            let tp = parseDecimal(o["take_profit_price"])
+            let existing = positionSltpMap[posId] ?? (nil, nil)
+            positionSltpMap[posId] = (
+                sl != nil && (sl ?? 0) > 0 ? sl : existing.sl,
+                tp != nil && (tp ?? 0) > 0 ? tp : existing.tp
+            )
+        }
+        
+        // 5. Group deals by position_id
+        struct DealGroup {
+            let positionId: String
+            var symbol: String
+            var openDeals: [[String: Any]]
+            var closeDeals: [[String: Any]]
+        }
+        
+        var groups: [String: DealGroup] = [:]
+        for d in allDeals {
+            let type = (d["type"] as? String) ?? ""
+            if type == "balance" {
+                // Deposit or withdrawal transaction
+                continue
+            }
+            guard let posId = d["position_id"] as? String, !posId.isEmpty else { continue }
+            let sym = (d["instrument"] as? String) ?? "UNKNOWN"
+            
+            if groups[posId] == nil {
+                groups[posId] = DealGroup(positionId: posId, symbol: sym, openDeals: [], closeDeals: [])
+            }
+            if type == "open" {
+                groups[posId]?.openDeals.append(d)
+            } else if type == "close" {
+                groups[posId]?.closeDeals.append(d)
+            }
+        }
+        
+        // 6. Build atomic Executions and authoritative Trades
         var directTrades: [Trade] = []
+        var newExecutions: [Execution] = []
         
-        for raw in allRawRecords {
-            let parsed = parseExnessRecord(raw, journalAccId: journalAccId)
-            newExecutions.append(contentsOf: parsed.executions)
-            if let dt = parsed.directTrade {
-                directTrades.append(dt)
+        for (posId, g) in groups {
+            let sym = g.symbol
+            let assetClass = assetClassForSymbol(sym)
+            let sltp = positionSltpMap[posId]
+            
+            // A. Open Deal & Entry
+            let openDeal = g.openDeals.first
+            let openDir = (openDeal?["direction"] as? String ?? "buy").lowercased()
+            let tradeDir: TradeDirection = (openDir == "sell") ? .short : .long
+            let entryPrice = parseDecimal(openDeal?["price"]) ?? 0
+            let openDate = parseDate(openDeal?["create_time"]) ?? Date()
+            let volume = parseDecimal(openDeal?["volume"]) ?? 0.01
+            
+            var execIds: [String] = []
+            
+            // Record Open Execution Fill
+            if let od = openDeal, let dId = od["deal_id"] as? String {
+                let execId = "exness_deal_\(dId)"
+                execIds.append(execId)
+                let fillHash = "\(journalAccId)|\(sym)|\(openDir)|\(volume)|\(entryPrice)|\(Int64(openDate.timeIntervalSince1970 * 1000))"
+                let openFill = Execution(
+                    id: execId,
+                    accountId: journalAccId,
+                    symbol: sym,
+                    side: tradeDir == .short ? .sell : .buy,
+                    quantity: volume,
+                    price: entryPrice,
+                    fee: 0,
+                    swap: nil,
+                    executedAt: openDate,
+                    assetClass: assetClass,
+                    source: "exness",
+                    contentHash: fillHash
+                )
+                newExecutions.append(openFill)
+            }
+            
+            // B. Close Deal & Exit
+            let closeDeal = g.closeDeals.first
+            if let cd = closeDeal, let cdId = cd["deal_id"] as? String {
+                let exitPrice = parseDecimal(cd["price"]) ?? entryPrice
+                let closeDate = parseDate(cd["create_time"]) ?? openDate
+                let exitDir = (cd["direction"] as? String ?? "sell").lowercased()
+                
+                // Profit amount reported by Exness broker
+                var pnl: Decimal = 0
+                if let pObj = cd["profit"] as? [String: Any] {
+                    pnl = parseDecimal(pObj["amount"]) ?? 0
+                }
+                
+                let exitExecId = "exness_deal_\(cdId)"
+                execIds.append(exitExecId)
+                let exitHash = "\(journalAccId)|\(sym)|\(exitDir)|\(volume)|\(exitPrice)|\(Int64(closeDate.timeIntervalSince1970 * 1000))"
+                let exitFill = Execution(
+                    id: exitExecId,
+                    accountId: journalAccId,
+                    symbol: sym,
+                    side: tradeDir == .short ? .buy : .sell,
+                    quantity: volume,
+                    price: exitPrice,
+                    fee: 0,
+                    swap: nil,
+                    executedAt: closeDate,
+                    assetClass: assetClass,
+                    source: "exness",
+                    contentHash: exitHash
+                )
+                newExecutions.append(exitFill)
+                
+                let status: TradeStatus = pnl > 0 ? .win : (pnl < 0 ? .loss : .breakeven)
+                let durMs = Int64(max(0, closeDate.timeIntervalSince(openDate) * 1000))
+                
+                let trade = Trade(
+                    key: "exness_\(posId)",
+                    accountId: journalAccId,
+                    symbol: sym,
+                    assetClass: assetClass,
+                    direction: tradeDir,
+                    status: status,
+                    openedAt: openDate,
+                    closedAt: closeDate,
+                    quantity: volume,
+                    openQuantity: 0,
+                    avgEntry: entryPrice,
+                    avgExit: exitPrice,
+                    grossPnl: pnl,
+                    fees: 0,
+                    swap: nil,
+                    netPnl: pnl,
+                    executionCount: execIds.count,
+                    executionIds: execIds,
+                    stopLoss: sltp?.sl,
+                    profitTarget: sltp?.tp,
+                    durationMs: durMs
+                )
+                directTrades.append(trade)
+            } else {
+                // Open position from historical deals without a close deal yet
+                let trade = Trade(
+                    key: "exness_\(posId)",
+                    accountId: journalAccId,
+                    symbol: sym,
+                    assetClass: assetClass,
+                    direction: tradeDir,
+                    status: .open,
+                    openedAt: openDate,
+                    closedAt: nil,
+                    quantity: volume,
+                    openQuantity: volume,
+                    avgEntry: entryPrice,
+                    avgExit: nil,
+                    grossPnl: 0,
+                    fees: 0,
+                    swap: nil,
+                    netPnl: 0,
+                    executionCount: execIds.count,
+                    executionIds: execIds,
+                    stopLoss: sltp?.sl,
+                    profitTarget: sltp?.tp,
+                    durationMs: nil
+                )
+                directTrades.append(trade)
             }
         }
         
-        // 4. Ingest executions and direct trades into TradeDataStore
+        // 7. Parse active Snapshot positions (if not already covered in deals)
+        for p in snapshotPositions {
+            guard let posId = p["position_id"] as? String, !posId.isEmpty else { continue }
+            if directTrades.contains(where: { $0.key == "exness_\(posId)" }) {
+                continue
+            }
+            let sym = (p["instrument"] as? String) ?? "UNKNOWN"
+            let assetClass = assetClassForSymbol(sym)
+            let dirStr = (p["direction"] as? String ?? "buy").lowercased()
+            let tradeDir: TradeDirection = (dirStr == "sell") ? .short : .long
+            let price = parseDecimal(p["open_price"]) ?? 0
+            let volume = parseDecimal(p["volume"]) ?? 0.01
+            let openDate = parseDate(p["create_time"]) ?? Date()
+            let sltp = positionSltpMap[posId]
+            
+            let execId = "exness_pos_\(posId)"
+            let fillHash = "\(journalAccId)|\(sym)|\(dirStr)|\(volume)|\(price)|\(Int64(openDate.timeIntervalSince1970 * 1000))"
+            let fill = Execution(
+                id: execId,
+                accountId: journalAccId,
+                symbol: sym,
+                side: tradeDir == .short ? .sell : .buy,
+                quantity: volume,
+                price: price,
+                fee: 0,
+                swap: nil,
+                executedAt: openDate,
+                assetClass: assetClass,
+                source: "exness",
+                contentHash: fillHash
+            )
+            newExecutions.append(fill)
+            
+            let openTrade = Trade(
+                key: "exness_\(posId)",
+                accountId: journalAccId,
+                symbol: sym,
+                assetClass: assetClass,
+                direction: tradeDir,
+                status: .open,
+                openedAt: openDate,
+                closedAt: nil,
+                quantity: volume,
+                openQuantity: volume,
+                avgEntry: price,
+                avgExit: nil,
+                grossPnl: 0,
+                fees: 0,
+                swap: nil,
+                netPnl: 0,
+                executionCount: 1,
+                executionIds: [execId],
+                stopLoss: sltp?.sl,
+                profitTarget: sltp?.tp,
+                durationMs: nil
+            )
+            directTrades.append(openTrade)
+        }
+        
+        // 8. Ingest into TradeDataStore
         await MainActor.run {
             let dataStore = TradeDataStore.shared
             
-            // A. Merge direct trades first so authoritative broker trades are in place
+            // A. Merge direct trades with broker-reported P&L
             if !directTrades.isEmpty {
                 var currentTrades = dataStore.trades
                 for t in directTrades {
@@ -1064,14 +1019,13 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
                 dataStore.deduplicateTrades()
             }
             
-            // B. Import executions for execution history audit log
+            // B. Import execution fills
             if !newExecutions.isEmpty {
                 dataStore.importExecutions(accountId: journalAccId, newExecutions: newExecutions)
             }
             
-            // Only invalidate caches and write to disk if new trades or executions arrived
+            // C. Invalidate performance caches and persist
             if !directTrades.isEmpty || !newExecutions.isEmpty {
-                // Ensure newly synced Exness account is selected if currently default or empty
                 if dataStore.selectedAccountId.isEmpty || dataStore.selectedAccountId == "default-acc" {
                     dataStore.selectedAccountId = journalAccId
                 }
@@ -1080,7 +1034,7 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
                 dataStore.objectWillChange.send()
             }
             
-            let total = directTrades.count > 0 ? directTrades.count : (newExecutions.count / 2)
+            let total = directTrades.count
             self.syncedTradesCount = total
             
             let formattedBal = Formatters.formatCurrency(self.balance, currency: self.currency)
@@ -1088,10 +1042,8 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
             
             if total > 0 {
                 self.lastSyncSummary = "Connected • Balance: \(formattedBal) • \(total) trades synced"
-            } else if hadPermissionDenied {
-                self.lastSyncSummary = "Connected • Balance: \(formattedBal) • 0 trades (API Trade permission required in Exness PA)"
             } else {
-                self.lastSyncSummary = "Connected • Balance: \(formattedBal) • Account \(accLabel) synced. Note: Exness trade history is hosted on MT4/MT5. Import your MT statement HTML/CSV or use cTrader/The5ers auto-sync."
+                self.lastSyncSummary = "Connected • Balance: \(formattedBal) • Account \(accLabel) synced (no recent deals in 28-day window)"
             }
         }
         
