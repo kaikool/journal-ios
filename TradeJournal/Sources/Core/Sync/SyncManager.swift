@@ -84,26 +84,18 @@ public final class SyncManager: ObservableObject {
     private var backgroundBackupTask: Task<Void, Never>? = nil
     private var activeSyncTask: Task<[SyncResult], Never>? = nil
     private var lastAutoSyncDate: Date? = nil
-    private var autoSyncTimer: AnyCancellable? = nil
     
-    /// Starts periodic gentle background auto-sync every 60 seconds while the app is active
+    /// Starts periodic background timer - disabled to guarantee 120fps UI performance without main-thread jitter
     public func startPeriodicAutoSync() {
         stopPeriodicAutoSync()
-        autoSyncTimer = Timer.publish(every: 60, on: .main, in: .common)
-            .autoconnect()
-            .sink { [weak self] _ in
-                self?.autoSyncIfNeeded(cooldownSeconds: 45, delaySeconds: 0)
-            }
     }
     
-    /// Stops periodic background timer when app enters background
+    /// Stops periodic background timer
     public func stopPeriodicAutoSync() {
-        autoSyncTimer?.cancel()
-        autoSyncTimer = nil
+        // No-op: background timer permanently retired to prevent UI stutter
     }
     
     /// Automatically synchronizes data in the background without blocking the UI.
-    /// Runs gently on app launch, foreground resume, and periodically every 5 minutes.
     public func autoSyncIfNeeded(cooldownSeconds: Double = 120, delaySeconds: Double = 3, force: Bool = false) {
         guard !isSyncing else { return }
         
@@ -114,7 +106,6 @@ public final class SyncManager: ObservableObject {
         lastAutoSyncDate = now
         
         Task.detached(priority: .background) { [weak self] in
-            // Wait for UI to finish loading completely and be 100% interactive
             if delaySeconds > 0 {
                 try? await Task.sleep(nanoseconds: UInt64(delaySeconds * 1_000_000_000))
             }
@@ -143,14 +134,12 @@ public final class SyncManager: ObservableObject {
                 if count > 0 { brokerUpdatesCount += count }
             }
             
-            // If any broker brought fresh trades or balance updates, refresh UI and schedule cloud backup
             if brokerUpdatesCount > 0 {
                 await MainActor.run {
                     TradeDataStore.shared.invalidatePerformanceCaches()
-                    TradeDataStore.shared.saveToDisk(immediate: true)
+                    TradeDataStore.shared.performSaveToDiskAsync()
                     TradeDataStore.shared.objectWillChange.send()
                 }
-                await self?.scheduleBackgroundCloudBackup(delaySeconds: 5)
             }
         }
     }
@@ -300,8 +289,8 @@ public final class SyncManager: ObservableObject {
             return results
         }
         
-        // 3. Persist local store
-        TradeDataStore.shared.saveToDisk()
+        // 3. Persist local store asynchronously
+        TradeDataStore.shared.performSaveToDiskAsync()
         
         // 4. If Cloud Backup is requested and Supabase provider is configured, backup fresh data
         if options.backupToCloud, let supabaseProvider = provider(for: "supabase"), supabaseProvider.isConfigured {

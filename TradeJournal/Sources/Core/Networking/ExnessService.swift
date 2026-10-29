@@ -1030,7 +1030,7 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
                     dataStore.selectedAccountId = journalAccId
                 }
                 dataStore.invalidatePerformanceCaches()
-                dataStore.saveToDisk(immediate: true)
+                dataStore.performSaveToDiskAsync()
                 dataStore.objectWillChange.send()
             }
             
@@ -1054,17 +1054,16 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
             self.isConnected = true
         }
         
-        // Immediately sync everything to Supabase Cloud
-        Task {
-            if SupabaseService.shared.isConfigured {
+        // Asynchronously backup to Supabase Cloud in the background without blocking UI
+        if SupabaseService.shared.isConfigured {
+            Task.detached(priority: .background) {
                 if !directTrades.isEmpty {
-                    try? await SupabaseService.shared.upsertTrades(directTrades)
+                    _ = try? await SupabaseService.shared.upsertTrades(directTrades)
                 }
                 if !newExecutions.isEmpty {
-                    try? await SupabaseService.shared.upsertExecutions(newExecutions)
+                    _ = try? await SupabaseService.shared.upsertExecutions(newExecutions)
                 }
             }
-            await TradeDataStore.shared.syncWithSupabase(isBackground: true)
         }
         
         return self.syncedTradesCount
