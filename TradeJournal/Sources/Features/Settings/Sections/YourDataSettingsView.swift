@@ -1,7 +1,7 @@
 import SwiftUI
 
 // MARK: - 7. Your Data & Backups Settings View
-// Clean Apple HIG settings view: Built-in cloud sync, Wipe tools for dev, Export & Local reset
+// Clean Apple HIG settings view: Cloud Database sync, Export tools, and local data management.
 public struct YourDataSettingsView: View {
     @ObservedObject private var dataStore = TradeDataStore.shared
     
@@ -12,11 +12,6 @@ public struct YourDataSettingsView: View {
     @State private var isWipingSupabase: Bool = false
     @State private var supabaseSyncStatus: String? = nil
     
-    @State private var supabaseUrl: String = SupabaseService.shared.supabaseUrl
-    @State private var supabaseAnonKey: String = SupabaseService.shared.supabaseAnonKey
-    @State private var showSupabaseConfig: Bool = false
-    @State private var configSaveStatus: String? = nil
-    
     public init() {}
     
     public var body: some View {
@@ -26,92 +21,35 @@ public struct YourDataSettingsView: View {
                 VStack(alignment: .leading, spacing: 14) {
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Supabase Cloud Storage")
+                            Text("Supabase Cloud")
                                 .font(AppTypography.headline)
-                            Text("Trades, accounts, and journals automatically sync to your private cloud database.")
-                                .font(AppTypography.caption)
-                                .foregroundColor(AppColors.secondaryText)
+                            HStack(spacing: 6) {
+                                Circle()
+                                    .fill(SupabaseService.shared.isConfigured ? AppColors.profit : AppColors.secondaryText)
+                                    .frame(width: 8, height: 8)
+                                Text(SupabaseService.shared.isConfigured ? "Đã kết nối" : "Chưa kết nối")
+                                    .font(AppTypography.captionBold)
+                                    .foregroundColor(SupabaseService.shared.isConfigured ? AppColors.profit : AppColors.secondaryText)
+                            }
                         }
                         Spacer()
-                        Text(SupabaseService.shared.isConfigured ? "Connected" : "Not configured")
-                            .font(AppTypography.captionBold)
-                            .foregroundColor(SupabaseService.shared.isConfigured ? AppColors.profit : AppColors.secondaryText)
-                    }
-                    
-                    DisclosureGroup(isExpanded: $showSupabaseConfig) {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Hardware-backed credentials (AES-256 Keychain). Leave empty to use environment variables.")
-                                .font(AppTypography.caption)
-                                .foregroundColor(AppColors.secondaryText)
-                                .padding(.top, 4)
-                            
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Project URL")
-                                    .font(AppTypography.captionBold)
-                                    .foregroundColor(AppColors.secondaryText)
-                                TextField("https://your-project.supabase.co", text: $supabaseUrl)
-                                    .textFieldStyle(.roundedBorder)
-                                    .textInputAutocapitalization(.never)
-                                    .autocorrectionDisabled()
+                        HStack(spacing: 8) {
+                            AppButton("Sync", icon: "arrow.triangle.2.circlepath", style: .primary, size: .compact, isLoading: dataStore.isSyncing) {
+                                syncSupabase()
                             }
+                            .disabled(!SupabaseService.shared.isConfigured)
                             
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Anon Public Key")
-                                    .font(AppTypography.captionBold)
-                                    .foregroundColor(AppColors.secondaryText)
-                                SecureField("Enter Supabase Anon Key", text: $supabaseAnonKey)
-                                    .textFieldStyle(.roundedBorder)
-                                    .textInputAutocapitalization(.never)
-                                    .autocorrectionDisabled()
+                            AppButton("Wipe", icon: "trash", style: .destructive, size: .compact, isLoading: isWipingSupabase) {
+                                showWipeConfirmation = true
                             }
-                            
-                            HStack(spacing: 12) {
-                                AppButton("Save Credentials", icon: "checkmark.circle", style: .primary, size: .compact) {
-                                    saveSupabaseConfig()
-                                }
-                                
-                                if SupabaseService.shared.isConfigured {
-                                    AppButton("Disconnect", icon: "xmark.circle", style: .destructive, size: .compact) {
-                                        disconnectSupabase()
-                                    }
-                                }
-                            }
-                            
-                            if let saveStatus = configSaveStatus {
-                                Text(saveStatus)
-                                    .font(AppTypography.caption)
-                                    .foregroundColor(saveStatus.contains("error") ? AppColors.loss : AppColors.profit)
-                            }
+                            .disabled(isWipingSupabase || dataStore.isSyncing || !SupabaseService.shared.isConfigured)
                         }
-                        .padding(.vertical, 8)
-                    } label: {
-                        HStack {
-                            Image(systemName: "key.fill")
-                                .foregroundColor(AppColors.brand)
-                            Text("Database Credentials & Connection")
-                                .font(AppTypography.subheadlineBold)
-                                .foregroundColor(AppColors.primaryText)
-                        }
-                    }
-                    
-                    Divider()
-                    
-                    HStack(spacing: 12) {
-                        AppButton("Sync now", icon: "arrow.triangle.2.circlepath", style: .primary, size: .compact, fullWidth: true, isLoading: dataStore.isSyncing) {
-                            syncSupabase()
-                        }
-                        .disabled(!SupabaseService.shared.isConfigured)
-                        
-                        AppButton("Wipe cloud data", icon: "trash", style: .destructive, size: .compact, fullWidth: true, isLoading: isWipingSupabase) {
-                            showWipeConfirmation = true
-                        }
-                        .disabled(isWipingSupabase || dataStore.isSyncing || !SupabaseService.shared.isConfigured)
                     }
                     
                     if let status = supabaseSyncStatus {
                         Text(status)
                             .font(AppTypography.caption)
-                            .foregroundColor(status.contains("Error") || status.contains("error") ? AppColors.loss : AppColors.profit)
+                            .foregroundColor(status.contains("Error") || status.contains("error") || status.contains("Lỗi") ? AppColors.loss : AppColors.profit)
                     }
                 }
             }
@@ -173,32 +111,17 @@ public struct YourDataSettingsView: View {
     
     // MARK: - Actions
     
-    private func saveSupabaseConfig() {
-        let cleanUrl = supabaseUrl.trimmingCharacters(in: .whitespacesAndNewlines)
-        let cleanKey = supabaseAnonKey.trimmingCharacters(in: .whitespacesAndNewlines)
-        
-        SupabaseService.shared.configure(url: cleanUrl, anonKey: cleanKey)
-        configSaveStatus = "Supabase configuration saved securely in Apple Keychain."
-    }
-    
-    private func disconnectSupabase() {
-        supabaseUrl = ""
-        supabaseAnonKey = ""
-        SupabaseService.shared.configure(url: "", anonKey: "")
-        configSaveStatus = "Disconnected from Supabase."
-    }
-    
     private func syncSupabase() {
         Task {
-            supabaseSyncStatus = "Syncing with cloud database..."
+            supabaseSyncStatus = "Đang đồng bộ..."
             await dataStore.syncWithSupabase()
             await MainActor.run {
                 if let err = dataStore.lastSyncError {
-                    self.supabaseSyncStatus = "Sync error: \(err)"
+                    self.supabaseSyncStatus = "Lỗi sync: \(err)"
                 } else if let summary = dataStore.lastSyncSummary {
                     self.supabaseSyncStatus = summary
                 } else {
-                    self.supabaseSyncStatus = "Cloud sync completed successfully!"
+                    self.supabaseSyncStatus = "Đồng bộ thành công!"
                 }
             }
         }
@@ -206,18 +129,18 @@ public struct YourDataSettingsView: View {
     
     private func wipeSupabaseData() {
         isWipingSupabase = true
-        supabaseSyncStatus = "Wiping all tables on Supabase cloud database..."
+        supabaseSyncStatus = "Đang xóa dữ liệu đám mây..."
         Task {
             do {
                 try await SupabaseService.shared.wipeAllRemoteData()
                 await MainActor.run {
                     self.isWipingSupabase = false
-                    self.supabaseSyncStatus = "Cloud database wiped successfully."
+                    self.supabaseSyncStatus = "Đã xóa toàn bộ dữ liệu đám mây."
                 }
             } catch {
                 await MainActor.run {
                     self.isWipingSupabase = false
-                    self.supabaseSyncStatus = "Wipe error: \(error.localizedDescription)"
+                    self.supabaseSyncStatus = "Lỗi: \(error.localizedDescription)"
                 }
             }
         }
@@ -266,18 +189,34 @@ public struct YourDataSettingsView: View {
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         encoder.dateEncodingStrategy = .iso8601
         
-        guard let data = try? encoder.encode(backup) else { return }
-        let tempUrl = FileManager.default.temporaryDirectory.appendingPathComponent("trade-journal-export.json")
-        try? data.write(to: tempUrl)
-        self.exportedFileUrl = tempUrl
-        self.showExportSheet = true
+        do {
+            let data = try encoder.encode(backup)
+            let tempDir = FileManager.default.temporaryDirectory
+            let fileUrl = tempDir.appendingPathComponent("TradeJournal_Backup_\(Date().timeIntervalSince1970).json")
+            try data.write(to: fileUrl)
+            
+            self.exportedFileUrl = fileUrl
+            self.showExportSheet = true
+        } catch {
+            AppLogger.error("Failed to export full backup JSON: \(error.localizedDescription)")
+        }
     }
     
     private func exportTradesCsv() {
-        let csv = dataStore.exportTradesCsv()
-        let tempUrl = FileManager.default.temporaryDirectory.appendingPathComponent("trades.csv")
-        try? csv.data(using: .utf8)?.write(to: tempUrl)
-        self.exportedFileUrl = tempUrl
-        self.showExportSheet = true
+        var csv = "Trade ID,Account,Symbol,Direction,Entry Date,Exit Date,Entry Price,Exit Price,Size,Net P&L,Status,Playbook\n"
+        for trade in dataStore.trades {
+            let line = "\(trade.id),\(trade.accountId),\(trade.symbol),\(trade.direction.rawValue),\(trade.entryDate?.description ?? ""),\(trade.exitDate?.description ?? ""),\(trade.entryPrice ?? 0),\(trade.exitPrice ?? 0),\(trade.size ?? 0),\(trade.netPnl ?? 0),\(trade.status.rawValue),\"\(trade.playbookTag ?? "")\"\n"
+            csv += line
+        }
+        
+        let tempDir = FileManager.default.temporaryDirectory
+        let fileUrl = tempDir.appendingPathComponent("TradeJournal_Trades_\(Date().timeIntervalSince1970).csv")
+        do {
+            try csv.write(to: fileUrl, atomically: true, encoding: .utf8)
+            self.exportedFileUrl = fileUrl
+            self.showExportSheet = true
+        } catch {
+            AppLogger.error("Failed to export trades CSV: \(error.localizedDescription)")
+        }
     }
 }

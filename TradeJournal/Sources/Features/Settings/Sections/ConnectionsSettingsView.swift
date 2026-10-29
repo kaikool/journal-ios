@@ -374,150 +374,76 @@ public struct ConnectionsSettingsView: View {
                 }
             }
             
-            // Card 4: Exness REST API Connection (exness-api.com)
+            // Card 4: Exness REST API Connection
             SettingsCard(title: "Exness") {
                 VStack(alignment: .leading, spacing: 14) {
                     HStack {
-                        Text("Exness REST API (exness-api.com)")
-                            .font(AppTypography.headline)
-                        Spacer()
-                        Text(exness.isConnected ? "Connected · Active" : "Not configured")
-                            .font(AppTypography.captionBold)
-                            .foregroundColor(exness.isConnected ? AppColors.profit : AppColors.secondaryText)
-                    }
-                    
-                    Text("Đồng bộ trực tiếp qua chuẩn Exness REST API & chữ ký Ed25519 (không cần Cloud Bridge trung gian). API Key và Private Key được mã hóa phần cứng an toàn trong Apple Keychain.")
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.secondaryText)
-                    
-                    // API Host Field
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("API Host URL:")
-                            .font(AppTypography.captionBold)
-                            .foregroundColor(AppColors.secondaryText)
-                        
-                        TextField("https://api.exness.com hoặc node được cấp", text: $exnessHost)
-                            .font(AppTypography.inputText)
-                            .textFieldStyle(.roundedBorder)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled(true)
-                    }
-                    
-                    // Account ID
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Account ID (Số tài khoản Exness):")
-                            .font(AppTypography.captionBold)
-                            .foregroundColor(AppColors.secondaryText)
-                        
-                        TextField("Nhập số tài khoản Exness (ví dụ: 12345678)", text: $exnessAccountId)
-                            .font(AppTypography.inputText)
-                            .textFieldStyle(.roundedBorder)
-                            .keyboardType(.numberPad)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled(true)
-                    }
-                    
-                    // Public API Key (EXN-API-KEY)
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack {
-                            Text("Public API Key (EXN-API-KEY):")
-                                .font(AppTypography.captionBold)
-                                .foregroundColor(AppColors.secondaryText)
-                            Spacer()
-                            #if canImport(UIKit)
-                            Button("Dán") {
-                                if let str = UIPasteboard.general.string {
-                                    exnessApiKey = str.trimmingCharacters(in: .whitespacesAndNewlines)
-                                }
-                            }
-                            .font(AppTypography.captionBold)
-                            .foregroundColor(AppColors.brand)
-                            #endif
-                        }
-                        
-                        TextField("exnsk_...", text: $exnessApiKey)
-                            .font(AppTypography.inputText)
-                            .textFieldStyle(.roundedBorder)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled(true)
-                    }
-                    
-                    // Private Key (Ed25519)
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack {
-                            Text("Private Key (Khóa ký Ed25519):")
-                                .font(AppTypography.captionBold)
-                                .foregroundColor(AppColors.secondaryText)
-                            Spacer()
-                            #if canImport(UIKit)
-                            Button("Dán") {
-                                if let str = UIPasteboard.general.string {
-                                    exnessPrivateKey = str.trimmingCharacters(in: .whitespacesAndNewlines)
-                                }
-                            }
-                            .font(AppTypography.captionBold)
-                            .foregroundColor(AppColors.brand)
-                            #endif
-                        }
-                        
-                        SecureField("Dán Private Key (Hex / Base64)...", text: $exnessPrivateKey)
-                            .font(AppTypography.inputText)
-                            .textFieldStyle(.roundedBorder)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled(true)
-                    }
-                    
-                    // Cryptographic signing security badge
-                    HStack(alignment: .top, spacing: 8) {
-                        Image(systemName: "lock.shield.fill")
-                            .foregroundColor(AppColors.brand)
-                            .font(.system(size: 16))
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Ký số Ed25519 cục bộ & Bảo mật Keychain:")
-                                .font(AppTypography.captionBold)
-                                .foregroundColor(AppColors.primaryText)
-                            Text("Ứng dụng tự động sinh header EXN-SIGN và EXN-DATA bằng Apple CryptoKit ngay trên máy. Private Key được khóa trong chip Secure Enclave, không bao giờ gửi khóa bí mật lên internet.")
-                                .font(AppTypography.caption)
-                                .foregroundColor(AppColors.secondaryText)
+                            Text("Exness REST API")
+                                .font(AppTypography.headline)
+                            HStack(spacing: 6) {
+                                Circle()
+                                    .fill(exness.isConnected ? AppColors.profit : AppColors.secondaryText)
+                                    .frame(width: 8, height: 8)
+                                Text(exness.isConnected ? "Đã kết nối" : "Chưa kết nối")
+                                    .font(AppTypography.captionBold)
+                                    .foregroundColor(exness.isConnected ? AppColors.profit : AppColors.secondaryText)
+                            }
                         }
-                    }
-                    .padding(10)
-                    .background(AppColors.brand.opacity(0.08))
-                    .cornerRadius(8)
-                    
-                    // Buttons
-                    HStack(spacing: 8) {
-                        AppButton(
-                            "Kết nối Exness API",
-                            icon: "bolt.fill",
-                            style: .primary,
-                            size: .compact,
-                            fullWidth: true,
-                            isLoading: isTestingExness
-                        ) {
-                            saveAndTestExness()
-                        }
-                        .disabled(exnessAccountId.isEmpty || exnessApiKey.isEmpty || (exnessPrivateKey.isEmpty && !exness.isConnected) || isTestingExness)
-                        
-                        if exness.isConnected {
-                            AppButton("Đồng bộ", icon: "arrow.triangle.2.circlepath", style: .secondary, size: .compact, fullWidth: true, isLoading: isSyncingExness) {
-                                syncExnessNow()
+                        Spacer()
+                        HStack(spacing: 8) {
+                            AppButton("Ping", icon: "bolt.fill", style: .secondary, size: .compact, isLoading: isTestingExness) {
+                                saveAndTestExness()
                             }
                             
-                            AppButton("Ngắt kết nối", icon: "xmark.circle", style: .destructive, size: .compact, fullWidth: true) {
-                                disconnectExness()
+                            AppButton("Sync", icon: "arrow.triangle.2.circlepath", style: .primary, size: .compact, isLoading: isSyncingExness) {
+                                syncExnessNow()
+                            }
+                            .disabled(!exness.isConnected)
+                        }
+                    }
+                    
+                    if exness.isConnected {
+                        HStack(spacing: 16) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Số dư")
+                                    .font(AppTypography.caption)
+                                    .foregroundColor(AppColors.secondaryText)
+                                Text("$\(exness.balance.description)")
+                                    .font(AppTypography.subheadlineBold)
+                                    .foregroundColor(AppColors.primaryText)
+                            }
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Equity")
+                                    .font(AppTypography.caption)
+                                    .foregroundColor(AppColors.secondaryText)
+                                Text("$\(exness.equity.description)")
+                                    .font(AppTypography.subheadlineBold)
+                                    .foregroundColor(AppColors.primaryText)
+                            }
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Đòn bẩy")
+                                    .font(AppTypography.caption)
+                                    .foregroundColor(AppColors.secondaryText)
+                                Text("1:\(exness.leverage)")
+                                    .font(AppTypography.subheadlineBold)
+                                    .foregroundColor(AppColors.primaryText)
                             }
                         }
+                        .padding(10)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(AppColors.secondaryBackground)
+                        .cornerRadius(8)
                     }
                     
                     if !exnessStatus.isEmpty {
                         Text(exnessStatus)
                             .font(AppTypography.caption)
-                            .foregroundColor(exnessStatus.contains("Error") || exnessStatus.contains("thất bại") || exnessStatus.contains("lỗi") ? AppColors.loss : AppColors.profit)
+                            .foregroundColor(exnessStatus.contains("Lỗi") || exnessStatus.contains("thất bại") ? AppColors.loss : AppColors.secondaryText)
                     }
                     
                     if let lastSync = exness.lastSyncDate {
-                        Text("Đồng bộ lần cuối: \(Formatters.formatDateTime(lastSync))")
+                        Text("Sync lần cuối: \(Formatters.formatDateTime(lastSync))")
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText)
                     }
@@ -714,14 +640,7 @@ public struct ConnectionsSettingsView: View {
     
     private func saveAndTestExness() {
         isTestingExness = true
-        exnessStatus = "Đang xác thực chữ ký Ed25519 và kết nối Exness API..."
-        
-        exness.saveCredentials(
-            host: exnessHost,
-            accountId: exnessAccountId,
-            apiKey: exnessApiKey,
-            privateKey: exnessPrivateKey
-        )
+        exnessStatus = "Đang ping Exness API..."
         
         Task {
             do {
@@ -733,7 +652,7 @@ public struct ConnectionsSettingsView: View {
             } catch {
                 await MainActor.run {
                     self.isTestingExness = false
-                    self.exnessStatus = "Lỗi kết nối Exness: \(error.localizedDescription)"
+                    self.exnessStatus = "Lỗi: \(error.localizedDescription)"
                 }
             }
         }
