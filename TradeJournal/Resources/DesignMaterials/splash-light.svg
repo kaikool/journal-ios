@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1920" width="1080" height="1920" fill="none">
+  <defs>
+    <linearGradient id="bgSplashLight" x1="0" y1="0" x2="1080" y2="1920" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFFFFF" />
+      <stop offset="55%" stop-color="#F0F9FF" />
+      <stop offset="100%" stop-color="#E0F2FE" />
+    </linearGradient>
+
+    <linearGradient id="gradLLight" x1="110" y1="120" x2="246" y2="392" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#10B981" />
+      <stop offset="100%" stop-color="#0284C7" />
+    </linearGradient>
+    <linearGradient id="gradRLight" x1="266" y1="120" x2="402" y2="392" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0EA5E9" />
+      <stop offset="100%" stop-color="#059669" />
+    </linearGradient>
+    <linearGradient id="textAccentLight" x1="400" y1="0" x2="720" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#059669" />
+      <stop offset="100%" stop-color="#0284C7" />
+    </linearGradient>
+
+    <filter id="shadowSplash" x="-15%" y="-15%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#0284C7" flood-opacity="0.18" />
+    </filter>
+    <style>
+      .play-left { animation: joinLeft 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+      .play-right { animation: joinRight 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+      .brand-group { animation: fadeUp 0.8s ease-out forwards; }
+      @keyframes joinLeft {
+        0% { opacity: 0; transform: translateX(-45px); }
+        100% { opacity: 1; transform: translateX(0); }
+      }
+      @keyframes joinRight {
+        0% { opacity: 0; transform: translateX(45px); }
+        100% { opacity: 1; transform: translateX(0); }
+      }
+      @keyframes fadeUp {
+        0% { opacity: 0; transform: translateY(20px); }
+        100% { opacity: 1; transform: translateY(0); }
+      }
+    </style>
+  </defs>
+
+  <rect width="1080" height="1920" fill="url(#bgSplashLight)" />
+
+  <!-- Cụm Icon thu nhỏ (Scale 0.62) -->
+  <g transform="translate(381, 701) scale(0.62)" filter="url(#shadowSplash)">
+    <path class="play-left" d="M 238 118 C 243 118 246 121 246 126 V 168 H 232 C 223 168 216 175 216 184 V 328 C 216 337 223 344 232 344 H 246 V 386 C 246 391 243 394 238 394 C 235 394 232 393 229 390 L 114 275 C 103 264 103 248 114 237 L 229 122 C 232 119 235 118 238 118 Z" fill="url(#gradLLight)" />
+    <path class="play-right" d="M 274 118 C 269 118 266 121 266 126 V 168 H 280 C 289 168 296 175 296 184 V 328 C 296 337 289 344 280 344 H 266 V 386 C 266 391 269 394 274 394 C 277 394 280 393 283 390 L 398 275 C 409 264 409 248 398 237 L 283 122 C 280 119 277 118 274 118 Z" fill="url(#gradRLight)" />
+  </g>
+
+  <!-- Typography kiểu Apple Modern -->
+  <g class="brand-group">
+    <text x="540" y="1065" font-family="&#39;Avenir Next&#39;, &#39;SF Pro Display&#39;, &#39;Inter&#39;, &#39;Montserrat&#39;, sans-serif" font-size="38" text-anchor="middle" letter-spacing="14">
+      <tspan font-weight="300" fill="#334155">TRADE </tspan>
+      <tspan font-weight="700" fill="url(#textAccentLight)">JOURNAL</tspan>
+    </text>
+    <rect x="490" y="1092" width="100" height="2" rx="1" fill="url(#textAccentLight)" opacity="0.4" />
+    <text x="540" y="1126" font-family="&#39;Avenir Next&#39;, &#39;SF Pro Text&#39;, &#39;Inter&#39;, sans-serif" font-size="16" font-weight="500" fill="#64748B" text-anchor="middle" letter-spacing="10">PRECISION ANALYTICS</text>
+  </g>
+</svg>

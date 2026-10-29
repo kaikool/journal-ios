@@ -1,0 +1,59 @@
+import Foundation
+
+public struct Account: Identifiable, Codable, Equatable {
+    public let id: String
+    public var name: String
+    public var broker: String
+    public var kind: AccountKind
+    public var currency: String
+    public var initialBalance: Decimal
+    public var profitCalcMethod: ProfitCalcMethod
+    public var autoSync: Bool
+    public var lastSyncAt: Date?
+    public var archivedAt: Date?
+    public var visibleInJournal: Bool?
+    public var propProgram: String?
+    public let createdAt: Date
+    
+    public init(
+        id: String = JournalIds.newId(),
+        name: String,
+        broker: String = "",
+        kind: AccountKind = .manual,
+        currency: String = "USD",
+        initialBalance: Decimal = 0,
+        profitCalcMethod: ProfitCalcMethod = .fifo,
+        autoSync: Bool = false,
+        lastSyncAt: Date? = nil,
+        archivedAt: Date? = nil,
+        visibleInJournal: Bool? = true,
+        propProgram: String? = nil,
+        createdAt: Date = Date()
+    ) {
+        self.id = id
+        self.name = name
+        self.broker = broker
+        self.kind = kind
+        self.currency = currency
+        self.initialBalance = initialBalance
+        self.profitCalcMethod = profitCalcMethod
+        self.autoSync = autoSync
+        self.lastSyncAt = lastSyncAt
+        self.archivedAt = archivedAt
+        self.visibleInJournal = visibleInJournal
+        self.propProgram = propProgram
+        self.createdAt = createdAt
+    }
+}
+
+public enum AccountKind: String, Codable, Equatable {
+    case sync = "sync"
+    case `import` = "import"
+    case manual = "manual"
+}
+
+public enum ProfitCalcMethod: String, Codable, Equatable {
+    case fifo = "fifo"
+    case lifo = "lifo"
+    case wavg = "wavg"
+}

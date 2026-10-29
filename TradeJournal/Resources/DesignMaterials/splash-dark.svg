@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1920" width="1080" height="1920" fill="none">
+  <defs>
+    <linearGradient id="bgSplashDark" x1="0" y1="0" x2="1080" y2="1920" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#111E32" />
+      <stop offset="50%" stop-color="#0A111E" />
+      <stop offset="100%" stop-color="#05080F" />
+    </linearGradient>
+    <radialGradient id="splashAmbient" cx="540" cy="860" r="320" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#38BDF8" stop-opacity="0.14" />
+      <stop offset="100%" stop-color="#05080F" stop-opacity="0" />
+    </radialGradient>
+
+    <linearGradient id="gradL" x1="110" y1="120" x2="246" y2="392" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#34D399" />
+      <stop offset="100%" stop-color="#0284C7" />
+    </linearGradient>
+    <linearGradient id="gradR" x1="266" y1="120" x2="402" y2="392" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#38BDF8" />
+      <stop offset="100%" stop-color="#10B981" />
+    </linearGradient>
+    <linearGradient id="textAccent" x1="400" y1="0" x2="720" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#34D399" />
+      <stop offset="100%" stop-color="#38BDF8" />
+    </linearGradient>
+
+    <filter id="glowSplash" x="-25%" y="-25%" width="150%" height="150%">
+      <feGaussianBlur stdDeviation="10" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+    <style>
+      .play-left { animation: joinLeft 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+      .play-right { animation: joinRight 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+      .brand-group { animation: fadeUp 0.8s ease-out forwards; }
+      @keyframes joinLeft {
+        0% { opacity: 0; transform: translateX(-45px); }
+        100% { opacity: 1; transform: translateX(0); }
+      }
+      @keyframes joinRight {
+        0% { opacity: 0; transform: translateX(45px); }
+        100% { opacity: 1; transform: translateX(0); }
+      }
+      @keyframes fadeUp {
+        0% { opacity: 0; transform: translateY(20px); }
+        100% { opacity: 1; transform: translateY(0); }
+      }
+    </style>
+  </defs>
+
+  <rect width="1080" height="1920" fill="url(#bgSplashDark)" />
+  <circle cx="540" cy="860" r="320" fill="url(#splashAmbient)" />
+
+  <!-- Cụm Icon thu nhỏ (Scale 0.62) nằm gọn gàng ở tâm màn hình -->
+  <g transform="translate(381, 701) scale(0.62)" filter="url(#glowSplash)">
+    <path class="play-left" d="M 238 118 C 243 118 246 121 246 126 V 168 H 232 C 223 168 216 175 216 184 V 328 C 216 337 223 344 232 344 H 246 V 386 C 246 391 243 394 238 394 C 235 394 232 393 229 390 L 114 275 C 103 264 103 248 114 237 L 229 122 C 232 119 235 118 238 118 Z" fill="url(#gradL)" />
+    <path class="play-right" d="M 274 118 C 269 118 266 121 266 126 V 168 H 280 C 289 168 296 175 296 184 V 328 C 296 337 289 344 280 344 H 266 V 386 C 266 391 269 394 274 394 C 277 394 280 393 283 390 L 398 275 C 409 264 409 248 398 237 L 283 122 C 280 119 277 118 274 118 Z" fill="url(#gradR)" />
+  </g>
+
+  <!-- Typography kiểu Apple Modern: Chữ TRADE mảnh thanh lịch + JOURNAL đậm phủ Gradient -->
+  <g class="brand-group">
+    <text x="540" y="1065" font-family="&#39;Avenir Next&#39;, &#39;SF Pro Display&#39;, &#39;Inter&#39;, &#39;Montserrat&#39;, sans-serif" font-size="38" text-anchor="middle" letter-spacing="14">
+      <tspan font-weight="300" fill="#E2E8F0">TRADE </tspan>
+      <tspan font-weight="700" fill="url(#textAccent)">JOURNAL</tspan>
+    </text>
+    <!-- Đường kẻ mảnh tinh tế phân cách -->
+    <rect x="490" y="1092" width="100" height="2" rx="1" fill="url(#textAccent)" opacity="0.5" />
+    <text x="540" y="1126" font-family="&#39;Avenir Next&#39;, &#39;SF Pro Text&#39;, &#39;Inter&#39;, sans-serif" font-size="16" font-weight="500" fill="#64748B" text-anchor="middle" letter-spacing="10">PRECISION ANALYTICS</text>
+  </g>
+</svg>
