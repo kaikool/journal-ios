@@ -83,11 +83,19 @@ extension TradeDataStore {
         
         if immediate {
             performSaveToDiskAsync(isBackgroundTrigger: false)
+            if SupabaseService.shared.isConfigured {
+                Task { [weak self] in
+                    await self?.syncWithSupabase(isBackground: true)
+                }
+            }
         } else {
             saveDebounceTask = Task { @MainActor [weak self] in
                 try? await Task.sleep(nanoseconds: 350_000_000)
                 guard !Task.isCancelled, let self = self else { return }
                 self.performSaveToDiskAsync(isBackgroundTrigger: false)
+                if SupabaseService.shared.isConfigured {
+                    await self.syncWithSupabase(isBackground: true)
+                }
             }
         }
     }
@@ -274,5 +282,10 @@ extension TradeDataStore {
             selectedAccountId = mostRecentActiveAccount?.id ?? visibleAccounts.first?.id ?? accounts.first?.id ?? "default-acc"
         }
         invalidatePerformanceCaches()
+        if SupabaseService.shared.isConfigured {
+            Task { [weak self] in
+                await self?.syncWithSupabase(isBackground: true)
+            }
+        }
     }
 }

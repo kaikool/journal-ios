@@ -62,25 +62,24 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
         self.apiHost = storedHost
         
         let plistAcc = AppSecretsLoader.loadSecret(named: "EXNESS_ACCOUNT_ID")
-        var acc = (plistAcc != nil && !plistAcc!.isEmpty) ? plistAcc! : (ud.string(forKey: kExnessAccountId) ?? "26000002813")
-        if acc.isEmpty { acc = "26000002813" }
-        ud.set(acc, forKey: kExnessAccountId)
+        let acc = (plistAcc != nil && !plistAcc!.isEmpty) ? plistAcc! : (ud.string(forKey: kExnessAccountId) ?? "")
+        if !acc.isEmpty {
+            ud.set(acc, forKey: kExnessAccountId)
+        }
         self.accountId = acc
         
         let plistKey = AppSecretsLoader.loadSecret(named: "EXNESS_API_KEY")
-        var key = (plistKey != nil && !plistKey!.isEmpty) ? plistKey! : (KeychainManager.get(forKey: kExnessApiKey) ?? "")
-        if key.isEmpty || key.hasPrefix("exnsk-e6c68d") {
-            key = "exnsk-304eac2ba1608160db68efe98eb9ceee5b6c7cc474f1571a3c70c6aba87e4ae9"
+        let key = (plistKey != nil && !plistKey!.isEmpty) ? plistKey! : (KeychainManager.get(forKey: kExnessApiKey) ?? "")
+        if !key.isEmpty {
+            KeychainManager.set(key, forKey: kExnessApiKey)
         }
-        KeychainManager.set(key, forKey: kExnessApiKey)
         self.apiKey = key
         
         let plistPriv = AppSecretsLoader.loadSecret(named: "EXNESS_PRIVATE_KEY")
-        var priv = (plistPriv != nil && !plistPriv!.isEmpty) ? plistPriv! : (KeychainManager.get(forKey: kExnessPrivateKey) ?? "")
-        if priv.isEmpty || priv.hasPrefix("860dccd4") {
-            priv = "af4debe7bdee6e8c756b51e9c0b9eba7e6d9f0f163506e077a043e008ebbcc3347777ea680d48c13f9f6d40fd3620cdd6a818af701c6a212f1aaf61777b26d4e"
+        let priv = (plistPriv != nil && !plistPriv!.isEmpty) ? plistPriv! : (KeychainManager.get(forKey: kExnessPrivateKey) ?? "")
+        if !priv.isEmpty {
+            KeychainManager.set(priv, forKey: kExnessPrivateKey)
         }
-        KeychainManager.set(priv, forKey: kExnessPrivateKey)
         
         self.lastSyncDate = ud.object(forKey: kExnessLastSync) as? Date
         
@@ -130,11 +129,7 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
     }
     
     public func getStoredPrivateKey() -> String {
-        let stored = KeychainManager.get(forKey: kExnessPrivateKey) ?? AppSecretsLoader.loadSecret(named: "EXNESS_PRIVATE_KEY") ?? ""
-        if stored.isEmpty || stored.hasPrefix("860dccd4") {
-            return "af4debe7bdee6e8c756b51e9c0b9eba7e6d9f0f163506e077a043e008ebbcc3347777ea680d48c13f9f6d40fd3620cdd6a818af701c6a212f1aaf61777b26d4e"
-        }
-        return stored
+        KeychainManager.get(forKey: kExnessPrivateKey) ?? AppSecretsLoader.loadSecret(named: "EXNESS_PRIVATE_KEY") ?? ""
     }
     
     public func disconnect() {
@@ -212,10 +207,7 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
         bodyData: Data? = nil,
         idempotencyKey: String = ""
     ) throws -> [String: String] {
-        var cleanKey = apiKey.isEmpty ? (KeychainManager.get(forKey: kExnessApiKey) ?? AppSecretsLoader.loadSecret(named: "EXNESS_API_KEY") ?? "") : apiKey
-        if cleanKey.isEmpty || cleanKey.hasPrefix("exnsk-e6c68d") {
-            cleanKey = "exnsk-304eac2ba1608160db68efe98eb9ceee5b6c7cc474f1571a3c70c6aba87e4ae9"
-        }
+        let cleanKey = apiKey.isEmpty ? (KeychainManager.get(forKey: kExnessApiKey) ?? AppSecretsLoader.loadSecret(named: "EXNESS_API_KEY") ?? "") : apiKey
         let privKeyStr = getStoredPrivateKey()
         
         guard !cleanKey.isEmpty, !privKeyStr.isEmpty else {
@@ -534,6 +526,14 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
             dataStore.invalidatePerformanceCaches()
             dataStore.saveToDisk(immediate: true)
             dataStore.objectWillChange.send()
+            
+            Task {
+                if SupabaseService.shared.isConfigured,
+                   let acc = dataStore.accounts.first(where: { $0.id == journalAccId }) {
+                    try? await SupabaseService.shared.upsertAccounts([acc])
+                }
+                await dataStore.syncWithSupabase(isBackground: true)
+            }
         }
     }
     
@@ -908,9 +908,9 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
                     netPnl: pnl,
                     executionCount: execIds.count,
                     executionIds: execIds,
+                    durationMs: durMs,
                     stopLoss: sltp?.sl,
-                    profitTarget: sltp?.tp,
-                    durationMs: durMs
+                    profitTarget: sltp?.tp
                 )
                 directTrades.append(trade)
             } else {
@@ -934,9 +934,9 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
                     netPnl: 0,
                     executionCount: execIds.count,
                     executionIds: execIds,
+                    durationMs: nil,
                     stopLoss: sltp?.sl,
-                    profitTarget: sltp?.tp,
-                    durationMs: nil
+                    profitTarget: sltp?.tp
                 )
                 directTrades.append(trade)
             }
@@ -994,9 +994,9 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
                 netPnl: 0,
                 executionCount: 1,
                 executionIds: [execId],
+                durationMs: nil,
                 stopLoss: sltp?.sl,
-                profitTarget: sltp?.tp,
-                durationMs: nil
+                profitTarget: sltp?.tp
             )
             directTrades.append(openTrade)
         }
@@ -1052,6 +1052,19 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
         await MainActor.run {
             self.lastSyncDate = now
             self.isConnected = true
+        }
+        
+        // Immediately sync everything to Supabase Cloud
+        Task {
+            if SupabaseService.shared.isConfigured {
+                if !directTrades.isEmpty {
+                    try? await SupabaseService.shared.upsertTrades(directTrades)
+                }
+                if !newExecutions.isEmpty {
+                    try? await SupabaseService.shared.upsertExecutions(newExecutions)
+                }
+            }
+            await TradeDataStore.shared.syncWithSupabase(isBackground: true)
         }
         
         return self.syncedTradesCount
