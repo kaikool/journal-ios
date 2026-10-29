@@ -16,7 +16,10 @@ extension TradeDataStore {
                 if trade.symbol == "ACCOUNT" { return false }
                 if visibleIds.contains(trade.accountId) { return true }
                 let clean = trade.accountId.cleanAccountId
-                if visibleIds.contains(clean) || visibleIds.contains(trade.accountId.the5ersCanonicalId) {
+                if visibleIds.contains(clean) ||
+                   visibleIds.contains(trade.accountId.the5ersCanonicalId) ||
+                   visibleIds.contains(trade.accountId.ctraderCanonicalId) ||
+                   visibleIds.contains(trade.accountId.exnessCanonicalId) {
                     return true
                 }
                 return false

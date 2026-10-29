@@ -142,10 +142,14 @@ public struct ConnectionsSettingsView: View {
                         Spacer()
                         
                         HStack(spacing: 8) {
-                            if ctrader.isConnected || ctrader.isConfigured {
+                            if ctrader.isConnected {
                                 AppButton("Disconnect", icon: "xmark.circle", style: .destructive, size: .compact) {
                                     ctrader.disconnect()
                                     ctraderStatus = "cTrader disconnected."
+                                }
+                            } else {
+                                AppButton("Connect", icon: "link", style: .primary, size: .compact, isLoading: isTestingCTrader) {
+                                    testCTraderConnection()
                                 }
                             }
                             
@@ -187,10 +191,14 @@ public struct ConnectionsSettingsView: View {
                         Spacer()
                         
                         HStack(spacing: 8) {
-                            if exness.isConnected || exness.isConfigured {
+                            if exness.isConnected {
                                 AppButton("Disconnect", icon: "xmark.circle", style: .destructive, size: .compact) {
                                     exness.disconnect()
                                     exnessStatus = "Disconnected from Exness API."
+                                }
+                            } else {
+                                AppButton("Connect", icon: "link", style: .primary, size: .compact, isLoading: isTestingExness) {
+                                    testExnessConnection()
                                 }
                             }
                             

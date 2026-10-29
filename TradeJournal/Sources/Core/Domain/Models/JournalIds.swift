@@ -125,6 +125,8 @@ extension String {
             return String(dropFirst(8))
         } else if hasPrefix("ctrader_") {
             return String(dropFirst(8))
+        } else if hasPrefix("exness_") {
+            return String(dropFirst(7))
         }
         return self
     }
@@ -135,6 +137,10 @@ extension String {
     
     public var ctraderCanonicalId: String {
         hasPrefix("ctrader_") ? self : "ctrader_\(self)"
+    }
+
+    public var exnessCanonicalId: String {
+        hasPrefix("exness_") ? self : "exness_\(self)"
     }
     
     public func isEquivalentAccountId(to other: String) -> Bool {

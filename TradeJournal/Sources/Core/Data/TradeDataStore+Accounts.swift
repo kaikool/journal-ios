@@ -19,7 +19,8 @@ extension TradeDataStore {
             activeAccountIdsWithTrades.contains(acc.id) ||
             activeAccountIdsWithTrades.contains(acc.id.cleanAccountId) ||
             activeAccountIdsWithTrades.contains(acc.id.the5ersCanonicalId) ||
-            activeAccountIdsWithTrades.contains(acc.id.ctraderCanonicalId)
+            activeAccountIdsWithTrades.contains(acc.id.ctraderCanonicalId) ||
+            activeAccountIdsWithTrades.contains(acc.id.exnessCanonicalId)
         }
         
         let pool = accountsWithTrades.isEmpty ? targetAccounts : accountsWithTrades
@@ -118,6 +119,7 @@ extension TradeDataStore {
             ids.insert(clean)
             ids.insert(acc.id.the5ersCanonicalId)
             ids.insert(acc.id.ctraderCanonicalId)
+            ids.insert(acc.id.exnessCanonicalId)
         }
         for prop in propAccounts {
             if isPropAccountVisible(prop) {
@@ -126,12 +128,14 @@ extension TradeDataStore {
                 ids.insert(clean)
                 ids.insert(prop.id.the5ersCanonicalId)
                 ids.insert(prop.id.ctraderCanonicalId)
+                ids.insert(prop.id.exnessCanonicalId)
                 if let jId = prop.journalAccountId, !jId.isEmpty {
                     ids.insert(jId)
                     let cleanJ = jId.cleanAccountId
                     ids.insert(cleanJ)
                     ids.insert(jId.the5ersCanonicalId)
                     ids.insert(jId.ctraderCanonicalId)
+                    ids.insert(jId.exnessCanonicalId)
                 }
             }
         }
@@ -186,6 +190,8 @@ extension TradeDataStore {
             let candidates = [
                 acc.id,
                 acc.id.the5ersCanonicalId,
+                acc.id.ctraderCanonicalId,
+                acc.id.exnessCanonicalId,
                 acc.id.cleanAccountId
             ]
             for cand in candidates where !cand.isEmpty {
@@ -209,7 +215,16 @@ extension TradeDataStore {
         let selId = selectedAccountId
         let cleanSel = selId.cleanAccountId
         let altId = selId.the5ersCanonicalId
-        return accounts.first(where: { $0.id == selId || $0.id == cleanSel || $0.id == altId }) ?? mostRecentActiveAccount ?? accounts.first
+        let cId = selId.ctraderCanonicalId
+        let eId = selId.exnessCanonicalId
+        return accounts.first(where: {
+            $0.id == selId ||
+            $0.id == cleanSel ||
+            $0.id == altId ||
+            $0.id == cId ||
+            $0.id == eId ||
+            $0.id.isEquivalentAccountId(to: selId)
+        }) ?? mostRecentActiveAccount ?? accounts.first
     }
     
     public func selectAccount(id: String) {

@@ -196,7 +196,8 @@ public struct JournalCalendarView: View {
             tradeAccountIds.contains(acc.id) ||
             tradeAccountIds.contains(acc.id.cleanAccountId) ||
             tradeAccountIds.contains(acc.id.the5ersCanonicalId) ||
-            tradeAccountIds.contains(acc.id.ctraderCanonicalId)
+            tradeAccountIds.contains(acc.id.ctraderCanonicalId) ||
+            tradeAccountIds.contains(acc.id.exnessCanonicalId)
         }.map { $0.currency.uppercased() }
         
         let unique = Array(Set(activeCurrencies)).sorted()

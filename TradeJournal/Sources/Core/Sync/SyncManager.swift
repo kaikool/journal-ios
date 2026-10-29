@@ -24,7 +24,11 @@ public final class SyncManager: ObservableObject {
     private init() {
         // Load saved quick sync options from UserDefaults
         if let data = UserDefaults.standard.data(forKey: "journal_quick_sync_options_v1"),
-           let decoded = try? JSONDecoder().decode(SyncOptions.self, from: data) {
+           var decoded = try? JSONDecoder().decode(SyncOptions.self, from: data) {
+            // Ensure Exness is enabled if configured
+            if !decoded.enabledProviderIds.contains("exness") {
+                decoded.enabledProviderIds.insert("exness")
+            }
             self.savedQuickSyncOptions = decoded
         } else {
             self.savedQuickSyncOptions = .default

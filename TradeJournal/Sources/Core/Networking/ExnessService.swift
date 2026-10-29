@@ -429,6 +429,7 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
         if let existingIdx = dataStore.accounts.firstIndex(where: {
             $0.id == journalAccId ||
             $0.id == self.accountId ||
+            $0.id.isEquivalentAccountId(to: journalAccId) ||
             $0.name.contains(self.accountId)
         }) {
             var acc = dataStore.accounts[existingIdx]
@@ -437,9 +438,8 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
             acc.currency = self.currency
             acc.initialBalance = self.balance
             acc.lastSyncAt = Date()
+            acc.visibleInJournal = true
             dataStore.accounts[existingIdx] = acc
-            dataStore.saveToDisk(immediate: true)
-            dataStore.objectWillChange.send()
             AppLogger.info("Exness: Synced account \(acc.id) balance -> \(self.balance) \(self.currency)")
         } else {
             let newAcc = Account(
@@ -454,10 +454,16 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
                 visibleInJournal: true
             )
             dataStore.accounts.append(newAcc)
-            dataStore.saveToDisk(immediate: true)
-            dataStore.objectWillChange.send()
             AppLogger.info("Exness: Created new account \(journalAccId) balance -> \(self.balance) \(self.currency)")
         }
+        
+        if dataStore.selectedAccountId.isEmpty || dataStore.selectedAccountId == "default-acc" {
+            dataStore.selectedAccountId = journalAccId
+        }
+        
+        dataStore.invalidatePerformanceCaches()
+        dataStore.saveToDisk(immediate: true)
+        dataStore.objectWillChange.send()
     }
     
     // MARK: - API Calls
@@ -578,6 +584,15 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
                         collected.append(contentsOf: subArr)
                     }
                 }
+            }
+        }
+        
+        if collected.isEmpty {
+            let ticketKeys = ["ticket", "order_id", "deal_id", "position_id", "symbol", "trades", "deals"]
+            if ticketKeys.contains(where: { dict[$0] != nil }) {
+                collected.append(dict)
+            } else if let dataObj = dict["data"] as? [String: Any], ticketKeys.contains(where: { dataObj[$0] != nil }) {
+                collected.append(dataObj)
             }
         }
         
@@ -893,16 +908,20 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
                 }
                 dataStore.trades = currentTrades
                 dataStore.deduplicateTrades()
-                dataStore.invalidatePerformanceCaches()
             }
             
             // B. Import executions for execution history audit log
             if !newExecutions.isEmpty {
                 dataStore.importExecutions(accountId: journalAccId, newExecutions: newExecutions)
-            } else {
-                dataStore.saveToDisk(immediate: true)
-                dataStore.objectWillChange.send()
             }
+            
+            // Ensure newly synced Exness account is selected if currently default or empty
+            if dataStore.selectedAccountId.isEmpty || dataStore.selectedAccountId == "default-acc" {
+                dataStore.selectedAccountId = journalAccId
+            }
+            dataStore.invalidatePerformanceCaches()
+            dataStore.saveToDisk(immediate: true)
+            dataStore.objectWillChange.send()
             
             self.syncedTradesCount = directTrades.count > 0 ? directTrades.count : (newExecutions.count / 2)
         }

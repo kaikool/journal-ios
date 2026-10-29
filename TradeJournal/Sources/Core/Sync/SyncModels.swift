@@ -74,7 +74,7 @@ public struct SyncOptions: Codable, Equatable {
     public var backupToCloud: Bool
     
     public init(
-        enabledProviderIds: Set<String> = ["ctrader", "the5ers"],
+        enabledProviderIds: Set<String> = ["ctrader", "the5ers", "exness"],
         dateRangeMode: SyncDateRangeMode = .last30Days,
         customStartDate: Date? = nil,
         customEndDate: Date? = nil,
@@ -95,7 +95,7 @@ public struct SyncOptions: Codable, Equatable {
     
     public static var `default`: SyncOptions {
         SyncOptions(
-            enabledProviderIds: ["ctrader", "the5ers"],
+            enabledProviderIds: ["ctrader", "the5ers", "exness"],
             dateRangeMode: .last30Days,
             includeOpenPositions: true,
             includeHistoricalDeals: true,

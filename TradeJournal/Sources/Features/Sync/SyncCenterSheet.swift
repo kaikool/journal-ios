@@ -8,6 +8,7 @@ public struct SyncCenterSheet: View {
     @ObservedObject private var dataStore = TradeDataStore.shared
     @ObservedObject private var ctrader = CTraderService.shared
     @ObservedObject private var the5ers = The5ersService.shared
+    @ObservedObject private var exness = ExnessService.shared
     private let supabase = SupabaseService.shared
     
     @State private var options: SyncOptions = SyncManager.shared.savedQuickSyncOptions
@@ -127,6 +128,26 @@ public struct SyncCenterSheet: View {
                     subtitle: the5ers.isConfigured ? "Connected · Prop accounts & payouts" : "Not configured",
                     icon: "building.columns",
                     isConfigured: the5ers.isConfigured
+                )
+                
+                // Exness Source Card
+                let exnessSubtitle: String = {
+                    if !exness.isConfigured {
+                        return "Not configured"
+                    }
+                    if exness.isConnected {
+                        let formattedBal = Formatters.formatCurrency(exness.balance, currency: exness.currency)
+                        return "Connected · Balance: \(formattedBal)"
+                    }
+                    return "Configured · Ready to sync"
+                }()
+                
+                sourceRow(
+                    id: "exness",
+                    title: "Exness",
+                    subtitle: exnessSubtitle,
+                    icon: "chart.line.uptrend.xyaxis",
+                    isConfigured: exness.isConfigured
                 )
             }
         }
