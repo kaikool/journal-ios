@@ -200,6 +200,19 @@ public final class MarketDataCacheStore: @unchecked Sendable {
     
     private func saveEntry(_ entry: CacheEntry, forKey key: String) {
         lock.lock()
+        // Bounded memory cache: evict expired or older entries if count exceeds 100
+        if memoryCache.count >= 100 {
+            let expiredKeys = memoryCache.filter { $0.value.isExpired }.map(\.key)
+            for k in expiredKeys {
+                memoryCache.removeValue(forKey: k)
+            }
+            if memoryCache.count >= 100 {
+                let overflowKeys = Array(memoryCache.keys.prefix(25))
+                for k in overflowKeys {
+                    memoryCache.removeValue(forKey: k)
+                }
+            }
+        }
         memoryCache[key] = entry
         lock.unlock()
         

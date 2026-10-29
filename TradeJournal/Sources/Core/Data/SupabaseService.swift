@@ -154,6 +154,7 @@ public final class SupabaseService {
         }
         var request = URLRequest(url: url)
         request.httpMethod = method
+        request.timeoutInterval = 15
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
         
@@ -385,6 +386,7 @@ public final class SupabaseService {
         
         var authReq = URLRequest(url: authSettingsUrl)
         authReq.httpMethod = "GET"
+        authReq.timeoutInterval = 10
         authReq.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
         
         do {
@@ -412,6 +414,7 @@ public final class SupabaseService {
         
         var restReq = URLRequest(url: restUrl)
         restReq.httpMethod = "GET"
+        restReq.timeoutInterval = 10
         restReq.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
         restReq.setValue("Bearer \(supabaseAnonKey)", forHTTPHeaderField: "Authorization")
         
