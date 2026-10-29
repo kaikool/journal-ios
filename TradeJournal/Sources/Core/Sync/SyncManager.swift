@@ -109,15 +109,17 @@ public final class SyncManager: ObservableObject {
             }
             
             // 2. Auto-sync cTrader if configured
-            if CTraderService.shared.isConfigured {
-                let res = try? await CTraderService.shared.syncWithTradeStore(dataStore: TradeDataStore.shared)
+            if await CTraderService.shared.isConfigured {
+                let dataStore = await TradeDataStore.shared
+                let res = try? await CTraderService.shared.syncWithTradeStore(dataStore: dataStore)
                 let cCount = (res?.dealsImported ?? 0) + (res?.tradesRebuilt ?? 0)
                 if cCount > 0 { brokerUpdatesCount += cCount }
             }
             
             // 3. Auto-sync The5ers if configured
             if The5ersService.shared.isConfigured {
-                let count = (try? await The5ersService.shared.syncWithTradeStore(dataStore: TradeDataStore.shared)) ?? 0
+                let dataStore = await TradeDataStore.shared
+                let count = (try? await The5ersService.shared.syncWithTradeStore(dataStore: dataStore)) ?? 0
                 if count > 0 { brokerUpdatesCount += count }
             }
             
@@ -128,7 +130,7 @@ public final class SyncManager: ObservableObject {
                     TradeDataStore.shared.saveToDisk(immediate: true)
                     TradeDataStore.shared.objectWillChange.send()
                 }
-                self?.scheduleBackgroundCloudBackup(delaySeconds: 5)
+                await self?.scheduleBackgroundCloudBackup(delaySeconds: 5)
             }
         }
     }
