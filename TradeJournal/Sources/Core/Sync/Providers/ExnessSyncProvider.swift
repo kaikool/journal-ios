@@ -14,7 +14,7 @@ public final class ExnessSyncProvider: SyncProvider {
     public var capabilities: Set<SyncCapability> {
         [
             .openPositions,
-            .orderHistory
+            .historicalExecutions
         ]
     }
     
