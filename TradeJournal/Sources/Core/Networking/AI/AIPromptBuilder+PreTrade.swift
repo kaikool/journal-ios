@@ -416,8 +416,8 @@ extension AIPromptBuilder {
             - Nhận diện các VÙNG CẢN H4 (Swing High: \(h4SwingHighStr), Swing Low: \(h4SwingLowStr), Supply/Demand, FVG) để làm MỤC TIÊU CHỐT LỜI (TP1/TP2) hoặc CẮT LỖ (SL).
 
             ### 3. Cấu trúc thực thi H1 qua Chuỗi 15 nến (Execution, Price Action & Traps)
-            - Soi chiếu chuỗi 15 nến H1: Nến vừa đóng có rút chân từ chối (rejection wick) tại EMA 21/50 hay bứt phá dứt khoát? Giá đang bám EMA hay bị dãn biên độ (Overextended)?
-            - Động lượng RSI(14) H1: Nhìn đường đi của RSI qua 15 nến, RSI đang tăng hay giảm? Có phân kỳ đảo chiều (Bullish/Bearish Divergence) hoặc giao cắt Signal line để kích hoạt lệnh không?
+            - Dựa vào diễn biến chuỗi nến H1 và H4 ở trên (giá Mở, Cao, Thấp, Đóng và cụm EMA 21/50, RSI) để phân tích Price Action: Nến vừa đóng có rút chân/từ chối cản tại EMA 21/50 hay bứt phá dứt khoát? Giá đang bám EMA hay bị dãn biên độ (Overextended)?
+            - Động lượng RSI(14) H1: Nhìn quỹ đạo RSI qua 15 nến, RSI đang tăng hay giảm? Có phân kỳ đảo chiều (Bullish/Bearish Divergence) hoặc giao cắt Signal line để kích hoạt lệnh không?
             - Bẫy thanh khoản & Tín hiệu kích hoạt: Đã có nhịp quét thanh khoản (SFP Sweep) hoặc nến xác nhận chưa, hay vào lệnh sớm có rủi ro bị bẫy quét SL?
 
             ### 4. Khuyến nghị & Kế hoạch lệnh cụ thể (Actionable Recommendation)
@@ -498,7 +498,7 @@ extension AIPromptBuilder {
             - Identify key H4 barriers (Swing High: \(h4SwingHighStr), Swing Low: \(h4SwingLowStr), Supply/Demand zones, FVG) as TARGET BARRIERS for TP1/TP2 or protective SL.
 
             ### 3. H1 15-Candle Execution Dynamics, Price Action & Traps
-            - Audit the 15-candle H1 series: Has a recent bar produced a wick rejection at EMA 21/50 or broken cleanly? Is price riding or overextended from EMA 21?
+            - Analyze Price Action based on the 15-candle H1 and H4 sequences above (OHLC, EMA 21/50, RSI): Did the recent bar reject at EMA 21/50 or break cleanly? Is price riding or overextended from EMA 21?
             - H1 RSI(14) Trajectory: Looking at the 15-bar RSI values, is momentum expanding or stalling? Does divergence or a signal line crossover confirm an entry?
             - Traps & Execution Timing: Has an SFP sweep occurred or has an H1 confirmation candle closed, or does entering early carry high risk of being stopped out?
 
@@ -548,18 +548,7 @@ extension AIPromptBuilder {
         for (idx, b) in slice.enumerated() {
             let offset = n - 1 - idx
             let label = offset == 0 ? (isVi ? "H4 [Nến hiện tại]" : "H4 [Live Candle]") : "H4 [-\(offset * 4)h]"
-            let bodyTop = max(b.open, b.close)
-            let bodyBottom = min(b.open, b.close)
-            let upperWick = b.high - bodyTop
-            let lowerWick = bodyBottom - b.low
-            let body = bodyTop - bodyBottom
-            var wickNote = ""
-            if upperWick > body * 1.8 && upperWick > 0 {
-                wickNote = isVi ? " (Rút râu trên)" : " (Upper wick rejection)"
-            } else if lowerWick > body * 1.8 && lowerWick > 0 {
-                wickNote = isVi ? " (Rút chân dưới)" : " (Lower wick rejection)"
-            }
-            lines.append("  • \(label): O: \(fmt(b.open)) | H: \(fmt(b.high)) | L: \(fmt(b.low)) | C: \(fmt(b.close))\(wickNote)")
+            lines.append("  • \(label): O: \(fmt(b.open)) | H: \(fmt(b.high)) | L: \(fmt(b.low)) | C: \(fmt(b.close))")
         }
         return lines.joined(separator: "\n")
     }
@@ -618,21 +607,9 @@ extension AIPromptBuilder {
                 return "N/A"
             }()
             
-            let bodyTop = max(bar.open, bar.close)
-            let bodyBottom = min(bar.open, bar.close)
-            let upperWick = bar.high - bodyTop
-            let lowerWick = bodyBottom - bar.low
-            let body = bodyTop - bodyBottom
-            var wickNote = ""
-            if upperWick > body * 1.8 && upperWick > 0 {
-                wickNote = isVi ? " (Rút râu trên)" : " (Upper wick)"
-            } else if lowerWick > body * 1.8 && lowerWick > 0 {
-                wickNote = isVi ? " (Rút chân dưới)" : " (Lower wick)"
-            }
-            
             let num = lines.count + 1
             let numStr = num < 10 ? "0\(num)" : "\(num)"
-            let line = "  • #\(numStr) \(timeLabel): O: \(fmt(bar.open)) | H: \(fmt(bar.high)) | L: \(fmt(bar.low)) | C: \(fmt(bar.close)) | EMA21: \(e21Str) | EMA50: \(e50Str) | RSI: \(rsiVal)\(wickNote)"
+            let line = "  • #\(numStr) \(timeLabel): O: \(fmt(bar.open)) | H: \(fmt(bar.high)) | L: \(fmt(bar.low)) | C: \(fmt(bar.close)) | EMA21: \(e21Str) | EMA50: \(e50Str) | RSI: \(rsiVal)"
             lines.append(line)
         }
         
