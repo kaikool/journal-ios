@@ -154,7 +154,7 @@ public enum AIPromptBuilder {
                 - Ghi chú chiến thuật: \(notes.isEmpty ? "Chưa thiết lập" : notes)
                 
                 ⚠️ YÊU CẦU ĐỐI SOÁT HỒ SƠ:
-                Hãy luôn đối chiếu lệnh này với Hồ sơ Trader ở trên. Kiểm tra xem lệnh này có đang tuân thủ đúng Playbook, mức rủi ro, và có phạm phải các lỗi tâm lý quen thuộc mà Trader đã tự khai báo hay không.
+                Hãy luôn đối chiếu lệnh này với Hồ sơ Trader ở trên. Kiểm tra xem lệnh này có đang tuân thủ đúng Playbook, mức rủi ro, và có phạm phải các lỗi tâm lý quen thuộc mà Trader đã tự khai báo hay không. TUYỆT ĐỐI KHÔNG lặp lại, tóm tắt hoặc sao chép lại toàn văn hồ sơ trader vào bài phân tích.
                 
                 """
             } else {

@@ -108,8 +108,17 @@ public enum AIAccountContextProvider {
             if let acc = accountObj {
                 return acc.initialBalance + totalClosedNetPnl
             }
+            let activeAcc = dataStore.mostRecentActiveAccount ?? dataStore.visibleAccounts.first ?? dataStore.accounts.first
+            if let acc = activeAcc {
+                let accPnl = dataStore.trades.filter { TradeDataStore.isSameAccountId($0.accountId, acc.id) && ($0.status != .open || $0.closedAt != nil) }.reduce(Decimal.zero) { $0 + $1.netPnl }
+                return acc.initialBalance + accPnl
+            }
             if !dataStore.accounts.isEmpty {
-                return dataStore.totalPortfolioBalance
+                let totalInit = dataStore.visibleAccounts.reduce(Decimal.zero) { total, account in
+                    total + dataStore.currencyConversion.convertedBalance(account.initialBalance, currency: account.currency)
+                }
+                let totalPnl = dataStore.trades.filter { $0.status != .open || $0.closedAt != nil }.reduce(Decimal.zero) { $0 + $1.netPnl }
+                return totalInit + totalPnl
             }
             return nil
         }()

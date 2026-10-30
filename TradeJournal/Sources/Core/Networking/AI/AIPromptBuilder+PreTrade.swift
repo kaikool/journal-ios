@@ -184,7 +184,7 @@ extension AIPromptBuilder {
             
             if isVi {
                 profileSnippet = """
-                HỒ SƠ TRADER & QUẢN TRỊ RỦI RO (BẮT BUỘC TUÂN THỦ ĐỂ TÍNH KHỐI LƯỢNG LỆNH):
+                HỒ SƠ TRADER & QUẢN TRỊ RỦI RO (BỐI CẢNH NỘI BỘ - CHỈ DÙNG ĐỂ TÍNH TOÁN):
                 - SỐ DƯ TÀI KHOẢN THỰC TẾ (REAL BALANCE): \(realBalStr != "N/A" ? realBalStr : "Chưa xác định")
                 - Phong cách giao dịch: \(style.isEmpty ? "Day Trader / Intraday Scalper" : style)
                 - Mục tiêu tài khoản: \(objective.isEmpty ? "Bảo toàn vốn & Tăng trưởng bền vững" : objective)
@@ -192,10 +192,14 @@ extension AIPromptBuilder {
                 - Ngân sách rủi ro tối đa mỗi lệnh: \(risk.isEmpty ? "0.5% - 1.0% vốn" : risk)
                 - Lỗ hổng tâm lý nhận diện cần triệt tiêu: \(leaks.isEmpty ? "Dời SL, chốt non, FOMO vào lệnh trả thù sau khi thua" : leaks)
                 - Ghi chú & Kỷ luật cá nhân: \(notes.isEmpty ? "Tỷ lệ R:R >= 2:1, bảo vệ vốn khi thị trường giằng co, không bao giờ trả thù thị trường" : notes)
+                
+                ⚠️ QUY TẮC BẢO MẬT & TRÌNH BÀY QUAN TRỌNG:
+                - Toàn bộ thông tin Hồ sơ Trader, Số dư, và Kỷ luật cá nhân bên trên là BỐI CẢNH NỘI BỘ để bạn thấu hiểu trader và tính toán thông số lệnh (Volume/SL/TP).
+                - TUYỆT ĐỐI KHÔNG lặp lại, tóm tắt lại, liệt kê hay sao chép lại các gạch đầu dòng của hồ sơ này trong bài phân tích!
                 """
             } else {
                 profileSnippet = """
-                TRADER PROFILE & RISK PARAMETERS (MANDATORY FOR POSITION SIZING):
+                TRADER PROFILE & RISK PARAMETERS (INTERNAL CONTEXT FOR POSITION SIZING):
                 - AUTHORITATIVE REAL BALANCE: \(realBalStr != "N/A" ? realBalStr : "Unknown")
                 - Trading Style: \(style.isEmpty ? "Day Trader / Intraday Scalper" : style)
                 - Account Objective: \(objective.isEmpty ? "Capital Preservation & Sustainable Growth" : objective)
@@ -203,6 +207,10 @@ extension AIPromptBuilder {
                 - Max Risk Per Trade: \(risk.isEmpty ? "0.5% - 1.0% equity" : risk)
                 - Known Psychological Leaks to Prevent: \(leaks.isEmpty ? "Moving SL, premature profit taking, revenge FOMO" : leaks)
                 - Personal Discipline Notes: \(notes.isEmpty ? "R:R >= 2:1, protect capital during consolidation, never revenge trade" : notes)
+                
+                ⚠️ MANDATORY PRESENTATION DIRECTIVE:
+                - The Trader Profile, Balance, and Rules above are INTERNAL CONTEXT ONLY for position sizing and risk discipline.
+                - DO NOT echo, quote, summarize, or reproduce these profile bullet points in your response!
                 """
             }
         }
@@ -329,6 +337,7 @@ extension AIPromptBuilder {
             \(momentumBlock)\(liveUpdateBlock)\(thesisContinuityBlock)\(lessonsBlock)\(complianceBlock)\(researchBlock)\(visionBlockVi)
             
             NHIỆM VỤ CỦA RISK AI (PHÂN TÍCH ĐÓN ĐẦU ĐỂ RA QUYẾT ĐỊNH VÀO LỆNH):
+            ⚠️ NGUYÊN TẮC ĐẦU RA: Không sao chép hay liệt kê lại thông tin Hồ sơ Trader / Số dư / Quy tắc cá nhân ở phần mở đầu hay trong bài viết. Đi thẳng vào 4 mục phân tích chuyên môn và bảng thông số [PRE-TRADE SETUP SPECIFICATION] ở cuối.
             Hãy đưa ra bản phân tích đa khung chuyên sâu theo trường phái Smart Money Concepts (SMC) và Price Action tổ chức theo đúng cấu trúc sau:
             
             ### 1. Xu hướng vĩ mô & Biên độ ngày (D1 Macro Bias)
@@ -404,6 +413,7 @@ extension AIPromptBuilder {
             \(momentumBlock)\(liveUpdateBlock)\(thesisContinuityBlock)\(lessonsBlock)\(complianceBlock)\(researchBlock)\(visionBlockEn)
             
             TASK: INSTITUTIONAL SMC PRE-TRADE BIAS & ACTIONABLE PLAN:
+            ⚠️ OUTPUT CONSTRAINT: Do not parrot, repeat, or list the Trader Profile / Balance / Personal Rules in your response. Proceed directly to the 4 analytical sections and conclude with the [PRE-TRADE SETUP SPECIFICATION] block.
             
             ### 1. D1 Macro Regime & Directional Bias
             - Which participant (Bulls or Bears) holds dominance on the higher timeframe? Is current price operating in Premium or Discount territory?
