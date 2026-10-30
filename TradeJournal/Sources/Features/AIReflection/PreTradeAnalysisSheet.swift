@@ -279,7 +279,7 @@ public struct PreTradeAnalysisSheet: View {
                 }
             }
             
-            let displayTz = TimeZone(identifier: dataStore.generalSettings.displayTimeZone) ?? .current
+            let isVi = (dataStore.aiSettings.language.isEmpty || dataStore.aiSettings.language == "vi")
             var liveContext = ""
             if let latest = activeBars.last {
                 let d = (latest.close as NSDecimalNumber).doubleValue
@@ -288,46 +288,25 @@ public struct PreTradeAnalysisSheet: View {
                 let highStr = Formatters.price(latest.high)
                 let lowStr = Formatters.price(latest.low)
                 
-                let candleTape = CandleTapeFormatter.formatCandlesTable(
-                    bars: activeBars,
-                    count: 10,
-                    symbol: selectedSymbol,
-                    displayTimeZone: displayTz
-                )
+                let window = MomentumEngine.computeWindow(bars: activeBars, windowSize: 10)
+                let rsiVal = window.currentRSI.map { String(format: "%.1f", ($0 as NSDecimalNumber).doubleValue) } ?? "N/A"
+                let emaVal = window.currentEMA9.map { String(format: "%.1f", ($0 as NSDecimalNumber).doubleValue) } ?? "N/A"
+                let wmaVal = window.currentWMA45.map { String(format: "%.1f", ($0 as NSDecimalNumber).doubleValue) } ?? "N/A"
+                let divMsg = isVi ? (window.divergenceVi ?? "Không có") : (window.divergenceEn ?? "None")
                 
-                let window = MomentumEngine.computeWindow(bars: activeBars, windowSize: 15)
-                let momTable = MomentumEngine.formatMomentumTable(
-                    window: window,
-                    displayTimeZone: displayTz,
-                    isVi: dataStore.aiSettings.language == "vi"
-                )
-                
-                let isVi = (dataStore.aiSettings.language.isEmpty || dataStore.aiSettings.language == "vi")
                 if isVi {
                     liveContext = """
-                    [DỮ LIỆU THỊ TRƯỜNG & BĂNG NẾN THỰC TẾ TẠI THỜI ĐIỂM HỎI ĐÁP]:
-                    • Cặp tiền / Tài sản: \(currentSymbol)
-                    • Giá thị trường cập nhật mới nhất: \(priceStr)
-                    • Nến M15 mới nhất: Mở \(openStr) | Cao \(highStr) | Thấp \(lowStr) | Đóng \(priceStr)
-                    
-                    BẢNG BĂNG GIÁ 10 NẾN M15 MỚI NHẤT:
-                    \(candleTape)
-                    
-                    BẢNG ĐỘNG LƯỢNG M15 (RSI 14 WILDER / EMA 9 / WMA 45):
-                    \(momTable)
+                    [HÀNH ĐỘNG GIÁ MỚI NHẤT]:
+                    • Cặp tiền: \(currentSymbol) | Thị giá hiện tại: \(priceStr)
+                    • Nến M15 gần nhất: Mở \(openStr) | Cao \(highStr) | Thấp \(lowStr) | Đóng \(priceStr)
+                    • Động lượng M15: RSI(14) = \(rsiVal) | EMA(9) = \(emaVal) | WMA(45) = \(wmaVal) | Phân kỳ: \(divMsg)
                     """
                 } else {
                     liveContext = """
-                    [REAL-TIME MARKET & CANDLESTICK DATA AT MOMENT OF INQUIRY]:
-                    • Symbol: \(currentSymbol)
-                    • Latest Market Price: \(priceStr)
+                    [LATEST LIVE MARKET DATA]:
+                    • Symbol: \(currentSymbol) | Current Price: \(priceStr)
                     • Latest M15 Bar: Open \(openStr) | High \(highStr) | Low \(lowStr) | Close \(priceStr)
-                    
-                    RECENT 10 M15 CANDLESTICKS TAPE:
-                    \(candleTape)
-                    
-                    TECHNICAL MOMENTUM TABLE (RSI 14 / EMA 9 / WMA 45):
-                    \(momTable)
+                    • M15 Momentum: RSI(14) = \(rsiVal) | EMA(9) = \(emaVal) | WMA(45) = \(wmaVal) | Divergence: \(divMsg)
                     """
                 }
             }
@@ -337,8 +316,8 @@ public struct PreTradeAnalysisSheet: View {
             // Backend context: push condensed initial analysis and live market update invisibly to AI
             var historyToSend: [AICoachMessage] = []
             if !self.analysisResult.isEmpty {
-                let condensed = self.analysisResult.count > 1200
-                    ? String(self.analysisResult.prefix(1200)) + "\n[...Ngữ cảnh nhận định ban đầu...]"
+                let condensed = self.analysisResult.count > 1000
+                    ? String(self.analysisResult.prefix(1000)) + "\n[...trích lược kế hoạch ban đầu...]"
                     : self.analysisResult
                 historyToSend.append(AICoachMessage(role: "assistant", content: condensed))
             }
@@ -348,26 +327,15 @@ public struct PreTradeAnalysisSheet: View {
             if !liveContext.isEmpty {
                 augmentedPrompt = "\(q)\n\n\(liveContext)"
             }
-            let isVi = (dataStore.aiSettings.language.isEmpty || dataStore.aiSettings.language == "vi")
             if isVi {
                 augmentedPrompt += """
                 
-                [CHỈ DẪN BẮT BUỘC VỀ BẢN LĨNH & THÍCH ỨNG THEO CẤU TRÚC]:
-                1. CẤM XIN LỖI / NỊNH TRADER: Tuyệt đối không nói 'Tôi xin lỗi', 'Tôi nhầm' khi bị trader chất vấn hay nghi ngờ.
-                2. ĐỐI CHIẾU VỚI KẾ HOẠCH GỐC & GIÁ HIỆN TẠI:
-                   • Nếu cấu trúc thị trường VẪN BẢO TOÀN (giá chưa vi phạm mốc Invalidation SL): Giữ vững lập trường, giải thích điềm tĩnh nhịp biến động hiện tại là nhịp hồi hay bẫy thanh khoản bình thường.
-                   • Nếu thị trường ĐÃ THAY ĐỔI & VI PHẠM CẤU TRÚC (giá đóng nến qua mốc SL hoặc cấu trúc M15 bị gãy ngược chiều): Không cố chấp mù quáng! Hãy dứt khoát công bố kế hoạch ban đầu ĐÃ BỊ THỊ TRƯỜNG BÁC BỎ (INVALIDATED) do nến thực tế phá vỡ mức giá cụ thể nào, và chuyển ngay lập tức sang phương án QUẢN TRỊ RỦI RO / ĐỨNG NGOÀI (FLAT).
-                3. Định dạng: Trả lời 100% bằng TIẾNG VIỆT, đi thẳng vào câu hỏi, súc tích bằng Markdown (tiêu đề `###`, gạch đầu dòng `•`, bảng so sánh nếu cần).
+                ⚠️ YÊU CẦU: Trả lời trực diện, ngắn gọn, súc tích bằng tiếng Việt. Đối chiếu biến động giá hiện tại với mốc Invalidation SL và điểm kích hoạt trong kế hoạch ban đầu để xác định kế hoạch còn hiệu lực hay đã bị thị trường bác bỏ.
                 """
             } else {
                 augmentedPrompt += """
                 
-                [MANDATORY CONVICTION & EVIDENCE-BASED ADAPTATION PROTOCOL]:
-                1. ZERO APOLOGY: Never apologize or say 'I was wrong' simply because the trader challenges your view.
-                2. CROSS-EXAMINE WITH COMMITTED ANCHOR & LIVE CANDLES:
-                   • If market structure remains INTACT (price has not breached the structural Invalidation SL): Maintain professional conviction and explain why the current retest/pullback is technically expected within probabilistic variance.
-                   • If market has CHANGED & INVALIDATED structure (price closed beyond the SL or formed an opposing MSS): Do NOT be dogmatic! Explicitly declare the setup INVALIDATED citing the exact violation price, and transition stance to RISK DEFENSE / FLAT.
-                3. Formatting: Answer directly and concisely in Markdown (headers `###`, bullet points `•`, tables if helpful).
+                ⚠️ DIRECTIVE: Answer directly and concisely. Cross-reference current price with the structural Invalidation SL and entry triggers from the original plan to state if the thesis remains valid or is invalidated.
                 """
             }
             
