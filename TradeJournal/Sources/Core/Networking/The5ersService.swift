@@ -328,7 +328,7 @@ public final class The5ersService: ObservableObject {
         guard let url = URL(string: "\(Self.authHost)/oauth2/v1/apps/agentic/\(Self.tenantPath)/token") else { return nil }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        request.timeoutInterval = 15
+        request.timeoutInterval = 45
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         
@@ -442,7 +442,7 @@ public final class The5ersService: ObservableObject {
         guard let url = URL(string: Self.mcpUrl) else { throw URLError(.badURL) }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        request.timeoutInterval = 15
+        request.timeoutInterval = 45
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json, text/event-stream", forHTTPHeaderField: "Accept")
         request.setValue("Bearer \(effectiveToken)", forHTTPHeaderField: "Authorization")
@@ -1974,13 +1974,31 @@ public final class The5ersService: ObservableObject {
             
             if initialHasMore {
                 var page = 2
-                while page <= 25 {
+                while page <= 500 {
                     if Task.isCancelled || isCancelledByUser { break }
                     var pArgs = activePosArgs
                     pArgs["page"] = page
-                    guard let nextRes = try? await callMcpTool(name: "the5ers_positions", arguments: pArgs),
-                          !(nextRes["isError"] as? Bool ?? false) else { break }
-                    let nextUnwrapped = unwrapMcpToolResult(nextRes)
+                    
+                    lastStatus = "Syncing trades: \(acc.label) (page \(page), \(allPositions.count) loaded)..."
+                    await Task.yield()
+                    
+                    var nextRes: [String: Any]? = nil
+                    for retry in 1...3 {
+                        if let res = try? await callMcpTool(name: "the5ers_positions", arguments: pArgs),
+                           !(res["isError"] as? Bool ?? false) {
+                            nextRes = res
+                            break
+                        }
+                        if retry < 3 {
+                            try? await Task.sleep(nanoseconds: 500_000_000)
+                        }
+                    }
+                    guard let validRes = nextRes else {
+                        AppLogger.warning("The5ers positions: failed to fetch page \(page) for \(acc.label) after 3 retries, stopping.")
+                        break
+                    }
+                    
+                    let nextUnwrapped = unwrapMcpToolResult(validRes)
                     let nextPositions = extractMcpCollection(nextUnwrapped, collectionKey: "positions")
                     if nextPositions.isEmpty { break }
                     let nextFp = nextPositions.compactMap { row -> String? in

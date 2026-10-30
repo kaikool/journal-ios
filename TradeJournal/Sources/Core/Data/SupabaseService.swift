@@ -154,7 +154,7 @@ public final class SupabaseService {
         }
         var request = URLRequest(url: url)
         request.httpMethod = method
-        request.timeoutInterval = 15
+        request.timeoutInterval = 45
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
         

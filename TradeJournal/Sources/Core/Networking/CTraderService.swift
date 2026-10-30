@@ -746,7 +746,7 @@ public final class CTraderService: ObservableObject {
             let maxChunkMs: Int64 = 6 * 24 * 60 * 60 * 1000 // 518,400,000 ms (6 days safe margin)
             let dealsTo = toTimestamp ?? nowMs
             
-            let defaultLookbackDays: Int64 = 180 // Fast lookback window (6 months) for responsive account loading
+            let defaultLookbackDays: Int64 = 730 // Extended 2-year lookback for complete historical trade loading
             let fallbackStart = max(nowMs - (defaultLookbackDays * 86_400 * 1000), 0)
             
             let existingAccountExecs = dataStore.executions.filter { $0.accountId == journalAccId }
@@ -818,8 +818,8 @@ public final class CTraderService: ObservableObject {
                 
                 if dealsFoundInChunk == 0 && !rawDeals.isEmpty {
                     consecutiveEmptyChunks += 1
-                    if consecutiveEmptyChunks >= 4 {
-                        // Encountered 24 consecutive days without activity prior to known trades
+                    if consecutiveEmptyChunks >= 15 {
+                        // Encountered 90 consecutive days without activity prior to known trades
                         break
                     }
                 } else if dealsFoundInChunk > 0 {

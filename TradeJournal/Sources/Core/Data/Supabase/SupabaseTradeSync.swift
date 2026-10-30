@@ -36,17 +36,23 @@ extension SupabaseService {
     
     public func fetchExecutions(accountId: String? = nil) async throws -> [Execution] {
         guard isConfigured else { return [] }
-        let endpoint: String
-        if let acc = accountId, !acc.isEmpty {
-            endpoint = "executions?account_id=eq.\(acc)&select=*"
-        } else {
-            endpoint = "executions?select=*"
+        var allExecs: [Execution] = []
+        let batchSize = 1000
+        var offset = 0
+        
+        while true {
+            let base = (accountId != nil && !accountId!.isEmpty) ? "executions?account_id=eq.\(accountId!)&select=*" : "executions?select=*"
+            let endpoint = "\(base)&limit=\(batchSize)&offset=\(offset)&order=executed_at.asc"
+            let request = try makeRequest(endpoint: endpoint)
+            let (data, response) = try await session.data(for: request)
+            try validateResponse(response, data: data, endpoint: endpoint)
+            let records = decodeArray(SupabaseExecutionRecord.self, from: data)
+            if records.isEmpty { break }
+            allExecs.append(contentsOf: records.map { $0.toExecution() })
+            if records.count < batchSize { break }
+            offset += records.count
         }
-        let request = try makeRequest(endpoint: endpoint)
-        let (data, response) = try await session.data(for: request)
-        try validateResponse(response, data: data, endpoint: endpoint)
-        let records = decodeArray(SupabaseExecutionRecord.self, from: data)
-        return records.map { $0.toExecution() }
+        return allExecs
     }
     
     public func upsertExecutions(_ items: [Execution]) async throws {
@@ -57,17 +63,23 @@ extension SupabaseService {
     
     public func fetchTrades(accountId: String? = nil) async throws -> [Trade] {
         guard isConfigured else { return [] }
-        let endpoint: String
-        if let acc = accountId, !acc.isEmpty {
-            endpoint = "trades?account_id=eq.\(acc)&select=*"
-        } else {
-            endpoint = "trades?select=*"
+        var allTrades: [Trade] = []
+        let batchSize = 1000
+        var offset = 0
+        
+        while true {
+            let base = (accountId != nil && !accountId!.isEmpty) ? "trades?account_id=eq.\(accountId!)&select=*" : "trades?select=*"
+            let endpoint = "\(base)&limit=\(batchSize)&offset=\(offset)&order=opened_at.asc"
+            let request = try makeRequest(endpoint: endpoint)
+            let (data, response) = try await session.data(for: request)
+            try validateResponse(response, data: data, endpoint: endpoint)
+            let records = decodeArray(SupabaseTradeRecord.self, from: data)
+            if records.isEmpty { break }
+            allTrades.append(contentsOf: records.map { $0.toTrade() })
+            if records.count < batchSize { break }
+            offset += records.count
         }
-        let request = try makeRequest(endpoint: endpoint)
-        let (data, response) = try await session.data(for: request)
-        try validateResponse(response, data: data, endpoint: endpoint)
-        let records = decodeArray(SupabaseTradeRecord.self, from: data)
-        return records.map { $0.toTrade() }
+        return allTrades
     }
 
     public func upsertTrades(_ items: [Trade]) async throws {

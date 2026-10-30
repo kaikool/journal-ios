@@ -724,15 +724,17 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
         }
         
         // 3. Query Deals and Orders History in safe 14-day chunks (Exness limit: max 30 days per request)
-        // Backfill up to 28 days back
+        // Backfill up to 84 days back (6 chunks of 14 days)
         let nowServer = Date().addingTimeInterval(Double(serverTimeOffsetMs) / 1000.0)
         let isoFormatter = ISO8601DateFormatter()
         isoFormatter.formatOptions = [.withInternetDateTime]
         
-        let chunkWindows: [(from: Date, to: Date)] = [
-            (nowServer.addingTimeInterval(-14 * 24 * 3600), nowServer),
-            (nowServer.addingTimeInterval(-28 * 24 * 3600), nowServer.addingTimeInterval(-14 * 24 * 3600))
-        ]
+        var chunkWindows: [(from: Date, to: Date)] = []
+        for i in 0..<6 {
+            let chunkEnd = nowServer.addingTimeInterval(-Double(i * 14 * 24 * 3600))
+            let chunkStart = nowServer.addingTimeInterval(-Double((i + 1) * 14 * 24 * 3600))
+            chunkWindows.append((from: chunkStart, to: chunkEnd))
+        }
         
         var allDeals: [[String: Any]] = []
         var allOrders: [[String: Any]] = []
