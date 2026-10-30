@@ -105,24 +105,7 @@ public struct PreTradeAnalysisSheet: View {
                             }
                         })
                     } else if !analysisResult.isEmpty {
-                        AIDocumentReaderView(text: analysisResult)
-                        
-                        // Follow-up discussion section
-                        PreTradeFollowUpSection(
-                            analysisResult: analysisResult,
-                            followUpMessages: $followUpMessages,
-                            followUpQuery: $followUpQuery,
-                            isSubmitting: isSubmittingFollowUp,
-                            onResetThread: {
-                                followUpMessages = []
-                                followUpQuery = ""
-                                let cacheKey = "pretrade_\(selectedSymbol)"
-                                AICoachSessionStore.shared.save(key: cacheKey, result: analysisResult, followUps: [])
-                            },
-                            onSubmit: submitFollowUp
-                        )
-                        
-                        // Bottom action buttons
+                        // 5. Pre-Trade Action Bar (Save Note, Link Trade, Copy, Regenerate) - Placed RIGHT ON TOP of AI Result
                         PreTradeActionBar(
                             isSavedToNotebook: isSavedToNotebook,
                             showCopiedAlert: showCopiedAlert,
@@ -139,6 +122,15 @@ public struct PreTradeAnalysisSheet: View {
                                 }
                             }
                         )
+                        
+                        // 6. Structured Section Cards Reader
+                        AIDocumentReaderView(text: analysisResult)
+                        
+                        // 7. Follow-up conversation turns (message bubbles in scroll view)
+                        PreTradeFollowUpSection(
+                            analysisResult: analysisResult,
+                            followUpMessages: followUpMessages
+                        )
                     } else {
                         // User-triggered analysis card (no unprompted AI executions)
                         analyzeCtaCard
@@ -147,6 +139,22 @@ public struct PreTradeAnalysisSheet: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
                 .padding(.bottom, 24)
+            }
+            .safeAreaInset(edge: .bottom) {
+                if !analysisResult.isEmpty && !isAnalyzing && !isLoadingData {
+                    PreTradeBottomFloatingInput(
+                        followUpQuery: $followUpQuery,
+                        isSubmitting: isSubmittingFollowUp,
+                        hasHistory: !followUpMessages.isEmpty,
+                        onResetThread: {
+                            followUpMessages = []
+                            followUpQuery = ""
+                            let cacheKey = "pretrade_\(selectedSymbol)"
+                            AICoachSessionStore.shared.save(key: cacheKey, result: analysisResult, followUps: [])
+                        },
+                        onSubmit: submitFollowUp
+                    )
+                }
             }
             .background(AppColors.background)
             .navigationTitle("Market Structure Bias")
