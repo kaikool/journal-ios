@@ -73,6 +73,58 @@ extension AIPromptBuilder {
             symbol: symbol
         )
         
+        func formatEMALevels(_ snap: TimeframeEMASnapshot?, tfName: String) -> String {
+            guard let snap = snap, let e21 = snap.ema21, let e50 = snap.ema50 else {
+                return isVi ? "Chưa đủ dữ liệu nến tính EMA 21/50" : "Insufficient bars for EMA 21/50"
+            }
+            let p21 = formatPrice(e21)
+            let p50 = formatPrice(e50)
+            let cur = snap.currentPrice
+            let dist = cur - e21
+            let distVal = formatPrice(abs(dist))
+            
+            let posDesc: String
+            if isVi {
+                posDesc = dist >= 0 ? "Giá trên EMA 21 (+\(distVal) giá)" : "Giá dưới EMA 21 (-\(distVal) giá)"
+            } else {
+                posDesc = dist >= 0 ? "Price above EMA 21 (+\(distVal))" : "Price below EMA 21 (-\(distVal))"
+            }
+            
+            let spreadDesc: String
+            if isVi {
+                spreadDesc = e21 >= e50 ? "EMA 21 > EMA 50 (Thiên Tăng)" : "EMA 21 < EMA 50 (Thiên Giảm)"
+            } else {
+                spreadDesc = e21 >= e50 ? "EMA 21 > EMA 50 (Bullish)" : "EMA 21 < EMA 50 (Bearish)"
+            }
+            
+            return "EMA(21) = \(p21) | EMA(50) = \(p50) | \(posDesc) | \(spreadDesc)"
+        }
+        
+        let d1EMAStr = formatEMALevels(emaAnalysis.d1, tfName: "D1")
+        let h4EMAStr = formatEMALevels(emaAnalysis.h4, tfName: "H4")
+        let h1EMAStr = formatEMALevels(emaAnalysis.h1, tfName: "H1")
+        
+        // Accurate H4 Swing High & Swing Low Detection
+        let h4Pivots = LiquidityEngine.identifyPivots(bars: h4Bars, window: 2, timeframe: "H4")
+        let h4SwingHighStr: String = {
+            if let high = h4Pivots.filter({ $0.type == .buySide }).last?.price {
+                return formatPrice(high)
+            }
+            if let maxBar = h4Bars.suffix(20).max(by: { $0.high < $1.high }) {
+                return formatPrice(maxBar.high)
+            }
+            return "N/A"
+        }()
+        let h4SwingLowStr: String = {
+            if let low = h4Pivots.filter({ $0.type == .sellSide }).last?.price {
+                return formatPrice(low)
+            }
+            if let minBar = h4Bars.suffix(20).min(by: { $0.low < $1.low }) {
+                return formatPrice(minBar.low)
+            }
+            return "N/A"
+        }()
+        
         // 3. Institutional Liquidity & SFP Sweeps on H1 Execution Timeframe
         let liquidity = LiquidityEngine.analyzeLiquidity(
             symbol: symbol,
@@ -107,13 +159,40 @@ extension AIPromptBuilder {
             }.joined(separator: "; ")
         }()
         
-        // 4. H1 Momentum Metrics
+        // 4. H1 Momentum & RSI Metrics
         let momentumWindow = MomentumEngine.computeWindow(bars: execBars, windowSize: 10)
-        let rsiStr = momentumWindow.currentRSI.map { String(format: "%.1f", ($0 as NSDecimalNumber).doubleValue) } ?? "N/A"
-        let ema9Str = momentumWindow.currentEMA9.map { String(format: "%.1f", ($0 as NSDecimalNumber).doubleValue) } ?? "N/A"
-        let wma45Str = momentumWindow.currentWMA45.map { String(format: "%.1f", ($0 as NSDecimalNumber).doubleValue) } ?? "N/A"
-        let momAlignStr = isVi ? momentumWindow.alignmentVi : momentumWindow.alignmentEn
-        let divStr = isVi ? (momentumWindow.divergenceVi ?? "Không có") : (momentumWindow.divergenceEn ?? "None")
+        let rsiVal = momentumWindow.currentRSI.map { ($0 as NSDecimalNumber).doubleValue }
+        let rsiStr: String = {
+            guard let val = rsiVal else { return "N/A" }
+            let zone: String
+            if isVi {
+                if val >= 70 { zone = "Quá Mua (>70)" }
+                else if val <= 30 { zone = "Quá Bán (<30)" }
+                else if val >= 50 { zone = "Thiên Tăng / Phe Mua kiểm soát (50-70)" }
+                else { zone = "Thiên Giảm / Phe Bán kiểm soát (30-50)" }
+            } else {
+                if val >= 70 { zone = "Overbought (>70)" }
+                else if val <= 30 { zone = "Oversold (<30)" }
+                else if val >= 50 { zone = "Bullish Control (50-70)" }
+                else { zone = "Bearish Control (30-50)" }
+            }
+            return String(format: "%.1f (%@)", val, zone)
+        }()
+        
+        let rsiSignalStr: String = {
+            guard let rsi = rsiVal, let ema = momentumWindow.currentEMA9.map({ ($0 as NSDecimalNumber).doubleValue }) else {
+                return "N/A"
+            }
+            let status: String
+            if isVi {
+                status = rsi >= ema ? "RSI trên Signal (Động lượng Mua)" : "RSI dưới Signal (Động lượng Bán)"
+            } else {
+                status = rsi >= ema ? "RSI above Signal (Bullish)" : "RSI below Signal (Bearish)"
+            }
+            return String(format: "%.1f [%@]", ema, status)
+        }()
+        
+        let divStr = isVi ? (momentumWindow.divergenceVi ?? "Không có phân kỳ") : (momentumWindow.divergenceEn ?? "None")
         
         // 5. Macro News Catalyst
         let newsBlock: String = {
@@ -234,14 +313,26 @@ extension AIPromptBuilder {
             • Lỗ hổng tâm lý cần triệt tiêu: \(leaksStr)
             • Kỷ luật cá nhân: \(customNotesStr)
 
-            [CẤU TRÚC THỊ TRƯỜNG & DỮ LIỆU ĐO LƯỜNG THỰC TẾ]:
+            [CẤU TRÚC THỊ TRƯỜNG & HỆ THỐNG CHỈ BÁO KỸ THUẬT (EMA 21/50 & RSI 14)]:
             • Cặp tiền: \(symbol) | Thị giá hiện tại: \(currentPrice)
-            • Khung D1 (Macro): Xu hướng [\(emaAnalysis.d1?.summary ?? "N/A")] | Đỉnh PDH: \(d1PDH) | Đáy PDL: \(d1PDL) | ADR 14 ngày: \(d1ADR)
-            • Khung H4 (Cấu trúc sóng & Cản TP/SL): Xu hướng [\(emaAnalysis.h4?.summary ?? "N/A")] | Swing High: \(d1PDH) | Swing Low: \(d1PDL)
-            • Khung H1 (Thực thi & Tín hiệu kích hoạt): Xu hướng [\(emaAnalysis.h1?.summary ?? "N/A")]
+
+            • Khung D1 (Macro Bias): Xu hướng [\(emaAnalysis.d1?.trend.label ?? "N/A")]
+              - Chỉ báo EMA D1: \(d1EMAStr)
+              - Mức giá quan trọng: Đỉnh PDH: \(d1PDH) | Đáy PDL: \(d1PDL) | ADR 14 ngày: \(d1ADR)
+
+            • Khung H4 (Cấu trúc sóng & Cản TP/SL): Xu hướng [\(emaAnalysis.h4?.trend.label ?? "N/A")]
+              - Chỉ báo EMA H4: \(h4EMAStr)
+              - Mức giá then chốt: Swing High: \(h4SwingHighStr) | Swing Low: \(h4SwingLowStr)
+
+            • Khung H1 (Thực thi, Động lượng & Tín hiệu kích hoạt lệnh): Xu hướng [\(emaAnalysis.h1?.trend.label ?? "N/A")]
+              - Chỉ báo EMA H1: \(h1EMAStr)
+              - Chỉ báo Động lượng RSI(14) (Wilder):
+                • Mức RSI hiện tại: \(rsiStr)
+                • Đường tín hiệu RSI Signal (EMA 9): \(rsiSignalStr)
+                • Phân kỳ động lượng (Divergence): [\(divStr)]
               - Vùng thanh khoản: BSL gần nhất: \(nearestBSLStr) | SSL gần nhất: \(nearestSSLStr)
               - Quét thanh khoản (SFP Sweeps): \(sweepsStr)
-            • Động lượng H1: RSI(14) = \(rsiStr) | EMA(9) = \(ema9Str) | WMA(45) = \(wma45Str) | Trạng thái: [\(momAlignStr)] | Phân kỳ: [\(divStr)]
+
             • Tin tức kinh tế (Catalyst): \(newsBlock)
             \(symbolLessonsBlock)\(liveUpdateBlock)\(thesisContinuityBlock)\(visionNote)
             NHIỆM VỤ PHÂN TÍCH ĐÓN ĐẦU & THIẾT LẬP KẾ HOẠCH (PRE-TRADE ACTION PLAN):
@@ -249,25 +340,28 @@ extension AIPromptBuilder {
 
             ### 1. Xu hướng vĩ mô D1 & Định hướng dòng tiền (Macro Bias)
             - Phe nào đang kiểm soát (Bulls hay Bears)? Giá đang ở vùng Premium hay Discount?
+            - Đánh giá vị thế giá so với EMA(21) và EMA(50) D1 (Mở rộng xu hướng hay đang pullback về EMA)?
             - Mục tiêu thanh khoản ngày: Khả năng tìm về PDH (\(d1PDH)) hoặc PDL (\(d1PDL)).
 
             ### 2. Cấu trúc sóng & Vùng cản then chốt H4 (Key Barriers)
-            - Xu hướng H4 đang là TĂNG, GIẢM hay ĐI NGANG?
-            - Nhận diện các VÙNG CẢN H4 (Đỉnh/Đáy Swing, Supply/Demand, FVG) để làm MỤC TIÊU CHỐT LỜI (TP1/TP2) hoặc CẮT LỖ (SL).
+            - Xu hướng H4 đang là TĂNG, GIẢM hay ĐI NGANG theo cấu trúc sóng và cụm EMA 21/50?
+            - Đánh giá cụm EMA 21/50 H4 như vùng hỗ trợ/kháng cự động (Dynamic Support/Resistance): Giá có đang phản ứng hoặc test lại vùng đệm EMA 21-50 này không?
+            - Nhận diện các VÙNG CẢN H4 (Swing High: \(h4SwingHighStr), Swing Low: \(h4SwingLowStr), Supply/Demand, FVG) để làm MỤC TIÊU CHỐT LỜI (TP1/TP2) hoặc CẮT LỖ (SL).
 
-            ### 3. Cấu trúc thực thi H1 & Bẫy thanh khoản (Execution & Traps)
-            - Cấu trúc H1: Xác nhận thuận xu hướng H4 (Follow-trend) hay xuất hiện tín hiệu đảo chiều tại cản H4 (MSS / SFP / Phân kỳ RSI) để đánh sóng hồi nghịch xu hướng (Counter-trend)?
-            - Bẫy thanh khoản & Tín hiệu kích hoạt: Đã có nến H1 xác nhận hay vào lệnh sớm có rủi ro bị quét SL?
+            ### 3. Cấu trúc thực thi H1 & Tín hiệu chỉ báo (Execution, EMA & RSI)
+            - Cấu trúc giá & EMA H1: Giá đang bám đường EMA nào? Có bị dãn biên độ (Overextended) quá xa EMA 21 không?
+            - Động lượng RSI(14) H1: RSI đang ở vùng nào (Quá mua / Quá bán / Tích lũy)? Có xuất hiện Phân kỳ RSI (Bullish/Bearish Divergence) hay tín hiệu giao cắt Signal để kích hoạt lệnh không?
+            - Bẫy thanh khoản & Tín hiệu kích hoạt: Đã có nhịp quét thanh khoản (SFP Sweep) hoặc nến H1 xác nhận chưa, hay vào lệnh sớm có rủi ro bị bẫy quét SL?
 
             ### 4. Khuyến nghị & Kế hoạch lệnh cụ thể (Actionable Recommendation)
             - KẾT LUẬN RÕ RÀNG: [BUY (LONG) / SELL (SHORT) / FLAT (ĐỨNG NGOÀI)].
-            - LOẠI SETUP: [THUẬN XU HƯỚNG H4] hoặc [NGHỊCH XU HƯỚNG H4 / SÓNG HỒI TỪ CẢN H4].
+            - LOẠI SETUP: [THUẬN XU HƯỚNG THEO CỤM EMA H4/H1] hoặc [NGHỊCH XU HƯỚNG / SÓNG HỒI TỪ CẢN H4 KÈM PHÂN KỲ RSI].
             - Nếu KHUYẾN NGHỊ VÀO LỆNH (BUY/SELL):
-              • Điểm vào tối ưu (Entry) & Tín hiệu nến H1 kích hoạt (Trigger).
-              • Cắt lỗ bắt buộc (Structural Invalidation SL): Mức giá SL cụ thể theo vi phạm H1.
+              • Điểm vào tối ưu (Entry) & Tín hiệu nến H1 / RSI kích hoạt (Trigger).
+              • Cắt lỗ bắt buộc (Structural Invalidation SL): Mức giá SL cụ thể theo vi phạm cấu trúc nến hoặc mốc EMA then chốt.
               • Mục tiêu chốt lời (Targets): TP 1 và TP 2 đặt tại các vùng Cản H4 ở Mục 2.
               • Tỷ lệ Risk/Reward (R:R) dự kiến.
-            - Nếu KHUYẾN NGHỊ FLAT (ĐỨNG NGOÀI): Nêu rõ điều kiện H1 cần chờ thêm trước khi vào lệnh.
+            - Nếu KHUYẾN NGHỊ FLAT (ĐỨNG NGOÀI): Nêu rõ điều kiện H1 / RSI / EMA cần chờ thêm trước khi vào lệnh.
 
             BẮT BUỘC KẾT THÚC BẰNG KHỐI THÔNG SỐ SETUP ĐÚNG ĐỊNH DẠNG SAU:
             [PRE-TRADE SETUP SPECIFICATION]
@@ -292,14 +386,26 @@ extension AIPromptBuilder {
             • Known Leaks: \(leaksStr)
             • Discipline Notes: \(customNotesStr)
 
-            [MARKET STRUCTURE & OBJECTIVE MEASUREMENTS]:
+            [MARKET STRUCTURE & TECHNICAL INDICATORS (EMA 21/50 & RSI 14)]:
             • Symbol: \(symbol) | Current Price: \(currentPrice)
-            • D1 Frame (Macro): Trend [\(emaAnalysis.d1?.summary ?? "N/A")] | PDH: \(d1PDH) | PDL: \(d1PDL) | 14-day ADR: \(d1ADR)
-            • H4 Frame (Key Barriers for TP/SL): Trend [\(emaAnalysis.h4?.summary ?? "N/A")] | Swing High: \(d1PDH) | Swing Low: \(d1PDL)
-            • H1 Frame (Execution & Entry Triggers): Trend [\(emaAnalysis.h1?.summary ?? "N/A")]
+
+            • D1 Frame (Macro Bias): Trend [\(emaAnalysis.d1?.trend.label ?? "N/A")]
+              - D1 EMA Levels: \(d1EMAStr)
+              - Macro Key Levels: PDH: \(d1PDH) | PDL: \(d1PDL) | 14-day ADR: \(d1ADR)
+
+            • H4 Frame (Key Barriers for TP/SL): Trend [\(emaAnalysis.h4?.trend.label ?? "N/A")]
+              - H4 EMA Levels: \(h4EMAStr)
+              - Key Swing Levels: Swing High: \(h4SwingHighStr) | Swing Low: \(h4SwingLowStr)
+
+            • H1 Frame (Execution, Momentum & Entry Triggers): Trend [\(emaAnalysis.h1?.trend.label ?? "N/A")]
+              - H1 EMA Levels: \(h1EMAStr)
+              - Wilder RSI(14) Momentum:
+                • Current RSI: \(rsiStr)
+                • RSI Signal Line (EMA 9): \(rsiSignalStr)
+                • Momentum Divergence: [\(divStr)]
               - Liquidity Pools: Nearest BSL: \(nearestBSLStr) | Nearest SSL: \(nearestSSLStr)
               - Recent SFP Sweeps: \(sweepsStr)
-            • H1 Momentum: RSI(14) = \(rsiStr) | EMA(9) = \(ema9Str) | WMA(45) = \(wma45Str) | State: [\(momAlignStr)] | Divergence: [\(divStr)]
+
             • Macro News Catalyst: \(newsBlock)
             \(symbolLessonsBlock)\(liveUpdateBlock)\(thesisContinuityBlock)\(visionNote)
             TASK: PRE-TRADE SMC MARKET BIAS & ACTIONABLE PLAN:
@@ -307,25 +413,28 @@ extension AIPromptBuilder {
 
             ### 1. D1 Macro Regime & Directional Bias
             - Which participant controls the market (Bulls or Bears)? Is price operating in Premium or Discount?
+            - Evaluate price position relative to D1 EMA(21) and EMA(50) (Trend expansion or retracement)?
             - Daily liquidity draw: Probability of tagging PDH (\(d1PDH)) or PDL (\(d1PDL)).
 
             ### 2. H4 Swing Structure & Key Barriers (TP/SL Targets)
-            - What is the H4 trend (Bullish, Bearish, or Consolidation)?
-            - Identify key H4 Supply/Demand zones, Order Blocks, and Swing Highs/Lows that serve as TARGET BARRIERS for TP1/TP2 or protective SL.
+            - What is the H4 trend according to swing structure and EMA 21/50 dynamic alignment?
+            - Assess EMA 21/50 dynamic support/resistance: Is price currently testing or reacting to this EMA pocket?
+            - Identify key H4 barriers (Swing High: \(h4SwingHighStr), Swing Low: \(h4SwingLowStr), Supply/Demand zones, FVG) as TARGET BARRIERS for TP1/TP2 or protective SL.
 
-            ### 3. H1 Execution Trigger & Traps
-            - H1 Structure: Does it confirm H4 Follow-Trend continuation, or show a reversal setup (MSS/SFP/Divergence) off an H4 barrier for a Counter-Trend retracement?
-            - Traps & Execution Timing: Is there clear H1 candle confirmation, or does entering now risk getting stopped out by a sweep?
+            ### 3. H1 Execution Trigger, EMA & RSI Dynamics
+            - H1 Structure & EMAs: Is price riding the EMAs or overextended from EMA 21?
+            - H1 RSI(14) Momentum: Is RSI overbought, oversold, or consolidating? Does divergence or a signal line crossover confirm an entry or warn of a reversal?
+            - Traps & Execution Timing: Has an SFP sweep occurred or has an H1 confirmation candle closed, or does entering early carry high risk of being stopped out?
 
             ### 4. Actionable Directive & Execution Blueprint
             - DECISIVE VERDICT: [BUY (LONG) / SELL (SHORT) / FLAT (NO SETUP)].
-            - SETUP TYPE: [FOLLOW-TREND CONTINUATION] or [COUNTER-TREND REVERSAL FROM H4 BARRIER].
+            - SETUP TYPE: [FOLLOW-TREND CONTINUATION WITH EMAs] or [COUNTER-TREND REVERSAL FROM H4 BARRIER WITH RSI DIVERGENCE].
             - If EXECUTABLE SETUP (BUY/SELL):
-              • Optimal Entry Zone & H1 Confirmation Trigger.
-              • Structural Invalidation (SL): Specific price level based on H1 structure failure.
+              • Optimal Entry Zone & H1 Confirmation / RSI Trigger.
+              • Structural Invalidation (SL): Specific price level based on H1 structure failure or key EMA invalidation.
               • Profit Targets (TP1 & TP2): Anchored to H4 key barriers from Section 2.
               • Projected Risk-to-Reward (R:R).
-            - If FLAT: State clearly what H1 price development is required before entering.
+            - If FLAT: State clearly what H1 price/EMA/RSI development is required before entering.
 
             MANDATORY: CONCLUDE WITH THIS PRE-TRADE SETUP SPECIFICATION BLOCK:
             [PRE-TRADE SETUP SPECIFICATION]

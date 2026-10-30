@@ -291,22 +291,25 @@ public struct PreTradeAnalysisSheet: View {
                 let window = MomentumEngine.computeWindow(bars: activeBars, windowSize: 10)
                 let rsiVal = window.currentRSI.map { String(format: "%.1f", ($0 as NSDecimalNumber).doubleValue) } ?? "N/A"
                 let emaVal = window.currentEMA9.map { String(format: "%.1f", ($0 as NSDecimalNumber).doubleValue) } ?? "N/A"
-                let wmaVal = window.currentWMA45.map { String(format: "%.1f", ($0 as NSDecimalNumber).doubleValue) } ?? "N/A"
                 let divMsg = isVi ? (window.divergenceVi ?? "Không có") : (window.divergenceEn ?? "None")
+                
+                let emaSnapshot = MovingAverageEngine.analyzeTimeframe(bars: activeBars, timeframe: "H1", symbol: currentSymbol)
+                let e21Str = emaSnapshot?.ema21.map { Formatters.price($0, symbol: currentSymbol) } ?? "N/A"
+                let e50Str = emaSnapshot?.ema50.map { Formatters.price($0, symbol: currentSymbol) } ?? "N/A"
                 
                 if isVi {
                     liveContext = """
                     [HÀNH ĐỘNG GIÁ MỚI NHẤT]:
                     • Cặp tiền: \(currentSymbol) | Thị giá hiện tại: \(priceStr)
                     • Nến H1 gần nhất: Mở \(openStr) | Cao \(highStr) | Thấp \(lowStr) | Đóng \(priceStr)
-                    • Động lượng H1: RSI(14) = \(rsiVal) | EMA(9) = \(emaVal) | WMA(45) = \(wmaVal) | Phân kỳ: \(divMsg)
+                    • Chỉ báo H1: EMA(21) = \(e21Str) | EMA(50) = \(e50Str) | RSI(14) = \(rsiVal) | RSI Signal = \(emaVal) | Phân kỳ: \(divMsg)
                     """
                 } else {
                     liveContext = """
                     [LATEST LIVE MARKET DATA]:
                     • Symbol: \(currentSymbol) | Current Price: \(priceStr)
                     • Latest H1 Bar: Open \(openStr) | High \(highStr) | Low \(lowStr) | Close \(priceStr)
-                    • H1 Momentum: RSI(14) = \(rsiVal) | EMA(9) = \(emaVal) | WMA(45) = \(wmaVal) | Divergence: \(divMsg)
+                    • H1 Indicators: EMA(21) = \(e21Str) | EMA(50) = \(e50Str) | RSI(14) = \(rsiVal) | RSI Signal = \(emaVal) | Divergence: \(divMsg)
                     """
                 }
             }
