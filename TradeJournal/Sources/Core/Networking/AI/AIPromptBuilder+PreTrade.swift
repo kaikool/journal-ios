@@ -2,16 +2,16 @@ import Foundation
 
 // MARK: - Pre-Trade Multi-Timeframe Prompt Builder Extension
 // Integrates Algorithmic Market Structure Engine (MSS, Liquidity Sweeps, Fractal Swings)
-// and enforces clean, institutional, zero-fluff Pre-Trade forward planning.
+// and enforces clean, institutional, zero-fluff Pre-Trade forward planning on H1 execution.
 extension AIPromptBuilder {
     
-    /// Assembles a streamlined, high-signal multi-timeframe market structure prompt (D1, H4, H1, M15) for pre-trade forward bias
+    /// Assembles a streamlined, high-signal multi-timeframe market structure prompt (D1, H4, H1) for pre-trade forward bias
     public static func buildPreTradeAnalysisPrompt(
         symbol: String,
         d1Bars: [MarketBar],
         h4Bars: [MarketBar],
         h1Bars: [MarketBar] = [],
-        m15Bars: [MarketBar],
+        m15Bars: [MarketBar] = [],
         marketSnapshot: MarketStateSnapshot? = nil,
         events: [ForexFactoryEvent] = [],
         language: String = "vi",
@@ -32,8 +32,11 @@ extension AIPromptBuilder {
             return String(format: "%.5f", d)
         }
         
+        // Prioritize H1 execution bars as requested
+        let execBars = !h1Bars.isEmpty ? h1Bars : m15Bars
+        
         let currentPrice: String = {
-            if let last = m15Bars.last ?? h4Bars.last ?? d1Bars.last {
+            if let last = execBars.last ?? h4Bars.last ?? d1Bars.last {
                 return formatPrice(last.close)
             }
             return "N/A"
@@ -70,10 +73,10 @@ extension AIPromptBuilder {
             symbol: symbol
         )
         
-        // 3. Institutional Liquidity & SFP Sweeps
+        // 3. Institutional Liquidity & SFP Sweeps on H1 Execution Timeframe
         let liquidity = LiquidityEngine.analyzeLiquidity(
             symbol: symbol,
-            barsM15: m15Bars,
+            barsM15: execBars,
             barsH4: h4Bars,
             barsD1: d1Bars
         )
@@ -104,8 +107,8 @@ extension AIPromptBuilder {
             }.joined(separator: "; ")
         }()
         
-        // 4. M15 Momentum Metrics
-        let momentumWindow = MomentumEngine.computeWindow(bars: m15Bars, windowSize: 10)
+        // 4. H1 Momentum Metrics
+        let momentumWindow = MomentumEngine.computeWindow(bars: execBars, windowSize: 10)
         let rsiStr = momentumWindow.currentRSI.map { String(format: "%.1f", ($0 as NSDecimalNumber).doubleValue) } ?? "N/A"
         let ema9Str = momentumWindow.currentEMA9.map { String(format: "%.1f", ($0 as NSDecimalNumber).doubleValue) } ?? "N/A"
         let wma45Str = momentumWindow.currentWMA45.map { String(format: "%.1f", ($0 as NSDecimalNumber).doubleValue) } ?? "N/A"
@@ -126,13 +129,28 @@ extension AIPromptBuilder {
             return isVi ? "Không có tin tức Đỏ (High Impact) trong 12h tới" : "No High-Impact events within 12h"
         }()
         
-        // 6. Account & Risk Sizing Context (Crisp, zero-clutter)
+        // 6. Active Account Context & Trader Profile Integration
+        let accNameStr: String = {
+            if let name = sessionSummary?.accountName, !name.isEmpty {
+                return "(\(name))"
+            }
+            return ""
+        }()
+        
         let realBalStr: String = {
             if let bal = sessionSummary?.balance {
                 let curr = sessionSummary?.accountCurrency ?? "USD"
                 return Formatters.formatCurrency(bal, currency: curr)
             }
             return "N/A"
+        }()
+        
+        let equityStr: String = {
+            if let eq = sessionSummary?.equity, let bal = sessionSummary?.balance, eq != bal {
+                let curr = sessionSummary?.accountCurrency ?? "USD"
+                return "| Vốn ròng (Equity): \(Formatters.formatCurrency(eq, currency: curr))"
+            }
+            return ""
         }()
         
         let riskPctStr = traderProfile?.maxRiskPerTrade.trimmingCharacters(in: .whitespaces).isEmpty == false
@@ -142,7 +160,7 @@ extension AIPromptBuilder {
         let riskDollarStr: String = {
             if let bal = sessionSummary?.balance {
                 let balNum = NSDecimalNumber(decimal: bal).doubleValue
-                let riskVal = balNum * 0.01 // default 1% estimate
+                let riskVal = balNum * 0.01
                 return String(format: " (~$%.2f)", riskVal)
             }
             return ""
@@ -155,6 +173,22 @@ extension AIPromptBuilder {
             let firm = sessionSummary?.propFirmName ?? "Quỹ"
             return isVi ? " | Hạn mức lỗ ngày còn lại (\(firm)): $\(String(format: "%.2f", bufVal))" : " | Remaining Daily Buffer (\(firm)): $\(String(format: "%.2f", bufVal))"
         }()
+        
+        let tradingStyleStr = traderProfile?.tradingStyle.trimmingCharacters(in: .whitespaces).isEmpty == false
+            ? traderProfile!.tradingStyle.trimmingCharacters(in: .whitespaces)
+            : "Day Trader / Swing Trader"
+            
+        let strategyStr = traderProfile?.primaryPlaybooks.trimmingCharacters(in: .whitespaces).isEmpty == false
+            ? traderProfile!.primaryPlaybooks.trimmingCharacters(in: .whitespaces)
+            : "SMC, Price Action, Support & Resistance"
+            
+        let leaksStr = traderProfile?.knownPsychologicalLeaks.trimmingCharacters(in: .whitespaces).isEmpty == false
+            ? traderProfile!.knownPsychologicalLeaks.trimmingCharacters(in: .whitespaces)
+            : "Dời SL, chốt non, FOMO"
+            
+        let customNotesStr = traderProfile?.customMemoryNotes.trimmingCharacters(in: .whitespaces).isEmpty == false
+            ? traderProfile!.customMemoryNotes.trimmingCharacters(in: .whitespaces)
+            : "Tỷ lệ R:R >= 2:1, bảo vệ vốn khi thị trường giằng co, không bao giờ trả thù lệnh"
         
         // 7. Symbol Lessons (Max 2 concise principles)
         let symbolLessonsBlock: String = {
@@ -186,25 +220,28 @@ extension AIPromptBuilder {
         }
         
         let visionNote = hasImage
-            ? (isVi ? "\n[ẢNH BIỂU ĐỒ ĐÍNH KÈM]: Phân tích trực quan Tri-Panel đính kèm (D1 vĩ mô, H4 cấu trúc, M15 thực thi).\n" : "\n[ATTACHED CHART IMAGE]: Refer to attached Tri-Panel visual chart.\n")
+            ? (isVi ? "\n[ẢNH BIỂU ĐỒ ĐÍNH KÈM]: Phân tích trực quan Tri-Panel đính kèm (D1 vĩ mô, H4 cấu trúc, H1 thực thi).\n" : "\n[ATTACHED CHART IMAGE]: Refer to attached Tri-Panel visual chart.\n")
             : ""
             
         // Final Assembly
         if isVi {
             return """
             [THÔNG TIN TÀI KHOẢN & QUẢN TRỊ RỦI RO]:
-            • Số dư thực tế: \(realBalStr != "N/A" ? realBalStr : "[Chưa kết nối]")\(propBufferStr)
+            • Tài khoản & Số dư thực tế: \(realBalStr != "N/A" ? "\(realBalStr) \(accNameStr) \(equityStr)" : "[Chưa kết nối]")\(propBufferStr)
             • Ngân sách rủi ro mỗi lệnh: \(riskPctStr)\(riskDollarStr)
-            • Chiến lược ưu tiên: SMC & Price Action đa khung (H4 làm cản mục tiêu, M15 kích hoạt lệnh)
+            • Phong cách giao dịch: \(tradingStyleStr)
+            • Chiến lược & Playbook ưu tiên: \(strategyStr)
+            • Lỗ hổng tâm lý cần triệt tiêu: \(leaksStr)
+            • Kỷ luật cá nhân: \(customNotesStr)
 
             [CẤU TRÚC THỊ TRƯỜNG & DỮ LIỆU ĐO LƯỜNG THỰC TẾ]:
             • Cặp tiền: \(symbol) | Thị giá hiện tại: \(currentPrice)
             • Khung D1 (Macro): Xu hướng [\(emaAnalysis.d1?.summary ?? "N/A")] | Đỉnh PDH: \(d1PDH) | Đáy PDL: \(d1PDL) | ADR 14 ngày: \(d1ADR)
-            • Khung H4 (Order Flow & Vùng cản làm TP/SL): Xu hướng [\(emaAnalysis.h4?.summary ?? "N/A")] | Swing High: \(d1PDH) | Swing Low: \(d1PDL)
-            • Khung M15 (Thực thi & Tín hiệu kích hoạt): Xu hướng [\(emaAnalysis.m15?.summary ?? "N/A")]
+            • Khung H4 (Cấu trúc sóng & Cản TP/SL): Xu hướng [\(emaAnalysis.h4?.summary ?? "N/A")] | Swing High: \(d1PDH) | Swing Low: \(d1PDL)
+            • Khung H1 (Thực thi & Tín hiệu kích hoạt): Xu hướng [\(emaAnalysis.h1?.summary ?? "N/A")]
               - Vùng thanh khoản: BSL gần nhất: \(nearestBSLStr) | SSL gần nhất: \(nearestSSLStr)
               - Quét thanh khoản (SFP Sweeps): \(sweepsStr)
-            • Động lượng M15: RSI(14) = \(rsiStr) | EMA(9) = \(ema9Str) | WMA(45) = \(wma45Str) | Trạng thái: [\(momAlignStr)] | Phân kỳ: [\(divStr)]
+            • Động lượng H1: RSI(14) = \(rsiStr) | EMA(9) = \(ema9Str) | WMA(45) = \(wma45Str) | Trạng thái: [\(momAlignStr)] | Phân kỳ: [\(divStr)]
             • Tin tức kinh tế (Catalyst): \(newsBlock)
             \(symbolLessonsBlock)\(liveUpdateBlock)\(thesisContinuityBlock)\(visionNote)
             NHIỆM VỤ PHÂN TÍCH ĐÓN ĐẦU & THIẾT LẬP KẾ HOẠCH (PRE-TRADE ACTION PLAN):
@@ -215,22 +252,22 @@ extension AIPromptBuilder {
             - Mục tiêu thanh khoản ngày: Khả năng tìm về PDH (\(d1PDH)) hoặc PDL (\(d1PDL)).
 
             ### 2. Cấu trúc sóng & Vùng cản then chốt H4 (Key Barriers)
-            - Order Flow H4 đang là TĂNG, GIẢM hay ĐI NGANG?
+            - Xu hướng H4 đang là TĂNG, GIẢM hay ĐI NGANG?
             - Nhận diện các VÙNG CẢN H4 (Đỉnh/Đáy Swing, Supply/Demand, FVG) để làm MỤC TIÊU CHỐT LỜI (TP1/TP2) hoặc CẮT LỖ (SL).
 
-            ### 3. Cấu trúc thực thi M15 & Bẫy thanh khoản (Execution & Traps)
-            - Cấu trúc M15: Xác nhận thuận xu hướng H4 (Follow-trend) hay xuất hiện tín hiệu đảo chiều tại cản H4 (MSS / SFP / Phân kỳ RSI) để đánh sóng hồi nghịch xu hướng (Counter-trend)?
-            - Bẫy thanh khoản & Tín hiệu kích hoạt: Đã có nến M15 xác nhận hay vào lệnh sớm có rủi ro bị quét SL?
+            ### 3. Cấu trúc thực thi H1 & Bẫy thanh khoản (Execution & Traps)
+            - Cấu trúc H1: Xác nhận thuận xu hướng H4 (Follow-trend) hay xuất hiện tín hiệu đảo chiều tại cản H4 (MSS / SFP / Phân kỳ RSI) để đánh sóng hồi nghịch xu hướng (Counter-trend)?
+            - Bẫy thanh khoản & Tín hiệu kích hoạt: Đã có nến H1 xác nhận hay vào lệnh sớm có rủi ro bị quét SL?
 
             ### 4. Khuyến nghị & Kế hoạch lệnh cụ thể (Actionable Recommendation)
             - KẾT LUẬN RÕ RÀNG: [BUY (LONG) / SELL (SHORT) / FLAT (ĐỨNG NGOÀI)].
             - LOẠI SETUP: [THUẬN XU HƯỚNG H4] hoặc [NGHỊCH XU HƯỚNG H4 / SÓNG HỒI TỪ CẢN H4].
             - Nếu KHUYẾN NGHỊ VÀO LỆNH (BUY/SELL):
-              • Điểm vào tối ưu (Entry) & Tín hiệu nến M15 kích hoạt (Trigger).
-              • Cắt lỗ bắt buộc (Structural Invalidation SL): Mức giá SL cụ thể theo vi phạm M15.
+              • Điểm vào tối ưu (Entry) & Tín hiệu nến H1 kích hoạt (Trigger).
+              • Cắt lỗ bắt buộc (Structural Invalidation SL): Mức giá SL cụ thể theo vi phạm H1.
               • Mục tiêu chốt lời (Targets): TP 1 và TP 2 đặt tại các vùng Cản H4 ở Mục 2.
               • Tỷ lệ Risk/Reward (R:R) dự kiến.
-            - Nếu KHUYẾN NGHỊ FLAT (ĐỨNG NGOÀI): Nêu rõ điều kiện M15 cần chờ thêm trước khi vào lệnh.
+            - Nếu KHUYẾN NGHỊ FLAT (ĐỨNG NGOÀI): Nêu rõ điều kiện H1 cần chờ thêm trước khi vào lệnh.
 
             BẮT BUỘC KẾT THÚC BẰNG KHỐI THÔNG SỐ SETUP ĐÚNG ĐỊNH DẠNG SAU:
             [PRE-TRADE SETUP SPECIFICATION]
@@ -248,18 +285,21 @@ extension AIPromptBuilder {
         } else {
             return """
             [ACCOUNT CONTEXT & RISK SIZING]:
-            • Real Balance: \(realBalStr != "N/A" ? realBalStr : "[Not configured]")\(propBufferStr)
+            • Real Balance: \(realBalStr != "N/A" ? "\(realBalStr) \(accNameStr) \(equityStr)" : "[Not configured]")\(propBufferStr)
             • Risk Budget Per Trade: \(riskPctStr)\(riskDollarStr)
-            • Core Strategy: Multi-timeframe SMC & Price Action (H4 key barriers for TP/SL, M15 for execution trigger)
+            • Trading Style: \(tradingStyleStr)
+            • Primary Playbooks: \(strategyStr)
+            • Known Leaks: \(leaksStr)
+            • Discipline Notes: \(customNotesStr)
 
             [MARKET STRUCTURE & OBJECTIVE MEASUREMENTS]:
             • Symbol: \(symbol) | Current Price: \(currentPrice)
             • D1 Frame (Macro): Trend [\(emaAnalysis.d1?.summary ?? "N/A")] | PDH: \(d1PDH) | PDL: \(d1PDL) | 14-day ADR: \(d1ADR)
-            • H4 Frame (Order Flow & TP/SL Target Barriers): Trend [\(emaAnalysis.h4?.summary ?? "N/A")] | Swing High: \(d1PDH) | Swing Low: \(d1PDL)
-            • M15 Frame (Execution & Entry Triggers): Trend [\(emaAnalysis.m15?.summary ?? "N/A")]
+            • H4 Frame (Key Barriers for TP/SL): Trend [\(emaAnalysis.h4?.summary ?? "N/A")] | Swing High: \(d1PDH) | Swing Low: \(d1PDL)
+            • H1 Frame (Execution & Entry Triggers): Trend [\(emaAnalysis.h1?.summary ?? "N/A")]
               - Liquidity Pools: Nearest BSL: \(nearestBSLStr) | Nearest SSL: \(nearestSSLStr)
               - Recent SFP Sweeps: \(sweepsStr)
-            • M15 Momentum: RSI(14) = \(rsiStr) | EMA(9) = \(ema9Str) | WMA(45) = \(wma45Str) | State: [\(momAlignStr)] | Divergence: [\(divStr)]
+            • H1 Momentum: RSI(14) = \(rsiStr) | EMA(9) = \(ema9Str) | WMA(45) = \(wma45Str) | State: [\(momAlignStr)] | Divergence: [\(divStr)]
             • Macro News Catalyst: \(newsBlock)
             \(symbolLessonsBlock)\(liveUpdateBlock)\(thesisContinuityBlock)\(visionNote)
             TASK: PRE-TRADE SMC MARKET BIAS & ACTIONABLE PLAN:
@@ -270,22 +310,22 @@ extension AIPromptBuilder {
             - Daily liquidity draw: Probability of tagging PDH (\(d1PDH)) or PDL (\(d1PDL)).
 
             ### 2. H4 Swing Structure & Key Barriers (TP/SL Targets)
-            - What is the dominant H4 Order Flow (Bullish, Bearish, or Consolidation)?
+            - What is the H4 trend (Bullish, Bearish, or Consolidation)?
             - Identify key H4 Supply/Demand zones, Order Blocks, and Swing Highs/Lows that serve as TARGET BARRIERS for TP1/TP2 or protective SL.
 
-            ### 3. M15 Execution Trigger & Traps
-            - M15 Structure: Does it confirm H4 Follow-Trend continuation, or show a reversal setup (MSS/SFP/Divergence) off an H4 barrier for a Counter-Trend retracement?
-            - Traps & Execution Timing: Is there clear M15 candle confirmation, or does entering now risk getting stopped out by a sweep?
+            ### 3. H1 Execution Trigger & Traps
+            - H1 Structure: Does it confirm H4 Follow-Trend continuation, or show a reversal setup (MSS/SFP/Divergence) off an H4 barrier for a Counter-Trend retracement?
+            - Traps & Execution Timing: Is there clear H1 candle confirmation, or does entering now risk getting stopped out by a sweep?
 
             ### 4. Actionable Directive & Execution Blueprint
             - DECISIVE VERDICT: [BUY (LONG) / SELL (SHORT) / FLAT (NO SETUP)].
             - SETUP TYPE: [FOLLOW-TREND CONTINUATION] or [COUNTER-TREND REVERSAL FROM H4 BARRIER].
             - If EXECUTABLE SETUP (BUY/SELL):
-              • Optimal Entry Zone & M15 Confirmation Trigger.
-              • Structural Invalidation (SL): Specific price level based on M15 structure failure.
+              • Optimal Entry Zone & H1 Confirmation Trigger.
+              • Structural Invalidation (SL): Specific price level based on H1 structure failure.
               • Profit Targets (TP1 & TP2): Anchored to H4 key barriers from Section 2.
               • Projected Risk-to-Reward (R:R).
-            - If FLAT: State clearly what M15 price development is required before entering.
+            - If FLAT: State clearly what H1 price development is required before entering.
 
             MANDATORY: CONCLUDE WITH THIS PRE-TRADE SETUP SPECIFICATION BLOCK:
             [PRE-TRADE SETUP SPECIFICATION]

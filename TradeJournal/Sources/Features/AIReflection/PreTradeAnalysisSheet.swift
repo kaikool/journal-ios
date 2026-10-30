@@ -264,18 +264,18 @@ public struct PreTradeAnalysisSheet: View {
         let currentSymbol = self.selectedSymbol
         
         Task {
-            // 1. Fetch freshest M15 candles, or fallback to current m15Bars
-            var activeBars = self.m15Bars
-            if let freshM15 = try? await MarketDataService.shared.fetchBarsForSymbol(
+            // 1. Fetch freshest H1 candles, or fallback to current h1Bars
+            var activeBars = self.h1Bars
+            if let freshH1 = try? await MarketDataService.shared.fetchBarsForSymbol(
                 symbol: currentSymbol,
                 config: dataStore.marketConnections,
-                resolution: "15m",
-                count: 100,
+                resolution: "1h",
+                count: 48,
                 forceRefresh: true
-            ), !freshM15.bars.isEmpty {
-                activeBars = freshM15.bars
+            ), !freshH1.bars.isEmpty {
+                activeBars = freshH1.bars
                 await MainActor.run {
-                    self.m15Bars = freshM15.bars
+                    self.h1Bars = freshH1.bars
                 }
             }
             
@@ -298,15 +298,15 @@ public struct PreTradeAnalysisSheet: View {
                     liveContext = """
                     [HÀNH ĐỘNG GIÁ MỚI NHẤT]:
                     • Cặp tiền: \(currentSymbol) | Thị giá hiện tại: \(priceStr)
-                    • Nến M15 gần nhất: Mở \(openStr) | Cao \(highStr) | Thấp \(lowStr) | Đóng \(priceStr)
-                    • Động lượng M15: RSI(14) = \(rsiVal) | EMA(9) = \(emaVal) | WMA(45) = \(wmaVal) | Phân kỳ: \(divMsg)
+                    • Nến H1 gần nhất: Mở \(openStr) | Cao \(highStr) | Thấp \(lowStr) | Đóng \(priceStr)
+                    • Động lượng H1: RSI(14) = \(rsiVal) | EMA(9) = \(emaVal) | WMA(45) = \(wmaVal) | Phân kỳ: \(divMsg)
                     """
                 } else {
                     liveContext = """
                     [LATEST LIVE MARKET DATA]:
                     • Symbol: \(currentSymbol) | Current Price: \(priceStr)
-                    • Latest M15 Bar: Open \(openStr) | High \(highStr) | Low \(lowStr) | Close \(priceStr)
-                    • M15 Momentum: RSI(14) = \(rsiVal) | EMA(9) = \(emaVal) | WMA(45) = \(wmaVal) | Divergence: \(divMsg)
+                    • Latest H1 Bar: Open \(openStr) | High \(highStr) | Low \(lowStr) | Close \(priceStr)
+                    • H1 Momentum: RSI(14) = \(rsiVal) | EMA(9) = \(emaVal) | WMA(45) = \(wmaVal) | Divergence: \(divMsg)
                     """
                 }
             }
