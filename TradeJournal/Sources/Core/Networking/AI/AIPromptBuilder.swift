@@ -124,13 +124,19 @@ public enum AIPromptBuilder {
         let isVi = language == "vi"
         var context = ""
         
+        let isPreTradeOrLiveInquiry = prompt?.contains("[THÔNG TIN TÀI KHOẢN") == true ||
+                                      prompt?.contains("[ACCOUNT CONTEXT") == true ||
+                                      prompt?.contains("[HÀNH ĐỘNG GIÁ MỚI NHẤT]") == true ||
+                                      prompt?.contains("[LATEST LIVE MARKET DATA]") == true
+        
         // 1. Intraday Session & Risk Context (Zero-Data-Lack)
-        if let session = sessionSummary {
+        // Skip duplicate or bloated historical stats if already embedded or during live pre-trade follow-up inquiry
+        if let session = sessionSummary, !isPreTradeOrLiveInquiry {
             context += AIAccountContextProvider.formatContextForPrompt(session, isVi: isVi)
         }
         
         // 1b. Multi-Dimensional Performance Snapshot (Module B Intelligence Form)
-        if let snapshot = analyticsSnapshot {
+        if let snapshot = analyticsSnapshot, !isPreTradeOrLiveInquiry {
             context += TradeAnalyticsAggregator.formatSnapshotForPrompt(snapshot, isVi: isVi)
         }
         
@@ -175,7 +181,7 @@ public enum AIPromptBuilder {
         }
         
         // 3. Performance Metrics (Strictly 2 Decimal Places)
-        if let m = metrics {
+        if let m = metrics, !isPreTradeOrLiveInquiry {
             let wr = String(format: "%.2f%%", (m.winRate ?? 0.0) * 100)
             let pf = m.profitFactor.map { String(format: "%.2f", $0) } ?? "N/A"
             let netPnl = String(format: "%.2f", NSDecimalNumber(decimal: m.netPnl).doubleValue)

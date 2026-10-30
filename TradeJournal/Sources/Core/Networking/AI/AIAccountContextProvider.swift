@@ -96,34 +96,77 @@ public enum AIAccountContextProvider {
         }
         
         // 3. Prop Firm Risk & Capital Preservation Rules
-        let currency = accountObj?.currency ?? propObj?.currency ?? dataStore.currencyConversion.reportingCurrency
+        let isExnessAccount = (accountObj?.broker.lowercased() == "exness") ||
+                              activeAccId.contains("exness") ||
+                              (ExnessService.shared.isConnected && (activeAccId.isEmpty || activeAccId == "default-acc" || activeAccId == "all"))
+        
+        let currency: String = {
+            if isExnessAccount && !ExnessService.shared.currency.isEmpty {
+                return ExnessService.shared.currency
+            }
+            return accountObj?.currency ?? propObj?.currency ?? dataStore.currencyConversion.reportingCurrency
+        }()
+        
         let totalClosedNetPnl = accountTrades.filter { $0.status != .open || $0.closedAt != nil }.reduce(Decimal.zero) { $0 + $1.netPnl }
         
         let balance: Decimal? = {
+            // Priority 1: Direct live balance from ExnessService if connected
+            if isExnessAccount && ExnessService.shared.balance > 0 {
+                return ExnessService.shared.balance
+            }
+            
             if let prop = propObj {
                 if let minor = prop.balanceMinor ?? prop.sizeMinor {
                     return Decimal(minor) / 100
                 }
             }
+            
             if let acc = accountObj {
+                // If it's a synced broker account (e.g. Exness, cTrader), its stored balance is already the live net balance from the broker.
+                // Do NOT add historical closed trades net PnL to an already-current synced balance!
+                if acc.kind == .sync || acc.broker.lowercased() == "exness" {
+                    if acc.broker.lowercased() == "exness" && ExnessService.shared.balance > 0 {
+                        return ExnessService.shared.balance
+                    }
+                    return acc.initialBalance
+                }
                 return acc.initialBalance + totalClosedNetPnl
             }
+            
             let activeAcc = dataStore.mostRecentActiveAccount ?? dataStore.visibleAccounts.first ?? dataStore.accounts.first
             if let acc = activeAcc {
+                if acc.broker.lowercased() == "exness" && ExnessService.shared.balance > 0 {
+                    return ExnessService.shared.balance
+                }
+                if acc.kind == .sync || acc.broker.lowercased() == "exness" {
+                    return acc.initialBalance
+                }
                 let accPnl = dataStore.trades.filter { TradeDataStore.isSameAccountId($0.accountId, acc.id) && ($0.status != .open || $0.closedAt != nil) }.reduce(Decimal.zero) { $0 + $1.netPnl }
                 return acc.initialBalance + accPnl
             }
+            
             if !dataStore.accounts.isEmpty {
-                let totalInit = dataStore.visibleAccounts.reduce(Decimal.zero) { total, account in
-                    total + dataStore.currencyConversion.convertedBalance(account.initialBalance, currency: account.currency)
+                let total = dataStore.visibleAccounts.reduce(Decimal.zero) { total, account in
+                    let base = (account.kind == .sync || account.broker.lowercased() == "exness")
+                        ? account.initialBalance
+                        : (account.initialBalance + dataStore.trades.filter { TradeDataStore.isSameAccountId($0.accountId, account.id) && ($0.status != .open || $0.closedAt != nil) }.reduce(Decimal.zero) { $0 + $1.netPnl })
+                    return total + dataStore.currencyConversion.convertedBalance(base, currency: account.currency)
                 }
-                let totalPnl = dataStore.trades.filter { $0.status != .open || $0.closedAt != nil }.reduce(Decimal.zero) { $0 + $1.netPnl }
-                return totalInit + totalPnl
+                return total
             }
+            
+            // Fallback to ExnessService directly if connected
+            if ExnessService.shared.isConnected && ExnessService.shared.balance > 0 {
+                return ExnessService.shared.balance
+            }
+            
             return nil
         }()
         
         let equity: Decimal? = {
+            if isExnessAccount && ExnessService.shared.equity > 0 {
+                return ExnessService.shared.equity
+            }
             if let prop = propObj {
                 if let minor = prop.equityMinor ?? prop.balanceMinor ?? prop.sizeMinor {
                     return Decimal(minor) / 100
@@ -203,7 +246,7 @@ public enum AIAccountContextProvider {
             weekToDateTradesCount: wtdTrades.count,
             monthToDateNetPnl: netPnlMtd,
             monthToDateTradesCount: mtdTrades.count,
-            accountName: accountObj?.name ?? propObj?.name,
+            accountName: accountObj?.name ?? propObj?.name ?? (isExnessAccount && ExnessService.shared.isConnected ? (!ExnessService.shared.accountName.isEmpty ? ExnessService.shared.accountName : "Exness (\(ExnessService.shared.accountId))") : nil),
             propFirmName: propObj?.firm,
             accountCurrency: currency,
             balance: balance,
