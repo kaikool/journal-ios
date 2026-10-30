@@ -165,7 +165,7 @@ public struct PreTradeAnalysisSheet: View {
                     .accessibilityLabel("Close")
                 }
             }
-            .sheet(isPresented: $showFullScreenChart) {
+            .fullScreenCover(isPresented: $showFullScreenChart) {
                 if let img = activeChartSnapshot ?? renderActiveSnapshot() ?? userAttachedImage {
                     FullScreenChartLightboxView(image: img)
                 }
@@ -481,8 +481,16 @@ public struct PreTradeAnalysisSheet: View {
                 let cacheKey = "pretrade_\(self.selectedSymbol)"
                 AICoachSessionStore.shared.save(key: cacheKey, result: response, followUps: self.followUpMessages)
                 
+                // Capture account balance for setup record
+                let session = AIAccountContextProvider.captureContext(dataStore: self.dataStore)
+                let balStr = session.balance.map { Formatters.formatCurrency($0, currency: session.currency) }
+                
                 // Persist structured advisor commitment so Trade Coach can automatically link and honor it
-                let commitment = AIAdvisorMemoryEngine.shared.extractCommitment(from: response, symbol: self.selectedSymbol)
+                let commitment = AIAdvisorMemoryEngine.shared.extractCommitment(
+                    from: response,
+                    symbol: self.selectedSymbol,
+                    fallbackBalance: balStr
+                )
                 AIAdvisorMemoryEngine.shared.saveCommitment(commitment)
             }
         } catch {

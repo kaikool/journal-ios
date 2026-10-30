@@ -10,6 +10,10 @@ public struct AdvisorCommitmentRecord: Codable, Identifiable, Sendable {
     public let plannedEntry: String?
     public let invalidationSL: String?
     public let targetTP: String?
+    public let takeProfit1: String?
+    public let takeProfit2: String?
+    public let volume: String?
+    public let balance: String?
     public let triggerCondition: String?
     public let thesisSummary: String
     public var linkedOrderTicket: String?
@@ -23,6 +27,10 @@ public struct AdvisorCommitmentRecord: Codable, Identifiable, Sendable {
         plannedEntry: String? = nil,
         invalidationSL: String? = nil,
         targetTP: String? = nil,
+        takeProfit1: String? = nil,
+        takeProfit2: String? = nil,
+        volume: String? = nil,
+        balance: String? = nil,
         triggerCondition: String? = nil,
         thesisSummary: String,
         linkedOrderTicket: String? = nil,
@@ -35,6 +43,10 @@ public struct AdvisorCommitmentRecord: Codable, Identifiable, Sendable {
         self.plannedEntry = plannedEntry
         self.invalidationSL = invalidationSL
         self.targetTP = targetTP
+        self.takeProfit1 = takeProfit1 ?? targetTP
+        self.takeProfit2 = takeProfit2
+        self.volume = volume
+        self.balance = balance
         self.triggerCondition = triggerCondition
         self.thesisSummary = thesisSummary
         self.linkedOrderTicket = linkedOrderTicket
@@ -694,18 +706,40 @@ public final class AIAdvisorMemoryEngine: @unchecked Sendable {
     
     // MARK: - 4. Parsing & Extraction Helpers
     
-    /// Parses an AI analysis output string into a structured AdvisorCommitmentRecord.
-    public func extractCommitment(from analysisText: String, symbol: String) -> AdvisorCommitmentRecord {
+    /// Parses an AI analysis output string into a structured AdvisorCommitmentRecord with discrete setup fields.
+    public func extractCommitment(
+        from analysisText: String,
+        symbol: String,
+        fallbackBalance: String? = nil,
+        fallbackVolume: String? = nil
+    ) -> AdvisorCommitmentRecord {
         let lines = analysisText.components(separatedBy: .newlines)
         var bias = "FLAT"
         var entry: String? = nil
         var sl: String? = nil
-        var tp: String? = nil
+        var tp1: String? = nil
+        var tp2: String? = nil
+        var volume: String? = fallbackVolume
+        var balance: String? = fallbackBalance
         var trigger: String? = nil
+        
+        func cleanField(_ raw: String) -> String {
+            var s = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            s = s.replacingOccurrences(of: "^[-•*\\s>\\[\\]]+", with: "", options: .regularExpression)
+            if let colonIdx = s.firstIndex(of: ":") {
+                let after = s[s.index(after: colonIdx)...].trimmingCharacters(in: .whitespacesAndNewlines)
+                if !after.isEmpty { s = after }
+            }
+            s = s.replacingOccurrences(of: "[*`\\[\\]]", with: "", options: .regularExpression).trimmingCharacters(in: .whitespacesAndNewlines)
+            return s
+        }
         
         for line in lines {
             let lower = line.lowercased()
-            if lower.contains("kết luận:") || lower.contains("verdict:") || lower.contains("khuyến nghị hành động:") || lower.contains("actionable recommendation:") {
+            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            
+            // 1. Direction / Bias
+            if lower.contains("direction:") || lower.contains("hướng:") || lower.contains("bias:") || lower.contains("kết luận:") || lower.contains("verdict:") {
                 if lower.contains("sell") || lower.contains("short") || lower.contains("bán") {
                     bias = "SELL"
                 } else if lower.contains("buy") || lower.contains("long") || lower.contains("mua") {
@@ -714,21 +748,67 @@ public final class AIAdvisorMemoryEngine: @unchecked Sendable {
                     bias = "FLAT"
                 }
             }
-            if lower.contains("optimal entry") || lower.contains("điểm vào tối ưu") || lower.contains("vùng vào lệnh") {
-                entry = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            
+            // 2. Balance
+            if lower.contains("balance:") || lower.contains("số dư:") || lower.contains("vốn:") {
+                let val = cleanField(trimmed)
+                if !val.isEmpty && val != "N/A" {
+                    balance = val
+                }
             }
-            if lower.contains("invalidation") || lower.contains("cắt lỗ bắt buộc") || lower.contains("sl:") {
-                sl = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            
+            // 3. Entry
+            if lower.contains("entry:") || lower.contains("optimal entry") || lower.contains("điểm vào") || lower.contains("vùng vào lệnh") || lower.contains("vào lệnh tại:") {
+                let val = cleanField(trimmed)
+                if !val.isEmpty && val != "N/A" {
+                    entry = val
+                }
             }
-            if lower.contains("targets") || lower.contains("mục tiêu chốt lời") || lower.contains("tp 1") {
-                tp = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            
+            // 4. Stop Loss
+            if lower.contains("stop loss:") || lower.contains("sl:") || lower.contains("cắt lỗ:") || lower.contains("invalidation:") {
+                let val = cleanField(trimmed)
+                if !val.isEmpty && val != "N/A" {
+                    sl = val
+                }
             }
-            if lower.contains("điều kiện kích hoạt") || lower.contains("trigger") || lower.contains("điều kiện cần chờ") {
-                trigger = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            
+            // 5. Take Profit 1
+            if lower.contains("take profit 1:") || lower.contains("tp 1:") || lower.contains("tp1:") || lower.contains("chốt lời 1:") || lower.contains("mục tiêu 1:") {
+                let val = cleanField(trimmed)
+                if !val.isEmpty && val != "N/A" {
+                    tp1 = val
+                }
+            } else if tp1 == nil && (lower.contains("target tp:") || lower.contains("targets:") || lower.contains("mục tiêu chốt lời:") || lower.contains("take profit:")) && !lower.contains("tp 2") && !lower.contains("tp2") {
+                let val = cleanField(trimmed)
+                if !val.isEmpty && val != "N/A" {
+                    tp1 = val
+                }
+            }
+            
+            // 6. Take Profit 2 (nếu có)
+            if lower.contains("take profit 2:") || lower.contains("tp 2:") || lower.contains("tp2:") || lower.contains("chốt lời 2:") || lower.contains("mục tiêu 2:") {
+                let val = cleanField(trimmed)
+                if !val.isEmpty && !val.lowercased().contains("không") && !val.lowercased().contains("none") && !val.lowercased().contains("n/a") {
+                    tp2 = val
+                }
+            }
+            
+            // 7. Volume
+            if lower.contains("volume:") || lower.contains("khối lượng:") || lower.contains("lot:") || lower.contains("size:") {
+                let val = cleanField(trimmed)
+                if !val.isEmpty && val != "N/A" {
+                    volume = val
+                }
+            }
+            
+            // 8. Trigger
+            if lower.contains("điều kiện kích hoạt:") || lower.contains("trigger:") || lower.contains("điều kiện cần chờ:") {
+                trigger = cleanField(trimmed)
             }
         }
         
-        // First 3 non-empty lines for summary
+        // Summary
         let nonHeaders = lines.filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty && !$0.hasPrefix("#") }
         let summary = nonHeaders.prefix(3).joined(separator: " ")
         
@@ -737,7 +817,11 @@ public final class AIAdvisorMemoryEngine: @unchecked Sendable {
             bias: bias,
             plannedEntry: entry,
             invalidationSL: sl,
-            targetTP: tp,
+            targetTP: tp1,
+            takeProfit1: tp1,
+            takeProfit2: tp2,
+            volume: volume,
+            balance: balance,
             triggerCondition: trigger,
             thesisSummary: summary.isEmpty ? analysisText.prefix(200).description : summary
         )

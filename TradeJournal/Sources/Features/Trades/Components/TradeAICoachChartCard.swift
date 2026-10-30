@@ -84,10 +84,10 @@ public struct TradeAICoachChartCard: View {
                         ZStack(alignment: .bottomTrailing) {
                             Image(uiImage: image)
                                 .resizable()
-                                .scaledToFit()
+                                .scaledToFill()
                                 .frame(maxWidth: .infinity)
-                                .frame(maxHeight: 160)
-                                .background(Color.black.opacity(0.3))
+                                .frame(height: 180)
+                                .clipped()
                                 .cornerRadius(8)
                                 .overlay(RoundedRectangle(cornerRadius: 8).stroke(AppColors.border, lineWidth: 0.8))
                             
@@ -121,7 +121,11 @@ public struct TradeAICoachChartCard: View {
                 // Bottom Info & Manual Screenshot Upload
                 HStack {
                     if let provider = activeCandleProvider, activeBarsCount > 0 {
-                        Text("\(activeBarsCount) bars • \(provider)")
+                        let cleanProvider = provider
+                            .replacingOccurrences(of: "\\s*\\(.*?Cache.*?\\)", with: "", options: .regularExpression)
+                            .replacingOccurrences(of: "\\s*\\(Cached\\)", with: "", options: .regularExpression)
+                            .trimmingCharacters(in: .whitespaces)
+                        Text("\(activeBarsCount) bars • \(cleanProvider)")
                             .font(.system(size: 10, weight: .medium))
                             .foregroundColor(AppColors.brand)
                     } else {

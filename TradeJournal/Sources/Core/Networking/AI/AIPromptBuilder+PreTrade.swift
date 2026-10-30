@@ -347,6 +347,17 @@ extension AIPromptBuilder {
             
             ⚠️ YÊU CẦU BẮT BUỘC: Trình bày cô đọng, sắc bén và BẮT BUỘC hoàn thành trọn vẹn cả 4 phần trên (đặc biệt là Phần 4: Vùng vào lệnh, Cắt lỗ SL, Chốt lời TP1/TP2, Tỷ lệ R:R). Tuyệt đối không dừng lại giữa chừng!
             
+            BẮT BUỘC KẾT THÚC BẰNG KHỐI TÓM TẮT THÔNG SỐ SETUP ĐÚNG ĐỊNH DẠNG SAU:
+            [PRE-TRADE SETUP SPECIFICATION]
+            - Direction: [BUY hoặc SELL hoặc FLAT]
+            - Balance: [Số dư tài khoản]
+            - Entry: [Mức giá hoặc vùng giá vào lệnh]
+            - Stop loss: [Mức giá SL cụ thể]
+            - Take profit 1: [Mức giá TP 1]
+            - Take profit 2: [Mức giá TP 2 nếu có, nếu không ghi Không]
+            - Volume: [Khối lượng khuyến nghị, ví dụ 0.10 lot]
+            - Date time: [Thời gian hiện tại]
+            
             > [Đúng 1 câu quy tắc kỷ luật hành động không khoan nhượng]
             """
         } else {
@@ -407,6 +418,17 @@ extension AIPromptBuilder {
               • Projected Risk-to-Reward (R:R): Expected ratio.
             - If FLAT:
               • Clearly state the mandatory M15 trigger required before entering.
+            
+            MANDATORY: YOU MUST CONCLUDE WITH THIS PRE-TRADE SETUP SPECIFICATION BLOCK:
+            [PRE-TRADE SETUP SPECIFICATION]
+            - Direction: [BUY or SELL or FLAT]
+            - Balance: [Account Balance]
+            - Entry: [Entry price or zone]
+            - Stop loss: [Specific SL price]
+            - Take profit 1: [Specific TP1 price]
+            - Take profit 2: [Specific TP2 price if any, otherwise None]
+            - Volume: [Recommended volume/lots based on risk management]
+            - Date time: [Current date and time]
             
             > [Single non-negotiable operational directive]
             """

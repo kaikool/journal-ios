@@ -135,6 +135,10 @@ public struct AIMemoryRecord: Identifiable, Codable, Equatable, Sendable {
             "plannedEntry": commitment.plannedEntry ?? "",
             "invalidationSL": commitment.invalidationSL ?? "",
             "targetTP": commitment.targetTP ?? "",
+            "takeProfit1": commitment.takeProfit1 ?? "",
+            "takeProfit2": commitment.takeProfit2 ?? "",
+            "volume": commitment.volume ?? "",
+            "balance": commitment.balance ?? "",
             "triggerCondition": commitment.triggerCondition ?? "",
             "linkedOrderTicket": commitment.linkedOrderTicket ?? "",
             "linkedTradeKey": commitment.linkedTradeKey ?? ""
@@ -164,6 +168,10 @@ public struct AIMemoryRecord: Identifiable, Codable, Equatable, Sendable {
         var plannedEntry: String? = nil
         var invalidationSL: String? = nil
         var targetTP: String? = nil
+        var takeProfit1: String? = nil
+        var takeProfit2: String? = nil
+        var volume: String? = nil
+        var balance: String? = nil
         var triggerCondition: String? = nil
         var linkedOrderTicket: String? = nil
         var linkedTradeKey: String? = nil
@@ -174,6 +182,10 @@ public struct AIMemoryRecord: Identifiable, Codable, Equatable, Sendable {
             plannedEntry = dict["plannedEntry"]?.isEmpty == false ? dict["plannedEntry"] : nil
             invalidationSL = dict["invalidationSL"]?.isEmpty == false ? dict["invalidationSL"] : nil
             targetTP = dict["targetTP"]?.isEmpty == false ? dict["targetTP"] : nil
+            takeProfit1 = dict["takeProfit1"]?.isEmpty == false ? dict["takeProfit1"] : (dict["targetTP"]?.isEmpty == false ? dict["targetTP"] : nil)
+            takeProfit2 = dict["takeProfit2"]?.isEmpty == false ? dict["takeProfit2"] : nil
+            volume = dict["volume"]?.isEmpty == false ? dict["volume"] : nil
+            balance = dict["balance"]?.isEmpty == false ? dict["balance"] : nil
             triggerCondition = dict["triggerCondition"]?.isEmpty == false ? dict["triggerCondition"] : nil
             linkedOrderTicket = dict["linkedOrderTicket"]?.isEmpty == false ? dict["linkedOrderTicket"] : nil
             linkedTradeKey = dict["linkedTradeKey"]?.isEmpty == false ? dict["linkedTradeKey"] : nil
@@ -187,6 +199,10 @@ public struct AIMemoryRecord: Identifiable, Codable, Equatable, Sendable {
             plannedEntry: plannedEntry,
             invalidationSL: invalidationSL,
             targetTP: targetTP,
+            takeProfit1: takeProfit1,
+            takeProfit2: takeProfit2,
+            volume: volume,
+            balance: balance,
             triggerCondition: triggerCondition,
             thesisSummary: content,
             linkedOrderTicket: linkedOrderTicket,

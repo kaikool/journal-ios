@@ -452,8 +452,7 @@ public final class MarketDataService: Sendable {
         if !effectiveForceRefresh,
            let cached = MarketDataCacheStore.shared.getTradeBars(tradeId: trade.id, resolution: resolution, isClosed: isClosed),
            !cached.isEmpty {
-            let tag = isClosed ? "Historical Cache" : "Cache"
-            return ("\(providerTag) (\(tag))", cached)
+            return (providerTag, cached)
         }
         
         let coalescingKey = "trade_\(trade.id)_\(resolution)"
@@ -550,11 +549,11 @@ public final class MarketDataService: Sendable {
                 }
             }
             
-            return (providerTag, fetchedBars)
+            return (effectiveForceRefresh ? "\(providerTag) Live" : providerTag, fetchedBars)
         } catch {
             // Stale / Offline Cache Fallback
             if let stale = MarketDataCacheStore.shared.getStaleTradeBars(tradeId: trade.id, resolution: resolution), !stale.isEmpty {
-                return ("\(providerTag) (Offline Cache)", stale)
+                return (providerTag, stale)
             }
             throw error
         }
@@ -671,7 +670,7 @@ public final class MarketDataService: Sendable {
         if !forceRefresh,
            let cached = MarketDataCacheStore.shared.getSymbolBars(symbol: cleanSymbol, resolution: resolution, count: count),
            !cached.isEmpty {
-            return ("\(providerTag) (Cached)", cached)
+            return (providerTag, cached)
         }
         
         let coalescingKey = "sym_\(cleanSymbol)_\(resolution)_\(count)"
@@ -736,11 +735,11 @@ public final class MarketDataService: Sendable {
                 }
             }
             
-            return (providerTag, fetchedBars)
+            return (forceRefresh ? "\(providerTag) Live" : providerTag, fetchedBars)
         } catch {
             // Stale / Offline Cache Fallback
             if let stale = MarketDataCacheStore.shared.getStaleSymbolBars(symbol: cleanSymbol, resolution: resolution, count: count), !stale.isEmpty {
-                return ("\(providerTag) (Offline Cache)", stale)
+                return (providerTag, stale)
             }
             throw error
         }

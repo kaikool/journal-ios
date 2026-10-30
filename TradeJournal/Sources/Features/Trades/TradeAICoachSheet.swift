@@ -54,37 +54,9 @@ public struct TradeAICoachSheet: View {
                     // 1. Trade Context Pill
                     TradeAICoachContextCard(trade: trade, isOpen: isOpen)
                     
-                    // 1b. Linked Pre-Trade Plan Banner (Accountability & Continuity)
+                    // 1b. Linked Pre-Trade Setup Card (Parsed Execution Blueprint)
                     if let plan = linkedPreTradePlan {
-                        HStack(spacing: 8) {
-                            Image(systemName: "link.badge.plus")
-                                .font(.system(size: 13, weight: .bold))
-                                .foregroundColor(AppColors.brand)
-                            
-                            VStack(alignment: .leading, spacing: 2) {
-                                HStack(spacing: 6) {
-                                    Text("Linked Pre-Trade Setup:")
-                                        .font(.system(size: 11, weight: .bold))
-                                        .foregroundColor(AppColors.primaryText)
-                                    Text("\(plan.bias) \(plan.plannedEntry ?? "")")
-                                        .font(.system(size: 11, weight: .bold))
-                                        .foregroundColor(AppColors.brand)
-                                }
-                                Text("AI Coach is held accountable to this plan and will audit execution against it.")
-                                    .font(.system(size: 10))
-                                    .foregroundColor(AppColors.secondaryText)
-                            }
-                            
-                            Spacer()
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(AppColors.brand.opacity(0.1))
-                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                .stroke(AppColors.brand.opacity(0.35), lineWidth: 0.8)
-                        )
+                        linkedPreTradeSetupCard(plan: plan)
                     }
                     
                     // 2. Trader Profile Compliance Pill
@@ -178,7 +150,7 @@ public struct TradeAICoachSheet: View {
             .sheet(isPresented: $showTraderProfileSheet) {
                 TraderProfileSheet()
             }
-            .sheet(isPresented: $showFullScreenChart) {
+            .fullScreenCover(isPresented: $showFullScreenChart) {
                 if let img = selectedChartImage {
                     FullScreenChartLightboxView(image: img)
                 }
@@ -752,5 +724,119 @@ public struct TradeAICoachSheet: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
             showCopiedAlert = false
         }
+    }
+    
+    // MARK: - Linked Pre-Trade Setup Card Component
+    private func linkedPreTradeSetupCard(plan: AdvisorCommitmentRecord) -> some View {
+        let isBuy = plan.bias.uppercased().contains("BUY") || plan.bias.uppercased().contains("LONG")
+        let isSell = plan.bias.uppercased().contains("SELL") || plan.bias.uppercased().contains("SHORT")
+        let biasColor = isBuy ? Color.green : (isSell ? Color.red : Color.orange)
+        let biasBg = biasColor.opacity(0.16)
+        
+        return VStack(alignment: .leading, spacing: 8) {
+            // Header
+            HStack {
+                HStack(spacing: 5) {
+                    Image(systemName: "link.badge.plus")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(AppColors.brand)
+                    Text("LINKED PRE-TRADE SETUP")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(AppColors.brand)
+                }
+                Spacer()
+                Text(plan.bias.uppercased())
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundColor(biasColor)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 2)
+                    .background(biasBg)
+                    .clipShape(Capsule())
+            }
+            
+            Divider()
+                .background(AppColors.border.opacity(0.6))
+            
+            // Parsed Setup Parameters (Clean key-value rows)
+            VStack(spacing: 5) {
+                preTradeParamRow(label: "Direction:", value: plan.bias.uppercased(), valueColor: biasColor)
+                
+                if let bal = resolvedBalance(plan: plan) {
+                    preTradeParamRow(label: "Balance:", value: bal)
+                }
+                
+                if let entry = plan.plannedEntry, !entry.isEmpty {
+                    preTradeParamRow(label: "Entry:", value: entry)
+                }
+                
+                if let sl = plan.invalidationSL, !sl.isEmpty {
+                    preTradeParamRow(label: "Stop loss:", value: sl, valueColor: Color.red)
+                }
+                
+                if let tp1 = plan.takeProfit1 ?? plan.targetTP, !tp1.isEmpty {
+                    preTradeParamRow(label: "Take profit 1:", value: tp1, valueColor: Color.green)
+                }
+                
+                if let tp2 = plan.takeProfit2, !tp2.isEmpty {
+                    preTradeParamRow(label: "Take profit 2:", value: tp2, valueColor: Color.green)
+                }
+                
+                if let vol = resolvedVolume(plan: plan) {
+                    preTradeParamRow(label: "Volume:", value: vol)
+                }
+                
+                preTradeParamRow(label: "Date time:", value: formatDateTime(plan.timestamp))
+            }
+        }
+        .padding(10)
+        .background(AppColors.cardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(AppColors.brand.opacity(0.35), lineWidth: 0.8)
+        )
+    }
+    
+    private func preTradeParamRow(label: String, value: String, valueColor: Color = AppColors.primaryText) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Text(label)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(AppColors.secondaryText)
+                .frame(width: 90, alignment: .leading)
+            
+            Text(value)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(valueColor)
+                .lineLimit(2)
+            
+            Spacer()
+        }
+    }
+    
+    private func resolvedBalance(plan: AdvisorCommitmentRecord) -> String? {
+        if let b = plan.balance, !b.isEmpty { return b }
+        let session = AIAccountContextProvider.captureContext(dataStore: dataStore)
+        if let b = session.balance {
+            return Formatters.formatCurrency(b, currency: session.currency)
+        }
+        if let acc = dataStore.accounts.first(where: { $0.id == trade.accountId }) {
+            return Formatters.formatCurrency(acc.initialBalance, currency: acc.currency)
+        }
+        return nil
+    }
+    
+    private func resolvedVolume(plan: AdvisorCommitmentRecord) -> String? {
+        if let v = plan.volume, !v.isEmpty { return v }
+        if trade.quantity > 0 {
+            return String(format: "%.2f lots", (trade.quantity as NSDecimalNumber).doubleValue)
+        }
+        return nil
+    }
+    
+    private func formatDateTime(_ date: Date) -> String {
+        let df = DateFormatter()
+        df.dateFormat = "yyyy-MM-dd HH:mm"
+        df.timeZone = TimeZone(identifier: dataStore.generalSettings.displayTimeZone) ?? .current
+        return df.string(from: date)
     }
 }

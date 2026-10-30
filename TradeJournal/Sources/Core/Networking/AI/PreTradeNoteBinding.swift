@@ -55,8 +55,17 @@ public struct PreTradeNoteBinding: Sendable {
         if let sl = commitment.invalidationSL, !sl.isEmpty {
             lines.append("> - **Stop Loss (SL)**: \(sl)")
         }
-        if let tp = commitment.targetTP, !tp.isEmpty {
-            lines.append("> - **Take Profit (TP)**: \(tp)")
+        if let tp1 = commitment.takeProfit1 ?? commitment.targetTP, !tp1.isEmpty {
+            lines.append("> - **Take Profit 1**: \(tp1)")
+        }
+        if let tp2 = commitment.takeProfit2, !tp2.isEmpty {
+            lines.append("> - **Take Profit 2**: \(tp2)")
+        }
+        if let vol = commitment.volume, !vol.isEmpty {
+            lines.append("> - **Volume**: \(vol)")
+        }
+        if let bal = commitment.balance, !bal.isEmpty {
+            lines.append("> - **Balance**: \(bal)")
         }
         if let trigger = commitment.triggerCondition, !trigger.isEmpty {
             lines.append("> - **Trigger Condition**: \(trigger)")
