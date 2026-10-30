@@ -818,6 +818,7 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
         // 6. Build atomic Executions and authoritative Trades
         var directTrades: [Trade] = []
         var newExecutions: [Execution] = []
+        let defaultPlaybookId = await MainActor.run { TradeDataStore.shared.defaultPlaybook?.id }
         
         for (posId, g) in groups {
             let sym = g.symbol
@@ -911,7 +912,7 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
                     executionCount: execIds.count,
                     executionIds: execIds,
                     durationMs: durMs,
-                    playbookId: TradeDataStore.shared.defaultPlaybook?.id,
+                    playbookId: defaultPlaybookId,
                     stopLoss: sltp?.sl,
                     profitTarget: sltp?.tp
                 )
@@ -938,7 +939,7 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
                     executionCount: execIds.count,
                     executionIds: execIds,
                     durationMs: nil,
-                    playbookId: TradeDataStore.shared.defaultPlaybook?.id,
+                    playbookId: defaultPlaybookId,
                     stopLoss: sltp?.sl,
                     profitTarget: sltp?.tp
                 )
@@ -999,7 +1000,7 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
                 executionCount: 1,
                 executionIds: [execId],
                 durationMs: nil,
-                playbookId: TradeDataStore.shared.defaultPlaybook?.id,
+                playbookId: defaultPlaybookId,
                 stopLoss: sltp?.sl,
                 profitTarget: sltp?.tp
             )
