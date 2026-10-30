@@ -89,24 +89,7 @@ public struct TradeAICoachSheet: View {
                             Task { await runCoachingAnalysis() }
                         })
                     } else if !coachingResult.isEmpty {
-                        // 5. Structured Section Cards Reader
-                        AIDocumentReaderView(text: coachingResult)
-                        
-                        // Follow-up conversation turns & input card
-                        TradeAICoachFollowUpView(
-                            coachingResult: coachingResult,
-                            followUpMessages: $followUpMessages,
-                            followUpQuery: $followUpQuery,
-                            isSubmitting: isSubmittingFollowUp,
-                            onResetThread: {
-                                followUpMessages = []
-                                followUpQuery = ""
-                                AICoachSessionStore.shared.save(key: trade.key, result: coachingResult, followUps: [])
-                            },
-                            onSubmit: submitFollowUpQuestion
-                        )
-                        
-                        // 6. Compact Action Bar
+                        // 5. Compact Action Bar (Append to Notes, Save to Notebook, Copy, Regenerate) - Placed RIGHT ON TOP of AI response
                         TradeAICoachActionBar(
                             isSavedToNotes: isSavedToNotes,
                             isSavedToNotebook: isSavedToNotebook,
@@ -120,11 +103,35 @@ public struct TradeAICoachSheet: View {
                                 Task { await runCoachingAnalysis() }
                             }
                         )
+                        
+                        // 6. Structured Section Cards Reader
+                        AIDocumentReaderView(text: coachingResult)
+                        
+                        // 7. Follow-up conversation turns (message bubbles in scroll view)
+                        TradeAICoachFollowUpView(
+                            coachingResult: coachingResult,
+                            followUpMessages: followUpMessages
+                        )
                     }
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
                 .padding(.bottom, 24)
+            }
+            .safeAreaInset(edge: .bottom) {
+                if !coachingResult.isEmpty && !isLoading {
+                    TradeAICoachBottomFloatingInput(
+                        followUpQuery: $followUpQuery,
+                        isSubmitting: isSubmittingFollowUp,
+                        hasHistory: !followUpMessages.isEmpty,
+                        onResetThread: {
+                            followUpMessages = []
+                            followUpQuery = ""
+                            AICoachSessionStore.shared.save(key: trade.key, result: coachingResult, followUps: [])
+                        },
+                        onSubmit: submitFollowUpQuestion
+                    )
+                }
             }
             .background(AppColors.background)
             .navigationTitle("Risk AI Coach")
