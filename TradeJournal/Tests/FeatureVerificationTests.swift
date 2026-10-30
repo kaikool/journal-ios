@@ -406,7 +406,7 @@ final class FeatureVerificationTests: XCTestCase {
         // Must contain Pre-Trade commitment context
         XCTAssertTrue(promptVi.contains("LỊCH SỬ KẾ HOẠCH PRE-TRADE ĐÃ TƯ VẤN"))
         XCTAssertTrue(promptVi.contains("2350"))
-        XCTAssertTrue(promptVi.contains("Thesis Validation & RSI Momentum"))
+        XCTAssertTrue(promptVi.contains("Đánh giá chất lượng điểm vào & Động lượng nến"))
         
         // 4. Test Lesson Memory & Relevant Recall
         let lesson = TraderAILesson(
@@ -539,8 +539,7 @@ final class FeatureVerificationTests: XCTestCase {
         XCTAssertFalse(coachPrompt.contains("(GMT+7)"))
         XCTAssertFalse(coachPrompt.contains("(UTC)"))
         XCTAssertFalse(coachPrompt.contains("GMT+7"))
-        XCTAssertTrue(coachPrompt.contains("Thesis Validation & RSI Momentum"))
-        XCTAssertTrue(coachPrompt.contains("RSI(14) Wilder = [số cụ thể]"))
+        XCTAssertTrue(coachPrompt.contains("Thẩm định tính hợp lý của vị thế & Động lượng nến"))
         
         // 2. Pre-Trade Analysis Prompt is clean and mandates RSI Core
         let dummyBars = [
@@ -557,8 +556,8 @@ final class FeatureVerificationTests: XCTestCase {
         XCTAssertFalse(preTradePrompt.contains("(GMT+7)"))
         XCTAssertFalse(preTradePrompt.contains("(UTC)"))
         XCTAssertFalse(preTradePrompt.contains("GMT+7"))
-        XCTAssertTrue(preTradePrompt.contains("M15 Trigger & RSI Momentum"))
-        XCTAssertTrue(preTradePrompt.contains("RSI(14) Wilder = [số]"))
+        XCTAssertTrue(preTradePrompt.contains("Cấu trúc thực thi H1 qua Chuỗi 15 nến"))
+        XCTAssertTrue(preTradePrompt.contains("PRE-TRADE SETUP SPECIFICATION"))
         
         // 3. Candlestick Tape Markdown Table Header
         let table = MarketStructureFormatter.formatCandlesTable(

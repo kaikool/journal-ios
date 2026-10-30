@@ -26,7 +26,7 @@ public struct TradeAICoachSheet: View {
     @State private var showPhotoPicker: Bool = false
     @State private var showFullScreenChart: Bool = false
     @State private var hasAutoLoadedAttachment: Bool = false
-    @State private var selectedResolution: String = "15m" // "5m", "15m", "1h", "4h"
+    @State private var selectedResolution: String = "1h" // "5m", "15m", "1h", "4h"
     @State private var activeCandleProvider: String? = nil
     @State private var activeBarsCount: Int = 0
     @State private var activeBars: [MarketBar]? = nil
@@ -310,27 +310,25 @@ public struct TradeAICoachSheet: View {
         
         if isVi {
             return """
-            [TRẠNG THÁI LỆNH THỰC TẾ ĐẾN THỜI ĐIỂM HIỆN TẠI (THỜI GIAN: \(nowStr))]:
-            - Trạng thái: \(isOpen ? "LỆNH ĐANG MỞ (LIVE RUNNING)" : "LỆNH ĐÃ ĐÓNG")
-            - Cặp tiền: \(currentTrade.symbol) | Vị thế: \(isShort ? "SELL / SHORT" : "BUY / LONG") | Khối lượng: \(volStr) lots
-            - Thời gian mở: \(openedStr) (Đã giữ lệnh: \(durationStr))
-            - Giá vào (Entry): \(entryPriceStr)
-            - GIÁ THỊ TRƯỜNG HIỆN TẠI: \(curPriceStr) (Biên độ giá: \(pipsDeltaStr))
-            - LỢI NHUẬN TẠM TÍNH HIỆN TẠI: \(pnlStr) (Tỷ lệ: \(rStr))
-            - Khoảng cách đến Cắt lỗ (SL): \(slDistStr)
-            - Khoảng cách đến Chốt lời (TP): \(tpDistStr)\(extremesStr)\(candleReactionStr)
+            [TRẠNG THÁI VỊ THẾ THỜI GIAN THỰC (CẬP NHẬT TẠI \(nowStr))]:
+            • Cặp tiền: \(currentTrade.symbol) | Vị thế: \(isShort ? "SELL / SHORT" : "BUY / LONG") | Khối lượng: \(volStr) lots
+            • Thời gian mở: \(openedStr) (Thời gian đã giữ lệnh: \(durationStr))
+            • Giá vào (Entry): \(entryPriceStr)
+            • Thị giá hiện tại: \(curPriceStr) (Biên độ lãi/lỗ hiện tại: \(pipsDeltaStr))
+            • Lợi nhuận tạm tính hiện tại: \(pnlStr) (Tỷ lệ: \(rStr))
+            • Cắt lỗ (SL hiện tại): \(slDistStr)
+            • Chốt lời (TP hiện tại): \(tpDistStr)\(extremesStr)
             """
         } else {
             return """
             [EXACT REAL-TIME POSITION STATE AT THIS MOMENT (TIMESTAMP: \(nowStr))]:
-            - Position Status: \(isOpen ? "LIVE RUNNING POSITION" : "CLOSED POSITION")
-            - Symbol: \(currentTrade.symbol) | Direction: \(isShort ? "SELL / SHORT" : "BUY / LONG") | Volume: \(volStr) lots
-            - Opened At: \(openedStr) (Time elapsed: \(durationStr))
-            - Entry Price: \(entryPriceStr)
-            - CURRENT MARKET PRICE: \(curPriceStr) (Delta: \(pipsDeltaStr))
-            - UNREALIZED P&L RIGHT NOW: \(pnlStr) (Current R: \(rStr))
-            - Distance to Stop Loss (SL): \(slDistStr)
-            - Distance to Take Profit (TP): \(tpDistStr)\(extremesStr)\(candleReactionStr)
+            • Symbol: \(currentTrade.symbol) | Direction: \(isShort ? "SELL / SHORT" : "BUY / LONG") | Volume: \(volStr) lots
+            • Opened At: \(openedStr) (Time elapsed: \(durationStr))
+            • Entry Price: \(entryPriceStr)
+            • Current Market Price: \(curPriceStr) (Delta: \(pipsDeltaStr))
+            • Unrealized P&L Right Now: \(pnlStr) (Current R: \(rStr))
+            • Distance to Stop Loss (SL): \(slDistStr)
+            • Distance to Take Profit (TP): \(tpDistStr)\(extremesStr)
             """
         }
     }
@@ -365,26 +363,45 @@ public struct TradeAICoachSheet: View {
             let liveSnapshot = buildLivePositionSnapshot(isVi: isVi)
             
             var promptComponents: [String] = []
-            promptComponents.append(q)
+            promptComponents.append(isVi ? "CÂU HỎI CỦA TRADER:\n\"\(q)\"" : "TRADER INQUIRY:\n\"\(q)\"")
             promptComponents.append(liveSnapshot)
             
             if let b = activeBars, !b.isEmpty {
-                let window = MomentumEngine.computeWindow(bars: b, windowSize: 15)
-                let momStr = MomentumEngine.formatMomentumTable(
-                    window: window,
-                    displayTimeZone: TimeZone(identifier: dataStore.generalSettings.displayTimeZone) ?? .current,
+                let h1Series = AIPromptBuilder.buildH1CandleSeriesSummary(
+                    bars: b,
+                    count: 15,
+                    symbol: trade.symbol,
                     isVi: isVi
                 )
-                if !momStr.isEmpty {
-                    promptComponents.append(momStr)
-                }
+                let h1Block = isVi ? """
+                [DIỄN BIẾN CHUỖI 15 NẾN H1 GẦN NHẤT (OHLC + EMA 21/50 + WILDER RSI 14)]:
+                \(h1Series)
+                """ : """
+                [RECENT 15-CANDLE H1 EXECUTION SERIES (OHLC + EMA 21/50 + WILDER RSI 14)]:
+                \(h1Series)
+                """
+                promptComponents.append(h1Block)
             }
             
             var augmentedPrompt = promptComponents.joined(separator: "\n\n")
             if isVi {
-                augmentedPrompt += "\n\n(BẮT BUỘC TRẢ LỜI 100% BẰNG TIẾNG VIỆT, đi thẳng vào câu hỏi của trader, căn cứ vào thực trạng vị thế, giá và động lượng ở trên để đánh giá chuẩn xác. Tuyệt đối không trả lời bằng tiếng Anh)."
+                augmentedPrompt += """
+
+
+                CHỈ THỊ PHÂN TÍCH & TRẢ LỜI:
+                - BẮT BUỘC: Trả lời 100% bằng TIẾNG VIỆT, đi thẳng vào câu hỏi của trader.
+                - Dựa vào diễn biến chuỗi 15 nến H1 và trạng thái vị thế ở trên để phân tích Price Action (rút râu, từ chối giá, cấu trúc nến, tương quan giá với EMA 21/50, phân kỳ RSI).
+                - Đưa ra kết luận hành động dứt khoát: Giữ nguyên lệnh, Dời SL về hòa vốn (BE), hay Chốt một phần lợi nhuận (nêu rõ số lot chốt và mức SL mới).
+                """
             } else {
-                augmentedPrompt += "\n\n(Please answer directly and concisely in English, assessing the real-time position state and price action above)."
+                augmentedPrompt += """
+
+
+                ANALYSIS & RESPONSE DIRECTIVE:
+                - Respond directly and concisely in English to the trader's inquiry.
+                - Analyze Price Action from the 15-candle H1 sequence and real-time position state above (wicks, rejections, EMA 21/50 dynamic support/resistance, RSI divergence).
+                - Provide a decisive operational directive: Hold, Move SL to BE, Partial TP (state volume and new SL), or Close Now.
+                """
             }
             
             do {

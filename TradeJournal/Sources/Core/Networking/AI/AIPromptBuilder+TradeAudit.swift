@@ -225,81 +225,153 @@ extension AIPromptBuilder {
         
         let candleInfo = recentCandlesSummary ?? (isVi ? "Không có chuỗi nến số hóa (Dựa vào thông số lệnh và ảnh biểu đồ đính kèm nếu có)." : "No numeric candle feed (Rely on trade metrics and attached chart image if present).")
         
+        let tradesToday = sessionSummary?.totalTradesToday ?? 0
+        let winsToday = sessionSummary?.winsToday ?? 0
+        let lossesToday = sessionSummary?.lossesToday ?? 0
+        let beToday = sessionSummary?.breakevensToday ?? 0
+        let openToday = sessionSummary?.openTradesToday ?? 0
+        let todayTradesDesc = isVi
+            ? "Tổng \(tradesToday) lệnh (\(winsToday) Thắng | \(lossesToday) Thua | \(beToday) Hòa) | Lệnh đang chạy: \(openToday)"
+            : "Total \(tradesToday) trades (\(winsToday) W | \(lossesToday) L | \(beToday) BE) | Active Open: \(openToday)"
+        let pnlTodayVal = sessionSummary != nil ? NSDecimalNumber(decimal: sessionSummary!.netPnlToday).doubleValue : 0.0
+        let pnlTodayStr = (pnlTodayVal >= 0 ? "+$" : "-$") + String(format: "%.2f", abs(pnlTodayVal))
+        let streak = sessionSummary?.currentStreakToday ?? 0
+        let streakStr: String = {
+            if streak > 0 { return isVi ? "Thắng \(streak) lệnh liên tiếp (+)" : "\(streak) wins in a row (+)" }
+            if streak < 0 { return isVi ? "⚠️ Đang thua \(abs(streak)) lệnh liên tiếp (-)" : "⚠️ In a \(abs(streak))-loss losing streak (-)" }
+            return isVi ? "Chưa có chuỗi lệnh hôm nay" : "No active streak today"
+        }()
+        
+        let realBalStr: String = {
+            if let bal = sessionSummary?.balance {
+                let curr = sessionSummary?.accountCurrency ?? "USD"
+                return Formatters.formatCurrency(bal, currency: curr)
+            }
+            return isVi ? "[Chưa kết nối]" : "[Not connected]"
+        }()
+        let equityStr: String = {
+            if let eq = sessionSummary?.equity, let bal = sessionSummary?.balance, eq != bal {
+                let curr = sessionSummary?.accountCurrency ?? "USD"
+                return isVi ? "| Vốn ròng (Equity): \(Formatters.formatCurrency(eq, currency: curr))" : "| Equity: \(Formatters.formatCurrency(eq, currency: curr))"
+            }
+            return ""
+        }()
+        
+        let h1SeriesStr: String = {
+            guard let b = bars, !b.isEmpty else { return isVi ? "Không có dữ liệu nến H1" : "No H1 candle data" }
+            return AIPromptBuilder.buildH1CandleSeriesSummary(bars: b, count: 15, symbol: trade.symbol, isVi: isVi)
+        }()
+
         if isOpen {
             return isVi ? """
-            LỆNH ĐANG MỞ CẦN THẨM ĐỊNH (LIVE OPEN POSITION AUDIT):
-            - Cặp tiền: \(trade.symbol) | Chiều vị thế: \(directionStrVi) | Khối lượng: \(volumeStr) lots
-            - Thời gian mở lệnh: \(openedAtStr)
-            - Giá vào (Entry): \(entryStr) | Giá thị trường hiện tại: \(exitStr)\(liveDeltaInfo)
-            - Lợi nhuận tạm tính: \(pnlStr)\(excursionBlock)
-            - Mức Cắt lỗ (SL): \(slStr) | Mức Chốt lời (TP): \(tpStr)
-            - Mức rủi ro 1R tính toán: \(risk1RStr) | Thời gian giữ lệnh: \(durationStr)
-            - Chi phí sàn: \(feesStr) | Phí Swap: \(swapStr)
-            - Ghi chú trader: \(notes)
-            - Tóm tắt nến quanh phiên: \(candleInfo)\(preTradeBlock)\(lessonsBlock)\(complianceBlock)
-            \(trajectoryBlock)
-            \(candlesTableBlock)\(momentumBlock)
-            
+            [THÔNG TIN TÀI KHOẢN & TRẠNG THÁI RỦI RO HÔM NAY]:
+            • Số dư thực tế: \(realBalStr) \(equityStr)
+            • Trạng thái lệnh hôm nay: \(todayTradesDesc)
+            • PnL ròng hôm nay: \(pnlTodayStr) | Chuỗi lệnh: \(streakStr)
+
+            [THÔNG SỐ VỊ THẾ ĐANG MỞ (LIVE OPEN POSITION)]:
+            • Cặp tiền: \(trade.symbol) | Chiều vị thế: \(directionStrVi) | Khối lượng: \(volumeStr) lots
+            • Thời gian mở lệnh: \(openedAtStr) | Thời gian giữ lệnh: \(durationStr)
+            • Giá vào (Entry): \(entryStr) | Thị giá hiện tại: \(exitStr)\(liveDeltaInfo)
+            • Lợi nhuận tạm tính: \(pnlStr)\(excursionBlock)
+            • Mức Cắt lỗ (SL): \(slStr) | Mức Chốt lời (TP): \(tpStr)
+            • Mức rủi ro 1R tính toán: \(risk1RStr)
+            • Chi phí sàn: \(feesStr) | Phí Swap: \(swapStr)
+            • Ghi chú của trader: \(notes)\(preTradeBlock)\(lessonsBlock)\(complianceBlock)
+
             \(directionWarningVi)
-            
+
+            [DIỄN BIẾN CHUỖI 15 NẾN H1 GẦN NHẤT (OHLC + EMA 21/50 + WILDER RSI 14)]:
+            \(h1SeriesStr)
+            • Hướng dẫn phân tích: Dựa vào diễn biến chuỗi nến H1 ở trên để phân tích Price Action (rút râu, từ chối giá, cấu trúc nến, phân kỳ động lượng).
+
             NHIỆM VỤ CỦA RISK AI (CỐ VẤN QUẢN TRỊ RỦI RO ĐỘC LẬP):
-            Phân tích sắc bén, khách quan theo 4 mục:
-            
-            ### 1. Thẩm định tính hợp lý của vị thế & Động lượng nến (Thesis Validation & RSI Momentum)
-            - Vị thế [\(isShort ? "SELL" : "BUY")] tại \(entryStr) có hợp lý kỹ thuật và xác suất không? Trader vào lệnh theo kịch bản xác nhận (giá test vùng kế hoạch rồi phản ứng đóng nến tại \(entryStr)) hay vào lệnh cảm tính?
-            - Phân tích Động lượng RSI Core (BẮT BUỘC TRÍCH DẪN SỐ LIỆU TỪ BẢNG ĐỘNG LƯỢNG):
-              • BẮT BUỘC GHI RÕ SỐ LIỆU: RSI(14) Wilder = [số], EMA(9) = [số], WMA(45) = [số] tại nến gần nhất / lúc vào lệnh.
-              • So sánh EMA(9) vs WMA(45): Nền trung hạn nghiêng về Tăng hay Giảm hay đang co thắt (Squeeze)?
-              • Tương quan 3 đường & Phân kỳ: RSI nằm trên/dưới EMA9 và WMA45? Có phân kỳ đỉnh/đáy cảnh báo không?
-              • Kết luận: Động lượng có đồng thuận ủng hộ việc tiếp tục giữ vị thế [\(isShort ? "SELL" : "BUY")] không?
-            - Kết luận dứt khoát: [VỊ THẾ HỢP LÝ / CẦN PHÒNG THỦ CAO / SAI LẦM - NÊN CẮT HOẶC HẠ TỶ TRỌNG].
-            
-            ### 2. Cấu trúc thị trường & Bối cảnh đa khung (Multi-Timeframe Structure)
-            - Xu hướng chủ đạo HTF (D1/H4/H1) ủng hộ phe nào? Thị trường đang trong pha Mở rộng (Expansion) hay Hồi quy (Retracement)?
-            - Thanh khoản Buy/Sell-side Liquidity và bẫy giá (Liquidity Trap / Stop Hunt) ở đâu? Các vùng cản then chốt (Order Block, FVG, Hỗ trợ/Kháng cự)?
-            
-            ### 3. Điểm vô hiệu hóa & Kế hoạch bảo vệ vốn (Invalidation & Defense)
-            - Mức giá nào nếu bị vượt qua sẽ BẺ GÃY cấu trúc của lệnh này (Structural Invalidation)?
-            - Hành động khuyến nghị: Giữ, chốt 1 phần (Partial TP), dời SL về hòa vốn (BE), hay đóng lệnh ngay?
-            
-            ### 4. Đối chiếu Hồ sơ Trader & Bài học kỷ luật (Profile & Discipline)
+            Phân tích sắc bén, khách quan, trực diện theo đúng 4 mục (không lặp lại thông tin hồ sơ tài khoản) và kết thúc bằng bảng chỉ đạo hành động [LIVE POSITION DIRECTIVE]:
+
+            ### 1. Thẩm định tính hợp lý của vị thế & Động lượng nến
+            - Vị thế [\(isShort ? "SELL" : "BUY")] tại \(entryStr) có hợp lý kỹ thuật và đúng với kế hoạch Pre-Trade đã cam kết không? Trader vào lệnh theo kịch bản xác nhận nến H1 hay vào vội vã cảm tính?
+            - Phân tích động lượng H1 từ chuỗi 15 nến: Quỹ đạo RSI(14) và vị trí giá so với EMA(21) và EMA(50). Có xuất hiện phân kỳ cảnh báo đảo chiều không, hay động lượng vẫn đang gia tốc ủng hộ giữ vị thế [\(isShort ? "SELL" : "BUY")]?
+            - Kết luận dứt khoát: [VỊ THẾ HỢP LÝ / CẦN PHÒNG THỦ CAO / SAI LẦM KỸ THUẬT].
+
+            ### 2. Cấu trúc thị trường & Bối cảnh đa khung
+            - Cấu trúc xu hướng khung lớn có tiếp tục ủng hộ lệnh này không hay giá đang tiệm cận vùng kháng cự/hỗ trợ mạnh hoặc vùng thanh khoản (BSL/SSL)?
+            - Các vùng cản then chốt tiếp theo mà vị thế cần vượt qua hoặc có nguy cơ bị phản ứng đảo chiều?
+
+            ### 3. Điểm vô hiệu hóa cấu trúc & Kế hoạch bảo vệ vốn
+            - Mức giá cụ thể nào nếu nến H1 đóng cửa vi phạm sẽ BẺ GÃY cấu trúc của lệnh này (Structural Invalidation)?
+            - Khuyến nghị hành động cụ thể ngay lúc này:
+              • [GIỮ LỆNH (HOLD)]: Nếu cấu trúc và động lượng vẫn đồng thuận thuận chiều.
+              • [DỜI SL VỀ HÒA VỐN (MOVE SL TO BE)]: Nếu biên độ lãi đã đủ điều kiện bảo vệ vốn an toàn.
+              • [CHỐT LỜI MỘT PHẦN (PARTIAL TP)]: Nếu giá đang chạm cản nhạy cảm có râu từ chối.
+              • [ĐÓNG LỆNH NGAY (CLOSE NOW)]: Nếu xuất hiện tín hiệu đảo chiều bất lợi hoặc vi phạm cấu trúc.
+
+            ### 4. Đối chiếu Hồ sơ Trader & Phòng chống lỗi tâm lý
             - Khối lượng \(volumeStr) lots và rủi ro có tuân thủ quy tắc không? Có dấu hiệu FOMO hay lỗi tâm lý đã khai báo không?
+            - Cảnh báo phòng ngừa các lỗi tâm lý quen thuộc của trader (như chốt non sớm vì sợ mất lãi tạm tính, hoặc không chịu chủ động kéo SL bảo vệ thành quả).
+
+            BẮT BUỘC KẾT THÚC BẰNG KHỐI CHỈ ĐẠO HÀNH ĐỘNG ĐÚNG ĐỊNH DẠNG SAU:
+            [LIVE POSITION DIRECTIVE]
+            - Action: [HOLD hoặc PARTIAL TP hoặc MOVE SL TO BE hoặc CLOSE NOW]
+            - Current Price: [Thị giá hiện tại]
+            - Adjusted SL: [Mức SL mới khuyến nghị, ví dụ: Dời về \(entryStr) (BE), hoặc Giữ nguyên \(slStr)]
+            - Partial Close Volume: [Khối lượng chốt nếu chọn Partial TP, ví dụ: 0.02 lot, nếu không ghi Không]
+            - Next Target: [Vùng giá mục tiêu tiếp theo]
+
+            > [Đúng 1 câu quy tắc kỷ luật hành động không khoan nhượng]
             """ : """
-            LIVE OPEN POSITION AUDIT:
-            - Symbol: \(trade.symbol) | Direction: \(directionStrEn) | Volume: \(volumeStr) lots
-            - Opened At: \(openedAtStr)
-            - Entry Price: \(entryStr) | Current Price: \(exitStr)\(liveDeltaInfo)
-            - Unrealized P&L: \(pnlStr)\(excursionBlock)
-            - Stop Loss: \(slStr) | Take Profit: \(tpStr)
-            - Calculated 1R Risk: \(risk1RStr) | Duration: \(durationStr)
-            - Fees: \(feesStr) | Swap: \(swapStr)
-            - Trader Notes: \(notes)
-            - Context: \(candleInfo)\(preTradeBlock)\(lessonsBlock)\(complianceBlock)
-            \(trajectoryBlock)
-            \(candlesTableBlock)\(momentumBlock)
-            
+            [ACCOUNT CONTEXT & TODAY'S RISK PROFILE]:
+            • Authoritative Balance: \(realBalStr) \(equityStr)
+            • Today's Trade Activity: \(todayTradesDesc)
+            • Net PnL Today: \(pnlTodayStr) | Current Streak: \(streakStr)
+
+            [LIVE OPEN POSITION AUDIT]:
+            • Symbol: \(trade.symbol) | Direction: \(directionStrEn) | Volume: \(volumeStr) lots
+            • Opened At: \(openedAtStr) | Duration: \(durationStr)
+            • Entry Price: \(entryStr) | Current Price: \(exitStr)\(liveDeltaInfo)
+            • Unrealized P&L: \(pnlStr)\(excursionBlock)
+            • Stop Loss: \(slStr) | Take Profit: \(tpStr)
+            • Calculated 1R Risk: \(risk1RStr)
+            • Fees: \(feesStr) | Swap: \(swapStr)
+            • Trader Notes: \(notes)\(preTradeBlock)\(lessonsBlock)\(complianceBlock)
+
             \(directionWarningEn)
-            
+
+            [RECENT 15-CANDLE H1 EXECUTION SERIES (OHLC + EMA 21/50 + WILDER RSI 14)]:
+            \(h1SeriesStr)
+            • Analysis Directive: Analyze Price Action based on the 15-candle H1 series above (wicks, rejections, candle structure, momentum divergence).
+
             TASK: INDEPENDENT RISK ADVISORY AUDIT:
-            
-            ### 1. Thesis Validation & RSI Core Momentum
-            - Is opening [\(isShort ? "SHORT" : "LONG")] at \(entryStr) rational? Did trader enter on disciplined confirmation or impulse?
-            - RSI Core Momentum (MANDATORY METRIC CITATION FROM TABLE):
-              • State exact values: RSI(14) = [value], EMA(9) = [value], WMA(45) = [value].
-              • Compare EMA(9) vs WMA(45): Does intermediate baseline favor Bulls, Bears, or Squeeze?
-              • Alignment & Divergence: Is RSI above/below EMA9 & WMA45? Any threatening divergences?
-              • Verdict: [RATIONAL POSITION / DEFENSIVE STANCE REQUIRED / FLAWED SETUP].
-            
-            ### 2. Multi-Timeframe Structure
-            - HTF trend and market phase (Expansion vs Retracement)?
-            - Liquidity resting pools, stop hunt zones, and key Order Blocks / Fair Value Gaps?
-            
-            ### 3. Invalidation & Capital Defense
-            - Exact price level representing structural invalidation?
-            - Actionable advice: Hold, partial TP, move SL to BE, or close?
-            
-            ### 4. Profile Alignment & Discipline
-            - Does this trade honor their declared risk budget and guard against psychological leaks?
+            Provide a razor-sharp, objective, institutional critique across the 4 sections below, concluding with the [LIVE POSITION DIRECTIVE] block:
+
+            ### 1. Position Validity & Momentum
+            - Is opening [\(isShort ? "SHORT" : "LONG")] at \(entryStr) technically rational and aligned with the Pre-Trade plan? Did trader enter on disciplined confirmation or impulse?
+            - H1 Momentum across the 15 bars: RSI(14) trajectory and price relation to EMA(21) and EMA(50). Any threatening divergences or is momentum accelerating?
+            - Decisive Verdict: [RATIONAL POSITION / DEFENSIVE STANCE REQUIRED / FLAWED SETUP].
+
+            ### 2. Market Structure & Key Barriers
+            - Does higher timeframe structure support holding, or is price running into major liquidity pools (BSL/SSL) or strong resistance?
+            - Key upcoming barriers where price may react or reverse?
+
+            ### 3. Structural Invalidation & Capital Defense
+            - Exact price level representing structural invalidation where the setup must be aborted?
+            - Immediate Actionable Directive:
+              • [HOLD]: If structure and momentum remain fully intact toward TP.
+              • [MOVE SL TO BE]: If profit runup is sufficient to secure risk-free status.
+              • [PARTIAL TP]: If price is stalling at key barriers with rejection wicks.
+              • [CLOSE NOW]: If momentum has completely inverted or broken structure.
+
+            ### 4. Trader Profile Alignment & Discipline
+            - Does volume of \(volumeStr) lots honor their declared risk budget? Any psychological leakage (premature profit taking, moving SL, or fear-driven decisions)?
+
+            MANDATORY: CONCLUDE WITH THIS LIVE POSITION DIRECTIVE BLOCK:
+            [LIVE POSITION DIRECTIVE]
+            - Action: [HOLD or PARTIAL TP or MOVE SL TO BE or CLOSE NOW]
+            - Current Price: [Current market price]
+            - Adjusted SL: [Recommended SL level, e.g. Move to \(entryStr) (BE), or Keep \(slStr)]
+            - Partial Close Volume: [Volume to close if Partial TP, e.g. 0.02 lot, otherwise None]
+            - Next Target: [Next target price level]
+
+            > [Single non-negotiable operational discipline rule]
             """
         } else {
             return isVi ? """
@@ -322,7 +394,7 @@ extension AIPromptBuilder {
             NHIỆM VỤ CỦA RISK AI (BẢN ĐÚC KẾT BÀI HỌC KỶ LUẬT):
             Nhận xét chuyên nghiệp, sắc bén theo 4 mục:
             
-            ### 1. Đánh giá chất lượng điểm vào & Động lượng nến (Entry Thesis & RSI Momentum)
+            ### 1. Đánh giá chất lượng điểm vào & Động lượng nến
             - Điểm vào có tuân thủ Playbook/kế hoạch không? Đối chiếu với hành động giá nến xác nhận quanh vùng cản.
             - Phân tích Động lượng RSI Core (BẮT BUỘC TRÍCH DẪN TỪ BẢNG ĐỘNG LƯỢNG):
               • BẮT BUỘC GHI RÕ SỐ LIỆU TẠI THỜI ĐIỂM VÀO: RSI(14) Wilder = [số], EMA(9) = [số], WMA(45) = [số].
@@ -330,14 +402,14 @@ extension AIPromptBuilder {
               • Tương quan 3 đường: RSI nằm trên/dưới EMA9 và WMA45? Có giao cắt hay phân kỳ bất lợi không?
               • Kết luận: Vào lệnh thuận dòng động lượng hay ngược đà RSI?
             
-            ### 2. Đánh giá quản trị lệnh & Điểm thoát (Execution & Exit Quality)
+            ### 2. Đánh giá quản trị lệnh & Điểm thoát
             - Điểm thoát ở \(exitStr) là tuân thủ kế hoạch (chạm TP/SL chuẩn) hay do tâm lý (chốt non, gồng lỗ)?
             - Có hành vi dời SL, gỡ SL, hay nhồi lệnh vô kỷ luật không?
             
-            ### 3. Cấu trúc thị trường & Bối cảnh đa khung (Multi-Timeframe Context)
+            ### 3. Cấu trúc thị trường & Bối cảnh đa khung
             - Thị trường đã đi đúng hay ngược phân tích? Điểm săn thanh khoản (Liquidity Sweep) nào đã tác động đến lệnh?
             
-            ### 4. Phân loại sai lệch & Bài học kỷ luật (Failure Taxonomy & Discipline Takeaway)
+            ### 4. Phân loại sai lệch & Bài học kỷ luật
             - Nếu lệnh này thua lỗ hoặc thoát lệnh sai nguyên tắc, BẮT BUỘC PHÂN LOẠI theo 1 trong 4 nhóm:
               1. [Lỗi thực thi (Bad Execution)]: Vào lệnh sai điểm, trễ, đuổi giá (FOMO), chốt non, dời SL sai quy tắc.
               2. [Kế hoạch sai lệch (Flawed Plan)]: Giả định phân tích sai, đọc sai cấu trúc, bỏ qua cản HTF lớn.
@@ -364,7 +436,7 @@ extension AIPromptBuilder {
             
             TASK: POST-TRADE FORENSIC DISCIPLINE AUDIT:
             
-            ### 1. Entry Thesis Validation & RSI Core Momentum
+            ### 1. Entry Quality & Candlestick Momentum
             - Did this entry follow defined Playbook? Cross-examine with candle action and confirmed rejection at setup levels.
             - RSI Core Momentum (MANDATORY METRIC CITATION FROM TABLE):
               • State exact values at entry: RSI(14) = [value], EMA(9) = [value], WMA(45) = [value].
@@ -375,10 +447,10 @@ extension AIPromptBuilder {
             ### 2. Execution & Exit Quality
             - Was the exit at \(exitStr) planned (hit TP/SL) or emotional (panicked early exit, widened SL)?
             
-            ### 3. Multi-Timeframe Context
+            ### 3. Market Structure & Multi-Timeframe Context
             - What structural event or liquidity sweep dictated the outcome?
             
-            ### 4. Failure Taxonomy & Discipline Takeaway
+            ### 4. Failure Classification & Discipline Takeaway
             - If this trade was a loss or suboptimal, CLASSIFY the primary cause into one of the four canonical modes:
               1. [Bad Execution]: Missed entry level, chasing price (FOMO), premature exit, or improper SL modification.
               2. [Flawed Plan]: Invalidation of initial thesis, structural misread, or ignoring major HTF barriers.

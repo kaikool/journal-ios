@@ -318,7 +318,7 @@ extension AIPromptBuilder {
             
         let strategyStr = traderProfile?.primaryPlaybooks.trimmingCharacters(in: .whitespaces).isEmpty == false
             ? traderProfile!.primaryPlaybooks.trimmingCharacters(in: .whitespaces)
-            : "SMC, Price Action, Support & Resistance"
+            : (isVi ? "Price Action, Cấu trúc thị trường H4/H1" : "Price Action, H4/H1 Market Structure")
             
         let leaksStr = traderProfile?.knownPsychologicalLeaks.trimmingCharacters(in: .whitespaces).isEmpty == false
             ? traderProfile!.knownPsychologicalLeaks.trimmingCharacters(in: .whitespaces)
@@ -365,7 +365,6 @@ extension AIPromptBuilder {
         if isVi {
             return """
             [THÔNG TIN TÀI KHOẢN & TRẠNG THÁI RỦI RO HÔM NAY]:
-            • Tài khoản: \(realBalStr != "N/A" ? "\(accNameStr)" : "[Chưa kết nối]") | Phân loại: \(accountCategoryStr) | Nền tảng: \(platformDesc)
             • Số dư thực tế: \(realBalStr) \(equityStr)
             • Trạng thái lệnh hôm nay: \(todayTradesDesc)
             • PnL ròng hôm nay: \(pnlTodayStr) | Chuỗi lệnh: \(streakStr)
@@ -405,22 +404,22 @@ extension AIPromptBuilder {
             NHIỆM VỤ PHÂN TÍCH ĐÓN ĐẦU & THIẾT LẬP KẾ HOẠCH (PRE-TRADE ACTION PLAN):
             Phân tích ngắn gọn, trực diện theo đúng 4 mục (không lặp lại thông tin hồ sơ tài khoản) và kết thúc bằng bảng thông số [PRE-TRADE SETUP SPECIFICATION]:
 
-            ### 1. Xu hướng vĩ mô D1 & Định hướng dòng tiền (Macro Bias)
+            ### 1. Xu hướng vĩ mô D1 & Định hướng dòng tiền
             - Phe nào đang kiểm soát (Bulls hay Bears)? Giá đang ở vùng Premium hay Discount?
             - Đánh giá vị thế giá so với EMA(21) và EMA(50) D1 (Mở rộng xu hướng hay đang pullback về EMA)?
             - Mục tiêu thanh khoản ngày: Khả năng tìm về PDH (\(d1PDH)) hoặc PDL (\(d1PDL)).
 
-            ### 2. Cấu trúc sóng & Vùng cản then chốt H4 (Key Barriers & H4 Bars)
+            ### 2. Cấu trúc sóng & Vùng cản then chốt H4
             - Xu hướng H4 đang là TĂNG, GIẢM hay ĐI NGANG theo cấu trúc sóng và cụm EMA 21/50?
             - Đánh giá 3 nến H4 gần nhất: Có xuất hiện nến từ chối (Rejection wick) hay nến đóng cửa xác nhận tại cản / EMA 21-50 không?
             - Nhận diện các VÙNG CẢN H4 (Swing High: \(h4SwingHighStr), Swing Low: \(h4SwingLowStr), Supply/Demand, FVG) để làm MỤC TIÊU CHỐT LỜI (TP1/TP2) hoặc CẮT LỖ (SL).
 
-            ### 3. Cấu trúc thực thi H1 qua Chuỗi 15 nến (Execution, Price Action & Traps)
+            ### 3. Cấu trúc thực thi H1 qua Chuỗi 15 nến
             - Dựa vào diễn biến chuỗi nến H1 và H4 ở trên (giá Mở, Cao, Thấp, Đóng và cụm EMA 21/50, RSI) để phân tích Price Action: Nến vừa đóng có rút chân/từ chối cản tại EMA 21/50 hay bứt phá dứt khoát? Giá đang bám EMA hay bị dãn biên độ (Overextended)?
             - Động lượng RSI(14) H1: Nhìn quỹ đạo RSI qua 15 nến, RSI đang tăng hay giảm? Có phân kỳ đảo chiều (Bullish/Bearish Divergence) hoặc giao cắt Signal line để kích hoạt lệnh không?
             - Bẫy thanh khoản & Tín hiệu kích hoạt: Đã có nhịp quét thanh khoản (SFP Sweep) hoặc nến xác nhận chưa, hay vào lệnh sớm có rủi ro bị bẫy quét SL?
 
-            ### 4. Khuyến nghị & Kế hoạch lệnh cụ thể (Actionable Recommendation)
+            ### 4. Khuyến nghị & Kế hoạch lệnh cụ thể
             - KẾT LUẬN RÕ RÀNG: [BUY (LONG) / SELL (SHORT) / FLAT (ĐỨNG NGOÀI)].
             ⚠️ NGUYÊN TẮC QUẢN TRỊ RỦI RO NGHIÊM NGẶT: Nếu hôm nay trader đã dính chuỗi thua (-2 trở lên) hoặc đệm lỗ ngày đã cạn, BẮT BUỘC KẾT LUẬN FLAT (ĐỨNG NGOÀI) để bảo vệ tài khoản, TUYỆT ĐỐI KHÔNG GỢI Ý MỞ LỆNH!
             - LOẠI SETUP: [THUẬN XU HƯỚNG THEO CỤM EMA H4/H1] hoặc [NGHỊCH XU HƯỚNG / SÓNG HỒI TỪ CẢN H4 KÈM PHÂN KỲ RSI].
@@ -447,14 +446,13 @@ extension AIPromptBuilder {
         } else {
             return """
             [ACCOUNT CONTEXT & TODAY'S RISK PROFILE]:
-            • Account: \(realBalStr != "N/A" ? "\(accNameStr)" : "[Not connected]") | Category: \(accountCategoryStr) | Platform: \(platformDesc)
-            • Real Balance: \(realBalStr) \(equityStr)
-            • Today's Execution State: \(todayTradesDesc)
+            • Authoritative Balance: \(realBalStr) \(equityStr)
+            • Today's Trade Activity: \(todayTradesDesc)
             • Today's Net P&L: \(pnlTodayStr) | Current Streak: \(streakStr)
             • \(dailyBufferStr)
             • Risk Budget Per Trade: \(riskPctStr)\(riskDollarStr)
             • Trading Style: \(tradingStyleStr)
-            • Primary Playbooks: \(strategyStr)
+            • Primary Playbooks & Strategy: \(strategyStr)
             • Known Leaks: \(leaksStr)
             • Discipline Notes: \(customNotesStr)\(riskGuardrailWarning)
             [MARKET STRUCTURE & TECHNICAL INDICATORS (EMA 21/50 & RSI 14)]:
@@ -484,7 +482,7 @@ extension AIPromptBuilder {
 
             • Macro News Catalyst: \(newsBlock)
             \(symbolLessonsBlock)\(liveUpdateBlock)\(thesisContinuityBlock)\(visionNote)
-            TASK: PRE-TRADE SMC MARKET BIAS & ACTIONABLE PLAN:
+            TASK: PRE-TRADE MARKET BIAS & ACTIONABLE PLAN:
             Provide a razor-sharp, institutional analysis across the 4 sections below, concluding with the [PRE-TRADE SETUP SPECIFICATION] block:
 
             ### 1. D1 Macro Regime & Directional Bias
@@ -492,17 +490,17 @@ extension AIPromptBuilder {
             - Evaluate price position relative to D1 EMA(21) and EMA(50) (Trend expansion or retracement)?
             - Daily liquidity draw: Probability of tagging PDH (\(d1PDH)) or PDL (\(d1PDL)).
 
-            ### 2. H4 Swing Structure, Key Barriers & H4 Candlestick Confirmation
+            ### 2. H4 Swing Structure & Key Barriers
             - What is the H4 trend according to swing structure and EMA 21/50 dynamic alignment?
             - Assess recent 3 H4 candles: Is there an upper/lower wick rejection or confirmed close against the EMA 21-50 zone?
             - Identify key H4 barriers (Swing High: \(h4SwingHighStr), Swing Low: \(h4SwingLowStr), Supply/Demand zones, FVG) as TARGET BARRIERS for TP1/TP2 or protective SL.
 
-            ### 3. H1 15-Candle Execution Dynamics, Price Action & Traps
+            ### 3. H1 Execution Across 15-Candle Series
             - Analyze Price Action based on the 15-candle H1 and H4 sequences above (OHLC, EMA 21/50, RSI): Did the recent bar reject at EMA 21/50 or break cleanly? Is price riding or overextended from EMA 21?
             - H1 RSI(14) Trajectory: Looking at the 15-bar RSI values, is momentum expanding or stalling? Does divergence or a signal line crossover confirm an entry?
             - Traps & Execution Timing: Has an SFP sweep occurred or has an H1 confirmation candle closed, or does entering early carry high risk of being stopped out?
 
-            ### 4. Actionable Directive & Execution Blueprint
+            ### 4. Actionable Trade Setup & Recommendation
             - DECISIVE VERDICT: [BUY (LONG) / SELL (SHORT) / FLAT (NO SETUP)].
             ⚠️ STRICT CAPITAL PRESERVATION: If trader has hit a losing streak (-2 or worse) or depleted the daily buffer, MANDATORY VERDICT IS FLAT. Do NOT issue new trade setups!
             - SETUP TYPE: [FOLLOW-TREND CONTINUATION WITH EMAs] or [COUNTER-TREND REVERSAL FROM H4 BARRIER WITH RSI DIVERGENCE].

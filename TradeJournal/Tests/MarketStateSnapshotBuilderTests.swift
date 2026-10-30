@@ -118,7 +118,7 @@ final class MarketStateSnapshotBuilderTests: XCTestCase {
             language: "vi"
         )
         
-        XCTAssertTrue(prompt.contains("[DỮ LIỆU ĐO LƯỜNG THỊ TRƯỜNG THỰC TẾ (OBJECTIVE MARKET FACTS)]"))
+        XCTAssertTrue(prompt.contains("[CẤU TRÚC THỊ TRƯỜNG & HỆ THỐNG CHỈ BÁO KỸ THUẬT (EMA 21/50 & RSI 14)]:"))
         XCTAssertTrue(prompt.contains("US500"))
     }
 }
