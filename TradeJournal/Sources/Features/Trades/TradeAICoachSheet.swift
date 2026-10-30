@@ -752,38 +752,38 @@ public struct TradeAICoachSheet: View {
     
     // MARK: - Linked Pre-Trade Setup Card Component
     private func linkedPreTradeSetupCard(plan: AdvisorCommitmentRecord) -> some View {
-        let isBuy = plan.bias.uppercased().contains("BUY") || plan.bias.uppercased().contains("LONG")
-        let isSell = plan.bias.uppercased().contains("SELL") || plan.bias.uppercased().contains("SHORT")
-        let biasColor = isBuy ? Color.green : (isSell ? Color.red : Color.orange)
-        let biasBg = biasColor.opacity(0.16)
-        
-        return VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 8) {
             // Header
             HStack {
                 HStack(spacing: 5) {
-                    Image(systemName: "link.badge.plus")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundColor(AppColors.brand)
+                    Image(systemName: "link")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(AppColors.secondaryText)
                     Text("LINKED PRE-TRADE SETUP")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundColor(AppColors.brand)
+                        .font(.system(size: 10, weight: .semibold))
+                        .tracking(0.5)
+                        .foregroundColor(AppColors.secondaryText)
                 }
                 Spacer()
                 Text(plan.bias.uppercased())
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundColor(biasColor)
-                    .padding(.horizontal, 7)
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundColor(AppColors.primaryText)
+                    .padding(.horizontal, 6)
                     .padding(.vertical, 2)
-                    .background(biasBg)
-                    .clipShape(Capsule())
+                    .background(AppColors.secondaryBackground)
+                    .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 4, style: .continuous)
+                            .stroke(AppColors.border.opacity(0.4), lineWidth: 0.5)
+                    )
             }
             
             Divider()
-                .background(AppColors.border.opacity(0.6))
+                .background(AppColors.border.opacity(0.35))
             
-            // Parsed Setup Parameters (Clean key-value rows)
+            // Parsed Setup Parameters (Clean monochrome key-value rows)
             VStack(spacing: 5) {
-                preTradeParamRow(label: "Direction:", value: plan.bias.uppercased(), valueColor: biasColor)
+                preTradeParamRow(label: "Direction:", value: plan.bias.uppercased())
                 
                 if let bal = resolvedBalance(plan: plan) {
                     preTradeParamRow(label: "Balance:", value: bal)
@@ -794,15 +794,15 @@ public struct TradeAICoachSheet: View {
                 }
                 
                 if let sl = plan.invalidationSL, !sl.isEmpty {
-                    preTradeParamRow(label: "Stop loss:", value: sl, valueColor: Color.red)
+                    preTradeParamRow(label: "Stop loss:", value: sl)
                 }
                 
                 if let tp1 = plan.takeProfit1 ?? plan.targetTP, !tp1.isEmpty {
-                    preTradeParamRow(label: "Take profit 1:", value: tp1, valueColor: Color.green)
+                    preTradeParamRow(label: "Take profit 1:", value: tp1)
                 }
                 
                 if let tp2 = plan.takeProfit2, !tp2.isEmpty {
-                    preTradeParamRow(label: "Take profit 2:", value: tp2, valueColor: Color.green)
+                    preTradeParamRow(label: "Take profit 2:", value: tp2)
                 }
                 
                 if let vol = resolvedVolume(plan: plan) {
@@ -817,20 +817,20 @@ public struct TradeAICoachSheet: View {
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(AppColors.brand.opacity(0.35), lineWidth: 0.8)
+                .stroke(AppColors.border.opacity(0.4), lineWidth: 0.8)
         )
     }
     
-    private func preTradeParamRow(label: String, value: String, valueColor: Color = AppColors.primaryText) -> some View {
+    private func preTradeParamRow(label: String, value: String) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
             Text(label)
-                .font(.system(size: 11, weight: .medium))
+                .font(.system(size: 11, weight: .regular))
                 .foregroundColor(AppColors.secondaryText)
-                .frame(width: 90, alignment: .leading)
+                .frame(width: 85, alignment: .leading)
             
             Text(value)
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundColor(valueColor)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(AppColors.primaryText)
                 .lineLimit(2)
             
             Spacer()

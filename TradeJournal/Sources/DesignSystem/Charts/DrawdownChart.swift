@@ -28,14 +28,22 @@ public struct DrawdownChart: View {
         return maxVal * 100.0
     }
     
+    private var barWidth: CGFloat {
+        if points.count <= 2 { return 16 }
+        if points.count <= 5 { return 12 }
+        if points.count <= 15 { return 8 }
+        if points.count <= 30 { return 5 }
+        return 3
+    }
+    
     private var xDomain: ClosedRange<Date> {
         guard let first = points.first?.date, let last = points.last?.date else {
-            return Date()...Date().addingTimeInterval(86400)
+            return Date().addingTimeInterval(-86400 * 2)...Date().addingTimeInterval(86400 * 2)
         }
-        if first == last {
-            return first.addingTimeInterval(-86400)...last.addingTimeInterval(86400)
-        }
-        return first...last
+        let diff = max(0, last.timeIntervalSince(first))
+        // Always provide at least 1.5 - 2 days margin on both sides so bars near edges don't overflow the chart area
+        let margin = max(86400.0 * 2, diff * 0.15)
+        return first.addingTimeInterval(-margin)...last.addingTimeInterval(margin)
     }
     
     public var body: some View {
@@ -88,7 +96,8 @@ public struct DrawdownChart: View {
                         
                         BarMark(
                             x: .value("Date", point.date, unit: .day),
-                            y: .value("Drawdown", ddVal)
+                            y: .value("Drawdown", ddVal),
+                            width: .fixed(barWidth)
                         )
                         .foregroundStyle(
                             LinearGradient(
@@ -128,6 +137,9 @@ public struct DrawdownChart: View {
                             }
                         }
                     }
+                }
+                .chartPlotStyle { plotArea in
+                    plotArea.clipped()
                 }
                 .animation(.spring(response: 0.85, dampingFraction: 0.82), value: animProgress)
                 .frame(height: height)

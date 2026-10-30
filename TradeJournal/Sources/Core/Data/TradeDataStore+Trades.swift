@@ -175,7 +175,7 @@ extension TradeDataStore {
                 t.stopLoss = ann.stopLoss
                 t.profitTarget = ann.profitTarget
                 t.reviewedAt = ann.reviewedAt
-                t.playbookId = ann.playbookId
+                t.playbookId = (ann.playbookId?.isEmpty ?? true) ? defaultPlaybook?.id : ann.playbookId
             } else {
                 let defaultRisk = JournalDefaultsEngine.defaultRisk(
                     entry: t.avgEntry,
@@ -193,13 +193,20 @@ extension TradeDataStore {
         
         // Invariant Defense: Explicitly preserve broker-synced trades for this account that are not built from atomic fills
         let fillIds = Set(accountFills.map(\.id))
-        let brokerSyncedTrades = trades.filter { trade in
+        var brokerSyncedTrades = trades.filter { trade in
             trade.accountId == accountId && (
                 trade.key.hasPrefix("the5ers_") ||
                 trade.key.hasPrefix("exness_") ||
                 trade.executionIds.isEmpty ||
                 !trade.executionIds.contains(where: { fillIds.contains($0) })
             )
+        }
+        if let defPbId = defaultPlaybook?.id {
+            for i in 0..<brokerSyncedTrades.count {
+                if brokerSyncedTrades[i].playbookId == nil || brokerSyncedTrades[i].playbookId?.isEmpty == true {
+                    brokerSyncedTrades[i].playbookId = defPbId
+                }
+            }
         }
         let otherTrades = trades.filter { $0.accountId != accountId }
         trades = otherTrades + brokerSyncedTrades + mergedTrades

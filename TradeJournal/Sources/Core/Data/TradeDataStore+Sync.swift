@@ -123,7 +123,15 @@ extension TradeDataStore {
                         if local.rating == nil && rTrade.rating != nil { local.rating = rTrade.rating; mutated = true }
                         if local.stopLoss == nil && rTrade.stopLoss != nil { local.stopLoss = rTrade.stopLoss; mutated = true }
                         if local.profitTarget == nil && rTrade.profitTarget != nil { local.profitTarget = rTrade.profitTarget; mutated = true }
-                        if local.playbookId == nil && rTrade.playbookId != nil { local.playbookId = rTrade.playbookId; mutated = true }
+                        if (local.playbookId == nil || local.playbookId?.isEmpty == true) {
+                            if let rPb = rTrade.playbookId, !rPb.isEmpty {
+                                local.playbookId = rPb
+                                mutated = true
+                            } else if let defPb = defaultPlaybook?.id {
+                                local.playbookId = defPb
+                                mutated = true
+                            }
+                        }
                         if local.reviewedAt == nil && rTrade.reviewedAt != nil { local.reviewedAt = rTrade.reviewedAt; mutated = true }
                         if mutated {
                             localTrades[idx] = local
@@ -132,11 +140,19 @@ extension TradeDataStore {
                     } else if (local.netPnl != 0 || local.grossPnl != 0) && (rTrade.netPnl == 0 && rTrade.grossPnl == 0) {
                         // Keep local non-zero PnL if remote has zero PnL
                     } else if local != rTrade {
-                        localTrades[idx] = rTrade
+                        var updated = rTrade
+                        if updated.playbookId == nil || updated.playbookId?.isEmpty == true {
+                            updated.playbookId = local.playbookId ?? defaultPlaybook?.id
+                        }
+                        localTrades[idx] = updated
                         tradesModified = true
                     }
                 } else {
-                    localTrades.append(rTrade)
+                    var newTrade = rTrade
+                    if newTrade.playbookId == nil || newTrade.playbookId?.isEmpty == true {
+                        newTrade.playbookId = defaultPlaybook?.id
+                    }
+                    localTrades.append(newTrade)
                     tradesModified = true
                 }
                 if !rTrade.accountId.isEmpty {
@@ -614,12 +630,20 @@ extension TradeDataStore {
             }
             
             if rulesModified {
-                self.progressRules = localRules
-                saveToDisk(immediate: true)
+                await MainActor.run {
+                    self.progressRules = localRules
+                    self.saveToDisk(immediate: true)
+                    self.objectWillChange.send()
+                }
             }
             
             if !rulesToUpload.isEmpty {
-                try? await SupabaseService.shared.upsertProgressRules(rulesToUpload)
+                do {
+                    try await SupabaseService.shared.upsertProgressRules(rulesToUpload)
+                    AppLogger.info("Supabase sync uploaded \(rulesToUpload.count) progress rules")
+                } catch {
+                    AppLogger.warning("Supabase upsertProgressRules failed: \(error.localizedDescription)")
+                }
             }
             
             let remoteChecks = try await SupabaseService.shared.fetchProgressChecks()
@@ -632,7 +656,7 @@ extension TradeDataStore {
                     Task { try? await SupabaseService.shared.deleteProgressCheck(id: rCheck.id) }
                     continue
                 }
-                if let idx = localChecks.firstIndex(where: { $0.ruleId == rCheck.ruleId && $0.date == rCheck.date }) {
+                if let idx = localChecks.firstIndex(where: { ($0.ruleId == rCheck.ruleId && $0.date == rCheck.date) || $0.id == rCheck.id }) {
                     if localChecks[idx].done != rCheck.done {
                         localChecks[idx].done = rCheck.done
                         checksModified = true
@@ -645,7 +669,7 @@ extension TradeDataStore {
             
             for localCheck in localChecks {
                 if deletedProgressRuleIds.contains(localCheck.ruleId) { continue }
-                if !remoteChecks.contains(where: { $0.ruleId == localCheck.ruleId && $0.date == localCheck.date }) {
+                if !remoteChecks.contains(where: { ($0.ruleId == localCheck.ruleId && $0.date == localCheck.date) || $0.id == localCheck.id }) {
                     checksToUpload.append(localCheck)
                 }
             }
@@ -657,12 +681,20 @@ extension TradeDataStore {
             }
             
             if checksModified {
-                self.progressChecks = localChecks
-                saveToDisk(immediate: true)
+                await MainActor.run {
+                    self.progressChecks = localChecks
+                    self.saveToDisk(immediate: true)
+                    self.objectWillChange.send()
+                }
             }
             
             if !checksToUpload.isEmpty {
-                try? await SupabaseService.shared.upsertProgressChecks(checksToUpload)
+                do {
+                    try await SupabaseService.shared.upsertProgressChecks(checksToUpload)
+                    AppLogger.info("Supabase sync uploaded \(checksToUpload.count) progress checks")
+                } catch {
+                    AppLogger.warning("Supabase upsertProgressChecks failed: \(error.localizedDescription)")
+                }
             }
         } catch {
             if Self.isCancellation(error) { return }

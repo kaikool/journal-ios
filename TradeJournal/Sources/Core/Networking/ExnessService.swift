@@ -911,6 +911,7 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
                     executionCount: execIds.count,
                     executionIds: execIds,
                     durationMs: durMs,
+                    playbookId: TradeDataStore.shared.defaultPlaybook?.id,
                     stopLoss: sltp?.sl,
                     profitTarget: sltp?.tp
                 )
@@ -937,6 +938,7 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
                     executionCount: execIds.count,
                     executionIds: execIds,
                     durationMs: nil,
+                    playbookId: TradeDataStore.shared.defaultPlaybook?.id,
                     stopLoss: sltp?.sl,
                     profitTarget: sltp?.tp
                 )
@@ -997,6 +999,7 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
                 executionCount: 1,
                 executionIds: [execId],
                 durationMs: nil,
+                playbookId: TradeDataStore.shared.defaultPlaybook?.id,
                 stopLoss: sltp?.sl,
                 profitTarget: sltp?.tp
             )
@@ -1010,11 +1013,27 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
             // A. Merge direct trades with broker-reported P&L
             if !directTrades.isEmpty {
                 var currentTrades = dataStore.trades
+                let defaultPbId = dataStore.defaultPlaybook?.id
                 for t in directTrades {
-                    if let idx = currentTrades.firstIndex(where: { $0.key == t.key || $0.id == t.id }) {
-                        currentTrades[idx] = t
+                    var tradeToMerge = t
+                    if let idx = currentTrades.firstIndex(where: { $0.key == tradeToMerge.key || $0.id == tradeToMerge.id }) {
+                        if let existingPbId = currentTrades[idx].playbookId, !existingPbId.isEmpty {
+                            tradeToMerge.playbookId = existingPbId
+                        } else if tradeToMerge.playbookId == nil {
+                            tradeToMerge.playbookId = defaultPbId
+                        }
+                        if let existingNotes = currentTrades[idx].notes, !existingNotes.isEmpty {
+                            tradeToMerge.notes = existingNotes
+                        }
+                        if !currentTrades[idx].tags.isEmpty {
+                            tradeToMerge.tags = Array(Set(currentTrades[idx].tags + tradeToMerge.tags))
+                        }
+                        currentTrades[idx] = tradeToMerge
                     } else {
-                        currentTrades.append(t)
+                        if tradeToMerge.playbookId == nil {
+                            tradeToMerge.playbookId = defaultPbId
+                        }
+                        currentTrades.append(tradeToMerge)
                     }
                 }
                 dataStore.trades = currentTrades

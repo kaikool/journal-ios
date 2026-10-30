@@ -51,12 +51,12 @@ extension TradeDataStore {
     
     public static var defaultProgressRules: [ProgressRule] {
         [
-            ProgressRule(title: "Check high-impact economic news", stage: "Before trading", weekdaysJson: "[1,2,3,4,5]"),
-            ProgressRule(title: "Identify H1-H4 Key Levels & Liquidity", stage: "Before trading", weekdaysJson: "[1,2,3,4,5]"),
-            ProgressRule(title: "Always set Stop Loss before order fill", stage: "During trading", weekdaysJson: "[1,2,3,4,5]"),
-            ProgressRule(title: "Do not move SL or hold beyond planned R:R", stage: "During trading", weekdaysJson: "[1,2,3,4,5]"),
-            ProgressRule(title: "Log emotional notes & post-trade review", stage: "After trading", weekdaysJson: "[1,2,3,4,5]"),
-            ProgressRule(title: "Save chart screenshots and score Playbook", stage: "After trading", weekdaysJson: "[1,2,3,4,5]")
+            ProgressRule(id: "rule_news_check", title: "Check high-impact economic news", stage: "Before trading", weekdaysJson: "[1,2,3,4,5]"),
+            ProgressRule(id: "rule_levels_liquidity", title: "Identify H1-H4 Key Levels & Liquidity", stage: "Before trading", weekdaysJson: "[1,2,3,4,5]"),
+            ProgressRule(id: "rule_set_sl", title: "Always set Stop Loss before order fill", stage: "During trading", weekdaysJson: "[1,2,3,4,5]"),
+            ProgressRule(id: "rule_hold_rr", title: "Do not move SL or hold beyond planned R:R", stage: "During trading", weekdaysJson: "[1,2,3,4,5]"),
+            ProgressRule(id: "rule_emotional_notes", title: "Log emotional notes & post-trade review", stage: "After trading", weekdaysJson: "[1,2,3,4,5]"),
+            ProgressRule(id: "rule_save_screenshots", title: "Save chart screenshots and score Playbook", stage: "After trading", weekdaysJson: "[1,2,3,4,5]")
         ]
     }
     
@@ -68,9 +68,15 @@ extension TradeDataStore {
             progressRules.append(rule)
         }
         saveToDisk(immediate: true)
+        objectWillChange.send()
         Task {
             if SupabaseService.shared.isConfigured {
-                try? await SupabaseService.shared.upsertProgressRules([rule])
+                do {
+                    try await SupabaseService.shared.upsertProgressRules([rule])
+                    AppLogger.info("Successfully synced progress rule '\(rule.title)' to Supabase")
+                } catch {
+                    AppLogger.warning("Supabase upsertProgressRules failed: \(error.localizedDescription)")
+                }
             }
         }
     }
@@ -128,19 +134,26 @@ extension TradeDataStore {
     }
     
     public func toggleProgressCheck(ruleId: String, date: String) {
+        let checkId = "chk_\(ruleId)_\(date)"
         let checkToSync: ProgressCheck
-        if let idx = progressChecks.firstIndex(where: { $0.ruleId == ruleId && $0.date == date }) {
+        if let idx = progressChecks.firstIndex(where: { ($0.ruleId == ruleId && $0.date == date) || $0.id == checkId }) {
             progressChecks[idx].done.toggle()
             checkToSync = progressChecks[idx]
         } else {
-            let newCheck = ProgressCheck(ruleId: ruleId, date: date, done: true)
+            let newCheck = ProgressCheck(id: checkId, ruleId: ruleId, date: date, done: true)
             progressChecks.append(newCheck)
             checkToSync = newCheck
         }
-        saveToDisk()
+        saveToDisk(immediate: true)
+        objectWillChange.send()
         Task {
             if SupabaseService.shared.isConfigured {
-                try? await SupabaseService.shared.upsertProgressChecks([checkToSync])
+                do {
+                    try await SupabaseService.shared.upsertProgressChecks([checkToSync])
+                    AppLogger.info("Successfully synced progress check '\(checkToSync.id)' to Supabase")
+                } catch {
+                    AppLogger.warning("Supabase upsertProgressChecks failed: \(error.localizedDescription)")
+                }
             }
         }
     }
@@ -167,10 +180,25 @@ extension TradeDataStore {
         for i in 0..<playbooks.count {
             playbooks[i].isDefault = (playbooks[i].id == id)
         }
+        if let targetId = id {
+            var modified = false
+            for i in 0..<trades.count {
+                if trades[i].playbookId == nil || trades[i].playbookId?.isEmpty == true {
+                    trades[i].playbookId = targetId
+                    modified = true
+                }
+            }
+            if modified {
+                invalidatePerformanceCaches()
+            }
+        }
         saveToDisk(immediate: true)
         Task {
             do {
                 try await SupabaseService.shared.upsertPlaybooks(playbooks)
+                if SupabaseService.shared.isConfigured {
+                    try await SupabaseService.shared.upsertTrades(trades)
+                }
             } catch {
                 AppLogger.warning("Supabase setDefaultPlaybook notice: \(error.localizedDescription)")
             }

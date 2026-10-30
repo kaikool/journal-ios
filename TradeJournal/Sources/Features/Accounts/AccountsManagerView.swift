@@ -19,7 +19,7 @@ public struct AccountsManagerView: View {
     @ObservedObject private var dataStore = TradeDataStore.shared
     @EnvironmentObject private var env: AppEnvironment
     
-    @State private var filterTab: AccountFilterTab = .visible
+    @State private var filterTab: AccountFilterTab = .active
     @State private var searchText: String = ""
     @State private var showNewAccountSheet: Bool = false
     @State private var accountToEdit: Account? = nil

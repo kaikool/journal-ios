@@ -175,6 +175,9 @@ public struct PlaybooksView: View {
                 onDelete: {
                     playbookToDelete = summary.playbook
                     showDeleteConfirmation = true
+                },
+                onSetDefault: {
+                    dataStore.setDefaultPlaybook(id: summary.playbook.isDefault ? nil : summary.playbook.id)
                 }
             )
         }

@@ -30,27 +30,18 @@ public struct MarketDataSettingsView: View {
                             
                             HStack(spacing: 5) {
                                 Circle()
-                                    .fill(binanceEnabled ? AppColors.profit : AppColors.secondaryText)
+                                    .fill(AppColors.profit)
                                     .frame(width: 7, height: 7)
-                                Text(binanceEnabled ? "Connected" : "Disabled")
+                                Text("Connected")
                                     .font(AppTypography.caption)
-                                    .foregroundColor(binanceEnabled ? AppColors.profit : AppColors.secondaryText)
+                                    .foregroundColor(AppColors.profit)
                             }
                         }
                         
                         Spacer()
                         
-                        HStack(spacing: 10) {
-                            Toggle("", isOn: $binanceEnabled)
-                                .labelsHidden()
-                                .onChange(of: binanceEnabled) { val in
-                                    dataStore.marketConnections.binanceEnabled = val
-                                    dataStore.saveToDisk()
-                                }
-                            
-                            AppButton("Ping", icon: "bolt.fill", style: .secondary, size: .compact, isLoading: isTestingBinance) {
-                                testBinance()
-                            }
+                        AppButton("Ping", icon: "bolt.fill", style: .secondary, size: .compact, isLoading: isTestingBinance) {
+                            testBinance()
                         }
                     }
                     

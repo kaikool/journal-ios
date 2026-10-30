@@ -8,6 +8,7 @@ public struct PlaybookCardView: View {
     let onSelect: () -> Void
     let onEdit: () -> Void
     let onDelete: () -> Void
+    let onSetDefault: (() -> Void)?
     
     @State private var isExpanded: Bool = false
     
@@ -16,13 +17,15 @@ public struct PlaybookCardView: View {
         currency: String,
         onSelect: @escaping () -> Void,
         onEdit: @escaping () -> Void,
-        onDelete: @escaping () -> Void
+        onDelete: @escaping () -> Void,
+        onSetDefault: (() -> Void)? = nil
     ) {
         self.summary = summary
         self.currency = currency
         self.onSelect = onSelect
         self.onEdit = onEdit
         self.onDelete = onDelete
+        self.onSetDefault = onSetDefault
     }
     
     public var body: some View {
@@ -191,36 +194,67 @@ public struct PlaybookCardView: View {
                 }
                 .buttonStyle(.plain)
                 
-                // Expand / Collapse Pill if more than 3 rules (outside the detail button)
-                if summary.playbook.rules.count > 3 {
-                    Button {
-                        #if canImport(UIKit)
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        #endif
-                        withAnimation(.spring(response: 0.32, dampingFraction: 0.8)) {
-                            isExpanded.toggle()
+                // Bottom Action Row: More rules (left) & Set Default under When broken (right)
+                HStack(alignment: .center) {
+                    if summary.playbook.rules.count > 3 {
+                        Button {
+                            #if canImport(UIKit)
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            #endif
+                            withAnimation(.spring(response: 0.32, dampingFraction: 0.8)) {
+                                isExpanded.toggle()
+                            }
+                        } label: {
+                            HStack(spacing: 5) {
+                                Text(isExpanded ? "Show less" : "+ \(summary.playbook.rules.count - 3) more rules")
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .lineLimit(1)
+                                    .fixedSize()
+                                Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                                    .font(.system(size: 9, weight: .bold))
+                            }
+                            .foregroundColor(AppColors.brand)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4)
+                            .background(AppColors.brand.opacity(0.08))
+                            .clipShape(Capsule())
+                            .overlay(
+                                Capsule().stroke(AppColors.brand.opacity(0.2), lineWidth: 0.5)
+                            )
                         }
-                    } label: {
-                        HStack(spacing: 5) {
-                            Text(isExpanded ? "Show less" : "+ \(summary.playbook.rules.count - 3) more rules")
-                                .font(.system(size: 11, weight: .semibold))
-                                .lineLimit(1)
-                                .fixedSize()
-                            Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                                .font(.system(size: 9, weight: .bold))
-                        }
-                        .foregroundColor(AppColors.brand)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
-                        .background(AppColors.brand.opacity(0.08))
-                        .clipShape(Capsule())
-                        .overlay(
-                            Capsule().stroke(AppColors.brand.opacity(0.2), lineWidth: 0.5)
-                        )
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
-                    .padding(.top, -2)
+                    
+                    Spacer()
+                    
+                    if let onSetDefault = onSetDefault {
+                        Button {
+                            #if canImport(UIKit)
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            #endif
+                            onSetDefault()
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: summary.playbook.isDefault ? "checkmark.circle.fill" : "star")
+                                    .font(.system(size: 10, weight: summary.playbook.isDefault ? .bold : .medium))
+                                Text(summary.playbook.isDefault ? "Default" : "Set default")
+                                    .font(.system(size: 11, weight: summary.playbook.isDefault ? .semibold : .medium))
+                                    .lineLimit(1)
+                                    .fixedSize()
+                            }
+                            .foregroundColor(summary.playbook.isDefault ? AppColors.brand : AppColors.secondaryText)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4)
+                            .background(summary.playbook.isDefault ? AppColors.brand.opacity(0.12) : AppColors.secondaryBackground)
+                            .clipShape(Capsule())
+                            .overlay(
+                                Capsule().stroke(summary.playbook.isDefault ? AppColors.brand.opacity(0.3) : AppColors.border.opacity(0.5), lineWidth: 0.6)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
+                .padding(.top, -2)
             }
         }
     }

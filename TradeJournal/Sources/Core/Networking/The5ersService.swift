@@ -2679,6 +2679,9 @@ public final class The5ersService: ObservableObject {
                     existing.executionIds.append(t)
                     existing.executionCount = existing.executionIds.count
                 }
+                if existing.playbookId == nil || existing.playbookId?.isEmpty == true {
+                    existing.playbookId = dataStore.defaultPlaybook?.id
+                }
                 syncedAccountTrades.append(existing)
                 count += 1
             } else {
@@ -2715,10 +2718,17 @@ public final class The5ersService: ObservableObject {
         } else {
             var updatedTrades = dataStore.trades
             for synced in syncedAccountTrades {
-                if let idx = updatedTrades.firstIndex(where: { $0.key == synced.key }) {
-                    updatedTrades[idx] = synced
+                var s = synced
+                if s.playbookId == nil || s.playbookId?.isEmpty == true {
+                    s.playbookId = dataStore.defaultPlaybook?.id
+                }
+                if let idx = updatedTrades.firstIndex(where: { $0.key == s.key }) {
+                    if (s.playbookId == nil || s.playbookId?.isEmpty == true), let existingPb = updatedTrades[idx].playbookId, !existingPb.isEmpty {
+                        s.playbookId = existingPb
+                    }
+                    updatedTrades[idx] = s
                 } else {
-                    updatedTrades.append(synced)
+                    updatedTrades.append(s)
                 }
             }
             dataStore.trades = updatedTrades

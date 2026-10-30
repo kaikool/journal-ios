@@ -90,36 +90,50 @@ public struct NavigationDrawerView: View {
             // Apple-Standard Sidebar Header (with top notch safe clearance)
             headerView
             
-            // Dedicated Hero Account Switcher & Balance Card
+            // Dedicated Hero Account Switcher & Balance Card (Proportioned & Comfortable)
             accountHeroCard
             
-            // Sectioned Navigation List with comfortably proportioned spacing
+            // Sectioned Navigation List with evenly balanced spacing
             ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 0) {
                     // Section 1: TRADING
-                    VStack(alignment: .leading, spacing: 2.5) {
+                    VStack(alignment: .leading, spacing: 4) {
                         sectionHeader(title: "TRADING")
                         
                         ForEach(mainNavTabs) { tab in
                             navRow(for: tab)
                         }
                     }
+                    .padding(.horizontal, 10)
+                    .padding(.top, 2)
+                    
+                    // Balanced Divider between Trading & Workspace
+                    Divider()
+                        .background(AppColors.border.opacity(0.3))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 10)
                     
                     // Section 2: WORKSPACE & SETUP
-                    VStack(alignment: .leading, spacing: 2.5) {
+                    VStack(alignment: .leading, spacing: 4) {
                         sectionHeader(title: "WORKSPACE")
                         
                         ForEach(setupNavTabs) { tab in
                             navRow(for: tab)
                         }
                     }
+                    .padding(.horizontal, 10)
+                    
+                    // Balanced Divider between Workspace & Controls
+                    Divider()
+                        .background(AppColors.border.opacity(0.3))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 10)
+                    
+                    // Section 3: Bottom System Controls (Cloud sync, Theme, Privacy)
+                    footerControlDock
                 }
-                .padding(.vertical, 8)
-                .padding(.horizontal, 10)
+                .padding(.bottom, max(AppSafeArea.bottomInset + 8, 32))
             }
-            
-            // Bottom Glass Control Dock
-            footerControlDock
         }
         .frame(width: 300)
         .background(
@@ -239,42 +253,47 @@ public struct NavigationDrawerView: View {
                 }
             }
         } label: {
-            HStack(spacing: 8) {
-                Circle()
-                    .fill(AppColors.profit)
-                    .frame(width: 6, height: 6)
+            HStack(spacing: 10) {
+                ZStack {
+                    Circle()
+                        .fill(AppColors.profit.opacity(0.18))
+                        .frame(width: 18, height: 18)
+                    Circle()
+                        .fill(AppColors.profit)
+                        .frame(width: 7, height: 7)
+                }
                 
                 Text(shortAccountDisplayName)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(AppColors.primaryText)
                     .lineLimit(1)
                 
-                Spacer(minLength: 4)
+                Spacer(minLength: 6)
                 
                 Text(currentAccountBalanceFormatted)
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
                     .foregroundColor(AppColors.profit)
                     .lineLimit(1)
                 
                 Image(systemName: "chevron.up.chevron.down")
-                    .font(.system(size: 8, weight: .semibold))
+                    .font(.system(size: 10, weight: .semibold))
                     .foregroundColor(AppColors.secondaryText.opacity(0.8))
             }
             .padding(.horizontal, 12)
-            .padding(.vertical, 7)
+            .frame(height: 44)
             .background(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(AppColors.secondaryBackground.opacity(0.65))
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(AppColors.secondaryBackground.opacity(0.75))
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .stroke(AppColors.border.opacity(0.4), lineWidth: 0.6)
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(AppColors.border.opacity(0.45), lineWidth: 0.8)
             )
         }
         .buttonStyle(ApplePressableButtonStyle())
-        .padding(.horizontal, 12)
-        .padding(.top, 6)
-        .padding(.bottom, 2)
+        .padding(.horizontal, 10)
+        .padding(.top, 10)
+        .padding(.bottom, 8)
     }
     
     // MARK: - Section Header
@@ -326,27 +345,11 @@ public struct NavigationDrawerView: View {
                 
                 Spacer()
                 
-                // Trailing Badges or Active Indicator
+                // Active Indicator
                 if isActive {
                     Image(systemName: "chevron.right")
                         .font(.system(size: 11, weight: .bold))
                         .foregroundColor(AppColors.brand)
-                } else if tab == .trades && !dataStore.trades.isEmpty {
-                    Text("\(dataStore.trades.count)")
-                        .font(AppTypography.number(11, weight: .medium))
-                        .foregroundColor(AppColors.secondaryText)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(AppColors.secondaryBackground.opacity(0.6))
-                        .clipShape(Capsule())
-                } else if tab == .accounts && !dataStore.accounts.isEmpty {
-                    Text("\(dataStore.accounts.count)")
-                        .font(AppTypography.number(11, weight: .medium))
-                        .foregroundColor(AppColors.secondaryText)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(AppColors.secondaryBackground.opacity(0.6))
-                        .clipShape(Capsule())
                 }
             }
             .padding(.horizontal, 10)
@@ -368,37 +371,62 @@ public struct NavigationDrawerView: View {
     @ViewBuilder
     private var footerControlDock: some View {
         VStack(spacing: 8) {
-            Divider().background(AppColors.border.opacity(0.35))
+            // Global Quick Sync Row
+            Button {
+                triggerHaptic()
+                Task {
+                    await dataStore.performGlobalSync()
+                }
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "arrow.triangle.2.circlepath")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(dataStore.isSyncing ? AppColors.brand : AppColors.secondaryText)
+                        .rotationEffect(dataStore.isSyncing ? .degrees(360) : .zero)
+                        .animation(dataStore.isSyncing ? Animation.linear(duration: 1).repeatForever(autoreverses: false) : .default, value: dataStore.isSyncing)
+                    
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Cloud & Broker Sync")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(AppColors.primaryText)
+                        
+                        Text(dataStore.isSyncing ? "Syncing..." : SyncManager.shared.formattedLastSyncTime)
+                            .font(.system(size: 11))
+                            .foregroundColor(AppColors.secondaryText)
+                    }
+                    
+                    Spacer()
+                }
+                .padding(.horizontal, 12)
+                .frame(height: 44)
+                .background(AppColors.secondaryBackground.opacity(0.6))
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(AppColors.border.opacity(0.4), lineWidth: 0.5)
+                )
+            }
+            .buttonStyle(ApplePressableButtonStyle())
+            .disabled(dataStore.isSyncing)
             
-            VStack(spacing: 8) {
-                // Global Quick Sync Row
+            // Inline Side-by-Side Controls (Theme + Privacy)
+            HStack(spacing: 8) {
+                // Theme Switcher
                 Button {
                     triggerHaptic()
-                    Task {
-                        await dataStore.performGlobalSync()
-                    }
+                    env.toggleTheme()
                 } label: {
-                    HStack(spacing: 10) {
-                        Image(systemName: "arrow.triangle.2.circlepath")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(dataStore.isSyncing ? AppColors.brand : AppColors.secondaryText)
-                            .rotationEffect(dataStore.isSyncing ? .degrees(360) : .zero)
-                            .animation(dataStore.isSyncing ? Animation.linear(duration: 1).repeatForever(autoreverses: false) : .default, value: dataStore.isSyncing)
+                    HStack(spacing: 6) {
+                        Image(systemName: env.appTheme == .dark ? "sun.max.fill" : "moon.fill")
+                            .font(.system(size: 13))
+                            .foregroundColor(env.appTheme == .dark ? .orange : .indigo)
                         
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text("Cloud & Broker Sync")
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundColor(AppColors.primaryText)
-                            
-                            Text(dataStore.isSyncing ? "Syncing..." : SyncManager.shared.formattedLastSyncTime)
-                                .font(.system(size: 11))
-                                .foregroundColor(AppColors.secondaryText)
-                        }
-                        
-                        Spacer()
+                        Text(env.appTheme == .dark ? "Light" : "Dark")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(AppColors.primaryText)
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 38)
                     .background(AppColors.secondaryBackground.opacity(0.6))
                     .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                     .overlay(
@@ -407,64 +435,34 @@ public struct NavigationDrawerView: View {
                     )
                 }
                 .buttonStyle(ApplePressableButtonStyle())
-                .disabled(dataStore.isSyncing)
                 
-                // Inline Side-by-Side Controls (Theme + Privacy)
-                HStack(spacing: 8) {
-                    // Theme Switcher
-                    Button {
-                        triggerHaptic()
-                        env.toggleTheme()
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: env.appTheme == .dark ? "sun.max.fill" : "moon.fill")
-                                .font(.system(size: 13))
-                                .foregroundColor(env.appTheme == .dark ? .orange : .indigo)
-                            
-                            Text(env.appTheme == .dark ? "Light" : "Dark")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundColor(AppColors.primaryText)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 36)
-                        .background(AppColors.secondaryBackground.opacity(0.6))
-                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .stroke(AppColors.border.opacity(0.4), lineWidth: 0.5)
-                        )
+                // Privacy Mode Toggle
+                Button {
+                    triggerHaptic()
+                    env.togglePrivacyMode()
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: env.isPrivacyModeEnabled ? "eye.slash.fill" : "eye.fill")
+                            .font(.system(size: 13))
+                            .foregroundColor(env.isPrivacyModeEnabled ? AppColors.brand : AppColors.secondaryText)
+                        
+                        Text(env.isPrivacyModeEnabled ? "Hidden" : "Public")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(env.isPrivacyModeEnabled ? AppColors.brand : AppColors.primaryText)
                     }
-                    .buttonStyle(ApplePressableButtonStyle())
-                    
-                    // Privacy Mode Toggle
-                    Button {
-                        triggerHaptic()
-                        env.togglePrivacyMode()
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: env.isPrivacyModeEnabled ? "eye.slash.fill" : "eye.fill")
-                                .font(.system(size: 13))
-                                .foregroundColor(env.isPrivacyModeEnabled ? AppColors.brand : AppColors.secondaryText)
-                            
-                            Text(env.isPrivacyModeEnabled ? "Hidden" : "Public")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundColor(env.isPrivacyModeEnabled ? AppColors.brand : AppColors.primaryText)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 36)
-                        .background(AppColors.secondaryBackground.opacity(0.6))
-                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .stroke(env.isPrivacyModeEnabled ? AppColors.brand.opacity(0.4) : AppColors.border.opacity(0.4), lineWidth: 0.5)
-                        )
-                    }
-                    .buttonStyle(ApplePressableButtonStyle())
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 38)
+                    .background(AppColors.secondaryBackground.opacity(0.6))
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .stroke(env.isPrivacyModeEnabled ? AppColors.brand.opacity(0.4) : AppColors.border.opacity(0.4), lineWidth: 0.5)
+                    )
                 }
+                .buttonStyle(ApplePressableButtonStyle())
             }
-            .padding(.horizontal, 12)
-            .padding(.bottom, 22)
         }
+        .padding(.horizontal, 10)
     }
     
     private func triggerHaptic() {

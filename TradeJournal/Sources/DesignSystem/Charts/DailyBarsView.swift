@@ -121,14 +121,22 @@ public struct DailyBarsView: View {
         return maxVal > 0 ? maxVal * 1.15 : 100
     }
     
+    private var barWidth: CGFloat {
+        if data.count <= 2 { return 18 }
+        if data.count <= 5 { return 14 }
+        if data.count <= 15 { return 10 }
+        if data.count <= 30 { return 6 }
+        return 4
+    }
+    
     private var xDomain: ClosedRange<Date> {
         guard let first = data.first?.dateObj, let last = data.last?.dateObj else {
-            return Date()...Date().addingTimeInterval(86400)
+            return Date().addingTimeInterval(-86400 * 2)...Date().addingTimeInterval(86400 * 2)
         }
-        if first == last {
-            return first.addingTimeInterval(-86400)...last.addingTimeInterval(86400)
-        }
-        return first...last
+        let diff = max(0, last.timeIntervalSince(first))
+        // Always give at least 1.5 - 2 days margin on both sides so edge bars don't collide with the leading Y-axis or bleed past the trailing chart boundary
+        let margin = max(86400.0 * 2.0, diff * 0.15)
+        return first.addingTimeInterval(-margin)...last.addingTimeInterval(margin)
     }
     
     private var visibleDateObjs: [Date] {
@@ -215,7 +223,8 @@ public struct DailyBarsView: View {
                         
                         BarMark(
                             x: .value("Date", entry.dateObj, unit: .day),
-                            y: .value("Net P&L", val)
+                            y: .value("Net P&L", val),
+                            width: .fixed(barWidth)
                         )
                         .foregroundStyle(
                             isBest ?
@@ -280,6 +289,9 @@ public struct DailyBarsView: View {
                             .font(.system(size: 10, weight: .medium))
                             .foregroundStyle(AppColors.secondaryText)
                     }
+                }
+                .chartPlotStyle { plotArea in
+                    plotArea.clipped()
                 }
                 .animation(.spring(response: 0.85, dampingFraction: 0.82), value: animProgress)
                 .frame(height: height)

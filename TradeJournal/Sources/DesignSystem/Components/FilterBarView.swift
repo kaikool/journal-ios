@@ -13,6 +13,17 @@ public enum AppSafeArea {
         let top = window?.safeAreaInsets.top ?? 0
         return top > 0 ? top : 47
     }
+    
+    /// Safe area bottom inset dynamically detected from active UIWindowScene (e.g. Home Indicator bar).
+    public static var bottomInset: CGFloat {
+        let scenes = UIApplication.shared.connectedScenes
+        let windowScene = scenes.first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene
+            ?? scenes.first as? UIWindowScene
+        let window = windowScene?.windows.first(where: { $0.isKeyWindow })
+            ?? windowScene?.windows.first
+        let bottom = window?.safeAreaInsets.bottom ?? 0
+        return bottom > 0 ? bottom : 34
+    }
 }
 #endif
 

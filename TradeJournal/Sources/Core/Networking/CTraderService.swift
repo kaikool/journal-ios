@@ -964,6 +964,9 @@ public final class CTraderService: ObservableObject {
                         existing.avgEntry = Decimal(price)
                         if let sl = stopLossVal { existing.stopLoss = Decimal(sl) }
                         if let tp = takeProfitVal { existing.profitTarget = Decimal(tp) }
+                        if existing.playbookId == nil || existing.playbookId?.isEmpty == true {
+                            existing.playbookId = dataStore.defaultPlaybook?.id
+                        }
                         dataStore.trades[existingIdx] = existing
                     } else {
                         // Check if TradeReconstructionEngine already has an open trade for this position

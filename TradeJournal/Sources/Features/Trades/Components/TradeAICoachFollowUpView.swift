@@ -76,44 +76,13 @@ public struct TradeAICoachBottomFloatingInput: View {
     }
     
     public var body: some View {
-        VStack(spacing: 6) {
-            // Header Row
-            HStack(spacing: 5) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundColor(AppColors.brand)
-                Text("ASK FOLLOW-UP QUESTION")
-                    .font(.system(size: 10, weight: .bold))
-                    .tracking(0.6)
-                    .foregroundColor(AppColors.secondaryText)
-                
-                Spacer()
-                
-                if hasHistory {
-                    Button(action: onResetThread) {
-                        HStack(spacing: 3) {
-                            Image(systemName: "arrow.counterclockwise")
-                                .font(.system(size: 8, weight: .semibold))
-                            Text("New Thread")
-                                .font(.system(size: 9, weight: .semibold))
-                        }
-                        .foregroundColor(AppColors.secondaryText)
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 3)
-                        .background(AppColors.secondaryBackground)
-                        .clipShape(Capsule())
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(.horizontal, 4)
-            
-            // Sleek Modern Input Pill
+        HStack(spacing: 8) {
+            // Sleek Floating Input Pill
             HStack(spacing: 8) {
                 Image(systemName: "bubble.left.and.text.bubble.right.fill")
                     .font(.system(size: 12))
                     .foregroundColor(AppColors.secondaryText.opacity(0.7))
-                    .padding(.leading, 2)
+                    .padding(.leading, 4)
                 
                 TextField("Ask a follow-up question...", text: $followUpQuery)
                     .font(.system(size: 13, weight: .regular))
@@ -123,6 +92,19 @@ public struct TradeAICoachBottomFloatingInput: View {
                             onSubmit()
                         }
                     }
+                
+                if hasHistory && !hasQueryText {
+                    Button(action: onResetThread) {
+                        Image(systemName: "arrow.counterclockwise")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(AppColors.secondaryText)
+                            .frame(width: 24, height: 24)
+                            .background(AppColors.secondaryBackground.opacity(0.8))
+                            .clipShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .help("New Thread")
+                }
                 
                 if isSubmitting {
                     ProgressView()
@@ -145,25 +127,17 @@ public struct TradeAICoachBottomFloatingInput: View {
                 }
             }
             .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(AppColors.secondaryBackground.opacity(0.65))
-            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .padding(.vertical, 7)
+            .background(AppColors.cardBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(AppColors.border.opacity(0.45), lineWidth: 0.8)
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(AppColors.border.opacity(0.55), lineWidth: 0.8)
             )
+            .shadow(color: Color.black.opacity(0.25), radius: 8, x: 0, y: 3)
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(
-            AppColors.cardBackground
-                .shadow(color: Color.black.opacity(0.35), radius: 12, x: 0, y: -4)
-        )
-        .overlay(
-            Rectangle()
-                .frame(height: 0.5)
-                .foregroundColor(AppColors.border.opacity(0.5)),
-            alignment: .top
-        )
+        .padding(.vertical, 8)
+        .background(Color.clear)
     }
 }
