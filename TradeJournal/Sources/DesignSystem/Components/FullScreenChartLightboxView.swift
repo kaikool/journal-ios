@@ -33,13 +33,14 @@ public struct FullScreenChartLightboxView: View {
                             .onChanged { val in
                                 let delta = val / lastScale
                                 lastScale = val
-                                scale = max(1.0, min(scale * delta, 5.0))
+                                let newScale = scale * delta
+                                scale = max(CGFloat(1.0), min(newScale, CGFloat(5.0)))
                             }
                             .onEnded { _ in
-                                lastScale = 1.0
-                                if scale <= 1.0 {
+                                lastScale = CGFloat(1.0)
+                                if scale <= CGFloat(1.0) {
                                     withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                        scale = 1.0
+                                        scale = CGFloat(1.0)
                                         offset = .zero
                                     }
                                 }
@@ -48,7 +49,7 @@ public struct FullScreenChartLightboxView: View {
                     .simultaneousGesture(
                         DragGesture()
                             .onChanged { val in
-                                guard scale > 1.0 else { return }
+                                guard scale > CGFloat(1.0) else { return }
                                 offset = CGSize(
                                     width: lastOffset.width + val.translation.width,
                                     height: lastOffset.height + val.translation.height
@@ -60,12 +61,12 @@ public struct FullScreenChartLightboxView: View {
                     )
                     .onTapGesture(count: 2) {
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                            if scale > 1.2 {
-                                scale = 1.0
+                            if scale > CGFloat(1.2) {
+                                scale = CGFloat(1.0)
                                 offset = .zero
                                 lastOffset = .zero
                             } else {
-                                scale = 2.5
+                                scale = CGFloat(2.5)
                             }
                         }
                     }
@@ -121,6 +122,8 @@ public struct FullScreenChartLightboxView: View {
                 }
             }
         }
+        #if os(iOS)
         .statusBarHidden(true)
+        #endif
     }
 }

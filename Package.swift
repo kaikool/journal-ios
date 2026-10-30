@@ -7,7 +7,7 @@ let package = Package(
     name: "TradeJournal",
     defaultLocalization: "en",
     platforms: [
-        .iOS(.v17)
+        .iOS(.v16)
     ],
     products: [
         .library(

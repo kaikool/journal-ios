@@ -817,7 +817,7 @@ public struct TradeAICoachSheet: View {
         if let b = plan.balance, !b.isEmpty { return b }
         let session = AIAccountContextProvider.captureContext(dataStore: dataStore)
         if let b = session.balance {
-            return Formatters.formatCurrency(b, currency: session.currency)
+            return Formatters.formatCurrency(b, currency: session.accountCurrency)
         }
         if let acc = dataStore.accounts.first(where: { $0.id == trade.accountId }) {
             return Formatters.formatCurrency(acc.initialBalance, currency: acc.currency)

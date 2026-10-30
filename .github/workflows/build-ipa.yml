@@ -177,6 +177,8 @@ jobs:
           echo "==> Removing existing code signature (ESign will re-sign from scratch)..."
           rm -rf "$APP_PATH/_CodeSignature" || true
           codesign --remove-signature "$APP_PATH" 2>/dev/null || true
+          echo "==> Ensuring correct binary permissions for eSign / iOS..."
+          chmod -R 755 "$APP_PATH" || true
           echo "==> Copying clean unsigned bundle..."
           cp -R "$APP_PATH" build/Payload/
           cd build
