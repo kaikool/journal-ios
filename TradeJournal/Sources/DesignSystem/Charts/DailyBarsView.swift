@@ -24,17 +24,19 @@ private struct HeartbeatStarView: View {
         ZStack {
             // Golden halo shockwave
             Image(systemName: "star.fill")
-                .font(.system(size: 9, weight: .bold))
-                .foregroundColor(Color.yellow.opacity(isBeating ? 0.0 : 0.75))
-                .scaleEffect(isBeating ? 2.5 : 1.0)
+                .font(.system(size: 8, weight: .bold))
+                .foregroundColor(Color.yellow.opacity(isBeating ? 0.0 : 0.70))
+                .scaleEffect(isBeating ? 1.8 : 1.0)
             
             // Core heartbeat golden star
             Image(systemName: "star.fill")
-                .font(.system(size: 9, weight: .bold))
+                .font(.system(size: 8.5, weight: .bold))
                 .foregroundColor(Color.yellow)
-                .shadow(color: Color.yellow.opacity(isBeating ? 0.95 : 0.3), radius: isBeating ? 6 : 1)
-                .scaleEffect(isBeating ? 1.35 : 0.88)
+                .shadow(color: Color.yellow.opacity(isBeating ? 0.9 : 0.3), radius: isBeating ? 3 : 1)
+                .scaleEffect(isBeating ? 1.2 : 0.95)
         }
+        .frame(width: 18, height: 18)
+        .padding(.bottom, 2)
         .onAppear {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                 withAnimation(.easeInOut(duration: 0.90).repeatForever(autoreverses: true)) {
@@ -50,10 +52,12 @@ private struct HeartbeatWarningView: View {
     
     var body: some View {
         Image(systemName: "exclamationmark.triangle.fill")
-            .font(.system(size: 9, weight: .bold))
+            .font(.system(size: 8.5, weight: .bold))
             .foregroundColor(AppColors.loss)
-            .shadow(color: AppColors.loss.opacity(isBeating ? 0.8 : 0.2), radius: isBeating ? 4 : 1)
-            .scaleEffect(isBeating ? 1.25 : 0.90)
+            .shadow(color: AppColors.loss.opacity(isBeating ? 0.8 : 0.2), radius: isBeating ? 3 : 1)
+            .scaleEffect(isBeating ? 1.15 : 0.95)
+            .frame(width: 18, height: 18)
+            .padding(.top, 2)
             .onAppear {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                     withAnimation(.easeInOut(duration: 1.1).repeatForever(autoreverses: true)) {
@@ -112,13 +116,13 @@ public struct DailyBarsView: View {
     private var yDomainMin: Double {
         let vals = data.map { isPrivate ? 0 : ($0.netPnl as NSDecimalNumber).doubleValue }
         let minVal = vals.min() ?? 0
-        return minVal < 0 ? minVal * 1.15 : 0
+        return minVal < 0 ? (minVal * 1.28) - 15 : 0
     }
     
     private var yDomainMax: Double {
         let vals = data.map { isPrivate ? 0 : ($0.netPnl as NSDecimalNumber).doubleValue }
         let maxVal = vals.max() ?? 0
-        return maxVal > 0 ? maxVal * 1.15 : 100
+        return maxVal > 0 ? (maxVal * 1.28) + 15 : 100
     }
     
     private var barWidth: CGFloat {
@@ -289,9 +293,6 @@ public struct DailyBarsView: View {
                             .font(.system(size: 10, weight: .medium))
                             .foregroundStyle(AppColors.secondaryText)
                     }
-                }
-                .chartPlotStyle { plotArea in
-                    plotArea.clipped()
                 }
                 .animation(.spring(response: 0.85, dampingFraction: 0.82), value: animProgress)
                 .frame(height: height)

@@ -328,7 +328,6 @@ public struct EditPlaybookSheet: View {
     @State private var title: String
     @State private var description: String
     @State private var rules: [String]
-    @State private var isDefault: Bool
     
     public init(playbook: Playbook) {
         self.playbook = playbook
@@ -336,7 +335,6 @@ public struct EditPlaybookSheet: View {
         _description = State(initialValue: playbook.description)
         let initialRules = playbook.rules.isEmpty ? [""] : playbook.rules + [""]
         _rules = State(initialValue: initialRules)
-        _isDefault = State(initialValue: playbook.isDefault)
     }
     
     private var validRulesCount: Int {
@@ -451,40 +449,6 @@ public struct EditPlaybookSheet: View {
                                 .stroke(AppColors.border.opacity(0.5), lineWidth: 0.8)
                         )
                 }
-                
-                // Default Playbook Checkbox
-                Button {
-                    #if canImport(UIKit)
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    #endif
-                    isDefault.toggle()
-                } label: {
-                    HStack(spacing: 12) {
-                        Image(systemName: isDefault ? "checkmark.square.fill" : "square")
-                            .font(.system(size: 20))
-                            .foregroundColor(isDefault ? AppColors.brand : AppColors.secondaryText)
-                        
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Set as Default Playbook")
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundColor(AppColors.primaryText)
-                            Text("Automatically assigned to newly opened and imported trades")
-                                .font(AppTypography.caption)
-                                .foregroundColor(AppColors.secondaryText)
-                        }
-                        
-                        Spacer()
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .background(AppColors.background)
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .stroke(isDefault ? AppColors.brand.opacity(0.4) : AppColors.border.opacity(0.5), lineWidth: 0.8)
-                    )
-                }
-                .buttonStyle(.plain)
             }
         }
     }
@@ -626,7 +590,7 @@ public struct EditPlaybookSheet: View {
             title: title.isEmpty ? playbook.title : title,
             description: description,
             rules: parsedRules,
-            isDefault: isDefault
+            isDefault: playbook.isDefault
         )
         dismiss()
     }

@@ -86,54 +86,67 @@ public struct NavigationDrawerView: View {
     }
     
     public var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Apple-Standard Sidebar Header (with top notch safe clearance)
-            headerView
+        GeometryReader { proxy in
+            let totalHeight = proxy.size.height
+            let isCompact = totalHeight < 740
+            let rowHeight: CGFloat = isCompact ? 32 : (totalHeight < 840 ? 35 : 37)
+            let iconSize: CGFloat = isCompact ? 14 : 15
+            let fontSize: CGFloat = isCompact ? 12.5 : 13.5
+            let itemSpacing: CGFloat = isCompact ? 1 : 2
             
-            // Dedicated Hero Account Switcher & Balance Card (Proportioned & Comfortable)
-            accountHeroCard
-            
-            // Sectioned Navigation List with evenly balanced spacing
-            ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 0) {
-                    // Section 1: TRADING
-                    VStack(alignment: .leading, spacing: 4) {
-                        sectionHeader(title: "TRADING")
-                        
-                        ForEach(mainNavTabs) { tab in
-                            navRow(for: tab)
-                        }
+            VStack(alignment: .leading, spacing: 0) {
+                // Apple-Standard Sidebar Header (with top notch safe clearance)
+                headerView(isCompact: isCompact)
+                
+                // Dedicated Hero Account Switcher & Balance Card
+                accountHeroCard(isCompact: isCompact)
+                
+                // Dynamic spacer above Trading
+                Spacer(minLength: 4)
+                
+                // Section 1: TRADING
+                VStack(alignment: .leading, spacing: itemSpacing) {
+                    sectionHeader(title: "TRADING", isCompact: isCompact)
+                    
+                    ForEach(mainNavTabs) { tab in
+                        navRow(for: tab, height: rowHeight, iconSize: iconSize, fontSize: fontSize)
                     }
-                    .padding(.horizontal, 10)
-                    .padding(.top, 2)
-                    
-                    // Balanced Divider between Trading & Workspace
-                    Divider()
-                        .background(AppColors.border.opacity(0.3))
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 10)
-                    
-                    // Section 2: WORKSPACE & SETUP
-                    VStack(alignment: .leading, spacing: 4) {
-                        sectionHeader(title: "WORKSPACE")
-                        
-                        ForEach(setupNavTabs) { tab in
-                            navRow(for: tab)
-                        }
-                    }
-                    .padding(.horizontal, 10)
-                    
-                    // Balanced Divider between Workspace & Controls
-                    Divider()
-                        .background(AppColors.border.opacity(0.3))
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 10)
-                    
-                    // Section 3: Bottom System Controls (Cloud sync, Theme, Privacy)
-                    footerControlDock
                 }
-                .padding(.bottom, max(AppSafeArea.bottomInset + 8, 32))
+                .padding(.horizontal, 10)
+                
+                // Dynamic spacer between Trading & Workspace
+                Spacer(minLength: 4)
+                
+                Divider()
+                    .background(AppColors.border.opacity(0.3))
+                    .padding(.horizontal, 12)
+                
+                Spacer(minLength: 4)
+                
+                // Section 2: WORKSPACE
+                VStack(alignment: .leading, spacing: itemSpacing) {
+                    sectionHeader(title: "WORKSPACE", isCompact: isCompact)
+                    
+                    ForEach(setupNavTabs) { tab in
+                        navRow(for: tab, height: rowHeight, iconSize: iconSize, fontSize: fontSize)
+                    }
+                }
+                .padding(.horizontal, 10)
+                
+                // Dynamic spacer between Workspace & Cloudbroker Sync
+                Spacer(minLength: 4)
+                
+                Divider()
+                    .background(AppColors.border.opacity(0.3))
+                    .padding(.horizontal, 12)
+                
+                Spacer(minLength: 4)
+                
+                // Section 3: CLOUD & BROKER SYNC & SYSTEM CONTROLS
+                footerControlDock(isCompact: isCompact)
+                    .padding(.bottom, max(AppSafeArea.bottomInset, isCompact ? 8 : 14))
             }
+            .frame(width: 300, height: totalHeight)
         }
         .frame(width: 300)
         .background(
@@ -164,14 +177,14 @@ public struct NavigationDrawerView: View {
     // MARK: - Header View (Preserving Notch & Dynamic Island Clearance)
     
     @ViewBuilder
-    private var headerView: some View {
+    private func headerView(isCompact: Bool = false) -> some View {
         VStack(spacing: 0) {
             HStack(spacing: 12) {
-                LogoMarkView(size: 28)
+                LogoMarkView(size: isCompact ? 24 : 28)
                 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Trade Journal")
-                        .font(.system(size: 16, weight: .bold))
+                        .font(.system(size: isCompact ? 15 : 16, weight: .bold))
                         .foregroundColor(AppColors.primaryText)
                     
                     if dataStore.isSyncing {
@@ -198,9 +211,9 @@ public struct NavigationDrawerView: View {
                     }
                 } label: {
                     Image(systemName: "xmark")
-                        .font(.system(size: 12, weight: .bold))
+                        .font(.system(size: 11, weight: .bold))
                         .foregroundColor(AppColors.secondaryText)
-                        .frame(width: 30, height: 30)
+                        .frame(width: isCompact ? 26 : 28, height: isCompact ? 26 : 28)
                         .background(AppColors.secondaryBackground.opacity(0.8))
                         .clipShape(Circle())
                 }
@@ -209,11 +222,11 @@ public struct NavigationDrawerView: View {
             }
             .padding(.horizontal, 16)
             #if canImport(UIKit)
-            .padding(.top, max(AppSafeArea.topInset + 6, 52))
+            .padding(.top, max(AppSafeArea.topInset + (isCompact ? 2 : 4), isCompact ? 36 : 48))
             #else
-            .padding(.top, 52)
+            .padding(.top, isCompact ? 36 : 48)
             #endif
-            .padding(.bottom, 10)
+            .padding(.bottom, isCompact ? 6 : 8)
             
             Divider().background(AppColors.border.opacity(0.35))
         }
@@ -221,7 +234,7 @@ public struct NavigationDrawerView: View {
     
     // MARK: - Account Switcher & Balance Hero Card
     @ViewBuilder
-    private var accountHeroCard: some View {
+    private func accountHeroCard(isCompact: Bool = false) -> some View {
         Menu {
             if dataStore.visibleAccounts.count > 1 {
                 Section("Switch Account") {
@@ -257,30 +270,30 @@ public struct NavigationDrawerView: View {
                 ZStack {
                     Circle()
                         .fill(AppColors.profit.opacity(0.18))
-                        .frame(width: 18, height: 18)
+                        .frame(width: isCompact ? 16 : 18, height: isCompact ? 16 : 18)
                     Circle()
                         .fill(AppColors.profit)
-                        .frame(width: 7, height: 7)
+                        .frame(width: isCompact ? 6 : 7, height: isCompact ? 6 : 7)
                 }
                 
                 Text(shortAccountDisplayName)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: isCompact ? 12 : 13, weight: .semibold))
                     .foregroundColor(AppColors.primaryText)
                     .lineLimit(1)
                 
                 Spacer(minLength: 6)
                 
                 Text(currentAccountBalanceFormatted)
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .font(.system(size: isCompact ? 12 : 13, weight: .bold, design: .rounded))
                     .foregroundColor(AppColors.profit)
                     .lineLimit(1)
                 
                 Image(systemName: "chevron.up.chevron.down")
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.system(size: isCompact ? 9 : 10, weight: .semibold))
                     .foregroundColor(AppColors.secondaryText.opacity(0.8))
             }
             .padding(.horizontal, 12)
-            .frame(height: 44)
+            .frame(height: isCompact ? 38 : 42)
             .background(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .fill(AppColors.secondaryBackground.opacity(0.75))
@@ -292,27 +305,27 @@ public struct NavigationDrawerView: View {
         }
         .buttonStyle(ApplePressableButtonStyle())
         .padding(.horizontal, 10)
-        .padding(.top, 10)
-        .padding(.bottom, 8)
+        .padding(.top, isCompact ? 6 : 8)
+        .padding(.bottom, isCompact ? 4 : 6)
     }
     
     // MARK: - Section Header
     
     @ViewBuilder
-    private func sectionHeader(title: String) -> some View {
+    private func sectionHeader(title: String, isCompact: Bool = false) -> some View {
         Text(title)
-            .font(.system(size: 11, weight: .bold))
+            .font(.system(size: isCompact ? 10 : 10.5, weight: .bold))
             .tracking(1.0)
             .foregroundColor(AppColors.mutedText)
             .padding(.horizontal, 10)
-            .padding(.top, 4)
-            .padding(.bottom, 2)
+            .padding(.top, isCompact ? 1 : 2)
+            .padding(.bottom, 1)
     }
     
-    // MARK: - Navigation Row (42pt Apple HIG Standard, 14pt Typography)
+    // MARK: - Navigation Row (Flexible height, icon and typography)
     
     @ViewBuilder
-    private func navRow(for tab: AppTab) -> some View {
+    private func navRow(for tab: AppTab, height: CGFloat = 36, iconSize: CGFloat = 15, fontSize: CGFloat = 13.5) -> some View {
         let isActive = env.selectedTab == tab
         
         Button {
@@ -335,12 +348,12 @@ public struct NavigationDrawerView: View {
             HStack(spacing: 12) {
                 // Clean SF Symbol Icon (no background box, Apple HIG standard)
                 Image(systemName: isActive ? tab.selectedIconName : tab.iconName)
-                    .font(.system(size: 16, weight: isActive ? .semibold : .regular))
+                    .font(.system(size: iconSize, weight: isActive ? .semibold : .regular))
                     .foregroundColor(isActive ? AppColors.brand : AppColors.secondaryText)
-                    .frame(width: 24, height: 24, alignment: .center)
+                    .frame(width: 22, height: 22, alignment: .center)
                 
                 Text(tab.rawValue)
-                    .font(.system(size: 14, weight: isActive ? .semibold : .medium))
+                    .font(.system(size: fontSize, weight: isActive ? .semibold : .medium))
                     .foregroundColor(isActive ? AppColors.primaryText : AppColors.secondaryText)
                 
                 Spacer()
@@ -348,12 +361,12 @@ public struct NavigationDrawerView: View {
                 // Active Indicator
                 if isActive {
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 11, weight: .bold))
+                        .font(.system(size: 10, weight: .bold))
                         .foregroundColor(AppColors.brand)
                 }
             }
             .padding(.horizontal, 10)
-            .frame(height: 42)
+            .frame(height: height)
             .background(
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
                     .fill(isActive ? AppColors.brand.opacity(0.12) : Color.clear)
@@ -369,8 +382,8 @@ public struct NavigationDrawerView: View {
     // MARK: - Footer Control Dock
     
     @ViewBuilder
-    private var footerControlDock: some View {
-        VStack(spacing: 8) {
+    private func footerControlDock(isCompact: Bool = false) -> some View {
+        VStack(spacing: isCompact ? 6 : 8) {
             // Global Quick Sync Row
             Button {
                 triggerHaptic()
@@ -380,25 +393,25 @@ public struct NavigationDrawerView: View {
             } label: {
                 HStack(spacing: 10) {
                     Image(systemName: "arrow.triangle.2.circlepath")
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.system(size: isCompact ? 13 : 14, weight: .semibold))
                         .foregroundColor(dataStore.isSyncing ? AppColors.brand : AppColors.secondaryText)
                         .rotationEffect(dataStore.isSyncing ? .degrees(360) : .zero)
                         .animation(dataStore.isSyncing ? Animation.linear(duration: 1).repeatForever(autoreverses: false) : .default, value: dataStore.isSyncing)
                     
                     VStack(alignment: .leading, spacing: 1) {
                         Text("Cloud & Broker Sync")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.system(size: isCompact ? 12 : 13, weight: .semibold))
                             .foregroundColor(AppColors.primaryText)
                         
                         Text(dataStore.isSyncing ? "Syncing..." : SyncManager.shared.formattedLastSyncTime)
-                            .font(.system(size: 11))
+                            .font(.system(size: isCompact ? 10 : 11))
                             .foregroundColor(AppColors.secondaryText)
                     }
                     
                     Spacer()
                 }
                 .padding(.horizontal, 12)
-                .frame(height: 44)
+                .frame(height: isCompact ? 38 : 42)
                 .background(AppColors.secondaryBackground.opacity(0.6))
                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 .overlay(
@@ -426,7 +439,7 @@ public struct NavigationDrawerView: View {
                             .foregroundColor(AppColors.primaryText)
                     }
                     .frame(maxWidth: .infinity)
-                    .frame(height: 38)
+                    .frame(height: isCompact ? 34 : 36)
                     .background(AppColors.secondaryBackground.opacity(0.6))
                     .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                     .overlay(
@@ -451,7 +464,7 @@ public struct NavigationDrawerView: View {
                             .foregroundColor(env.isPrivacyModeEnabled ? AppColors.brand : AppColors.primaryText)
                     }
                     .frame(maxWidth: .infinity)
-                    .frame(height: 38)
+                    .frame(height: isCompact ? 34 : 36)
                     .background(AppColors.secondaryBackground.opacity(0.6))
                     .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                     .overlay(
