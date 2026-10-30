@@ -280,38 +280,95 @@ public struct PreTradeAnalysisSheet: View {
             }
             
             let isVi = (dataStore.aiSettings.language.isEmpty || dataStore.aiSettings.language == "vi")
-            var liveContext = ""
-            if let latest = activeBars.last {
-                let d = (latest.close as NSDecimalNumber).doubleValue
-                let priceStr = d >= 100 ? String(format: "%.2f", d) : String(format: "%.5f", d)
-                let openStr = Formatters.price(latest.open)
-                let highStr = Formatters.price(latest.high)
-                let lowStr = Formatters.price(latest.low)
-                
-                let window = MomentumEngine.computeWindow(bars: activeBars, windowSize: 10)
-                let rsiVal = window.currentRSI.map { String(format: "%.1f", ($0 as NSDecimalNumber).doubleValue) } ?? "N/A"
-                let emaVal = window.currentEMA9.map { String(format: "%.1f", ($0 as NSDecimalNumber).doubleValue) } ?? "N/A"
-                let divMsg = isVi ? (window.divergenceVi ?? "Không có") : (window.divergenceEn ?? "None")
-                
-                let emaSnapshot = MovingAverageEngine.analyzeTimeframe(bars: activeBars, timeframe: "H1", symbol: currentSymbol)
-                let e21Str = emaSnapshot?.ema21.map { Formatters.price($0, symbol: currentSymbol) } ?? "N/A"
-                let e50Str = emaSnapshot?.ema50.map { Formatters.price($0, symbol: currentSymbol) } ?? "N/A"
-                
-                if isVi {
-                    liveContext = """
-                    [HÀNH ĐỘNG GIÁ MỚI NHẤT]:
-                    • Cặp tiền: \(currentSymbol) | Thị giá hiện tại: \(priceStr)
-                    • Nến H1 gần nhất: Mở \(openStr) | Cao \(highStr) | Thấp \(lowStr) | Đóng \(priceStr)
-                    • Chỉ báo H1: EMA(21) = \(e21Str) | EMA(50) = \(e50Str) | RSI(14) = \(rsiVal) | RSI Signal = \(emaVal) | Phân kỳ: \(divMsg)
-                    """
-                } else {
-                    liveContext = """
-                    [LATEST LIVE MARKET DATA]:
-                    • Symbol: \(currentSymbol) | Current Price: \(priceStr)
-                    • Latest H1 Bar: Open \(openStr) | High \(highStr) | Low \(lowStr) | Close \(priceStr)
-                    • H1 Indicators: EMA(21) = \(e21Str) | EMA(50) = \(e50Str) | RSI(14) = \(rsiVal) | RSI Signal = \(emaVal) | Divergence: \(divMsg)
-                    """
+            
+            // 2. Capture Real Account, Today's Execution Stats & Prop Firm Buffer
+            let sessionSummary = await MainActor.run {
+                AIAccountContextProvider.captureContext(dataStore: self.dataStore)
+            }
+            
+            let accName = sessionSummary.accountName ?? "Exness"
+            let propFirm = sessionSummary.propFirmName
+            let isProp = propFirm != nil && !propFirm!.isEmpty
+            let accCategory = isProp
+                ? (isVi ? "Quỹ Cấp Vốn (\(propFirm!))" : "Prop Firm (\(propFirm!))")
+                : (isVi ? "Tài khoản Cá nhân (\(accName.contains("Exness") ? "Exness" : "Broker"))" : "Personal Brokerage (\(accName.contains("Exness") ? "Exness" : "Broker"))")
+            
+            let balVal = sessionSummary.balance.map { Formatters.formatCurrency($0, currency: sessionSummary.accountCurrency) } ?? "N/A"
+            let eqVal = sessionSummary.equity.map { Formatters.formatCurrency($0, currency: sessionSummary.accountCurrency) } ?? balVal
+            
+            let pnlToday = NSDecimalNumber(decimal: sessionSummary.netPnlToday).doubleValue
+            let pnlTodayStr = (pnlToday >= 0 ? "+$" : "-$") + String(format: "%.2f", abs(pnlToday))
+            let streakToday = sessionSummary.currentStreakToday
+            let streakDesc: String = {
+                if streakToday > 0 { return isVi ? "Thắng \(streakToday) lệnh liên tiếp (+)" : "\(streakToday) wins in a row (+)" }
+                if streakToday < 0 { return isVi ? "⚠️ Đang thua \(abs(streakToday)) lệnh liên tiếp (-)" : "⚠️ In a \(abs(streakToday))-loss streak (-)" }
+                return isVi ? "Chưa có chuỗi lệnh hôm nay" : "No streak today"
+            }()
+            
+            let bufferStr: String = {
+                if let buf = sessionSummary.dailyLossBufferRemainingUsd {
+                    let limit = sessionSummary.dailyLossLimitUsd.map { String(format: "$%.2f", ($0 as NSDecimalNumber).doubleValue) } ?? (isVi ? "Quy định" : "Rule")
+                    let bufVal = (buf as NSDecimalNumber).doubleValue
+                    return isVi
+                        ? "Hạn mức lỗ ngày: \(limit) | Đệm lỗ còn lại hôm nay: $\(String(format: "%.2f", bufVal))"
+                        : "Daily Limit: \(limit) | Remaining Buffer: $\(String(format: "%.2f", bufVal))"
                 }
+                return isVi ? "Hạn mức rủi ro ngày: Tối đa 2-3 lệnh (2-3% vốn)" : "Daily Risk Budget: Max 2-3 trades (2-3% capital)"
+            }()
+            
+            let isRiskBreached = streakToday <= -2 || (sessionSummary.dailyLossBufferRemainingUsd != nil && sessionSummary.dailyLossBufferRemainingUsd! <= 0)
+            let riskAlert = isRiskBreached
+                ? (isVi
+                    ? "\n🚨 CẢNH BÁO RỦI RO ĐỎ: Trader đang dính chuỗi thua hoặc đệm lỗ ngày đã cạn. AI BẮT BUỘC KHUYẾN NGHỊ ĐỨNG NGOÀI (FLAT), TUYỆT ĐỐI KHÔNG GỢI Ý MỞ LỆNH MỚI!\n"
+                    : "\n🚨 CRITICAL RISK GUARDRAIL: Trader is on a losing streak or daily buffer exhausted. AI MUST ADVISE FLAT (STAND ASIDE), NO NEW TRADES!\n")
+                : ""
+            
+            // 3. Multi-Timeframe Context: H4 Context & 15-Candle H1 Series
+            let h4EMA = MovingAverageEngine.analyzeTimeframe(bars: self.h4Bars, timeframe: "H4", symbol: currentSymbol)
+            let h4_21 = h4EMA?.ema21.map { Formatters.price($0, symbol: currentSymbol) } ?? "N/A"
+            let h4_50 = h4EMA?.ema50.map { Formatters.price($0, symbol: currentSymbol) } ?? "N/A"
+            let h4Trend = h4EMA?.trend.label ?? "N/A"
+            let h4Candles = AIPromptBuilder.buildH4CandleSummary(bars: self.h4Bars, count: 3, isVi: isVi)
+            
+            let h1Series = AIPromptBuilder.buildH1CandleSeriesSummary(bars: activeBars, count: 15, symbol: currentSymbol, isVi: isVi)
+            
+            let latestClose = activeBars.last.map { Formatters.price($0.close, symbol: currentSymbol) } ?? "N/A"
+            
+            var liveContext = ""
+            if isVi {
+                liveContext = """
+                [TRẠNG THÁI TÀI KHOẢN & RỦI RO HÔM NAY]:
+                • Tài khoản: \(accName) | Phân loại: \(accCategory) | Nền tảng: cTrader / Terminal
+                • Số dư: \(balVal) | Vốn ròng: \(eqVal)
+                • Trạng thái lệnh hôm nay: \(sessionSummary.totalTradesToday) lệnh (\(sessionSummary.winsToday) Thắng | \(sessionSummary.lossesToday) Thua | \(sessionSummary.breakevensToday) Hòa) | Đang chạy: \(sessionSummary.openTradesToday)
+                • PnL ròng hôm nay: \(pnlTodayStr) | Chuỗi lệnh: \(streakDesc)
+                • \(bufferStr)\(riskAlert)
+                [CẤU TRÚC ĐA KHUNG VÀ HÀNH ĐỘNG GIÁ THỜI GIAN THỰC]:
+                • Cặp tiền: \(currentSymbol) | Thị giá hiện tại: \(latestClose)
+                • Khung H4: Xu hướng [\(h4Trend)] | EMA(21) = \(h4_21) | EMA(50) = \(h4_50)
+                • 3 nến H4 gần nhất:
+                \(h4Candles)
+
+                • Chuỗi 15 nến H1 gần nhất (OHLC + EMA 21/50 + RSI 14):
+                \(h1Series)
+                """
+            } else {
+                liveContext = """
+                [ACCOUNT & TODAY'S RISK CONTEXT]:
+                • Account: \(accName) | Category: \(accCategory) | Platform: cTrader / Terminal
+                • Balance: \(balVal) | Equity: \(eqVal)
+                • Today's Execution: \(sessionSummary.totalTradesToday) trades (\(sessionSummary.winsToday) W | \(sessionSummary.lossesToday) L | \(sessionSummary.breakevensToday) BE) | Active Open: \(sessionSummary.openTradesToday)
+                • Net P&L Today: \(pnlTodayStr) | Current Streak: \(streakDesc)
+                • \(bufferStr)\(riskAlert)
+                [MULTI-TIMEFRAME & REAL-TIME PRICE ACTION]:
+                • Symbol: \(currentSymbol) | Current Price: \(latestClose)
+                • H4 Frame: Trend [\(h4Trend)] | EMA(21) = \(h4_21) | EMA(50) = \(h4_50)
+                • Recent 3 H4 Bars:
+                \(h4Candles)
+
+                • Recent 15-Candle H1 Execution Series (OHLC + EMA 21/50 + Wilder RSI 14):
+                \(h1Series)
+                """
             }
             
             let attachedImageB64 = userAttachedImage?.jpegData(compressionQuality: 0.85)?.base64EncodedString()

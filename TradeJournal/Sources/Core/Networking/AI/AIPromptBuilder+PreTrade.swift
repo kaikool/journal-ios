@@ -133,6 +133,12 @@ extension AIPromptBuilder {
             barsD1: d1Bars
         )
         
+        // 3b. Recent H4 Candles (Last 3 bars OHLC)
+        let h4CandlesSummary = buildH4CandleSummary(bars: h4Bars, count: 3, isVi: isVi)
+        
+        // 3c. 15-Candle H1 Execution Series (OHLC + EMA 21/50 + Wilder RSI 14)
+        let h1CandlesSummary = buildH1CandleSeriesSummary(bars: execBars, count: 15, symbol: symbol, isVi: isVi)
+        
         let nearestBSLStr: String = {
             if let bsl = liquidity.nearestBSL {
                 let dist = liquidity.distanceToBSLPips.map { " (cách \(formatPrice($0)) giá)" } ?? ""
@@ -208,7 +214,68 @@ extension AIPromptBuilder {
             return isVi ? "Không có tin tức Đỏ (High Impact) trong 12h tới" : "No High-Impact events within 12h"
         }()
         
-        // 6. Active Account Context & Trader Profile Integration
+        // 6. Active Account Context, Broker vs Prop Firm, and Today's Performance
+        let accName = sessionSummary?.accountName ?? "Exness"
+        let propFirm = sessionSummary?.propFirmName
+        let isProp = propFirm != nil && !propFirm!.isEmpty
+        
+        let accountCategoryStr: String = {
+            if isProp {
+                let firm = propFirm!
+                let phase = sessionSummary?.stepOrPhaseName.map { " - \($0)" } ?? ""
+                return isVi ? "Quỹ Cấp Vốn (\(firm)\(phase))" : "Prop Firm Account (\(firm)\(phase))"
+            } else {
+                let broker = accName.lowercased().contains("exness") ? "Exness" : "Broker tiêu chuẩn"
+                return isVi ? "Tài khoản Cá nhân (\(broker))" : "Personal Brokerage (\(broker))"
+            }
+        }()
+        
+        let platformDesc = "cTrader / Broker Terminal"
+        
+        let tradesToday = sessionSummary?.totalTradesToday ?? 0
+        let winsToday = sessionSummary?.winsToday ?? 0
+        let lossesToday = sessionSummary?.lossesToday ?? 0
+        let beToday = sessionSummary?.breakevensToday ?? 0
+        let openToday = sessionSummary?.openTradesToday ?? 0
+        
+        let todayTradesDesc = isVi
+            ? "Tổng \(tradesToday) lệnh (\(winsToday) Thắng | \(lossesToday) Thua | \(beToday) Hòa) | Lệnh đang chạy: \(openToday)"
+            : "Total \(tradesToday) trades (\(winsToday) W | \(lossesToday) L | \(beToday) BE) | Active Open: \(openToday)"
+            
+        let pnlTodayVal = sessionSummary != nil ? NSDecimalNumber(decimal: sessionSummary!.netPnlToday).doubleValue : 0.0
+        let pnlTodayStr = (pnlTodayVal >= 0 ? "+$" : "-$") + String(format: "%.2f", abs(pnlTodayVal))
+        
+        let streak = sessionSummary?.currentStreakToday ?? 0
+        let streakStr: String = {
+            if streak > 0 { return isVi ? "Thắng \(streak) lệnh liên tiếp (+)" : "\(streak) wins in a row (+)" }
+            if streak < 0 { return isVi ? "⚠️ Đang thua \(abs(streak)) lệnh liên tiếp (-)" : "⚠️ In a \(abs(streak))-loss losing streak (-)" }
+            return isVi ? "Chưa có chuỗi lệnh hôm nay" : "No active streak today"
+        }()
+        
+        let dailyBufferStr: String = {
+            if let buf = sessionSummary?.dailyLossBufferRemainingUsd {
+                let limit = sessionSummary?.dailyLossLimitUsd.map { String(format: "$%.2f", ($0 as NSDecimalNumber).doubleValue) } ?? (isVi ? "Theo quy định" : "Rule-based")
+                let bufVal = (buf as NSDecimalNumber).doubleValue
+                return isVi
+                    ? "Hạn mức lỗ ngày: \(limit) | Đệm lỗ còn lại hôm nay: $\(String(format: "%.2f", bufVal))"
+                    : "Daily Loss Limit: \(limit) | Remaining Buffer: $\(String(format: "%.2f", bufVal))"
+            }
+            return isVi
+                ? "Hạn mức rủi ro ngày: 2-3 lệnh (tối đa 2-3% vốn) | Đang tuân thủ kỷ luật"
+                : "Daily Risk Budget: 2-3 trades (max 2-3% capital) | Disciplined"
+        }()
+        
+        let isStreakOrBufferBreached = streak <= -2 || (sessionSummary?.dailyLossBufferRemainingUsd != nil && sessionSummary!.dailyLossBufferRemainingUsd! <= 0)
+        
+        let riskGuardrailWarning: String = {
+            if isStreakOrBufferBreached {
+                return isVi
+                    ? "\n🚨 CẢNH BÁO RỦI RO ĐỎ TỪ HỆ THỐNG: Trader đang dính chuỗi thua (-2 trở lên) hoặc đệm lỗ ngày đã cạn. AI BẮT BUỘC KHUYẾN NGHỊ ĐỨNG NGOÀI (FLAT), TUYỆT ĐỐI KHÔNG GỢI Ý MỞ LỆNH MỚI ĐỂ TRÁNH TRẢ THÙ THỊ TRƯỜNG (REVENGE TRADING)!\n"
+                    : "\n🚨 CRITICAL RISK GUARDRAIL: Trader is on a losing streak (-2 or worse) or daily loss buffer is exhausted. AI MUST STRICTLY ADVISE FLAT (STAND ASIDE), ZERO NEW TRADES TO PREVENT REVENGE TRADING!\n"
+            }
+            return ""
+        }()
+        
         let accNameStr: String = {
             if let name = sessionSummary?.accountName, !name.isEmpty {
                 return "(\(name))"
@@ -245,14 +312,6 @@ extension AIPromptBuilder {
             return ""
         }()
         
-        let propBufferStr: String = {
-            guard let limit = sessionSummary?.dailyLossLimitUsd else { return "" }
-            let buf = sessionSummary?.dailyLossBufferRemainingUsd ?? limit
-            let bufVal = NSDecimalNumber(decimal: buf).doubleValue
-            let firm = sessionSummary?.propFirmName ?? "Quỹ"
-            return isVi ? " | Hạn mức lỗ ngày còn lại (\(firm)): $\(String(format: "%.2f", bufVal))" : " | Remaining Daily Buffer (\(firm)): $\(String(format: "%.2f", bufVal))"
-        }()
-        
         let tradingStyleStr = traderProfile?.tradingStyle.trimmingCharacters(in: .whitespaces).isEmpty == false
             ? traderProfile!.tradingStyle.trimmingCharacters(in: .whitespaces)
             : "Day Trader / Swing Trader"
@@ -263,7 +322,7 @@ extension AIPromptBuilder {
             
         let leaksStr = traderProfile?.knownPsychologicalLeaks.trimmingCharacters(in: .whitespaces).isEmpty == false
             ? traderProfile!.knownPsychologicalLeaks.trimmingCharacters(in: .whitespaces)
-            : "Dời SL, chốt non, FOMO"
+            : "Dời SL, chốt non, FOMO, Trả thù lệnh"
             
         let customNotesStr = traderProfile?.customMemoryNotes.trimmingCharacters(in: .whitespaces).isEmpty == false
             ? traderProfile!.customMemoryNotes.trimmingCharacters(in: .whitespaces)
@@ -305,14 +364,17 @@ extension AIPromptBuilder {
         // Final Assembly
         if isVi {
             return """
-            [THÔNG TIN TÀI KHOẢN & QUẢN TRỊ RỦI RO]:
-            • Tài khoản & Số dư thực tế: \(realBalStr != "N/A" ? "\(realBalStr) \(accNameStr) \(equityStr)" : "[Chưa kết nối]")\(propBufferStr)
+            [THÔNG TIN TÀI KHOẢN & TRẠNG THÁI RỦI RO HÔM NAY]:
+            • Tài khoản: \(realBalStr != "N/A" ? "\(accNameStr)" : "[Chưa kết nối]") | Phân loại: \(accountCategoryStr) | Nền tảng: \(platformDesc)
+            • Số dư thực tế: \(realBalStr) \(equityStr)
+            • Trạng thái lệnh hôm nay: \(todayTradesDesc)
+            • PnL ròng hôm nay: \(pnlTodayStr) | Chuỗi lệnh: \(streakStr)
+            • \(dailyBufferStr)
             • Ngân sách rủi ro mỗi lệnh: \(riskPctStr)\(riskDollarStr)
             • Phong cách giao dịch: \(tradingStyleStr)
             • Chiến lược & Playbook ưu tiên: \(strategyStr)
             • Lỗ hổng tâm lý cần triệt tiêu: \(leaksStr)
-            • Kỷ luật cá nhân: \(customNotesStr)
-
+            • Kỷ luật cá nhân: \(customNotesStr)\(riskGuardrailWarning)
             [CẤU TRÚC THỊ TRƯỜNG & HỆ THỐNG CHỈ BÁO KỸ THUẬT (EMA 21/50 & RSI 14)]:
             • Cặp tiền: \(symbol) | Thị giá hiện tại: \(currentPrice)
 
@@ -323,8 +385,10 @@ extension AIPromptBuilder {
             • Khung H4 (Cấu trúc sóng & Cản TP/SL): Xu hướng [\(emaAnalysis.h4?.trend.label ?? "N/A")]
               - Chỉ báo EMA H4: \(h4EMAStr)
               - Mức giá then chốt: Swing High: \(h4SwingHighStr) | Swing Low: \(h4SwingLowStr)
+              - 3 nến H4 gần nhất (Hành vi nến khung lớn):
+            \(h4CandlesSummary)
 
-            • Khung H1 (Thực thi, Động lượng & Tín hiệu kích hoạt lệnh): Xu hướng [\(emaAnalysis.h1?.trend.label ?? "N/A")]
+            • Khung H1 (Thực thi, Động lượng & Kích hoạt lệnh): Xu hướng [\(emaAnalysis.h1?.trend.label ?? "N/A")]
               - Chỉ báo EMA H1: \(h1EMAStr)
               - Chỉ báo Động lượng RSI(14) (Wilder):
                 • Mức RSI hiện tại: \(rsiStr)
@@ -332,6 +396,9 @@ extension AIPromptBuilder {
                 • Phân kỳ động lượng (Divergence): [\(divStr)]
               - Vùng thanh khoản: BSL gần nhất: \(nearestBSLStr) | SSL gần nhất: \(nearestSSLStr)
               - Quét thanh khoản (SFP Sweeps): \(sweepsStr)
+
+            • Chuỗi 15 nến H1 gần nhất (OHLC + EMA 21/50 + RSI 14):
+            \(h1CandlesSummary)
 
             • Tin tức kinh tế (Catalyst): \(newsBlock)
             \(symbolLessonsBlock)\(liveUpdateBlock)\(thesisContinuityBlock)\(visionNote)
@@ -343,25 +410,26 @@ extension AIPromptBuilder {
             - Đánh giá vị thế giá so với EMA(21) và EMA(50) D1 (Mở rộng xu hướng hay đang pullback về EMA)?
             - Mục tiêu thanh khoản ngày: Khả năng tìm về PDH (\(d1PDH)) hoặc PDL (\(d1PDL)).
 
-            ### 2. Cấu trúc sóng & Vùng cản then chốt H4 (Key Barriers)
+            ### 2. Cấu trúc sóng & Vùng cản then chốt H4 (Key Barriers & H4 Bars)
             - Xu hướng H4 đang là TĂNG, GIẢM hay ĐI NGANG theo cấu trúc sóng và cụm EMA 21/50?
-            - Đánh giá cụm EMA 21/50 H4 như vùng hỗ trợ/kháng cự động (Dynamic Support/Resistance): Giá có đang phản ứng hoặc test lại vùng đệm EMA 21-50 này không?
+            - Đánh giá 3 nến H4 gần nhất: Có xuất hiện nến từ chối (Rejection wick) hay nến đóng cửa xác nhận tại cản / EMA 21-50 không?
             - Nhận diện các VÙNG CẢN H4 (Swing High: \(h4SwingHighStr), Swing Low: \(h4SwingLowStr), Supply/Demand, FVG) để làm MỤC TIÊU CHỐT LỜI (TP1/TP2) hoặc CẮT LỖ (SL).
 
-            ### 3. Cấu trúc thực thi H1 & Tín hiệu chỉ báo (Execution, EMA & RSI)
-            - Cấu trúc giá & EMA H1: Giá đang bám đường EMA nào? Có bị dãn biên độ (Overextended) quá xa EMA 21 không?
-            - Động lượng RSI(14) H1: RSI đang ở vùng nào (Quá mua / Quá bán / Tích lũy)? Có xuất hiện Phân kỳ RSI (Bullish/Bearish Divergence) hay tín hiệu giao cắt Signal để kích hoạt lệnh không?
-            - Bẫy thanh khoản & Tín hiệu kích hoạt: Đã có nhịp quét thanh khoản (SFP Sweep) hoặc nến H1 xác nhận chưa, hay vào lệnh sớm có rủi ro bị bẫy quét SL?
+            ### 3. Cấu trúc thực thi H1 qua Chuỗi 15 nến (Execution, Price Action & Traps)
+            - Soi chiếu chuỗi 15 nến H1: Nến vừa đóng có rút chân từ chối (rejection wick) tại EMA 21/50 hay bứt phá dứt khoát? Giá đang bám EMA hay bị dãn biên độ (Overextended)?
+            - Động lượng RSI(14) H1: Nhìn đường đi của RSI qua 15 nến, RSI đang tăng hay giảm? Có phân kỳ đảo chiều (Bullish/Bearish Divergence) hoặc giao cắt Signal line để kích hoạt lệnh không?
+            - Bẫy thanh khoản & Tín hiệu kích hoạt: Đã có nhịp quét thanh khoản (SFP Sweep) hoặc nến xác nhận chưa, hay vào lệnh sớm có rủi ro bị bẫy quét SL?
 
             ### 4. Khuyến nghị & Kế hoạch lệnh cụ thể (Actionable Recommendation)
             - KẾT LUẬN RÕ RÀNG: [BUY (LONG) / SELL (SHORT) / FLAT (ĐỨNG NGOÀI)].
+            ⚠️ NGUYÊN TẮC QUẢN TRỊ RỦI RO NGHIÊM NGẶT: Nếu hôm nay trader đã dính chuỗi thua (-2 trở lên) hoặc đệm lỗ ngày đã cạn, BẮT BUỘC KẾT LUẬN FLAT (ĐỨNG NGOÀI) để bảo vệ tài khoản, TUYỆT ĐỐI KHÔNG GỢI Ý MỞ LỆNH!
             - LOẠI SETUP: [THUẬN XU HƯỚNG THEO CỤM EMA H4/H1] hoặc [NGHỊCH XU HƯỚNG / SÓNG HỒI TỪ CẢN H4 KÈM PHÂN KỲ RSI].
             - Nếu KHUYẾN NGHỊ VÀO LỆNH (BUY/SELL):
               • Điểm vào tối ưu (Entry) & Tín hiệu nến H1 / RSI kích hoạt (Trigger).
               • Cắt lỗ bắt buộc (Structural Invalidation SL): Mức giá SL cụ thể theo vi phạm cấu trúc nến hoặc mốc EMA then chốt.
               • Mục tiêu chốt lời (Targets): TP 1 và TP 2 đặt tại các vùng Cản H4 ở Mục 2.
               • Tỷ lệ Risk/Reward (R:R) dự kiến.
-            - Nếu KHUYẾN NGHỊ FLAT (ĐỨNG NGOÀI): Nêu rõ điều kiện H1 / RSI / EMA cần chờ thêm trước khi vào lệnh.
+            - Nếu KHUYẾN NGHỊ FLAT (ĐỨNG NGOÀI): Nêu rõ điều kiện H1 / RSI / EMA hoặc tâm lý cần chờ thêm trước khi vào lệnh.
 
             BẮT BUỘC KẾT THÚC BẰNG KHỐI THÔNG SỐ SETUP ĐÚNG ĐỊNH DẠNG SAU:
             [PRE-TRADE SETUP SPECIFICATION]
@@ -378,14 +446,17 @@ extension AIPromptBuilder {
             """
         } else {
             return """
-            [ACCOUNT CONTEXT & RISK SIZING]:
-            • Real Balance: \(realBalStr != "N/A" ? "\(realBalStr) \(accNameStr) \(equityStr)" : "[Not configured]")\(propBufferStr)
+            [ACCOUNT CONTEXT & TODAY'S RISK PROFILE]:
+            • Account: \(realBalStr != "N/A" ? "\(accNameStr)" : "[Not connected]") | Category: \(accountCategoryStr) | Platform: \(platformDesc)
+            • Real Balance: \(realBalStr) \(equityStr)
+            • Today's Execution State: \(todayTradesDesc)
+            • Today's Net P&L: \(pnlTodayStr) | Current Streak: \(streakStr)
+            • \(dailyBufferStr)
             • Risk Budget Per Trade: \(riskPctStr)\(riskDollarStr)
             • Trading Style: \(tradingStyleStr)
             • Primary Playbooks: \(strategyStr)
             • Known Leaks: \(leaksStr)
-            • Discipline Notes: \(customNotesStr)
-
+            • Discipline Notes: \(customNotesStr)\(riskGuardrailWarning)
             [MARKET STRUCTURE & TECHNICAL INDICATORS (EMA 21/50 & RSI 14)]:
             • Symbol: \(symbol) | Current Price: \(currentPrice)
 
@@ -396,6 +467,8 @@ extension AIPromptBuilder {
             • H4 Frame (Key Barriers for TP/SL): Trend [\(emaAnalysis.h4?.trend.label ?? "N/A")]
               - H4 EMA Levels: \(h4EMAStr)
               - Key Swing Levels: Swing High: \(h4SwingHighStr) | Swing Low: \(h4SwingLowStr)
+              - Recent 3 H4 Bars:
+            \(h4CandlesSummary)
 
             • H1 Frame (Execution, Momentum & Entry Triggers): Trend [\(emaAnalysis.h1?.trend.label ?? "N/A")]
               - H1 EMA Levels: \(h1EMAStr)
@@ -405,6 +478,9 @@ extension AIPromptBuilder {
                 • Momentum Divergence: [\(divStr)]
               - Liquidity Pools: Nearest BSL: \(nearestBSLStr) | Nearest SSL: \(nearestSSLStr)
               - Recent SFP Sweeps: \(sweepsStr)
+
+            • Recent 15-Candle H1 Execution Series (OHLC + EMA 21/50 + Wilder RSI 14):
+            \(h1CandlesSummary)
 
             • Macro News Catalyst: \(newsBlock)
             \(symbolLessonsBlock)\(liveUpdateBlock)\(thesisContinuityBlock)\(visionNote)
@@ -416,18 +492,19 @@ extension AIPromptBuilder {
             - Evaluate price position relative to D1 EMA(21) and EMA(50) (Trend expansion or retracement)?
             - Daily liquidity draw: Probability of tagging PDH (\(d1PDH)) or PDL (\(d1PDL)).
 
-            ### 2. H4 Swing Structure & Key Barriers (TP/SL Targets)
+            ### 2. H4 Swing Structure, Key Barriers & H4 Candlestick Confirmation
             - What is the H4 trend according to swing structure and EMA 21/50 dynamic alignment?
-            - Assess EMA 21/50 dynamic support/resistance: Is price currently testing or reacting to this EMA pocket?
+            - Assess recent 3 H4 candles: Is there an upper/lower wick rejection or confirmed close against the EMA 21-50 zone?
             - Identify key H4 barriers (Swing High: \(h4SwingHighStr), Swing Low: \(h4SwingLowStr), Supply/Demand zones, FVG) as TARGET BARRIERS for TP1/TP2 or protective SL.
 
-            ### 3. H1 Execution Trigger, EMA & RSI Dynamics
-            - H1 Structure & EMAs: Is price riding the EMAs or overextended from EMA 21?
-            - H1 RSI(14) Momentum: Is RSI overbought, oversold, or consolidating? Does divergence or a signal line crossover confirm an entry or warn of a reversal?
+            ### 3. H1 15-Candle Execution Dynamics, Price Action & Traps
+            - Audit the 15-candle H1 series: Has a recent bar produced a wick rejection at EMA 21/50 or broken cleanly? Is price riding or overextended from EMA 21?
+            - H1 RSI(14) Trajectory: Looking at the 15-bar RSI values, is momentum expanding or stalling? Does divergence or a signal line crossover confirm an entry?
             - Traps & Execution Timing: Has an SFP sweep occurred or has an H1 confirmation candle closed, or does entering early carry high risk of being stopped out?
 
             ### 4. Actionable Directive & Execution Blueprint
             - DECISIVE VERDICT: [BUY (LONG) / SELL (SHORT) / FLAT (NO SETUP)].
+            ⚠️ STRICT CAPITAL PRESERVATION: If trader has hit a losing streak (-2 or worse) or depleted the daily buffer, MANDATORY VERDICT IS FLAT. Do NOT issue new trade setups!
             - SETUP TYPE: [FOLLOW-TREND CONTINUATION WITH EMAs] or [COUNTER-TREND REVERSAL FROM H4 BARRIER WITH RSI DIVERGENCE].
             - If EXECUTABLE SETUP (BUY/SELL):
               • Optimal Entry Zone & H1 Confirmation / RSI Trigger.
@@ -450,5 +527,115 @@ extension AIPromptBuilder {
             > [Single non-negotiable operational directive]
             """
         }
+    }
+    
+    // MARK: - Higher-Timeframe H4 Candle Summary Helper
+    public static func buildH4CandleSummary(bars: [MarketBar], count: Int = 3, isVi: Bool = true) -> String {
+        guard !bars.isEmpty else { return isVi ? "Không có dữ liệu nến H4" : "No H4 candle data" }
+        let takeCount = min(count, bars.count)
+        let slice = Array(bars.suffix(takeCount))
+        
+        func fmt(_ p: Decimal) -> String {
+            let d = (p as NSDecimalNumber).doubleValue
+            if d >= 1000 { return String(format: "%.2f", d) }
+            if d >= 100 { return String(format: "%.2f", d) }
+            if d >= 10 { return String(format: "%.3f", d) }
+            return String(format: "%.5f", d)
+        }
+        
+        let n = slice.count
+        var lines: [String] = []
+        for (idx, b) in slice.enumerated() {
+            let offset = n - 1 - idx
+            let label = offset == 0 ? (isVi ? "H4 [Nến hiện tại]" : "H4 [Live Candle]") : "H4 [-\(offset * 4)h]"
+            let bodyTop = max(b.open, b.close)
+            let bodyBottom = min(b.open, b.close)
+            let upperWick = b.high - bodyTop
+            let lowerWick = bodyBottom - b.low
+            let body = bodyTop - bodyBottom
+            var wickNote = ""
+            if upperWick > body * 1.8 && upperWick > 0 {
+                wickNote = isVi ? " (Rút râu trên)" : " (Upper wick rejection)"
+            } else if lowerWick > body * 1.8 && lowerWick > 0 {
+                wickNote = isVi ? " (Rút chân dưới)" : " (Lower wick rejection)"
+            }
+            lines.append("  • \(label): O: \(fmt(b.open)) | H: \(fmt(b.high)) | L: \(fmt(b.low)) | C: \(fmt(b.close))\(wickNote)")
+        }
+        return lines.joined(separator: "\n")
+    }
+
+    // MARK: - 15-Candle H1 Execution Series Helper (OHLC + EMA 21/50 + Wilder RSI 14)
+    public static func buildH1CandleSeriesSummary(
+        bars: [MarketBar],
+        count: Int = 15,
+        symbol: String = "",
+        isVi: Bool = true
+    ) -> String {
+        guard !bars.isEmpty else { return isVi ? "Không có dữ liệu nến H1" : "No H1 candle data" }
+        
+        let ema21 = MovingAverageEngine.calculateEMA(period: 21, bars: bars)
+        let ema50 = MovingAverageEngine.calculateEMA(period: 50, bars: bars)
+        let momentumWindow = MomentumEngine.computeWindow(bars: bars, windowSize: count)
+        
+        let n = bars.count
+        let takeCount = min(count, n)
+        let startIndex = n - takeCount
+        
+        let rsiMap: [Int64: Decimal] = {
+            var map: [Int64: Decimal] = [:]
+            for p in momentumWindow.points {
+                map[Int64(p.date.timeIntervalSince1970 * 1000)] = p.rsi14
+            }
+            return map
+        }()
+        
+        func fmt(_ p: Decimal) -> String {
+            let d = (p as NSDecimalNumber).doubleValue
+            if d >= 1000 { return String(format: "%.2f", d) }
+            if d >= 100 { return String(format: "%.2f", d) }
+            if d >= 10 { return String(format: "%.3f", d) }
+            return String(format: "%.5f", d)
+        }
+        
+        var lines: [String] = []
+        for i in startIndex..<n {
+            let bar = bars[i]
+            let offset = n - 1 - i
+            let timeLabel = offset == 0 ? (isVi ? "[Hiện tại]" : "[Live]") : "[-t-\(offset)h]"
+            
+            let e21Str = i < ema21.count ? fmt(ema21[i]) : "N/A"
+            let e50Str = i < ema50.count ? fmt(ema50[i]) : "N/A"
+            
+            let rsiVal: String = {
+                if let r = rsiMap[bar.timestamp] {
+                    return String(format: "%.1f", (r as NSDecimalNumber).doubleValue)
+                }
+                let ptIndex = i - (n - momentumWindow.points.count)
+                if ptIndex >= 0 && ptIndex < momentumWindow.points.count {
+                    let r = momentumWindow.points[ptIndex].rsi14
+                    return String(format: "%.1f", (r as NSDecimalNumber).doubleValue)
+                }
+                return "N/A"
+            }()
+            
+            let bodyTop = max(bar.open, bar.close)
+            let bodyBottom = min(bar.open, bar.close)
+            let upperWick = bar.high - bodyTop
+            let lowerWick = bodyBottom - bar.low
+            let body = bodyTop - bodyBottom
+            var wickNote = ""
+            if upperWick > body * 1.8 && upperWick > 0 {
+                wickNote = isVi ? " (Rút râu trên)" : " (Upper wick)"
+            } else if lowerWick > body * 1.8 && lowerWick > 0 {
+                wickNote = isVi ? " (Rút chân dưới)" : " (Lower wick)"
+            }
+            
+            let num = lines.count + 1
+            let numStr = num < 10 ? "0\(num)" : "\(num)"
+            let line = "  • #\(numStr) \(timeLabel): O: \(fmt(bar.open)) | H: \(fmt(bar.high)) | L: \(fmt(bar.low)) | C: \(fmt(bar.close)) | EMA21: \(e21Str) | EMA50: \(e50Str) | RSI: \(rsiVal)\(wickNote)"
+            lines.append(line)
+        }
+        
+        return lines.joined(separator: "\n")
     }
 }
