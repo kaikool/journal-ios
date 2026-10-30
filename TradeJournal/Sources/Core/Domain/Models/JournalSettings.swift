@@ -167,11 +167,19 @@ public struct TraderProfileConfig: Codable, Equatable, Sendable {
 // MARK: - 6. AI Provider Settings
 // Multi-provider AI reflection layer supporting Groq, OpenRouter, Google Gemini, and OpenAI
 public struct AiSettingsConfig: Codable, Equatable, Sendable {
-    // Environment or user-configured secret resolution (Zero hardcoding in binary)
-    public static let defaultGeminiKey = ProcessInfo.processInfo.environment["GEMINI_API_KEY"] ?? ""
-    public static let defaultGroqKey = ProcessInfo.processInfo.environment["GROQ_API_KEY"] ?? ""
-    public static let defaultGroqBackupKey = ProcessInfo.processInfo.environment["GROQ_BACKUP_KEY"] ?? ""
-    public static let defaultOpenRouterKey = ProcessInfo.processInfo.environment["OPENROUTER_API_KEY"] ?? ""
+    // Dynamic Secret Resolution: Keychain -> UserDefaults fallback -> AppSecrets.plist -> Environment
+    public static var defaultGeminiKey: String {
+        AppSecretsLoader.loadSecret(named: "GEMINI_API_KEY", keychainKey: "gemini_api_key") ?? ""
+    }
+    public static var defaultGroqKey: String {
+        AppSecretsLoader.loadSecret(named: "GROQ_API_KEY", keychainKey: "groq_api_key") ?? ""
+    }
+    public static var defaultGroqBackupKey: String {
+        AppSecretsLoader.loadSecret(named: "GROQ_BACKUP_KEY", keychainKey: "groq_backup_key") ?? ""
+    }
+    public static var defaultOpenRouterKey: String {
+        AppSecretsLoader.loadSecret(named: "OPENROUTER_API_KEY", keychainKey: "openrouter_api_key") ?? ""
+    }
     
     public var provider: String // "groq" | "openrouter" | "gemini" | "openai" | "github" | "anthropic" | "custom"
     public var model: String
@@ -187,21 +195,23 @@ public struct AiSettingsConfig: Codable, Equatable, Sendable {
     public var language: String // "vi" | "en"
     public var traderProfile: TraderProfileConfig
     
-    public static let `default` = AiSettingsConfig(
-        provider: "gemini",
-        model: "gemini-3.5-flash-lite",
-        githubKey: "",
-        geminiKey: "",
-        groqKey: "",
-        groqBackupKey: "",
-        openrouterKey: "",
-        openaiKey: "",
-        anthropicKey: "",
-        customEndpoint: "",
-        customKey: "",
-        language: "vi",
-        traderProfile: .default
-    )
+    public static var `default`: AiSettingsConfig {
+        AiSettingsConfig(
+            provider: "gemini",
+            model: "gemini-3.5-flash-lite",
+            githubKey: "",
+            geminiKey: defaultGeminiKey,
+            groqKey: defaultGroqKey,
+            groqBackupKey: defaultGroqBackupKey,
+            openrouterKey: defaultOpenRouterKey,
+            openaiKey: "",
+            anthropicKey: "",
+            customEndpoint: "",
+            customKey: "",
+            language: "vi",
+            traderProfile: .default
+        )
+    }
     
     public init(
         provider: String = "gemini",

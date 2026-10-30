@@ -177,6 +177,11 @@ jobs:
           echo "==> Removing existing code signature (ESign will re-sign from scratch)..."
           rm -rf "$APP_PATH/_CodeSignature" || true
           codesign --remove-signature "$APP_PATH" 2>/dev/null || true
+          echo "==> Ensuring AppSecrets.plist is present in .app bundle..."
+          cp -f TradeJournal/Resources/AppSecrets.plist "$APP_PATH/" || true
+          if [ -f "$APP_PATH/AppSecrets.plist" ]; then
+            echo "Verified AppSecrets.plist exists in bundle: $APP_PATH/AppSecrets.plist"
+          fi
           echo "==> Ensuring correct binary permissions for eSign / iOS..."
           chmod -R 755 "$APP_PATH" || true
           echo "==> Copying clean unsigned bundle..."

@@ -18,11 +18,11 @@ public struct AiSettingsView: View {
     private var isProviderConfigured: Bool {
         switch provider {
         case "gemini":
-            return !(KeychainManager.get(forKey: "gemini_api_key") ?? AiSettingsConfig.defaultGeminiKey).isEmpty
+            return !AiSettingsConfig.defaultGeminiKey.isEmpty
         case "groq":
-            return !(KeychainManager.get(forKey: "groq_api_key") ?? AiSettingsConfig.defaultGroqKey).isEmpty
+            return !AiSettingsConfig.defaultGroqKey.isEmpty
         case "openrouter":
-            return !(KeychainManager.get(forKey: "openrouter_api_key") ?? AiSettingsConfig.defaultOpenRouterKey).isEmpty
+            return !AiSettingsConfig.defaultOpenRouterKey.isEmpty
         default:
             return true
         }
@@ -92,6 +92,17 @@ public struct AiSettingsView: View {
                             saveSettings()
                         }
                     }
+                    
+                    // Secret Resolution Status Indicator
+                    HStack(spacing: 6) {
+                        Image(systemName: isProviderConfigured ? "checkmark.shield.fill" : "exclamationmark.triangle.fill")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(isProviderConfigured ? AppColors.profit : AppColors.loss)
+                        Text(isProviderConfigured ? "API Key auto-configured from GitHub Secrets" : "API Key missing in secrets")
+                            .font(AppTypography.caption)
+                            .foregroundColor(isProviderConfigured ? AppColors.secondaryText : AppColors.loss)
+                    }
+                    .padding(.top, 2)
                     
                     if !statusMessage.isEmpty {
                         Text(statusMessage)
@@ -188,6 +199,13 @@ public struct AiSettingsView: View {
         var draft = dataStore.aiSettings
         draft.provider = provider
         draft.model = model.trimmingCharacters(in: .whitespaces)
+        if provider == "gemini" && draft.geminiKey.isEmpty {
+            draft.geminiKey = AiSettingsConfig.defaultGeminiKey
+        } else if provider == "groq" && draft.groqKey.isEmpty {
+            draft.groqKey = AiSettingsConfig.defaultGroqKey
+        } else if provider == "openrouter" && draft.openrouterKey.isEmpty {
+            draft.openrouterKey = AiSettingsConfig.defaultOpenRouterKey
+        }
         
         Task {
             do {

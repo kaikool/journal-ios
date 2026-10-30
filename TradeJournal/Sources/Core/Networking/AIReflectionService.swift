@@ -75,18 +75,19 @@ public actor AIReflectionService {
             return try await callDefaultProvider(action: action, prompt: prompt, metrics: activeMetrics, edgeScore: edgeScore, language: activeLang, traderProfile: profile, chartImageBase64: chartImageBase64, chartImagesBase64: chartImagesBase64, sessionSummary: activeSessionSummary, conversationHistory: conversationHistory)
             
         case "gemini":
-            if !config.geminiKey.trimmingCharacters(in: .whitespaces).isEmpty {
+            let activeGeminiKey = config.geminiKey.trimmingCharacters(in: .whitespaces).isEmpty ? AiSettingsConfig.defaultGeminiKey : config.geminiKey.trimmingCharacters(in: .whitespaces)
+            if !activeGeminiKey.isEmpty {
                 do {
                     let geminiModel: String = {
                         let m = config.model.trimmingCharacters(in: .whitespaces)
-                        if m.isEmpty || m == "gemini-2.0-flash" || m == "gemini-1.5-flash" || m == "gemini-2.5-flash" {
+                        if m.isEmpty || m == "auto" || m == "default" || m == "gemini-2.0-flash" || m == "gemini-1.5-flash" || m == "gemini-2.5-flash" {
                             return "gemini-3.5-flash-lite"
                         }
                         return m
                     }()
                     return try await callOpenAiCompatible(
                         endpoint: Self.geminiEndpoint,
-                        apiKey: config.geminiKey,
+                        apiKey: activeGeminiKey,
                         model: geminiModel,
                         action: action,
                         prompt: prompt,
@@ -376,13 +377,14 @@ public actor AIReflectionService {
             )
             
         case "gemini":
-            guard !config.geminiKey.trimmingCharacters(in: .whitespaces).isEmpty else {
+            let activeGeminiKey = config.geminiKey.trimmingCharacters(in: .whitespaces).isEmpty ? AiSettingsConfig.defaultGeminiKey : config.geminiKey.trimmingCharacters(in: .whitespaces)
+            guard !activeGeminiKey.isEmpty else {
                 throw NSError(domain: "Gemini", code: 400, userInfo: [NSLocalizedDescriptionKey: "Please enter your Google Gemini API key from aistudio.google.com."])
             }
-            let geminiModel = (config.model.isEmpty || config.model == "gemini-2.0-flash" || config.model == "gemini-1.5-flash" || config.model == "gemini-2.5-flash") ? "gemini-3.5-flash-lite" : config.model
+            let geminiModel = (config.model.isEmpty || config.model == "auto" || config.model == "default" || config.model == "gemini-2.0-flash" || config.model == "gemini-1.5-flash" || config.model == "gemini-2.5-flash") ? "gemini-3.5-flash-lite" : config.model
             return try await callOpenAiCompatible(
                 endpoint: Self.geminiEndpoint,
-                apiKey: config.geminiKey,
+                apiKey: activeGeminiKey,
                 model: geminiModel,
                 action: .ask,
                 prompt: "Say 'Google Gemini connected successfully.' and state your model name in one sentence.",
