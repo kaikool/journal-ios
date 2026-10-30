@@ -166,23 +166,43 @@ extension AIPromptBuilder {
         
         // Trader Profile Snippet
         var profileSnippet = ""
+        let realBalStr: String = {
+            if let bal = sessionSummary?.balance {
+                let curr = sessionSummary?.accountCurrency ?? "USD"
+                return Formatters.formatCurrency(bal, currency: curr)
+            }
+            return "N/A"
+        }()
+        
         if let prof = traderProfile {
+            let style = prof.tradingStyle.trimmingCharacters(in: .whitespaces)
+            let objective = prof.accountObjective.trimmingCharacters(in: .whitespaces)
             let playbooks = prof.primaryPlaybooks.trimmingCharacters(in: .whitespaces)
             let risk = prof.maxRiskPerTrade.trimmingCharacters(in: .whitespaces)
             let leaks = prof.knownPsychologicalLeaks.trimmingCharacters(in: .whitespaces)
+            let notes = prof.customMemoryNotes.trimmingCharacters(in: .whitespaces)
+            
             if isVi {
                 profileSnippet = """
-                HỒ SƠ TRADER:
-                - Playbook ưu tiên: \(playbooks.isEmpty ? "Price Action & SMC" : playbooks)
-                - Ngân sách rủi ro mỗi lệnh: \(risk.isEmpty ? "1R chuẩn" : risk)
-                - Lỗ hổng tâm lý nhận diện: \(leaks.isEmpty ? "Không có" : leaks)
+                HỒ SƠ TRADER & QUẢN TRỊ RỦI RO (BẮT BUỘC TUÂN THỦ ĐỂ TÍNH KHỐI LƯỢNG LỆNH):
+                - SỐ DƯ TÀI KHOẢN THỰC TẾ (REAL BALANCE): \(realBalStr != "N/A" ? realBalStr : "Chưa xác định")
+                - Phong cách giao dịch: \(style.isEmpty ? "Day Trader / Intraday Scalper" : style)
+                - Mục tiêu tài khoản: \(objective.isEmpty ? "Bảo toàn vốn & Tăng trưởng bền vững" : objective)
+                - Playbook / Chiến thuật ưu tiên: \(playbooks.isEmpty ? "Price Action, Trend Following, Support & Resistance" : playbooks)
+                - Ngân sách rủi ro tối đa mỗi lệnh: \(risk.isEmpty ? "0.5% - 1.0% vốn" : risk)
+                - Lỗ hổng tâm lý nhận diện cần triệt tiêu: \(leaks.isEmpty ? "Dời SL, chốt non, FOMO vào lệnh trả thù sau khi thua" : leaks)
+                - Ghi chú & Kỷ luật cá nhân: \(notes.isEmpty ? "Tỷ lệ R:R >= 2:1, bảo vệ vốn khi thị trường giằng co, không bao giờ trả thù thị trường" : notes)
                 """
             } else {
                 profileSnippet = """
-                TRADER PROFILE & RISK PARAMETERS:
-                - Declared Playbooks: \(playbooks.isEmpty ? "Price Action & SMC" : playbooks)
-                - Risk Per Trade: \(risk.isEmpty ? "1R Standard" : risk)
-                - Known Psychological Leaks: \(leaks.isEmpty ? "None" : leaks)
+                TRADER PROFILE & RISK PARAMETERS (MANDATORY FOR POSITION SIZING):
+                - AUTHORITATIVE REAL BALANCE: \(realBalStr != "N/A" ? realBalStr : "Unknown")
+                - Trading Style: \(style.isEmpty ? "Day Trader / Intraday Scalper" : style)
+                - Account Objective: \(objective.isEmpty ? "Capital Preservation & Sustainable Growth" : objective)
+                - Declared Playbooks: \(playbooks.isEmpty ? "Price Action, Trend Following, Support & Resistance" : playbooks)
+                - Max Risk Per Trade: \(risk.isEmpty ? "0.5% - 1.0% equity" : risk)
+                - Known Psychological Leaks to Prevent: \(leaks.isEmpty ? "Moving SL, premature profit taking, revenge FOMO" : leaks)
+                - Personal Discipline Notes: \(notes.isEmpty ? "R:R >= 2:1, protect capital during consolidation, never revenge trade" : notes)
                 """
             }
         }
@@ -350,12 +370,12 @@ extension AIPromptBuilder {
             BẮT BUỘC KẾT THÚC BẰNG KHỐI TÓM TẮT THÔNG SỐ SETUP ĐÚNG ĐỊNH DẠNG SAU:
             [PRE-TRADE SETUP SPECIFICATION]
             - Direction: [BUY hoặc SELL hoặc FLAT]
-            - Balance: [Số dư tài khoản]
+            - Balance: \(realBalStr != "N/A" ? realBalStr : "[Số dư tài khoản]")
             - Entry: [Mức giá hoặc vùng giá vào lệnh]
             - Stop loss: [Mức giá SL cụ thể]
             - Take profit 1: [Mức giá TP 1]
             - Take profit 2: [Mức giá TP 2 nếu có, nếu không ghi Không]
-            - Volume: [Khối lượng khuyến nghị, ví dụ 0.10 lot]
+            - Volume: [Khối lượng lot khuyến nghị tính theo số dư thực tế \(realBalStr) và % rủi ro, ví dụ 0.25 lot]
             - Date time: [Thời gian hiện tại]
             
             > [Đúng 1 câu quy tắc kỷ luật hành động không khoan nhượng]
@@ -422,12 +442,12 @@ extension AIPromptBuilder {
             MANDATORY: YOU MUST CONCLUDE WITH THIS PRE-TRADE SETUP SPECIFICATION BLOCK:
             [PRE-TRADE SETUP SPECIFICATION]
             - Direction: [BUY or SELL or FLAT]
-            - Balance: [Account Balance]
+            - Balance: \(realBalStr != "N/A" ? realBalStr : "[Account Balance]")
             - Entry: [Entry price or zone]
             - Stop loss: [Specific SL price]
             - Take profit 1: [Specific TP1 price]
             - Take profit 2: [Specific TP2 price if any, otherwise None]
-            - Volume: [Recommended volume/lots based on risk management]
+            - Volume: [Recommended volume/lots computed from real balance \(realBalStr) and risk per trade, e.g. 0.25 lot]
             - Date time: [Current date and time]
             
             > [Single non-negotiable operational directive]

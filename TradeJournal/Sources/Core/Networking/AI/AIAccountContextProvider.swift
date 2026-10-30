@@ -14,7 +14,15 @@ public enum AIAccountContextProvider {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd"
         
-        let activeAccId = targetAccountId ?? dataStore.selectedAccountId
+        let activeAccId: String = {
+            if let t = targetAccountId, !t.isEmpty, t != "all", t != "default-acc" {
+                return t
+            }
+            if !dataStore.selectedAccountId.isEmpty, dataStore.selectedAccountId != "all", dataStore.selectedAccountId != "default-acc" {
+                return dataStore.selectedAccountId
+            }
+            return dataStore.mostRecentActiveAccount?.id ?? dataStore.visibleAccounts.first?.id ?? dataStore.accounts.first?.id ?? ""
+        }()
         
         // 1. Account Filtering
         let accountTrades: [Trade] = {
@@ -88,7 +96,7 @@ public enum AIAccountContextProvider {
         }
         
         // 3. Prop Firm Risk & Capital Preservation Rules
-        let currency = accountObj?.currency ?? propObj?.currency ?? "USD"
+        let currency = accountObj?.currency ?? propObj?.currency ?? dataStore.currencyConversion.reportingCurrency
         let totalClosedNetPnl = accountTrades.filter { $0.status != .open || $0.closedAt != nil }.reduce(Decimal.zero) { $0 + $1.netPnl }
         
         let balance: Decimal? = {
@@ -99,6 +107,9 @@ public enum AIAccountContextProvider {
             }
             if let acc = accountObj {
                 return acc.initialBalance + totalClosedNetPnl
+            }
+            if !dataStore.accounts.isEmpty {
+                return dataStore.totalPortfolioBalance
             }
             return nil
         }()
@@ -275,10 +286,30 @@ public enum AIAccountContextProvider {
             }
         }()
         
+        let balanceBlockVi: String = {
+            if let bal = summary.balance {
+                let formattedBal = Formatters.formatCurrency(bal, currency: summary.accountCurrency)
+                let eqStr = summary.equity != nil ? " | Vốn ròng (Equity): \(Formatters.formatCurrency(summary.equity!, currency: summary.accountCurrency))" : ""
+                let accNameStr = summary.accountName != nil ? " (Tài khoản: \(summary.accountName!))" : ""
+                return "- SỐ DƯ TÀI KHOẢN THỰC TẾ HIỆN TẠI\(accNameStr): \(formattedBal)\(eqStr)\n"
+            }
+            return ""
+        }()
+        
+        let balanceBlockEn: String = {
+            if let bal = summary.balance {
+                let formattedBal = Formatters.formatCurrency(bal, currency: summary.accountCurrency)
+                let eqStr = summary.equity != nil ? " | Equity: \(Formatters.formatCurrency(summary.equity!, currency: summary.accountCurrency))" : ""
+                let accNameStr = summary.accountName != nil ? " (Account: \(summary.accountName!))" : ""
+                return "- CURRENT AUTHORITATIVE ACCOUNT BALANCE\(accNameStr): \(formattedBal)\(eqStr)\n"
+            }
+            return ""
+        }()
+        
         if isVi {
             return """
             BỐI CẢNH HIỆN TẠI & PHÂN ĐỊNH MỐC THỜI GIAN THỰC TẾ:
-            - Thời gian hệ thống hiện tại: \(summary.currentTimestampStr.isEmpty ? "Hôm nay" : summary.currentTimestampStr)
+            \(balanceBlockVi)- Thời gian hệ thống hiện tại: \(summary.currentTimestampStr.isEmpty ? "Hôm nay" : summary.currentTimestampStr)
             - HÔM NAY (NGÀY \(summary.todayDateStr)): \(summary.totalTradesToday) lệnh (Đang mở: \(summary.openTradesToday) | Đã đóng: \(summary.closedTradesToday)) | Net P&L: \(pnlStr) (\(summary.winsToday) Thắng - \(summary.lossesToday) Thua) | Chuỗi: \(streakStr)
             - HÔM QUA (NGÀY \(summary.yesterdayDateStr)): \(summary.totalTradesYesterday) lệnh (\(summary.winsYesterday) Thắng - \(summary.lossesYesterday) Thua) | Net P&L Hôm qua: \(pnlYesterdayStr)
             - TUẦN NÀY (WTD): \(summary.weekToDateTradesCount) lệnh | Net P&L Tuần này: \(pnlWtdStr)
@@ -294,7 +325,7 @@ public enum AIAccountContextProvider {
         } else {
             return """
             CHRONOLOGICAL ACCOUNT CONTEXT & TIMEFRAME SEPARATION:
-            - Current System Timestamp: \(summary.currentTimestampStr.isEmpty ? "Now" : summary.currentTimestampStr)
+            \(balanceBlockEn)- Current System Timestamp: \(summary.currentTimestampStr.isEmpty ? "Now" : summary.currentTimestampStr)
             - TODAY (DATE \(summary.todayDateStr)): \(summary.totalTradesToday) trades (Open: \(summary.openTradesToday) | Closed: \(summary.closedTradesToday)) | Net P&L Today: \(pnlStr) (\(summary.winsToday)W - \(summary.lossesToday)L) | Streak: \(streakStr)
             - YESTERDAY (DATE \(summary.yesterdayDateStr)): \(summary.totalTradesYesterday) trades (\(summary.winsYesterday)W - \(summary.lossesYesterday)L) | Net P&L Yesterday: \(pnlYesterdayStr)
             - THIS WEEK (WTD): \(summary.weekToDateTradesCount) trades | Net P&L This Week: \(pnlWtdStr)
