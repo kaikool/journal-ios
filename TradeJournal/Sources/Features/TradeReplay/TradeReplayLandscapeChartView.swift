@@ -257,58 +257,6 @@ public struct TradeReplayLandscapeChartView: View {
                 .foregroundColor(color)
                 .clipShape(Capsule())
             }
-            
-            // Minimalist Legend Dots (EMA 21, EMA 50, BSL, SSL, RSI 14)
-            HStack(spacing: 8) {
-                HStack(spacing: 3) {
-                    Circle()
-                        .fill(Color(red: 0.0, green: 0.85, blue: 1.0))
-                        .frame(width: 5, height: 5)
-                    Text("EMA 21")
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundColor(AppColors.secondaryText)
-                }
-                HStack(spacing: 3) {
-                    Circle()
-                        .fill(Color.orange)
-                        .frame(width: 5, height: 5)
-                    Text("EMA 50")
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundColor(AppColors.secondaryText)
-                }
-                HStack(spacing: 3) {
-                    Circle()
-                        .fill(Color(red: 1.0, green: 0.62, blue: 0.2))
-                        .frame(width: 5, height: 5)
-                    Text("BSL-H")
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundColor(AppColors.secondaryText)
-                }
-                HStack(spacing: 3) {
-                    Circle()
-                        .fill(Color(red: 0.2, green: 0.82, blue: 0.95))
-                        .frame(width: 5, height: 5)
-                    Text("SSL-L")
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundColor(AppColors.secondaryText)
-                }
-                HStack(spacing: 3) {
-                    Circle()
-                        .fill(Color(red: 0.65, green: 0.45, blue: 0.95))
-                        .frame(width: 5, height: 5)
-                    Text("RSI")
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundColor(AppColors.secondaryText)
-                }
-                HStack(spacing: 3) {
-                    Circle()
-                        .fill(Color(red: 1.0, green: 0.82, blue: 0.2))
-                        .frame(width: 5, height: 5)
-                    Text("WMA 45")
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundColor(AppColors.secondaryText)
-                }
-            }
         }
     }
     

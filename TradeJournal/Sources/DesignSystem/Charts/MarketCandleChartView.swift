@@ -71,28 +71,6 @@ public struct MarketCandleChartView: View {
             }
             
             Spacer()
-            
-            // Minimalist EMA Curve Legend (Cyan 21 / Orange 50) - without bulky numbers
-            if showEMA {
-                HStack(spacing: 10) {
-                    HStack(spacing: 4) {
-                        Circle()
-                            .fill(Color(red: 0.0, green: 0.85, blue: 1.0))
-                            .frame(width: 5, height: 5)
-                        Text("EMA 21")
-                            .font(.system(size: 9.5, weight: .medium))
-                            .foregroundColor(AppColors.secondaryText)
-                    }
-                    HStack(spacing: 4) {
-                        Circle()
-                            .fill(Color.orange)
-                            .frame(width: 5, height: 5)
-                        Text("EMA 50")
-                            .font(.system(size: 9.5, weight: .medium))
-                            .foregroundColor(AppColors.secondaryText)
-                    }
-                }
-            }
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 4)

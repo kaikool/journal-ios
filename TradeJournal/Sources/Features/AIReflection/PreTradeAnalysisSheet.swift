@@ -240,7 +240,7 @@ public struct PreTradeAnalysisSheet: View {
             self.analysisResult = ""
             self.followUpMessages = []
         }
-        Task { await fetchAllTimeframeBars(for: sym) }
+        Task { await fetchAllTimeframeBars(for: sym, forceRefresh: true) }
     }
     
     private func submitCustomSymbol() {
@@ -440,10 +440,8 @@ public struct PreTradeAnalysisSheet: View {
             self.errorMessage = nil
         }
         
-        // Ensure bars are loaded before formulating bias
-        if d1Bars.isEmpty || h4Bars.isEmpty || h1Bars.isEmpty || m15Bars.isEmpty {
-            await fetchAllTimeframeBars(for: selectedSymbol, forceRefresh: false)
-        }
+        // Always ensure we have the freshest bars before formulating bias
+        await fetchAllTimeframeBars(for: selectedSymbol, forceRefresh: true)
         
         guard !d1Bars.isEmpty || !h4Bars.isEmpty || !h1Bars.isEmpty || !m15Bars.isEmpty else {
             await MainActor.run {

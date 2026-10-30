@@ -394,11 +394,13 @@ public struct NoteAIInquirySheet: View {
     
     private func fetchBarsForAudit(trade: Trade) async -> [MarketBar]? {
         let sym = detectedSymbol
+        let isOpen = (trade.status == .open || trade.closedAt == nil)
         if trade.avgEntry > 0 && !trade.symbol.isEmpty && trade.symbol != "Asset" && trade.symbol != "Pre-Trade" {
             if let res = try? await MarketDataService.shared.fetchBarsForTrade(
                 trade: trade,
                 config: dataStore.marketConnections,
-                resolution: "15m"
+                resolution: "15m",
+                forceRefresh: isOpen
             ), !res.bars.isEmpty {
                 return res.bars
             }
@@ -407,7 +409,8 @@ public struct NoteAIInquirySheet: View {
             symbol: sym,
             config: dataStore.marketConnections,
             resolution: "15m",
-            count: 100
+            count: 100,
+            forceRefresh: true
         ), !res.bars.isEmpty {
             return res.bars
         }

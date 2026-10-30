@@ -85,10 +85,7 @@ public struct TradeReplayView: View {
                     reportingCurrency: env.currentCurrency
                 )
                 
-                // Timeframe Selector: 15m, 1h, 4h, 1D
-                resolutionSelectorBar
-                
-                // Professional Candlestick Chart (with sleek minimalist legend and pure gesture pinch-zoom)
+                // Professional Candlestick Chart (with integrated 15m/1h/4h timeframe selector and pure gesture pinch-zoom)
                 chartCard
                 
                 // Replay Playback Controls (Play/Pause, Step, Speed, Fullscreen)
@@ -168,47 +165,6 @@ public struct TradeReplayView: View {
         }
     }
     
-    // MARK: - Timeframe Resolution Selector (1m, 5m, 15m, 1h, 1d)
-    private var resolutionSelectorBar: some View {
-        HStack(spacing: 6) {
-            Text("TF:")
-                .font(AppTypography.caption)
-                .foregroundColor(AppColors.secondaryText)
-                .lineLimit(1)
-                .fixedSize()
-            
-            ForEach(TradeReplayView.replayResolutions) { res in
-                let isSelected = res == selectedResolution
-                let title: String = {
-                    switch res {
-                    case .m15: return "15m"
-                    case .h1: return "1h"
-                    case .h4: return "4h"
-                    default: return res.rawValue.uppercased()
-                    }
-                }()
-                Button {
-                    guard selectedResolution != res else { return }
-                    selectedResolution = res
-                } label: {
-                    Text(title)
-                        .font(AppTypography.pill)
-                        .lineLimit(1)
-                        .fixedSize()
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 4)
-                        .background(isSelected ? AppColors.accent : AppColors.secondaryBackground)
-                        .foregroundColor(isSelected ? .white : AppColors.secondaryText)
-                        .cornerRadius(6)
-                }
-                .buttonStyle(.plain)
-            }
-            
-            Spacer()
-        }
-        .padding(.horizontal, 4)
-    }
-    
     // MARK: - Candlestick Chart Card
     private var chartCard: some View {
         VStack(spacing: 8) {
@@ -281,7 +237,10 @@ public struct TradeReplayView: View {
                         resolution: selectedResolution,
                         showMarketStructure: true,
                         showLiquidity: true,
-                        showRSI: true
+                        showRSI: true,
+                        onResolutionChange: { newRes in
+                            self.selectedResolution = newRes
+                        }
                     )
                     
                     // Floating Updating Pill (Replaces the cramped loading indicator in Resolution bar)
@@ -326,8 +285,12 @@ public struct TradeReplayView: View {
     private func loadMarketCandles() async {
         stopTimer()
         
-        // 1. Check local disk cache for this exact resolution (require at least 40 bars for full indicators)
-        if let cached = TradeReplayCacheStore.shared.getBars(for: trade.id, resolution: selectedResolution.rawValue), cached.count >= 40 {
+        let isOpenTrade = (trade.status == .open || trade.closedAt == nil)
+        
+        // 1. Check local disk cache for this exact resolution ONLY if trade is fully closed
+        if !isOpenTrade,
+           let cached = TradeReplayCacheStore.shared.getBars(for: trade.id, resolution: selectedResolution.rawValue),
+           cached.count >= 40 {
             self.bars = cached
             self.currentStep = cached.count
             self.excursionEstimate = TradeReplayEngine.estimateExcursions(
@@ -348,7 +311,8 @@ public struct TradeReplayView: View {
             let (_, fetchedBars) = try await MarketDataService.shared.fetchBarsForTrade(
                 trade: trade,
                 config: TradeDataStore.shared.marketConnections,
-                resolution: selectedResolution.rawValue
+                resolution: selectedResolution.rawValue,
+                forceRefresh: isOpenTrade
             )
             
             if !fetchedBars.isEmpty {
@@ -363,7 +327,9 @@ public struct TradeReplayView: View {
                 )
                 self.bars = alignedBars
                 self.currentStep = alignedBars.count
-                TradeReplayCacheStore.shared.saveBars(alignedBars, for: trade.id, resolution: selectedResolution.rawValue)
+                if !isOpenTrade {
+                    TradeReplayCacheStore.shared.saveBars(alignedBars, for: trade.id, resolution: selectedResolution.rawValue)
+                }
                 self.excursionEstimate = TradeReplayEngine.estimateExcursions(
                     trade: trade,
                     fills: executions,

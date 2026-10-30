@@ -14,6 +14,7 @@ public struct CandleChartView: View {
     let timeZone: TimeZone
     let currency: String
     let resolution: MarketResolution
+    public var onResolutionChange: ((MarketResolution) -> Void)? = nil
     let showMarketStructure: Bool
     let showLiquidity: Bool
     let showRSI: Bool
@@ -41,7 +42,8 @@ public struct CandleChartView: View {
         showLiquidity: Bool = true,
         showRSI: Bool = true,
         rsiMAType: MomentumEngine.RSIMAType = .ema,
-        isLandscape: Bool = false
+        isLandscape: Bool = false,
+        onResolutionChange: ((MarketResolution) -> Void)? = nil
     ) {
         self.visibleBars = visibleBars
         self.allBars = allBars.isEmpty ? visibleBars : allBars
@@ -57,6 +59,7 @@ public struct CandleChartView: View {
         self.showLiquidity = showLiquidity
         self.showRSI = showRSI
         self.isLandscape = isLandscape
+        self.onResolutionChange = onResolutionChange
         self._activeRSIMAType = State(initialValue: rsiMAType)
     }
     
@@ -246,57 +249,27 @@ public struct CandleChartView: View {
                     .clipShape(Capsule())
             }
             
-            // 5. Minimalist Legend Dots (EMA 21 cyan, EMA 50 orange, BSL amber, SSL mint)
-            HStack(spacing: 8) {
-                HStack(spacing: 3) {
-                    Circle()
-                        .fill(Color(red: 0.0, green: 0.85, blue: 1.0))
-                        .frame(width: 5, height: 5)
-                    Text("EMA 21")
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundColor(AppColors.secondaryText)
-                }
-                HStack(spacing: 3) {
-                    Circle()
-                        .fill(Color.orange)
-                        .frame(width: 5, height: 5)
-                    Text("EMA 50")
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundColor(AppColors.secondaryText)
-                }
-                HStack(spacing: 3) {
-                    Circle()
-                        .fill(Color(red: 1.0, green: 0.62, blue: 0.2))
-                        .frame(width: 5, height: 5)
-                    Text("BSL-H")
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundColor(AppColors.secondaryText)
-                }
-                HStack(spacing: 3) {
-                    Circle()
-                        .fill(Color(red: 0.2, green: 0.82, blue: 0.95))
-                        .frame(width: 5, height: 5)
-                    Text("SSL-L")
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundColor(AppColors.secondaryText)
-                }
-                if showRSI {
-                    HStack(spacing: 3) {
-                        Circle()
-                            .fill(Color(red: 0.65, green: 0.45, blue: 0.95))
-                            .frame(width: 5, height: 5)
-                        Text("RSI")
-                            .font(.system(size: 9, weight: .medium))
-                            .foregroundColor(AppColors.secondaryText)
+            // Timeframe Resolution Selector Pills: 15m, 1h, 4h (No "TF:" label, sleek and minimal)
+            HStack(spacing: 5) {
+                ForEach([MarketResolution.m15, .h1, .h4], id: \.self) { res in
+                    let isSelected = res == resolution
+                    let label = res == .m15 ? "15m" : (res == .h1 ? "1h" : "4h")
+                    Button {
+                        #if os(iOS)
+                        UISelectionFeedbackGenerator().selectionChanged()
+                        #endif
+                        onResolutionChange?(res)
+                    } label: {
+                        Text(label)
+                            .font(.system(size: 10, weight: isSelected ? .bold : .medium))
+                            .foregroundColor(isSelected ? .white : AppColors.secondaryText)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(isSelected ? AppColors.brand : AppColors.secondaryBackground)
+                            .clipShape(Capsule())
                     }
-                    HStack(spacing: 3) {
-                        Circle()
-                            .fill(Color(red: 1.0, green: 0.82, blue: 0.2))
-                            .frame(width: 5, height: 5)
-                        Text("WMA 45")
-                            .font(.system(size: 9, weight: .medium))
-                            .foregroundColor(AppColors.secondaryText)
-                    }
+                    .buttonStyle(.plain)
+                    .disabled(onResolutionChange == nil)
                 }
             }
         }

@@ -411,6 +411,8 @@ extension TradeDataStore {
         if !trade.accountId.hasPrefix("the5ers_") || trade.accountId.hasPrefix("ctrader_") {
             rebuildAccount(accountId: trade.accountId)
         }
+        MarketDataCacheStore.shared.invalidateTrade(tradeId: key)
+        AICoachSessionStore.shared.clear(key: key)
         saveToDisk(immediate: true)
         AppLogger.info("Deleted trade \(key), remaining trades: \(trades.count)")
         Task {
@@ -522,6 +524,12 @@ extension TradeDataStore {
         }
         
         saveToDisk(immediate: true)
+        MarketDataCacheStore.shared.invalidateTrade(tradeId: key)
+        AICoachSessionStore.shared.clear(key: key)
+        if updatedKey != key {
+            MarketDataCacheStore.shared.invalidateTrade(tradeId: updatedKey)
+            AICoachSessionStore.shared.clear(key: updatedKey)
+        }
         AppLogger.info("Updated manual trade for \(cleanSymbol). Total trades now: \(trades.count)")
         if updatedKey != key {
             Task {

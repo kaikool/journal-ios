@@ -443,12 +443,13 @@ public final class MarketDataService: Sendable {
         resolution: String = "15m",
         forceRefresh: Bool = false
     ) async throws -> (provider: String, bars: [MarketBar]) {
-        let isClosed = (trade.status != .open)
+        let isClosed = (trade.status != .open && trade.closedAt != nil)
+        let effectiveForceRefresh = forceRefresh || !isClosed
         let provider = detectProviderForSymbol(symbol: trade.symbol)
         let providerTag = provider == "binance" ? "Binance Spot" : "OANDA v20"
         
-        // 1. Check multi-tier cache (instant 0ms lookup)
-        if !forceRefresh,
+        // 1. Check multi-tier cache (instant 0ms lookup) - only for closed trades when not force refreshing
+        if !effectiveForceRefresh,
            let cached = MarketDataCacheStore.shared.getTradeBars(tradeId: trade.id, resolution: resolution, isClosed: isClosed),
            !cached.isEmpty {
             let tag = isClosed ? "Historical Cache" : "Cache"
@@ -460,7 +461,7 @@ public final class MarketDataService: Sendable {
         do {
             let fetchedBars = try await MarketDataCacheStore.shared.runCoalesced(key: coalescingKey) { [self] in
                 // Check cache again inside coalescing task
-                if !forceRefresh,
+                if !effectiveForceRefresh,
                    let cached = MarketDataCacheStore.shared.getTradeBars(tradeId: trade.id, resolution: resolution, isClosed: isClosed),
                    !cached.isEmpty {
                     return cached
@@ -513,11 +514,13 @@ public final class MarketDataService: Sendable {
                         code: 404,
                         userInfo: [NSLocalizedDescriptionKey: "No candlestick data available on Binance for \(trade.symbol)."]
                     )
-                } else if !config.oandaApiKey.isEmpty {
+                } else if !config.oandaApiKey.isEmpty || KeychainManager.get(forKey: "oanda_api_key") != nil || AppSecretsLoader.loadSecret(named: "OANDA_API_KEY") != nil {
+                    let effectiveKey = KeychainManager.get(forKey: "oanda_api_key") ?? AppSecretsLoader.loadSecret(named: "OANDA_API_KEY") ?? config.oandaApiKey
+                    let effectiveAcc = UserDefaults.standard.string(forKey: "oanda_account_id") ?? AppSecretsLoader.loadSecret(named: "OANDA_ACCOUNT_ID") ?? config.oandaAccountId
                     let bars = try await fetchOandaBars(
                         symbol: trade.symbol,
-                        apiKey: config.oandaApiKey,
-                        accountId: config.oandaAccountId,
+                        apiKey: effectiveKey,
+                        accountId: effectiveAcc,
                         environment: config.oandaEnvironment,
                         from: openTime,
                         to: closeTime,

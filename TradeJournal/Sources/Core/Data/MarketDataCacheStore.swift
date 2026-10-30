@@ -90,9 +90,12 @@ public final class MarketDataCacheStore: @unchecked Sendable {
         if let bars = getBars(forKey: key, bypassExpiry: isClosed), !bars.isEmpty {
             return bars
         }
-        // Fallback: Check TradeReplayCacheStore for matching resolution
-        if let replayBars = TradeReplayCacheStore.shared.getBars(for: tradeId, resolution: resolution), !replayBars.isEmpty {
-            return replayBars
+        // ONLY fallback to TradeReplayCacheStore for fully closed historical trades!
+        // Open/running trades must never hit indefinite replay cache so fresh candles can be fetched.
+        if isClosed {
+            if let replayBars = TradeReplayCacheStore.shared.getBars(for: tradeId, resolution: resolution), !replayBars.isEmpty {
+                return replayBars
+            }
         }
         return nil
     }
@@ -108,10 +111,24 @@ public final class MarketDataCacheStore: @unchecked Sendable {
     public func saveTradeBars(_ bars: [MarketBar], tradeId: String, resolution: String, isClosed: Bool) {
         guard !bars.isEmpty else { return }
         let key = "trade_\(tradeId)_\(resolution)"
-        let ttl = isClosed ? 0.0 : 30.0 // 30s TTL if trade is still open, permanent if closed
+        let ttl = isClosed ? 0.0 : 20.0 // 20s adaptive TTL if trade is still running, permanent if closed
         let entry = CacheEntry(bars: bars, ttlSeconds: ttl, isPermanent: isClosed)
         saveEntry(entry, forKey: key)
-        TradeReplayCacheStore.shared.saveBars(bars, for: tradeId, resolution: resolution)
+        if isClosed {
+            TradeReplayCacheStore.shared.saveBars(bars, for: tradeId, resolution: resolution)
+        }
+    }
+    
+    public func invalidateTrade(tradeId: String) {
+        lock.lock()
+        for res in ["1m", "5m", "15m", "30m", "1h", "4h", "1d"] {
+            let key = "trade_\(tradeId)_\(res)"
+            memoryCache.removeValue(forKey: key)
+            let sanitizedKey = key.replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: ":", with: "_")
+            let fileUrl = cacheDirectoryUrl.appendingPathComponent("\(sanitizedKey).json")
+            try? fileManager.removeItem(at: fileUrl)
+        }
+        lock.unlock()
     }
     
     // MARK: - 3. Symbol Bars Caching (Pre-Trade Forward Analysis & Market Bias)

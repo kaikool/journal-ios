@@ -189,6 +189,10 @@ public struct TradeAICoachSheet: View {
                 self.coachingResult = cached.result
                 self.followUpMessages = cached.followUps
                 self.isLoading = false
+                // Always fetch fresh market bars in background so activeBars and real-time live price are up to date
+                Task {
+                    await refreshActiveBars(force: self.isOpen)
+                }
                 return
             }
             if !hasAutoLoadedAttachment {
@@ -373,6 +377,11 @@ public struct TradeAICoachSheet: View {
         let chartBase64 = selectedChartImage?.jpegData(compressionQuality: 0.85)?.base64EncodedString()
         
         Task {
+            // Always ensure the very latest real-time bars are fetched before sending question to AI
+            if self.isOpen || self.activeBars == nil {
+                await refreshActiveBars(force: true)
+            }
+            
             // Compose backend context: push initial coachingResult silently in history to AI
             var historyToSend: [AICoachMessage] = []
             if !self.coachingResult.isEmpty {
@@ -456,6 +465,36 @@ public struct TradeAICoachSheet: View {
     }
     
     // MARK: - Coaching Logic & Context Fetching
+    private func refreshActiveBars(force: Bool = false) async {
+        do {
+            let res = try await MarketDataService.shared.fetchBarsForTrade(
+                trade: trade,
+                config: dataStore.marketConnections,
+                resolution: selectedResolution,
+                forceRefresh: force
+            )
+            await MainActor.run {
+                self.activeBars = res.bars
+                self.activeBarsCount = res.bars.count
+                self.activeCandleProvider = res.provider
+            }
+        } catch {
+            if let symRes = try? await MarketDataService.shared.fetchBarsForSymbol(
+                symbol: trade.symbol,
+                config: dataStore.marketConnections,
+                resolution: selectedResolution,
+                count: 100,
+                forceRefresh: force
+            ), !symRes.bars.isEmpty {
+                await MainActor.run {
+                    self.activeBars = symRes.bars
+                    self.activeBarsCount = symRes.bars.count
+                    self.activeCandleProvider = symRes.provider
+                }
+            }
+        }
+    }
+    
     private func runCoachingAnalysis() async {
         await MainActor.run {
             self.isLoading = true
@@ -470,7 +509,8 @@ public struct TradeAICoachSheet: View {
             let res = try await MarketDataService.shared.fetchBarsForTrade(
                 trade: trade,
                 config: dataStore.marketConnections,
-                resolution: selectedResolution
+                resolution: selectedResolution,
+                forceRefresh: isOpen
             )
             fetchedBars = res.bars
             
