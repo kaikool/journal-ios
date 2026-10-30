@@ -2,12 +2,12 @@ name: TradeJournal
 options:
   bundleIdPrefix: com.kaikool
   deploymentTarget:
-    iOS: "16.0"
+    iOS: "17.0"
 
 settings:
   base:
     SWIFT_VERSION: "5.0"
-    IPHONEOS_DEPLOYMENT_TARGET: "16.0"
+    IPHONEOS_DEPLOYMENT_TARGET: "17.0"
     TARGETED_DEVICE_FAMILY: "1,2"
     PRODUCT_BUNDLE_IDENTIFIER: "com.kaikool.tradejournal"
     CURRENT_PROJECT_VERSION: "1"
@@ -23,7 +23,7 @@ targets:
   TradeJournal:
     type: application
     platform: iOS
-    deploymentTarget: "16.0"
+    deploymentTarget: "17.0"
     sources:
       - path: TradeJournal/Sources
       - path: TradeJournal/Resources
@@ -44,7 +44,7 @@ targets:
   TradeJournalTests:
     type: bundle.unit-test
     platform: iOS
-    deploymentTarget: "16.0"
+    deploymentTarget: "17.0"
     sources:
       - path: TradeJournal/Tests
     dependencies:
