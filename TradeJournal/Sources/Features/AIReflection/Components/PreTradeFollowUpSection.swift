@@ -53,7 +53,7 @@ public struct PreTradeFollowUpSection: View {
 }
 
 // MARK: - Pre-Trade Bottom Floating Inquiry Dock
-// Pinned floating bottom input tool enabling immediate follow-up inquiries from anywhere in the document
+// Pinned modern glassmorphic floating bottom input dock
 public struct PreTradeBottomFloatingInput: View {
     @Binding public var followUpQuery: String
     public let isSubmitting: Bool
@@ -75,14 +75,20 @@ public struct PreTradeBottomFloatingInput: View {
         self.onSubmit = onSubmit
     }
     
+    private var hasQueryText: Bool {
+        !followUpQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+    
     public var body: some View {
         VStack(spacing: 6) {
-            HStack(spacing: 6) {
-                Image(systemName: "bubble.left.and.bubble.right.fill")
+            // Header Row
+            HStack(spacing: 5) {
+                Image(systemName: "sparkles")
                     .font(.system(size: 10, weight: .bold))
                     .foregroundColor(AppColors.brand)
                 Text("ASK FOLLOW-UP QUESTION")
                     .font(.system(size: 10, weight: .bold))
+                    .tracking(0.6)
                     .foregroundColor(AppColors.secondaryText)
                 
                 Spacer()
@@ -91,58 +97,76 @@ public struct PreTradeBottomFloatingInput: View {
                     Button(action: onResetThread) {
                         HStack(spacing: 3) {
                             Image(systemName: "arrow.counterclockwise")
-                                .font(.system(size: 9))
+                                .font(.system(size: 8, weight: .semibold))
                             Text("New Thread")
-                                .font(.system(size: 10, weight: .medium))
+                                .font(.system(size: 9, weight: .semibold))
                         }
                         .foregroundColor(AppColors.secondaryText)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 3)
+                        .background(AppColors.secondaryBackground)
+                        .clipShape(Capsule())
                     }
                     .buttonStyle(.plain)
                 }
             }
             .padding(.horizontal, 4)
             
+            // Sleek Modern Input Pill
             HStack(spacing: 8) {
-                TextField("Hỏi tiếp về kế hoạch này (Ask follow-up question)...", text: $followUpQuery)
-                    .font(AppTypography.inputText)
+                Image(systemName: "bubble.left.and.text.bubble.right.fill")
+                    .font(.system(size: 12))
+                    .foregroundColor(AppColors.secondaryText.opacity(0.7))
+                    .padding(.leading, 2)
+                
+                TextField("Ask a follow-up question...", text: $followUpQuery)
+                    .font(.system(size: 13, weight: .regular))
                     .foregroundColor(AppColors.primaryText)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 9)
-                    .background(AppColors.secondaryBackground)
-                    .cornerRadius(10)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10)
-                            .stroke(AppColors.border.opacity(0.8), lineWidth: 0.8)
-                    )
                     .onSubmit {
-                        onSubmit()
+                        if hasQueryText && !isSubmitting {
+                            onSubmit()
+                        }
                     }
                 
                 if isSubmitting {
                     ProgressView()
-                        .scaleEffect(0.85)
-                        .frame(width: 32, height: 32)
+                        .scaleEffect(0.75)
+                        .frame(width: 28, height: 28)
                 } else {
                     Button(action: onSubmit) {
-                        Image(systemName: "arrow.up.circle.fill")
-                            .font(.system(size: 30))
-                            .foregroundColor(followUpQuery.trimmingCharacters(in: .whitespaces).isEmpty ? AppColors.secondaryText.opacity(0.35) : AppColors.brand)
+                        ZStack {
+                            Circle()
+                                .fill(hasQueryText ? AppColors.brand : AppColors.secondaryBackground.opacity(0.8))
+                                .frame(width: 28, height: 28)
+                            
+                            Image(systemName: "arrow.up")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundColor(hasQueryText ? .white : AppColors.secondaryText.opacity(0.4))
+                        }
                     }
-                    .disabled(followUpQuery.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .disabled(!hasQueryText)
+                    .animation(.easeInOut(duration: 0.15), value: hasQueryText)
                 }
             }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(AppColors.secondaryBackground.opacity(0.65))
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(AppColors.border.opacity(0.45), lineWidth: 0.8)
+            )
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 10)
-        .padding(.bottom, 8)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
         .background(
             AppColors.cardBackground
-                .shadow(color: Color.black.opacity(0.35), radius: 10, x: 0, y: -4)
+                .shadow(color: Color.black.opacity(0.35), radius: 12, x: 0, y: -4)
         )
         .overlay(
             Rectangle()
                 .frame(height: 0.5)
-                .foregroundColor(AppColors.border.opacity(0.6)),
+                .foregroundColor(AppColors.border.opacity(0.5)),
             alignment: .top
         )
     }
