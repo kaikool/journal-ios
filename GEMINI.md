@@ -1,56 +1,97 @@
-# TradeJournal iOS - Development & UI Guidelines
+# TradeJournal iOS - 17-Component Architecture & Design System Guidelines
 
-## 1. Absolute Rule: Design System & Typography Compliance
-All views, components, sheets, HUDs, charts, and modal dialogs in this repository **MUST** strictly adhere to the unified Design System (`TradeJournal/Sources/DesignSystem`).
-
-### Strict Prohibitions
-- **NO INLINE FONTS**: Never write `.font(.system(size: ...))` or `.font(.custom(...))` anywhere outside `AppTypography.swift`.
-- **NO RAW TEXT HEADINGS**: Never use raw `.font(.largeTitle)`, `.font(.title)`, etc. Always use semantic `AppTypography` tokens.
-- **NO AD-HOC BUTTONS**: Do not build custom unstyled `Button { ... } label: { ... }` with ad-hoc padding/backgrounds when standard `AppButton`, `AppPrimaryButton`, `AppSecondaryButton`, `AppDestructiveButton`, `AppActionPill`, or `ModalToolbarButtons` can be used.
-- **NO AD-HOC CARDS**: Always wrap section content in `AppCard { ... }`.
-- **NO AD-HOC FORM INPUTS**: Use `AppTextField` and `AppNumericField` for all user inputs.
+## 1. Absolute Rule: Zero Inline / Ad-hoc Code
+All code in this repository **MUST** strictly adhere to the unified Design System across all 17 categories.
+Any attempt to write inline styles, raw system fonts, unstandardized buttons, ad-hoc cards, or direct UIKit haptics will be **automatically detected and rejected by GitHub Actions CI**.
 
 ---
 
-## 2. Standard Design System Component Usage
+## 2. The 17 Standardized Component Categories
 
-Component Type | Standard Component | Example Usage
-:--- | :--- | :---
-**Button (Primary)** | `AppPrimaryButton` / `AppButton(..., style: .primary)` | Main actions (Save, Submit, Connect)
-**Button (Secondary/Outline)** | `AppSecondaryButton` / `AppButton(..., style: .secondary)` | Secondary actions (Cancel, Filter, Manage)
-**Button (Destructive)** | `AppDestructiveButton` / `AppButton(..., style: .destructive)` | Delete trade, Reset database
-**Action Pill** | `AppActionPill` | Compact interactive action links
-**Modal Toolbar Buttons** | `ModalCloseButton`, `ModalBackButton`, `ModalDeleteButton` | Standard circular modal navigation controls
-**Badges & Pills** | `AppBadge`, `AppleMenuChip` | Status, win/loss, tags, regime indicators
-**Segmented / Tabs** | `AppSegmentedBar` | Tab switching, timeframe selectors
-**Filter Chips** | `AppFilterChip` | Filter toggles with active indicator & count
-**Form Fields** | `AppTextField`, `AppNumericField`, `AppDropdown` | Text fields, decimal numbers, dropdowns
-**Checklist & Rows** | `AppToggleRow`, `AppCheckboxRow` | Toggle settings, checklist compliance items
-**Card Containers** | `AppCard` | Standard Apple-style rounded container with subtle border
-**Section Headers** | `AppSectionHeader` | Standardized uppercase card section header with icon & badge
-**Metric Tiles** | `AppMetricTile` | KPI cards, label/value pairs, trend indicators
-**Empty States** | `AppEmptyState` | Standard icon pod, title, subtitle, and action button
-**Feedback Banners** | `ErrorBannerView`, `LoadingView` | Feedback, loading, and error states
+### Category 1: Buttons & Actions
+- **Primary Action**: `AppPrimaryButton("Title", icon: "...") { ... }`
+- **Secondary Action**: `AppSecondaryButton("Title", icon: "...") { ... }`
+- **Destructive Action**: `AppDestructiveButton("Title", icon: "...") { ... }`
+- **Compact Action Pill**: `AppActionPill("Title", icon: "...") { ... }`
+- **Modal Toolbar Circular Buttons**: `ModalCloseButton`, `ModalBackButton`, `ModalDeleteButton`, `ModalPrimaryButton`
+- **PROHIBITED**: Writing raw `Button { ... } label: { Text(...).padding().background(...) }`.
+
+### Category 2: Badges & Tags
+- **Standard**: `AppBadge("Status", style: .profit / .loss / .neutral / .brand)`
+- **Menu / Filter Chip**: `AppleMenuChip(title: "...", count: ...)`
+- **PROHIBITED**: Writing `Text(...).padding().background(...).clipShape(Capsule())`.
+
+### Category 3: Tablist & Segmented Controls
+- **Standard**: `AppSegmentedBar(items, selection: $selected, titleFor: { ... })`
+- **PROHIBITED**: Writing ad-hoc `HStack { ForEach ... Button }` loops for tab switches.
+
+### Category 4: Filter Chips
+- **Standard**: `AppFilterChip("Tag", isSelected: ..., count: ...)`
+- **PROHIBITED**: Writing inline capsule toggles.
+
+### Category 5: Form Fields & Inputs
+- **Text Input**: `AppTextField("Label", text: $text, placeholder: "...")`
+- **Financial / Decimal Input**: `AppNumericField("Position Size", text: $amount, unit: "Lots")`
+- **Dropdown Selection**: `AppDropdownField` / `AppDropdownPill`
+- **PROHIBITED**: Writing raw `TextField` with custom padding/borders.
+
+### Category 6: Selection & Checklist Rows
+- **Settings Toggle**: `AppToggleRow("Title", subtitle: "...", isOn: $isOn)`
+- **Discipline Checklist**: `AppCheckboxRow("Rule Checked", isChecked: ...)`
+- **PROHIBITED**: Writing raw `Toggle` without standardized row typography.
+
+### Category 7: Cards & Headers
+- **Card Container**: `AppCard { ... }`
+- **Card Section Header**: `AppSectionHeader("SECTION TITLE", icon: "...", badge: "...")`
+- **PROHIBITED**: Writing `.background(AppColors.cardBackground).clipShape(RoundedRectangle(cornerRadius: 16))`.
+
+### Category 8: Metric Tiles & Financial Display
+- **KPI Tiles**: `AppMetricTile(title: "WIN RATE", value: "68.4%", trend: .up)`
+- **Hero Figures**: `AppTypography.displayHero`, `AppTypography.numberHero`
+- **PROHIBITED**: Hardcoding custom stat blocks with arbitrary font sizes.
+
+### Category 9: Feedback & Empty States
+- **Empty State**: `AppEmptyState(icon: "tray", title: "...", message: "...")`
+- **Loading Spinner**: `LoadingView("Syncing...")`
+- **Error Banner**: `ErrorBannerView(message: "...")`
+- **PROHIBITED**: Creating custom empty state icons or error layouts.
+
+### Category 10: Chart HUDs & Annotations
+- **Candlestick Badges**: `AppTypography.badgeMarker`, `AppTypography.badgeMarkerSmall`
+- **Timeframe Pills**: Standardized uppercase micro tokens.
+
+### Category 11: Typography System (`AppTypography`)
+- **PROHIBITED**: Writing `.font(.system(size: ...))` or `.font(.custom(...))` anywhere outside `AppTypography.swift`.
+- Use the 9-tier scale: `displayHero`, `metricLarge`, `pageTitle`, `cardHeader`, `rowTitle`, `formLabel`, `statValue`, `badgeStandard`, `caption`.
+
+### Category 12: Spacing & Layout Grid (`AppSpacing`)
+- Use `AppSpacing.micro` (4pt), `.small` (8pt), `.standard` (12pt), `.cardPadding` (14pt), `.pageMargin` (16pt), `.sectionGutter` (24pt).
+- **PROHIBITED**: Using random hardcoded padding numbers (e.g. 11, 13, 17, 23).
+
+### Category 13: Modal Sheet Presentation (`AppSheetContainer`)
+- Standard: `AppSheetContainer("Title", onClose: { dismiss() }) { ... }`
+- **PROHIBITED**: Manually constructing navigation toolbars and close buttons inside sheets.
+
+### Category 14: Confirmation Dialogs (`appConfirmationAlert`)
+- Standard: `.appConfirmationAlert(isPresented: $show, title: "...", message: "...", onConfirm: { ... })`
+- **PROHIBITED**: Writing custom `.alert(...)` with unstandardized destructive buttons.
+
+### Category 15: Loading Shimmer Skeletons (`AppSkeleton`)
+- Standard: `AppSkeleton(height: 20)`
+- **PROHIBITED**: Letting views flash empty or jump layout before data loads.
+
+### Category 16: Haptics Feedback (`NativeHaptics`)
+- Standard: `NativeHaptics.lightImpact()`, `NativeHaptics.mediumImpact()`, `NativeHaptics.selection()`
+- **PROHIBITED**: Calling `UIImpactFeedbackGenerator` or `UISelectionFeedbackGenerator` directly.
+
+### Category 17: Animation Presets (`AppAnimations`)
+- Standard: `AppAnimations.springQuick`, `AppAnimations.springStandard`, `AppAnimations.sheetSpring`, `AppAnimations.easeInOutFast`
+- **PROHIBITED**: Hardcoding `.spring(response: ..., dampingFraction: ...)` repeatedly.
 
 ---
 
-## 3. Typography Semantic Tokens (`AppTypography`)
-
-Scale Tier | Token | Usage
-:--- | :--- | :---
-**Tier 1: Hero Financial** | `AppTypography.displayHero`, `displayHeroLarge`, `numberHero` | Net P&L hero, Total Balance
-**Tier 2: Major Metric** | `AppTypography.displayMajor`, `metricLarge`, `metricMedium` | KPI card hero numbers, Drawdown %
-**Tier 3: Page & Modal** | `AppTypography.pageTitle`, `sheetTitle` | Top navigation bar title, Sheet header title
-**Tier 4: Section & Card** | `AppTypography.cardHeader`, `cardTitle`, `cardHeaderUppercase` | Card title, uppercase section headers
-**Tier 5: Row & Inputs** | `AppTypography.rowTitle`, `rowPrimary`, `formInput`, `body` | List items, TextField content, body copy
-**Tier 6: Subtitles & Labels** | `AppTypography.rowSubtitle`, `formLabel`, `subheadline` | Secondary item descriptions, input labels
-**Tier 7: Key-Value Pairs** | `AppTypography.statLabel`, `statValue`, `numberSmall` | Stat label/value pairs with monospaced digits
-**Tier 8: Badges & Actions** | `AppTypography.actionButton`, `actionPill`, `badgeStandard`, `badgeMicro`, `badgeMarker` | Button labels, pills, tags, chart markers
-**Tier 9: Micro & Footers** | `AppTypography.caption`, `captionMicro`, `footnote` | Timestamps, metadata, footnotes, hints
-
----
-
-## 4. Verification Before Submitting
-Before pushing any code, you **MUST** run:
-1. `node check_swift.js` - verifies balanced AST syntax across all Swift files.
-2. `node scripts/check_design_system.js` - verifies 100% compliance with DesignSystem & AppTypography.
+## 3. GitHub CI Enforcement Gate
+Every push and pull request runs:
+1. `node check_swift.js` - Swift syntax balance.
+2. `node scripts/check_design_system.js` - Strict 17-category compliance audit.
+If any violation is detected, **the GitHub Actions build immediately halts and rejects the commit**.
