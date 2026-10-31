@@ -424,17 +424,17 @@ public struct NavigationDrawerView: View {
             
             // Inline Side-by-Side Controls (Theme + Privacy)
             HStack(spacing: 8) {
-                // Theme Switcher
+                // Theme Switcher (System / Dark / Light)
                 Button {
                     triggerHaptic()
                     env.toggleTheme()
                 } label: {
                     HStack(spacing: 6) {
-                        Image(systemName: env.appTheme == .dark ? "sun.max.fill" : "moon.fill")
+                        Image(systemName: themeIcon)
                             .font(.system(size: 13))
-                            .foregroundColor(env.appTheme == .dark ? .orange : .indigo)
+                            .foregroundColor(themeIconColor)
                         
-                        Text(env.appTheme == .dark ? "Light" : "Dark")
+                        Text(env.appTheme.rawValue)
                             .font(.system(size: 12, weight: .semibold))
                             .foregroundColor(AppColors.primaryText)
                     }
@@ -478,9 +478,23 @@ public struct NavigationDrawerView: View {
         .padding(.horizontal, 10)
     }
     
+    private var themeIcon: String {
+        switch env.appTheme {
+        case .system: return "circle.lefthalf.filled"
+        case .dark: return "moon.fill"
+        case .light: return "sun.max.fill"
+        }
+    }
+    
+    private var themeIconColor: Color {
+        switch env.appTheme {
+        case .system: return AppColors.brand
+        case .dark: return .indigo
+        case .light: return .orange
+        }
+    }
+    
     private func triggerHaptic() {
-        #if canImport(UIKit)
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        #endif
+        NativeHaptics.lightImpact()
     }
 }

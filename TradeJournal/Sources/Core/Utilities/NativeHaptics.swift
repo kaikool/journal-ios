@@ -42,6 +42,7 @@ public enum NativeHaptics {
     /// Triggered on tab switches, time range changes, and segmented controls.
     public static func selection() {
         #if canImport(UIKit)
+        guard AppEnvironment.shared.isHapticsEnabled else { return }
         selectionGenerator.selectionChanged()
         selectionGenerator.prepare()
         #endif
@@ -50,6 +51,7 @@ public enum NativeHaptics {
     /// Triggered on button taps, list row taps, and light card swipes.
     public static func lightImpact() {
         #if canImport(UIKit)
+        guard AppEnvironment.shared.isHapticsEnabled else { return }
         lightGenerator.impactOccurred()
         lightGenerator.prepare()
         #endif
@@ -58,6 +60,7 @@ public enum NativeHaptics {
     /// Triggered on swipe action threshold reached, delete confirmation, and modal presentation.
     public static func mediumImpact() {
         #if canImport(UIKit)
+        guard AppEnvironment.shared.isHapticsEnabled else { return }
         mediumGenerator.impactOccurred()
         mediumGenerator.prepare()
         #endif
@@ -66,6 +69,7 @@ public enum NativeHaptics {
     /// Triggered on critical warnings or danger zone actions.
     public static func heavyImpact() {
         #if canImport(UIKit)
+        guard AppEnvironment.shared.isHapticsEnabled else { return }
         heavyGenerator.impactOccurred()
         heavyGenerator.prepare()
         #endif
@@ -74,6 +78,7 @@ public enum NativeHaptics {
     /// Triggered on successful actions (e.g. sync completed, trade imported, note saved).
     public static func success() {
         #if canImport(UIKit)
+        guard AppEnvironment.shared.isHapticsEnabled else { return }
         notificationGenerator.notificationOccurred(.success)
         notificationGenerator.prepare()
         #endif
@@ -82,6 +87,7 @@ public enum NativeHaptics {
     /// Triggered on validation errors or warnings.
     public static func warning() {
         #if canImport(UIKit)
+        guard AppEnvironment.shared.isHapticsEnabled else { return }
         notificationGenerator.notificationOccurred(.warning)
         notificationGenerator.prepare()
         #endif
@@ -90,6 +96,7 @@ public enum NativeHaptics {
     /// Triggered on failed operations or network errors.
     public static func error() {
         #if canImport(UIKit)
+        guard AppEnvironment.shared.isHapticsEnabled else { return }
         notificationGenerator.notificationOccurred(.error)
         notificationGenerator.prepare()
         #endif

@@ -53,6 +53,32 @@ public struct RootTabView: View {
                 bottomNavigationBar
             }
             .background(AppColors.background.ignoresSafeArea())
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 32, coordinateSpace: .local)
+                    .onEnded { value in
+                        guard !env.isDrawerOpen, env.selectedTab.isPrimaryTab else { return }
+                        let h = value.translation.width
+                        let v = value.translation.height
+                        // Must be a distinct horizontal swipe (at least 1.6x horizontal over vertical, and > 45pt)
+                        guard abs(h) > abs(v) * 1.6, abs(h) > 45 else { return }
+                        
+                        if h < -45 {
+                            // Swipe Left: Next Tab (Dashboard -> Calendar -> Journal -> Trades -> Reports)
+                            env.navigateToNextTab()
+                        } else if h > 45 {
+                            // Swipe Right: Previous Tab (Reports -> Trades -> Journal -> Calendar -> Dashboard)
+                            if env.selectedTab.previousPrimaryTab != nil {
+                                env.navigateToPreviousTab()
+                            } else {
+                                // On Dashboard (first tab), swiping right smoothly pulls open Drawer
+                                NativeHaptics.lightImpact()
+                                withAnimation(.spring(response: 0.30, dampingFraction: 0.82)) {
+                                    env.isDrawerOpen = true
+                                }
+                            }
+                        }
+                    }
+            )
             
             // Dedicated Right Edge Swipe Trigger (Active on primary tabs to advance)
             HStack {

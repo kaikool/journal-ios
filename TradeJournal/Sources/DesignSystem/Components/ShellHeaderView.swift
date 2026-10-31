@@ -83,6 +83,26 @@ public struct ShellHeaderView: View {
         .padding(.vertical, 8)
         .frame(minHeight: 52)
         .background(Color.clear)
+        .gesture(
+            DragGesture(minimumDistance: 20, coordinateSpace: .local)
+                .onEnded { value in
+                    let h = value.translation.width
+                    let v = value.translation.height
+                    guard abs(h) > abs(v) * 1.3, abs(h) > 30 else { return }
+                    if h < -30 {
+                        env.navigateToNextTab()
+                    } else if h > 30 {
+                        if env.selectedTab.previousPrimaryTab != nil {
+                            env.navigateToPreviousTab()
+                        } else {
+                            NativeHaptics.lightImpact()
+                            withAnimation(.spring(response: 0.30, dampingFraction: 0.82)) {
+                                env.isDrawerOpen = true
+                            }
+                        }
+                    }
+                }
+        )
         .sheet(isPresented: $showPreTradeAnalysis) {
             PreTradeAnalysisSheet(initialSymbol: "XAUUSD")
         }

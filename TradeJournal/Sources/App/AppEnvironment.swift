@@ -24,6 +24,11 @@ public final class AppEnvironment: ObservableObject {
             UserDefaults.standard.set(appTheme.rawValue, forKey: "journal_theme_preference")
         }
     }
+    @Published public var isHapticsEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(isHapticsEnabled, forKey: "journal_haptics_enabled")
+        }
+    }
     
     // Production user identity management (isolated per device)
     @Published public var isAuthenticated: Bool = true
@@ -49,12 +54,15 @@ public final class AppEnvironment: ObservableObject {
     
     public init() {
         let savedTheme = UserDefaults.standard.string(forKey: "journal_theme_preference")
-        self.appTheme = savedTheme.flatMap(AppTheme.init(rawValue:)) ?? .dark
+        self.appTheme = savedTheme.flatMap(AppTheme.init(rawValue:)) ?? .system
+        
+        let savedHaptics = UserDefaults.standard.object(forKey: "journal_haptics_enabled") as? Bool ?? true
+        self.isHapticsEnabled = savedHaptics
         
         // Auto-bootstrap any uncommitted local secrets from AppSecrets.plist to Apple Keychain
         AppSecretsLoader.bootstrapLocalSecretsToKeychain()
         
-        AppLogger.info("AppEnvironment initialized. PrivacyMode: \(isPrivacyModeEnabled), Currency: \(currentCurrency), Theme: \(appTheme.rawValue)")
+        AppLogger.info("AppEnvironment initialized. PrivacyMode: \(isPrivacyModeEnabled), Currency: \(currentCurrency), Theme: \(appTheme.rawValue), Haptics: \(isHapticsEnabled)")
     }
     
     public func togglePrivacyMode() {
@@ -71,26 +79,39 @@ public final class AppEnvironment: ObservableObject {
     }
     
     public func toggleTheme() {
-        appTheme = (appTheme == .dark) ? .light : .dark
+        switch appTheme {
+        case .system:
+            appTheme = .dark
+        case .dark:
+            appTheme = .light
+        case .light:
+            appTheme = .system
+        }
         AppLogger.debug("Theme toggled to: \(appTheme.rawValue)")
+    }
+    
+    public func setAppTheme(_ theme: AppTheme) {
+        withAnimation(.easeInOut(duration: 0.25)) {
+            appTheme = theme
+        }
     }
     
     // MARK: - Gesture-based Tab Navigation
     public func navigateToNextTab() {
         if let next = selectedTab.nextPrimaryTab {
-            #if canImport(UIKit)
-            UISelectionFeedbackGenerator().selectionChanged()
-            #endif
-            selectedTab = next
+            NativeHaptics.selection()
+            withAnimation(.spring(response: 0.30, dampingFraction: 0.82)) {
+                selectedTab = next
+            }
         }
     }
     
     public func navigateToPreviousTab() {
         if let prev = selectedTab.previousPrimaryTab {
-            #if canImport(UIKit)
-            UISelectionFeedbackGenerator().selectionChanged()
-            #endif
-            selectedTab = prev
+            NativeHaptics.selection()
+            withAnimation(.spring(response: 0.30, dampingFraction: 0.82)) {
+                selectedTab = prev
+            }
         }
     }
 }
