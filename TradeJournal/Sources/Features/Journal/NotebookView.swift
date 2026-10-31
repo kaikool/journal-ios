@@ -255,18 +255,10 @@ public struct NotebookView: View {
                                         .monospacedDigit()
                                         .foregroundColor(AppColors.secondaryText.opacity(0.8))
                                     Spacer()
-                                    Button {
-                                        #if canImport(UIKit)
-                                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                                        #endif
+                                    ModalDeleteButton {
                                         noteToDelete = note
                                         showDeleteNoteAlert = true
-                                    } label: {
-                                        Image(systemName: "trash")
-                                            .font(.system(size: 12))
-                                            .foregroundColor(AppColors.loss.opacity(0.8))
                                     }
-                                    .buttonStyle(.plain)
                                 }
                             }
                         }

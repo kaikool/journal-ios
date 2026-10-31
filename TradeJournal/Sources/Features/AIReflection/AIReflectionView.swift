@@ -110,22 +110,12 @@ public struct AIReflectionView: View {
             .navigationTitle("AI Trader Reflection")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    ModalDismissButton { dismiss() }
+                }
+                
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        #if canImport(UIKit)
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        #endif
-                        dismiss()
-                    } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundColor(AppColors.secondaryText)
-                            .frame(width: 28, height: 28)
-                            .background(AppColors.secondaryBackground.opacity(0.85))
-                            .clipShape(Circle())
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                    .accessibilityLabel("Close")
+                    ModalPrimaryButton("Done") { dismiss() }
                 }
             }
             .sheet(isPresented: $showTraderProfileSheet) {
@@ -168,7 +158,7 @@ public struct AIReflectionView: View {
             .foregroundColor(AppColors.secondaryText)
             .padding(.vertical, 4)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ApplePressableButtonStyle())
     }
     
     // MARK: - Template Filtering

@@ -76,10 +76,7 @@ public struct PlaybookDetailView: View {
                 }
                 
                 ToolbarItem(placement: .topBarTrailing) {
-                    HStack(spacing: 8) {
-                        ModalDeleteButton { showDeleteAlert = true }
-                        ModalPrimaryButton("Edit", icon: "pencil") { showEditSheet = true }
-                    }
+                    ModalPrimaryButton("Edit", icon: "pencil") { showEditSheet = true }
                 }
             }
         }

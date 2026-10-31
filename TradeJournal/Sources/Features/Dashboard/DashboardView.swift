@@ -462,21 +462,11 @@ public struct DashboardView: View {
             
             Spacer()
             
-            Button("Done") {
-                #if canImport(UIKit)
-                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                #endif
+            AppPrimaryButton("Done", height: 28) {
                 withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
                     isEditingLayout = false
                 }
             }
-            .font(AppTypography.captionBold)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 4)
-            .background(AppColors.brand)
-            .foregroundColor(.white)
-            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-            .fixedSize()
         }
         .padding(10)
         .background(AppColors.cardBackground)

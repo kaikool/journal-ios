@@ -36,6 +36,10 @@ public struct ReviewExportModal: View {
                 ToolbarItem(placement: .topBarLeading) {
                     ModalDismissButton { dismiss() }
                 }
+                
+                ToolbarItem(placement: .topBarTrailing) {
+                    ModalPrimaryButton("Done") { dismiss() }
+                }
             }
         }
     }

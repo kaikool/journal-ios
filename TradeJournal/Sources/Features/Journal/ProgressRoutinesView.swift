@@ -803,16 +803,10 @@ public struct ArchivedProgressRoutinesSheet: View {
             }
             .buttonStyle(.plain)
             
-            Button {
+            ModalDeleteButton {
                 ruleToDelete = rule
                 showDeleteAlert = true
-            } label: {
-                Image(systemName: "trash")
-                    .font(.system(size: 13))
-                    .foregroundColor(AppColors.loss.opacity(0.8))
-                    .frame(width: 32, height: 32)
             }
-            .buttonStyle(.plain)
         }
         .listRowBackground(AppColors.secondaryBackground)
     }

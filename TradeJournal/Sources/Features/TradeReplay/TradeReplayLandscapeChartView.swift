@@ -113,27 +113,9 @@ public struct TradeReplayLandscapeChartView: View {
     private var topNavBar: some View {
         HStack(spacing: 10) {
             // Dismiss button
-            Button {
+            ModalDismissButton {
                 onDismiss()
-            } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 11, weight: .bold))
-                    Text("Exit")
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
-                        .lineLimit(1)
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(AppColors.secondaryBackground)
-                .foregroundColor(AppColors.primaryText)
-                .clipShape(Capsule())
-                .overlay(
-                    Capsule().stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
-                )
             }
-            .buttonStyle(ApplePressableButtonStyle())
-            .accessibilityLabel("Exit Landscape View")
             
             // Symbol & Direction
             Text(trade.symbol)

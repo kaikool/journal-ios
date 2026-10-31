@@ -163,6 +163,10 @@ public struct PreTradeAnalysisSheet: View {
                 ToolbarItem(placement: .topBarLeading) {
                     ModalDismissButton { dismiss() }
                 }
+                
+                ToolbarItem(placement: .topBarTrailing) {
+                    ModalPrimaryButton("Done") { dismiss() }
+                }
             }
             .fullScreenCover(isPresented: $showFullScreenChart) {
                 if let img = activeChartSnapshot ?? renderActiveSnapshot() ?? userAttachedImage {

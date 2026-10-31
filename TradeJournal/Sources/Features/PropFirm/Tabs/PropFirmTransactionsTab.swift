@@ -119,21 +119,10 @@ extension PropFirmLedgerView {
                                         .buttonStyle(ApplePressableButtonStyle())
                                     }
                                     
-                                    Button {
-                                        #if canImport(UIKit)
-                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                        #endif
+                                    ModalDeleteButton {
                                         itemToVoid = (id: m.entryId, isEntry: true)
                                         showVoidAlert = true
-                                    } label: {
-                                        Image(systemName: "trash")
-                                            .font(.system(size: 12))
-                                            .foregroundColor(AppColors.loss.opacity(0.8))
-                                            .padding(6)
-                                            .background(AppColors.secondaryBackground)
-                                            .clipShape(Circle())
                                     }
-                                    .buttonStyle(ApplePressableButtonStyle())
                                 }
                             }
                         }

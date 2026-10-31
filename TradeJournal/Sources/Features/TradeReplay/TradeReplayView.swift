@@ -131,9 +131,7 @@ public struct TradeReplayView: View {
                 }
                 
                 ToolbarItem(placement: .topBarTrailing) {
-                    ModalIconButton(icon: "arrow.up.left.and.arrow.down.right", color: AppColors.primaryText, label: "Landscape Fullscreen") {
-                        showLandscapeChart = true
-                    }
+                    ModalPrimaryButton("Done") { dismiss() }
                 }
             }
         }

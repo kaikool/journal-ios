@@ -76,37 +76,8 @@ public struct PlaybookCardView: View {
                         .foregroundColor(AppColors.secondaryText)
                         .lineLimit(1)
                     
-                    Button {
-                        #if canImport(UIKit)
-                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                        #endif
-                        onEdit()
-                    } label: {
-                        Image(systemName: "pencil")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(AppColors.secondaryText)
-                            .frame(width: 32, height: 32)
-                            .background(AppColors.secondaryBackground)
-                            .clipShape(Circle())
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    
-                    Button {
-                        #if canImport(UIKit)
-                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                        #endif
-                        onDelete()
-                    } label: {
-                        Image(systemName: "trash")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(AppColors.loss.opacity(0.9))
-                            .frame(width: 32, height: 32)
-                            .background(AppColors.loss.opacity(0.1))
-                            .clipShape(Circle())
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
+                    ModalIconButton(icon: "pencil", color: AppColors.secondaryText, label: "Edit playbook", action: onEdit)
+                    ModalDeleteButton(action: onDelete)
                 }
                 
                 // Content area that opens Detail

@@ -240,12 +240,7 @@ public struct AttachmentCardView: View {
                 
                 Spacer()
                 
-                Button(action: onDelete) {
-                    Image(systemName: "trash")
-                        .font(.system(size: 11))
-                        .foregroundColor(AppColors.loss.opacity(0.8))
-                        .padding(4)
-                }
+                ModalDeleteButton(action: onDelete)
             }
         }
         .padding(8)
@@ -297,6 +292,10 @@ public struct AttachmentPreviewSheet: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     ModalDismissButton { dismiss() }
+                }
+                
+                ToolbarItem(placement: .topBarTrailing) {
+                    ModalPrimaryButton("Done") { dismiss() }
                 }
             }
         }

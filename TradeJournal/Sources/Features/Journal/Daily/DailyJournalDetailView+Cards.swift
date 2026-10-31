@@ -271,18 +271,6 @@ extension DailyJournalDetailView {
                             generateAiRecap()
                         }
                     )
-                    
-                    if !noteText.isEmpty {
-                        Button {
-                            showDeleteNoteAlert = true
-                        } label: {
-                            Image(systemName: "trash")
-                                .font(.system(size: 11, weight: .medium))
-                                .foregroundColor(AppColors.loss.opacity(0.75))
-                                .padding(4)
-                        }
-                        .buttonStyle(.plain)
-                    }
                 }
                 
                 if let err = aiErrorMessage {

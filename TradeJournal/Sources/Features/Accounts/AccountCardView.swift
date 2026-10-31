@@ -194,44 +194,14 @@ public struct AccountCardView: View {
                     
                     Spacer()
                     
-                    // Edit Account
-                    Button {
-                        #if canImport(UIKit)
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        #endif
-                        onEdit()
-                    } label: {
-                        Image(systemName: "pencil")
-                            .font(.system(size: 14))
-                            .foregroundColor(AppColors.secondaryText)
+                    // Actions
+                    HStack(spacing: 8) {
+                        ModalIconButton(icon: "pencil", color: AppColors.secondaryText, label: "Edit account", action: onEdit)
+                        ModalIconButton(icon: isArchived ? "tray.and.arrow.down" : "tray.and.arrow.up", color: AppColors.secondaryText, label: isArchived ? "Restore account" : "Archive account") {
+                            dataStore.archiveAccount(id: account.id, archived: !isArchived)
+                        }
+                        ModalDeleteButton(action: onDelete)
                     }
-                    .buttonStyle(ApplePressableButtonStyle())
-                    
-                    // Archive / Restore
-                    Button {
-                        #if canImport(UIKit)
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        #endif
-                        dataStore.archiveAccount(id: account.id, archived: !isArchived)
-                    } label: {
-                        Image(systemName: "tray.and.arrow.up")
-                            .font(.system(size: 14))
-                            .foregroundColor(AppColors.secondaryText)
-                    }
-                    .buttonStyle(ApplePressableButtonStyle())
-                    
-                    // Delete
-                    Button {
-                        #if canImport(UIKit)
-                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                        #endif
-                        onDelete()
-                    } label: {
-                        Image(systemName: "trash")
-                            .font(.system(size: 14))
-                            .foregroundColor(AppColors.loss.opacity(0.8))
-                    }
-                    .buttonStyle(ApplePressableButtonStyle())
                 }
             }
         }

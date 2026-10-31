@@ -169,16 +169,6 @@ public struct DayDetailSheet: View {
                 HStack(alignment: .center) {
                     AppSectionHeader("Daily note")
                     Spacer()
-                    if !noteContent.isEmpty || rating > 0 {
-                        Button {
-                            showDeleteNoteAlert = true
-                        } label: {
-                            Image(systemName: "trash")
-                                .font(.system(size: 11, weight: .medium))
-                                .foregroundColor(AppColors.loss.opacity(0.75))
-                        }
-                        .buttonStyle(.plain)
-                    }
                     HStack(spacing: 4) {
                         ForEach(1...5, id: \.self) { star in
                             Image(systemName: star <= rating ? "star.fill" : "star")

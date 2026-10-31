@@ -140,6 +140,10 @@ public struct TradeAICoachSheet: View {
                 ToolbarItem(placement: .topBarLeading) {
                     ModalDismissButton { dismiss() }
                 }
+                
+                ToolbarItem(placement: .topBarTrailing) {
+                    ModalPrimaryButton("Done") { dismiss() }
+                }
             }
             .sheet(isPresented: $showPhotoPicker) {
                 UIKitImagePicker(isPresented: $showPhotoPicker) { data, _ in
