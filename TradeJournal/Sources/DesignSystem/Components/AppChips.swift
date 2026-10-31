@@ -45,7 +45,7 @@ public struct AppFilterChip: View {
                 
                 if let count = count {
                     Text("\(count)")
-                        .font(AppTypography.badgeTiny)
+                        .font(AppTypography.badgeMicro)
                         .padding(.horizontal, 5)
                         .padding(.vertical, 1.5)
                         .background(isSelected ? activeColor.opacity(0.25) : AppColors.secondaryBackground)

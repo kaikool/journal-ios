@@ -36,6 +36,7 @@ public enum AppTypography {
     // MARK: - Tier 4: Section & Card Headers
     public static let sectionHeader = Font.system(size: 14, weight: .bold, design: .default)
     public static let cardHeader = Font.system(size: 14, weight: .bold, design: .default)
+    public static let cardHeaderLarge = Font.system(size: 14.5, weight: .bold, design: .default)
     public static let cardTitle = Font.system(size: 14, weight: .bold, design: .default)
     public static let cardHeaderUppercase = Font.system(size: 11.5, weight: .semibold, design: .default)
     
@@ -77,6 +78,7 @@ public enum AppTypography {
     public static let badge = Font.system(size: 10, weight: .bold, design: .default)
     public static let badgeStandard = Font.system(size: 10, weight: .bold, design: .default)
     public static let badgeMicro = Font.system(size: 9, weight: .bold, design: .default)
+    public static let badgeTiny = Font.system(size: 9, weight: .bold, design: .default)
     public static let badgeMarker = Font.system(size: 7.5, weight: .bold, design: .default)
     public static let badgeMarkerSmall = Font.system(size: 6.5, weight: .black, design: .default)
     
