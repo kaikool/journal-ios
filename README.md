@@ -137,18 +137,6 @@ Download the latest unsigned release binary from GitHub Releases:
 
 ---
 
-## Database Migrations (`supabase/migrations/`)
-
-To provision a self-hosted or cloud Supabase PostgreSQL instance, apply the SQL migrations in chronological order:
-1. `20261016_initial_schema.sql` — Core tables (`accounts`, `trades`, `executions`, `playbooks`, `journal_notes`, `prop_firm_transactions`).
-2. `20261021_financial_precision_and_swap.sql` — Exact `numeric(38,10)` monetary columns and overnight swap accounting.
-3. `20261025_economic_calendar.sql` — Macro economic calendar events schema and indexing.
-4. `20261026_progress_notes_missed_trades.sql` — Daily routine checklists and missed trade records.
-5. `20261028_ai_coach_intelligence.sql` — Persistent AI advisor memory, research projects, and trade lessons.
-6. `20261028_trade_mae_mfe_and_rpc.sql` — MAE/MFE excursion telemetry and batch sync RPC functions.
-
----
-
 ## License
 
 This project is licensed under the [MIT License](LICENSE).
