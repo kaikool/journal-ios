@@ -182,13 +182,7 @@ public struct TraderProfileSheet: View {
                         .font(AppTypography.captionBold)
                         .foregroundColor(AppColors.primaryText)
                     
-                    TextField("e.g. Minimum 2:1 R:R. Stop trading after 2 consecutive losses.", text: $customMemoryNotes, axis: .vertical)
-                        .lineLimit(3...5)
-                        .font(AppTypography.inputText)
-                        .padding(10)
-                        .background(AppColors.secondaryBackground)
-                        .cornerRadius(8)
-                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(AppColors.border.opacity(0.6), lineWidth: 0.8))
+                    AppTextField("e.g. Minimum 2:1 R:R. Stop trading after 2 consecutive losses.", text: $customMemoryNotes)
                 }
             }
             .padding(.vertical, 2)
@@ -247,9 +241,7 @@ public struct TraderProfileSheet: View {
         dataStore.aiSettings = conf
         dataStore.saveToDisk()
         
-        #if os(iOS)
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
-        #endif
+        NativeHaptics.success()
         
         showSavedToast = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {

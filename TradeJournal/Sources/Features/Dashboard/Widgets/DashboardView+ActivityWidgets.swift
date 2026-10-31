@@ -11,9 +11,7 @@ extension DashboardView {
                         .foregroundColor(AppColors.primaryText)
                     Spacer()
                     Button {
-                        #if canImport(UIKit)
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        #endif
+                        .lightImpact()
                         env.selectedTab = .calendar
                     } label: {
                         Text("Full calendar")
@@ -145,10 +143,8 @@ extension DashboardView {
                     ForEach(["recent", "open"], id: \.self) { tab in
                         let isSelected = activityTab == tab
                         Button {
-                            #if canImport(UIKit)
-                            UISelectionFeedbackGenerator().selectionChanged()
-                            #endif
-                            withAnimation(.spring(response: 0.28, dampingFraction: 0.75)) {
+                            .selection()
+                            withAnimation(AppAnimations.springQuick) {
                                 activityTab = tab
                             }
                         } label: {
@@ -358,9 +354,7 @@ extension DashboardView {
     // MARK: - Day Selection Action
     
     internal func openCalendarDay(dateKey: String, stats: DayStats?) {
-        #if canImport(UIKit)
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        #endif
+        .lightImpact()
         let tradesForDay = dataStore.filteredTrades.filter {
             Formatters.isoDayString(from: $0.closedAt ?? $0.openedAt, timeZone: env.currentTimeZone) == dateKey
         }

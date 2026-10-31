@@ -91,11 +91,9 @@ public struct RichNoteEditor: View {
                 
                 if allowPreviewToggle {
                     Button {
-                        #if canImport(UIKit)
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        #endif
+                        .lightImpact()
                         hasUserManuallyToggled = true
-                        withAnimation(.spring(response: 0.28, dampingFraction: 0.8)) {
+                        withAnimation(AppAnimations.springQuick) {
                             isPreviewMode.toggle()
                         }
                     } label: {
@@ -167,9 +165,7 @@ public struct RichNoteEditor: View {
         action: @escaping () -> Void
     ) -> some View {
         Button {
-            #if canImport(UIKit)
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            #endif
+            .lightImpact()
             action()
         } label: {
             Text(label)
@@ -194,9 +190,7 @@ public struct RichNoteEditor: View {
         action: @escaping () -> Void
     ) -> some View {
         Button {
-            #if canImport(UIKit)
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            #endif
+            .lightImpact()
             action()
         } label: {
             Image(systemName: systemName)
@@ -267,10 +261,8 @@ public struct RichNoteEditor: View {
     @ViewBuilder
     private var previewContainer: some View {
         Button {
-            #if canImport(UIKit)
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            #endif
-            withAnimation(.spring(response: 0.28, dampingFraction: 0.8)) {
+            .lightImpact()
+            withAnimation(AppAnimations.springQuick) {
                 isPreviewMode = false
             }
         } label: {

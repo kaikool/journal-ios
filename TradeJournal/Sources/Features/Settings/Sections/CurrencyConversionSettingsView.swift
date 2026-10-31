@@ -18,10 +18,7 @@ public struct CurrencyConversionSettingsView: View {
     public var body: some View {
         SettingsCard(title: "Currency conversion", footer: "Set reporting currency and exchange rates for combined analytics.") {
             VStack(alignment: .leading, spacing: 14) {
-                Toggle("Convert Dashboard & Calendar", isOn: $enabled)
-                    .font(AppTypography.rowPrimary)
-                    .foregroundColor(AppColors.primaryText)
-                    .tint(AppColors.brand)
+                AppToggleRow("Convert Dashboard & Calendar", isOn: $enabled)
                 
                 Divider()
                     .background(AppColors.border.opacity(0.4))
@@ -55,13 +52,14 @@ public struct CurrencyConversionSettingsView: View {
                                 .foregroundColor(AppColors.primaryText)
                                 .frame(width: 75, alignment: .leading)
                             
-                            TextField("Rate", text: Binding(
-                                get: { code == reportingCurrency ? "1" : (rates[code] ?? "") },
-                                set: { rates[code] = $0 }
-                            ))
-                            .font(AppTypography.formInput)
-                            .keyboardType(.decimalPad)
-                            .textFieldStyle(.roundedBorder)
+                            AppNumericField(
+                                text: Binding(
+                                    get: { code == reportingCurrency ? "1" : (rates[code] ?? "") },
+                                    set: { rates[code] = $0 }
+                                ),
+                                placeholder: "Rate",
+                                height: 32
+                            )
                             .disabled(code == reportingCurrency)
                             .frame(maxWidth: 130)
                             

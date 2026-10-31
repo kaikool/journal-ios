@@ -437,14 +437,14 @@ public struct DashboardView: View {
             .presentationDragIndicator(.visible)
             .presentationCornerRadius(28)
         }
-        .alert(activeTooltip?.title ?? "Info", isPresented: Binding(
-            get: { activeTooltip != nil },
-            set: { if !$0 { activeTooltip = nil } }
-        )) {
-            Button("Got it", role: .cancel) { activeTooltip = nil }
-        } message: {
-            Text(activeTooltip?.hint ?? "")
-        }
+        .appInfoAlert(
+            isPresented: Binding(
+                get: { activeTooltip != nil },
+                set: { if !$0 { activeTooltip = nil } }
+            ),
+            title: activeTooltip?.title ?? "Info",
+            message: activeTooltip?.hint ?? ""
+        )
     }
     
     // MARK: - Reorder Mode Banner
@@ -463,7 +463,7 @@ public struct DashboardView: View {
             Spacer()
             
             AppPrimaryButton("Done", height: 28) {
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                withAnimation(AppAnimations.springStandard) {
                     isEditingLayout = false
                 }
             }
@@ -539,9 +539,7 @@ public struct DashboardView: View {
             
             // Customize button (Sheet)
             Button {
-                #if canImport(UIKit)
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                #endif
+                .lightImpact()
                 showCustomizerSheet = true
             } label: {
                 HStack(spacing: 6) {
@@ -569,10 +567,8 @@ public struct DashboardView: View {
     // MARK: - Presets & Reorder Actions
     
     private func applyPreset(_ preset: DashboardPreset) {
-        #if canImport(UIKit)
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        #endif
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+        .mediumImpact()
+        withAnimation(AppAnimations.springStandard) {
             activePresetRaw = preset.rawValue
             cardOrderRaw = preset.canonicalOrder.joined(separator: ",")
             hiddenWidgetsRaw = preset.canonicalHidden.joined(separator: ",")
@@ -585,10 +581,8 @@ public struct DashboardView: View {
         let newIndex = currentIndex + direction
         guard newIndex >= 0 && newIndex < currentOrder.count else { return }
         
-        #if canImport(UIKit)
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        #endif
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+        .mediumImpact()
+        withAnimation(AppAnimations.springStandard) {
             currentOrder.swapAt(currentIndex, newIndex)
             cardOrderRaw = currentOrder.joined(separator: ",")
             activePresetRaw = DashboardPreset.custom.rawValue
@@ -596,12 +590,10 @@ public struct DashboardView: View {
     }
     
     func hideCard(cardId: String) {
-        #if canImport(UIKit)
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        #endif
+        .lightImpact()
         var currentHidden = hiddenCardIds
         currentHidden.insert(cardId)
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+        withAnimation(AppAnimations.springStandard) {
             hiddenWidgetsRaw = currentHidden.joined(separator: ",")
             activePresetRaw = DashboardPreset.custom.rawValue
         }

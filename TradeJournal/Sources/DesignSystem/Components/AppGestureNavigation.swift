@@ -91,10 +91,8 @@ public struct InteractiveEdgeBackSwipeModifier: ViewModifier {
                                 isDragging = false
                                 let velocity = value.predictedEndTranslation.width - value.translation.width
                                 if value.translation.width > 70 || velocity > 150 {
-                                    #if canImport(UIKit)
-                                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                                    #endif
-                                    withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
+                                    .mediumImpact()
+                                    withAnimation(AppAnimations.springQuick) {
                                         dragOffset = 220
                                     }
                                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
@@ -102,7 +100,7 @@ public struct InteractiveEdgeBackSwipeModifier: ViewModifier {
                                         dragOffset = 0
                                     }
                                 } else {
-                                    withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
+                                    withAnimation(AppAnimations.springQuick) {
                                         dragOffset = 0
                                     }
                                 }

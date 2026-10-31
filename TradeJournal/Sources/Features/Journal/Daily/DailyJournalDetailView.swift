@@ -252,15 +252,14 @@ public struct DailyJournalDetailView: View {
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(28)
         }
-        .alert("Delete note for \(date)?", isPresented: $showDeleteNoteAlert) {
-            Button("Cancel", role: .cancel) {}
-            Button("Delete", role: .destructive) {
-                noteText = ""
-                dataStore.deleteCalendarNote(for: date)
-                saveStatusMessage = "Deleted"
-            }
-        } message: {
-            Text("This note will be permanently removed from your calendar and Supabase.")
+        .appConfirmationAlert(
+            isPresented: $showDeleteNoteAlert,
+            title: "Delete note for \(date)?",
+            message: "This note will be permanently removed from your calendar and Supabase."
+        ) {
+            noteText = ""
+            dataStore.deleteCalendarNote(for: date)
+            saveStatusMessage = "Deleted"
         }
         .onAppear {
             loadNote()
@@ -311,9 +310,7 @@ public struct DailyJournalDetailView: View {
     }
     
     internal func applyFormat(marker: String) {
-        #if canImport(UIKit)
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        #endif
+        .lightImpact()
         let res = NoteFormattingEngine.formatInlineSelection(
             value: noteText,
             start: (noteText as NSString).length,
@@ -325,9 +322,7 @@ public struct DailyJournalDetailView: View {
     }
     
     internal func insertBullet() {
-        #if canImport(UIKit)
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        #endif
+        .lightImpact()
         if noteText.isEmpty || noteText.hasSuffix("\n") {
             noteText += "- "
         } else {
@@ -337,9 +332,7 @@ public struct DailyJournalDetailView: View {
     }
     
     internal func insertNumberedList() {
-        #if canImport(UIKit)
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        #endif
+        .lightImpact()
         if noteText.isEmpty || noteText.hasSuffix("\n") {
             noteText += "1. "
         } else {

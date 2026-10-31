@@ -98,13 +98,13 @@ public struct GaugeView: View {
         .onAppear {
             guard animatedRatio == 0.0 && targetRatio > 0 else { return }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
-                withAnimation(.spring(response: 0.85, dampingFraction: 0.80)) {
+                withAnimation(AppAnimations.chartEntrance) {
                     animatedRatio = targetRatio
                 }
             }
         }
         .onChange(of: targetRatio) { newRatio in
-            withAnimation(.spring(response: 0.55, dampingFraction: 0.82)) {
+            withAnimation(AppAnimations.sheetSpring) {
                 animatedRatio = newRatio
             }
         }

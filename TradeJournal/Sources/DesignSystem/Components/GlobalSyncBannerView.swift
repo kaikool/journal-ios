@@ -91,7 +91,7 @@ public struct GlobalSyncBannerView: View {
         .onChange(of: dataStore.lastSyncError) { _ in
             isDismissed = false
         }
-        .animation(.spring(response: 0.32, dampingFraction: 0.82), value: dataStore.isSyncing)
+        .animation(AppAnimations.springStandard, value: dataStore.isSyncing)
     }
     
     private func scheduleAutoDismiss() {

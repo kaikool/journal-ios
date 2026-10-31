@@ -102,14 +102,14 @@ public struct AIMemoryManagementSheet: View {
                     reloadMemories()
                 })
             }
-            .alert("Delete Memory Permanently?", isPresented: $showDeleteConfirmation, presenting: memoryToDelete) { mem in
-                Button("Delete", role: .destructive) {
-                    AIAdvisorMemoryEngine.shared.deleteMemory(id: mem.id)
-                    reloadMemories()
-                }
-                Button("Cancel", role: .cancel) {}
-            } message: { mem in
-                Text("Memory '\(mem.title)' will be deleted locally and from cloud storage.")
+            .appConfirmationAlert(
+                isPresented: $showDeleteConfirmation,
+                presenting: memoryToDelete,
+                title: { _ in "Delete Memory Permanently?" },
+                message: { mem in "Memory '\(mem.title)' will be deleted locally and from cloud storage." }
+            ) { mem in
+                AIAdvisorMemoryEngine.shared.deleteMemory(id: mem.id)
+                reloadMemories()
             }
         }
     }

@@ -539,7 +539,7 @@ extension JournalCalendarView {
         
         Button(action: {
             guard hasTrades else { return }
-            withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
+            withAnimation(AppAnimations.springQuick) {
                 selectedWeekdayIndex = (selectedWeekdayIndex == wd.index) ? nil : wd.index
             }
         }) {

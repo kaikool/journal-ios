@@ -61,9 +61,7 @@ public struct TradeDetailDisciplineCard: View {
                                 .foregroundColor(star <= (trade.rating ?? 0) ? .yellow : AppColors.secondaryText.opacity(0.3))
                                 .font(AppTypography.displayMedium)
                                 .onTapGesture {
-                                    #if canImport(UIKit)
-                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                    #endif
+                                    .lightImpact()
                                     trade.rating = (trade.rating == star) ? nil : star
                                     onUpdate()
                                 }

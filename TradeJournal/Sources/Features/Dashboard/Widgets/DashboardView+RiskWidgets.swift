@@ -38,9 +38,7 @@ extension DashboardView {
                     EdgeRadarView(components: edgeResult.components, height: 210)
                     
                     Button {
-                        #if canImport(UIKit)
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        #endif
+                        .lightImpact()
                         withAnimation {
                             showEdgeScoreBreakdown.toggle()
                         }

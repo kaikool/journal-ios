@@ -14,6 +14,12 @@ public enum AppAnimations {
     /// 0.38s / 0.88: Smooth fluid transition for sheet presentations and drawer slides
     public static let sheetSpring = Animation.spring(response: 0.38, dampingFraction: 0.88)
     
+    /// 0.85s / 0.82: Fluid progressive entrance animation for charts, curves, and heatmaps
+    public static let chartEntrance = Animation.spring(response: 0.85, dampingFraction: 0.82)
+    
+    /// 0.30s / 0.82: Snappy interactive feedback for scrubbers and lightboxes
+    public static let interactive = Animation.spring(response: 0.30, dampingFraction: 0.82)
+    
     /// 0.20s: Instant fade in / fade out for tooltips and overlays
     public static let easeInOutFast = Animation.easeInOut(duration: 0.20)
     

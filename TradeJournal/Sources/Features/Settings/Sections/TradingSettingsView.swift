@@ -70,10 +70,7 @@ public struct TradingSettingsView: View {
                             .font(AppTypography.captionBold)
                             .foregroundColor(AppColors.secondaryText)
                         
-                        TextField("0", text: $breakevenText)
-                            .font(AppTypography.inputText)
-                            .keyboardType(.decimalPad)
-                            .textFieldStyle(.roundedBorder)
+                        AppNumericField(text: $breakevenText, placeholder: "0", height: 34)
                         
                         AppSegmentedBar(
                             selection: $breakevenMode,
@@ -119,17 +116,12 @@ public struct TradingSettingsView: View {
                                         height: 32
                                     )
                                     
-                                    TextField("Symbol (e.g. ES)", text: $feeRules[index].symbol)
-                                        .font(AppTypography.inputText)
-                                        .textFieldStyle(.roundedBorder)
+                                    AppTextField("Symbol (e.g. ES)", text: $feeRules[index].symbol)
                                         .textInputAutocapitalization(.characters)
                                 }
                                 
                                 HStack {
-                                    TextField("Amount", value: $feeRules[index].amount, format: .number)
-                                        .font(AppTypography.inputText)
-                                        .keyboardType(.decimalPad)
-                                        .textFieldStyle(.roundedBorder)
+                                    AppNumericValueField("Amount", value: $feeRules[index].amount, height: 34)
                                         .frame(maxWidth: 100)
                                     
                                     AppSegmentedBar(
@@ -186,26 +178,18 @@ public struct TradingSettingsView: View {
                                         height: 32
                                     )
                                     
-                                    TextField("Symbol (e.g. NQ)", text: $riskRules[index].symbol)
-                                        .font(AppTypography.inputText)
-                                        .textFieldStyle(.roundedBorder)
+                                    AppTextField("Symbol (e.g. NQ)", text: $riskRules[index].symbol)
                                         .textInputAutocapitalization(.characters)
                                 }
                                 
                                 HStack(spacing: 8) {
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text("Stop").font(AppTypography.caption)
-                                        TextField("Stop", value: $riskRules[index].stop, format: .number)
-                                            .font(AppTypography.inputText)
-                                            .keyboardType(.decimalPad)
-                                            .textFieldStyle(.roundedBorder)
+                                        AppNumericValueField("Stop", value: $riskRules[index].stop, height: 34)
                                     }
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text("Target").font(AppTypography.caption)
-                                        TextField("Target", value: $riskRules[index].target, format: .number)
-                                            .font(AppTypography.inputText)
-                                            .keyboardType(.decimalPad)
-                                            .textFieldStyle(.roundedBorder)
+                                        AppNumericValueField("Target", value: $riskRules[index].target, height: 34)
                                     }
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text("Unit").font(AppTypography.caption)

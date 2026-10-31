@@ -295,10 +295,8 @@ public struct DashboardCustomizerSheet: View {
                     HStack(spacing: 8) {
                         ForEach(DashboardPreset.allCases.filter { $0 != .custom }) { preset in
                             Button {
-                                #if canImport(UIKit)
-                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                                #endif
-                                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                .mediumImpact()
+                                withAnimation(AppAnimations.springStandard) {
                                     activePreset = preset
                                     cardOrder = preset.canonicalOrder
                                     hiddenCardIds = preset.canonicalHidden
@@ -401,9 +399,7 @@ public struct DashboardCustomizerSheet: View {
                     }
                 }
                 .onMove { source, destination in
-                    #if canImport(UIKit)
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    #endif
+                    .lightImpact()
                     cardOrder.move(fromOffsets: source, toOffset: destination)
                     activePreset = .custom
                 }

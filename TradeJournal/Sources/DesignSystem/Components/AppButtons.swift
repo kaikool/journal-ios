@@ -6,7 +6,7 @@ public struct ApplePressableButtonStyle: ButtonStyle {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.96 : 1.0)
             .opacity(configuration.isPressed ? 0.92 : 1.0)
-            .animation(.spring(response: 0.28, dampingFraction: 0.72), value: configuration.isPressed)
+            .animation(AppAnimations.springQuick, value: configuration.isPressed)
     }
 }
 
@@ -47,9 +47,11 @@ public struct AppButton: View {
     
     public var body: some View {
         Button {
-            #if os(iOS)
-            UIImpactFeedbackGenerator(style: style == .primary ? .medium : .light).impactOccurred()
-            #endif
+            if style == .primary {
+                NativeHaptics.mediumImpact()
+            } else {
+                NativeHaptics.lightImpact()
+            }
             action()
         } label: {
             HStack(spacing: size == .compact ? 4 : 6) {
@@ -318,9 +320,11 @@ public struct AppActionPill: View {
     
     public var body: some View {
         Button {
-            #if os(iOS)
-            UIImpactFeedbackGenerator(style: isPrimary ? .medium : .light).impactOccurred()
-            #endif
+            if isPrimary {
+                NativeHaptics.mediumImpact()
+            } else {
+                NativeHaptics.lightImpact()
+            }
             action()
         } label: {
             HStack(spacing: 5) {
@@ -371,9 +375,7 @@ public struct AppBackButton: View {
     
     public var body: some View {
         Button {
-            #if os(iOS)
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            #endif
+            .mediumImpact()
             action()
         } label: {
             HStack(spacing: 4) {

@@ -23,12 +23,12 @@ public struct AppRatioBar: View {
         }
         .frame(height: 6)
         .onAppear {
-            withAnimation(.spring(response: 0.65, dampingFraction: 0.82)) {
+            withAnimation(AppAnimations.sheetSpring) {
                 animatedRatio = greenRatio
             }
         }
         .onChange(of: greenRatio) { newRatio in
-            withAnimation(.spring(response: 0.55, dampingFraction: 0.82)) {
+            withAnimation(AppAnimations.sheetSpring) {
                 animatedRatio = newRatio
             }
         }

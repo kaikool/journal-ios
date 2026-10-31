@@ -39,7 +39,7 @@ public struct FullScreenChartLightboxView: View {
                             .onEnded { _ in
                                 lastScale = CGFloat(1.0)
                                 if scale <= CGFloat(1.0) {
-                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                    withAnimation(AppAnimations.springQuick) {
                                         scale = CGFloat(1.0)
                                         offset = .zero
                                     }
@@ -60,7 +60,7 @@ public struct FullScreenChartLightboxView: View {
                             }
                     )
                     .onTapGesture(count: 2) {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        withAnimation(AppAnimations.springQuick) {
                             if scale > CGFloat(1.2) {
                                 scale = CGFloat(1.0)
                                 offset = .zero

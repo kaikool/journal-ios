@@ -227,9 +227,7 @@ public struct EditManualTradeSheet: View {
                 // Direction Selector
                 HStack(spacing: 8) {
                     Button {
-                        #if canImport(UIKit)
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        #endif
+                        .lightImpact()
                         direction = .long
                     } label: {
                         HStack(spacing: 6) {
@@ -247,9 +245,7 @@ public struct EditManualTradeSheet: View {
                     .buttonStyle(ApplePressableButtonStyle())
                     
                     Button {
-                        #if canImport(UIKit)
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        #endif
+                        .lightImpact()
                         direction = .short
                     } label: {
                         HStack(spacing: 6) {
@@ -281,17 +277,11 @@ public struct EditManualTradeSheet: View {
                     .foregroundColor(AppColors.secondaryText)
                     .tracking(0.5)
                 
-                Toggle(isOn: $isClosed) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Trade is Closed")
-                            .font(AppTypography.bodyBold)
-                            .foregroundColor(AppColors.primaryText)
-                        Text(isClosed ? "Calculates realized net P&L and metrics" : "Tracked as an open position")
-                            .font(AppTypography.caption)
-                            .foregroundColor(AppColors.secondaryText)
-                    }
-                }
-                .tint(AppColors.brand)
+                AppToggleRow(
+                    "Trade is Closed",
+                    subtitle: isClosed ? "Calculates realized net P&L and metrics" : "Tracked as an open position",
+                    isOn: $isClosed
+                )
                 
                 Divider().background(AppColors.border.opacity(0.5))
                 

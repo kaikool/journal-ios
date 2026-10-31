@@ -158,7 +158,7 @@ public struct CandleChartView: View {
                     }
             )
             .onTapGesture(count: 2) {
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                withAnimation(AppAnimations.springStandard) {
                     zoomScale = 1.0
                     panOffset = 0.0
                 }
@@ -255,9 +255,7 @@ public struct CandleChartView: View {
                     let isSelected = res == resolution
                     let label = res == .m15 ? "15m" : (res == .h1 ? "1h" : "4h")
                     Button {
-                        #if os(iOS)
-                        UISelectionFeedbackGenerator().selectionChanged()
-                        #endif
+                        .selection()
                         onResolutionChange?(res)
                     } label: {
                         Text(label)
@@ -603,9 +601,7 @@ public struct CandleChartView: View {
         let index = Int(adjustedX / stX)
         if index >= 0 && index < visibleBars.count && self.hoveredBarIndex != index {
             self.hoveredBarIndex = index
-            #if os(iOS)
-            UISelectionFeedbackGenerator().selectionChanged()
-            #endif
+            .selection()
         }
     }
     

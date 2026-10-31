@@ -206,7 +206,7 @@ public struct NavigationDrawerView: View {
                 // Native Apple Circular Close Button
                 Button {
                     triggerHaptic()
-                    withAnimation(.spring(response: 0.34, dampingFraction: 0.84)) {
+                    withAnimation(AppAnimations.springStandard) {
                         env.isDrawerOpen = false
                     }
                 } label: {
@@ -258,7 +258,7 @@ public struct NavigationDrawerView: View {
                 Button {
                     triggerHaptic()
                     env.selectedTab = .accounts
-                    withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
+                    withAnimation(AppAnimations.springStandard) {
                         env.isDrawerOpen = false
                     }
                 } label: {
@@ -331,7 +331,7 @@ public struct NavigationDrawerView: View {
         Button {
             triggerHaptic()
             if env.selectedTab == tab {
-                withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
+                withAnimation(AppAnimations.springStandard) {
                     env.isDrawerOpen = false
                 }
                 return
@@ -341,7 +341,7 @@ public struct NavigationDrawerView: View {
             env.selectedTab = tab
             
             // Smoothly dismiss drawer at 120fps
-            withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
+            withAnimation(AppAnimations.springStandard) {
                 env.isDrawerOpen = false
             }
         } label: {

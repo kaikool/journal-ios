@@ -76,10 +76,8 @@ public struct RootTabView: View {
             
             // Menu / More button
             Button {
-                #if os(iOS)
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                #endif
-                withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
+                .lightImpact()
+                withAnimation(AppAnimations.springStandard) {
                     env.isDrawerOpen.toggle()
                 }
             } label: {
@@ -87,7 +85,7 @@ public struct RootTabView: View {
                     Image(systemName: env.isDrawerOpen ? "xmark" : "line.3.horizontal")
                         .font(AppTypography.actionButton)
                         .scaleEffect(env.isDrawerOpen ? 1.05 : 1.0)
-                        .animation(.spring(response: 0.28, dampingFraction: 0.72), value: env.isDrawerOpen)
+                        .animation(AppAnimations.springQuick, value: env.isDrawerOpen)
                     
                     Text("Menu")
                         .font(env.isDrawerOpen ? AppTypography.captionBold : AppTypography.captionMicro)
@@ -138,14 +136,10 @@ public struct RootTabView: View {
         
         return Button {
             if !isSelected {
-                #if os(iOS)
-                UISelectionFeedbackGenerator().selectionChanged()
-                #endif
+                .selection()
                 env.selectedTab = tab
             } else {
-                #if os(iOS)
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                #endif
+                .lightImpact()
                 NotificationCenter.default.post(name: .appScrollToTop, object: tab)
             }
         } label: {
@@ -169,7 +163,7 @@ public struct RootTabView: View {
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .fill(isSelected ? AppColors.brand.opacity(env.colorScheme == .dark ? 0.18 : 0.10) : Color.clear)
             )
-            .animation(.spring(response: 0.28, dampingFraction: 0.72), value: isSelected)
+            .animation(AppAnimations.springQuick, value: isSelected)
         }
         .buttonStyle(ApplePressableButtonStyle())
         .accessibilityLabel("\(label) tab")
@@ -215,7 +209,7 @@ private struct InteractiveDrawerOverlay: View {
                 .allowsHitTesting(env.isDrawerOpen || dragOffset > 0)
                 .onTapGesture {
                     NativeHaptics.lightImpact()
-                    withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
+                    withAnimation(AppAnimations.springQuick) {
                         env.isDrawerOpen = false
                         dragOffset = 0
                     }
@@ -253,7 +247,7 @@ private struct InteractiveDrawerOverlay: View {
                                 if shouldOpen {
                                     NativeHaptics.lightImpact()
                                 }
-                                withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
+                                withAnimation(AppAnimations.springQuick) {
                                     env.isDrawerOpen = shouldOpen
                                     dragOffset = 0
                                 }
@@ -279,7 +273,7 @@ private struct InteractiveDrawerOverlay: View {
                     if shouldClose {
                         NativeHaptics.lightImpact()
                     }
-                    withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
+                    withAnimation(AppAnimations.springQuick) {
                         env.isDrawerOpen = !shouldClose
                         dragOffset = 0
                     }

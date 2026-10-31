@@ -200,9 +200,7 @@ public struct AddTradeSheet: View {
                 // Direction Selector
                 HStack(spacing: 8) {
                     Button {
-                        #if canImport(UIKit)
-                        UISelectionFeedbackGenerator().selectionChanged()
-                        #endif
+                        .selection()
                         direction = .long
                     } label: {
                         HStack(spacing: 6) {
@@ -220,9 +218,7 @@ public struct AddTradeSheet: View {
                     .buttonStyle(ApplePressableButtonStyle())
                     
                     Button {
-                        #if canImport(UIKit)
-                        UISelectionFeedbackGenerator().selectionChanged()
-                        #endif
+                        .selection()
                         direction = .short
                     } label: {
                         HStack(spacing: 6) {
@@ -241,17 +237,11 @@ public struct AddTradeSheet: View {
                 }
                 
                 // Closed Position Toggle
-                Toggle(isOn: $isClosed) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Trade is Closed")
-                            .font(AppTypography.bodyBold)
-                            .foregroundColor(AppColors.primaryText)
-                        Text(isClosed ? "Calculates realized net P&L and metrics" : "Tracked as an open position")
-                            .font(AppTypography.caption)
-                            .foregroundColor(AppColors.secondaryText)
-                    }
-                }
-                .tint(AppColors.brand)
+                AppToggleRow(
+                    "Trade is Closed",
+                    subtitle: isClosed ? "Calculates realized net P&L and metrics" : "Tracked as an open position",
+                    isOn: $isClosed
+                )
                 
                 Divider().background(AppColors.border.opacity(0.5))
                 

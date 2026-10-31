@@ -116,16 +116,15 @@ public struct DayDetailSheet: View {
                     }
                 }
             }
-            .alert("Delete note for this day?", isPresented: $showDeleteNoteAlert) {
-                Button("Cancel", role: .cancel) {}
-                Button("Delete", role: .destructive) {
-                    noteContent = ""
-                    rating = 0
-                    TradeDataStore.shared.deleteCalendarNote(for: dateKey)
-                    saveStatus = "Deleted"
-                }
-            } message: {
-                Text("This note will be permanently removed from your calendar and Supabase.")
+            .appConfirmationAlert(
+                isPresented: $showDeleteNoteAlert,
+                title: "Delete note for this day?",
+                message: "This note will be permanently removed from your calendar and Supabase."
+            ) {
+                noteContent = ""
+                rating = 0
+                TradeDataStore.shared.deleteCalendarNote(for: dateKey)
+                saveStatus = "Deleted"
             }
             .sheet(isPresented: $showFullJournal, onDismiss: { reloadNote() }) {
                 DailyJournalDetailView(date: dateKey, isModal: true)
@@ -344,9 +343,7 @@ public struct DayDetailSheet: View {
     }
     
     private func applyFormat(marker: String) {
-        #if canImport(UIKit)
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        #endif
+        .lightImpact()
         let res = NoteFormattingEngine.formatInlineSelection(
             value: noteContent,
             start: (noteContent as NSString).length,
@@ -358,9 +355,7 @@ public struct DayDetailSheet: View {
     }
     
     private func insertBullet() {
-        #if canImport(UIKit)
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        #endif
+        .lightImpact()
         if noteContent.isEmpty || noteContent.hasSuffix("\n") {
             noteContent += "- "
         } else {
@@ -370,9 +365,7 @@ public struct DayDetailSheet: View {
     }
     
     private func insertNumberedList() {
-        #if canImport(UIKit)
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        #endif
+        .lightImpact()
         if noteContent.isEmpty || noteContent.hasSuffix("\n") {
             noteContent += "1. "
         } else {

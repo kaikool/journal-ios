@@ -20,7 +20,7 @@ public struct CreateAccountSheet: View {
         NavigationStack {
             Form {
                 Section(header: Text("Account & Broker")) {
-                    TextField("Account name (e.g. IC Markets Live #5123981)", text: $name)
+                    AppTextField("Account name (e.g. IC Markets Live #5123981)", text: $name)
                     
                     AppDropdownField(
                         label: "Broker",
@@ -38,9 +38,7 @@ public struct CreateAccountSheet: View {
                         titleFor: { $0 }
                     )
                     
-                    TextField("Initial balance (e.g. 10000)", text: $initialBalanceText)
-                        .keyboardType(.decimalPad)
-                        .monospacedDigit()
+                    AppNumericField("Initial balance", text: $initialBalanceText, placeholder: "10000")
                     
                     AppDropdownField(
                         label: "P&L Method",
@@ -111,7 +109,7 @@ public struct EditAccountSheet: View {
         NavigationStack {
             Form {
                 Section(header: Text("Account & Broker")) {
-                    TextField("Account name", text: $name)
+                    AppTextField("Account name", text: $name)
                     
                     AppDropdownField(
                         label: "Broker",
@@ -129,9 +127,7 @@ public struct EditAccountSheet: View {
                         titleFor: { $0 }
                     )
                     
-                    TextField("Initial balance (e.g. 10000)", text: $initialBalanceText)
-                        .keyboardType(.decimalPad)
-                        .monospacedDigit()
+                    AppNumericField("Initial balance", text: $initialBalanceText, placeholder: "10000")
                 }
             }
             .navigationTitle("Edit account")

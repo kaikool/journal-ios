@@ -52,9 +52,7 @@ public struct NotebookEditorSheet: View {
             VStack(spacing: 0) {
                 // Header inputs
                 VStack(spacing: 12) {
-                    TextField("Title", text: $title)
-                        .font(AppTypography.headline)
-                        .foregroundColor(AppColors.primaryText)
+                    AppTextField("Title", text: $title)
                         .padding(.horizontal, 16)
                         .padding(.top, 14)
                         .onChange(of: title) { _ in scheduleAutoSave() }
@@ -191,14 +189,13 @@ public struct NotebookEditorSheet: View {
                     }
                 }
             }
-            .alert("Delete this note?", isPresented: $showDeleteConfirmation) {
-                Button("Cancel", role: .cancel) {}
-                Button("Delete", role: .destructive) {
-                    dataStore.deleteNote(id: noteId)
-                    dismiss()
-                }
-            } message: {
-                Text("This note will be permanently removed.")
+            .appConfirmationAlert(
+                isPresented: $showDeleteConfirmation,
+                title: "Delete this note?",
+                message: "This note will be permanently removed."
+            ) {
+                dataStore.deleteNote(id: noteId)
+                dismiss()
             }
             .sheet(isPresented: $showLinkTradeSheet) {
                 LinkNoteToTradeSheet(

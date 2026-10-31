@@ -38,7 +38,7 @@ public struct ShellHeaderView: View {
                 // Leading: App Brand Logo Button as Drawer Menu Trigger
                 Button {
                     NativeHaptics.lightImpact()
-                    withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
+                    withAnimation(AppAnimations.springStandard) {
                         env.isDrawerOpen.toggle()
                     }
                 } label: {
@@ -406,7 +406,7 @@ public struct ShellHeaderView: View {
     private var searchToggleButton: some View {
         Button {
             NativeHaptics.lightImpact()
-            withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
+            withAnimation(AppAnimations.springQuick) {
                 env.isSearchActive.toggle()
                 if !env.isSearchActive {
                     env.searchQuery = ""

@@ -69,7 +69,7 @@ public struct AppSegmentedBar<T: Hashable>: View {
         let isSelected = selection == item
         Button {
             NativeHaptics.lightImpact()
-            withAnimation(.spring(response: 0.32, dampingFraction: 0.78)) {
+            withAnimation(AppAnimations.springStandard) {
                 selection = item
             }
         } label: {

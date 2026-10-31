@@ -292,12 +292,12 @@ public struct DailyBarsView: View {
                             .foregroundStyle(AppColors.secondaryText)
                     }
                 }
-                .animation(.spring(response: 0.85, dampingFraction: 0.82), value: animProgress)
+                .animation(AppAnimations.chartEntrance, value: animProgress)
                 .frame(height: height)
                 .onAppear {
                     guard animProgress == 0.0 else { return }
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
-                        withAnimation(.spring(response: 0.85, dampingFraction: 0.82)) {
+                        withAnimation(AppAnimations.chartEntrance) {
                             animProgress = 1.0
                         }
                     }

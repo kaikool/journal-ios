@@ -90,21 +90,21 @@ public struct YourDataSettingsView: View {
                 ShareFileSheet(fileUrl: fileUrl)
             }
         }
-        .alert("Reset all local data?", isPresented: $showResetConfirmation) {
-            Button("Delete All Data", role: .destructive) {
-                dataStore.resetAllData()
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("All trades, executions, journal logs, and notes will be permanently erased from this device.")
+        .appConfirmationAlert(
+            isPresented: $showResetConfirmation,
+            title: "Reset all local data?",
+            message: "All trades, executions, journal logs, and notes will be permanently erased from this device.",
+            confirmTitle: "Delete All Data"
+        ) {
+            dataStore.resetAllData()
         }
-        .alert("Wipe all cloud data?", isPresented: $showWipeConfirmation) {
-            Button("Wipe Remote Data", role: .destructive) {
-                wipeSupabaseData()
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("This will permanently delete all records across all tables in your cloud database.")
+        .appConfirmationAlert(
+            isPresented: $showWipeConfirmation,
+            title: "Wipe all cloud data?",
+            message: "This will permanently delete all records across all tables in your cloud database.",
+            confirmTitle: "Wipe Remote Data"
+        ) {
+            wipeSupabaseData()
         }
     }
     

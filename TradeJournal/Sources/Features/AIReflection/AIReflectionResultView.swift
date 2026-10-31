@@ -148,11 +148,7 @@ public struct AIReflectionResultView: View {
             }
             savedNoteTitle = title
             isSavedToNotebook = true
-            
-            #if os(iOS)
-            let generator = UINotificationFeedbackGenerator()
-            generator.notificationOccurred(.success)
-            #endif
+            NativeHaptics.success()
         } catch {
             AppLogger.warning("Failed to save AI reflection note: \(error.localizedDescription)")
         }
@@ -161,10 +157,7 @@ public struct AIReflectionResultView: View {
     private func copyToClipboard() {
         UIPasteboard.general.string = resultText
         showCopiedAlert = true
-        #if os(iOS)
-        let generator = UIImpactFeedbackGenerator(style: .light)
-        generator.impactOccurred()
-        #endif
+        NativeHaptics.lightImpact()
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
             showCopiedAlert = false
         }

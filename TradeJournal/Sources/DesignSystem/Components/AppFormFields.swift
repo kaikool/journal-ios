@@ -37,6 +37,14 @@ public struct AppFormField: View {
         self.height = height
     }
     
+    public init(
+        _ placeholder: String,
+        text: Binding<String>,
+        icon: String? = nil
+    ) {
+        self.init(nil, text: text, placeholder: placeholder, icon: icon)
+    }
+    
     public var body: some View {
         VStack(alignment: .leading, spacing: 5) {
             if label != nil || subtitle != nil {
@@ -101,6 +109,39 @@ public struct AppFormField: View {
                     .padding(.leading, 2)
             }
         }
+    }
+}
+
+public struct AppNumericValueField<T: BinaryFloatingPoint>: View {
+    public let placeholder: String
+    @Binding public var value: T?
+    public let height: CGFloat
+    
+    public init(_ placeholder: String = "", value: Binding<T?>, height: CGFloat = 34) {
+        self.placeholder = placeholder
+        self._value = value
+        self.height = height
+    }
+    
+    public var body: some View {
+        TextField(
+            placeholder,
+            value: Binding(
+                get: { value.map { Double($0) } },
+                set: { value = $0.map { T($0) } }
+            ),
+            format: .number
+        )
+        .font(AppTypography.formInputMono)
+        .keyboardType(.decimalPad)
+        .padding(.horizontal, 10)
+        .frame(height: height)
+        .background(AppColors.secondaryBackground.opacity(0.65))
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(AppColors.border.opacity(0.45), lineWidth: 0.6)
+        )
     }
 }
 
@@ -182,5 +223,38 @@ public struct AppNumericField: View {
                     .stroke(AppColors.border.opacity(0.45), lineWidth: 0.6)
             )
         }
+    }
+}
+
+public struct AppNumericValueField<T: BinaryFloatingPoint>: View {
+    public let placeholder: String
+    @Binding public var value: T?
+    public let height: CGFloat
+    
+    public init(_ placeholder: String = "", value: Binding<T?>, height: CGFloat = 34) {
+        self.placeholder = placeholder
+        self._value = value
+        self.height = height
+    }
+    
+    public var body: some View {
+        TextField(
+            placeholder,
+            value: Binding(
+                get: { value.map { Double($0) } },
+                set: { value = $0.map { T($0) } }
+            ),
+            format: .number
+        )
+        .font(AppTypography.formInputMono)
+        .keyboardType(.decimalPad)
+        .padding(.horizontal, 10)
+        .frame(height: height)
+        .background(AppColors.secondaryBackground.opacity(0.65))
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(AppColors.border.opacity(0.45), lineWidth: 0.6)
+        )
     }
 }

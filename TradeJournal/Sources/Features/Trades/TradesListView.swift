@@ -312,7 +312,7 @@ public struct TradesListView: View {
                             Label(isTradeOpen ? "Live Position Coach" : "Post-Trade AI Audit", systemImage: isTradeOpen ? "bolt.fill" : "sparkles")
                         }
                         Button(role: .destructive) {
-                            withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
+                            withAnimation(AppAnimations.springStandard) {
                                 dataStore.deleteTrade(key: trade.key)
                             }
                         } label: {

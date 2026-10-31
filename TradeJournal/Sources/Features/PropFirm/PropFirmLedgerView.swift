@@ -206,10 +206,13 @@ public struct PropFirmLedgerView: View {
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(28)
         }
-        .alert("Transaction Action", isPresented: $showVoidAlert) {
-            TextField("Void reason (optional)...", text: $voidReason)
-            Button("Cancel", role: .cancel) { itemToVoid = nil; voidReason = "" }
-            Button("Void transaction", role: .destructive) {
+        .appTransactionActionAlert(
+            isPresented: $showVoidAlert,
+            title: "Transaction Action",
+            message: "You can void this transaction to keep it in audit history, or delete it permanently from your journal and Supabase.",
+            placeholder: "Void reason (optional)...",
+            text: $voidReason,
+            onVoid: {
                 if let target = itemToVoid {
                     if target.isEntry {
                         try? dataStore.voidPropEntry(id: target.id, voided: true, reason: voidReason.isEmpty ? "Void transaction" : voidReason)
@@ -217,8 +220,8 @@ public struct PropFirmLedgerView: View {
                     itemToVoid = nil
                     voidReason = ""
                 }
-            }
-            Button("Delete permanently", role: .destructive) {
+            },
+            onDelete: {
                 if let target = itemToVoid {
                     if target.isEntry {
                         dataStore.deletePropEntry(id: target.id)
@@ -226,10 +229,9 @@ public struct PropFirmLedgerView: View {
                     itemToVoid = nil
                     voidReason = ""
                 }
-            }
-        } message: {
-            Text("You can void this transaction to keep it in audit history, or delete it permanently from your journal and Supabase.")
-        }
+            },
+            onCancel: { itemToVoid = nil; voidReason = "" }
+        )
         .onAppear {
             if !availableCurrencies.contains(selectedCurrency), let first = availableCurrencies.first {
                 selectedCurrency = first
@@ -250,9 +252,7 @@ public struct PropFirmLedgerView: View {
                 AppleMenuChip(title: "Status", selectionText: selectedAccountStatus.rawValue, icon: "circle.circle") {
                     ForEach(PropAccountStatusFilter.allCases) { s in
                         Button(s.rawValue) {
-                            #if canImport(UIKit)
-                            UISelectionFeedbackGenerator().selectionChanged()
-                            #endif
+                            .selection()
                             selectedAccountStatus = s
                         }
                     }
@@ -261,9 +261,7 @@ public struct PropFirmLedgerView: View {
                 AppleMenuChip(title: "Currency", selectionText: selectedCurrency, icon: "dollarsign.circle") {
                     ForEach(availableCurrencies, id: \.self) { c in
                         Button(c) {
-                            #if canImport(UIKit)
-                            UISelectionFeedbackGenerator().selectionChanged()
-                            #endif
+                            .selection()
                             selectedCurrency = c
                         }
                     }
@@ -274,9 +272,7 @@ public struct PropFirmLedgerView: View {
             
             if selectedTab == .accounts {
                 Button {
-                    #if canImport(UIKit)
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    #endif
+                    .lightImpact()
                     showArchivedAccounts.toggle()
                 } label: {
                     HStack(spacing: 4) {

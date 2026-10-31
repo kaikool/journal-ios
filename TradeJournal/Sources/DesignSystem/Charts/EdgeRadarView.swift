@@ -196,7 +196,7 @@ public struct EdgeRadarView: View {
         .onAppear {
             guard animProgress == 0.0 else { return }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
-                withAnimation(.spring(response: 0.85, dampingFraction: 0.78)) {
+                withAnimation(AppAnimations.chartEntrance) {
                     animProgress = 1.0
                 }
             }

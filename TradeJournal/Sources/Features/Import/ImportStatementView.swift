@@ -98,9 +98,7 @@ public struct ImportStatementView: View {
                             }
                             
                             Button {
-                                #if canImport(UIKit)
-                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                #endif
+                                .lightImpact()
                                 isFileImporterPresented = true
                             } label: {
                                 HStack(spacing: 6) {
@@ -282,9 +280,7 @@ public struct ImportStatementView: View {
                                 
                                 // Confirm Button
                                 Button {
-                                    #if canImport(UIKit)
-                                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                                    #endif
+                                    .mediumImpact()
                                     commitImport(preview.usableExecutions)
                                 } label: {
                                     HStack(spacing: 8) {

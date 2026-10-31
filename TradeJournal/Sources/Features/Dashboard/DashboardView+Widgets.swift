@@ -133,9 +133,7 @@ extension DashboardView {
                 .minimumScaleFactor(0.85)
             Spacer()
             Button {
-                #if canImport(UIKit)
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                #endif
+                .lightImpact()
                 activeTooltip = (title: title, hint: hint)
             } label: {
                 Image(systemName: icon)

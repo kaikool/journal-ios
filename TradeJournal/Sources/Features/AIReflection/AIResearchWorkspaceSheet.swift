@@ -95,14 +95,14 @@ public struct AIResearchWorkspaceSheet: View {
                     reloadProjects()
                 })
             }
-            .alert("Delete Research Project?", isPresented: $showDeleteConfirmation, presenting: projectToDelete) { p in
-                Button("Delete", role: .destructive) {
-                    AIResearchWorkspaceEngine.shared.deleteProject(projectId: p.id)
-                    reloadProjects()
-                }
-                Button("Cancel", role: .cancel) {}
-            } message: { p in
-                Text("Project '\(p.title)' and all its checkpoint history will be removed.")
+            .appConfirmationAlert(
+                isPresented: $showDeleteConfirmation,
+                presenting: projectToDelete,
+                title: { _ in "Delete Research Project?" },
+                message: { p in "Project '\(p.title)' and all its checkpoint history will be removed." }
+            ) { p in
+                AIResearchWorkspaceEngine.shared.deleteProject(projectId: p.id)
+                reloadProjects()
             }
         }
     }

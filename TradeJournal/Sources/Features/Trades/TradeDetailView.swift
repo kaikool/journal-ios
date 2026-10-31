@@ -207,14 +207,14 @@ public struct TradeDetailView: View {
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         }
-        .alert("Delete trade \(trade.symbol)?", isPresented: $showDeleteAlert) {
-            Button("Cancel", role: .cancel) {}
-            Button("Delete permanently", role: .destructive) {
-                dataStore.deleteTrade(key: trade.key)
-                dismiss()
-            }
-        } message: {
-            Text("This trade and its associated executions will be permanently removed.")
+        .appConfirmationAlert(
+            isPresented: $showDeleteAlert,
+            title: "Delete trade \(trade.symbol)?",
+            message: "This trade and its associated executions will be permanently removed.",
+            confirmTitle: "Delete permanently"
+        ) {
+            dataStore.deleteTrade(key: trade.key)
+            dismiss()
         }
         .sheet(isPresented: $showEditTargetsSheet) {
             EditTargetsSheet(trade: trade) { updated in

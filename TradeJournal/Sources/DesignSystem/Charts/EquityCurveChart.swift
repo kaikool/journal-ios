@@ -443,12 +443,12 @@ public struct EquityCurveChart: View {
                         }
                     }
                 }
-                .animation(.spring(response: 0.90, dampingFraction: 0.82), value: animProgress)
+                .animation(AppAnimations.chartEntrance, value: animProgress)
                 .frame(height: height)
                 .onAppear {
                     guard animProgress == 0.0 else { return }
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
-                        withAnimation(.spring(response: 0.90, dampingFraction: 0.82)) {
+                        withAnimation(AppAnimations.chartEntrance) {
                             animProgress = 1.0
                         }
                     }
@@ -568,10 +568,8 @@ public struct EquityCurveChart: View {
             HStack(spacing: 2) {
                 ForEach(EquityChartMode.allCases) { mode in
                     Button {
-                        #if os(iOS)
-                        UISelectionFeedbackGenerator().selectionChanged()
-                        #endif
-                        withAnimation(.spring(response: 0.30, dampingFraction: 0.82)) {
+                        .selection()
+                        withAnimation(AppAnimations.springQuick) {
                             chartMode = mode
                         }
                     } label: {

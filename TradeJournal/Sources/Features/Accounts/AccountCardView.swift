@@ -30,9 +30,7 @@ public struct AccountCardView: View {
                 HStack(alignment: .top) {
                     // Journal visibility toggle button
                     Button {
-                        #if canImport(UIKit)
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        #endif
+                        .lightImpact()
                         dataStore.toggleAccountVisibility(id: account.id)
                     } label: {
                         Image(systemName: isVisible ? "checkmark.circle.fill" : "circle")
@@ -68,9 +66,7 @@ public struct AccountCardView: View {
                     // Primary active view button
                     if !isSelected {
                         Button {
-                            #if canImport(UIKit)
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            #endif
+                            .lightImpact()
                             dataStore.selectAccount(id: account.id)
                         } label: {
                             AppBadge("Select", variant: .brand)
@@ -171,12 +167,10 @@ public struct AccountCardView: View {
                 
                 // Action row
                 HStack(spacing: 12) {
-                    Toggle("Auto-sync", isOn: Binding(
+                    AppToggleRow("Auto-sync", isOn: Binding(
                         get: { account.autoSync },
                         set: { _ in dataStore.toggleAccountAutoSync(id: account.id) }
                     ))
-                    .font(AppTypography.caption)
-                    .tint(AppColors.brand)
                     
                     Spacer()
                     

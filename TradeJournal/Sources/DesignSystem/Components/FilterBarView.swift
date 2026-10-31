@@ -218,9 +218,7 @@ public struct FilterBarView<Actions: View>: View {
         Menu {
             ForEach(dataStore.visibleAccounts) { acc in
                 Button {
-                    #if os(iOS)
-                    UISelectionFeedbackGenerator().selectionChanged()
-                    #endif
+                    .selection()
                     dataStore.selectAccount(id: acc.id)
                 } label: {
                     accountMenuItemLabel(acc: acc)
@@ -280,7 +278,7 @@ public struct FilterBarView<Actions: View>: View {
                 Button {
                     if selectedRange != range {
                         NativeHaptics.selection()
-                        withAnimation(.spring(response: 0.28, dampingFraction: 0.72)) {
+                        withAnimation(AppAnimations.springQuick) {
                             selectedRange = range
                         }
                     }
@@ -316,12 +314,12 @@ public struct FilterBarView<Actions: View>: View {
                     
                     if h < -15 && currentIndex < cases.count - 1 {
                         NativeHaptics.selection()
-                        withAnimation(.spring(response: 0.28, dampingFraction: 0.76)) {
+                        withAnimation(AppAnimations.springQuick) {
                             selectedRange = cases[currentIndex + 1]
                         }
                     } else if h > 15 && currentIndex > 0 {
                         NativeHaptics.selection()
-                        withAnimation(.spring(response: 0.28, dampingFraction: 0.76)) {
+                        withAnimation(AppAnimations.springQuick) {
                             selectedRange = cases[currentIndex - 1]
                         }
                     }
@@ -345,9 +343,7 @@ public struct FilterBarView<Actions: View>: View {
     
     private func filterDialogButton(onFilter: @escaping () -> Void) -> some View {
         Button {
-            #if os(iOS)
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            #endif
+            .lightImpact()
             onFilter()
         } label: {
             HStack(spacing: 4) {

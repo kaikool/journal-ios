@@ -267,9 +267,7 @@ public struct JournalCalendarView: View {
     // MARK: - Instant Day Selection Handler
     
     internal func openDayDetail(for dateKey: String) {
-        #if os(iOS)
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        #endif
+        .lightImpact()
         let stats = dailyStatsMap[dateKey]
         let trades = tradesByDateMap[dateKey] ?? []
         let note = dataStore.calendarNotes[dateKey] ?? JournalNote(date: dateKey)
@@ -374,13 +372,13 @@ public struct JournalCalendarView: View {
                     if h < -30 {
                         // Swipe Left: Next Month
                         NativeHaptics.selection()
-                        withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
+                        withAnimation(AppAnimations.springStandard) {
                             changeMonth(by: 1)
                         }
                     } else if h > 30 {
                         // Swipe Right: Previous Month
                         NativeHaptics.selection()
-                        withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
+                        withAnimation(AppAnimations.springStandard) {
                             changeMonth(by: -1)
                         }
                     }

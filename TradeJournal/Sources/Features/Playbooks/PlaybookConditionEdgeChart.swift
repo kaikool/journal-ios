@@ -150,7 +150,7 @@ public struct PlaybookConditionEdgeChart: View {
         .onAppear {
             guard animProgress == 0.0 else { return }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
-                withAnimation(.spring(response: 0.85, dampingFraction: 0.82)) {
+                withAnimation(AppAnimations.chartEntrance) {
                     animProgress = 1.0
                 }
             }
@@ -318,9 +318,7 @@ public struct PlaybookConditionEdgeChart: View {
         let isSelected = selectedIndex == stat.index
         
         Button {
-            #if canImport(UIKit)
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            #endif
+            .lightImpact()
             if selectedIndex == stat.index {
                 selectedIndex = nil
             } else {
@@ -492,9 +490,7 @@ public struct PlaybookConditionEdgeChart: View {
                 )
                 .contentShape(Rectangle())
                 .onTapGesture {
-                    #if canImport(UIKit)
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    #endif
+                    .lightImpact()
                     if selectedIndex == stat.index {
                         selectedIndex = nil
                     } else {

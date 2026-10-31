@@ -543,9 +543,7 @@ public struct NoteAIInquirySheet: View {
         withAnimation {
             showSavedToast = true
         }
-        #if os(iOS)
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
-        #endif
+        NativeHaptics.success()
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
             withAnimation {
                 showSavedToast = false

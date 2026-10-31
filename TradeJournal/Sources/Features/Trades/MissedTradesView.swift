@@ -343,9 +343,7 @@ public struct AddMissedTradeSheet: View {
     
     private func directionButton(title: String, isBuy: Bool, isSelected: Bool, action: @escaping () -> Void) -> some View {
         Button {
-            #if canImport(UIKit)
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            #endif
+            .lightImpact()
             action()
         } label: {
             HStack(spacing: 6) {

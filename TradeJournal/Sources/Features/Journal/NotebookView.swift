@@ -112,30 +112,29 @@ public struct NotebookView: View {
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(28)
         }
-        .alert("Delete “\(folderToDelete?.name ?? "")”?", isPresented: $showDeleteFolderAlert) {
-            Button("Cancel", role: .cancel) { folderToDelete = nil }
-            Button("Delete folder", role: .destructive) {
-                if let folder = folderToDelete {
-                    try? dataStore.deleteFolder(id: folder.id)
-                    if selectedFolderId == folder.id {
-                        selectedFolderId = NotebookEngine.systemFolderMyNotes
-                    }
-                    folderToDelete = nil
+        .appConfirmationAlert(
+            isPresented: $showDeleteFolderAlert,
+            title: "Delete “\(folderToDelete?.name ?? "")”?",
+            message: "The folder will be removed. Its notes will be kept in My notes.",
+            confirmTitle: "Delete folder"
+        ) {
+            if let folder = folderToDelete {
+                try? dataStore.deleteFolder(id: folder.id)
+                if selectedFolderId == folder.id {
+                    selectedFolderId = NotebookEngine.systemFolderMyNotes
                 }
+                folderToDelete = nil
             }
-        } message: {
-            Text("The folder will be removed. Its notes will be kept in My notes.")
         }
-        .alert("Delete this note?", isPresented: $showDeleteNoteAlert) {
-            Button("Cancel", role: .cancel) { noteToDelete = nil }
-            Button("Delete", role: .destructive) {
-                if let note = noteToDelete {
-                    dataStore.deleteNote(id: note.id)
-                    noteToDelete = nil
-                }
+        .appConfirmationAlert(
+            isPresented: $showDeleteNoteAlert,
+            title: "Delete this note?",
+            message: "This note will be permanently removed."
+        ) {
+            if let note = noteToDelete {
+                dataStore.deleteNote(id: note.id)
+                noteToDelete = nil
             }
-        } message: {
-            Text("This note will be permanently removed.")
         }
     }
     
@@ -146,9 +145,7 @@ public struct NotebookView: View {
             AppSearchBar("Search notes", text: $searchQuery)
             
             AppPrimaryButton("New", icon: "plus", height: 34) {
-                #if canImport(UIKit)
-                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                #endif
+                .mediumImpact()
                 createNewNote()
             }
         }
@@ -197,9 +194,7 @@ public struct NotebookView: View {
         LazyVStack(spacing: 12) {
             ForEach(filteredNotes) { note in
                     Button {
-                        #if canImport(UIKit)
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        #endif
+                        .lightImpact()
                         editingNote = note
                     } label: {
                         cardContainer {
@@ -297,7 +292,7 @@ public struct NotebookView: View {
         NavigationStack {
             Form {
                 Section {
-                    TextField("Folder name", text: $newFolderName)
+                    AppTextField("Folder name", text: $newFolderName)
                     if let err = folderError {
                         Text(err)
                             .font(AppTypography.caption)
@@ -337,7 +332,7 @@ public struct NotebookView: View {
         NavigationStack {
             Form {
                 Section {
-                    TextField("Folder name", text: $renameFolderName)
+                    AppTextField("Folder name", text: $renameFolderName)
                     if let err = folderError {
                         Text(err)
                             .font(AppTypography.caption)

@@ -53,8 +53,8 @@ public struct NewPropAccountSheet: View {
                 }
                 
                 Section("Firm & Account Name") {
-                    TextField("Firm name (Topstep, FTMO, Apex...)", text: $firm)
-                    TextField("Account name", text: $name)
+                    AppTextField("Firm name (Topstep, FTMO, Apex...)", text: $firm)
+                    AppTextField("Account name", text: $name)
                 }
                 
                 Section("Program Type & Size") {
@@ -64,12 +64,12 @@ public struct NewPropAccountSheet: View {
                         options: PropProgram.allCases,
                         titleFor: { $0.label }
                     )
-                    TextField("Account size (\(defaultCurrency))", text: $sizeText)
+                    AppNumericField(text: $sizeText, placeholder: "Account size (\(defaultCurrency))")
                         .keyboardType(.numberPad)
                 }
                 
                 Section("Notes") {
-                    TextField("Drawdown rules, profit targets...", text: $notes)
+                    AppTextField("Drawdown rules, profit targets...", text: $notes)
                 }
             }
             .font(AppTypography.inputText)
@@ -138,7 +138,7 @@ public struct EditPropAccountSheet: View {
                 Section("Firm & Account Name") {
                     Text("Firm: \(account.firm)")
                         .foregroundColor(AppColors.secondaryText)
-                    TextField("Account name", text: $name)
+                    AppTextField("Account name", text: $name)
                 }
                 
                 Section("Status") {
@@ -149,18 +149,18 @@ public struct EditPropAccountSheet: View {
                         titleFor: { $0.label }
                     )
                     if status == .passed || status == .breached || status == .closed {
-                        TextField("Closed date (YYYY-MM-DD)", text: $closedDateText)
+                        AppTextField("Closed date (YYYY-MM-DD)", text: $closedDateText)
                     }
                 }
                 
                 Section("Renewal Reminder") {
-                    TextField("Next renewal date (YYYY-MM-DD)", text: $renewalDateText)
-                    TextField("Renewal fee (\(account.currency))", text: $renewalAmountText)
+                    AppTextField("Next renewal date (YYYY-MM-DD)", text: $renewalDateText)
+                    AppNumericField(text: $renewalAmountText, placeholder: "Renewal fee (\(account.currency))")
                         .keyboardType(.numberPad)
                 }
                 
                 Section("Notes") {
-                    TextField("Account notes...", text: $notes)
+                    AppTextField("Account notes...", text: $notes)
                 }
                 
                 Section {
@@ -207,14 +207,14 @@ public struct EditPropAccountSheet: View {
                     }
                 }
             }
-            .alert("Delete “\(account.name)”? ", isPresented: $showDeleteConfirm) {
-                Button("Cancel", role: .cancel) {}
-                Button("Delete permanently", role: .destructive) {
-                    TradeDataStore.shared.deletePropAccount(id: account.id)
-                    dismiss()
-                }
-            } message: {
-                Text("This will permanently remove this prop account and all its transactions from your device and Supabase.")
+            .appConfirmationAlert(
+                isPresented: $showDeleteConfirm,
+                title: "Delete “\(account.name)”? ",
+                message: "This will permanently remove this prop account and all its transactions from your device and Supabase.",
+                confirmTitle: "Delete permanently"
+            ) {
+                TradeDataStore.shared.deletePropAccount(id: account.id)
+                dismiss()
             }
         }
     }
@@ -349,19 +349,17 @@ public struct NewPropEntrySheet: View {
                 }
                 
                 Section("Amount") {
-                    TextField("Amount (\(defaultCurrency))", text: $amountText)
-                        .keyboardType(.decimalPad)
+                    AppNumericField(text: $amountText, placeholder: "Amount (\(defaultCurrency))")
                     
                     if kind == "payout" {
-                        TextField("Trader split (%) (e.g. 90)", text: $splitText)
+                        AppNumericField(text: $splitText, placeholder: "Trader split (%) (e.g. 90)")
                             .keyboardType(.numberPad)
-                        TextField("Transfer fee (\(defaultCurrency))", text: $feeText)
-                            .keyboardType(.decimalPad)
+                        AppNumericField(text: $feeText, placeholder: "Transfer fee (\(defaultCurrency))")
                     }
                 }
                 
                 Section("Notes") {
-                    TextField("Invoice number, context...", text: $notes)
+                    AppTextField("Invoice number, context...", text: $notes)
                 }
             }
             .font(AppTypography.inputText)
@@ -432,14 +430,13 @@ public struct AddReceiptSheet: View {
                 }
                 
                 Section("Cash Settlement") {
-                    Toggle("Reversal / Return?", isOn: $isReversal)
-                    TextField("Actual amount received (\(payout.currency))", text: $amountText)
-                        .keyboardType(.decimalPad)
-                    TextField("Bank reference (Deel, Wise...)", text: $reference)
+                    AppToggleRow("Reversal / Return?", isOn: $isReversal)
+                    AppNumericField(text: $amountText, placeholder: "Actual amount received (\(payout.currency))")
+                    AppTextField("Bank reference (Deel, Wise...)", text: $reference)
                 }
                 
                 Section("Notes") {
-                    TextField("Additional notes...", text: $notes)
+                    AppTextField("Additional notes...", text: $notes)
                 }
             }
             .navigationTitle("Record payout receipt")
@@ -505,9 +502,8 @@ public struct AddRefundSheet: View {
                 }
                 
                 Section("Refund Details") {
-                    TextField("Refunded amount (\(expense.currency))", text: $amountText)
-                        .keyboardType(.decimalPad)
-                    TextField("Notes...", text: $notes)
+                    AppNumericField(text: $amountText, placeholder: "Refunded amount (\(expense.currency))")
+                    AppTextField("Notes...", text: $notes)
                 }
             }
             .font(AppTypography.inputText)

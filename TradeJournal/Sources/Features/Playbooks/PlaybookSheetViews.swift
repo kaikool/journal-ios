@@ -129,7 +129,7 @@ public struct NewPlaybookSheet: View {
             
             // Sleek text field with clear button
             HStack(spacing: 8) {
-                TextField("Rule condition (e.g. Price above 200 EMA)", text: Binding(
+                AppTextField("Rule condition (e.g. Price above 200 EMA)", text: Binding(
                     get: {
                         guard index < rules.count else { return "" }
                         return rules[index]
@@ -139,7 +139,7 @@ public struct NewPlaybookSheet: View {
                         rules[index] = newVal
                         // Progressive Disclosure: If user typed in the last row, spawn next row
                         if !newVal.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && index == rules.count - 1 {
-                            withAnimation(.spring(response: 0.28, dampingFraction: 0.78)) {
+                            withAnimation(AppAnimations.springQuick) {
                                 rules.append("")
                             }
                         }
@@ -150,10 +150,8 @@ public struct NewPlaybookSheet: View {
                 
                 if rules.count > 1 || (index < rules.count && !rules[index].isEmpty) {
                     Button {
-                        #if canImport(UIKit)
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        #endif
-                        withAnimation(.spring(response: 0.28, dampingFraction: 0.78)) {
+                        .lightImpact()
+                        withAnimation(AppAnimations.springQuick) {
                             if index < rules.count {
                                 rules.remove(at: index)
                                 if rules.isEmpty {
@@ -321,7 +319,7 @@ public struct EditPlaybookSheet: View {
             }
             
             HStack(spacing: 8) {
-                TextField("Rule condition", text: Binding(
+                AppTextField("Rule condition", text: Binding(
                     get: {
                         guard index < rules.count else { return "" }
                         return rules[index]
@@ -330,7 +328,7 @@ public struct EditPlaybookSheet: View {
                         guard index < rules.count else { return }
                         rules[index] = newVal
                         if !newVal.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && index == rules.count - 1 {
-                            withAnimation(.spring(response: 0.28, dampingFraction: 0.78)) {
+                            withAnimation(AppAnimations.springQuick) {
                                 rules.append("")
                             }
                         }
@@ -341,10 +339,8 @@ public struct EditPlaybookSheet: View {
                 
                 if rules.count > 1 || (index < rules.count && !rules[index].isEmpty) {
                     Button {
-                        #if canImport(UIKit)
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        #endif
-                        withAnimation(.spring(response: 0.28, dampingFraction: 0.78)) {
+                        .lightImpact()
+                        withAnimation(AppAnimations.springQuick) {
                             if index < rules.count {
                                 rules.remove(at: index)
                                 if rules.isEmpty {

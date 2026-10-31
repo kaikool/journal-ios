@@ -93,21 +93,24 @@ public struct ProgressRoutinesView: View {
         .sheet(isPresented: $showArchivedSheet) {
             ArchivedProgressRoutinesSheet()
         }
-        .alert("Archive Routine", isPresented: $showArchiveAlert, presenting: ruleToArchive) { rule in
-            Button("Archive") {
-                dataStore.archiveProgressRule(id: rule.id)
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: { rule in
-            Text("“\(rule.title)” will be hidden from daily checklists starting today. Past days' completion records are preserved.")
+        .appConfirmationAlert(
+            isPresented: $showArchiveAlert,
+            presenting: ruleToArchive,
+            title: { _ in "Archive Routine" },
+            message: { rule in "“\(rule.title)” will be hidden from daily checklists starting today. Past days' completion records are preserved." },
+            confirmTitle: "Archive",
+            isDestructive: false
+        ) { rule in
+            dataStore.archiveProgressRule(id: rule.id)
         }
-        .alert("Delete Routine Permanently?", isPresented: $showDeleteAlert, presenting: ruleToDelete) { rule in
-            Button("Delete Permanently", role: .destructive) {
-                dataStore.deleteProgressRule(id: rule.id)
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: { rule in
-            Text("“\(rule.title)” will be completely removed from your device and cloud sync. All logs will be deleted and it will never appear again.")
+        .appConfirmationAlert(
+            isPresented: $showDeleteAlert,
+            presenting: ruleToDelete,
+            title: { _ in "Delete Routine Permanently?" },
+            message: { rule in "“\(rule.title)” will be completely removed from your device and cloud sync. All logs will be deleted and it will never appear again." },
+            confirmTitle: "Delete Permanently"
+        ) { rule in
+            dataStore.deleteProgressRule(id: rule.id)
         }
     }
     
@@ -498,9 +501,7 @@ public struct AddProgressRoutineSheet: View {
                         .font(AppTypography.cardHeader)
                         .foregroundColor(AppColors.brand)
                     
-                    TextField("e.g. Check ForexFactory Calendar", text: $title)
-                        .font(AppTypography.body)
-                        .foregroundColor(AppColors.primaryText)
+                    AppTextField("e.g. Check ForexFactory Calendar", text: $title)
                     
                     if !title.isEmpty {
                         Button {
@@ -560,9 +561,7 @@ public struct AddProgressRoutineSheet: View {
                     ForEach(Self.stageMetadata, id: \.id) { meta in
                         let isSelected = stage == meta.id
                         Button {
-                            #if canImport(UIKit)
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            #endif
+                            .lightImpact()
                             stage = meta.id
                         } label: {
                             HStack(spacing: 12) {
@@ -618,9 +617,7 @@ public struct AddProgressRoutineSheet: View {
                     // Quick Presets
                     HStack(spacing: 6) {
                         Button("Mon-Fri") {
-                            #if canImport(UIKit)
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            #endif
+                            .lightImpact()
                             selectedDays = [1, 2, 3, 4, 5]
                         }
                         .font(AppTypography.captionMicro)
@@ -631,9 +628,7 @@ public struct AddProgressRoutineSheet: View {
                             .foregroundColor(AppColors.border)
                         
                         Button("All Days") {
-                            #if canImport(UIKit)
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            #endif
+                            .lightImpact()
                             selectedDays = [0, 1, 2, 3, 4, 5, 6]
                         }
                         .font(AppTypography.captionMicro)
@@ -645,9 +640,7 @@ public struct AddProgressRoutineSheet: View {
                     ForEach(weekdayNames, id: \.0) { day in
                         let isSelected = selectedDays.contains(day.0)
                         Button {
-                            #if canImport(UIKit)
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            #endif
+                            .lightImpact()
                             if isSelected {
                                 if selectedDays.count > 1 {
                                     selectedDays.remove(day.0)
@@ -726,13 +719,14 @@ public struct ArchivedProgressRoutinesSheet: View {
                     }
                 }
             }
-            .alert("Delete Routine Permanently?", isPresented: $showDeleteAlert, presenting: ruleToDelete) { rule in
-                Button("Delete Permanently", role: .destructive) {
-                    dataStore.deleteProgressRule(id: rule.id)
-                }
-                Button("Cancel", role: .cancel) {}
-            } message: { rule in
-                Text("“\(rule.title)” will be completely removed from your device and cloud sync. All logs will be deleted and it will never appear again.")
+            .appConfirmationAlert(
+                isPresented: $showDeleteAlert,
+                presenting: ruleToDelete,
+                title: { _ in "Delete Routine Permanently?" },
+                message: { rule in "“\(rule.title)” will be completely removed from your device and cloud sync. All logs will be deleted and it will never appear again." },
+                confirmTitle: "Delete Permanently"
+            ) { rule in
+                dataStore.deleteProgressRule(id: rule.id)
             }
         }
     }

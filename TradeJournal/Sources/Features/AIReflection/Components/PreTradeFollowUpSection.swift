@@ -88,9 +88,7 @@ public struct PreTradeBottomFloatingInput: View {
                     .foregroundColor(AppColors.secondaryText.opacity(0.8))
                     .padding(.leading, 6)
                 
-                TextField("Ask a follow-up question...", text: $followUpQuery)
-                    .font(AppTypography.formInput)
-                    .foregroundColor(AppColors.primaryText)
+                AppTextField("Ask a follow-up question...", text: $followUpQuery)
                     .onSubmit {
                         if hasQueryText && !isSubmitting {
                             onSubmit()

@@ -140,19 +140,18 @@ public struct AttachmentsSectionView: View {
         .sheet(item: $previewAttachment) { att in
             AttachmentPreviewSheet(attachment: att)
         }
-        .alert("Delete attachment?", isPresented: Binding(
-            get: { itemToDelete != nil },
-            set: { if !$0 { itemToDelete = nil } }
-        )) {
-            Button("Cancel", role: .cancel) { itemToDelete = nil }
-            Button("Delete", role: .destructive) {
-                if let att = itemToDelete {
-                    try? dataStore.deleteAttachment(id: att.id)
-                    itemToDelete = nil
-                }
+        .appConfirmationAlert(
+            isPresented: Binding(
+                get: { itemToDelete != nil },
+                set: { if !$0 { itemToDelete = nil } }
+            ),
+            title: "Delete attachment?",
+            message: "This file will be permanently removed."
+        ) {
+            if let att = itemToDelete {
+                try? dataStore.deleteAttachment(id: att.id)
+                itemToDelete = nil
             }
-        } message: {
-            Text("This file will be permanently removed.")
         }
     }
     

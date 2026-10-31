@@ -76,16 +76,15 @@ public struct PlaybooksView: View {
             .presentationDragIndicator(.visible)
             .presentationCornerRadius(28)
         }
-        .alert("Delete “\(playbookToDelete?.title ?? "")”?", isPresented: $showDeleteConfirmation) {
-            Button("Cancel", role: .cancel) { playbookToDelete = nil }
-            Button("Delete", role: .destructive) {
-                if let pb = playbookToDelete {
-                    dataStore.deletePlaybook(id: pb.id)
-                    playbookToDelete = nil
-                }
+        .appConfirmationAlert(
+            isPresented: $showDeleteConfirmation,
+            title: "Delete “\(playbookToDelete?.title ?? "")”?",
+            message: "Trades keep their data, just lose the link."
+        ) {
+            if let pb = playbookToDelete {
+                dataStore.deletePlaybook(id: pb.id)
+                playbookToDelete = nil
             }
-        } message: {
-            Text("Trades keep their data, just lose the link.")
         }
     }
     

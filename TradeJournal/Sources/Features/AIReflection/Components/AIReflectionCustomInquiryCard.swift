@@ -82,10 +82,7 @@ public struct AIReflectionCustomInquiryCard: View {
                     }
                     .buttonStyle(.plain)
                     
-                    TextField("Enter question or instruction for Risk AI...", text: $userPrompt)
-                        .font(AppTypography.inputText)
-                        .foregroundColor(AppColors.primaryText)
-                        .padding(.vertical, 8)
+                    AppTextField("Enter question or instruction for Risk AI...", text: $userPrompt)
                     
                     if !userPrompt.isEmpty {
                         Button(action: { userPrompt = "" }) {

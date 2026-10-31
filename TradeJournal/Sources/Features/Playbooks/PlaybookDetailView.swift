@@ -86,14 +86,13 @@ public struct PlaybookDetailView: View {
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(28)
         }
-        .alert("Delete “\(currentPlaybook.title)”? ", isPresented: $showDeleteAlert) {
-            Button("Cancel", role: .cancel) {}
-            Button("Delete", role: .destructive) {
-                dataStore.deletePlaybook(id: currentPlaybook.id)
-                dismiss()
-            }
-        } message: {
-            Text("Trades keep their data, just lose the link.")
+        .appConfirmationAlert(
+            isPresented: $showDeleteAlert,
+            title: "Delete “\(currentPlaybook.title)”? ",
+            message: "Trades keep their data, just lose the link."
+        ) {
+            dataStore.deletePlaybook(id: currentPlaybook.id)
+            dismiss()
         }
     }
     

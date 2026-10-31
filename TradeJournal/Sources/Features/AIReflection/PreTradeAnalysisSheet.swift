@@ -216,18 +216,9 @@ public struct PreTradeAnalysisSheet: View {
                     Spacer()
                 }
                 
-                Button(action: {
+                AppPrimaryButton("Analyze Market Bias", icon: "sparkles") {
                     Task { await runFullAnalysis() }
-                }) {
-                    Text("Analyze Market Bias")
-                        .font(AppTypography.actionButton)
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 42)
-                        .background(AppColors.brand)
-                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 }
-                .buttonStyle(PlainButtonStyle())
             }
             .padding(.vertical, 4)
         }
@@ -669,9 +660,7 @@ public struct PreTradeAnalysisSheet: View {
                 createdNoteId = note.id
             }
             isSavedToNotebook = true
-            #if os(iOS)
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
-            #endif
+            NativeHaptics.success()
         } catch {
             AppLogger.warning("Failed to save note: \(error.localizedDescription)")
         }
@@ -680,9 +669,7 @@ public struct PreTradeAnalysisSheet: View {
     private func copyToClipboard() {
         UIPasteboard.general.string = fullAnalysisContent()
         showCopiedAlert = true
-        #if os(iOS)
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        #endif
+        NativeHaptics.lightImpact()
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
             showCopiedAlert = false
         }

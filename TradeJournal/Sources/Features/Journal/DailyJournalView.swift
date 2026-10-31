@@ -172,29 +172,7 @@ public struct DailyJournalListView: View {
     
     private var searchAndTodayBar: some View {
         HStack(spacing: 10) {
-            HStack {
-                Image(systemName: "magnifyingglass")
-                    .foregroundColor(AppColors.secondaryText)
-                    .font(AppTypography.body)
-                TextField("Search date, note...", text: $searchText)
-                    .font(AppTypography.body)
-                if !searchText.isEmpty {
-                    Button {
-                        searchText = ""
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(AppColors.secondaryText)
-                    }
-                }
-            }
-            .padding(.horizontal, 10)
-            .frame(height: 36)
-            .background(AppColors.secondaryBackground.opacity(0.75))
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .stroke(AppColors.border.opacity(0.5), lineWidth: 0.6)
-            )
+            AppSearchBar("Search date, note...", text: $searchText, height: 36)
             
             Button {
                 selectedDateForDetail = todayKey

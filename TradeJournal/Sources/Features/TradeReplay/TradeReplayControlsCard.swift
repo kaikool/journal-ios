@@ -69,9 +69,7 @@ public struct TradeReplayControlsCard: View {
                 HStack(spacing: 8) {
                     // Restart
                     Button {
-                        #if os(iOS)
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        #endif
+                        .lightImpact()
                         onReset()
                     } label: {
                         Image(systemName: "backward.end.fill")
@@ -90,9 +88,7 @@ public struct TradeReplayControlsCard: View {
                     
                     // Step back
                     Button {
-                        #if os(iOS)
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        #endif
+                        .lightImpact()
                         onStep(-1)
                     } label: {
                         Image(systemName: "chevron.left")
@@ -111,9 +107,7 @@ public struct TradeReplayControlsCard: View {
                     
                     // Play / Pause
                     Button {
-                        #if os(iOS)
-                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                        #endif
+                        .mediumImpact()
                         onTogglePlay()
                     } label: {
                         HStack(spacing: 5) {
@@ -136,9 +130,7 @@ public struct TradeReplayControlsCard: View {
                     
                     // Step forward
                     Button {
-                        #if os(iOS)
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        #endif
+                        .lightImpact()
                         onStep(1)
                     } label: {
                         Image(systemName: "chevron.right")
@@ -157,9 +149,7 @@ public struct TradeReplayControlsCard: View {
                     
                     // Forward to end
                     Button {
-                        #if os(iOS)
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        #endif
+                        .lightImpact()
                         onForwardToEnd()
                     } label: {
                         Image(systemName: "forward.end.fill")
@@ -192,9 +182,7 @@ public struct TradeReplayControlsCard: View {
                     // Fullscreen Landscape Trigger (placed directly next to Speed button)
                     if let onLandscape = onOpenLandscape {
                         Button {
-                            #if os(iOS)
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            #endif
+                            .lightImpact()
                             onLandscape()
                         } label: {
                             Image(systemName: "arrow.up.left.and.arrow.down.right")

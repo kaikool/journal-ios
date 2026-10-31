@@ -655,9 +655,7 @@ public struct TradeAICoachSheet: View {
         
         guard !additions.isEmpty else {
             isSavedToNotes = true
-            #if os(iOS)
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
-            #endif
+            NativeHaptics.success()
             return
         }
         
@@ -683,9 +681,7 @@ public struct TradeAICoachSheet: View {
         }
         
         isSavedToNotes = true
-        #if os(iOS)
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
-        #endif
+        NativeHaptics.success()
     }
     
     private func saveToNotebook() {
@@ -731,9 +727,7 @@ public struct TradeAICoachSheet: View {
                 createdNotebookNoteId = note.id
             }
             isSavedToNotebook = true
-            #if os(iOS)
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
-            #endif
+            NativeHaptics.success()
         } catch {
             AppLogger.warning("Failed to save note: \(error.localizedDescription)")
         }
@@ -742,9 +736,7 @@ public struct TradeAICoachSheet: View {
     private func copyToClipboard() {
         UIPasteboard.general.string = fullCoachingContent()
         showCopiedAlert = true
-        #if os(iOS)
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        #endif
+        NativeHaptics.lightImpact()
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
             showCopiedAlert = false
         }

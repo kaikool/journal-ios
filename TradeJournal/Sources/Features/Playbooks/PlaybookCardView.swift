@@ -34,9 +34,7 @@ public struct PlaybookCardView: View {
                 // Header row
                 HStack(alignment: .center) {
                     Button {
-                        #if canImport(UIKit)
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        #endif
+                        .lightImpact()
                         onSelect()
                     } label: {
                         HStack(spacing: 8) {
@@ -76,9 +74,7 @@ public struct PlaybookCardView: View {
                 
                 // Content area that opens Detail
                 Button {
-                    #if canImport(UIKit)
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    #endif
+                    .lightImpact()
                     onSelect()
                 } label: {
                     VStack(alignment: .leading, spacing: 10) {
@@ -168,7 +164,7 @@ public struct PlaybookCardView: View {
                             icon: isExpanded ? "chevron.up" : "chevron.down",
                             height: 26
                         ) {
-                            withAnimation(.spring(response: 0.32, dampingFraction: 0.8)) {
+                            withAnimation(AppAnimations.springStandard) {
                                 isExpanded.toggle()
                             }
                         }

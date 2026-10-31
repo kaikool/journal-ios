@@ -128,13 +128,13 @@ public struct AccountsManagerView: View {
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(28)
         }
-        .alert("Delete Account", isPresented: $showDeleteAlert, presenting: accountToDelete) { acc in
-            Button("Delete", role: .destructive) {
-                dataStore.deleteAccount(id: acc.id)
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: { acc in
-            Text("This will remove “\(acc.name)” and unlink its associated trades from your device.")
+        .appConfirmationAlert(
+            isPresented: $showDeleteAlert,
+            presenting: accountToDelete,
+            title: { _ in "Delete Account" },
+            message: { acc in "This will remove “\(acc.name)” and unlink its associated trades from your device." }
+        ) { acc in
+            dataStore.deleteAccount(id: acc.id)
         }
     }
     
@@ -173,9 +173,7 @@ public struct AccountsManagerView: View {
         let totalCount = dataStore.accounts.count
         
         return Button {
-            #if canImport(UIKit)
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            #endif
+            .lightImpact()
             dataStore.selectAccount(id: "all")
         } label: {
             HStack(spacing: 10) {
