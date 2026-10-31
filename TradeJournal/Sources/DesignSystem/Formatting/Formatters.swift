@@ -265,6 +265,17 @@ public enum Formatters {
         let num = (value as NSDecimalNumber).doubleValue
         return pips(num, signed: signed)
     }
+
+    /// Formats an R-Multiple value (e.g. "1.50 R", "-0.80 R")
+    public static func formatRMultiple(_ value: Double?) -> String {
+        guard let v = value else { return "–" }
+        return String(format: "%.2f R", v)
+    }
+
+    public static func formatRMultiple(_ value: Decimal?) -> String {
+        guard let v = value else { return "–" }
+        return formatRMultiple((v as NSDecimalNumber).doubleValue)
+    }
     
     public static func formatNumber(_ value: Decimal) -> String {
         return priceFormatter.string(from: value as NSDecimalNumber) ?? "\(value)"

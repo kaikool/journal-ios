@@ -37,7 +37,7 @@ public struct TradeAICoachContextCard: View {
                 
                 Spacer()
                 
-                let pnlStr = Formatters.formatPnL(trade.netPnl, currency: trade.currency ?? "USD")
+                let pnlStr = Formatters.formatPnL(trade.netPnl, currency: "USD")
                 
                 VStack(alignment: .trailing, spacing: 2) {
                     Text(pnlStr)
