@@ -288,9 +288,10 @@ public struct TradesListView: View {
                     if dataStore.trades.isEmpty {
                         showAddTradeSheet = true
                     } else {
-                        searchQuery = ""
-                        selectedAccountFilter = "All Accounts"
-                        selectedStatusFilter = "All"
+                        searchText = ""
+                        env.searchQuery = ""
+                        statusFilter = .all
+                        dataStore.selectedTimeRange = .allTime
                     }
                 }
             }
