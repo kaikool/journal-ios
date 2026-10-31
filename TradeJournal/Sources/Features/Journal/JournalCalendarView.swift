@@ -267,7 +267,7 @@ public struct JournalCalendarView: View {
     // MARK: - Instant Day Selection Handler
     
     internal func openDayDetail(for dateKey: String) {
-        .lightImpact()
+        NativeHaptics.lightImpact()
         let stats = dailyStatsMap[dateKey]
         let trades = tradesByDateMap[dateKey] ?? []
         let note = dataStore.calendarNotes[dateKey] ?? JournalNote(date: dateKey)

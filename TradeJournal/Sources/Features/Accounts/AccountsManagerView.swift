@@ -173,7 +173,7 @@ public struct AccountsManagerView: View {
         let totalCount = dataStore.accounts.count
         
         return Button {
-            .lightImpact()
+            NativeHaptics.lightImpact()
             dataStore.selectAccount(id: "all")
         } label: {
             HStack(spacing: 10) {

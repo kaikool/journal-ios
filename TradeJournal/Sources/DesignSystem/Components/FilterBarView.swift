@@ -218,7 +218,7 @@ public struct FilterBarView<Actions: View>: View {
         Menu {
             ForEach(dataStore.visibleAccounts) { acc in
                 Button {
-                    .selection()
+                    NativeHaptics.selection()
                     dataStore.selectAccount(id: acc.id)
                 } label: {
                     accountMenuItemLabel(acc: acc)
@@ -343,7 +343,7 @@ public struct FilterBarView<Actions: View>: View {
     
     private func filterDialogButton(onFilter: @escaping () -> Void) -> some View {
         Button {
-            .lightImpact()
+            NativeHaptics.lightImpact()
             onFilter()
         } label: {
             HStack(spacing: 4) {

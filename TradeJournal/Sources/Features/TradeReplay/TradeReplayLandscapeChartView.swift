@@ -267,7 +267,7 @@ public struct TradeReplayLandscapeChartView: View {
         HStack(spacing: 10) {
             // Reset to beginning
             Button {
-                .lightImpact()
+                NativeHaptics.lightImpact()
                 onReset()
             } label: {
                 Image(systemName: "backward.end.fill")
@@ -283,7 +283,7 @@ public struct TradeReplayLandscapeChartView: View {
             
             // Step back 1 bar
             Button {
-                .lightImpact()
+                NativeHaptics.lightImpact()
                 onStep(-1)
             } label: {
                 Image(systemName: "chevron.left")
@@ -299,7 +299,7 @@ public struct TradeReplayLandscapeChartView: View {
             
             // Play / Pause (Large central button)
             Button {
-                .mediumImpact()
+                NativeHaptics.mediumImpact()
                 onTogglePlay()
             } label: {
                 Image(systemName: isPlaying ? "pause.fill" : "play.fill")
@@ -316,7 +316,7 @@ public struct TradeReplayLandscapeChartView: View {
             
             // Step forward 1 bar
             Button {
-                .lightImpact()
+                NativeHaptics.lightImpact()
                 onStep(1)
             } label: {
                 Image(systemName: "chevron.right")
@@ -332,7 +332,7 @@ public struct TradeReplayLandscapeChartView: View {
             
             // Forward to end
             Button {
-                .lightImpact()
+                NativeHaptics.lightImpact()
                 onForwardToEnd()
             } label: {
                 Image(systemName: "forward.end.fill")

@@ -11,7 +11,7 @@ extension DashboardView {
                         .foregroundColor(AppColors.primaryText)
                     Spacer()
                     Button {
-                        .lightImpact()
+                        NativeHaptics.lightImpact()
                         env.selectedTab = .calendar
                     } label: {
                         Text("Full calendar")
@@ -143,7 +143,7 @@ extension DashboardView {
                     ForEach(["recent", "open"], id: \.self) { tab in
                         let isSelected = activityTab == tab
                         Button {
-                            .selection()
+                            NativeHaptics.selection()
                             withAnimation(AppAnimations.springQuick) {
                                 activityTab = tab
                             }
@@ -354,7 +354,7 @@ extension DashboardView {
     // MARK: - Day Selection Action
     
     internal func openCalendarDay(dateKey: String, stats: DayStats?) {
-        .lightImpact()
+        NativeHaptics.lightImpact()
         let tradesForDay = dataStore.filteredTrades.filter {
             Formatters.isoDayString(from: $0.closedAt ?? $0.openedAt, timeZone: env.currentTimeZone) == dateKey
         }

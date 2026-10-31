@@ -200,7 +200,7 @@ public struct AddTradeSheet: View {
                 // Direction Selector
                 HStack(spacing: 8) {
                     Button {
-                        .selection()
+                        NativeHaptics.selection()
                         direction = .long
                     } label: {
                         HStack(spacing: 6) {
@@ -218,7 +218,7 @@ public struct AddTradeSheet: View {
                     .buttonStyle(ApplePressableButtonStyle())
                     
                     Button {
-                        .selection()
+                        NativeHaptics.selection()
                         direction = .short
                     } label: {
                         HStack(spacing: 6) {

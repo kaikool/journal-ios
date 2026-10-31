@@ -145,7 +145,7 @@ public struct NotebookView: View {
             AppSearchBar("Search notes", text: $searchQuery)
             
             AppPrimaryButton("New", icon: "plus", height: 34) {
-                .mediumImpact()
+                NativeHaptics.mediumImpact()
                 createNewNote()
             }
         }
@@ -194,7 +194,7 @@ public struct NotebookView: View {
         LazyVStack(spacing: 12) {
             ForEach(filteredNotes) { note in
                     Button {
-                        .lightImpact()
+                        NativeHaptics.lightImpact()
                         editingNote = note
                     } label: {
                         cardContainer {

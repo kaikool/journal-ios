@@ -38,7 +38,7 @@ extension DashboardView {
                     EdgeRadarView(components: edgeResult.components, height: 210)
                     
                     Button {
-                        .lightImpact()
+                        NativeHaptics.lightImpact()
                         withAnimation {
                             showEdgeScoreBreakdown.toggle()
                         }

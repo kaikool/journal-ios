@@ -98,7 +98,7 @@ public struct ImportStatementView: View {
                             }
                             
                             Button {
-                                .lightImpact()
+                                NativeHaptics.lightImpact()
                                 isFileImporterPresented = true
                             } label: {
                                 HStack(spacing: 6) {
@@ -280,7 +280,7 @@ public struct ImportStatementView: View {
                                 
                                 // Confirm Button
                                 Button {
-                                    .mediumImpact()
+                                    NativeHaptics.mediumImpact()
                                     commitImport(preview.usableExecutions)
                                 } label: {
                                     HStack(spacing: 8) {

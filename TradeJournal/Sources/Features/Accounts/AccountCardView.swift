@@ -30,7 +30,7 @@ public struct AccountCardView: View {
                 HStack(alignment: .top) {
                     // Journal visibility toggle button
                     Button {
-                        .lightImpact()
+                        NativeHaptics.lightImpact()
                         dataStore.toggleAccountVisibility(id: account.id)
                     } label: {
                         Image(systemName: isVisible ? "checkmark.circle.fill" : "circle")
@@ -66,7 +66,7 @@ public struct AccountCardView: View {
                     // Primary active view button
                     if !isSelected {
                         Button {
-                            .lightImpact()
+                            NativeHaptics.lightImpact()
                             dataStore.selectAccount(id: account.id)
                         } label: {
                             AppBadge("Select", variant: .brand)

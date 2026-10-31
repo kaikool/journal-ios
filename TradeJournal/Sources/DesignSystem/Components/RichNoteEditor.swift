@@ -91,7 +91,7 @@ public struct RichNoteEditor: View {
                 
                 if allowPreviewToggle {
                     Button {
-                        .lightImpact()
+                        NativeHaptics.lightImpact()
                         hasUserManuallyToggled = true
                         withAnimation(AppAnimations.springQuick) {
                             isPreviewMode.toggle()
@@ -165,7 +165,7 @@ public struct RichNoteEditor: View {
         action: @escaping () -> Void
     ) -> some View {
         Button {
-            .lightImpact()
+            NativeHaptics.lightImpact()
             action()
         } label: {
             Text(label)
@@ -190,7 +190,7 @@ public struct RichNoteEditor: View {
         action: @escaping () -> Void
     ) -> some View {
         Button {
-            .lightImpact()
+            NativeHaptics.lightImpact()
             action()
         } label: {
             Image(systemName: systemName)
@@ -261,7 +261,7 @@ public struct RichNoteEditor: View {
     @ViewBuilder
     private var previewContainer: some View {
         Button {
-            .lightImpact()
+            NativeHaptics.lightImpact()
             withAnimation(AppAnimations.springQuick) {
                 isPreviewMode = false
             }

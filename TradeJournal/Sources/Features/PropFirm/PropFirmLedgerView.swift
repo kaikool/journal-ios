@@ -252,7 +252,7 @@ public struct PropFirmLedgerView: View {
                 AppleMenuChip(title: "Status", selectionText: selectedAccountStatus.rawValue, icon: "circle.circle") {
                     ForEach(PropAccountStatusFilter.allCases) { s in
                         Button(s.rawValue) {
-                            .selection()
+                            NativeHaptics.selection()
                             selectedAccountStatus = s
                         }
                     }
@@ -261,7 +261,7 @@ public struct PropFirmLedgerView: View {
                 AppleMenuChip(title: "Currency", selectionText: selectedCurrency, icon: "dollarsign.circle") {
                     ForEach(availableCurrencies, id: \.self) { c in
                         Button(c) {
-                            .selection()
+                            NativeHaptics.selection()
                             selectedCurrency = c
                         }
                     }
@@ -272,7 +272,7 @@ public struct PropFirmLedgerView: View {
             
             if selectedTab == .accounts {
                 Button {
-                    .lightImpact()
+                    NativeHaptics.lightImpact()
                     showArchivedAccounts.toggle()
                 } label: {
                     HStack(spacing: 4) {

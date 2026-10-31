@@ -295,7 +295,7 @@ public struct DashboardCustomizerSheet: View {
                     HStack(spacing: 8) {
                         ForEach(DashboardPreset.allCases.filter { $0 != .custom }) { preset in
                             Button {
-                                .mediumImpact()
+                                NativeHaptics.mediumImpact()
                                 withAnimation(AppAnimations.springStandard) {
                                     activePreset = preset
                                     cardOrder = preset.canonicalOrder
@@ -399,7 +399,7 @@ public struct DashboardCustomizerSheet: View {
                     }
                 }
                 .onMove { source, destination in
-                    .lightImpact()
+                    NativeHaptics.lightImpact()
                     cardOrder.move(fromOffsets: source, toOffset: destination)
                     activePreset = .custom
                 }

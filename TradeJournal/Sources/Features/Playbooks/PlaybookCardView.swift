@@ -34,7 +34,7 @@ public struct PlaybookCardView: View {
                 // Header row
                 HStack(alignment: .center) {
                     Button {
-                        .lightImpact()
+                        NativeHaptics.lightImpact()
                         onSelect()
                     } label: {
                         HStack(spacing: 8) {
@@ -74,7 +74,7 @@ public struct PlaybookCardView: View {
                 
                 // Content area that opens Detail
                 Button {
-                    .lightImpact()
+                    NativeHaptics.lightImpact()
                     onSelect()
                 } label: {
                     VStack(alignment: .leading, spacing: 10) {

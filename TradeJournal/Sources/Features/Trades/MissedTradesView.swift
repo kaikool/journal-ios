@@ -343,7 +343,7 @@ public struct AddMissedTradeSheet: View {
     
     private func directionButton(title: String, isBuy: Bool, isSelected: Bool, action: @escaping () -> Void) -> some View {
         Button {
-            .lightImpact()
+            NativeHaptics.lightImpact()
             action()
         } label: {
             HStack(spacing: 6) {

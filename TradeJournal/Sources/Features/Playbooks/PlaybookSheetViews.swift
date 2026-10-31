@@ -150,7 +150,7 @@ public struct NewPlaybookSheet: View {
                 
                 if rules.count > 1 || (index < rules.count && !rules[index].isEmpty) {
                     Button {
-                        .lightImpact()
+                        NativeHaptics.lightImpact()
                         withAnimation(AppAnimations.springQuick) {
                             if index < rules.count {
                                 rules.remove(at: index)
@@ -339,7 +339,7 @@ public struct EditPlaybookSheet: View {
                 
                 if rules.count > 1 || (index < rules.count && !rules[index].isEmpty) {
                     Button {
-                        .lightImpact()
+                        NativeHaptics.lightImpact()
                         withAnimation(AppAnimations.springQuick) {
                             if index < rules.count {
                                 rules.remove(at: index)

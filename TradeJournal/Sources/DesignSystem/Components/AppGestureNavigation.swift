@@ -91,7 +91,7 @@ public struct InteractiveEdgeBackSwipeModifier: ViewModifier {
                                 isDragging = false
                                 let velocity = value.predictedEndTranslation.width - value.translation.width
                                 if value.translation.width > 70 || velocity > 150 {
-                                    .mediumImpact()
+                                    NativeHaptics.mediumImpact()
                                     withAnimation(AppAnimations.springQuick) {
                                         dragOffset = 220
                                     }

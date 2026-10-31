@@ -375,7 +375,7 @@ public struct AppBackButton: View {
     
     public var body: some View {
         Button {
-            .mediumImpact()
+            NativeHaptics.mediumImpact()
             action()
         } label: {
             HStack(spacing: 4) {

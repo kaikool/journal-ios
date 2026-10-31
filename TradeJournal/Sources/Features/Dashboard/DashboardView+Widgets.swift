@@ -133,7 +133,7 @@ extension DashboardView {
                 .minimumScaleFactor(0.85)
             Spacer()
             Button {
-                .lightImpact()
+                NativeHaptics.lightImpact()
                 activeTooltip = (title: title, hint: hint)
             } label: {
                 Image(systemName: icon)

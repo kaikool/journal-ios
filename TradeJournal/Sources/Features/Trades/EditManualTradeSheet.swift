@@ -227,7 +227,7 @@ public struct EditManualTradeSheet: View {
                 // Direction Selector
                 HStack(spacing: 8) {
                     Button {
-                        .lightImpact()
+                        NativeHaptics.lightImpact()
                         direction = .long
                     } label: {
                         HStack(spacing: 6) {
@@ -245,7 +245,7 @@ public struct EditManualTradeSheet: View {
                     .buttonStyle(ApplePressableButtonStyle())
                     
                     Button {
-                        .lightImpact()
+                        NativeHaptics.lightImpact()
                         direction = .short
                     } label: {
                         HStack(spacing: 6) {

@@ -539,7 +539,7 @@ public struct DashboardView: View {
             
             // Customize button (Sheet)
             Button {
-                .lightImpact()
+                NativeHaptics.lightImpact()
                 showCustomizerSheet = true
             } label: {
                 HStack(spacing: 6) {
@@ -567,7 +567,7 @@ public struct DashboardView: View {
     // MARK: - Presets & Reorder Actions
     
     private func applyPreset(_ preset: DashboardPreset) {
-        .mediumImpact()
+        NativeHaptics.mediumImpact()
         withAnimation(AppAnimations.springStandard) {
             activePresetRaw = preset.rawValue
             cardOrderRaw = preset.canonicalOrder.joined(separator: ",")
@@ -581,7 +581,7 @@ public struct DashboardView: View {
         let newIndex = currentIndex + direction
         guard newIndex >= 0 && newIndex < currentOrder.count else { return }
         
-        .mediumImpact()
+        NativeHaptics.mediumImpact()
         withAnimation(AppAnimations.springStandard) {
             currentOrder.swapAt(currentIndex, newIndex)
             cardOrderRaw = currentOrder.joined(separator: ",")
@@ -590,7 +590,7 @@ public struct DashboardView: View {
     }
     
     func hideCard(cardId: String) {
-        .lightImpact()
+        NativeHaptics.lightImpact()
         var currentHidden = hiddenCardIds
         currentHidden.insert(cardId)
         withAnimation(AppAnimations.springStandard) {

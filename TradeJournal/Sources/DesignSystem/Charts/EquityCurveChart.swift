@@ -568,7 +568,7 @@ public struct EquityCurveChart: View {
             HStack(spacing: 2) {
                 ForEach(EquityChartMode.allCases) { mode in
                     Button {
-                        .selection()
+                        NativeHaptics.selection()
                         withAnimation(AppAnimations.springQuick) {
                             chartMode = mode
                         }

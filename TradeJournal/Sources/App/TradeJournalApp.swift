@@ -76,7 +76,7 @@ public struct RootTabView: View {
             
             // Menu / More button
             Button {
-                .lightImpact()
+                NativeHaptics.lightImpact()
                 withAnimation(AppAnimations.springStandard) {
                     env.isDrawerOpen.toggle()
                 }
@@ -136,10 +136,10 @@ public struct RootTabView: View {
         
         return Button {
             if !isSelected {
-                .selection()
+                NativeHaptics.selection()
                 env.selectedTab = tab
             } else {
-                .lightImpact()
+                NativeHaptics.lightImpact()
                 NotificationCenter.default.post(name: .appScrollToTop, object: tab)
             }
         } label: {

@@ -69,7 +69,7 @@ public struct TradeReplayControlsCard: View {
                 HStack(spacing: 8) {
                     // Restart
                     Button {
-                        .lightImpact()
+                        NativeHaptics.lightImpact()
                         onReset()
                     } label: {
                         Image(systemName: "backward.end.fill")
@@ -88,7 +88,7 @@ public struct TradeReplayControlsCard: View {
                     
                     // Step back
                     Button {
-                        .lightImpact()
+                        NativeHaptics.lightImpact()
                         onStep(-1)
                     } label: {
                         Image(systemName: "chevron.left")
@@ -107,7 +107,7 @@ public struct TradeReplayControlsCard: View {
                     
                     // Play / Pause
                     Button {
-                        .mediumImpact()
+                        NativeHaptics.mediumImpact()
                         onTogglePlay()
                     } label: {
                         HStack(spacing: 5) {
@@ -130,7 +130,7 @@ public struct TradeReplayControlsCard: View {
                     
                     // Step forward
                     Button {
-                        .lightImpact()
+                        NativeHaptics.lightImpact()
                         onStep(1)
                     } label: {
                         Image(systemName: "chevron.right")
@@ -149,7 +149,7 @@ public struct TradeReplayControlsCard: View {
                     
                     // Forward to end
                     Button {
-                        .lightImpact()
+                        NativeHaptics.lightImpact()
                         onForwardToEnd()
                     } label: {
                         Image(systemName: "forward.end.fill")
@@ -182,7 +182,7 @@ public struct TradeReplayControlsCard: View {
                     // Fullscreen Landscape Trigger (placed directly next to Speed button)
                     if let onLandscape = onOpenLandscape {
                         Button {
-                            .lightImpact()
+                            NativeHaptics.lightImpact()
                             onLandscape()
                         } label: {
                             Image(systemName: "arrow.up.left.and.arrow.down.right")

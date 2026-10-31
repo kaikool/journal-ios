@@ -318,7 +318,7 @@ public struct PlaybookConditionEdgeChart: View {
         let isSelected = selectedIndex == stat.index
         
         Button {
-            .lightImpact()
+            NativeHaptics.lightImpact()
             if selectedIndex == stat.index {
                 selectedIndex = nil
             } else {
@@ -490,7 +490,7 @@ public struct PlaybookConditionEdgeChart: View {
                 )
                 .contentShape(Rectangle())
                 .onTapGesture {
-                    .lightImpact()
+                    NativeHaptics.lightImpact()
                     if selectedIndex == stat.index {
                         selectedIndex = nil
                     } else {

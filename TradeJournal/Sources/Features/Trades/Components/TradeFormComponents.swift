@@ -78,7 +78,7 @@ public struct TradeSymbolSelector: View {
                         .tracking(0.5)
                     Spacer()
                     Button {
-                        .lightImpact()
+                        NativeHaptics.lightImpact()
                         showCryptoSymbols.toggle()
                     } label: {
                         Text(showCryptoSymbols ? "Forex/Gold" : "Crypto/Indices")
@@ -293,7 +293,7 @@ public struct TradePlaybookRulesCard: View {
                         Spacer()
                         
                         Button {
-                            .lightImpact()
+                            NativeHaptics.lightImpact()
                             let allFollowed = pb.rules.allSatisfy { ruleAssessments[$0] == true }
                             for rule in pb.rules {
                                 ruleAssessments[rule] = !allFollowed
@@ -309,7 +309,7 @@ public struct TradePlaybookRulesCard: View {
                         ForEach(pb.rules, id: \.self) { rule in
                             let isFollowed = ruleAssessments[rule] ?? false
                             Button {
-                                .lightImpact()
+                                NativeHaptics.lightImpact()
                                 ruleAssessments[rule] = !isFollowed
                             } label: {
                                 HStack(spacing: 10) {
@@ -393,7 +393,7 @@ public struct TradeDisciplineAndNotesCard: View {
                                 .font(AppTypography.headline)
                                 .foregroundColor(star <= rating ? .yellow : AppColors.secondaryText.opacity(0.4))
                                 .onTapGesture {
-                                    .lightImpact()
+                                    NativeHaptics.lightImpact()
                                     rating = (rating == star) ? 0 : star
                                 }
                         }
@@ -422,7 +422,7 @@ public struct TradeDisciplineAndNotesCard: View {
                             ForEach(Self.commonMistakes, id: \.self) { m in
                                 let isAdded = mistakes.contains(m)
                                 Button {
-                                    .lightImpact()
+                                    NativeHaptics.lightImpact()
                                     if isAdded {
                                         mistakes.removeAll { $0 == m }
                                     } else {

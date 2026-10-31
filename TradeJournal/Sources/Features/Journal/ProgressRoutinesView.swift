@@ -561,7 +561,7 @@ public struct AddProgressRoutineSheet: View {
                     ForEach(Self.stageMetadata, id: \.id) { meta in
                         let isSelected = stage == meta.id
                         Button {
-                            .lightImpact()
+                            NativeHaptics.lightImpact()
                             stage = meta.id
                         } label: {
                             HStack(spacing: 12) {
@@ -617,7 +617,7 @@ public struct AddProgressRoutineSheet: View {
                     // Quick Presets
                     HStack(spacing: 6) {
                         Button("Mon-Fri") {
-                            .lightImpact()
+                            NativeHaptics.lightImpact()
                             selectedDays = [1, 2, 3, 4, 5]
                         }
                         .font(AppTypography.captionMicro)
@@ -628,7 +628,7 @@ public struct AddProgressRoutineSheet: View {
                             .foregroundColor(AppColors.border)
                         
                         Button("All Days") {
-                            .lightImpact()
+                            NativeHaptics.lightImpact()
                             selectedDays = [0, 1, 2, 3, 4, 5, 6]
                         }
                         .font(AppTypography.captionMicro)
@@ -640,7 +640,7 @@ public struct AddProgressRoutineSheet: View {
                     ForEach(weekdayNames, id: \.0) { day in
                         let isSelected = selectedDays.contains(day.0)
                         Button {
-                            .lightImpact()
+                            NativeHaptics.lightImpact()
                             if isSelected {
                                 if selectedDays.count > 1 {
                                     selectedDays.remove(day.0)
