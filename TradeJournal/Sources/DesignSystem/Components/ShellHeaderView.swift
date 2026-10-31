@@ -252,40 +252,30 @@ public struct ShellHeaderView: View {
     }
     
     private var notebookFoldersSubBar: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(dataStore.notebookFolders) { folder in
-                    folderChip(folder)
-                }
-            }
-            .padding(.horizontal, 16)
-        }
+        let activeFolders = dataStore.folders.filter { $0.deletedAt == nil }
+        let selectedFolder = activeFolders.first(where: { $0.id == (env.notebookFolderId ?? NotebookEngine.systemFolderAll) })
+            ?? activeFolders.first
+            ?? NotebookFolder(id: NotebookEngine.systemFolderAll, name: "All notes")
+        
+        return AppleSlidingSegmentedBar(
+            selection: Binding<NotebookFolder>(
+                get: { selectedFolder },
+                set: { env.notebookFolderId = ($0.id == NotebookEngine.systemFolderAll) ? nil : $0.id }
+            ),
+            items: activeFolders,
+            titleFor: { $0.name },
+            iconFor: { folder in
+                folder.id == NotebookEngine.systemFolderAll ? "tray.full" : "folder"
+            },
+            badgeCountFor: { folder in
+                dataStore.notebookNotes.filter {
+                    folder.id == NotebookEngine.systemFolderAll ? true : $0.folderId == folder.id
+                }.count
+            },
+            isScrollable: true
+        )
+        .padding(.horizontal, 14)
         .padding(.bottom, 8)
-    }
-    
-    @ViewBuilder
-    private func folderChip(_ folder: NotebookFolder) -> some View {
-        let isSelected = (env.notebookFolderId == folder.id) || (env.notebookFolderId == nil && folder.id == NotebookEngine.systemFolderAll)
-        Button {
-            NativeHaptics.selection()
-            env.notebookFolderId = (folder.id == NotebookEngine.systemFolderAll) ? nil : folder.id
-        } label: {
-            HStack(spacing: 4) {
-                Image(systemName: isSelected ? "folder.fill" : "folder")
-                    .font(.system(size: 11))
-                Text(folder.name)
-                    .font(.system(size: 11.5, weight: isSelected ? .bold : .medium))
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(isSelected ? AppColors.brand : AppColors.secondaryBackground.opacity(0.75))
-            .foregroundColor(isSelected ? .white : AppColors.secondaryText)
-            .clipShape(Capsule())
-            .overlay(
-                Capsule().stroke(isSelected ? AppColors.brand : AppColors.border.opacity(0.6), lineWidth: 0.6)
-            )
-        }
-        .buttonStyle(PlainButtonStyle())
     }
     
     // MARK: - Trailing Action Slot by Page Context
