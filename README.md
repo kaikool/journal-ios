@@ -5,8 +5,8 @@
 </p>
 
 <p align="center">
-  <strong>Institutional-Grade Trading Terminal, Performance Analytics & AI Execution Coach for iOS</strong><br>
-  Engineered natively with SwiftUI, Swift Charts, Swift Concurrency, and Supabase.
+  <strong>Native iOS Trading Terminal, Performance Journal, Prop Firm Ledger & AI Execution Coach</strong><br>
+  Built with SwiftUI, Swift Charts, Swift Concurrency, and Supabase PostgreSQL.
 </p>
 
 <p align="center">
@@ -15,7 +15,6 @@
   </a>
   <img src="https://img.shields.io/badge/iOS-17.0%2B-007AFF.svg?logo=apple&logoColor=white" alt="iOS 17.0+" />
   <img src="https://img.shields.io/badge/Swift-5.10%20%7C%206.0-F05138.svg?logo=swift&logoColor=white" alt="Swift 5.10 / 6.0" />
-  <img src="https://img.shields.io/badge/Architecture-Offline--First-34C759.svg" alt="Offline-First" />
   <img src="https://img.shields.io/badge/Backend-Supabase%20PostgreSQL-3ECF8E.svg?logo=supabase&logoColor=white" alt="Supabase" />
   <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License MIT" />
 </p>
@@ -30,119 +29,126 @@
 
 ## Overview
 
-**Trade Journal** is a native iOS trading journal and analytical terminal built for Forex, Metals, Indices, Futures, and Crypto traders. It combines deterministic financial accounting with multi-timeframe market visualization, prop firm treasury management, and an context-aware AI coaching engine.
-
-### Core Engineering Principles
-- **Deterministic Financial Precision:** Eliminates floating-point drift by executing all P&L, fee, swap, R-multiple, and drawdown calculations using exact `Decimal` and minor-unit (`Int64`) arithmetic. Cloud persistence stores monetary fields as PostgreSQL `numeric(38,10)` serialized via lossless decimal strings.
-- **Offline-First Reactivity:** Instant cold start and zero-latency navigation backed by atomic local persistence, automatic snapshot recovery (`.bak`), and asynchronous bidirectional cloud synchronization.
-- **Unified Native Design System:** Built strictly on Apple Human Interface Guidelines with an adaptive semantic color system, tactile haptics, and a centralized component architecture.
+**Trade Journal** is a native iOS trading journal and analytical terminal designed for Forex, Metals, Indices, Futures, and Crypto traders. It unifies order-fill reconstruction, multi-account prop firm tracking, historical candle replay, macro economic calendar monitoring, and multi-provider AI coaching into an offline-first mobile workspace.
 
 ---
 
-## Key Features
+## Core Modules & Capabilities
 
-### 📊 Performance Terminal & Analytics
-- **Equity & Drawdown Curves:** High-frequency Swift Charts visualizations tracking cumulative net/gross P&L, peak-to-trough underwater drawdown (%), and daily return distribution.
-- **Multi-Dimensional Edge Radar:** Quantitative scoring across Win Rate, Profit Factor, Expectancy, Risk-to-Reward, Consistency, and Drawdown Recovery.
-- **Temporal & Session Attribution:** Automated performance segmentation across Asian, London, London/NY Overlap, and New York sessions, paired with weekday and hourly heatmaps.
-- **Customizable Workspace:** Modular widget layout supporting role-based presets and drag-and-drop card arrangement.
+### 1. Terminal Dashboard & Quantitative Analytics (`Features/Dashboard`, `Features/Analytics`)
+- **Equity & Underwater Drawdown Curves:** Interactive Swift Charts tracking cumulative Net/Gross P&L, peak-to-trough drawdown percentage, and daily return bars.
+- **Multi-Axis Edge Score (`EdgeScoreEngine`):** Evaluates trading edge across Win Rate, Profit Factor, Expectancy, Risk-to-Reward, Consistency, and Max Drawdown Control.
+- **Temporal & Session Attribution:** Breakdowns across Asian, London, London/NY Overlap, and New York sessions (`SessionBreakdownChart`), alongside weekday and hourly heatmaps (`TimeHeatmapView`, `WeekdayChart`).
+- **Customizable Layout (`DashboardCustomizerSheet`):** Role-based layout presets and drag-and-drop widget ordering.
 
-### ⚡ Flat-to-Flat Trade Reconstruction
-- **Execution Matching Engines:** Reconstructs complete round-trip trades and partial scale-outs from raw broker fills using **FIFO**, **LIFO**, or **Weighted Average (WAVG)** accounting.
-- **Canonical Contract Resolution:** Normalizes broker-specific symbol suffixes (e.g., `XAUUSDm`, `EURUSD.pro`, `US30_i`) to accurately resolve contract multipliers, pip values, and tick sizes across asset classes.
-- **Multi-Currency Reporting:** Converts cross-pair profits into the account's base currency using execution-time exchange rates or configurable FX rate tables.
+### 2. Trade Reconstruction & Execution Audit (`Core/Domain/Engines`, `Features/Trades`)
+- **Flat-to-Flat Order Matching (`TradeReconstructionEngine`):** Reconstructs closed round-trip positions and partial scale-outs from raw execution fills using **FIFO**, **LIFO**, or **Weighted Average (WAVG)**.
+- **Exact Decimal Accounting (`FinancialInvariants`, `AssetContractEngine`):** Computes Gross P&L, Commissions, Overnight Swaps (`netP&L = grossP&L − fees + swap`), R-Multiples, and MAE/MFE using exact `Decimal` arithmetic and normalized broker contract sizes (`XAUUSD` 100 oz/lot, standard FX 100,000 units/lot, Indices, and Crypto).
+- **Playbook & Discipline Tracking (`Features/Playbooks`):** Setup checklists (`TradeRuleCheck`), mistake categorization (`TradeFailureTaxonomy`), and Missed Trade logging (`MissedTradesView`).
 
-### 🤖 AI Execution Coach & Pre-Trade Desk
-- **Multi-Timeframe Pre-Trade Scanner:** Simultaneous `D1 • H4 • M15` candlestick canvas featuring algorithmic detection of liquidity sweeps, order blocks, momentum shifts, and key moving averages.
-- **Post-Trade & Live Position Audits:** Contextual AI evaluation of individual trades—analyzing entry timing, stop-loss placement, MAE/MFE efficiency, and rule adherence.
-- **Persistent Trader Memory & Research Workspace:** Long-term behavioral memory that tracks verified strengths, recurring psychological leaks, and structured market hypotheses across sessions.
+### 3. AI Execution Coach, Pre-Trade Desk & Memory (`Features/AIReflection`, `Core/Networking/AI`)
+- **Multi-Timeframe Pre-Trade Scanner (`MultiTimeframeTriVisionCanvas`):** Simultaneous `D1 • H4 • M15` candlestick inspection with algorithmic liquidity sweeps, order blocks, momentum, and moving average snapshots (`LiquidityEngine`, `MarketStateSnapshotBuilder`).
+- **Trade Audit & Interactive Follow-Up (`TradeAICoachSheet`):** Context-aware AI evaluation of live and closed trades with multi-turn Q&A (`AICoachSessionStore`) and lesson extraction (`SupabaseTradeLessonSync`).
+- **Persistent AI Memory & Research Workspace (`AIAdvisorMemoryEngine`, `AIResearchWorkspaceEngine`):** Tracks verified trader habits, recurring psychological leaks, and structured market hypotheses across sessions.
+- **Multi-Provider AI Routing (`AIFallbackProvider`):** Supports Google Gemini, Groq Cloud, OpenRouter, and Supabase Edge Functions (`supabase/functions/ai-reflection`).
 
-### 📅 Daily Journal, Macro Calendar & Notebook
-- **Timezone-Locked Daily Ledger:** Resolves all trading days, streaks, and daily summaries strictly against the trader's configured market timezone.
-- **Real-Time Economic Calendar:** Integrated ForexFactory macro feed with impact filtering, live event countdowns, and Actual / Forecast / Previous consensus data.
-- **Rich Markdown Notebook:** Structured pre-market and post-market templates, chart screenshot attachments, bidirectional trade linking, and embedded AI inquiry.
+### 4. Daily Journal, Economic Calendar & Rich Notebook (`Features/Journal`)
+- **Timezone-Aligned Daily Ledger:** Resolves daily logs, trading streaks, and session windows strictly against the trader's active market timezone (`JournalIds.dayId(for:timeZone:)`).
+- **Economic Calendar (`ForexFactoryService`, `DayEconomicCalendarView`):** Macro news feed with high/medium/low impact filtering, countdown badges, and Actual / Forecast / Previous figures.
+- **Markdown Notebook & Routines (`NotebookView`, `ProgressRoutinesView`):** Rich note editor with templates, chart attachments (`SupabaseStorageService`), trade linking, embedded AI note inquiry (`NoteAIInquirySheet`), and daily pre/post-market checklists.
 
-### 💼 Prop Firm Tracker & Treasury Ledger
-- **Evaluation & Funded Lifecycle:** Track Phase 1, Phase 2, and Funded accounts across major proprietary trading firms (**The5ers**, **FTMO**, **Topstep**, **FundedNext**, and custom programs).
-- **Risk & Objective Guardrails:** Real-time monitoring of profit targets, daily drawdown limits, and static/trailing maximum loss thresholds.
-- **True Net ROI Accounting:** Dedicated ledger for challenge fees, resets, fee refunds, and profit-split payouts.
+### 5. Prop Firm Tracker & Treasury Ledger (`Features/PropFirm`)
+- **Challenge & Funded Account Lifecycle (`PropFirmTrackerView`):** Tracks evaluation phases (Phase 1, Phase 2) and Funded accounts across **The5ers**, **FTMO**, **Topstep**, **FundedNext**, and custom firms.
+- **Objective Guardrails (`PropAccountObjectivesChartCard`):** Visual progress tracking for profit targets, daily drawdown limits, and maximum loss thresholds.
+- **Financial Ledger (`PropFirmLedgerView`):** Records challenge fees, resets, fee refunds, and profit-split payouts to calculate net prop trading ROI.
 
-### ⏪ Multi-Timeframe Trade Replay
-- **Historical Candle Playback:** Interactive bar-by-bar replay across `M1`, `M5`, `M15`, `H1`, `H4`, and `D1` resolutions with synchronized entry/exit markers, dynamic SL/TP levels, and real-time unrealized P&L / R-multiple telemetry.
+### 6. Multi-Timeframe Trade Replay (`Features/TradeReplay`)
+- **Historical Candle Playback (`TradeReplayView`, `TradeReplayLandscapeChartView`):** Bar-by-bar OHLCV playback across `M1`, `M5`, `M15`, `H1`, `H4`, and `D1` timeframes (`MarketDataService` / OANDA feed) with entry/exit markers, dynamic SL/TP lines, and live unrealized P&L telemetry.
 
-### 🔄 Multi-Broker Sync & Universal CSV Import
-- **Direct Broker Integrations:** Native synchronization providers for **The5ers**, **Exness**, and **cTrader** (OAuth 2.0), alongside **Supabase** cloud backup.
-- **Universal Statement Importer:** RFC 4180 CSV parser supporting **MetaTrader 4/5**, **cTrader**, **TradingView**, and **TradeLocker** exports with deterministic SHA-256 fill deduplication.
+### 7. Multi-Broker Sync & Universal CSV Importer (`Core/Sync`, `Features/Import`)
+- **Direct Broker & Cloud Providers (`SyncManager`):**
+  - **The5ers (`The5ersSyncProvider`):** Direct synchronization of prop accounts, balance/equity metrics, and trade history.
+  - **Exness (`ExnessSyncProvider`):** REST API synchronization for Exness accounts.
+  - **cTrader (`CTraderSyncProvider`):** OAuth 2.0 account and deal history sync.
+  - **Supabase Cloud (`SupabaseSyncProvider`):** Bidirectional PostgreSQL and Storage sync with offline-first local caching (`TradeDataStore`).
+- **Universal CSV Importer (`StandardCSVImporter`):** Auto-detects **MetaTrader 4/5**, **cTrader**, **TradingView**, and **TradeLocker** statements with deterministic SHA-256 fill deduplication (`TradeDeduplicator`).
 
 ---
 
-## System Architecture
+## Repository Structure
 
 ```text
-TradeJournal/
-├── Sources/
-│   ├── App/                        # Application lifecycle, environment container & root navigation
-│   ├── Core/
-│   │   ├── Domain/
-│   │   │   ├── Models/             # Immutable financial entities, currency contexts & journal schemas
-│   │   │   └── Engines/            # Pure domain engines (FIFO/LIFO/WAVG, EdgeScore, Liquidity, PropFirm)
-│   │   ├── Data/                   # Reactive TradeDataStore, local persistence & Supabase sync modules
-│   │   ├── Networking/             # Broker API clients, market data feeds, economic calendar & AI services
-│   │   ├── Sync/                   # Unified SyncManager & provider implementations
-│   │   └── Utilities/              # Keychain security, privacy masking, haptics & structured logging
-│   ├── DesignSystem/               # Centralized UI tokens, typography, formatters, charts & HIG components
-│   └── Features/
-│       ├── Dashboard/              # Terminal KPI widgets, equity curves & layout customizer
-│       ├── Trades/                 # Trade feed, execution audit views, manual entry & AI trade coach
-│       ├── AIReflection/           # AI Coach hub, pre-trade multi-timeframe desk, memory & research
-│       ├── Journal/                # Calendar analytics, daily journal, economic calendar & rich notebook
-│       ├── Playbooks/              # Strategy playbooks, rule checklists & expectancy attribution
-│       ├── PropFirm/               # Prop account tracker, objective gauges & payout ledger
-│       ├── TradeReplay/            # Portrait & landscape historical candle replay engine
-│       ├── Analytics/              # Behavioral & drawdown deep-dive reports
-│       ├── Accounts/               # Multi-account management & currency configuration
-│       ├── Import/                 # Universal CSV statement mapper & deduplication preview
-│       └── Settings/               # Broker connections, AI provider config & data management
-└── docs/                           # Technical specifications, database schemas & sync architecture
+.
+├── .github/workflows/
+│   └── build-ipa.yml               # CI/CD pipeline: Design System audit, XcodeGen & Release IPA packaging
+├── TradeJournal/
+│   ├── Resources/                  # Assets.xcassets & bundled configuration
+│   ├── Sources/
+│   │   ├── App/                    # AppEnvironment, TradeJournalApp & SplashScreenView
+│   │   ├── Core/
+│   │   │   ├── Data/               # TradeDataStore (offline cache) & Supabase sync services
+│   │   │   ├── Domain/
+│   │   │   │   ├── Engines/        # 27 domain engines (FIFO/LIFO/WAVG, EdgeScore, Liquidity, CSV, PropFirm)
+│   │   │   │   └── Models/         # 21 financial & journal domain models
+│   │   │   ├── Networking/         # The5ers, Exness, cTrader, ForexFactory, MarketData & AI clients
+│   │   │   ├── Sync/               # SyncManager & broker/cloud sync providers
+│   │   │   └── Utilities/          # KeychainHelper, NativeHaptics, PrivacyMask & AppLogger
+│   │   ├── DesignSystem/           # Single Source of Truth UI components, Swift Charts, Theme & Typography
+│   │   └── Features/               # Dashboard, Trades, AIReflection, Journal, Playbooks, PropFirm,
+│   │                               # TradeReplay, Analytics, Accounts, Import & Settings
+│   └── Tests/                      # Unit & financial invariant test suite
+├── supabase/
+│   ├── functions/ai-reflection/    # Supabase Edge Function for AI coaching & reflection
+│   └── migrations/                 # PostgreSQL schema migrations (trades, numeric(38,10), MAE/MFE, AI memory)
+├── scripts/
+│   └── check_design_system.js      # Automated static analyzer enforcing Design System standards in CI
+├── AppSecrets.plist.example        # Template for local API keys & cloud credentials
+├── Package.swift                   # Swift Package Manager manifest
+└── project.yml                     # XcodeGen project specification
 ```
 
 ---
 
-## Installation & Getting Started
+## Installation & Development
 
-### Direct Installation (Pre-built IPA)
-Download the latest release binary directly from GitHub Releases:
-- **Latest Binary:** [TradeJournal.ipa](https://github.com/kaikool/journal-ios/releases/latest/download/TradeJournal.ipa)
-- Install on iOS 17.0+ devices via **AltStore**, **SideStore**, **Sideloadly**, **TrollStore**, or **LiveContainer**.
+### 1. Direct Sideload (Pre-built IPA)
+Download the latest unsigned release binary from GitHub Releases:
+- **Direct Download:** [TradeJournal.ipa](https://github.com/kaikool/journal-ios/releases/latest/download/TradeJournal.ipa)
+- Sideload onto iOS 17.0+ devices via **TrollStore**, **AltStore**, **SideStore**, **Sideloadly**, or **ESign / LiveContainer**.
 
-### Building from Source
+### 2. Local Build from Source (macOS + Xcode 16+)
 1. **Clone the repository:**
    ```bash
    git clone https://github.com/kaikool/journal-ios.git
    cd journal-ios
    ```
-2. **Generate the Xcode project:**
+2. **Configure API Credentials (Optional for Local Build):**
+   Copy `AppSecrets.plist.example` to `TradeJournal/Resources/AppSecrets.plist` and populate your keys (`GEMINI_API_KEY`, `GROQ_API_KEY`, `OPENROUTER_API_KEY`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `OANDA_API_KEY`, `EXNESS_API_KEY`). `AppSecrets.plist` is git-ignored so credentials are never committed.
+3. **Generate the Xcode Project & Run:**
    ```bash
    brew install xcodegen
    xcodegen generate
+   open TradeJournal.xcodeproj
    ```
-3. **Build and Run:**
-   Open `TradeJournal.xcodeproj` in **Xcode 16.0+**, select an iOS 17.0+ simulator or physical device, and press `Cmd + R`.
+4. **Verify Design System Compliance:**
+   ```bash
+   node scripts/check_design_system.js
+   ```
 
 ---
 
-## Documentation
+## Database Migrations (`supabase/migrations/`)
 
-In-depth architectural specifications are available in the [`docs/`](docs/) directory:
-
-- [Master Architecture & System Plan](docs/MASTER_PLAN.md)
-- [Domain Models & Financial Formulas](docs/ios/02_DOMAIN_MAPPING.md)
-- [Supabase Database & Storage Schema](docs/ios/03_SUPABASE_ARCHITECTURE.md)
-- [Multi-Provider Synchronization Strategy](docs/ios/06_SYNC_STRATEGY.md)
-- [Automated IPA Build & Release Pipeline](docs/ios/BUILD_IPA_GUIDE.md)
+To provision a self-hosted or cloud Supabase PostgreSQL instance, apply the SQL migrations in chronological order:
+1. `20261016_initial_schema.sql` — Core tables (`accounts`, `trades`, `executions`, `playbooks`, `journal_notes`, `prop_firm_transactions`).
+2. `20261021_financial_precision_and_swap.sql` — Exact `numeric(38,10)` monetary columns and overnight swap accounting.
+3. `20261025_economic_calendar.sql` — Macro economic calendar events schema and indexing.
+4. `20261026_progress_notes_missed_trades.sql` — Daily routine checklists and missed trade records.
+5. `20261028_ai_coach_intelligence.sql` — Persistent AI advisor memory, research projects, and trade lessons.
+6. `20261028_trade_mae_mfe_and_rpc.sql` — MAE/MFE excursion telemetry and batch sync RPC functions.
 
 ---
 
 ## License
 
-Released under the [MIT License](LICENSE).
+This project is licensed under the [MIT License](LICENSE).
