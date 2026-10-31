@@ -59,7 +59,7 @@ public struct PreTradeContextMetricsCard: View {
                             .foregroundColor(AppColors.brand)
                         
                         Text("TREND & LIQUIDITY CONTEXT")
-                            .font(.system(size: 11, weight: .bold))
+                            .font(AppTypography.cardHeaderUppercase)
                             .foregroundColor(AppColors.secondaryText)
                             .tracking(0.5)
                     }
@@ -68,7 +68,7 @@ public struct PreTradeContextMetricsCard: View {
                     
                     if let cur = livePrice {
                         Text("Live: \(Formatters.price(cur, symbol: symbol))")
-                            .font(AppTypography.number(11, weight: .bold))
+                            .font(AppTypography.statValue)
                             .foregroundColor(AppColors.brand)
                     }
                 }
@@ -78,7 +78,7 @@ public struct PreTradeContextMetricsCard: View {
                 // Section 1: Multi-Timeframe EMA 21 & 50
                 VStack(alignment: .leading, spacing: 6) {
                     Text("DYNAMIC TREND (EMA 21 / 50)")
-                        .font(.system(size: 9.5, weight: .semibold))
+                        .font(AppTypography.captionMicro)
                         .foregroundColor(AppColors.secondaryText)
                         .tracking(0.3)
                     

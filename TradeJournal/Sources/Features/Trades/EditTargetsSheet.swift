@@ -147,23 +147,21 @@ public struct EditTargetsSheet: View {
                 HStack(alignment: .center) {
                     HStack(spacing: 6) {
                         Text(trade.symbol)
-                            .font(.system(size: 16, weight: .bold))
+                            .font(AppTypography.rowPrimary)
                             .foregroundColor(AppColors.primaryText)
                         
-                        Text(trade.direction.rawValue.uppercased())
-                            .font(.system(size: 10, weight: .bold))
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(trade.direction == .long ? AppColors.profit.opacity(0.15) : AppColors.loss.opacity(0.15))
-                            .foregroundColor(trade.direction == .long ? AppColors.profit : AppColors.loss)
-                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                        AppBadge(
+                            trade.direction.rawValue.uppercased(),
+                            variant: trade.direction == .long ? .profit : .loss
+                        )
                     }
                     
                     Spacer()
                     
-                    Text(trade.status == .open ? "ACTIVE TRADE" : "CLOSED TRADE")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundColor(trade.status == .open ? AppColors.profit : AppColors.secondaryText)
+                    AppBadge(
+                        trade.status == .open ? "ACTIVE TRADE" : "CLOSED TRADE",
+                        variant: trade.status == .open ? .profit : .secondary
+                    )
                 }
                 
                 Divider().background(AppColors.border.opacity(0.4))
@@ -171,10 +169,10 @@ public struct EditTargetsSheet: View {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Entry Price")
-                            .font(AppTypography.caption)
+                            .font(AppTypography.statLabel)
                             .foregroundColor(AppColors.secondaryText)
                         Text(Formatters.price(entryPrice))
-                            .font(AppTypography.number(14, weight: .semibold))
+                            .font(AppTypography.statValue)
                             .foregroundColor(AppColors.primaryText)
                     }
                     
@@ -182,10 +180,10 @@ public struct EditTargetsSheet: View {
                     
                     VStack(alignment: .trailing, spacing: 2) {
                         Text("Volume")
-                            .font(AppTypography.caption)
+                            .font(AppTypography.statLabel)
                             .foregroundColor(AppColors.secondaryText)
                         Text("\(Formatters.formatDecimal(trade.quantity, maxDecimals: 3)) lots")
-                            .font(AppTypography.number(14, weight: .semibold))
+                            .font(AppTypography.statValue)
                             .foregroundColor(AppColors.primaryText)
                     }
                 }
@@ -202,7 +200,7 @@ public struct EditTargetsSheet: View {
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundColor(AppColors.loss)
                     Text("STOP LOSS (RISK)")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(AppTypography.cardHeaderUppercase)
                         .foregroundColor(AppColors.secondaryText)
                         .tracking(0.5)
                     Spacer()
@@ -211,7 +209,7 @@ public struct EditTargetsSheet: View {
                             stopLossText = ""
                         } label: {
                             Text("Clear")
-                                .font(.system(size: 11, weight: .medium))
+                                .font(AppTypography.actionButtonCompact)
                                 .foregroundColor(AppColors.secondaryText)
                         }
                     }
@@ -228,10 +226,10 @@ public struct EditTargetsSheet: View {
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Risk Distance")
-                                .font(AppTypography.caption)
+                                .font(AppTypography.statLabel)
                                 .foregroundColor(AppColors.secondaryText)
                             Text("\(Formatters.formatDecimal(rDist, maxDecimals: symbolSpec.defaultDecimals)) pts")
-                                .font(AppTypography.number(12, weight: .semibold))
+                                .font(AppTypography.statValueMedium)
                                 .foregroundColor(AppColors.primaryText)
                         }
                         
@@ -239,10 +237,10 @@ public struct EditTargetsSheet: View {
                         
                         VStack(alignment: .trailing, spacing: 2) {
                             Text("Risk at Stake (1R)")
-                                .font(AppTypography.caption)
+                                .font(AppTypography.statLabel)
                                 .foregroundColor(AppColors.secondaryText)
                             Text("-\(Formatters.formatCurrency(rAmt, currency: env.currentCurrency))")
-                                .font(AppTypography.number(13, weight: .bold))
+                                .font(AppTypography.statValue)
                                 .foregroundColor(AppColors.loss)
                         }
                     }
@@ -257,7 +255,7 @@ public struct EditTargetsSheet: View {
                             .font(.system(size: 11))
                             .foregroundColor(.orange)
                         Text(trade.direction == .long ? "Stop loss should be below entry price for Buy trades." : "Stop loss should be above entry price for Sell trades.")
-                            .font(.system(size: 11))
+                            .font(AppTypography.footnote)
                             .foregroundColor(.orange)
                     }
                 }
@@ -274,7 +272,7 @@ public struct EditTargetsSheet: View {
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundColor(AppColors.profit)
                     Text("PROFIT TARGET (REWARD)")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(AppTypography.cardHeaderUppercase)
                         .foregroundColor(AppColors.secondaryText)
                         .tracking(0.5)
                     Spacer()
@@ -283,7 +281,7 @@ public struct EditTargetsSheet: View {
                             profitTargetText = ""
                         } label: {
                             Text("Clear")
-                                .font(.system(size: 11, weight: .medium))
+                                .font(AppTypography.actionButtonCompact)
                                 .foregroundColor(AppColors.secondaryText)
                         }
                     }
@@ -300,10 +298,10 @@ public struct EditTargetsSheet: View {
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Target Distance")
-                                .font(AppTypography.caption)
+                                .font(AppTypography.statLabel)
                                 .foregroundColor(AppColors.secondaryText)
                             Text("\(Formatters.formatDecimal(tDist, maxDecimals: symbolSpec.defaultDecimals)) pts")
-                                .font(AppTypography.number(12, weight: .semibold))
+                                .font(AppTypography.statValueMedium)
                                 .foregroundColor(AppColors.primaryText)
                         }
                         
@@ -311,10 +309,10 @@ public struct EditTargetsSheet: View {
                         
                         VStack(alignment: .trailing, spacing: 2) {
                             Text("Planned Reward")
-                                .font(AppTypography.caption)
+                                .font(AppTypography.statLabel)
                                 .foregroundColor(AppColors.secondaryText)
                             Text("+\(Formatters.formatCurrency(tAmt, currency: env.currentCurrency))")
-                                .font(AppTypography.number(13, weight: .bold))
+                                .font(AppTypography.statValue)
                                 .foregroundColor(AppColors.profit)
                         }
                     }
@@ -329,7 +327,7 @@ public struct EditTargetsSheet: View {
                             .font(.system(size: 11))
                             .foregroundColor(.orange)
                         Text(trade.direction == .long ? "Profit target should be above entry price for Buy trades." : "Profit target should be below entry price for Sell trades.")
-                            .font(.system(size: 11))
+                            .font(AppTypography.footnote)
                             .foregroundColor(.orange)
                     }
                 }
@@ -375,14 +373,14 @@ public struct EditTargetsSheet: View {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
                     Text("PLANNED RISK / REWARD")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(AppTypography.cardHeaderUppercase)
                         .foregroundColor(AppColors.secondaryText)
                         .tracking(0.5)
                     Spacer()
                     if let pR = plannedR {
                         let plannedVal = (pR as NSDecimalNumber).doubleValue
                         Text(String(format: "1 : %.2f R", plannedVal))
-                            .font(AppTypography.number(14, weight: .bold))
+                            .font(AppTypography.displayMedium)
                             .foregroundColor(plannedVal >= 1.5 ? AppColors.profit : (plannedVal >= 1.0 ? AppColors.brand : .orange))
                     } else {
                         Text("Set SL & TP to calculate")
@@ -408,11 +406,11 @@ public struct EditTargetsSheet: View {
                         
                         HStack {
                             Text("1R Risk")
-                                .font(.system(size: 10, weight: .semibold))
+                                .font(AppTypography.badgeStandard)
                                 .foregroundColor(AppColors.loss)
                             Spacer()
                             Text(String(format: "%.1fR Reward", plannedVal))
-                                .font(.system(size: 10, weight: .semibold))
+                                .font(AppTypography.badgeStandard)
                                 .foregroundColor(AppColors.profit)
                         }
                     }

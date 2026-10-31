@@ -62,7 +62,7 @@ extension PropFirmLedgerView {
                             }
                             
                             Text(Formatters.cleanAccountName(acc.name, balance: acc.sizeMinor.map { Decimal($0) / 100 }))
-                                .font(AppTypography.headline)
+                                .font(AppTypography.rowPrimary)
                                 .foregroundColor(AppColors.primaryText)
                                 .lineLimit(1)
                                 .truncationMode(.tail)
@@ -73,7 +73,7 @@ extension PropFirmLedgerView {
                                         .font(.system(size: 10))
                                         .foregroundColor(AppColors.brand)
                                     Text("Next phase of: \(Formatters.cleanAccountName(parentAcc.name))")
-                                        .font(.system(size: 11, weight: .medium))
+                                        .font(AppTypography.caption)
                                         .foregroundColor(AppColors.brand)
                                         .lineLimit(1)
                                         .truncationMode(.tail)
@@ -83,14 +83,14 @@ extension PropFirmLedgerView {
                             HStack {
                                 if let size = acc.sizeMinor {
                                     Text("Initial Size: \(Formatters.formatCurrency(Decimal(size) / 100, currency: acc.currency))")
-                                        .font(AppTypography.caption)
+                                        .font(AppTypography.statLabel)
                                         .monospacedDigit()
                                         .foregroundColor(AppColors.secondaryText)
                                         .lineLimit(1)
                                 }
                                 Spacer()
                                 Text(acc.currentStepName ?? acc.program.label)
-                                    .font(AppTypography.caption)
+                                    .font(AppTypography.statLabel)
                                     .foregroundColor(AppColors.secondaryText)
                                     .lineLimit(1)
                             }
@@ -106,11 +106,11 @@ extension PropFirmLedgerView {
                             HStack(spacing: 0) {
                                 VStack(alignment: .leading, spacing: 3) {
                                     Text("BALANCE")
-                                        .font(.system(size: 10, weight: .semibold))
+                                        .font(AppTypography.statLabel)
                                         .foregroundColor(AppColors.secondaryText)
                                         .tracking(0.5)
                                     Text(Formatters.formatCurrency(Decimal(balMinor) / 100, currency: acc.currency))
-                                        .font(AppTypography.financialNumber(size: 16, weight: .bold))
+                                        .font(AppTypography.displayMedium)
                                         .monospacedDigit()
                                         .foregroundColor(AppColors.primaryText)
                                         .lineLimit(1)
@@ -120,11 +120,11 @@ extension PropFirmLedgerView {
                                 
                                 VStack(alignment: .center, spacing: 3) {
                                     Text("EQUITY")
-                                        .font(.system(size: 10, weight: .semibold))
+                                        .font(AppTypography.statLabel)
                                         .foregroundColor(AppColors.secondaryText)
                                         .tracking(0.5)
                                     Text(Formatters.formatCurrency(Decimal(eqMinor) / 100, currency: acc.currency))
-                                        .font(AppTypography.financialNumber(size: 16, weight: .bold))
+                                        .font(AppTypography.displayMedium)
                                         .monospacedDigit()
                                         .foregroundColor(AppColors.primaryText)
                                         .lineLimit(1)
@@ -134,7 +134,7 @@ extension PropFirmLedgerView {
                                 
                                 VStack(alignment: .trailing, spacing: 3) {
                                     Text("NET P&L")
-                                        .font(.system(size: 10, weight: .semibold))
+                                        .font(AppTypography.statLabel)
                                         .foregroundColor(AppColors.secondaryText)
                                         .tracking(0.5)
                                     let isNetPos = pnlMinor >= 0

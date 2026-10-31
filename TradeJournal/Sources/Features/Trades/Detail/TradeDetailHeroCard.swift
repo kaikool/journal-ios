@@ -17,7 +17,7 @@ public struct TradeDetailHeroCard: View {
                 HStack(alignment: .center) {
                     HStack(spacing: 8) {
                         Text(trade.symbol)
-                            .font(AppTypography.headline)
+                            .font(AppTypography.rowPrimary)
                             .foregroundColor(AppColors.primaryText)
                         
                         AppBadge(
@@ -26,7 +26,7 @@ public struct TradeDetailHeroCard: View {
                         )
                         
                         Text("\(Formatters.formatNumber(trade.quantity)) Lots")
-                            .font(AppTypography.number(11, weight: .medium))
+                            .font(AppTypography.statLabel)
                             .foregroundColor(AppColors.secondaryText)
                     }
                     
@@ -41,7 +41,7 @@ public struct TradeDetailHeroCard: View {
                 AppMonetaryText(
                     Formatters.formatPnL(trade.netPnl, currency: env.currentCurrency),
                     isPrivate: env.isPrivacyModeEnabled,
-                    font: AppTypography.financialNumber(size: 32, weight: .bold),
+                    font: AppTypography.displayHeroLarge,
                     color: Formatters.pnlColor(trade.netPnl)
                 )
                 

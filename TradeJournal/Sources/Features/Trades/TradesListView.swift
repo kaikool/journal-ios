@@ -166,7 +166,7 @@ public struct TradesListView: View {
             cardContainer {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("NET CUMULATIVE P&L")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(AppTypography.cardHeaderUppercase)
                         .foregroundColor(AppColors.secondaryText)
                         .tracking(0.5)
                         .lineLimit(1)
@@ -174,7 +174,7 @@ public struct TradesListView: View {
                     AppMonetaryText(
                         Formatters.formatPnL(overviewMetrics.netPnl, currency: env.currentCurrency),
                         isPrivate: env.isPrivacyModeEnabled,
-                        font: AppTypography.financialNumber(size: 19, weight: .bold),
+                        font: AppTypography.displayMajor,
                         color: pnlColor
                     )
                     .lineLimit(1)
@@ -185,7 +185,7 @@ public struct TradesListView: View {
                         Text("·")
                         Text("Fees \(Formatters.formatCurrency(overviewMetrics.fees ?? 0, currency: env.currentCurrency))")
                     }
-                    .font(.system(size: 10))
+                    .font(AppTypography.captionMicro)
                     .monospacedDigit()
                     .foregroundColor(AppColors.secondaryText)
                     .lineLimit(1)
@@ -195,20 +195,20 @@ public struct TradesListView: View {
             cardContainer {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("PROFIT FACTOR")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(AppTypography.cardHeaderUppercase)
                         .foregroundColor(AppColors.secondaryText)
                         .tracking(0.5)
                         .lineLimit(1)
                     
                     Text(pfStr)
-                        .font(AppTypography.financialNumber(size: 19, weight: .bold))
+                        .font(AppTypography.displayMajor)
                         .monospacedDigit()
                         .foregroundColor(AppColors.primaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.85)
                     
                     Text("Payoff efficiency")
-                        .font(.system(size: 10))
+                        .font(AppTypography.captionMicro)
                         .foregroundColor(AppColors.secondaryText)
                         .lineLimit(1)
                 }
@@ -217,20 +217,20 @@ public struct TradesListView: View {
             cardContainer {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("TRADE WIN %")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(AppTypography.cardHeaderUppercase)
                         .foregroundColor(AppColors.secondaryText)
                         .tracking(0.5)
                         .lineLimit(1)
                     
                     Text(winRateStr)
-                        .font(AppTypography.financialNumber(size: 19, weight: .bold))
+                        .font(AppTypography.displayMajor)
                         .monospacedDigit()
                         .foregroundColor(AppColors.primaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.85)
                     
                     Text("\(overviewMetrics.winningTrades)W · \(overviewMetrics.losingTrades)L")
-                        .font(.system(size: 10))
+                        .font(AppTypography.captionMicro)
                         .monospacedDigit()
                         .foregroundColor(AppColors.secondaryText)
                         .lineLimit(1)
@@ -240,20 +240,20 @@ public struct TradesListView: View {
             cardContainer {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("AVG WIN / LOSS")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(AppTypography.cardHeaderUppercase)
                         .foregroundColor(AppColors.secondaryText)
                         .tracking(0.5)
                         .lineLimit(1)
                     
                     Text(avgWlStr)
-                        .font(AppTypography.financialNumber(size: 19, weight: .bold))
+                        .font(AppTypography.displayMajor)
                         .monospacedDigit()
                         .foregroundColor(AppColors.primaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.85)
                     
                     Text("Expectancy multiple")
-                        .font(.system(size: 10))
+                        .font(AppTypography.captionMicro)
                         .foregroundColor(AppColors.secondaryText)
                         .lineLimit(1)
                 }
@@ -391,7 +391,7 @@ private struct TradeTerminalRow: View {
             // Symbol + Direction pill
             HStack(spacing: 6) {
                 Text(trade.symbol)
-                    .font(.system(size: 15, weight: .bold))
+                    .font(AppTypography.rowPrimary)
                     .foregroundColor(AppColors.primaryText)
                     .lineLimit(1)
                 
@@ -413,7 +413,7 @@ private struct TradeTerminalRow: View {
                 AppMonetaryText(
                     Formatters.formatPnL(trade.netPnl, currency: env.currentCurrency),
                     isPrivate: env.isPrivacyModeEnabled,
-                    font: AppTypography.financialNumber(size: 16, weight: .bold),
+                    font: AppTypography.displayMedium,
                     color: trade.netPnl >= 0 ? AppColors.profit : AppColors.loss
                 )
                 .lineLimit(1)
@@ -421,7 +421,7 @@ private struct TradeTerminalRow: View {
                 
                 if let r = rMultiple {
                     Text("\(r >= 0 ? "+" : "")\(Formatters.formatNumber(r))R")
-                        .font(AppTypography.number(11, weight: .semibold))
+                        .font(AppTypography.statValueMedium)
                         .foregroundColor(r >= 0 ? AppColors.profit : AppColors.loss)
                         .lineLimit(1)
                 }
@@ -435,7 +435,7 @@ private struct TradeTerminalRow: View {
             // Entry -> Exit price path
             HStack(spacing: 4) {
                 Text(Formatters.price(trade.avgEntry, symbol: trade.symbol))
-                    .font(AppTypography.number(12, weight: .medium))
+                    .font(AppTypography.statValueMedium)
                     .foregroundColor(AppColors.primaryText)
                 
                 Image(systemName: "arrow.right")
@@ -444,11 +444,11 @@ private struct TradeTerminalRow: View {
                 
                 if let exit = trade.avgExit {
                     Text(Formatters.price(exit, symbol: trade.symbol))
-                        .font(AppTypography.number(12, weight: .medium))
+                        .font(AppTypography.statValueMedium)
                         .foregroundColor(AppColors.primaryText)
                 } else {
                     Text("Active")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(AppTypography.statValueMedium)
                         .foregroundColor(AppColors.brand)
                 }
             }
@@ -459,7 +459,7 @@ private struct TradeTerminalRow: View {
             // Volume and Duration
             HStack(spacing: 6) {
                 Text("\(Formatters.formatNumber(trade.quantity)) lots")
-                    .font(.system(size: 11, weight: .medium))
+                    .font(AppTypography.statLabel)
                     .foregroundColor(AppColors.secondaryText)
                 
                 if let dur = durationText {
@@ -470,7 +470,7 @@ private struct TradeTerminalRow: View {
                             .font(.system(size: 9))
                         Text(dur)
                     }
-                    .font(.system(size: 11, weight: .regular))
+                    .font(AppTypography.statLabel)
                     .foregroundColor(AppColors.secondaryText)
                 }
             }

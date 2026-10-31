@@ -50,7 +50,7 @@ public struct PlaybookCardView: View {
                             }
                             
                             Text(summary.playbook.title)
-                                .font(AppTypography.subheadlineBold)
+                                .font(AppTypography.rowPrimary)
                                 .foregroundColor(AppColors.primaryText)
                                 .lineLimit(1)
                                 .truncationMode(.tail)
@@ -65,7 +65,7 @@ public struct PlaybookCardView: View {
                     Spacer()
                     
                     Text("\(summary.totalTrades) trades")
-                        .font(AppTypography.caption)
+                        .font(AppTypography.statLabel)
                         .monospacedDigit()
                         .foregroundColor(AppColors.secondaryText)
                         .lineLimit(1)
@@ -84,7 +84,7 @@ public struct PlaybookCardView: View {
                     VStack(alignment: .leading, spacing: 10) {
                         if !summary.playbook.description.isEmpty {
                             Text(summary.playbook.description)
-                                .font(AppTypography.caption)
+                                .font(AppTypography.rowSecondary)
                                 .foregroundColor(AppColors.secondaryText)
                                 .lineLimit(2)
                                 .multilineTextAlignment(.leading)
@@ -103,13 +103,13 @@ public struct PlaybookCardView: View {
                                                 .fill(AppColors.brand.opacity(0.1))
                                                 .frame(width: 18, height: 18)
                                             Text("\(index + 1)")
-                                                .font(.system(size: 10, weight: .bold))
+                                                .font(AppTypography.badgeStandard)
                                                 .foregroundColor(AppColors.brand)
                                         }
                                         .padding(.top, 1)
                                         
                                         Text(rule)
-                                            .font(AppTypography.caption)
+                                            .font(AppTypography.body)
                                             .foregroundColor(AppColors.primaryText)
                                             .lineLimit(isExpanded ? 3 : 1)
                                             .multilineTextAlignment(.leading)
@@ -127,11 +127,11 @@ public struct PlaybookCardView: View {
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("When followed")
-                                    .font(AppTypography.caption)
+                                    .font(AppTypography.statLabel)
                                     .foregroundColor(AppColors.secondaryText)
                                     .lineLimit(1)
                                 Text(Formatters.formatPnL(summary.netPnlWhenFollowed, currency: currency))
-                                    .font(AppTypography.subheadlineBold)
+                                    .font(AppTypography.statValue)
                                     .monospacedDigit()
                                     .foregroundColor(Formatters.pnlColor(summary.netPnlWhenFollowed))
                                     .lineLimit(1)
@@ -142,11 +142,11 @@ public struct PlaybookCardView: View {
                             
                             VStack(alignment: .trailing, spacing: 2) {
                                 Text("When broken")
-                                    .font(AppTypography.caption)
+                                    .font(AppTypography.statLabel)
                                     .foregroundColor(AppColors.secondaryText)
                                     .lineLimit(1)
                                 Text(Formatters.formatPnL(summary.netPnlWhenBroken, currency: currency))
-                                    .font(AppTypography.subheadlineBold)
+                                    .font(AppTypography.statValue)
                                     .monospacedDigit()
                                     .foregroundColor(Formatters.pnlColor(summary.netPnlWhenBroken))
                                     .lineLimit(1)

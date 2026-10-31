@@ -223,32 +223,32 @@ public struct DailyJournalListView: View {
                 // Date & Weekday column (compact & non-wrapping)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(day.date)
-                        .font(.system(size: 13, weight: .bold))
+                        .font(AppTypography.rowPrimary)
                         .foregroundColor(day.date == todayKey ? AppColors.brand : AppColors.primaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.85)
                     Text(day.weekday.uppercased())
-                        .font(.system(size: 10, weight: .semibold))
+                        .font(AppTypography.captionMicro)
                         .foregroundColor(AppColors.secondaryText)
                         .lineLimit(1)
                 }
                 .fixedSize(horizontal: true, vertical: false)
                 
                 Divider()
-                    .frame(height: 32)
+                .frame(height: 32)
                 
                 // PnL & stats column (tightly fitted with line limits)
                 if day.tradesCount > 0 {
                     VStack(alignment: .leading, spacing: 3) {
                         HStack(spacing: 6) {
                             Text(day.netPnl >= 0 ? "+\(Formatters.currency(day.netPnl))" : Formatters.currency(day.netPnl))
-                                .font(AppTypography.number(13, weight: .bold))
+                                .font(AppTypography.statValue)
                                 .foregroundColor(day.netPnl >= 0 ? AppColors.profit : AppColors.loss)
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.8)
                             
                             Text("• \(day.tradesCount)T")
-                                .font(.system(size: 11, weight: .medium))
+                                .font(AppTypography.statLabel)
                                 .foregroundColor(AppColors.secondaryText)
                                 .lineLimit(1)
                         }
@@ -256,19 +256,19 @@ public struct DailyJournalListView: View {
                         HStack(spacing: 6) {
                             if let wr = day.winRate {
                                 Text("\(Int(wr * 100))% win")
-                                    .font(.system(size: 11, weight: .semibold))
+                                    .font(AppTypography.statLabel)
                                     .foregroundColor(AppColors.primaryText)
                                     .lineLimit(1)
                             }
                             Text("(\(day.winsCount)W / \(day.lossesCount)L)")
-                                .font(.system(size: 11))
+                                .font(AppTypography.caption)
                                 .foregroundColor(AppColors.secondaryText)
                                 .lineLimit(1)
                         }
                     }
                 } else {
                     Text("No trades")
-                        .font(.system(size: 12))
+                        .font(AppTypography.caption)
                         .foregroundColor(AppColors.secondaryText)
                         .lineLimit(1)
                 }

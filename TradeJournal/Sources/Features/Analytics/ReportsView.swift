@@ -176,7 +176,7 @@ public struct ReportsView: View {
                             .font(.system(size: 13))
                             .foregroundColor(AppColors.brand)
                         Text("Performance Summary")
-                            .font(AppTypography.subheadlineBold)
+                            .font(AppTypography.cardHeader)
                             .foregroundColor(AppColors.primaryText)
                         Spacer()
                     }
@@ -185,12 +185,12 @@ public struct ReportsView: View {
                         ForEach(summaryKPIs, id: \.label) { kpi in
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(kpi.label.uppercased())
-                                    .font(.system(size: 10, weight: .semibold))
+                                    .font(AppTypography.statLabel)
                                     .foregroundColor(AppColors.secondaryText)
                                     .tracking(0.5)
                                     .lineLimit(1)
                                 Text(kpi.value)
-                                    .font(.system(size: 17, weight: .bold))
+                                    .font(AppTypography.displayMajor)
                                     .monospacedDigit()
                                     .foregroundColor(kpi.isNet ? (metrics.netPnl >= 0 ? AppColors.profit : AppColors.loss) : AppColors.primaryText)
                                     .lineLimit(1)
@@ -268,7 +268,7 @@ public struct ReportsView: View {
                             .font(.system(size: 13))
                             .foregroundColor(AppColors.brand)
                         Text("EQUITY CURVE")
-                            .font(.system(size: 11, weight: .semibold))
+                            .font(AppTypography.cardHeaderUppercase)
                             .foregroundColor(AppColors.secondaryText)
                             .tracking(0.5)
                     }
@@ -286,7 +286,7 @@ public struct ReportsView: View {
                             .font(.system(size: 13))
                             .foregroundColor(AppColors.loss)
                         Text("DRAWDOWN ANALYSIS")
-                            .font(.system(size: 11, weight: .semibold))
+                            .font(AppTypography.cardHeaderUppercase)
                             .foregroundColor(AppColors.secondaryText)
                             .tracking(0.5)
                     }
@@ -307,7 +307,7 @@ public struct ReportsView: View {
                             .font(.system(size: 12))
                             .foregroundColor(AppColors.brand)
                         Text("Trade explorer (\(trades.count))")
-                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                            .font(AppTypography.cardHeader)
                             .foregroundColor(AppColors.primaryText)
                         Spacer()
                     }
@@ -326,20 +326,20 @@ public struct ReportsView: View {
                                     )
                                     
                                     Text(t.symbol)
-                                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                                        .font(AppTypography.rowPrimary)
                                         .foregroundColor(AppColors.primaryText)
                                         .lineLimit(1)
                                     
                                     if let exitDate = t.closedAt {
                                         Text(Formatters.formatDate(exitDate, timeZone: env.currentTimeZone))
-                                            .font(.system(size: 10.5, weight: .regular))
+                                            .font(AppTypography.rowSecondary)
                                             .foregroundColor(AppColors.secondaryText)
                                     }
                                     
                                     Spacer()
                                     
                                     Text(t.netPnl >= 0 ? "+\(Formatters.currency(t.netPnl))" : Formatters.currency(t.netPnl))
-                                        .font(.system(size: 13, weight: .semibold))
+                                        .font(AppTypography.statValue)
                                         .monospacedDigit()
                                         .foregroundColor(t.netPnl >= 0 ? AppColors.profit : AppColors.loss)
                                         .lineLimit(1)
@@ -368,14 +368,14 @@ public struct ReportsView: View {
                             .font(.system(size: 13))
                             .foregroundColor(AppColors.brand)
                         Text("Analysis Dimensions")
-                            .font(AppTypography.subheadlineBold)
+                            .font(AppTypography.cardHeader)
                             .foregroundColor(AppColors.primaryText)
                     }
                     
                     HStack(spacing: 12) {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Group by")
-                                .font(.system(size: 11))
+                                .font(AppTypography.formLabel)
                                 .foregroundColor(AppColors.secondaryText)
                             
                             AppleMenuChip(
@@ -396,7 +396,7 @@ public struct ReportsView: View {
                             
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("Then by")
-                                    .font(.system(size: 11))
+                                    .font(AppTypography.formLabel)
                                     .foregroundColor(AppColors.secondaryText)
                                 
                                 AppleMenuChip(
@@ -424,7 +424,7 @@ public struct ReportsView: View {
                             .font(.system(size: 13))
                             .foregroundColor(AppColors.brand)
                         Text(selectedMode == .cross ? "\(primaryDimension.label) × \(secondaryDimension.label)" : "\(primaryDimension.label) Performance")
-                            .font(AppTypography.subheadlineBold)
+                            .font(AppTypography.cardHeader)
                             .foregroundColor(AppColors.primaryText)
                         Spacer()
                     }

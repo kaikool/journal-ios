@@ -123,7 +123,7 @@ public struct ProgressRoutinesView: View {
                             .foregroundColor(AppColors.secondaryText)
                         
                         Text("\(Int(score.percent * 100))%")
-                            .font(.system(size: 26, weight: .bold))
+                            .font(AppTypography.displayHero)
                             .monospacedDigit()
                             .foregroundColor(score.percent >= 0.8 ? AppColors.profit : (score.percent >= 0.5 ? AppColors.brand : AppColors.secondaryText))
                         
@@ -137,7 +137,7 @@ public struct ProgressRoutinesView: View {
                     // Review date selector
                     VStack(alignment: .trailing, spacing: 3) {
                         Text("Review date")
-                            .font(.system(size: 10, weight: .regular))
+                            .font(AppTypography.captionMicro)
                             .foregroundColor(AppColors.secondaryText)
                         
                         HStack(spacing: 5) {
@@ -145,7 +145,7 @@ public struct ProgressRoutinesView: View {
                                 .font(.system(size: 11))
                                 .foregroundColor(AppColors.brand)
                             Text(activeDate == todayKey ? "Today" : activeDate)
-                                .font(.system(size: 12, weight: .semibold))
+                                .font(AppTypography.actionButtonCompact)
                                 .foregroundColor(AppColors.primaryText)
                         }
                         .padding(.horizontal, 10)
@@ -201,11 +201,11 @@ public struct ProgressRoutinesView: View {
                     Image(systemName: stageIcon(stage))
                         .foregroundColor(AppColors.brand)
                     Text(stage)
-                        .font(AppTypography.subheadlineBold)
+                        .font(AppTypography.cardHeader)
                         .foregroundColor(AppColors.primaryText)
                     Spacer()
                     Text("\(rulesForStage.filter { isRuleChecked($0.id) }.count)/\(rulesForStage.count)")
-                        .font(AppTypography.captionBold)
+                        .font(AppTypography.badgeStandard)
                         .foregroundColor(AppColors.secondaryText)
                 }
                 
@@ -230,7 +230,7 @@ public struct ProgressRoutinesView: View {
                                 .buttonStyle(.plain)
                                 
                                 Text(rule.title)
-                                    .font(AppTypography.subheadline)
+                                    .font(AppTypography.rowTitle)
                                     .foregroundColor(isRuleChecked(rule.id) ? AppColors.secondaryText : AppColors.primaryText)
                                     .strikethrough(isRuleChecked(rule.id))
                                 

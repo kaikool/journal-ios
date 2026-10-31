@@ -16,7 +16,7 @@ public struct PreTradeLoadingCard: View {
                 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(isLoadingData ? "Streaming Multi-Timeframe Bars..." : "Auditing Liquidity & Formulating Bias...")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(AppTypography.rowTitle)
                         .foregroundColor(AppColors.primaryText)
                     
                     Text("Risk AI is cross-referencing D1 macro regime, H4 order blocks, and M15 liquidity triggers.")
@@ -43,7 +43,7 @@ public struct PreTradeErrorCard: View {
         AppCard {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Market Stream Notice")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(AppTypography.cardHeader)
                     .foregroundColor(AppColors.loss)
                 
                 Text(message)
@@ -53,7 +53,7 @@ public struct PreTradeErrorCard: View {
                 
                 Button(action: onRetry) {
                     Text("Retry Stream")
-                        .font(.system(size: 11, weight: .medium))
+                        .font(AppTypography.actionButtonCompact)
                         .foregroundColor(AppColors.brand)
                 }
                 .buttonStyle(.plain)

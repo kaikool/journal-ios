@@ -518,12 +518,12 @@ public struct DashboardView: View {
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundColor(AppColors.brand)
                     Text(activePreset.name)
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(AppTypography.actionButtonCompact)
                         .foregroundColor(AppColors.primaryText)
                         .lineLimit(1)
                     Spacer()
                     Image(systemName: "chevron.up.chevron.down")
-                        .font(.system(size: 10, weight: .semibold))
+                        .font(AppTypography.badgeStandard)
                         .foregroundColor(AppColors.secondaryText)
                 }
                 .padding(.horizontal, 14)
@@ -548,7 +548,7 @@ public struct DashboardView: View {
                     Image(systemName: "slider.horizontal.3")
                         .font(.system(size: 13, weight: .semibold))
                     Text("Customize")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(AppTypography.actionButtonCompact)
                         .lineLimit(1)
                 }
                 .foregroundColor(AppColors.primaryText)

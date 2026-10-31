@@ -19,7 +19,7 @@ public struct SettingsCard<Content: View>: View {
         VStack(alignment: .leading, spacing: 6) {
             if !title.isEmpty {
                 Text(title.uppercased())
-                    .font(.system(size: 11, weight: .semibold, design: .default))
+                    .font(AppTypography.cardHeaderUppercase)
                     .foregroundColor(AppColors.secondaryText)
                     .padding(.leading, 4)
             }
@@ -39,7 +39,7 @@ public struct SettingsCard<Content: View>: View {
             
             if let f = footer, !f.isEmpty {
                 Text(f)
-                    .font(.system(size: 11, weight: .regular))
+                    .font(AppTypography.disclaimer)
                     .foregroundColor(AppColors.secondaryText)
                     .padding(.leading, 4)
             }

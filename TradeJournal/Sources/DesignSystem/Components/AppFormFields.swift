@@ -41,13 +41,13 @@ public struct AppFormField: View {
                 HStack {
                     if let label = label {
                         Text(label)
-                            .font(AppTypography.caption)
+                            .font(AppTypography.formLabel)
                             .foregroundColor(AppColors.secondaryText)
                     }
                     Spacer()
                     if let subtitle = subtitle {
                         Text(subtitle)
-                            .font(.system(size: 10, weight: .medium))
+                            .font(AppTypography.captionMicro)
                             .foregroundColor(AppColors.secondaryText.opacity(0.8))
                     }
                 }
@@ -62,17 +62,17 @@ public struct AppFormField: View {
                 
                 if isSecure {
                     SecureField(placeholder, text: $text)
-                        .font(.system(size: 14, weight: .medium))
+                        .font(AppTypography.formInput)
                         .foregroundColor(AppColors.primaryText)
                 } else {
                     TextField(placeholder, text: $text)
-                        .font(.system(size: 14, weight: .medium))
+                        .font(AppTypography.formInput)
                         .foregroundColor(AppColors.primaryText)
                 }
                 
                 if let trailingText = trailingText, !trailingText.isEmpty {
                     Text(trailingText)
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(AppTypography.statLabel)
                         .foregroundColor(AppColors.secondaryText)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
@@ -94,7 +94,7 @@ public struct AppFormField: View {
             
             if let err = errorMessage, !err.isEmpty {
                 Text(err)
-                    .font(.system(size: 11, weight: .medium))
+                    .font(AppTypography.footnote)
                     .foregroundColor(AppColors.loss)
                     .padding(.leading, 2)
             }
@@ -137,13 +137,13 @@ public struct AppNumericField: View {
                 HStack {
                     if let label = label {
                         Text(label)
-                            .font(AppTypography.caption)
+                            .font(AppTypography.formLabel)
                             .foregroundColor(AppColors.secondaryText)
                     }
                     Spacer()
                     if let subtitle = subtitle {
                         Text(subtitle)
-                            .font(.system(size: 10, weight: .medium))
+                            .font(AppTypography.captionMicro)
                             .foregroundColor(AppColors.secondaryText.opacity(0.8))
                     }
                 }
@@ -158,13 +158,12 @@ public struct AppNumericField: View {
                 
                 TextField(placeholder, text: $text)
                     .keyboardType(.decimalPad)
-                    .font(.system(size: 14.5, weight: .semibold, design: .rounded))
-                    .monospacedDigit()
+                    .font(AppTypography.formInputMono)
                     .foregroundColor(AppColors.primaryText)
                 
                 if let unit = unit, !unit.isEmpty {
                     Text(unit)
-                        .font(.system(size: 10.5, weight: .bold))
+                        .font(AppTypography.badgeStandard)
                         .foregroundColor(AppColors.secondaryText)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)

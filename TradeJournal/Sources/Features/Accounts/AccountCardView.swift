@@ -45,7 +45,7 @@ public struct AccountCardView: View {
                     VStack(alignment: .leading, spacing: 3) {
                         HStack(spacing: 6) {
                             Text(Formatters.cleanAccountName(account.name, balance: account.initialBalance))
-                                .font(AppTypography.bodyBold)
+                                .font(AppTypography.rowPrimary)
                                 .foregroundColor(AppColors.primaryText)
                                 .lineLimit(1)
                                 .truncationMode(.tail)
@@ -58,7 +58,7 @@ public struct AccountCardView: View {
                         }
                         
                         Text("\(account.broker.isEmpty ? "Standard" : account.broker) · \(account.currency)")
-                            .font(AppTypography.caption)
+                            .font(AppTypography.rowSecondary)
                             .foregroundColor(AppColors.secondaryText)
                             .lineLimit(1)
                     }
@@ -140,11 +140,11 @@ public struct AccountCardView: View {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Initial Balance")
-                            .font(.system(size: 10))
+                            .font(AppTypography.statLabel)
                             .foregroundColor(AppColors.secondaryText)
                             .lineLimit(1)
                         Text(Formatters.formatCurrency(account.initialBalance, currency: account.currency))
-                            .font(AppTypography.bodyBold)
+                            .font(AppTypography.statValue)
                             .monospacedDigit()
                             .lineLimit(1)
                             .minimumScaleFactor(0.85)
@@ -155,11 +155,11 @@ public struct AccountCardView: View {
                     
                     VStack(alignment: .trailing, spacing: 2) {
                         Text("Total Trades")
-                            .font(.system(size: 10))
+                            .font(AppTypography.statLabel)
                             .foregroundColor(AppColors.secondaryText)
                             .lineLimit(1)
                         Text("\(tradeCount) trades")
-                            .font(AppTypography.bodyBold)
+                            .font(AppTypography.statValue)
                             .monospacedDigit()
                             .lineLimit(1)
                             .minimumScaleFactor(0.85)

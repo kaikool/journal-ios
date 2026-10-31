@@ -19,7 +19,7 @@ extension DashboardView {
                     
                     HStack(spacing: 2) {
                         Text(edgeResult.score.map { "\(Int($0))" } ?? "–")
-                            .font(AppTypography.financialNumber(size: 24, weight: .bold))
+                            .font(AppTypography.displayHero)
                             .monospacedDigit()
                             .foregroundColor(AppColors.brand)
                         Text("/100")

@@ -618,21 +618,21 @@ extension JournalCalendarView {
         AppCard {
             VStack(alignment: .leading, spacing: 3) {
                 Text(title.uppercased())
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(AppTypography.cardHeaderUppercase)
                     .foregroundColor(AppColors.secondaryText)
                     .tracking(0.5)
                 
                 AppMonetaryText(
                     value,
                     isPrivate: env.isPrivacyModeEnabled,
-                    font: AppTypography.financialNumber(size: 17, weight: .semibold),
+                    font: AppTypography.displayMajor,
                     color: valueColor
                 )
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
                 
                 Text(detail)
-                    .font(AppTypography.caption)
+                    .font(AppTypography.captionMicro)
                     .foregroundColor(AppColors.mutedText)
             }
             .frame(maxWidth: .infinity, alignment: .leading)

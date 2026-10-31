@@ -28,14 +28,14 @@ public struct PreTradeSymbolSelectorCard: View {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
                     Text("TARGET ASSET")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(AppTypography.cardHeaderUppercase)
                         .foregroundColor(AppColors.secondaryText)
                         .tracking(0.5)
                     
                     Spacer()
                     
                     Text(selectedSymbol)
-                        .font(.system(size: 13, weight: .bold))
+                        .font(AppTypography.rowPrimary)
                         .foregroundColor(AppColors.primaryText)
                 }
                 

@@ -46,14 +46,14 @@ public struct AppSectionHeader: View {
             }
             
             Text(title.uppercased())
-                .font(AppTypography.cardHeader)
+                .font(AppTypography.cardHeaderUppercase)
                 .tracking(0.5)
                 .foregroundColor(AppColors.secondaryText)
                 .lineLimit(1)
             
             if let badge = badge, !badge.isEmpty {
                 Text(badge)
-                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                    .font(AppTypography.badgeStandard)
                     .foregroundColor(badgeColor)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
@@ -65,7 +65,7 @@ public struct AppSectionHeader: View {
             
             if let trailingBadge = trailingBadge, !trailingBadge.isEmpty {
                 Text(trailingBadge)
-                    .font(AppTypography.badgeMicro)
+                    .font(AppTypography.badgeStandard)
                     .foregroundColor(trailingBadgeColor)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
