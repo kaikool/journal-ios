@@ -12,7 +12,7 @@ public struct AIReflectionView: View {
     
     @State private var selectedCategory: String = "All"
     @State private var userPrompt: String = ""
-    @State private var selectedTemplate: AIReflectionTemplate = AIReflectionTemplates.all[0]
+    @State private var selectedTemplate: AIReflectionTemplate = AIReflectionTemplates.defaultTemplate
     @State private var reflectionResult: String = ""
     @State private var isLoading: Bool = false
     @State private var showTraderProfileSheet: Bool = false

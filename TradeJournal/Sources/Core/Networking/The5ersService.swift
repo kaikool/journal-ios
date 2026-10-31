@@ -1311,7 +1311,10 @@ public final class The5ersService: ObservableObject {
                     if bal > 0 {
                         let journalIdForPayout = stableId.hasPrefix("the5ers_") ? stableId : "the5ers_\(stableId)"
                         let settledAccountPayouts = dataStore.propEntries
-                            .filter { $0.firm == "The5ers" && $0.kind == "payout" && $0.status == .completed && !$0.voided && $0.accountId != nil && ($0.accountId == journalIdForPayout || TradeDataStore.isSameAccountId($0.accountId!, journalIdForPayout)) }
+                            .filter { entry in
+                                guard entry.firm == "The5ers", entry.kind == "payout", entry.status == .completed, !entry.voided, let accId = entry.accountId else { return false }
+                                return accId == journalIdForPayout || TradeDataStore.isSameAccountId(accId, journalIdForPayout)
+                            }
                             .reduce(Decimal.zero) { $0 + Decimal($1.amountMinor) / 100 }
                         accProfitAndLoss = (bal - sb) + settledAccountPayouts
                     }
@@ -1361,7 +1364,7 @@ public final class The5ersService: ObservableObject {
                                            existingTradesForAccount.isEmpty ||
                                            (accTotalTrades == nil || (accTotalTrades ?? 0) > 0) ||
                                            abs(accProfitAndLoss ?? 0) > 0.005 ||
-                                           (resolvedStartBal != nil && abs(bal - resolvedStartBal!) > 0.005)
+                                           (resolvedStartBal.map { abs(bal - $0) > 0.005 } ?? false)
                 if shouldFetchPositions {
                     let embeddedPos = extractMcpCollection(item, collectionKey: "positions")
                     await syncAccountPositions(
@@ -1766,7 +1769,10 @@ public final class The5ersService: ObservableObject {
         let balMinor: Int64 = NSDecimalNumber(decimal: acc.balance * 100).int64Value
         let eqMinor: Int64? = acc.equity.map { NSDecimalNumber(decimal: $0 * 100).int64Value }
         let settledPayoutsMinor = dataStore.propEntries
-            .filter { $0.firm == "The5ers" && $0.kind == "payout" && $0.status == .completed && !$0.voided && $0.accountId != nil && ($0.accountId == journalAccId || TradeDataStore.isSameAccountId($0.accountId!, journalAccId)) }
+            .filter { entry in
+                guard entry.firm == "The5ers", entry.kind == "payout", entry.status == .completed, !entry.voided, let accId = entry.accountId else { return false }
+                return accId == journalAccId || TradeDataStore.isSameAccountId(accId, journalAccId)
+            }
             .reduce(Int64(0)) { $0 + $1.amountMinor }
         let pnlMinor: Int64? = {
             if let pnl = acc.profitAndLoss ?? acc.totalNetProfit {
@@ -1798,14 +1804,14 @@ public final class The5ersService: ObservableObject {
         let existingLinkedAcc = dataStore.accounts.first(where: {
             $0.id == journalAccId ||
             $0.name == acc.label ||
-            (accountNumber != nil && ($0.id.cleanAccountId == accountNumber! || $0.name.contains(accountNumber!)))
+            (accountNumber.map { accNum in $0.id.cleanAccountId == accNum || $0.name.contains(accNum) } ?? false)
         })
         let linkedAccountId = existingLinkedAcc?.id ?? journalAccId
         
         if let existingIndex = dataStore.propAccounts.firstIndex(where: {
             TradeDataStore.isSameAccountId($0.id, journalAccId) ||
             $0.name == acc.label ||
-            (accountNumber != nil && ($0.id.cleanAccountId == accountNumber! || $0.name.contains(accountNumber!)))
+            (accountNumber.map { accNum in $0.id.cleanAccountId == accNum || $0.name.contains(accNum) } ?? false)
         }) {
             let old = dataStore.propAccounts[existingIndex]
             dataStore.propAccounts[existingIndex] = PropAccountItem(
@@ -1876,7 +1882,7 @@ public final class The5ersService: ObservableObject {
         if let accIdx = dataStore.accounts.firstIndex(where: {
             TradeDataStore.isSameAccountId($0.id, journalAccId) ||
             $0.name == acc.label ||
-            (accountNumber != nil && ($0.id.cleanAccountId == accountNumber! || $0.name.contains(accountNumber!)))
+            (accountNumber.map { accNum in $0.id.cleanAccountId == accNum || $0.name.contains(accNum) } ?? false)
         }) {
             var old = dataStore.accounts[accIdx]
             old.name = acc.label
@@ -1970,7 +1976,7 @@ public final class The5ersService: ObservableObject {
             let totalReported = (posPagination?["total"] as? Int) ?? (posPagination?["total"] as? NSNumber)?.intValue
             let initialHasMore = (posPagination?["has_more"] as? Bool) ??
                                  (posPagination?["hasMore"] as? Bool) ??
-                                 (totalReported != nil ? allPositions.count < totalReported! : allPositions.count >= pageLimit)
+                                 (totalReported.map { allPositions.count < $0 } ?? (allPositions.count >= pageLimit))
             
             if initialHasMore {
                 var page = 2
@@ -2014,7 +2020,7 @@ public final class The5ersService: ObservableObject {
                     let nextTotal = (nextPag?["total"] as? Int) ?? (nextPag?["total"] as? NSNumber)?.intValue ?? totalReported
                     let hasMore = (nextPag?["has_more"] as? Bool) ??
                                   (nextPag?["hasMore"] as? Bool) ??
-                                  (nextTotal != nil ? allPositions.count < nextTotal! : nextPositions.count >= pageLimit)
+                                  (nextTotal.map { allPositions.count < $0 } ?? (nextPositions.count >= pageLimit))
                     if !hasMore { break }
                     page += 1
                 }
@@ -2538,10 +2544,9 @@ public final class The5ersService: ObservableObject {
         
         var valid: [SourcePosition] = []
         for (_, group) in groups {
-            if group.count == 1 {
+            if group.count == 1, var item = group.first {
                 // Keep identityDiscriminator = nil for unique (symbol, direction, openedAt) positions
                 // so tradeKey remains 100% deterministic across sync sessions.
-                var item = group[0]
                 item.identityDiscriminator = nil
                 valid.append(item)
                 continue
@@ -3521,7 +3526,7 @@ public final class The5ersService: ObservableObject {
                 }
             } else if let eg = explicitGross {
                 grossMinor = Int64(round(eg * 100))
-                if splitPercentVal != nil && splitPercentVal! < 100.0 {
+                if let sp = splitPercentVal, sp < 100.0 {
                     netReceivedMinor = max(0, Int64((Double(grossMinor) * Double(splitBps) + 5000) / 10000) - feeMinor)
                 } else {
                     netReceivedMinor = grossMinor
@@ -3531,7 +3536,7 @@ public final class The5ersService: ObservableObject {
                 // In payout history, reported amount represents received cash under owner confirmation.
                 // Do not invent artificial gross/split multipliers unless explicit split info exists.
                 let amtMinor = Int64(round(ga * 100))
-                if splitPercentVal != nil && splitPercentVal! < 100.0 {
+                if let sp = splitPercentVal, sp < 100.0 {
                     grossMinor = amtMinor
                     netReceivedMinor = max(0, Int64((Double(grossMinor) * Double(splitBps) + 5000) / 10000) - feeMinor)
                 } else {
@@ -3710,9 +3715,8 @@ public final class The5ersService: ObservableObject {
                 )
                 dataStore.propEntries.append(entry)
                 dataStore.propReceipts.append(rcpt)
-            } else if the5ersReceiptIndices.count == 1 && abs(currentPaidSum - authPaidMinor) > 10 {
+            } else if let rIdx = the5ersReceiptIndices.first, abs(currentPaidSum - authPaidMinor) > 10 {
                 // Single payout where `history` only had gross `amount` and default split differed from actual wallet net paid out
-                let rIdx = the5ersReceiptIndices[0]
                 let oldRcpt = dataStore.propReceipts[rIdx]
                 dataStore.propReceipts[rIdx] = PropReceiptItem(
                     id: oldRcpt.id,

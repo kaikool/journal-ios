@@ -531,8 +531,8 @@ public final class SupabaseService {
         var params: [String: String] = [:]
         for item in fragment.components(separatedBy: "&") {
             let pair = item.components(separatedBy: "=")
-            if pair.count == 2 {
-                params[pair[0]] = pair[1].removingPercentEncoding ?? pair[1]
+            if pair.count == 2, let key = pair.first, let val = pair.last {
+                params[key] = val.removingPercentEncoding ?? val
             }
         }
         

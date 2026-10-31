@@ -90,7 +90,7 @@ public struct TradeDetailMetricsCard: View {
                     metricTile(
                         label: "Avg Exit Price",
                         value: trade.avgExit.map { Formatters.price($0, symbol: trade.symbol) } ?? "Open",
-                        subtext: trade.closedAt != nil ? Formatters.formatDateTime(trade.closedAt!, timeZone: timeZone) : nil
+                        subtext: trade.closedAt.map { Formatters.formatDateTime($0, timeZone: timeZone) }
                     )
                 }
             }

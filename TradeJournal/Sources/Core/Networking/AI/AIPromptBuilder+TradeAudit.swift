@@ -26,12 +26,12 @@ extension AIPromptBuilder {
         let slStr = trade.stopLoss.map { Formatters.price($0, symbol: trade.symbol) } ?? (isVi ? "Chưa cài SL" : "Not Set")
         let tpStr = trade.profitTarget.map { Formatters.price($0, symbol: trade.symbol) } ?? (isVi ? "Chưa cài TP" : "Not Set")
         let mistakes = trade.mistakes.isEmpty ? (isVi ? "Không ghi nhận" : "None") : trade.mistakes.joined(separator: ", ")
-        let notes = (trade.notes?.isEmpty ?? true) ? (isVi ? "Không có ghi chú" : "None") : trade.notes!
+        let notes = trade.notes?.isEmpty == false ? (trade.notes ?? "") : (isVi ? "Không có ghi chú" : "None")
         
         let liveDeltaInfo: String = {
             guard isOpen, let cp = curLivePrice else { return "" }
             let spec = AssetContractEngine.spec(for: trade.symbol)
-            let pipUnit = spec.pipSize > 0 ? spec.pipSize : Decimal(string: "0.0001")!
+            let pipUnit: Decimal = spec.pipSize > 0 ? spec.pipSize : 0.0001
             let priceDelta = (trade.direction == .short) ? (trade.avgEntry - cp) : (cp - trade.avgEntry)
             let pips = (priceDelta / pipUnit as NSDecimalNumber).doubleValue
             let pipsStr = String(format: "%@%.1f pips", pips >= 0 ? "+" : "", pips)
@@ -233,7 +233,7 @@ extension AIPromptBuilder {
         let todayTradesDesc = isVi
             ? "Tổng \(tradesToday) lệnh (\(winsToday) Thắng | \(lossesToday) Thua | \(beToday) Hòa) | Lệnh đang chạy: \(openToday)"
             : "Total \(tradesToday) trades (\(winsToday) W | \(lossesToday) L | \(beToday) BE) | Active Open: \(openToday)"
-        let pnlTodayVal = sessionSummary != nil ? NSDecimalNumber(decimal: sessionSummary!.netPnlToday).doubleValue : 0.0
+        let pnlTodayVal = sessionSummary.map { NSDecimalNumber(decimal: $0.netPnlToday).doubleValue } ?? 0.0
         let pnlTodayStr = (pnlTodayVal >= 0 ? "+$" : "-$") + String(format: "%.2f", abs(pnlTodayVal))
         let streak = sessionSummary?.currentStreakToday ?? 0
         let streakStr: String = {
@@ -482,7 +482,7 @@ extension AIPromptBuilder {
         let maxHighStr = Formatters.price(maxHigh)
         let minLowStr = Formatters.price(minLow)
         let entryStr = Formatters.price(trade.avgEntry)
-        let plannedEntry = (plannedZone?.isEmpty ?? true) ? (isVi ? "Vùng kỹ thuật" : "Technical setup zone") : plannedZone!
+        let plannedEntry = plannedZone?.isEmpty == false ? (plannedZone ?? "") : (isVi ? "Vùng kỹ thuật" : "Technical setup zone")
         
         let df = DateFormatter()
         df.dateFormat = "HH:mm"

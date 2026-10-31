@@ -129,13 +129,13 @@ public enum StandardCSVImporter {
         legacyTimeZone: TimeZone? = nil
     ) -> ImportPreview {
         let rows = CSVParser.parse(csvText)
-        guard rows.count > 1 else {
+        guard rows.count > 1, let firstRow = rows.first else {
             return ImportPreview(totalRows: 0, usableExecutions: [], problems: [
                 ImportRowProblem(lineNumber: 1, symbol: "-", reason: "CSV file is empty or contains only the header row.")
             ], duplicateCount: 0)
         }
         
-        let headers = rows[0].map { $0.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) }
+        let headers = firstRow.map { $0.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) }
         
 // Find column header indices
         let symbolIdx = bestIndex(headers, aliases: symbolAliases)

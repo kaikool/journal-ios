@@ -19,21 +19,23 @@ public enum LiquidityEngine: Sendable {
     /// Resolves the minimum tick size for tolerance checks.
     public static func resolveTickSize(symbol: String) -> Decimal {
         let pip = resolvePipSize(symbol: symbol)
-        return max(Decimal(string: "0.00001")!, pip / 10)
+        let minTick: Decimal = 0.00001
+        return max(minTick, pip / 10)
     }
     
     /// Computes causal Average True Range (Wilder's RMA / EMA smoothing) with zero lookahead bias.
     public static func calculateATR(bars: [MarketBar], period: Int = 14) -> [Decimal] {
-        guard !bars.isEmpty else { return [] }
+        guard let firstBar = bars.first else { return [] }
         var atrValues: [Decimal] = Array(repeating: 0, count: bars.count)
+        let minRange: Decimal = 0.0001
         guard bars.count >= 2 else {
-            atrValues[0] = max(bars[0].high - bars[0].low, Decimal(string: "0.0001")!)
+            atrValues[0] = max(firstBar.high - firstBar.low, minRange)
             return atrValues
         }
         
         var trueRanges: [Decimal] = []
         trueRanges.reserveCapacity(bars.count)
-        trueRanges.append(max(bars[0].high - bars[0].low, Decimal(string: "0.0001")!))
+        trueRanges.append(max(firstBar.high - firstBar.low, minRange))
         
         for i in 1..<bars.count {
             let h = bars[i].high
@@ -43,7 +45,8 @@ public enum LiquidityEngine: Sendable {
             trueRanges.append(tr)
         }
         
-        var currentATR = trueRanges[0]
+        guard let firstTR = trueRanges.first else { return atrValues }
+        var currentATR = firstTR
         atrValues[0] = currentATR
         let alpha = Decimal(1) / Decimal(period)
         let oneMinusAlpha = Decimal(1) - alpha
@@ -146,7 +149,7 @@ public enum LiquidityEngine: Sendable {
             return (lastCompleted.high, lastCompleted.low)
         }
         
-        if sortedD1.count >= 2 && sortedD1.first!.timestamp <= upToTimestamp {
+        if sortedD1.count >= 2, let firstD1 = sortedD1.first, firstD1.timestamp <= upToTimestamp {
             let prev = sortedD1[sortedD1.count - 2]
             return (prev.high, prev.low)
         }
@@ -291,8 +294,8 @@ public enum LiquidityEngine: Sendable {
     /// Tolerance is adaptive based on instrument tick size and local ATR, preventing fixed percentage failure.
     public static func detectEqualHighsLows(
         pivots: [LiquiditySwingPivot],
-        tickSize: Decimal = Decimal(string: "0.0001")!,
-        atr: Decimal = Decimal(string: "0.0010")!,
+        tickSize: Decimal = 0.0001,
+        atr: Decimal = 0.0010,
         maxBarDistance: Int = 60
     ) -> [LiquidityPool] {
         var pools: [LiquidityPool] = []
@@ -318,12 +321,11 @@ public enum LiquidityEngine: Sendable {
                 }
             }
             
-            if cluster.count >= 2 {
+            if cluster.count >= 2, let lastP = cluster.last {
                 for p in cluster { usedHighs.insert(p.id) }
                 let prices = cluster.map(\.price)
                 let maxP = prices.max() ?? p1.price
                 let minP = prices.min() ?? p1.price
-                let lastP = cluster.last!
                 let label = cluster.count == 2 ? "Double High (EQH)" : "Triple High (EQH)"
                 
                 pools.append(LiquidityPool(
@@ -367,12 +369,11 @@ public enum LiquidityEngine: Sendable {
                 }
             }
             
-            if cluster.count >= 2 {
+            if cluster.count >= 2, let lastP = cluster.last {
                 for p in cluster { usedLows.insert(p.id) }
                 let prices = cluster.map(\.price)
                 let maxP = prices.max() ?? p1.price
                 let minP = prices.min() ?? p1.price
-                let lastP = cluster.last!
                 let label = cluster.count == 2 ? "Double Low (EQL)" : "Triple Low (EQL)"
                 
                 pools.append(LiquidityPool(
@@ -610,7 +611,7 @@ public enum LiquidityEngine: Sendable {
         for t in 0..<n {
             let bar = bars[t]
             let barsAgo = (n - 1) - t
-            let range = max(bar.high - bar.low, Decimal(string: "0.00001")!)
+            let range = max(bar.high - bar.low, Decimal(0.00001))
             let currentATR = t < atrSeries.count ? atrSeries[t] : (pipSize * 10)
             let proximityThreshold = max(pipSize * 5, currentATR * 0.35)
             

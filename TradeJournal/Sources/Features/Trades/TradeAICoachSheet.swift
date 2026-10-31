@@ -215,7 +215,7 @@ public struct TradeAICoachSheet: View {
         // P&L and Points
         let priceDelta = isShort ? (currentTrade.avgEntry - curPrice) : (curPrice - currentTrade.avgEntry)
         let spec = AssetContractEngine.spec(for: currentTrade.symbol)
-        let pipDivisor = spec.pipSize > 0 ? spec.pipSize : Decimal(string: "0.0001")!
+        let pipDivisor: Decimal = spec.pipSize > 0 ? spec.pipSize : 0.0001
         let pipsDelta = priceDelta / pipDivisor
         let pipsDeltaDouble = (pipsDelta as NSDecimalNumber).doubleValue
         let pipsDeltaStr = String(format: "%@%.1f pips", pipsDeltaDouble >= 0 ? "+" : "", pipsDeltaDouble)

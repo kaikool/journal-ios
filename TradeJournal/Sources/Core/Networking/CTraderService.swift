@@ -470,10 +470,10 @@ public final class CTraderService: ObservableObject {
                         accounts[idx].brokerTitleShort = broker.trimmingCharacters(in: .whitespacesAndNewlines)
                     }
                     let balanceRaw = safeInt64(trader["balance"]) ?? 0
-                    let moneyDigits = (safeInt64(trader["moneyDigits"]) != nil) ? Int(safeInt64(trader["moneyDigits"])!) : 2
+                    let moneyDigits = safeInt64(trader["moneyDigits"]).map(Int.init) ?? 2
                     let divisor = pow(10.0, Double(moneyDigits))
                     let balDecimal = Decimal(Double(balanceRaw) / divisor)
-                    let leverage = (safeInt64(trader["leverageInCents"]) != nil) ? Int(safeInt64(trader["leverageInCents"])! / 100) : 100
+                    let leverage = safeInt64(trader["leverageInCents"]).map { Int($0 / 100) } ?? 100
                     
                     accounts[idx].balance = balDecimal
                     accounts[idx].leverage = leverage
@@ -883,7 +883,7 @@ public final class CTraderService: ObservableObject {
                 }
                 let quantity = max(Decimal(0.01), Decimal(volRaw) / lotDivisor)
                 
-                let moneyDigits = (safeInt64(raw["moneyDigits"]) != nil) ? Int(safeInt64(raw["moneyDigits"])!) : 2
+                let moneyDigits = safeInt64(raw["moneyDigits"]).map(Int.init) ?? 2
                 let moneyDivisor = pow(10.0, Double(moneyDigits))
                 let commRaw = safeDouble(raw["commission"]) ?? 0.0
                 let fee = Decimal(abs(commRaw) / moneyDivisor)

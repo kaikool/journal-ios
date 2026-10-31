@@ -36,7 +36,7 @@ public enum AIAccountContextProvider {
         let accountObj = dataStore.accounts.first(where: { TradeDataStore.isSameAccountId($0.id, activeAccId) })
         let propObj = dataStore.propAccounts.first(where: {
             TradeDataStore.isSameAccountId($0.id, activeAccId) ||
-            ($0.journalAccountId != nil && TradeDataStore.isSameAccountId($0.journalAccountId!, activeAccId))
+            ($0.journalAccountId.map { TradeDataStore.isSameAccountId($0, activeAccId) } ?? false)
         })
         
         // 2. Today's Intraday Trades & Temporal Breakdown

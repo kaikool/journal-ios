@@ -277,15 +277,15 @@ public struct TradingSettingsView: View {
             if trimmed.isEmpty { continue }
             let parts = trimmed.split(separator: "=").map { $0.trimmingCharacters(in: .whitespaces) }
             guard parts.count == 2,
-                  !parts[0].isEmpty,
-                  let val = Decimal(string: parts[1]),
+                  let sym = parts.first, !sym.isEmpty,
+                  let rawVal = parts.last, let val = Decimal(string: rawVal),
                   val > 0 else {
                 multiplierError = "Check line \(index + 1): enter a unique symbol and a positive multiplier, such as ESU6=50."
                 return
             }
             // Keys are canonicalised so that a multiplier configured for "EURUSD" also applies to
             // broker spellings such as "EURUSDm" or "EURUSD.pro".
-            parsed[AssetContractEngine.multiplierKey(for: parts[0])] = val
+            parsed[AssetContractEngine.multiplierKey(for: sym)] = val
         }
         
         dataStore.multipliers = parsed

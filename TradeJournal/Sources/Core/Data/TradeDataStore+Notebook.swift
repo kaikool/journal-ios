@@ -172,8 +172,8 @@ extension TradeDataStore {
     // MARK: - Attachments Management
     
     public var attachmentsBaseUrl: URL {
-        let paths = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
-        let dir = paths[0].appendingPathComponent("attachments")
+        let baseDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first ?? FileManager.default.temporaryDirectory
+        let dir = baseDir.appendingPathComponent("attachments")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir
     }

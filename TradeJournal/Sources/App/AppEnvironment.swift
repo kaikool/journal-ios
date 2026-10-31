@@ -25,9 +25,19 @@ public final class AppEnvironment: ObservableObject {
         }
     }
     
-    // Bypass authentication per local developer requirements
+    // Production user identity management (isolated per device)
     @Published public var isAuthenticated: Bool = true
-    @Published public var currentUserId: String = "local-developer-user"
+    @Published public var currentUserId: String = AppEnvironment.resolvePersistentUserId()
+    
+    private static func resolvePersistentUserId() -> String {
+        let key = "trade_journal_persistent_user_id"
+        if let existing = UserDefaults.standard.string(forKey: key), !existing.isEmpty {
+            return existing
+        }
+        let newId = UUID().uuidString
+        UserDefaults.standard.set(newId, forKey: key)
+        return newId
+    }
     
     public var colorScheme: ColorScheme? {
         switch appTheme {

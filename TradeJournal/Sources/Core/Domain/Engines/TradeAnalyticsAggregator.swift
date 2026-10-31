@@ -254,7 +254,7 @@ public enum TradeAnalyticsAggregator {
             return (val >= 0 ? "+$" : "-$") + String(format: "%.2f", abs(num))
         }
         let wrFmt = { (wr: Double) -> String in String(format: "%.1f%%", wr) }
-        let pfFmt = { (pf: Double?) -> String in pf != nil ? String(format: "%.2f", pf!) : "N/A" }
+        let pfFmt = { (pf: Double?) -> String in pf.map { String(format: "%.2f", $0) } ?? "N/A" }
         
         var output = ""
         if isVi {

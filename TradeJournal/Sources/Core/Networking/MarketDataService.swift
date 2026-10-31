@@ -168,7 +168,7 @@ public final class MarketDataService: Sendable {
                 var bars: [MarketBar] = []
                 for item in rawArray {
                     guard item.count >= 6,
-                          let timeNum = item[0] as? NSNumber else {
+                          let timeNum = item.first as? NSNumber else {
                         continue
                     }
                     
@@ -474,10 +474,12 @@ public final class MarketDataService: Sendable {
                 
                 let openTime = trade.openedAt.addingTimeInterval(-preBuffer)
                 let closeTime: Date = {
-                    if trade.status == .open || trade.closedAt == nil {
+                    if trade.status == .open {
                         return Date()
+                    } else if let closedAt = trade.closedAt {
+                        return min(Date(), closedAt.addingTimeInterval(postBuffer))
                     } else {
-                        return min(Date(), trade.closedAt!.addingTimeInterval(postBuffer))
+                        return Date()
                     }
                 }()
                 

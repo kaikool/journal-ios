@@ -392,7 +392,8 @@ public struct MomentumEngine: Sendable {
         emaSeries.reserveCapacity(values.count)
         
         // Seed with running average until `period`
-        var currentEMA = values[0]
+        guard let firstVal = values.first else { return [] }
+        var currentEMA = firstVal
         emaSeries.append(currentEMA)
         
         for i in 1..<values.count {
@@ -530,7 +531,7 @@ public struct MomentumEngine: Sendable {
         }
         
         // Bearish Divergence: Price higher high, RSI lower high (by at least 2.5 pts)
-        if maxPrice2 > maxPrice1 && maxRsi2 < (maxRsi1 - Decimal(string: "2.5")!) {
+        if maxPrice2 > maxPrice1 && maxRsi2 < (maxRsi1 - 2.5) {
             return (
                 "⚠️ PHÂN KỲ GIẢM (BEARISH DIVERGENCE): Giá tạo đỉnh mới cao hơn nhưng RSI(14) suy yếu tạo đỉnh thấp hơn!",
                 "⚠️ BEARISH DIVERGENCE: Price reached higher high while RSI(14) printed a lower high!"
@@ -538,7 +539,7 @@ public struct MomentumEngine: Sendable {
         }
         
         // Bullish Divergence: Price lower low, RSI higher low (by at least 2.5 pts)
-        if minPrice2 < minPrice1 && minRsi2 > (minRsi1 + Decimal(string: "2.5")!) {
+        if minPrice2 < minPrice1 && minRsi2 > (minRsi1 + 2.5) {
             return (
                 "🚀 PHÂN KỲ TĂNG (BULLISH DIVERGENCE): Giá tạo đáy mới thấp hơn nhưng RSI(14) nâng đáy cao hơn!",
                 "🚀 BULLISH DIVERGENCE: Price reached lower low while RSI(14) printed a higher low!"

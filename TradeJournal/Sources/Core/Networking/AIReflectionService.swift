@@ -111,8 +111,8 @@ public actor AIReflectionService {
             let (primaryGroqModel, fallbackGroqModel) = Self.resolveOptimalGroqModel(action: action, userRequestedModel: config.model)
             
             // Multimodal Vision: If chart image is attached and user has custom OpenRouter key, try vision model
-            let hasImages = (chartImagesBase64 != nil && !chartImagesBase64!.isEmpty)
-            let hasSingle = (chartImageBase64 != nil && !chartImageBase64!.isEmpty)
+            let hasImages = (chartImagesBase64?.isEmpty == false)
+            let hasSingle = (chartImageBase64?.isEmpty == false)
             let customOrKey = config.openrouterKey.trimmingCharacters(in: .whitespaces)
             let hasCustomOrKey = !customOrKey.isEmpty && customOrKey != AiSettingsConfig.defaultOpenRouterKey
             if (hasImages || hasSingle) && hasCustomOrKey {
@@ -242,7 +242,7 @@ public actor AIReflectionService {
             
         case "openrouter":
             let activeKey = config.openrouterKey.trimmingCharacters(in: .whitespaces).isEmpty ? AiSettingsConfig.defaultOpenRouterKey : config.openrouterKey.trimmingCharacters(in: .whitespaces)
-            let hasImages = (chartImagesBase64 != nil && !chartImagesBase64!.isEmpty) || (chartImageBase64 != nil && !chartImageBase64!.isEmpty)
+            let hasImages = (chartImagesBase64?.isEmpty == false) || (chartImageBase64?.isEmpty == false)
             let (primaryORModel, fallbackORModel) = Self.resolveOptimalOpenRouterModel(action: action, hasImages: hasImages, userRequestedModel: config.model)
             
             do {
@@ -551,7 +551,7 @@ public actor AIReflectionService {
         }
         
         let activeLang = language ?? config.language
-        let hasImage = (chartImageBase64 != nil && !chartImageBase64!.isEmpty) || (chartImagesBase64 != nil && !chartImagesBase64!.isEmpty)
+        let hasImage = (chartImageBase64?.isEmpty == false) || (chartImagesBase64?.isEmpty == false)
         let prompt = AIPromptBuilder.buildPreTradeAnalysisPrompt(
             symbol: symbol,
             d1Bars: d1Bars,

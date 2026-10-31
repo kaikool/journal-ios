@@ -13,7 +13,9 @@ public enum AppLogger {
     }
     
     public static func info(_ message: String) {
+        #if DEBUG
         logger.info("ℹ️ [INFO] \(sanitize(message), privacy: .public)")
+        #endif
     }
     
     public static func warning(_ message: String) {

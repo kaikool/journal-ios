@@ -41,8 +41,10 @@ public enum AIComplianceTracker {
         }
         
         let recurring: [RecurringViolation] = evaluations
-            .filter { $0.violatedCount > 0 && $0.ruleBroken != nil && !$0.ruleBroken!.isEmpty }
-            .map { RecurringViolation(rule: $0.ruleBroken!, count: $0.violatedCount) }
+            .compactMap { e -> RecurringViolation? in
+                guard e.violatedCount > 0, let rule = e.ruleBroken, !rule.isEmpty else { return nil }
+                return RecurringViolation(rule: rule, count: e.violatedCount)
+            }
             .sorted { $0.count > $1.count }
         
         return ComplianceSummary(

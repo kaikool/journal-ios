@@ -296,9 +296,10 @@ public struct PreTradeAnalysisSheet: View {
             
             let accName = sessionSummary.accountName ?? "Exness"
             let propFirm = sessionSummary.propFirmName
-            let isProp = propFirm != nil && !propFirm!.isEmpty
+            let isProp = propFirm?.isEmpty == false
+            let firmName = propFirm ?? ""
             let accCategory = isProp
-                ? (isVi ? "Quỹ Cấp Vốn (\(propFirm!))" : "Prop Firm (\(propFirm!))")
+                ? (isVi ? "Quỹ Cấp Vốn (\(firmName))" : "Prop Firm (\(firmName))")
                 : (isVi ? "Tài khoản Cá nhân (\(accName.contains("Exness") ? "Exness" : "Broker"))" : "Personal Brokerage (\(accName.contains("Exness") ? "Exness" : "Broker"))")
             
             let balVal = sessionSummary.balance.map { Formatters.formatCurrency($0, currency: sessionSummary.accountCurrency) } ?? "N/A"
@@ -324,7 +325,7 @@ public struct PreTradeAnalysisSheet: View {
                 return isVi ? "Hạn mức rủi ro ngày: Tối đa 2-3 lệnh (2-3% vốn)" : "Daily Risk Budget: Max 2-3 trades (2-3% capital)"
             }()
             
-            let isRiskBreached = streakToday <= -2 || (sessionSummary.dailyLossBufferRemainingUsd != nil && sessionSummary.dailyLossBufferRemainingUsd! <= 0)
+            let isRiskBreached = streakToday <= -2 || (sessionSummary.dailyLossBufferRemainingUsd.map { $0 <= 0 } ?? false)
             let riskAlert = isRiskBreached
                 ? (isVi
                     ? "\n🚨 CẢNH BÁO RỦI RO ĐỎ: Trader đang dính chuỗi thua hoặc đệm lỗ ngày đã cạn. AI BẮT BUỘC KHUYẾN NGHỊ ĐỨNG NGOÀI (FLAT), TUYỆT ĐỐI KHÔNG GỢI Ý MỞ LỆNH MỚI!\n"

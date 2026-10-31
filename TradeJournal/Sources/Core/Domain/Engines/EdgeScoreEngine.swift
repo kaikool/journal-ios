@@ -88,15 +88,22 @@ public enum EdgeScoreEngine {
             consistency: consistencyScore
         )
         
+        let wWin = weights["winRate"] ?? 0.25
+        let wPF = weights["profitFactor"] ?? 0.20
+        let wAWL = weights["avgWinLoss"] ?? 0.20
+        let wDD = weights["drawdown"] ?? 0.15
+        let wRec = weights["recovery"] ?? 0.10
+        let wCon = weights["consistency"] ?? 0.10
         let totalWeight = weights.values.reduce(0.0, +)
+        let safeTotal = totalWeight > 0 ? totalWeight : 1.0
         let weighted = (
-            components.winRate * weights["winRate"]! +
-            components.profitFactor * weights["profitFactor"]! +
-            components.avgWinLoss * weights["avgWinLoss"]! +
-            components.drawdown * weights["drawdown"]! +
-            components.recovery * weights["recovery"]! +
-            components.consistency * weights["consistency"]!
-        ) / totalWeight
+            components.winRate * wWin +
+            components.profitFactor * wPF +
+            components.avgWinLoss * wAWL +
+            components.drawdown * wDD +
+            components.recovery * wRec +
+            components.consistency * wCon
+        ) / safeTotal
         
         let finalScore: Double? = metrics.closedTrades >= 5 ? weighted : nil
         

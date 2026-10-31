@@ -335,10 +335,10 @@ public final class AIAdvisorMemoryEngine: @unchecked Sendable {
         // 1. Symbol-specific failures & lessons (up to 2)
         var selected: [AIMemoryRecord] = []
         let symbolFailures = eligible.filter { record in
-            guard record.category == .failure, let recSym = record.symbol?.replacingOccurrences(of: "/", with: "").replacingOccurrences(of: "_", with: "") else {
+            guard let clean = cleanSym, record.category == .failure, let recSym = record.symbol?.replacingOccurrences(of: "/", with: "").replacingOccurrences(of: "_", with: "") else {
                 return false
             }
-            return cleanSym != nil && (recSym == cleanSym || cleanSym!.hasPrefix(recSym) || recSym.hasPrefix(cleanSym!))
+            return recSym == clean || clean.hasPrefix(recSym) || recSym.hasPrefix(clean)
         }.sorted { ($0.confidence, $0.createdAt) > ($1.confidence, $1.createdAt) }
         
         selected.append(contentsOf: symbolFailures.prefix(2))
@@ -351,7 +351,7 @@ public final class AIAdvisorMemoryEngine: @unchecked Sendable {
         // 3. Relevant Decisions or Active Context (up to 1)
         if selected.count < maxItems {
             let contextOrDecisions = eligible.filter {
-                $0.category == .context || ($0.category == .decision && cleanSym != nil && $0.symbol?.contains(cleanSym!) == true)
+                $0.category == .context || ($0.category == .decision && (cleanSym.map { clean in $0.symbol?.contains(clean) == true } ?? false))
             }.sorted { $0.createdAt > $1.createdAt }
             selected.append(contentsOf: contextOrDecisions.prefix(maxItems - selected.count))
         }
@@ -614,9 +614,9 @@ public final class AIAdvisorMemoryEngine: @unchecked Sendable {
             .replacingOccurrences(of: "_", with: "")
         
         let symbolMatched = lessons.filter { l in
-            guard let lSym = l.symbol else { return false }
+            guard let clean = cleanSym, let lSym = l.symbol else { return false }
             let c = lSym.replacingOccurrences(of: "/", with: "").replacingOccurrences(of: "_", with: "")
-            return cleanSym != nil && (c == cleanSym || cleanSym!.hasPrefix(c) || c.hasPrefix(cleanSym!))
+            return c == clean || clean.hasPrefix(c) || c.hasPrefix(clean)
         }
         
         if !symbolMatched.isEmpty {

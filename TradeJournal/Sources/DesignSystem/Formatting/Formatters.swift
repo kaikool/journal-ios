@@ -592,18 +592,18 @@ public enum Formatters {
         let sep = trimmed.contains(" - ") ? " - " : (trimmed.contains(" · ") ? " · " : "")
         if !sep.isEmpty {
             let parts = trimmed.components(separatedBy: sep).map { $0.trimmingCharacters(in: .whitespaces) }
-            if parts.count >= 4 {
-                let p0 = parts[0].replacingOccurrences(of: " ", with: "")
+            if parts.count >= 4, let p0Raw = parts.first {
+                let p0 = p0Raw.replacingOccurrences(of: " ", with: "")
                 let p1 = parts[1].replacingOccurrences(of: "Phase ", with: "P").replacingOccurrences(of: "Step ", with: "P")
                 let p2 = parts[2]
                 return "\(p0) \(p1) · \(p2)"
-            } else if parts.count == 3 {
-                let p0 = parts[0].replacingOccurrences(of: " ", with: "")
+            } else if parts.count == 3, let p0Raw = parts.first {
+                let p0 = p0Raw.replacingOccurrences(of: " ", with: "")
                 let p1 = parts[1]
                 let p2 = parts[2]
                 return "\(p0) \(p1) · \(p2)"
-            } else if parts.count == 2 {
-                return "\(parts[0]) \(parts[1])"
+            } else if parts.count == 2, let p0 = parts.first, let p1 = parts.last {
+                return "\(p0) \(p1)"
             }
         }
         

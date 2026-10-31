@@ -41,7 +41,7 @@ extension SupabaseService {
         var offset = 0
         
         while true {
-            let base = (accountId != nil && !accountId!.isEmpty) ? "executions?account_id=eq.\(accountId!)&select=*" : "executions?select=*"
+            let base = (accountId?.isEmpty == false) ? "executions?account_id=eq.\(accountId ?? "")&select=*" : "executions?select=*"
             let endpoint = "\(base)&limit=\(batchSize)&offset=\(offset)&order=executed_at.asc"
             let request = try makeRequest(endpoint: endpoint)
             let (data, response) = try await session.data(for: request)
@@ -68,7 +68,7 @@ extension SupabaseService {
         var offset = 0
         
         while true {
-            let base = (accountId != nil && !accountId!.isEmpty) ? "trades?account_id=eq.\(accountId!)&select=*" : "trades?select=*"
+            let base = (accountId?.isEmpty == false) ? "trades?account_id=eq.\(accountId ?? "")&select=*" : "trades?select=*"
             let endpoint = "\(base)&limit=\(batchSize)&offset=\(offset)&order=opened_at.asc"
             let request = try makeRequest(endpoint: endpoint)
             let (data, response) = try await session.data(for: request)

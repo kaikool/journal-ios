@@ -84,13 +84,13 @@ public final class TradeDataStore: ObservableObject {
     }
     
     internal var persistenceUrl: URL {
-        let paths = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
-        return paths[0].appendingPathComponent("trade_journal_store_v1.json")
+        let baseDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first ?? FileManager.default.temporaryDirectory
+        return baseDir.appendingPathComponent("trade_journal_store_v1.json")
     }
     
     internal var backupPersistenceUrl: URL {
-        let paths = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
-        return paths[0].appendingPathComponent("trade_journal_store_v1.json.bak")
+        let baseDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first ?? FileManager.default.temporaryDirectory
+        return baseDir.appendingPathComponent("trade_journal_store_v1.json.bak")
     }
     
     /// Creates a store instance.

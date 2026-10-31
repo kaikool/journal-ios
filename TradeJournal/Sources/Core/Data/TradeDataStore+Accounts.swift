@@ -83,7 +83,7 @@ extension TradeDataStore {
             p.id.cleanAccountId == clean ||
             p.id.the5ersCanonicalId == canon ||
             p.journalAccountId == account.id ||
-            (p.journalAccountId != nil && p.journalAccountId!.cleanAccountId == clean) ||
+            p.journalAccountId?.cleanAccountId == clean ||
             p.name == account.name
         }
     }
@@ -550,7 +550,10 @@ extension TradeDataStore {
             var changed = false
             let sizeMinor = p.sizeMinor ?? 0
             let settledPayoutsMinor = propEntries
-                .filter { $0.firm == "The5ers" && $0.kind == "payout" && $0.status == .completed && !$0.voided && $0.accountId != nil && ($0.accountId == p.id || $0.accountId == p.journalAccountId || TradeDataStore.isSameAccountId($0.accountId!, p.id)) }
+                .filter { entry in
+                    guard entry.firm == "The5ers", entry.kind == "payout", entry.status == .completed, !entry.voided, let accId = entry.accountId else { return false }
+                    return accId == p.id || accId == p.journalAccountId || TradeDataStore.isSameAccountId(accId, p.id)
+                }
                 .reduce(Int64(0)) { $0 + $1.amountMinor }
             if sizeMinor > 0 {
                 let text = "\(p.name) \(p.currentStepName ?? "") \(p.program.rawValue)".lowercased()

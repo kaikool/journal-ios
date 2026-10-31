@@ -472,7 +472,7 @@ public enum PropFirmEngine {
         }
         
         let parts = trimmed.split(separator: ".", omittingEmptySubsequences: false)
-        let wholeStr = String(parts[0])
+        let wholeStr = parts.first.map(String.init) ?? ""
         let fractionStr = parts.count > 1 ? String(parts[1]) : ""
         
         if fractionStr.count > digits {
@@ -869,7 +869,7 @@ public enum PropFirmEngine {
                 throw PropFirmError.validation("Row \(index + 2): Kind must be expense, refund or payout (actual cash received).")
             }
             
-            let rowId = row["id"]!
+            let rowId = row["id"] ?? ""
             let idHash = JournalIds.sha256(rowId)
             let entryId = "csv-\(idHash)"
             // Sorted keys are required: the fingerprint has to be stable across runs, otherwise a
@@ -888,7 +888,7 @@ public enum PropFirmEngine {
                 continue
             }
             
-            let accountId = row["account_id"]?.isEmpty == false ? row["account_id"]! : nil
+            let accountId = (row["account_id"]?.isEmpty == false) ? row["account_id"] : nil
             if kind == "payout" {
                 guard let accId = accountId, let acc = accountMap[accId],
                       acc.program == .funded || acc.program == .instantFunded || acc.program == .live else {

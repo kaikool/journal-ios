@@ -156,7 +156,7 @@ public enum TradeReplayEngine {
         let exitTimeMs: Int64? = trade.closedAt.map { Int64($0.timeIntervalSince1970 * 1000) }
         
         let hasEntered = through >= entryTimeMs
-        let hasExited = exitTimeMs != nil && through >= exitTimeMs!
+        let hasExited = exitTimeMs.map { through >= $0 } ?? false
         let isLast = clampedIndex >= bars.count
         
         // Accurate entry gating: unrealized PnL is 0 until position is actually entered
@@ -399,9 +399,9 @@ public enum TradeReplayEngine {
         }
         
         return bucketOrder.compactMap { ts -> MarketBar? in
-            guard let group = buckets[ts], let first = group.first else { return nil }
+            guard let group = buckets[ts], let first = group.first, let last = group.last else { return nil }
             let open = first.open
-            let close = group.last!.close
+            let close = last.close
             var high = first.high
             var low = first.low
             var volume: Decimal = 0

@@ -204,8 +204,9 @@ extension AIPromptBuilder {
         let newsBlock: String = {
             let now = Date()
             let highImpacts = events.filter { $0.impact == .high }
-            if let nextEvent = highImpacts.first(where: { ($0.date ?? Date.distantPast) > now }) {
-                let diffMin = Int(nextEvent.date!.timeIntervalSince(now) / 60)
+            if let nextEvent = highImpacts.first(where: { ($0.date ?? Date.distantPast) > now }),
+               let eventDate = nextEvent.date {
+                let diffMin = Int(eventDate.timeIntervalSince(now) / 60)
                 let timeDesc = diffMin >= 60 ? "\(diffMin / 60)h \(diffMin % 60)m" : "\(diffMin) phút"
                 return isVi
                     ? "⚠️ Tin đỏ: \(nextEvent.title) (\(nextEvent.country)) sẽ công bố trong \(timeDesc)"
@@ -217,11 +218,10 @@ extension AIPromptBuilder {
         // 6. Active Account Context, Broker vs Prop Firm, and Today's Performance
         let accName = sessionSummary?.accountName ?? "Exness"
         let propFirm = sessionSummary?.propFirmName
-        let isProp = propFirm != nil && !propFirm!.isEmpty
+        let isProp = propFirm?.isEmpty == false
         
         let accountCategoryStr: String = {
-            if isProp {
-                let firm = propFirm!
+            if isProp, let firm = propFirm {
                 let phase = sessionSummary?.stepOrPhaseName.map { " - \($0)" } ?? ""
                 return isVi ? "Quỹ Cấp Vốn (\(firm)\(phase))" : "Prop Firm Account (\(firm)\(phase))"
             } else {
@@ -242,7 +242,7 @@ extension AIPromptBuilder {
             ? "Tổng \(tradesToday) lệnh (\(winsToday) Thắng | \(lossesToday) Thua | \(beToday) Hòa) | Lệnh đang chạy: \(openToday)"
             : "Total \(tradesToday) trades (\(winsToday) W | \(lossesToday) L | \(beToday) BE) | Active Open: \(openToday)"
             
-        let pnlTodayVal = sessionSummary != nil ? NSDecimalNumber(decimal: sessionSummary!.netPnlToday).doubleValue : 0.0
+        let pnlTodayVal = sessionSummary.map { NSDecimalNumber(decimal: $0.netPnlToday).doubleValue } ?? 0.0
         let pnlTodayStr = (pnlTodayVal >= 0 ? "+$" : "-$") + String(format: "%.2f", abs(pnlTodayVal))
         
         let streak = sessionSummary?.currentStreakToday ?? 0
@@ -265,7 +265,7 @@ extension AIPromptBuilder {
                 : "Daily Risk Budget: 2-3 trades (max 2-3% capital) | Disciplined"
         }()
         
-        let isStreakOrBufferBreached = streak <= -2 || (sessionSummary?.dailyLossBufferRemainingUsd != nil && sessionSummary!.dailyLossBufferRemainingUsd! <= 0)
+        let isStreakOrBufferBreached = streak <= -2 || (sessionSummary?.dailyLossBufferRemainingUsd.map { $0 <= 0 } ?? false)
         
         let riskGuardrailWarning: String = {
             if isStreakOrBufferBreached {
@@ -299,9 +299,7 @@ extension AIPromptBuilder {
             return ""
         }()
         
-        let riskPctStr = traderProfile?.maxRiskPerTrade.trimmingCharacters(in: .whitespaces).isEmpty == false
-            ? traderProfile!.maxRiskPerTrade.trimmingCharacters(in: .whitespaces)
-            : "1.0% vốn"
+        let riskPctStr = (traderProfile?.maxRiskPerTrade.trimmingCharacters(in: .whitespaces)).flatMap { $0.isEmpty ? nil : $0 } ?? "1.0% vốn"
         
         let riskDollarStr: String = {
             if let bal = sessionSummary?.balance {
@@ -312,21 +310,13 @@ extension AIPromptBuilder {
             return ""
         }()
         
-        let tradingStyleStr = traderProfile?.tradingStyle.trimmingCharacters(in: .whitespaces).isEmpty == false
-            ? traderProfile!.tradingStyle.trimmingCharacters(in: .whitespaces)
-            : "Day Trader / Swing Trader"
+        let tradingStyleStr = (traderProfile?.tradingStyle.trimmingCharacters(in: .whitespaces)).flatMap { $0.isEmpty ? nil : $0 } ?? "Day Trader / Swing Trader"
             
-        let strategyStr = traderProfile?.primaryPlaybooks.trimmingCharacters(in: .whitespaces).isEmpty == false
-            ? traderProfile!.primaryPlaybooks.trimmingCharacters(in: .whitespaces)
-            : (isVi ? "Price Action, Cấu trúc thị trường H4/H1" : "Price Action, H4/H1 Market Structure")
+        let strategyStr = (traderProfile?.primaryPlaybooks.trimmingCharacters(in: .whitespaces)).flatMap { $0.isEmpty ? nil : $0 } ?? (isVi ? "Price Action, Cấu trúc thị trường H4/H1" : "Price Action, H4/H1 Market Structure")
             
-        let leaksStr = traderProfile?.knownPsychologicalLeaks.trimmingCharacters(in: .whitespaces).isEmpty == false
-            ? traderProfile!.knownPsychologicalLeaks.trimmingCharacters(in: .whitespaces)
-            : "Dời SL, chốt non, FOMO, Trả thù lệnh"
+        let leaksStr = (traderProfile?.knownPsychologicalLeaks.trimmingCharacters(in: .whitespaces)).flatMap { $0.isEmpty ? nil : $0 } ?? "Dời SL, chốt non, FOMO, Trả thù lệnh"
             
-        let customNotesStr = traderProfile?.customMemoryNotes.trimmingCharacters(in: .whitespaces).isEmpty == false
-            ? traderProfile!.customMemoryNotes.trimmingCharacters(in: .whitespaces)
-            : "Tỷ lệ R:R >= 2:1, bảo vệ vốn khi thị trường giằng co, không bao giờ trả thù lệnh"
+        let customNotesStr = (traderProfile?.customMemoryNotes.trimmingCharacters(in: .whitespaces)).flatMap { $0.isEmpty ? nil : $0 } ?? "Tỷ lệ R:R >= 2:1, bảo vệ vốn khi thị trường giằng co, không bao giờ trả thù lệnh"
         
         // 7. Symbol Lessons (Max 2 concise principles)
         let symbolLessonsBlock: String = {

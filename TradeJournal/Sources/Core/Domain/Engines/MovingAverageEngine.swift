@@ -93,14 +93,14 @@ public enum MovingAverageEngine: Sendable {
     ///            EMA[i] = Close[i] * alpha + EMA[i-1] * (1 - alpha)
     /// Every point i depends solely on past data [0...i] and is strictly invariant to future bars.
     public static func calculateEMA(period: Int, bars: [MarketBar]) -> [Decimal] {
-        guard period > 0, !bars.isEmpty else { return [] }
+        guard period > 0, let firstBar = bars.first else { return [] }
         var result: [Decimal] = []
         result.reserveCapacity(bars.count)
         
         let alpha = Decimal(2) / Decimal(period + 1)
         let oneMinusAlpha = Decimal(1) - alpha
         
-        var currentEMA: Decimal = bars[0].close
+        var currentEMA: Decimal = firstBar.close
         result.append(currentEMA)
         
         for i in 1..<bars.count {
@@ -113,14 +113,14 @@ public enum MovingAverageEngine: Sendable {
     
     /// Pure causal EMA calculation for raw Decimal price series.
     public static func calculateEMA(period: Int, closes: [Decimal]) -> [Decimal] {
-        guard period > 0, !closes.isEmpty else { return [] }
+        guard period > 0, let firstClose = closes.first else { return [] }
         var result: [Decimal] = []
         result.reserveCapacity(closes.count)
         
         let alpha = Decimal(2) / Decimal(period + 1)
         let oneMinusAlpha = Decimal(1) - alpha
         
-        var currentEMA: Decimal = closes[0]
+        var currentEMA: Decimal = firstClose
         result.append(currentEMA)
         
         for i in 1..<closes.count {

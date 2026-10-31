@@ -361,10 +361,10 @@ public struct DashboardView: View {
                 } else {
                     // Dynamic Grid Conforming 1:1 to balancedDashboardSpans
                     ForEach(dashboardRows) { row in
-                        if row.items.count == 2 {
+                        if row.items.count == 2, let firstItem = row.items.first, let lastItem = row.items.last {
                             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                                renderWidget(id: row.items[0], snap: snap, isCompact: true)
-                                renderWidget(id: row.items[1], snap: snap, isCompact: true)
+                                renderWidget(id: firstItem, snap: snap, isCompact: true)
+                                renderWidget(id: lastItem, snap: snap, isCompact: true)
                             }
                         } else if let id = row.items.first {
                             renderWidget(id: id, snap: snap, isCompact: false)

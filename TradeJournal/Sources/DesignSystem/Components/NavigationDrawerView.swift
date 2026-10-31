@@ -56,8 +56,8 @@ public struct NavigationDrawerView: View {
         
         if clean.count > 18 {
             let tokens = clean.components(separatedBy: " ").filter { !$0.isEmpty }
-            if tokens.count >= 2 {
-                let candidate = "\(tokens[0]) \(tokens[1])"
+            if tokens.count >= 2, let t0 = tokens.first, let t1 = tokens.dropFirst().first {
+                let candidate = "\(t0) \(t1)"
                 if candidate.count <= 18 {
                     return candidate
                 }

@@ -147,7 +147,7 @@ public struct AIReflectionResultView: View {
             }
         }
         
-        let activeTemplate = template ?? AIReflectionTemplates.all[0]
+        let activeTemplate = template ?? AIReflectionTemplates.defaultTemplate
         let title = AIReflectionTemplates.generateNoteTitle(
             template: activeTemplate,
             metrics: metrics

@@ -62,21 +62,21 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
         self.apiHost = storedHost
         
         let plistAcc = AppSecretsLoader.loadSecret(named: "EXNESS_ACCOUNT_ID")
-        let acc = (plistAcc != nil && !plistAcc!.isEmpty) ? plistAcc! : (ud.string(forKey: kExnessAccountId) ?? "")
+        let acc = (plistAcc?.isEmpty == false) ? (plistAcc ?? "") : (ud.string(forKey: kExnessAccountId) ?? "")
         if !acc.isEmpty {
             ud.set(acc, forKey: kExnessAccountId)
         }
         self.accountId = acc
         
         let plistKey = AppSecretsLoader.loadSecret(named: "EXNESS_API_KEY")
-        let key = (plistKey != nil && !plistKey!.isEmpty) ? plistKey! : (KeychainManager.get(forKey: kExnessApiKey) ?? "")
+        let key = (plistKey?.isEmpty == false) ? (plistKey ?? "") : (KeychainManager.get(forKey: kExnessApiKey) ?? "")
         if !key.isEmpty {
             KeychainManager.set(key, forKey: kExnessApiKey)
         }
         self.apiKey = key
         
         let plistPriv = AppSecretsLoader.loadSecret(named: "EXNESS_PRIVATE_KEY")
-        let priv = (plistPriv != nil && !plistPriv!.isEmpty) ? plistPriv! : (KeychainManager.get(forKey: kExnessPrivateKey) ?? "")
+        let priv = (plistPriv?.isEmpty == false) ? (plistPriv ?? "") : (KeychainManager.get(forKey: kExnessPrivateKey) ?? "")
         if !priv.isEmpty {
             KeychainManager.set(priv, forKey: kExnessPrivateKey)
         }

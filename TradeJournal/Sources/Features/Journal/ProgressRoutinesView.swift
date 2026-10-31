@@ -457,7 +457,7 @@ public struct AddProgressRoutineSheet: View {
     public init(routineToEdit: ProgressRule? = nil) {
         self.routineToEdit = routineToEdit
         _title = State(initialValue: routineToEdit?.title ?? "")
-        _stage = State(initialValue: routineToEdit?.stage ?? ProgressRoutinesView.stages[0])
+        _stage = State(initialValue: routineToEdit?.stage ?? ProgressRoutinesView.stages.first ?? "Before trading")
         if let existing = routineToEdit {
             _selectedDays = State(initialValue: existing.activeWeekdays)
         } else {

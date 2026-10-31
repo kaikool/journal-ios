@@ -55,6 +55,18 @@ public struct AIReflectionTemplate: Identifiable, Sendable {
 
 // MARK: - Specialized Coaching Templates
 public struct AIReflectionTemplates {
+    public static var defaultTemplate: AIReflectionTemplate {
+        all.first ?? AIReflectionTemplate(
+            id: "daily_recap",
+            title: "Session Recap",
+            subtitle: "Review execution and profit & loss",
+            icon: "doc.text.magnifyingglass",
+            category: .cadence,
+            action: .recap,
+            tag: "#ai-session-recap",
+            notePrefix: "[AI Session Recap]"
+        )
+    }
     
     public static let all: [AIReflectionTemplate] = [
         // 1. Session Recap

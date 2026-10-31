@@ -149,6 +149,12 @@ public enum AssetContractEngine {
         }
     }
     
+    // Precomputed decimals for performance and 100% crash safety
+    private static let pipTenth: Decimal = Decimal(string: "0.1") ?? Decimal(0.1)
+    private static let pipHundredth: Decimal = Decimal(string: "0.01") ?? Decimal(0.01)
+    private static let pipThousandth: Decimal = Decimal(string: "0.001") ?? Decimal(0.001)
+    private static let pipTenThousandth: Decimal = Decimal(string: "0.0001") ?? Decimal(0.0001)
+
     // MARK: - Specification
     
     public static func spec(for rawSymbol: String) -> SymbolSpec {
@@ -156,10 +162,10 @@ public enum AssetContractEngine {
         
         // Metals: XAU / XAG with an optional quote currency and any broker suffix.
         if clean.contains("XAU") || clean.hasPrefix("GOLD") {
-            return metalSpec(prefix: "XAU", clean: clean, contractSize: 100, pipSize: Decimal(string: "0.1")!, decimals: 2, placeholder: "2000.00", lot: "contract size 100 oz per lot")
+            return metalSpec(prefix: "XAU", clean: clean, contractSize: 100, pipSize: pipTenth, decimals: 2, placeholder: "2000.00", lot: "contract size 100 oz per lot")
         }
         if clean.contains("XAG") || clean.hasPrefix("SILVER") {
-            return metalSpec(prefix: "XAG", clean: clean, contractSize: 5000, pipSize: Decimal(string: "0.001")!, decimals: 3, placeholder: "25.000", lot: "contract size 5,000 oz per lot")
+            return metalSpec(prefix: "XAG", clean: clean, contractSize: 5000, pipSize: pipThousandth, decimals: 3, placeholder: "25.000", lot: "contract size 5,000 oz per lot")
         }
         
         // Spot FX: detected through currency codes so that broker suffixes stay harmless.
@@ -171,7 +177,7 @@ public enum AssetContractEngine {
                     baseCurrency: pair.base,
                     quoteCurrency: pair.quote,
                     contractSize: 100_000,
-                    pipSize: Decimal(string: "0.01")!,
+                    pipSize: pipHundredth,
                     defaultDecimals: 3,
                     cleanSymbol: canonical,
                     pricePlaceholder: "155.250",
@@ -183,7 +189,7 @@ public enum AssetContractEngine {
                 baseCurrency: pair.base,
                 quoteCurrency: pair.quote,
                 contractSize: 100_000,
-                pipSize: Decimal(string: "0.0001")!,
+                pipSize: pipTenThousandth,
                 defaultDecimals: 5,
                 cleanSymbol: canonical,
                 pricePlaceholder: "1.08000",
@@ -198,7 +204,7 @@ public enum AssetContractEngine {
                 baseCurrency: "OIL",
                 quoteCurrency: "USD",
                 contractSize: 100,
-                pipSize: Decimal(string: "0.01")!,
+                pipSize: pipHundredth,
                 defaultDecimals: 2,
                 cleanSymbol: clean,
                 pricePlaceholder: "70.00",
@@ -232,7 +238,7 @@ public enum AssetContractEngine {
             baseCurrency: String(clean.prefix(3)),
             quoteCurrency: "USD",
             contractSize: 1,
-            pipSize: Decimal(string: "0.01")!,
+            pipSize: pipHundredth,
             defaultDecimals: 2,
             cleanSymbol: clean,
             pricePlaceholder: "100.00",
@@ -243,7 +249,8 @@ public enum AssetContractEngine {
     private static func metalSpec(prefix: String, clean: String, contractSize: Decimal, pipSize: Decimal, decimals: Int, placeholder: String, lot: String) -> SymbolSpec {
         var quote = "USD"
         let chars = Array(clean)
-        if let start = chars.firstIndex(of: Array(prefix)[0]),
+        if let prefixChar = prefix.first,
+           let start = chars.firstIndex(of: prefixChar),
            start + 3 <= chars.count {
             // Look for a currency code right after the metal code (XAUUSD, XAUUSDm, XAUEUR...).
             let tail = String(chars[(start + 3)...])
@@ -279,7 +286,7 @@ public enum AssetContractEngine {
                     baseCurrency: base,
                     quoteCurrency: quote,
                     contractSize: 1,
-                    pipSize: Decimal(string: "0.01")!,
+                    pipSize: pipHundredth,
                     defaultDecimals: 2,
                     cleanSymbol: clean,
                     pricePlaceholder: "65000.00",
@@ -293,7 +300,7 @@ public enum AssetContractEngine {
                 baseCurrency: String(clean.prefix(clean.count - 4)),
                 quoteCurrency: "USDT",
                 contractSize: 1,
-                pipSize: Decimal(string: "0.01")!,
+                pipSize: pipHundredth,
                 defaultDecimals: 2,
                 cleanSymbol: clean,
                 pricePlaceholder: "65000.00",
@@ -358,7 +365,12 @@ public enum AssetContractEngine {
             return GrossPnlResult(amount: 0, quoteAmount: 0, quoteCurrency: quote, reportingCurrency: reporting, isConverted: false)
         }
         
-        let multiplier = (customMultiplier != nil && customMultiplier! > 0) ? customMultiplier! : spec.contractSize
+        let multiplier: Decimal
+        if let custom = customMultiplier, custom > 0 {
+            multiplier = custom
+        } else {
+            multiplier = spec.contractSize
+        }
         let quoteAmount: Decimal
         if let notional = entryNotional {
             let signed = direction == .long ? (exitPrice * quantity - notional) : (notional - exitPrice * quantity)
