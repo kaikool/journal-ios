@@ -97,8 +97,13 @@ public struct AppBadge: View {
         .clipShape(Capsule())
         .overlay(
             Capsule()
-                .stroke(borderColor, lineWidth: variant == .outline ? 0.8 : 0.5)
+                .stroke(borderColor, lineWidth: isOutline ? 0.8 : 0.5)
         )
+    }
+    
+    private var isOutline: Bool {
+        if case .outline = variant { return true }
+        return false
     }
     
     private var backgroundColor: Color {

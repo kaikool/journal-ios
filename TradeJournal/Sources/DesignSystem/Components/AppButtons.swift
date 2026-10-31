@@ -156,6 +156,7 @@ public struct AppPrimaryButton: View {
 public struct AppSecondaryButton: View {
     let title: String
     let icon: String?
+    let isEnabled: Bool
     let fullWidth: Bool
     let height: CGFloat
     let action: () -> Void
@@ -163,12 +164,14 @@ public struct AppSecondaryButton: View {
     public init(
         _ title: String,
         icon: String? = nil,
+        isEnabled: Bool = true,
         fullWidth: Bool = false,
         height: CGFloat = 38,
         action: @escaping () -> Void
     ) {
         self.title = title
         self.icon = icon
+        self.isEnabled = isEnabled
         self.fullWidth = fullWidth
         self.height = height
         self.action = action
@@ -187,7 +190,7 @@ public struct AppSecondaryButton: View {
                 Text(title)
                     .font(.system(size: height <= 32 ? 12.5 : 13.5, weight: .semibold, design: .rounded))
             }
-            .foregroundColor(AppColors.primaryText)
+            .foregroundColor(isEnabled ? AppColors.primaryText : AppColors.secondaryText.opacity(0.6))
             .padding(.horizontal, 14)
             .frame(maxWidth: fullWidth ? .infinity : nil)
             .frame(height: height)
@@ -198,6 +201,7 @@ public struct AppSecondaryButton: View {
             )
         }
         .buttonStyle(ApplePressableButtonStyle())
+        .disabled(!isEnabled)
     }
 }
 
