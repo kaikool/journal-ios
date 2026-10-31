@@ -35,7 +35,8 @@ public struct PlaybookAdherenceSummary: Identifiable, Sendable, Equatable {
 public enum AdherenceEngine {
     
     public static func defaultSummary(for playbook: Playbook) -> PlaybookAdherenceSummary {
-        PlaybookAdherenceSummary(
+        let emptyGroup = TradeAnalysisEngine.summarizeGroup(all: [])
+        return PlaybookAdherenceSummary(
             id: playbook.id,
             playbook: playbook,
             total: 0,
@@ -43,8 +44,8 @@ public enum AdherenceEngine {
             possible: 0,
             rate: nil,
             accountIds: [],
-            followed: GroupSummary(trades: 0, netPnl: 0, winRate: nil),
-            broken: GroupSummary(trades: 0, netPnl: 0, winRate: nil),
+            followed: emptyGroup,
+            broken: emptyGroup,
             unassessed: 0,
             rules: []
         )
