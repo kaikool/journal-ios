@@ -54,6 +54,19 @@ public struct AppMetricTile: View {
         self.minHeight = minHeight
     }
     
+    public init(
+        title: String,
+        value: String,
+        color: Color = AppColors.primaryText,
+        subtitle: String? = nil,
+        icon: String? = nil,
+        trend: MetricTrend? = nil,
+        alignment: HorizontalAlignment = .center,
+        minHeight: CGFloat = 52
+    ) {
+        self.init(title, value: value, color: color, subtitle: subtitle, icon: icon, trend: trend, alignment: alignment, minHeight: minHeight)
+    }
+    
     public var body: some View {
         VStack(alignment: alignment, spacing: 3) {
             HStack(spacing: 4) {

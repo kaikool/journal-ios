@@ -8,6 +8,8 @@ import SwiftUI
 /// - Identical 32x32 Circular Pods for icon actions (`xmark`, `trash`, `edit`, `back`)
 /// - Tactile ApplePressableButtonStyle with native spring feedback
 
+public typealias ModalCloseButton = ModalDismissButton
+
 // MARK: - Circular Dismiss Button (xmark)
 public struct ModalDismissButton: View {
     let action: () -> Void

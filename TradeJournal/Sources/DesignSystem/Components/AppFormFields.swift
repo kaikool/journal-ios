@@ -1,5 +1,7 @@
 import SwiftUI
 
+public typealias AppTextField = AppFormField
+
 /// Unified Apple HIG Form Field
 /// Standard form text input with label, optional leading icon, trailing badge/unit, and subtle border stroke.
 public struct AppFormField: View {
