@@ -296,23 +296,11 @@ private struct AIMemoryCard: View {
                 // Header: Category, Symbol, Status, Menu
                 HStack(spacing: 6) {
                     // Category Badge (Subtle brand tint matching PreTradeBanner)
-                    Text(memory.category.localizedTitle.uppercased())
-                        .font(AppTypography.badgeMicro)
-                        .foregroundColor(AppColors.brand)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2.5)
-                        .background(AppColors.brand.opacity(0.12))
-                        .cornerRadius(4)
+                    AppBadge(memory.category.localizedTitle.uppercased(), variant: .brand)
                     
                     // Symbol Badge (if present)
                     if let sym = memory.symbol, !sym.isEmpty {
-                        Text(sym)
-                            .font(AppTypography.badgeMicro)
-                            .foregroundColor(AppColors.primaryText)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2.5)
-                            .background(AppColors.secondaryBackground)
-                            .cornerRadius(4)
+                        AppBadge(sym, variant: .secondary)
                     }
                     
                     Spacer()
@@ -386,40 +374,17 @@ private struct AIMemoryCard: View {
         }
     }
     
+    @ViewBuilder
     private func statusBadgeView(_ status: AIMemoryStatus) -> some View {
         switch status {
         case .active:
-            return Text("Active")
-                .font(AppTypography.badgeMicro)
-                .foregroundColor(AppColors.secondaryText)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(AppColors.secondaryBackground)
-                .cornerRadius(4)
+            AppBadge("Active", variant: .secondary)
         case .verified:
-            return Text("Verified")
-                .font(AppTypography.badgeMicro)
-                .foregroundColor(AppColors.profit)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(AppColors.profitFill)
-                .cornerRadius(4)
+            AppBadge("Verified", variant: .profit)
         case .deprecated:
-            return Text("Deprecated")
-                .font(AppTypography.badgeMicro)
-                .foregroundColor(AppColors.secondaryText.opacity(0.6))
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(AppColors.secondaryBackground)
-                .cornerRadius(4)
+            AppBadge("Deprecated", variant: .secondary)
         case .refuted:
-            return Text("Refuted")
-                .font(AppTypography.badgeMicro)
-                .foregroundColor(AppColors.loss)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(AppColors.lossFill)
-                .cornerRadius(4)
+            AppBadge("Refuted", variant: .loss)
         }
     }
     

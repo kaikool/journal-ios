@@ -80,13 +80,11 @@ public struct LinkNoteToTradeSheet: View {
                 
                 // Trades List (Single Line Rows)
                 if filteredTrades.isEmpty {
-                    VStack(spacing: 8) {
-                        Spacer()
-                        Text("No matching trades")
-                            .font(AppTypography.caption)
-                            .foregroundColor(AppColors.secondaryText)
-                        Spacer()
-                    }
+                    AppEmptyState(
+                        icon: "magnifyingglass",
+                        title: "No matching trades",
+                        message: "Try searching with a different symbol, ticket number, or date."
+                    )
                 } else {
                     List {
                         ForEach(filteredTrades, id: \.key) { trade in
@@ -96,7 +94,7 @@ public struct LinkNoteToTradeSheet: View {
                             } label: {
                                 tradeRow(trade, isLinked: isLinked)
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(ApplePressableButtonStyle())
                             .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                             .listRowBackground(isLinked ? AppColors.secondaryBackground.opacity(0.4) : Color.clear)
                         }
@@ -111,9 +109,11 @@ public struct LinkNoteToTradeSheet: View {
                     ModalDismissButton { dismiss() }
                 }
                 
-                if currentTradeKey != nil {
-                    ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .topBarTrailing) {
+                    if currentTradeKey != nil {
                         ModalDeleteButton(title: "Unlink") { unlinkTrade() }
+                    } else {
+                        ModalPrimaryButton("Done") { dismiss() }
                     }
                 }
             }

@@ -20,13 +20,10 @@ public struct TradeDetailHeroCard: View {
                             .font(AppTypography.headline)
                             .foregroundColor(AppColors.primaryText)
                         
-                        Text(trade.direction == .long ? "BUY" : "SELL")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundColor(trade.direction == .long ? AppColors.brand : AppColors.warning)
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 2.5)
-                            .background((trade.direction == .long ? AppColors.brand : AppColors.warning).opacity(0.12))
-                            .clipShape(Capsule())
+                        AppBadge(
+                            trade.direction == .long ? "BUY" : "SELL",
+                            variant: trade.direction == .long ? .brand : .warning
+                        )
                         
                         Text("\(Formatters.formatNumber(trade.quantity)) Lots")
                             .font(AppTypography.number(11, weight: .medium))

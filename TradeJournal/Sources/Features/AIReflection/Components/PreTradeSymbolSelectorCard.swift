@@ -44,42 +44,25 @@ public struct PreTradeSymbolSelectorCard: View {
                     HStack(spacing: 6) {
                         ForEach(popularSymbols, id: \.self) { sym in
                             let isSel = selectedSymbol == sym
-                            Button(action: {
+                            AppFilterChip(sym, isSelected: isSel, height: 28) {
                                 selectedSymbol = sym
                                 onSelectSymbol(sym)
-                            }) {
-                                Text(sym)
-                                    .font(.system(size: 11, weight: isSel ? .bold : .medium))
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 5)
-                                    .background(isSel ? AppColors.brand.opacity(0.15) : AppColors.secondaryBackground)
-                                    .foregroundColor(isSel ? AppColors.brand : AppColors.primaryText)
-                                    .clipShape(Capsule())
-                                    .overlay(
-                                        Capsule().stroke(isSel ? AppColors.brand.opacity(0.5) : AppColors.border.opacity(0.5), lineWidth: 0.8)
-                                    )
                             }
-                            .buttonStyle(.plain)
                         }
                     }
                 }
                 
                 // Custom Symbol Input Field
                 HStack(spacing: 8) {
-                    TextField("Enter symbol (e.g. USDCAD, NVDA, SOLUSDT)...", text: $customSymbolText)
-                        .font(AppTypography.inputText)
-                        .foregroundColor(AppColors.primaryText)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 7)
-                        .background(AppColors.secondaryBackground)
-                        .cornerRadius(8)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
-                        )
-                        .onSubmit {
-                            onSubmitCustom()
-                        }
+                    AppFormField(
+                        text: $customSymbolText,
+                        placeholder: "Enter symbol (e.g. USDCAD, NVDA, SOLUSDT)...",
+                        icon: "magnifyingglass",
+                        height: 34
+                    )
+                    .onSubmit {
+                        onSubmitCustom()
+                    }
                     
                     AppPrimaryButton(
                         "Analyze",

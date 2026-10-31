@@ -128,20 +128,11 @@ public struct DailyJournalListView: View {
         ScrollView {
             VStack(spacing: 12) {
                 if daysList.isEmpty {
-                    VStack(spacing: 12) {
-                        Image(systemName: "calendar.badge.exclamationmark")
-                            .font(.system(size: 36))
-                            .foregroundColor(AppColors.secondaryText.opacity(0.6))
-                        Text("No trading days yet")
-                            .font(AppTypography.cardTitle)
-                            .foregroundColor(AppColors.primaryText)
-                        Text("No trading days yet — import trades or write your first day note.")
-                            .font(AppTypography.caption)
-                            .foregroundColor(AppColors.secondaryText)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 32)
-                    }
-                    .frame(maxWidth: .infinity)
+                    AppEmptyState(
+                        icon: "calendar.badge.exclamationmark",
+                        title: "No trading days yet",
+                        message: "Import trades or write your first day note to get started."
+                    )
                     .padding(.vertical, 60)
                 } else {
                     LazyVStack(spacing: 8) {

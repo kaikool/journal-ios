@@ -56,13 +56,7 @@ public struct PlaybookCardView: View {
                                 .truncationMode(.tail)
                             
                             if summary.playbook.isDefault {
-                                Text("DEFAULT")
-                                    .font(AppTypography.badgeMicro)
-                                    .foregroundColor(AppColors.brand)
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
-                                    .background(AppColors.brand.opacity(0.12))
-                                    .clipShape(Capsule())
+                                AppBadge("DEFAULT", variant: .brand)
                             }
                         }
                     }
@@ -168,61 +162,29 @@ public struct PlaybookCardView: View {
                 // Bottom Action Row: More rules (left) & Set Default under When broken (right)
                 HStack(alignment: .center) {
                     if summary.playbook.rules.count > 3 {
-                        Button {
-                            #if canImport(UIKit)
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            #endif
+                        AppFilterChip(
+                            isExpanded ? "Show less" : "+ \(summary.playbook.rules.count - 3) more rules",
+                            isSelected: isExpanded,
+                            icon: isExpanded ? "chevron.up" : "chevron.down",
+                            height: 26
+                        ) {
                             withAnimation(.spring(response: 0.32, dampingFraction: 0.8)) {
                                 isExpanded.toggle()
                             }
-                        } label: {
-                            HStack(spacing: 5) {
-                                Text(isExpanded ? "Show less" : "+ \(summary.playbook.rules.count - 3) more rules")
-                                    .font(.system(size: 11, weight: .semibold))
-                                    .lineLimit(1)
-                                    .fixedSize()
-                                Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                                    .font(.system(size: 9, weight: .bold))
-                            }
-                            .foregroundColor(AppColors.brand)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 4)
-                            .background(AppColors.brand.opacity(0.08))
-                            .clipShape(Capsule())
-                            .overlay(
-                                Capsule().stroke(AppColors.brand.opacity(0.2), lineWidth: 0.5)
-                            )
                         }
-                        .buttonStyle(.plain)
                     }
                     
                     Spacer()
                     
                     if let onSetDefault = onSetDefault {
-                        Button {
-                            #if canImport(UIKit)
-                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                            #endif
+                        AppFilterChip(
+                            summary.playbook.isDefault ? "Default" : "Set default",
+                            isSelected: summary.playbook.isDefault,
+                            icon: summary.playbook.isDefault ? "checkmark.circle.fill" : "star",
+                            height: 26
+                        ) {
                             onSetDefault()
-                        } label: {
-                            HStack(spacing: 4) {
-                                Image(systemName: summary.playbook.isDefault ? "checkmark.circle.fill" : "star")
-                                    .font(.system(size: 10, weight: summary.playbook.isDefault ? .bold : .medium))
-                                Text(summary.playbook.isDefault ? "Default" : "Set default")
-                                    .font(.system(size: 11, weight: summary.playbook.isDefault ? .semibold : .medium))
-                                    .lineLimit(1)
-                                    .fixedSize()
-                            }
-                            .foregroundColor(summary.playbook.isDefault ? AppColors.brand : AppColors.secondaryText)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 4)
-                            .background(summary.playbook.isDefault ? AppColors.brand.opacity(0.12) : AppColors.secondaryBackground)
-                            .clipShape(Capsule())
-                            .overlay(
-                                Capsule().stroke(summary.playbook.isDefault ? AppColors.brand.opacity(0.3) : AppColors.border.opacity(0.5), lineWidth: 0.6)
-                            )
                         }
-                        .buttonStyle(.plain)
                     }
                 }
                 .padding(.top, -2)

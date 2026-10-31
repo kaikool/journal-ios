@@ -285,23 +285,11 @@ private struct AIResearchProjectCard: View {
             statusBadge(project.status)
             
             if !project.criteria.symbols.isEmpty {
-                Text(project.criteria.symbols.joined(separator: ", "))
-                    .font(AppTypography.badgeMicro)
-                    .foregroundColor(AppColors.primaryText)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2.5)
-                    .background(AppColors.secondaryBackground)
-                    .cornerRadius(4)
+                AppBadge(project.criteria.symbols.joined(separator: ", "), variant: .secondary)
             }
             
             if !project.criteria.timeframes.isEmpty {
-                Text(project.criteria.timeframes.joined(separator: "/"))
-                    .font(AppTypography.badgeMicro)
-                    .foregroundColor(AppColors.secondaryText)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2.5)
-                    .background(AppColors.secondaryBackground)
-                    .cornerRadius(4)
+                AppBadge(project.criteria.timeframes.joined(separator: "/"), variant: .secondary)
             }
             
             Spacer()
@@ -516,48 +504,19 @@ private struct AIResearchProjectCard: View {
         .padding(.top, 2)
     }
     
+    @ViewBuilder
     private func statusBadge(_ st: AIResearchProjectStatus) -> some View {
         switch st {
         case .active:
-            return Text("Active")
-                .font(AppTypography.badgeMicro)
-                .foregroundColor(AppColors.brand)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(AppColors.brand.opacity(0.12))
-                .cornerRadius(4)
+            AppBadge("Active", variant: .brand)
         case .validated:
-            return Text("Validated")
-                .font(AppTypography.badgeMicro)
-                .foregroundColor(AppColors.profit)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(AppColors.profitFill)
-                .cornerRadius(4)
+            AppBadge("Validated", variant: .profit)
         case .invalidated:
-            return Text("Invalidated")
-                .font(AppTypography.badgeMicro)
-                .foregroundColor(AppColors.loss)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(AppColors.lossFill)
-                .cornerRadius(4)
+            AppBadge("Invalidated", variant: .loss)
         case .paused:
-            return Text("Paused")
-                .font(AppTypography.badgeMicro)
-                .foregroundColor(AppColors.secondaryText)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(AppColors.secondaryBackground)
-                .cornerRadius(4)
+            AppBadge("Paused", variant: .secondary)
         case .archived:
-            return Text("Archived")
-                .font(AppTypography.badgeMicro)
-                .foregroundColor(AppColors.secondaryText.opacity(0.6))
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(AppColors.secondaryBackground)
-                .cornerRadius(4)
+            AppBadge("Archived", variant: .secondary)
         }
     }
     

@@ -531,26 +531,8 @@ public struct AddProgressRoutineSheet: View {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 6) {
                             ForEach(Self.quickSuggestions, id: \.self) { suggestion in
-                                Button {
-                                    #if canImport(UIKit)
-                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                    #endif
+                                AppFilterChip(suggestion, isSelected: title == suggestion, icon: "plus", height: 26) {
                                     title = suggestion
-                                } label: {
-                                    HStack(spacing: 4) {
-                                        Image(systemName: "plus")
-                                            .font(.system(size: 9, weight: .bold))
-                                        Text(suggestion)
-                                            .font(.system(size: 11, weight: .medium))
-                                    }
-                                    .foregroundColor(title == suggestion ? AppColors.brand : AppColors.secondaryText)
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 5)
-                                    .background(title == suggestion ? AppColors.brand.opacity(0.12) : AppColors.secondaryBackground)
-                                    .clipShape(Capsule())
-                                    .overlay(
-                                        Capsule().stroke(title == suggestion ? AppColors.brand.opacity(0.4) : AppColors.border.opacity(0.5), lineWidth: 0.6)
-                                    )
                                 }
                             }
                         }
@@ -787,21 +769,9 @@ public struct ArchivedProgressRoutinesSheet: View {
             
             Spacer()
             
-            Button {
+            AppSecondaryButton("Restore", icon: "arrow.up.bin", height: 28) {
                 dataStore.unarchiveProgressRule(id: rule.id)
-            } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: "arrow.up.bin")
-                    Text("Restore")
-                }
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(AppColors.brand)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(AppColors.brand.opacity(0.12))
-                .clipShape(Capsule())
             }
-            .buttonStyle(.plain)
             
             ModalDeleteButton {
                 ruleToDelete = rule

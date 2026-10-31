@@ -43,54 +43,73 @@ public struct AppBadge: View {
     public enum Variant {
         case profit
         case loss
+        case brand
+        case warning
         case secondary
         case outline
+        case custom(color: Color)
     }
     
     private let text: String
+    private let icon: String?
     private let variant: Variant
     
-    public init(_ text: String, variant: Variant = .secondary) {
+    public init(_ text: String, icon: String? = nil, variant: Variant = .secondary) {
         self.text = text
+        self.icon = icon
         self.variant = variant
     }
     
-    public init(_ text: String, color: Color) {
+    public init(_ text: String, icon: String? = nil, color: Color) {
         self.text = text
+        self.icon = icon
         if color == AppColors.profit {
             self.variant = .profit
         } else if color == AppColors.loss {
             self.variant = .loss
+        } else if color == AppColors.brand {
+            self.variant = .brand
+        } else if color == AppColors.warning {
+            self.variant = .warning
         } else {
-            self.variant = .secondary
+            self.variant = .custom(color: color)
         }
     }
     
-    public init(text: String, color: Color) {
-        self.init(text, color: color)
+    public init(text: String, icon: String? = nil, color: Color) {
+        self.init(text, icon: icon, color: color)
     }
     
     public var body: some View {
-        Text(text)
-            .font(.system(size: 10, weight: .bold))
-            .lineLimit(1)
-            .padding(.horizontal, 7)
-            .padding(.vertical, 3)
-            .background(backgroundColor)
-            .foregroundColor(foregroundColor)
-            .clipShape(Capsule())
-            .overlay(
-                Capsule()
-                    .stroke(borderColor, lineWidth: variant == .outline ? 1 : 0)
-            )
+        HStack(spacing: 3.5) {
+            if let icon = icon {
+                Image(systemName: icon)
+                    .font(.system(size: 8.5, weight: .bold))
+            }
+            Text(text)
+                .font(.system(size: 10, weight: .bold, design: .rounded))
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 7)
+        .padding(.vertical, 3)
+        .background(backgroundColor)
+        .foregroundColor(foregroundColor)
+        .clipShape(Capsule())
+        .overlay(
+            Capsule()
+                .stroke(borderColor, lineWidth: variant == .outline ? 0.8 : 0.5)
+        )
     }
     
     private var backgroundColor: Color {
         switch variant {
         case .profit: return AppColors.profit.opacity(0.14)
         case .loss: return AppColors.loss.opacity(0.14)
+        case .brand: return AppColors.brand.opacity(0.12)
+        case .warning: return AppColors.warning.opacity(0.12)
         case .secondary: return AppColors.secondaryBackground
         case .outline: return Color.clear
+        case .custom(let color): return color.opacity(0.12)
         }
     }
     
@@ -98,15 +117,23 @@ public struct AppBadge: View {
         switch variant {
         case .profit: return AppColors.profit
         case .loss: return AppColors.loss
+        case .brand: return AppColors.brand
+        case .warning: return AppColors.warning
         case .secondary: return AppColors.primaryText
         case .outline: return AppColors.secondaryText
+        case .custom(let color): return color
         }
     }
     
     private var borderColor: Color {
         switch variant {
         case .outline: return AppColors.border
-        default: return Color.clear
+        case .brand: return AppColors.brand.opacity(0.3)
+        case .profit: return AppColors.profit.opacity(0.3)
+        case .loss: return AppColors.loss.opacity(0.3)
+        case .warning: return AppColors.warning.opacity(0.3)
+        case .secondary: return AppColors.border.opacity(0.4)
+        case .custom(let color): return color.opacity(0.3)
         }
     }
 }

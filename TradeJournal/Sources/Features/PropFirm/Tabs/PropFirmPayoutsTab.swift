@@ -150,26 +150,10 @@ extension PropFirmLedgerView {
                                     .foregroundColor(AppColors.secondaryText)
                                     .lineLimit(1)
                                 Spacer()
-                                Button {
-                                    #if canImport(UIKit)
-                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                    #endif
+                                AppPrimaryButton("Record receipt", icon: "plus.circle", height: 26) {
                                     selectedPayoutForReceipt = p.entry
-                                } label: {
-                                    HStack(spacing: 4) {
-                                        Image(systemName: "plus.circle")
-                                        Text("Record receipt")
-                                    }
-                                    .font(AppTypography.actionPill)
-                                    .foregroundColor(AppColors.brand)
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 5)
-                                    .background(AppColors.brand.opacity(0.12))
-                                    .clipShape(Capsule())
-                                    .lineLimit(1)
-                                    .fixedSize()
                                 }
-                                .buttonStyle(ApplePressableButtonStyle())
+                                .fixedSize()
                             }
                         }
                     }

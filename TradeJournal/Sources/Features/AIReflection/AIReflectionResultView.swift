@@ -66,45 +66,22 @@ public struct AIReflectionResultView: View {
             // Bottom Action Bar - Compact, Tidy, Minimalist
             HStack(spacing: 8) {
                 // Save to Notebook
-                Button(action: saveToNotebook) {
-                    HStack(spacing: 6) {
-                        Image(systemName: isSavedToNotebook ? "checkmark" : "bookmark")
-                            .font(.system(size: 11, weight: .semibold))
-                        Text(isSavedToNotebook ? "Saved" : "Save to Notebook")
-                            .font(.system(size: 12, weight: .semibold, design: .rounded))
-                    }
-                    .foregroundColor(isSavedToNotebook ? AppColors.profit : AppColors.primaryText)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 36)
-                    .background(AppColors.secondaryBackground)
-                    .clipShape(Capsule())
-                    .overlay(
-                        Capsule()
-                            .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
-                    )
-                }
-                .buttonStyle(ApplePressableButtonStyle())
-                .disabled(isSavedToNotebook)
+                AppSecondaryButton(
+                    isSavedToNotebook ? "Saved" : "Save to Notebook",
+                    icon: isSavedToNotebook ? "checkmark" : "bookmark",
+                    isEnabled: !isSavedToNotebook,
+                    fullWidth: true,
+                    height: 36,
+                    action: saveToNotebook
+                )
                 
                 // Copy Button
-                Button(action: copyToClipboard) {
-                    HStack(spacing: 5) {
-                        Image(systemName: showCopiedAlert ? "checkmark" : "doc.on.doc")
-                            .font(.system(size: 11, weight: .semibold))
-                        Text(showCopiedAlert ? "Copied" : "Copy")
-                            .font(.system(size: 12, weight: .semibold, design: .rounded))
-                    }
-                    .foregroundColor(AppColors.primaryText)
-                    .padding(.horizontal, 14)
-                    .frame(height: 36)
-                    .background(AppColors.secondaryBackground)
-                    .clipShape(Capsule())
-                    .overlay(
-                        Capsule()
-                            .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
-                    )
-                }
-                .buttonStyle(ApplePressableButtonStyle())
+                AppSecondaryButton(
+                    showCopiedAlert ? "Copied" : "Copy",
+                    icon: showCopiedAlert ? "checkmark" : "doc.on.doc",
+                    height: 36,
+                    action: copyToClipboard
+                )
                 
                 // Regenerate
                 AppIconPodButton(icon: "arrow.clockwise", size: 36, label: "Regenerate") {

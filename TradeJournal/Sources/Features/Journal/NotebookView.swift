@@ -211,16 +211,8 @@ public struct NotebookView: View {
                                         .lineLimit(1)
                                     Spacer()
                                     if let folder = activeFolders.first(where: { $0.id == note.folderId }) {
-                                        Text(folder.name)
-                                            .font(.system(size: 10, weight: .semibold))
-                                            .lineLimit(1)
-                                            .truncationMode(.tail)
+                                        AppBadge(folder.name, variant: .secondary)
                                             .frame(maxWidth: 100)
-                                            .padding(.horizontal, 7)
-                                            .padding(.vertical, 3)
-                                            .background(AppColors.secondaryBackground)
-                                            .foregroundColor(AppColors.secondaryText)
-                                            .clipShape(Capsule())
                                     }
                                 }
                                 

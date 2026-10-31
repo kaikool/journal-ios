@@ -50,14 +50,7 @@ extension PropFirmLedgerView {
                                 }
                                 
                                 if acc.archived {
-                                    Text("Archived")
-                                        .font(.system(size: 10, weight: .semibold))
-                                        .foregroundColor(AppColors.secondaryText)
-                                        .padding(.horizontal, 6)
-                                        .padding(.vertical, 2)
-                                        .background(AppColors.secondaryBackground)
-                                        .clipShape(Capsule())
-                                        .lineLimit(1)
+                                    AppBadge("Archived", variant: .secondary)
                                 }
                                 
                                 Spacer()
@@ -187,63 +180,21 @@ extension PropFirmLedgerView {
                                     Spacer()
                                     
                                     if acc.status == .passed || acc.status == .breached || acc.status == .closed {
-                                        Button {
-                                            #if canImport(UIKit)
-                                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                            #endif
+                                        AppPrimaryButton("Next phase", icon: "arrow.right.circle", height: 26) {
                                             selectedAccountForNextPhase = acc
-                                        } label: {
-                                            HStack(spacing: 4) {
-                                                Image(systemName: "arrow.right.circle")
-                                                Text("Next phase")
-                                            }
-                                            .font(AppTypography.actionPill)
-                                            .foregroundColor(AppColors.brand)
-                                            .padding(.horizontal, 9)
-                                            .padding(.vertical, 4)
-                                            .background(AppColors.brand.opacity(0.12))
-                                            .clipShape(Capsule())
-                                            .lineLimit(1)
-                                            .fixedSize()
                                         }
-                                        .buttonStyle(ApplePressableButtonStyle())
+                                        .fixedSize()
                                     }
                                     
-                                    Button {
-                                        #if canImport(UIKit)
-                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                        #endif
+                                    AppSecondaryButton("Edit", height: 26) {
                                         selectedAccountForEdit = acc
-                                    } label: {
-                                        Text("Edit")
-                                            .font(AppTypography.actionPill)
-                                            .foregroundColor(AppColors.brand)
-                                            .padding(.horizontal, 9)
-                                            .padding(.vertical, 4)
-                                            .background(AppColors.secondaryBackground)
-                                            .clipShape(Capsule())
-                                            .lineLimit(1)
-                                            .fixedSize()
-                                        }
-                                    .buttonStyle(ApplePressableButtonStyle())
-                                    
-                                    Button {
-                                        #if canImport(UIKit)
-                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                        #endif
-                                        dataStore.archivePropAccount(id: acc.id, archived: !acc.archived, reason: "User toggle archive")
-                                    } label: {
-                                        Text(acc.archived ? "Restore" : "Archive")
-                                            .font(AppTypography.actionPill)
-                                            .foregroundColor(AppColors.secondaryText)
-                                            .padding(.horizontal, 9)
-                                            .padding(.vertical, 4)
-                                            .background(AppColors.secondaryBackground)
-                                            .clipShape(Capsule())
-                                            .lineLimit(1)
-                                            .fixedSize()
                                     }
-                                    .buttonStyle(ApplePressableButtonStyle())
+                                    .fixedSize()
+                                    
+                                    AppSecondaryButton(acc.archived ? "Restore" : "Archive", height: 26) {
+                                        dataStore.archivePropAccount(id: acc.id, archived: !acc.archived, reason: "User toggle archive")
+                                    }
+                                    .fixedSize()
                                 }
                             }
                         }

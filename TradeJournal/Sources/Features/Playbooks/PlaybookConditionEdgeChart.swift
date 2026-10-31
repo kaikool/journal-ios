@@ -189,14 +189,10 @@ public struct PlaybookConditionEdgeChart: View {
             
             if let active = activeStat {
                 if let wr = active.winRate {
-                    Text("\(Int(wr * 100))% WR")
-                        .font(.system(size: 12, weight: .bold))
-                        .monospacedDigit()
-                        .foregroundColor(wr >= 0.5 ? AppColors.profit : AppColors.loss)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background((wr >= 0.5 ? AppColors.profit : AppColors.loss).opacity(0.12))
-                        .clipShape(Capsule())
+                    AppBadge(
+                        "\(Int(wr * 100))% WR",
+                        variant: wr >= 0.5 ? .profit : .loss
+                    )
                 } else {
                     Text("0 trades")
                         .font(AppTypography.caption)
@@ -460,15 +456,11 @@ public struct PlaybookConditionEdgeChart: View {
                     
                     // Win Rate Pill
                     if let wr = stat.winRate {
-                        Text("\(Int(wr * 100))%")
-                            .font(.system(size: 10, weight: .semibold))
-                            .monospacedDigit()
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background((wr >= 0.5 ? AppColors.profit : AppColors.loss).opacity(0.12))
-                            .clipShape(Capsule())
-                            .foregroundColor(wr >= 0.5 ? AppColors.profit : AppColors.loss)
-                            .frame(width: 44, alignment: .center)
+                        AppBadge(
+                            "\(Int(wr * 100))%",
+                            variant: wr >= 0.5 ? .profit : .loss
+                        )
+                        .frame(width: 44, alignment: .center)
                     } else {
                         Text("–")
                             .font(.system(size: 10, weight: .medium))

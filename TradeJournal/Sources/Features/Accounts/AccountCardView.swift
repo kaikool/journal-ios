@@ -73,26 +73,12 @@ public struct AccountCardView: View {
                             #endif
                             dataStore.selectAccount(id: account.id)
                         } label: {
-                            Text("Select")
-                                .font(.system(size: 11, weight: .semibold))
-                                .lineLimit(1)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 5)
-                                .background(AppColors.brand.opacity(0.12))
-                                .foregroundColor(AppColors.brand)
-                                .clipShape(Capsule())
+                            AppBadge("Select", variant: .brand)
                         }
                         .buttonStyle(ApplePressableButtonStyle())
                         .fixedSize()
                     } else {
-                        Text("Viewing")
-                            .font(.system(size: 11, weight: .semibold))
-                            .lineLimit(1)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 5)
-                            .background(AppColors.profit.opacity(0.15))
-                            .foregroundColor(AppColors.profit)
-                            .clipShape(Capsule())
+                        AppBadge("Viewing", variant: .profit)
                             .fixedSize()
                     }
                 }
@@ -209,12 +195,6 @@ public struct AccountCardView: View {
     }
     
     private func badgeView(_ text: String, color: Color) -> some View {
-        Text(text)
-            .font(.system(size: 10, weight: .semibold))
-            .padding(.horizontal, 7)
-            .padding(.vertical, 3)
-            .background(color.opacity(0.12))
-            .foregroundColor(color)
-            .clipShape(Capsule())
+        AppBadge(text, color: color)
     }
 }

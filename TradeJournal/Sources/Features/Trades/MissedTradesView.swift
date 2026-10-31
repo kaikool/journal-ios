@@ -88,13 +88,10 @@ public struct MissedTradesView: View {
                     .font(AppTypography.headline)
                     .foregroundColor(AppColors.primaryText)
                 
-                Text(trade.direction.uppercased())
-                    .font(.system(size: 9, weight: .bold))
-                    .foregroundColor(trade.direction.lowercased() == "long" ? AppColors.brand : AppColors.warning)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background((trade.direction.lowercased() == "long" ? AppColors.brand : AppColors.warning).opacity(0.12))
-                    .clipShape(Capsule())
+                AppBadge(
+                    trade.direction.uppercased(),
+                    variant: trade.direction.lowercased() == "long" ? .brand : .warning
+                )
                 
                 if let pbId = trade.playbookId, let pb = dataStore.playbooks.first(where: { $0.id == pbId }) {
                     AppBadge(text: pb.name, color: AppColors.secondaryText)
@@ -299,22 +296,8 @@ public struct AddMissedTradeSheet: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 6) {
                         ForEach(Self.quickSymbols, id: \.self) { sym in
-                            Button {
-                                #if canImport(UIKit)
-                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                #endif
+                            AppFilterChip(sym, isSelected: symbol == sym, height: 28) {
                                 symbol = sym
-                            } label: {
-                                Text(sym)
-                                    .font(.system(size: 11, weight: symbol == sym ? .bold : .medium))
-                                    .foregroundColor(symbol == sym ? AppColors.brand : AppColors.secondaryText)
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 5)
-                                    .background(symbol == sym ? AppColors.brand.opacity(0.14) : AppColors.secondaryBackground)
-                                    .clipShape(Capsule())
-                                    .overlay(
-                                        Capsule().stroke(symbol == sym ? AppColors.brand.opacity(0.4) : AppColors.border.opacity(0.5), lineWidth: 0.6)
-                                    )
                             }
                         }
                     }

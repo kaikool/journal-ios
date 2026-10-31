@@ -94,29 +94,12 @@ extension PropFirmLedgerView {
                                 
                                 HStack(spacing: 8) {
                                     if m.kind == "expense" {
-                                        Button {
-                                            #if canImport(UIKit)
-                                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                            #endif
+                                        AppPrimaryButton("Fee refund", icon: "arrow.counterclockwise", height: 26) {
                                             if let entry = dataStore.propEntries.first(where: { $0.id == m.entryId }) {
                                                 selectedExpenseForRefund = entry
                                             }
-                                        } label: {
-                                            HStack(spacing: 3) {
-                                                Image(systemName: "arrow.counterclockwise")
-                                                    .font(.system(size: 10))
-                                                Text("Fee refund")
-                                            }
-                                            .font(.system(size: 11, weight: .semibold))
-                                            .foregroundColor(AppColors.brand)
-                                            .padding(.horizontal, 8)
-                                            .padding(.vertical, 3)
-                                            .background(AppColors.brand.opacity(0.12))
-                                            .clipShape(Capsule())
-                                            .lineLimit(1)
-                                            .fixedSize()
                                         }
-                                        .buttonStyle(ApplePressableButtonStyle())
+                                        .fixedSize()
                                     }
                                     
                                     ModalDeleteButton {

@@ -200,24 +200,10 @@ public struct TradeReplayLandscapeChartView: View {
                     default: return res.rawValue.uppercased()
                     }
                 }()
-                Button {
+                AppFilterChip(title, isSelected: isSelected, height: 28) {
                     guard selectedResolution != res else { return }
                     selectedResolution = res
-                } label: {
-                    Text(title)
-                        .font(.system(size: 11.5, weight: .semibold, design: .rounded))
-                        .lineLimit(1)
-                        .fixedSize()
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 4.5)
-                        .background(isSelected ? AppColors.brand : AppColors.secondaryBackground)
-                        .foregroundColor(isSelected ? .white : AppColors.secondaryText)
-                        .clipShape(Capsule())
-                        .overlay(
-                            Capsule().stroke(isSelected ? AppColors.brand : AppColors.border.opacity(0.5), lineWidth: 0.8)
-                        )
                 }
-                .buttonStyle(ApplePressableButtonStyle())
             }
             
             Spacer()
@@ -227,23 +213,16 @@ public struct TradeReplayLandscapeChartView: View {
                 let isBull = t == .bullish || t == .strongBullish
                 let isBear = t == .bearish || t == .strongBearish
                 let color = isBull ? AppColors.profit : (isBear ? AppColors.loss : AppColors.warning)
+                let icon = isBull ? "arrow.up" : (isBear ? "arrow.down" : "arrow.left.and.right")
+                let cleanLabel = t.label
+                    .replacingOccurrences(of: " ▲▲", with: "")
+                    .replacingOccurrences(of: " ▲", with: "")
+                    .replacingOccurrences(of: " ▼▼", with: "")
+                    .replacingOccurrences(of: " ▼", with: "")
+                    .replacingOccurrences(of: " ⇄", with: "")
+                    .replacingOccurrences(of: " ▬", with: "")
                 
-                HStack(spacing: 4) {
-                    Text(isBull ? "▲" : (isBear ? "▼" : "⇄"))
-                        .font(.system(size: 8.5, weight: .bold))
-                    Text(t.label.replacingOccurrences(of: " ▲▲", with: "")
-                                .replacingOccurrences(of: " ▲", with: "")
-                                .replacingOccurrences(of: " ▼▼", with: "")
-                                .replacingOccurrences(of: " ▼", with: "")
-                                .replacingOccurrences(of: " ⇄", with: "")
-                                .replacingOccurrences(of: " ▬", with: ""))
-                        .font(.system(size: 9.5, weight: .bold))
-                }
-                .padding(.horizontal, 7)
-                .padding(.vertical, 2.5)
-                .background(color.opacity(0.12))
-                .foregroundColor(color)
-                .clipShape(Capsule())
+                AppBadge(cleanLabel, icon: icon, color: color)
             }
         }
     }
@@ -300,7 +279,7 @@ public struct TradeReplayLandscapeChartView: View {
                     .background(AppColors.secondaryBackground)
                     .clipShape(Circle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ApplePressableButtonStyle())
             .disabled(bars.isEmpty)
             .accessibilityLabel("Reset Replay")
             
@@ -318,7 +297,7 @@ public struct TradeReplayLandscapeChartView: View {
                     .background(AppColors.secondaryBackground)
                     .clipShape(Circle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ApplePressableButtonStyle())
             .disabled(currentStep <= 1 || bars.isEmpty)
             .accessibilityLabel("Step Backward")
             
@@ -337,7 +316,7 @@ public struct TradeReplayLandscapeChartView: View {
                     .clipShape(Circle())
                     .shadow(color: AppColors.brand.opacity(0.35), radius: 4, x: 0, y: 2)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ApplePressableButtonStyle())
             .disabled(bars.isEmpty)
             .accessibilityLabel(isPlaying ? "Pause" : "Play")
             
@@ -355,7 +334,7 @@ public struct TradeReplayLandscapeChartView: View {
                     .background(AppColors.secondaryBackground)
                     .clipShape(Circle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ApplePressableButtonStyle())
             .disabled(currentStep >= bars.count || bars.isEmpty)
             .accessibilityLabel("Step Forward")
             
@@ -373,7 +352,7 @@ public struct TradeReplayLandscapeChartView: View {
                     .background(AppColors.secondaryBackground)
                     .clipShape(Circle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ApplePressableButtonStyle())
             .disabled(bars.isEmpty)
             .accessibilityLabel("Forward To End")
             

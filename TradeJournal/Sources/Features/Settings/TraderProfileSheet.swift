@@ -198,20 +198,15 @@ public struct TraderProfileSheet: View {
     // MARK: - 5. Save Button Section
     private var saveButtonSection: some View {
         VStack(spacing: 8) {
-            Button(action: saveProfile) {
-                HStack(spacing: 6) {
-                    Image(systemName: showSavedToast ? "checkmark" : "square.and.arrow.down")
-                        .font(.system(size: 13, weight: .semibold))
-                    Text(showSavedToast ? "Profile Saved" : "Save Profile")
-                        .font(.system(size: 13, weight: .bold))
-                }
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .frame(height: 42)
-                .background(showSavedToast ? AppColors.profit : AppColors.brand)
-                .cornerRadius(10)
+            AppPrimaryButton(
+                showSavedToast ? "Profile Saved" : "Save Profile",
+                icon: showSavedToast ? "checkmark" : "square.and.arrow.down",
+                fullWidth: true,
+                height: 42
+            ) {
+                guard !showSavedToast else { return }
+                saveProfile()
             }
-            .disabled(showSavedToast)
         }
     }
     

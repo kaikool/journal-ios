@@ -28,67 +28,32 @@ public struct PreTradeActionBar: View {
     public var body: some View {
         HStack(spacing: 8) {
             // Save to Notebook
-            Button(action: onSaveNotebook) {
-                HStack(spacing: 5) {
-                    Image(systemName: isSavedToNotebook ? "checkmark" : "bookmark")
-                        .font(.system(size: 11, weight: .semibold))
-                    Text(isSavedToNotebook ? "Saved" : "Save Note")
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
-                }
-                .foregroundColor(isSavedToNotebook ? AppColors.profit : AppColors.primaryText)
-                .frame(maxWidth: .infinity)
-                .frame(height: 36)
-                .background(AppColors.secondaryBackground)
-                .clipShape(Capsule())
-                .overlay(
-                    Capsule()
-                        .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
-                )
-            }
-            .buttonStyle(ApplePressableButtonStyle())
-            .disabled(isSavedToNotebook)
+            AppSecondaryButton(
+                isSavedToNotebook ? "Saved" : "Save Note",
+                icon: isSavedToNotebook ? "checkmark" : "bookmark",
+                isEnabled: !isSavedToNotebook,
+                fullWidth: true,
+                height: 36,
+                action: onSaveNotebook
+            )
             
             // Link to Trade (available when note is saved)
             if isSavedToNotebook, let linkAction = onLinkTicket {
-                Button(action: linkAction) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "link")
-                            .font(.system(size: 11, weight: .semibold))
-                        Text("Link Trade")
-                            .font(.system(size: 12, weight: .semibold, design: .rounded))
-                    }
-                    .foregroundColor(AppColors.primaryText)
-                    .padding(.horizontal, 12)
-                    .frame(height: 36)
-                    .background(AppColors.secondaryBackground)
-                    .clipShape(Capsule())
-                    .overlay(
-                        Capsule()
-                            .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
-                    )
-                }
-                .buttonStyle(ApplePressableButtonStyle())
+                AppSecondaryButton(
+                    "Link Trade",
+                    icon: "link",
+                    height: 36,
+                    action: linkAction
+                )
             }
             
             // Copy
-            Button(action: onCopy) {
-                HStack(spacing: 4) {
-                    Image(systemName: showCopiedAlert ? "checkmark" : "doc.on.doc")
-                        .font(.system(size: 11, weight: .semibold))
-                    Text(showCopiedAlert ? "Copied" : "Copy")
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
-                }
-                .foregroundColor(AppColors.primaryText)
-                .padding(.horizontal, 14)
-                .frame(height: 36)
-                .background(AppColors.secondaryBackground)
-                .clipShape(Capsule())
-                .overlay(
-                    Capsule()
-                        .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
-                )
-            }
-            .buttonStyle(ApplePressableButtonStyle())
+            AppSecondaryButton(
+                showCopiedAlert ? "Copied" : "Copy",
+                icon: showCopiedAlert ? "checkmark" : "doc.on.doc",
+                height: 36,
+                action: onCopy
+            )
             
             // Regenerate
             AppIconPodButton(icon: "arrow.clockwise", size: 36, label: "Regenerate", action: onRegenerate)

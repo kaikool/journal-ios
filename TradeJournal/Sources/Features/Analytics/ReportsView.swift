@@ -320,13 +320,10 @@ public struct ReportsView: View {
                         VStack(spacing: 6) {
                             ForEach(trades.prefix(30)) { t in
                                 HStack(spacing: 8) {
-                                    Text(t.status.rawValue.uppercased())
-                                        .font(.system(size: 8.5, weight: .bold))
-                                        .padding(.horizontal, 5)
-                                        .padding(.vertical, 2)
-                                        .background(t.netPnl >= 0 ? AppColors.profit.opacity(0.12) : AppColors.loss.opacity(0.12))
-                                        .foregroundColor(t.netPnl >= 0 ? AppColors.profit : AppColors.loss)
-                                        .clipShape(Capsule())
+                                    AppBadge(
+                                        t.status.rawValue.uppercased(),
+                                        color: t.netPnl >= 0 ? AppColors.profit : AppColors.loss
+                                    )
                                     
                                     Text(t.symbol)
                                         .font(.system(size: 13, weight: .semibold, design: .rounded))

@@ -287,23 +287,20 @@ public struct NoteAIInquirySheet: View {
     
     private var inputArea: some View {
         HStack(spacing: 8) {
-            TextField("Ask AI about this note, execution, or plan...", text: $inputText)
-                .font(AppTypography.body)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(AppColors.secondaryBackground)
-                .cornerRadius(18)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 18)
-                        .stroke(AppColors.border.opacity(0.6), lineWidth: 0.5)
-                )
-                .onSubmit { submitInquiry() }
+            AppFormField(
+                text: $inputText,
+                placeholder: "Ask AI about this note, execution, or plan...",
+                icon: "sparkles",
+                height: 38
+            )
+            .onSubmit { submitInquiry() }
             
             Button(action: submitInquiry) {
                 Image(systemName: "arrow.up.circle.fill")
-                    .font(.system(size: 28))
+                    .font(.system(size: 32))
                     .foregroundColor(inputText.trimmingCharacters(in: .whitespaces).isEmpty ? AppColors.secondaryText.opacity(0.4) : AppColors.brand)
             }
+            .buttonStyle(ApplePressableButtonStyle())
             .disabled(inputText.trimmingCharacters(in: .whitespaces).isEmpty || isLoading)
         }
         .padding(10)

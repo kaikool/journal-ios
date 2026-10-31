@@ -189,13 +189,10 @@ extension DashboardView {
                                 HStack(spacing: 8) {
                                     AppBadge(t.status.rawValue.uppercased(), color: Formatters.statusColor(t.status))
                                     
-                                    Text(t.direction == .long ? "BUY" : "SELL")
-                                        .font(.system(size: 9, weight: .bold))
-                                        .foregroundColor(t.direction == .long ? AppColors.brand : AppColors.warning)
-                                        .padding(.horizontal, 5)
-                                        .padding(.vertical, 2)
-                                        .background((t.direction == .long ? AppColors.brand : AppColors.warning).opacity(0.12))
-                                        .clipShape(Capsule())
+                                    AppBadge(
+                                        t.direction == .long ? "BUY" : "SELL",
+                                        variant: t.direction == .long ? .brand : .warning
+                                    )
                                     
                                     Text(t.symbol)
                                         .font(.system(size: 13, weight: .bold))

@@ -183,14 +183,16 @@ public struct TradeDetailDisciplineCard: View {
             
             if showAddMistakeInput {
                 HStack(spacing: 6) {
-                    TextField("Custom mistake...", text: $newMistake)
-                        .font(AppTypography.caption)
-                        .padding(.horizontal, 8)
-                        .frame(height: 32)
-                        .background(AppColors.secondaryBackground)
-                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    AppFormField(
+                        text: $newMistake,
+                        placeholder: "Custom mistake...",
+                        height: 32
+                    )
                     
-                    Button("Add") {
+                    AppDestructiveButton(
+                        "Add",
+                        height: 32
+                    ) {
                         let clean = newMistake.trimmingCharacters(in: .whitespaces)
                         if !clean.isEmpty && !trade.mistakes.contains(clean) {
                             trade.mistakes.append(clean)
@@ -198,13 +200,6 @@ public struct TradeDetailDisciplineCard: View {
                             onUpdate()
                         }
                     }
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
-                    .padding(.horizontal, 12)
-                    .frame(height: 32)
-                    .background(AppColors.loss)
-                    .foregroundColor(.white)
-                    .clipShape(Capsule())
-                    .buttonStyle(ApplePressableButtonStyle())
                 }
                 .padding(.top, 2)
             }
@@ -263,14 +258,16 @@ public struct TradeDetailDisciplineCard: View {
             
             if showAddTagInput {
                 HStack(spacing: 6) {
-                    TextField("Custom tag...", text: $newTag)
-                        .font(AppTypography.caption)
-                        .padding(.horizontal, 8)
-                        .frame(height: 32)
-                        .background(AppColors.secondaryBackground)
-                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    AppFormField(
+                        text: $newTag,
+                        placeholder: "Custom tag...",
+                        height: 32
+                    )
                     
-                    Button("Add") {
+                    AppPrimaryButton(
+                        "Add",
+                        height: 32
+                    ) {
                         let clean = newTag.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: "#", with: "")
                         if !clean.isEmpty && !trade.tags.contains(clean) {
                             trade.tags.append(clean)
@@ -278,13 +275,6 @@ public struct TradeDetailDisciplineCard: View {
                             onUpdate()
                         }
                     }
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
-                    .padding(.horizontal, 12)
-                    .frame(height: 32)
-                    .background(AppColors.brand)
-                    .foregroundColor(.white)
-                    .clipShape(Capsule())
-                    .buttonStyle(ApplePressableButtonStyle())
                 }
                 .padding(.top, 2)
             }

@@ -101,30 +101,14 @@ public struct NewPlaybookSheet: View {
                 }
                 
                 // Explicit Add Rule button
-                Button {
-                    #if canImport(UIKit)
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    #endif
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
-                        rules.append("")
-                    }
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "plus.circle")
-                        Text("Add rule condition")
-                    }
-                    .font(.system(size: 12.5, weight: .semibold, design: .rounded))
-                    .foregroundColor(AppColors.brand)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 38)
-                    .background(AppColors.brand.opacity(0.06))
-                    .clipShape(Capsule())
-                    .overlay(
-                        Capsule()
-                            .stroke(AppColors.brand.opacity(0.3), style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
-                    )
+                AppButton(
+                    "Add rule condition",
+                    icon: "plus.circle",
+                    style: .outline,
+                    fullWidth: true
+                ) {
+                    rules.append("")
                 }
-                .buttonStyle(ApplePressableButtonStyle())
                 .padding(.top, 4)
             }
         }
@@ -311,30 +295,14 @@ public struct EditPlaybookSheet: View {
                     }
                 }
                 
-                Button {
-                    #if canImport(UIKit)
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    #endif
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
-                        rules.append("")
-                    }
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "plus.circle")
-                        Text("Add rule condition")
-                    }
-                    .font(.system(size: 12.5, weight: .semibold, design: .rounded))
-                    .foregroundColor(AppColors.brand)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 38)
-                    .background(AppColors.brand.opacity(0.06))
-                    .clipShape(Capsule())
-                    .overlay(
-                        Capsule()
-                            .stroke(AppColors.brand.opacity(0.3), style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
-                    )
+                AppButton(
+                    "Add rule condition",
+                    icon: "plus.circle",
+                    style: .outline,
+                    fullWidth: true
+                ) {
+                    rules.append("")
                 }
-                .buttonStyle(ApplePressableButtonStyle())
                 .padding(.top, 4)
             }
         }

@@ -395,14 +395,10 @@ private struct TradeTerminalRow: View {
                     .foregroundColor(AppColors.primaryText)
                     .lineLimit(1)
                 
-                Text(trade.direction == .long ? "LONG" : "SHORT")
-                    .font(.system(size: 9, weight: .heavy))
-                    .foregroundColor(trade.direction == .long ? AppColors.brand : AppColors.warning)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background((trade.direction == .long ? AppColors.brand : AppColors.warning).opacity(0.12))
-                    .clipShape(Capsule())
-                    .lineLimit(1)
+                AppBadge(
+                    trade.direction == .long ? "LONG" : "SHORT",
+                    variant: trade.direction == .long ? .brand : .warning
+                )
                 
                 AppBadge(
                     trade.status.rawValue.uppercased(),
@@ -487,29 +483,11 @@ private struct TradeTerminalRow: View {
         HStack(alignment: .center, spacing: 6) {
             HStack(spacing: 4) {
                 if let setup = playbookName {
-                    HStack(spacing: 3) {
-                        Image(systemName: "bookmark.fill")
-                            .font(.system(size: 9))
-                        Text(setup)
-                    }
-                    .font(.system(size: 10, weight: .medium))
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(AppColors.brand.opacity(0.10))
-                    .foregroundColor(AppColors.brand)
-                    .clipShape(Capsule())
-                    .lineLimit(1)
+                    AppBadge(setup, icon: "bookmark.fill", variant: .brand)
                 }
                 
                 ForEach(trade.tags.prefix(2), id: \.self) { tag in
-                    Text("#\(tag)")
-                        .font(.system(size: 10, weight: .medium))
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(AppColors.secondaryBackground)
-                        .foregroundColor(AppColors.secondaryText)
-                        .clipShape(Capsule())
-                        .lineLimit(1)
+                    AppTag(tag, color: AppColors.secondaryText, prefix: "#")
                 }
             }
             

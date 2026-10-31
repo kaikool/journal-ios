@@ -94,25 +94,9 @@ public struct TradeSymbolSelector: View {
                     HStack(spacing: 6) {
                         ForEach(activeList, id: \.self) { sym in
                             let isSelected = symbol.uppercased() == sym
-                            Button {
-                                #if canImport(UIKit)
-                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                #endif
+                            AppFilterChip(sym, isSelected: isSelected, height: 26) {
                                 symbol = sym
-                            } label: {
-                                Text(sym)
-                                    .font(.system(size: 11, weight: isSelected ? .bold : .medium))
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 5)
-                                    .background(isSelected ? AppColors.brand : AppColors.secondaryBackground)
-                                    .foregroundColor(isSelected ? .white : AppColors.primaryText)
-                                    .clipShape(Capsule())
-                                    .overlay(
-                                        Capsule()
-                                            .stroke(isSelected ? Color.clear : AppColors.border.opacity(0.7), lineWidth: 0.5)
-                                    )
                             }
-                            .buttonStyle(.plain)
                         }
                     }
                     .padding(.vertical, 2)
@@ -250,16 +234,7 @@ public struct TradeTimestampsCard: View {
     }
     
     private func presetButton(_ label: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(label)
-                .font(.system(size: 10, weight: .semibold))
-                .padding(.horizontal, 7)
-                .padding(.vertical, 3)
-                .background(AppColors.secondaryBackground)
-                .foregroundColor(AppColors.secondaryText)
-                .clipShape(Capsule())
-        }
-        .buttonStyle(.plain)
+        AppFilterChip(label, isSelected: false, height: 24, action: action)
     }
 }
 
@@ -498,34 +473,20 @@ public struct TradeDisciplineAndNotesCard: View {
                     }
                     
                     HStack {
-                        TextField("Add a tag (e.g. breakout)", text: $tagInput)
-                            .font(AppTypography.inputText)
-                            .padding(8)
-                            .background(AppColors.secondaryBackground)
-                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                    .stroke(AppColors.border.opacity(0.6), lineWidth: 0.5)
-                            )
+                        AppFormField(
+                            text: $tagInput,
+                            placeholder: "Add a tag (e.g. breakout)",
+                            height: 36
+                        )
                         
-                        Button("Add") {
+                        AppSecondaryButton("Add", height: 36) {
                             let clean = tagInput.trimmingCharacters(in: .whitespacesAndNewlines)
                             if !clean.isEmpty && !tags.contains(clean) {
                                 tags.append(clean)
                                 tagInput = ""
                             }
                         }
-                        .font(.system(size: 12.5, weight: .semibold, design: .rounded))
-                        .foregroundColor(AppColors.brand)
-                        .padding(.horizontal, 14)
-                        .frame(height: 36)
-                        .background(AppColors.brand.opacity(0.12))
-                        .clipShape(Capsule())
-                        .overlay(
-                            Capsule().stroke(AppColors.brand.opacity(0.25), lineWidth: 0.8)
-                        )
                     }
-                    .buttonStyle(ApplePressableButtonStyle())
                 }
                 
                 // Notes multiline editor with Office-style formatting & preview

@@ -148,67 +148,19 @@ public struct AccountsManagerView: View {
                     .foregroundColor(AppColors.secondaryText)
                     .lineLimit(1)
                 
-                Button {
-                    #if canImport(UIKit)
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    #endif
+                AppSecondaryButton("Active only", height: 28) {
                     dataStore.setBulkAccountVisibility(action: "select-active")
-                } label: {
-                    Text("Active only")
-                        .font(.system(size: 11, weight: .semibold))
-                        .lineLimit(1)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(AppColors.cardBackground)
-                        .foregroundColor(AppColors.primaryText)
-                        .clipShape(Capsule())
-                        .overlay(
-                            Capsule().stroke(AppColors.border.opacity(0.5), lineWidth: 0.5)
-                        )
                 }
-                .buttonStyle(ApplePressableButtonStyle())
                 .fixedSize()
                 
-                Button {
-                    #if canImport(UIKit)
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    #endif
+                AppSecondaryButton("Show all", height: 28) {
                     dataStore.setBulkAccountVisibility(action: "select-all")
-                } label: {
-                    Text("Show all")
-                        .font(.system(size: 11, weight: .semibold))
-                        .lineLimit(1)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(AppColors.cardBackground)
-                        .foregroundColor(AppColors.primaryText)
-                        .clipShape(Capsule())
-                        .overlay(
-                            Capsule().stroke(AppColors.border.opacity(0.5), lineWidth: 0.5)
-                        )
                 }
-                .buttonStyle(ApplePressableButtonStyle())
                 .fixedSize()
                 
-                Button {
-                    #if canImport(UIKit)
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    #endif
+                AppSecondaryButton("Hide all", height: 28) {
                     dataStore.setBulkAccountVisibility(action: "deselect-all")
-                } label: {
-                    Text("Hide all")
-                        .font(.system(size: 11, weight: .semibold))
-                        .lineLimit(1)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(AppColors.cardBackground)
-                        .foregroundColor(AppColors.secondaryText)
-                        .clipShape(Capsule())
-                        .overlay(
-                            Capsule().stroke(AppColors.border.opacity(0.5), lineWidth: 0.5)
-                        )
                 }
-                .buttonStyle(ApplePressableButtonStyle())
                 .fixedSize()
             }
             .padding(.horizontal, 16)
@@ -245,25 +197,9 @@ public struct AccountsManagerView: View {
                 Spacer()
                 
                 if isAllSelected {
-                    HStack(spacing: 4) {
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 9, weight: .bold))
-                        Text("Active View")
-                            .font(.system(size: 11, weight: .semibold))
-                    }
-                    .padding(.horizontal, 9)
-                    .padding(.vertical, 4)
-                    .background(AppColors.profit.opacity(0.12))
-                    .foregroundColor(AppColors.profit)
-                    .clipShape(Capsule())
+                    AppBadge("Active View", icon: "checkmark", variant: .profit)
                 } else {
-                    Text("Select All")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(AppColors.brand)
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 4)
-                        .background(AppColors.brand.opacity(0.10))
-                        .clipShape(Capsule())
+                    AppBadge("Select All", variant: .brand)
                 }
             }
             .padding(.horizontal, 14)

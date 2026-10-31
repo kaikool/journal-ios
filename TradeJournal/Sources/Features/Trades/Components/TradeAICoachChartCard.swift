@@ -60,20 +60,11 @@ public struct TradeAICoachChartCard: View {
                     HStack(spacing: 4) {
                         ForEach(resolutions, id: \.0) { tf in
                             let isSelected = selectedResolution == tf.0
-                            Button(action: {
+                            AppFilterChip(tf.1, isSelected: isSelected, height: 26) {
                                 guard selectedResolution != tf.0 else { return }
                                 selectedResolution = tf.0
                                 onResolutionChanged(tf.0)
-                            }) {
-                                Text(tf.1)
-                                    .font(.system(size: 10, weight: isSelected ? .bold : .medium))
-                                    .foregroundColor(isSelected ? .white : AppColors.secondaryText)
-                                    .padding(.horizontal, 7)
-                                    .padding(.vertical, 3)
-                                    .background(isSelected ? AppColors.brand : AppColors.secondaryBackground)
-                                    .clipShape(Capsule())
                             }
-                            .buttonStyle(.plain)
                         }
                     }
                 }
@@ -136,20 +127,12 @@ public struct TradeAICoachChartCard: View {
                     
                     Spacer()
                     
-                    Button(action: onUpload) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "photo.badge.plus")
-                                .font(.system(size: 11))
-                            Text("Upload Screenshot")
-                                .font(.system(size: 11, weight: .medium))
-                        }
-                        .foregroundColor(AppColors.secondaryText)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(AppColors.secondaryBackground)
-                        .clipShape(Capsule())
-                    }
-                    .buttonStyle(.plain)
+                    AppSecondaryButton(
+                        "Upload Screenshot",
+                        icon: "photo.badge.plus",
+                        height: 28,
+                        action: onUpload
+                    )
                 }
             }
             .padding(.vertical, 2)

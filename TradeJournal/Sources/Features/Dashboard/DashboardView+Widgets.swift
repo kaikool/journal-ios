@@ -34,7 +34,7 @@ internal struct DashboardCardWrapper<Content: View>: View {
                             .font(.system(size: 16))
                             .foregroundColor(AppColors.brand)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ApplePressableButtonStyle())
                     
                     // Move Down Button
                     Button {
@@ -44,7 +44,7 @@ internal struct DashboardCardWrapper<Content: View>: View {
                             .font(.system(size: 16))
                             .foregroundColor(AppColors.brand)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ApplePressableButtonStyle())
                     
                     // Hide Button
                     Button {
@@ -54,7 +54,7 @@ internal struct DashboardCardWrapper<Content: View>: View {
                             .font(.system(size: 16))
                             .foregroundColor(AppColors.loss)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ApplePressableButtonStyle())
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 5)

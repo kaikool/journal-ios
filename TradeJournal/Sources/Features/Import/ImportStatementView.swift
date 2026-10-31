@@ -249,13 +249,10 @@ public struct ImportStatementView: View {
                                                         Text(fill.symbol)
                                                             .font(AppTypography.bodyBold)
                                                             .foregroundColor(AppColors.primaryText)
-                                                        Text(fill.side.rawValue.uppercased())
-                                                            .font(.system(size: 9, weight: .bold))
-                                                            .foregroundColor(fill.side == .buy ? AppColors.brand : AppColors.warning)
-                                                            .padding(.horizontal, 6)
-                                                            .padding(.vertical, 2)
-                                                            .background((fill.side == .buy ? AppColors.brand : AppColors.warning).opacity(0.12))
-                                                            .clipShape(Capsule())
+                                                        AppBadge(
+                                                            fill.side.rawValue.uppercased(),
+                                                            variant: fill.side == .buy ? .brand : .warning
+                                                        )
                                                     }
                                                     Text("Qty: \(Formatters.formatNumber(fill.quantity)) @ \(Formatters.price(fill.price))")
                                                         .font(AppTypography.caption)
