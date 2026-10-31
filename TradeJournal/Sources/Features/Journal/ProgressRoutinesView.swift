@@ -446,70 +446,38 @@ public struct AddProgressRoutineSheet: View {
     
     public var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                // Header Bar
-                headerBar
-                
-                Divider()
-                    .background(AppColors.border.opacity(0.5))
-                
-                ScrollView {
-                    VStack(spacing: 14) {
-                        // Card 1: Routine Title & Suggestions
-                        routineTitleCard
-                        
-                        // Card 2: Execution Stage Selector
-                        stageSelectionCard
-                        
-                        // Card 3: Scheduled Days
-                        scheduledDaysCard
+            ScrollView {
+                VStack(spacing: 14) {
+                    // Card 1: Routine Title & Suggestions
+                    routineTitleCard
+                    
+                    // Card 2: Execution Stage Selector
+                    stageSelectionCard
+                    
+                    // Card 3: Scheduled Days
+                    scheduledDaysCard
+                }
+                .padding(16)
+                .padding(.bottom, 24)
+            }
+            .scrollDismissesKeyboard(.interactively)
+            .background(AppColors.background)
+            .navigationTitle(routineToEdit == nil ? "New Routine" : "Edit Routine")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    ModalSecondaryButton("Cancel") {
+                        dismiss()
                     }
-                    .padding(16)
-                    .padding(.bottom, 24)
+                }
+                
+                ToolbarItem(placement: .confirmationAction) {
+                    ModalPrimaryButton(routineToEdit == nil ? "Add" : "Save", isEnabled: isFormValid) {
+                        saveRoutine()
+                    }
                 }
             }
-            .background(AppColors.background)
         }
-    }
-    
-    // MARK: - Header Bar
-    private var headerBar: some View {
-        HStack(alignment: .center) {
-            Button {
-                #if canImport(UIKit)
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                #endif
-                dismiss()
-            } label: {
-                Text("Cancel")
-                    .font(AppTypography.body)
-                    .foregroundColor(AppColors.secondaryText)
-            }
-            
-            Spacer()
-            
-            Text(routineToEdit == nil ? "NEW ROUTINE" : "EDIT ROUTINE")
-                .font(.system(size: 13, weight: .bold))
-                .foregroundColor(AppColors.primaryText)
-                .tracking(0.5)
-            
-            Spacer()
-            
-            Button {
-                #if canImport(UIKit)
-                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                #endif
-                saveRoutine()
-            } label: {
-                Text(routineToEdit == nil ? "Add" : "Save")
-                    .font(AppTypography.headline)
-                    .foregroundColor(isFormValid ? AppColors.brand : AppColors.secondaryText.opacity(0.5))
-            }
-            .disabled(!isFormValid)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
-        .background(AppColors.cardBackground)
     }
     
     // MARK: - Card 1: Routine Title Card
@@ -759,27 +727,7 @@ public struct ArchivedProgressRoutinesSheet: View {
     
     public var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                // Header
-                HStack {
-                    Text("ARCHIVED ROUTINES")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundColor(AppColors.primaryText)
-                        .tracking(0.5)
-                    Spacer()
-                    Button("Done") {
-                        dismiss()
-                    }
-                    .font(AppTypography.headline)
-                    .foregroundColor(AppColors.brand)
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 14)
-                .background(AppColors.cardBackground)
-                
-                Divider()
-                    .background(AppColors.border.opacity(0.5))
-                
+            Group {
                 if archivedRules.isEmpty {
                     emptyArchivedView
                 } else {
@@ -787,6 +735,15 @@ public struct ArchivedProgressRoutinesSheet: View {
                 }
             }
             .background(AppColors.background)
+            .navigationTitle("Archived Routines")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    ModalPrimaryButton("Done") {
+                        dismiss()
+                    }
+                }
+            }
             .alert("Delete Routine Permanently?", isPresented: $showDeleteAlert, presenting: ruleToDelete) { rule in
                 Button("Delete Permanently", role: .destructive) {
                     dataStore.deleteProgressRule(id: rule.id)

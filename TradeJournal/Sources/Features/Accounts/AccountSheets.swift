@@ -60,12 +60,12 @@ public struct CreateAccountSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
+                    ModalSecondaryButton("Cancel") {
                         dismiss()
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
+                    ModalPrimaryButton("Save", isEnabled: !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) {
                         let bal = Decimal(string: initialBalanceText) ?? 0
                         dataStore.addAccount(
                             name: name.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -76,8 +76,6 @@ public struct CreateAccountSheet: View {
                         )
                         dismiss()
                     }
-                    .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    .font(AppTypography.headline)
                 }
             }
         }
@@ -140,12 +138,12 @@ public struct EditAccountSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
+                    ModalSecondaryButton("Cancel") {
                         dismiss()
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
+                    ModalPrimaryButton("Save", isEnabled: !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) {
                         let bal = Decimal(string: initialBalanceText) ?? account.initialBalance
                         dataStore.updateAccount(
                             id: account.id,
@@ -157,8 +155,6 @@ public struct EditAccountSheet: View {
                         )
                         dismiss()
                     }
-                    .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    .font(AppTypography.headline)
                 }
             }
         }

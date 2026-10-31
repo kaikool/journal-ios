@@ -47,42 +47,42 @@ public struct PlaybookDetailView: View {
     }
     
     public var body: some View {
-        ScrollView {
-            VStack(spacing: 12) {
-                kpiSummaryCard
-                
-                strategyChecklistCard
-                
-                PlaybookConditionEdgeChart(
-                    playbook: currentPlaybook,
-                    trades: trades,
-                    assessments: dataStore.playbookAssessments
-                )
-                
-                deleteButton
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 12) {
+                    kpiSummaryCard
+                    
+                    strategyChecklistCard
+                    
+                    PlaybookConditionEdgeChart(
+                        playbook: currentPlaybook,
+                        trades: trades,
+                        assessments: dataStore.playbookAssessments
+                    )
+                    
+                    deleteButton
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 10)
+                .padding(.bottom, 32)
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 10)
-            .padding(.bottom, 32)
-        }
-        .safeAreaInset(edge: .top, spacing: 0) {
-            FilterBarView(
-                title: currentPlaybook.title,
-                showFilters: false,
-                onBack: { dismiss() },
-                isModal: isModal
-            ) {
-                AppActionPill("Edit", icon: "pencil") {
-                    showEditSheet = true
+            .scrollDismissesKeyboard(.interactively)
+            .background(AppColors.background)
+            .navigationTitle(currentPlaybook.title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    ModalDismissButton { dismiss() }
+                }
+                
+                ToolbarItem(placement: .topBarTrailing) {
+                    HStack(spacing: 8) {
+                        ModalDeleteButton { showDeleteAlert = true }
+                        ModalPrimaryButton("Edit", icon: "pencil") { showEditSheet = true }
+                    }
                 }
             }
         }
-        .background(AppColors.background.ignoresSafeArea())
-        .navigationBarBackButtonHidden(true)
-        .toolbar(.hidden, for: .navigationBar)
-        .interactiveEdgeBack(onBack: isModal ? nil : { dismiss() })
-        .enableNativePopGesture()
-        .background(AppColors.background)
         .sheet(isPresented: $showEditSheet) {
             EditPlaybookSheet(playbook: currentPlaybook)
                 .presentationDetents([.large])

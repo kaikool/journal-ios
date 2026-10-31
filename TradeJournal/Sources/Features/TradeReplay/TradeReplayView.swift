@@ -73,66 +73,70 @@ public struct TradeReplayView: View {
     }
     
     public var body: some View {
-        ScrollView {
-            VStack(spacing: 12) {
-                // Header: Trade info and dynamic replay P&L
-                TradeReplayHeaderCard(
-                    trade: trade,
-                    frame: frame,
-                    bars: bars,
-                    currentStep: currentStep,
-                    isLoadingCandles: isLoadingCandles,
-                    reportingCurrency: env.currentCurrency
-                )
-                
-                // Professional Candlestick Chart (with integrated 15m/1h/4h timeframe selector and pure gesture pinch-zoom)
-                chartCard
-                
-                // Replay Playback Controls (Play/Pause, Step, Speed, Fullscreen)
-                TradeReplayControlsCard(
-                    currentStep: $currentStep,
-                    replaySpeed: $replaySpeed,
-                    isPlaying: isPlaying,
-                    barsCount: bars.count,
-                    currentBar: frame.currentBar,
-                    isLoadingCandles: isLoadingCandles,
-                    timeZone: env.currentTimeZone,
-                    onTogglePlay: togglePlay,
-                    onStep: { delta in step(by: delta) },
-                    onReset: resetReplay,
-                    onForwardToEnd: forwardToEnd,
-                    onSpeedChanged: restartTimerIfPlaying,
-                    onOpenLandscape: { showLandscapeChart = true }
-                )
-                
-                // MAE & MFE Excursion Statistics
-                TradeReplayExcursionCard(
-                    excursionEstimate: excursionEstimate,
-                    isLoadingCandles: isLoadingCandles,
-                    barsCount: bars.count,
-                    reportingCurrency: env.currentCurrency
-                )
-                
-                // Broker Data Notes
-                dataCoverageNote
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 12) {
+                    // Header: Trade info and dynamic replay P&L
+                    TradeReplayHeaderCard(
+                        trade: trade,
+                        frame: frame,
+                        bars: bars,
+                        currentStep: currentStep,
+                        isLoadingCandles: isLoadingCandles,
+                        reportingCurrency: env.currentCurrency
+                    )
+                    
+                    // Professional Candlestick Chart (with integrated 15m/1h/4h timeframe selector and pure gesture pinch-zoom)
+                    chartCard
+                    
+                    // Replay Playback Controls (Play/Pause, Step, Speed, Fullscreen)
+                    TradeReplayControlsCard(
+                        currentStep: $currentStep,
+                        replaySpeed: $replaySpeed,
+                        isPlaying: isPlaying,
+                        barsCount: bars.count,
+                        currentBar: frame.currentBar,
+                        isLoadingCandles: isLoadingCandles,
+                        timeZone: env.currentTimeZone,
+                        onTogglePlay: togglePlay,
+                        onStep: { delta in step(by: delta) },
+                        onReset: resetReplay,
+                        onForwardToEnd: forwardToEnd,
+                        onSpeedChanged: restartTimerIfPlaying,
+                        onOpenLandscape: { showLandscapeChart = true }
+                    )
+                    
+                    // MAE & MFE Excursion Statistics
+                    TradeReplayExcursionCard(
+                        excursionEstimate: excursionEstimate,
+                        isLoadingCandles: isLoadingCandles,
+                        barsCount: bars.count,
+                        reportingCurrency: env.currentCurrency
+                    )
+                    
+                    // Broker Data Notes
+                    dataCoverageNote
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 10)
+                .padding(.bottom, 32)
             }
-            .padding(.horizontal, 14)
-            .padding(.top, 10)
-            .padding(.bottom, 32)
+            .scrollDismissesKeyboard(.interactively)
+            .background(AppColors.background)
+            .navigationTitle("Replay · \(trade.symbol)")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    ModalDismissButton { dismiss() }
+                }
+                
+                ToolbarItem(placement: .topBarTrailing) {
+                    ModalIconButton(icon: "arrow.up.left.and.arrow.down.right", color: AppColors.primaryText, label: "Landscape Fullscreen") {
+                        showLandscapeChart = true
+                    }
+                }
+            }
         }
-        .safeAreaInset(edge: .top, spacing: 0) {
-            FilterBarView(
-                title: "Trade Replay · \(trade.symbol)",
-                showFilters: false,
-                onBack: { dismiss() },
-                isModal: isModal
-            )
-        }
-        .navigationBarBackButtonHidden(true)
-        .toolbar(.hidden, for: .navigationBar)
-        .interactiveEdgeBack(onBack: isModal ? nil : { dismiss() })
-        .enableNativePopGesture()
-        .background(AppColors.background)
         .task(id: "\(trade.id)_\(selectedResolution.rawValue)") {
             await loadMarketCandles()
         }

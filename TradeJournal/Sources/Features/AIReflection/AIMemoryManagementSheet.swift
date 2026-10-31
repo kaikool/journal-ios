@@ -78,28 +78,15 @@ public struct AIMemoryManagementSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") {
+                    ModalDismissButton {
                         dismiss()
                     }
-                    .font(AppTypography.captionBold)
-                    .foregroundColor(AppColors.primaryText)
                 }
                 
                 ToolbarItem(placement: .primaryAction) {
-                    Button(action: { isCreatingMemory = true }) {
-                        Text("Add Rule")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(AppColors.primaryText)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
-                            .background(AppColors.secondaryBackground)
-                            .cornerRadius(6)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .stroke(AppColors.border.opacity(0.8), lineWidth: 0.8)
-                            )
+                    ModalPrimaryButton("Add Rule", icon: "plus") {
+                        isCreatingMemory = true
                     }
-                    .buttonStyle(.plain)
                 }
             }
             .onAppear(perform: reloadMemories)
@@ -686,14 +673,12 @@ private struct AIMemoryEditorSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
+                    ModalSecondaryButton("Cancel") {
                         dismiss()
                     }
-                    .font(AppTypography.captionBold)
-                    .foregroundColor(AppColors.secondaryText)
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
+                    ModalPrimaryButton("Save", isEnabled: isFormValid) {
                         let cleanSym = symbol.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
                         let symOrNil = cleanSym.isEmpty ? nil : cleanSym
                         
@@ -715,9 +700,6 @@ private struct AIMemoryEditorSheet: View {
                         onSave(record)
                         dismiss()
                     }
-                    .font(AppTypography.captionBold)
-                    .foregroundColor(AppColors.brand)
-                    .disabled(!isFormValid)
                 }
             }
         }

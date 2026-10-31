@@ -34,32 +34,15 @@ public struct NewPlaybookSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        #if canImport(UIKit)
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        #endif
+                    ModalSecondaryButton("Cancel") {
                         dismiss()
                     }
-                    .font(.system(size: 15, weight: .regular))
-                    .foregroundColor(AppColors.secondaryText)
                 }
                 
                 ToolbarItem(placement: .confirmationAction) {
-                    Button {
-                        #if canImport(UIKit)
-                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                        #endif
+                    ModalPrimaryButton("Create", isEnabled: !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) {
                         saveAndDismiss()
-                    } label: {
-                        Text("Create")
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundColor(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? AppColors.secondaryText.opacity(0.6) : .white)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 6)
-                            .background(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? AppColors.secondaryBackground : AppColors.brand)
-                            .clipShape(Capsule())
                     }
-                    .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }
         }
@@ -341,32 +324,15 @@ public struct EditPlaybookSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        #if canImport(UIKit)
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        #endif
+                    ModalSecondaryButton("Cancel") {
                         dismiss()
                     }
-                    .font(.system(size: 15, weight: .regular))
-                    .foregroundColor(AppColors.secondaryText)
                 }
                 
                 ToolbarItem(placement: .confirmationAction) {
-                    Button {
-                        #if canImport(UIKit)
-                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                        #endif
+                    ModalPrimaryButton("Save", isEnabled: !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) {
                         saveAndDismiss()
-                    } label: {
-                        Text("Save")
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundColor(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? AppColors.secondaryText.opacity(0.6) : .white)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 6)
-                            .background(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? AppColors.secondaryBackground : AppColors.brand)
-                            .clipShape(Capsule())
                     }
-                    .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }
         }

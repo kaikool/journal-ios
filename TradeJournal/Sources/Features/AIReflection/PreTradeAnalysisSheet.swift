@@ -160,17 +160,8 @@ public struct PreTradeAnalysisSheet: View {
             .navigationTitle("Market Structure Bias")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: { dismiss() }) {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundColor(AppColors.secondaryText)
-                            .frame(width: 28, height: 28)
-                            .background(AppColors.secondaryBackground.opacity(0.8))
-                            .clipShape(Circle())
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                    .accessibilityLabel("Close")
+                ToolbarItem(placement: .topBarLeading) {
+                    ModalDismissButton { dismiss() }
                 }
             }
             .fullScreenCover(isPresented: $showFullScreenChart) {

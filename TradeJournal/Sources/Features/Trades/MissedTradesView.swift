@@ -280,88 +280,56 @@ public struct AddMissedTradeSheet: View {
     
     public var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                // Header Bar
-                headerBar
-                
-                Divider()
-                    .background(AppColors.border.opacity(0.5))
-                
-                ScrollView {
-                    VStack(spacing: 14) {
-                        // Error Banner
-                        if let err = errorMessage {
-                            HStack(spacing: 8) {
-                                Image(systemName: "exclamationmark.triangle.fill")
-                                    .foregroundColor(AppColors.loss)
-                                Text(err)
-                                    .font(AppTypography.caption)
-                                    .foregroundColor(AppColors.loss)
-                                Spacer()
-                            }
-                            .padding(12)
-                            .background(AppColors.loss.opacity(0.12))
-                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            ScrollView {
+                VStack(spacing: 14) {
+                    // Error Banner
+                    if let err = errorMessage {
+                        HStack(spacing: 8) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundColor(AppColors.loss)
+                            Text(err)
+                                .font(AppTypography.caption)
+                                .foregroundColor(AppColors.loss)
+                            Spacer()
                         }
-                        
-                        // Card 1: Opportunity Details
-                        opportunityCard
-                        
-                        // Card 2: Planned Prices & R:R
-                        plannedPricesCard
-                        
-                        // Card 3: Playbook Selection
-                        playbookCard
-                        
-                        // Card 4: Post-Mortem & Notes
-                        notesCard
+                        .padding(12)
+                        .background(AppColors.loss.opacity(0.12))
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                     }
-                    .padding(16)
-                    .padding(.bottom, 24)
+                    
+                    // Card 1: Opportunity Details
+                    opportunityCard
+                    
+                    // Card 2: Planned Prices & R:R
+                    plannedPricesCard
+                    
+                    // Card 3: Playbook Selection
+                    playbookCard
+                    
+                    // Card 4: Post-Mortem & Notes
+                    notesCard
                 }
-                .scrollDismissesKeyboard(.interactively)
+                .padding(16)
+                .padding(.bottom, 24)
             }
+            .scrollDismissesKeyboard(.interactively)
             .background(AppColors.background)
-        }
-    }
-    
-    // MARK: - Header Bar
-    private var headerBar: some View {
-        HStack(alignment: .center) {
-            Button {
-                #if canImport(UIKit)
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                #endif
-                dismiss()
-            } label: {
-                Text("Cancel")
-                    .font(AppTypography.body)
-                    .foregroundColor(AppColors.secondaryText)
-            }
-            
-            Spacer()
-            
-            Text(tradeToEdit == nil ? "LOG MISSED TRADE" : "EDIT MISSED TRADE")
-                .font(.system(size: 13, weight: .bold))
-                .foregroundColor(AppColors.primaryText)
-                .tracking(0.5)
-            
-            Spacer()
-            
-            Button {
-                #if canImport(UIKit)
-                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                #endif
-                save()
-            } label: {
-                Text("Save")
-                    .font(AppTypography.headline)
-                    .foregroundColor(AppColors.brand)
+            .navigationTitle(tradeToEdit == nil ? "Log Opportunity" : "Edit Opportunity")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    ModalSecondaryButton("Cancel") {
+                        dismiss()
+                    }
+                }
+                
+                ToolbarItem(placement: .confirmationAction) {
+                    ModalPrimaryButton("Save") {
+                        save()
+                    }
+                }
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
-        .background(AppColors.cardBackground)
     }
     
     // MARK: - Opportunity Card

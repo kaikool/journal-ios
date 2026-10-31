@@ -168,62 +168,22 @@ public struct TradeDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
-                Button {
-                    #if canImport(UIKit)
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    #endif
-                    dismiss()
-                } label: {
-                    if isModal {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundColor(AppColors.secondaryText)
-                            .frame(width: 28, height: 28)
-                            .background(AppColors.secondaryBackground.opacity(0.85))
-                            .clipShape(Circle())
-                    } else {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(AppColors.brand)
-                    }
+                if isModal {
+                    ModalDismissButton { dismiss() }
+                } else {
+                    ModalBackButton { dismiss() }
                 }
-                .buttonStyle(PlainButtonStyle())
-                .accessibilityLabel(isModal ? "Close" : "Back")
             }
             
             ToolbarItem(placement: .topBarTrailing) {
                 HStack(spacing: 8) {
-                    Button {
-                        #if canImport(UIKit)
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        #endif
+                    ModalIconButton(icon: "sparkles", color: AppColors.brand, label: "AI Coach") {
                         showAICoachSheet = true
-                    } label: {
-                        Image(systemName: "sparkles")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(AppColors.brand)
-                            .frame(width: 28, height: 28)
-                            .background(AppColors.brand.opacity(0.12))
-                            .clipShape(Circle())
                     }
-                    .buttonStyle(PlainButtonStyle())
-                    .accessibilityLabel("AI Coach")
                     
-                    Button {
-                        #if canImport(UIKit)
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        #endif
+                    ModalIconButton(icon: "pencil", color: AppColors.secondaryText, label: "Edit trade") {
                         showEditTradeSheet = true
-                    } label: {
-                        Image(systemName: "pencil")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundColor(AppColors.secondaryText)
-                            .frame(width: 28, height: 28)
-                            .background(AppColors.secondaryBackground.opacity(0.85))
-                            .clipShape(Circle())
                     }
-                    .buttonStyle(PlainButtonStyle())
-                    .accessibilityLabel("Edit trade")
                 }
             }
         }

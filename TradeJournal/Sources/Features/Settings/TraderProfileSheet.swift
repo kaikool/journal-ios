@@ -47,19 +47,15 @@ public struct TraderProfileSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") {
+                    ModalDismissButton {
                         dismiss()
                     }
-                    .font(AppTypography.captionBold)
-                    .foregroundColor(AppColors.secondaryText)
                 }
                 
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
+                    ModalPrimaryButton("Save") {
                         saveProfile()
                     }
-                    .font(AppTypography.captionBold)
-                    .foregroundColor(AppColors.brand)
                 }
             }
             .onAppear {

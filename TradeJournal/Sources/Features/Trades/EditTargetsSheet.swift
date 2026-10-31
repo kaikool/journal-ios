@@ -126,30 +126,14 @@ public struct EditTargetsSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        #if canImport(UIKit)
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        #endif
+                    ModalSecondaryButton("Cancel") {
                         dismiss()
                     }
-                    .font(.system(size: 15, weight: .regular))
-                    .foregroundColor(AppColors.secondaryText)
                 }
                 
                 ToolbarItem(placement: .confirmationAction) {
-                    Button {
-                        #if canImport(UIKit)
-                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                        #endif
+                    ModalPrimaryButton("Save") {
                         saveTargets()
-                    } label: {
-                        Text("Save")
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 6)
-                            .background(AppColors.brand)
-                            .clipShape(Capsule())
                     }
                 }
             }

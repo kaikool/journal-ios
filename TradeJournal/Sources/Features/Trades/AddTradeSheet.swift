@@ -136,32 +136,15 @@ public struct AddTradeSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        #if canImport(UIKit)
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        #endif
+                    ModalSecondaryButton("Cancel") {
                         dismiss()
                     }
-                    .font(.system(size: 15, weight: .regular))
-                    .foregroundColor(AppColors.secondaryText)
                 }
                 
                 ToolbarItem(placement: .confirmationAction) {
-                    Button {
-                        #if canImport(UIKit)
-                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                        #endif
+                    ModalPrimaryButton("Save", isEnabled: isValid) {
                         saveTrade()
-                    } label: {
-                        Text("Save")
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundColor(isValid ? .white : AppColors.secondaryText.opacity(0.6))
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 6)
-                            .background(isValid ? AppColors.brand : AppColors.secondaryBackground)
-                            .clipShape(Capsule())
                     }
-                    .disabled(!isValid)
                 }
             }
             .onAppear {

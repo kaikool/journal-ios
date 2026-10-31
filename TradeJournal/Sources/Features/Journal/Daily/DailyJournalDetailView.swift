@@ -229,59 +229,19 @@ public struct DailyJournalDetailView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button {
-                        #if canImport(UIKit)
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        #endif
-                        dismiss()
-                    } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundColor(AppColors.secondaryText)
-                            .frame(width: 28, height: 28)
-                            .background(AppColors.secondaryBackground.opacity(0.85))
-                            .clipShape(Circle())
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                    .accessibilityLabel("Close")
+                    ModalDismissButton { dismiss() }
                 }
                 
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: 8) {
                         if !noteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                            Button {
-                                #if canImport(UIKit)
-                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                #endif
-                                showDeleteNoteAlert = true
-                            } label: {
-                                Image(systemName: "trash")
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .foregroundColor(AppColors.loss)
-                                    .frame(width: 28, height: 28)
-                                    .background(AppColors.loss.opacity(0.12))
-                                    .clipShape(Circle())
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                            .accessibilityLabel("Delete note")
+                            ModalDeleteButton { showDeleteNoteAlert = true }
                         }
                         
-                        Button {
-                            #if canImport(UIKit)
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            #endif
+                        ModalPrimaryButton("Done") {
                             saveNoteImmediately(force: true)
                             dismiss()
-                        } label: {
-                            Text("Done")
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundColor(AppColors.brand)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
-                                .background(AppColors.brand.opacity(0.12))
-                                .clipShape(Capsule())
                         }
-                        .buttonStyle(PlainButtonStyle())
                     }
                 }
             }

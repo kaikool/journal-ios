@@ -76,8 +76,11 @@ public struct NewPropAccountSheet: View {
             .navigationTitle(parentId == nil ? "Track account" : "Next stage / Phase")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    ModalSecondaryButton("Cancel") { dismiss() }
+                }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
+                    ModalPrimaryButton("Save") {
                         let formatter = DateFormatter()
                         formatter.dateFormat = "yyyy-MM-dd"
                         let today = formatter.string(from: Date())
@@ -97,9 +100,6 @@ public struct NewPropAccountSheet: View {
                         onSave(acc)
                         dismiss()
                     }
-                }
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
                 }
             }
         }
@@ -181,8 +181,11 @@ public struct EditPropAccountSheet: View {
             .navigationTitle("Edit account")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    ModalSecondaryButton("Cancel") { dismiss() }
+                }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
+                    ModalPrimaryButton("Save") {
                         var updated = account
                         let cleanName = name.trimmingCharacters(in: .whitespaces)
                         updated.name = cleanName.isEmpty ? account.name : cleanName
@@ -202,9 +205,6 @@ public struct EditPropAccountSheet: View {
                         onSave(updated)
                         dismiss()
                     }
-                }
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
                 }
             }
             .alert("Delete “\(account.name)”? ", isPresented: $showDeleteConfirm) {
@@ -274,7 +274,7 @@ public struct PropAuditTrailSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Close") { dismiss() }
+                    ModalPrimaryButton("Done") { dismiss() }
                 }
             }
         }
@@ -362,8 +362,11 @@ public struct NewPropEntrySheet: View {
             .navigationTitle("Record expense / Payout")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    ModalSecondaryButton("Cancel") { dismiss() }
+                }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
+                    ModalPrimaryButton("Save", isEnabled: !amountText.trimmingCharacters(in: .whitespaces).isEmpty) {
                         let formatter = DateFormatter()
                         formatter.dateFormat = "yyyy-MM-dd"
                         let today = formatter.string(from: Date())
@@ -390,10 +393,6 @@ public struct NewPropEntrySheet: View {
                         onSave(entry)
                         dismiss()
                     }
-                    .disabled(amountText.trimmingCharacters(in: .whitespaces).isEmpty)
-                }
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
                 }
             }
         }
@@ -440,8 +439,11 @@ public struct AddReceiptSheet: View {
             .navigationTitle("Record payout receipt")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    ModalSecondaryButton("Cancel") { dismiss() }
+                }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Confirm") {
+                    ModalPrimaryButton("Confirm", isEnabled: !amountText.trimmingCharacters(in: .whitespaces).isEmpty) {
                         let formatter = DateFormatter()
                         formatter.dateFormat = "yyyy-MM-dd"
                         let today = formatter.string(from: Date())
@@ -458,10 +460,6 @@ public struct AddReceiptSheet: View {
                         onAdd(rcpt)
                         dismiss()
                     }
-                    .disabled(amountText.trimmingCharacters(in: .whitespaces).isEmpty)
-                }
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
                 }
             }
         }
@@ -510,8 +508,11 @@ public struct AddRefundSheet: View {
             .navigationTitle("Record fee refund")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    ModalSecondaryButton("Cancel") { dismiss() }
+                }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
+                    ModalPrimaryButton("Save", isEnabled: !amountText.trimmingCharacters(in: .whitespaces).isEmpty) {
                         let formatter = DateFormatter()
                         formatter.dateFormat = "yyyy-MM-dd"
                         let today = formatter.string(from: Date())
@@ -532,10 +533,6 @@ public struct AddRefundSheet: View {
                         onRefund(refundEntry)
                         dismiss()
                     }
-                    .disabled(amountText.trimmingCharacters(in: .whitespaces).isEmpty)
-                }
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
                 }
             }
         }
@@ -589,11 +586,11 @@ public struct PropCsvImportSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") { dismiss() }
+                    ModalSecondaryButton("Close") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     if importResult == nil {
-                        Button("Preview") {
+                        ModalPrimaryButton("Preview", isEnabled: !csvContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) {
                             do {
                                 errorMessage = nil
                                 let res = try dataStore.importPropCsvData(csvText: csvContent, preview: true)
@@ -602,9 +599,8 @@ public struct PropCsvImportSheet: View {
                                 errorMessage = error.localizedDescription
                             }
                         }
-                        .disabled(csvContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     } else {
-                        Button("Import now") {
+                        ModalPrimaryButton("Import") {
                             do {
                                 errorMessage = nil
                                 _ = try dataStore.importPropCsvData(csvText: csvContent, preview: false)

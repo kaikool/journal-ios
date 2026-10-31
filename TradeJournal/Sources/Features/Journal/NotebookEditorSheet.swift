@@ -173,55 +173,20 @@ public struct NotebookEditorSheet: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     HStack(spacing: 8) {
-                        Button {
-                            #if canImport(UIKit)
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            #endif
+                        ModalDismissButton {
                             flushSave()
                             dismiss()
-                        } label: {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 11, weight: .bold))
-                                .foregroundColor(AppColors.secondaryText)
-                                .frame(width: 28, height: 28)
-                                .background(AppColors.secondaryBackground.opacity(0.85))
-                                .clipShape(Circle())
                         }
-                        .buttonStyle(PlainButtonStyle())
-                        .accessibilityLabel("Close")
                         
-                        Button {
-                            #if canImport(UIKit)
-                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                            #endif
+                        ModalDeleteButton {
                             showDeleteConfirmation = true
-                        } label: {
-                            Image(systemName: "trash")
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(AppColors.loss.opacity(0.85))
-                                .frame(width: 28, height: 28)
-                                .background(AppColors.secondaryBackground.opacity(0.85))
-                                .clipShape(Circle())
                         }
-                        .buttonStyle(PlainButtonStyle())
-                        .accessibilityLabel("Delete note")
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        #if canImport(UIKit)
-                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                        #endif
+                    ModalPrimaryButton("Done") {
                         flushSave()
                         dismiss()
-                    } label: {
-                        Text("Done")
-                            .font(.system(size: 13.5, weight: .bold))
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 5)
-                            .background(AppColors.brand)
-                            .clipShape(Capsule())
                     }
                 }
             }

@@ -137,22 +137,8 @@ public struct TradeAICoachSheet: View {
             .navigationTitle(isOpen ? "Live Position Coach" : "Post-Trade AI Audit")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        #if canImport(UIKit)
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        #endif
-                        dismiss()
-                    } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundColor(AppColors.secondaryText)
-                            .frame(width: 28, height: 28)
-                            .background(AppColors.secondaryBackground.opacity(0.85))
-                            .clipShape(Circle())
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                    .accessibilityLabel("Close")
+                ToolbarItem(placement: .topBarLeading) {
+                    ModalDismissButton { dismiss() }
                 }
             }
             .sheet(isPresented: $showPhotoPicker) {
