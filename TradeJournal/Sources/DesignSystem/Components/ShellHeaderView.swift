@@ -228,11 +228,11 @@ public struct ShellHeaderView: View {
             selection: $env.accountFilterTab,
             items: AccountFilterTab.allCases,
             titleFor: { $0.rawValue },
-            badgeCountFor: { tab in
+            badgeCountFor: { (tab: AccountFilterTab) -> Int in
                 switch tab {
-                case .default: return dataStore.accounts.filter { $0.id == dataStore.defaultAccountId }.count
-                case .active: return dataStore.accounts.filter { $0.archivedAt == nil }.count
-                case .visible: return dataStore.visibleAccounts.count
+                case .default: return dataStore.accounts.filter { dataStore.isAccountVisible($0) }.count
+                case .active: return dataStore.accounts.filter { dataStore.isAccountActive($0) }.count
+                case .visible: return dataStore.accounts.filter { dataStore.isAccountVisible($0) }.count
                 case .all: return dataStore.accounts.count
                 }
             }
@@ -255,32 +255,37 @@ public struct ShellHeaderView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
                 ForEach(dataStore.notebookFolders) { folder in
-                    let isSelected = (env.notebookFolderId == folder.id) || (env.notebookFolderId == nil && folder.id == NotebookEngine.systemFolderAll)
-                    Button {
-                        NativeHaptics.selection()
-                        env.notebookFolderId = (folder.id == NotebookEngine.systemFolderAll) ? nil : folder.id
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: isSelected ? "folder.fill" : "folder")
-                                .font(.system(size: 11))
-                            Text(folder.name)
-                                .font(.system(size: 11.5, weight: isSelected ? .bold : .medium))
-                        }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(isSelected ? AppColors.brand : AppColors.secondaryBackground.opacity(0.75))
-                        .foregroundColor(isSelected ? .white : AppColors.secondaryText)
-                        .clipShape(Capsule())
-                        .overlay(
-                            Capsule().stroke(isSelected ? AppColors.brand : AppColors.border.opacity(0.6), lineWidth: 0.6)
-                        )
-                    }
-                    .buttonStyle(PlainButtonStyle())
+                    folderChip(folder)
                 }
             }
             .padding(.horizontal, 16)
         }
         .padding(.bottom, 8)
+    }
+    
+    @ViewBuilder
+    private func folderChip(_ folder: NotebookFolder) -> some View {
+        let isSelected = (env.notebookFolderId == folder.id) || (env.notebookFolderId == nil && folder.id == NotebookEngine.systemFolderAll)
+        Button {
+            NativeHaptics.selection()
+            env.notebookFolderId = (folder.id == NotebookEngine.systemFolderAll) ? nil : folder.id
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: isSelected ? "folder.fill" : "folder")
+                    .font(.system(size: 11))
+                Text(folder.name)
+                    .font(.system(size: 11.5, weight: isSelected ? .bold : .medium))
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(isSelected ? AppColors.brand : AppColors.secondaryBackground.opacity(0.75))
+            .foregroundColor(isSelected ? .white : AppColors.secondaryText)
+            .clipShape(Capsule())
+            .overlay(
+                Capsule().stroke(isSelected ? AppColors.brand : AppColors.border.opacity(0.6), lineWidth: 0.6)
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
     }
     
     // MARK: - Trailing Action Slot by Page Context
