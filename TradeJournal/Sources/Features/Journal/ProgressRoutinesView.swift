@@ -143,18 +143,7 @@ public struct ProgressRoutinesView: View {
                             .font(AppTypography.captionMicro)
                             .foregroundColor(AppColors.secondaryText)
                         
-                        HStack(spacing: 5) {
-                            Image(systemName: "calendar")
-                                .font(AppTypography.caption)
-                                .foregroundColor(AppColors.brand)
-                            Text(activeDate == todayKey ? "Today" : activeDate)
-                                .font(AppTypography.actionButtonCompact)
-                                .foregroundColor(AppColors.primaryText)
-                        }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(AppColors.secondaryBackground)
-                        .clipShape(Capsule())
+                        AppBadge(activeDate == todayKey ? "Today" : activeDate, icon: "calendar", variant: .secondary)
                     }
                 }
                 

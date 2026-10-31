@@ -167,7 +167,7 @@ public struct TradeReplayExcursionCard: View {
                             }
                         } else if isLoadingCandles && barsCount == 0 {
                             HStack(spacing: 4) {
-                                ProgressView().scaleEffect(0.7)
+                                TradeJournalProLoader(size: 16)
                                 Text("Calculating…")
                                     .font(AppTypography.caption)
                                     .foregroundColor(AppColors.secondaryText)
@@ -208,7 +208,7 @@ public struct TradeReplayExcursionCard: View {
                             }
                         } else if isLoadingCandles && barsCount == 0 {
                             HStack(spacing: 4) {
-                                ProgressView().scaleEffect(0.7)
+                                TradeJournalProLoader(size: 16)
                                 Text("Calculating…")
                                     .font(AppTypography.caption)
                                     .foregroundColor(AppColors.secondaryText)

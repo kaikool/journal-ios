@@ -97,7 +97,7 @@ internal struct PropAccountObjectivesChartCard: View {
                         ZStack(alignment: .leading) {
                             Capsule().fill(AppColors.secondaryBackground)
                             Capsule()
-                                .fill(bufferRatio < 0.25 ? AppColors.loss : (bufferRatio < 0.5 ? Color.orange : AppColors.brand))
+                                .fill(bufferRatio < 0.25 ? AppColors.loss : (bufferRatio < 0.5 ? AppColors.warning : AppColors.brand))
                                 .frame(width: max(0, min(geo.size.width, geo.size.width * CGFloat(bufferRatio))))
                         }
                     }
@@ -123,7 +123,7 @@ internal struct PropAccountObjectivesChartCard: View {
                     Capsule()
                         .fill(AppColors.secondaryBackground)
                         .overlay(
-                            Capsule().fill(Color.orange.opacity(0.85)),
+                            Capsule().fill(AppColors.warning.opacity(0.85)),
                             alignment: .leading
                         )
                         .frame(height: 4)

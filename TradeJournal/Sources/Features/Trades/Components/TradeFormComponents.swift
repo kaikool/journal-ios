@@ -421,23 +421,13 @@ public struct TradeDisciplineAndNotesCard: View {
                         HStack(spacing: 6) {
                             ForEach(Self.commonMistakes, id: \.self) { m in
                                 let isAdded = mistakes.contains(m)
-                                Button {
-                                    NativeHaptics.lightImpact()
+                                AppFilterChip(m, isSelected: isAdded) {
                                     if isAdded {
                                         mistakes.removeAll { $0 == m }
                                     } else {
                                         mistakes.append(m)
                                     }
-                                } label: {
-                                    Text(m)
-                                        .font(isAdded ? AppTypography.badgeStandard : AppTypography.captionMicro)
-                                        .padding(.horizontal, 8)
-                                        .padding(.vertical, 5)
-                                        .background(isAdded ? AppColors.loss.opacity(0.15) : AppColors.secondaryBackground)
-                                        .foregroundColor(isAdded ? AppColors.loss : AppColors.secondaryText)
-                                        .clipShape(Capsule())
                                 }
-                                .buttonStyle(ApplePressableButtonStyle())
                             }
                         }
                         .padding(.vertical, 2)

@@ -93,7 +93,7 @@ public struct AccountCardView: View {
                                 case .active:
                                     badgeView("Active", color: AppColors.profit)
                                 case .passed:
-                                    badgeView("Passed", color: Color.blue)
+                                    badgeView("Passed", color: AppColors.brand)
                                 case .breached:
                                     badgeView("Breached", color: AppColors.loss)
                                 case .closed:

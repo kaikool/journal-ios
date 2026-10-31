@@ -608,7 +608,7 @@ public struct DashboardView: View {
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .font(AppTypography.cardHeader)
-                    .foregroundColor(Color.orange)
+                    .foregroundColor(AppColors.warning)
                 
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Set up conversion to see your combined dashboard")
@@ -622,11 +622,11 @@ public struct DashboardView: View {
                 Spacer()
             }
             .padding(14)
-            .background(Color.orange.opacity(0.08))
+            .background(AppColors.warning.opacity(0.08))
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(Color.orange.opacity(0.3), lineWidth: 1)
+                    .stroke(AppColors.warning.opacity(0.3), lineWidth: 1)
             )
             
             // All Accounts Card

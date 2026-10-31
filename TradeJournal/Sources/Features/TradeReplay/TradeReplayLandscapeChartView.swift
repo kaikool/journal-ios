@@ -231,16 +231,10 @@ public struct TradeReplayLandscapeChartView: View {
     private var chartContainer: some View {
         Group {
             if bars.isEmpty {
-                VStack(spacing: 8) {
-                    ProgressView()
-                        .tint(AppColors.brand)
-                    Text("Loading Candles…")
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.secondaryText)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(AppColors.cardBackground)
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                LoadingView("Loading Candles…", size: 48)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(AppColors.cardBackground)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             } else {
                 CandleChartView(
                     visibleBars: frame.visibleBars,

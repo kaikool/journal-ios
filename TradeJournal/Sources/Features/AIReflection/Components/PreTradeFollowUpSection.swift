@@ -109,8 +109,7 @@ public struct PreTradeBottomFloatingInput: View {
                 }
                 
                 if isSubmitting {
-                    ProgressView()
-                        .scaleEffect(0.85)
+                    TradeJournalProLoader(size: 20)
                         .frame(width: 34, height: 34)
                 } else {
                     Button(action: onSubmit) {

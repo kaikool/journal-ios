@@ -82,18 +82,8 @@ public struct TradeAICoachChartCard: View {
                                 .cornerRadius(8)
                                 .overlay(RoundedRectangle(cornerRadius: 8).stroke(AppColors.border, lineWidth: 0.8))
                             
-                            HStack(spacing: 4) {
-                                Image(systemName: "arrow.up.left.and.arrow.down.right")
-                                    .font(AppTypography.captionMicro)
-                                Text("Expand")
-                                    .font(AppTypography.captionMicro)
-                            }
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 3)
-                            .background(Color.black.opacity(0.65))
-                            .clipShape(Capsule())
-                            .padding(6)
+                            AppBadge("Expand", icon: "arrow.up.left.and.arrow.down.right", variant: .secondary)
+                                .padding(6)
                         }
                     }
                     .buttonStyle(.plain)

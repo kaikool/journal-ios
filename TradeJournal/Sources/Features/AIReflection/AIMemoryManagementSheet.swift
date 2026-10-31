@@ -126,9 +126,7 @@ public struct AIMemoryManagementSheet: View {
             Spacer()
             
             if isSyncing {
-                ProgressView()
-                    .progressViewStyle(CircularProgressViewStyle(tint: AppColors.brand))
-                    .scaleEffect(0.7)
+                TradeJournalProLoader(size: 20)
             } else {
                 Button(action: performSync) {
                     HStack(spacing: 4) {

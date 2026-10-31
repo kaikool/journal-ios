@@ -25,23 +25,10 @@ extension DashboardView {
                     )
                     
                     if let delta = snap.weekDelta {
-                        HStack(spacing: 3) {
-                            Text(delta >= 0 ? "▲" : "▼")
-                                .font(AppTypography.captionMicro)
-                            Text(Formatters.formatCurrency(abs(delta), currency: env.currentCurrency))
-                                .font(AppTypography.captionBold)
-                                .monospacedDigit()
-                                .lineLimit(1)
-                            Text("vs 7d")
-                                .font(AppTypography.caption)
-                                .lineLimit(1)
-                        }
-                        .lineLimit(1)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(delta >= 0 ? AppColors.profit.opacity(0.12) : AppColors.loss.opacity(0.12))
-                        .foregroundColor(delta >= 0 ? AppColors.profit : AppColors.loss)
-                        .clipShape(Capsule())
+                        AppBadge(
+                            "\(delta >= 0 ? "▲" : "▼") \(Formatters.formatCurrency(abs(delta), currency: env.currentCurrency)) vs 7d",
+                            variant: delta >= 0 ? .profit : .loss
+                        )
                         .fixedSize(horizontal: true, vertical: false)
                     }
                     
@@ -69,23 +56,10 @@ extension DashboardView {
                         Spacer(minLength: 6)
                         
                         if let delta = snap.weekDelta {
-                            HStack(spacing: 3) {
-                                Text(delta >= 0 ? "▲" : "▼")
-                                    .font(AppTypography.captionMicro)
-                                Text(Formatters.formatCurrency(abs(delta), currency: env.currentCurrency))
-                                    .font(AppTypography.captionBold)
-                                    .monospacedDigit()
-                                    .lineLimit(1)
-                                Text("vs 7d")
-                                    .font(AppTypography.caption)
-                                    .lineLimit(1)
-                            }
-                            .lineLimit(1)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(delta >= 0 ? AppColors.profit.opacity(0.12) : AppColors.loss.opacity(0.12))
-                            .foregroundColor(delta >= 0 ? AppColors.profit : AppColors.loss)
-                            .clipShape(Capsule())
+                            AppBadge(
+                                "\(delta >= 0 ? "▲" : "▼") \(Formatters.formatCurrency(abs(delta), currency: env.currentCurrency)) vs 7d",
+                                variant: delta >= 0 ? .profit : .loss
+                            )
                             .fixedSize(horizontal: true, vertical: false)
                         }
                     }

@@ -122,7 +122,7 @@ files.forEach(f => {
 
     // --- STANDARD 02: BADGES & TAGS ---
     // Prohibits ad-hoc capsule badge wrappers in Feature views.
-    if (isFeature && trimmed.includes('.clipShape(Capsule())') && lines[Math.max(0, idx - 2)].includes('.background(') && lines[Math.max(0, idx - 3)].includes('Text(')) {
+    if (isFeature && trimmed.includes('.clipShape(Capsule())') && lines[Math.max(0, idx - 1)].includes('.background(') && (lines[Math.max(0, idx - 2)].includes('Text(') || lines[Math.max(0, idx - 3)].includes('Text('))) {
       violations.push({
         std: 'Standard 02: Badges & Tags',
         rule: 'PROHIBIT_ADHOC_BADGE',
@@ -213,7 +213,17 @@ files.forEach(f => {
     }
 
     // --- STANDARD 09: FEEDBACK & EMPTY STATES ---
-    // Prohibits ad-hoc empty state views or custom loading banners.
+    // Prohibits raw ProgressView or custom EmptyState in Feature views.
+    if (isFeature && /\bProgressView\b/.test(trimmed) && !trimmed.includes('ProgressView(value:')) {
+      violations.push({
+        std: 'Standard 09: Feedback & Empty States',
+        rule: 'PROHIBIT_RAW_PROGRESS_VIEW',
+        file: rel,
+        line: lineNum,
+        code: trimmed,
+        fix: 'Use LoadingView(...) or TradeJournalProLoader from DesignSystem'
+      });
+    }
     if (isFeature && /\bEmptyState\s*\(/.test(trimmed)) {
       violations.push({
         std: 'Standard 09: Feedback & Empty States',
@@ -354,15 +364,15 @@ files.forEach(f => {
     }
 
     // --- STANDARD 19: SEMANTIC COLOR HIERARCHY ---
-    // Prohibits direct Color(hex:) in Feature views.
-    if (isFeature && trimmed.includes('Color(hex:')) {
+    // Prohibits direct Color(hex:) or raw system colors in Feature views.
+    if (isFeature && (trimmed.includes('Color(hex:') || /\bColor\.(blue|green|red|purple|orange|yellow)\b/.test(trimmed))) {
       violations.push({
         std: 'Standard 19: Semantic Color Hierarchy',
-        rule: 'PROHIBIT_HEX_COLOR_IN_FEATURES',
+        rule: 'PROHIBIT_RAW_COLOR_IN_FEATURES',
         file: rel,
         line: lineNum,
         code: trimmed,
-        fix: 'Use AppColors semantic palette (brand, profit, loss, background, cardBackground, border)'
+        fix: 'Use AppColors semantic palette (brand, profit, loss, warning, background, cardBackground, border)'
       });
     }
 

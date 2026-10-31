@@ -106,27 +106,14 @@ public struct TradeReplayControlsCard: View {
                     .disabled(currentStep <= 1 || barsCount == 0)
                     
                     // Play / Pause
-                    Button {
-                        NativeHaptics.mediumImpact()
+                    AppActionPill(
+                        isPlaying ? "Pause" : "Play",
+                        icon: isPlaying ? "pause.fill" : "play.fill",
+                        isPrimary: true
+                    ) {
                         onTogglePlay()
-                    } label: {
-                        HStack(spacing: 5) {
-                            Image(systemName: isPlaying ? "pause.fill" : "play.fill")
-                                .font(AppTypography.actionButtonCompact)
-                            Text(isPlaying ? "Pause" : "Play")
-                                .font(AppTypography.actionButtonCompact)
-                                .lineLimit(1)
-                        }
-                        .frame(height: 34)
-                        .padding(.horizontal, 14)
-                        .background(AppColors.brand)
-                        .foregroundColor(.white)
-                        .clipShape(Capsule())
-                        .shadow(color: AppColors.brand.opacity(0.3), radius: 3, x: 0, y: 1)
                     }
-                    .buttonStyle(ApplePressableButtonStyle())
                     .disabled(barsCount == 0)
-                    .fixedSize()
                     
                     // Step forward
                     Button {

@@ -237,22 +237,8 @@ public struct TradeReplayView: View {
                     
                     // Floating Updating Pill (Replaces the cramped loading indicator in Resolution bar)
                     if isLoadingCandles {
-                        HStack(spacing: 5) {
-                            ProgressView()
-                                .scaleEffect(0.65)
-                                .tint(AppColors.brand)
-                            Text("Updating…")
-                                .font(AppTypography.number(9, weight: .medium))
-                                .foregroundColor(AppColors.primaryText)
-                        }
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(AppColors.cardBackground.opacity(0.88))
-                        .clipShape(Capsule())
-                        .overlay(
-                            Capsule().stroke(AppColors.border.opacity(0.4), lineWidth: 1)
-                        )
-                        .padding(8)
+                        AppBadge("Updating…", variant: .secondary)
+                            .padding(8)
                     }
                 }
             }
