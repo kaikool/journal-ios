@@ -36,7 +36,7 @@ public struct ShellHeaderView: View {
             HStack(spacing: 10) {
                 // Leading: App Brand Logo Button as Drawer Menu Trigger
                 Button {
-                    NativeHaptics.light()
+                    NativeHaptics.lightImpact()
                     withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
                         env.isDrawerOpen.toggle()
                     }
@@ -186,7 +186,7 @@ public struct ShellHeaderView: View {
     
     private func primaryActionButton(title: String, icon: String = "plus", action: @escaping () -> Void) -> some View {
         Button {
-            NativeHaptics.medium()
+            NativeHaptics.mediumImpact()
             action()
         } label: {
             HStack(spacing: 5) {
@@ -207,7 +207,7 @@ public struct ShellHeaderView: View {
     
     private var syncActionButton: some View {
         Button {
-            NativeHaptics.medium()
+            NativeHaptics.mediumImpact()
             Task {
                 await dataStore.performGlobalSync()
             }
@@ -236,7 +236,7 @@ public struct ShellHeaderView: View {
     
     private var searchToggleButton: some View {
         Button {
-            NativeHaptics.light()
+            NativeHaptics.lightImpact()
             withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
                 env.isSearchActive.toggle()
                 if !env.isSearchActive {
@@ -265,7 +265,7 @@ public struct ShellHeaderView: View {
     
     private var aiScannerButton: some View {
         Button {
-            NativeHaptics.medium()
+            NativeHaptics.mediumImpact()
             showPreTradeAnalysis = true
         } label: {
             ZStack {

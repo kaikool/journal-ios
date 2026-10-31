@@ -57,6 +57,10 @@ public enum NativeHaptics {
         #endif
     }
     
+    public static func light() {
+        lightImpact()
+    }
+    
     /// Triggered on swipe action threshold reached, delete confirmation, and modal presentation.
     public static func mediumImpact() {
         #if canImport(UIKit)
@@ -66,6 +70,10 @@ public enum NativeHaptics {
         #endif
     }
     
+    public static func medium() {
+        mediumImpact()
+    }
+    
     /// Triggered on critical warnings or danger zone actions.
     public static func heavyImpact() {
         #if canImport(UIKit)
@@ -73,6 +81,10 @@ public enum NativeHaptics {
         heavyGenerator.impactOccurred()
         heavyGenerator.prepare()
         #endif
+    }
+    
+    public static func heavy() {
+        heavyImpact()
     }
     
     /// Triggered on successful actions (e.g. sync completed, trade imported, note saved).
