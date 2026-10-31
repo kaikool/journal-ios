@@ -38,9 +38,9 @@ public struct GeneralSettingsView: View {
                     get: { env.appTheme },
                     set: { env.setAppTheme($0) }
                 )) {
-                    Text("System").tag(AppTheme.system)
-                    Text("Dark").tag(AppTheme.dark)
-                    Text("Light").tag(AppTheme.light)
+                    Label("System", systemImage: "circle.lefthalf.filled").tag(AppTheme.system)
+                    Label("Dark", systemImage: "moon.fill").tag(AppTheme.dark)
+                    Label("Light", systemImage: "sun.max.fill").tag(AppTheme.light)
                 }
                 .pickerStyle(.segmented)
             }
@@ -76,18 +76,13 @@ public struct GeneralSettingsView: View {
                             }
                         }
                         
-                        Text("Trade times, calendars, journal days, and analytics use this timezone.")
-                            .font(AppTypography.caption)
-                            .foregroundColor(AppColors.secondaryText)
-                        
                         Button {
                             displayTz = TimeZone.current.identifier
                             isSaved = false
                         } label: {
-                            Text("Use this device's timezone (\(TimeZone.current.identifier))")
+                            Text("Use device timezone (\(TimeZone.current.identifier))")
                                 .font(AppTypography.caption)
-                                .underline()
-                                .foregroundColor(AppColors.accent)
+                                .foregroundColor(AppColors.brand)
                         }
                     }
                     
@@ -108,7 +103,7 @@ public struct GeneralSettingsView: View {
                             }
                         }
                         
-                        Text("Used for timestamps without an offset in file imports and IBKR broker sync. You can override it for each file. Existing trades are not changed; correcting an IBKR account's timezone requires a separate account for recovery.")
+                        Text("Used for file imports and broker sync without timezone offset.")
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText)
                     }

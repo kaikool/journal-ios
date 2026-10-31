@@ -110,12 +110,22 @@ public struct AIReflectionView: View {
             .navigationTitle("AI Trader Reflection")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        #if canImport(UIKit)
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        #endif
                         dismiss()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(AppColors.secondaryText)
+                            .frame(width: 28, height: 28)
+                            .background(AppColors.secondaryBackground.opacity(0.85))
+                            .clipShape(Circle())
                     }
-                    .font(AppTypography.captionBold)
-                    .foregroundColor(AppColors.primaryText)
+                    .buttonStyle(PlainButtonStyle())
+                    .accessibilityLabel("Close")
                 }
             }
             .sheet(isPresented: $showTraderProfileSheet) {

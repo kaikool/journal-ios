@@ -318,13 +318,13 @@ public struct ReportsView: View {
     private var explorerSection: some View {
         VStack(spacing: 14) {
             cardContainer {
-                VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 10) {
                     HStack {
                         Image(systemName: "list.bullet.rectangle")
-                            .font(.system(size: 13))
+                            .font(.system(size: 12))
                             .foregroundColor(AppColors.brand)
                         Text("Trade explorer (\(trades.count))")
-                            .font(AppTypography.subheadlineBold)
+                            .font(.system(size: 13, weight: .bold, design: .rounded))
                             .foregroundColor(AppColors.primaryText)
                         Spacer()
                     }
@@ -334,35 +334,40 @@ public struct ReportsView: View {
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText)
                     } else {
-                        VStack(spacing: 8) {
+                        VStack(spacing: 6) {
                             ForEach(trades.prefix(30)) { t in
-                                HStack {
+                                HStack(spacing: 8) {
                                     Text(t.status.rawValue.uppercased())
-                                        .font(.system(size: 9, weight: .bold))
-                                        .padding(.horizontal, 6)
+                                        .font(.system(size: 8.5, weight: .bold))
+                                        .padding(.horizontal, 5)
                                         .padding(.vertical, 2)
                                         .background(t.netPnl >= 0 ? AppColors.profit.opacity(0.12) : AppColors.loss.opacity(0.12))
                                         .foregroundColor(t.netPnl >= 0 ? AppColors.profit : AppColors.loss)
                                         .clipShape(Capsule())
                                     
                                     Text(t.symbol)
-                                        .font(AppTypography.bodyBold)
+                                        .font(.system(size: 13, weight: .semibold, design: .rounded))
                                         .foregroundColor(AppColors.primaryText)
                                         .lineLimit(1)
+                                    
+                                    if let exitDate = t.closedAt {
+                                        Text(Formatters.formatDate(exitDate, timeZone: env.currentTimeZone))
+                                            .font(.system(size: 10.5, weight: .regular))
+                                            .foregroundColor(AppColors.secondaryText)
+                                    }
                                     
                                     Spacer()
                                     
                                     Text(t.netPnl >= 0 ? "+\(Formatters.currency(t.netPnl))" : Formatters.currency(t.netPnl))
-                                        .font(AppTypography.bodyBold)
+                                        .font(.system(size: 13, weight: .semibold))
                                         .monospacedDigit()
                                         .foregroundColor(t.netPnl >= 0 ? AppColors.profit : AppColors.loss)
                                         .lineLimit(1)
-                                        .minimumScaleFactor(0.85)
                                 }
-                                .padding(.vertical, 4)
+                                .padding(.vertical, 3)
                                 
                                 if t.id != trades.prefix(30).last?.id {
-                                    Divider().background(AppColors.border.opacity(0.3))
+                                    Divider().background(AppColors.border.opacity(0.25))
                                 }
                             }
                         }

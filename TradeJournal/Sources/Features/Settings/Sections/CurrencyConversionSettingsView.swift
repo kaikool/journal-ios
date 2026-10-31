@@ -18,8 +18,10 @@ public struct CurrencyConversionSettingsView: View {
     public var body: some View {
         SettingsCard(title: "Currency conversion", footer: "Set reporting currency and exchange rates for combined analytics.") {
             VStack(alignment: .leading, spacing: 14) {
-                Toggle("Convert dashboard and calendar to reporting currency", isOn: $enabled)
-                    .font(AppTypography.bodyBold)
+                Toggle("Convert Dashboard & Calendar", isOn: $enabled)
+                    .font(.system(size: 14.5, weight: .semibold))
+                    .foregroundColor(AppColors.primaryText)
+                    .tint(AppColors.brand)
                 
                 Divider()
                     .background(AppColors.border.opacity(0.4))
@@ -49,21 +51,22 @@ public struct CurrencyConversionSettingsView: View {
                     ForEach(allCurrencies, id: \.self) { code in
                         HStack(spacing: 8) {
                             Text("1 \(code) =")
-                                .font(AppTypography.captionBold)
-                                .frame(width: 80, alignment: .leading)
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(AppColors.primaryText)
+                                .frame(width: 75, alignment: .leading)
                             
                             TextField("Rate", text: Binding(
                                 get: { code == reportingCurrency ? "1" : (rates[code] ?? "") },
                                 set: { rates[code] = $0 }
                             ))
-                            .font(AppTypography.inputText)
+                            .font(.system(size: 13.5, weight: .regular))
                             .keyboardType(.decimalPad)
                             .textFieldStyle(.roundedBorder)
                             .disabled(code == reportingCurrency)
-                            .frame(maxWidth: 140)
+                            .frame(maxWidth: 130)
                             
                             Text(reportingCurrency)
-                                .font(AppTypography.caption)
+                                .font(.system(size: 12, weight: .medium))
                                 .foregroundColor(AppColors.secondaryText)
                         }
                     }

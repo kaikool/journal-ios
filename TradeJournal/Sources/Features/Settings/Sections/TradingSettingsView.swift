@@ -38,11 +38,7 @@ public struct TradingSettingsView: View {
                                 .stroke(AppColors.border.opacity(0.5), lineWidth: 0.5)
                         )
                     
-                    Text("Use the exact symbol shown on your imported trades, including the contract month when present.")
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.secondaryText)
-                    
-                    Text("Saving multipliers recalculates existing trade P&L from fills and preserves annotations.")
+                    Text("One entry per line (e.g. ESU6=50). Recalculates P&L on save.")
                         .font(AppTypography.caption)
                         .foregroundColor(AppColors.secondaryText)
                     
@@ -84,10 +80,6 @@ public struct TradingSettingsView: View {
                             Text("% of entry notional").tag("percent")
                         }
                         .pickerStyle(.segmented)
-                        
-                        Text("Closed trades within this net P&L range count as breakeven. Actual P&L is unchanged. Percentage mode uses entry price × total entry quantity × contract multiplier; configure multipliers for derivatives first.")
-                            .font(AppTypography.caption)
-                            .foregroundColor(AppColors.secondaryText)
                     }
                     
                     Divider()
@@ -96,9 +88,6 @@ public struct TradingSettingsView: View {
                     VStack(alignment: .leading, spacing: 10) {
                         Text("Default fees")
                             .font(AppTypography.captionBold)
-                            .foregroundColor(AppColors.secondaryText)
-                        Text("Applied to new fills with a zero fee, including explicit zeroes. Nonzero imported fees and existing fills are kept. The first matching rule wins.")
-                            .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText)
                         
                         ForEach(Array(feeRules.enumerated()), id: \.element.id) { index, rule in
@@ -161,9 +150,6 @@ public struct TradingSettingsView: View {
                     VStack(alignment: .leading, spacing: 10) {
                         Text("Stop and target defaults")
                             .font(AppTypography.captionBold)
-                            .foregroundColor(AppColors.secondaryText)
-                        Text("Distances from weighted entry, adjusted for long or short direction. Applied only when a new trade is first created. The first matching rule wins.")
-                            .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText)
                         
                         ForEach(Array(riskRules.enumerated()), id: \.element.id) { index, rule in

@@ -97,29 +97,56 @@ public struct AddTradeSheet: View {
     
     public var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                // Custom Navigation Header
-                HStack(alignment: .center) {
-                    Button {
+            ScrollView {
+                VStack(spacing: 14) {
+                    // Section 1: Account & Symbol
+                    accountAndSymbolCard
+                    
+                    // Section 2: Position & Pricing
+                    positionAndPricingCard
+                    
+                    // Section 3: Execution Timestamps
+                    TradeTimestampsCard(openedAt: $openedAt, closedAt: $closedAt, isClosed: isClosed)
+                    
+                    // Section 4: Risk & Playbook Checklist
+                    riskAndPlaybookCard
+                    
+                    // Section 5: Discipline & Journal Notes
+                    TradeDisciplineAndNotesCard(
+                        rating: $rating,
+                        mistakes: $mistakes,
+                        tags: $tags,
+                        notes: $notes
+                    )
+                    
+                    if let err = errorMessage {
+                        Text(err)
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.loss)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .padding(.top, 4)
+                    }
+                }
+                .padding(16)
+                .padding(.bottom, 24)
+            }
+            .scrollDismissesKeyboard(.interactively)
+            .background(AppColors.background)
+            .navigationTitle("New Trade")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
                         #if canImport(UIKit)
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         #endif
                         dismiss()
-                    } label: {
-                        Text("Cancel")
-                            .font(AppTypography.body)
-                            .foregroundColor(AppColors.secondaryText)
                     }
-                    
-                    Spacer()
-                    
-                    Text("ADD TRADE")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundColor(AppColors.primaryText)
-                        .tracking(0.5)
-                    
-                    Spacer()
-                    
+                    .font(.system(size: 15, weight: .regular))
+                    .foregroundColor(AppColors.secondaryText)
+                }
+                
+                ToolbarItem(placement: .confirmationAction) {
                     Button {
                         #if canImport(UIKit)
                         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
@@ -136,48 +163,6 @@ public struct AddTradeSheet: View {
                     }
                     .disabled(!isValid)
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                .background(AppColors.cardBackground)
-                
-                Divider().background(AppColors.border.opacity(0.5))
-                
-                // Form Content
-                ScrollView {
-                    VStack(spacing: 14) {
-                        // Section 1: Account & Symbol
-                        accountAndSymbolCard
-                        
-                        // Section 2: Position & Pricing
-                        positionAndPricingCard
-                        
-                        // Section 3: Execution Timestamps
-                        TradeTimestampsCard(openedAt: $openedAt, closedAt: $closedAt, isClosed: isClosed)
-                        
-                        // Section 4: Risk & Playbook Checklist
-                        riskAndPlaybookCard
-                        
-                        // Section 5: Discipline & Journal Notes
-                        TradeDisciplineAndNotesCard(
-                            rating: $rating,
-                            mistakes: $mistakes,
-                            tags: $tags,
-                            notes: $notes
-                        )
-                        
-                        if let err = errorMessage {
-                            Text(err)
-                                .font(AppTypography.caption)
-                                .foregroundColor(AppColors.loss)
-                                .frame(maxWidth: .infinity, alignment: .center)
-                                .padding(.top, 4)
-                        }
-                    }
-                    .padding(16)
-                    .padding(.bottom, 24)
-                }
-                .scrollDismissesKeyboard(.interactively)
-                .background(AppColors.background)
             }
             .onAppear {
                 if accountId.isEmpty {

@@ -41,18 +41,9 @@ public struct ShellHeaderView: View {
                         env.isDrawerOpen.toggle()
                     }
                 } label: {
-                    ZStack {
-                        Circle()
-                            .fill(AppColors.secondaryBackground.opacity(0.85))
-                            .frame(width: 38, height: 38)
-                            .overlay(
-                                Circle()
-                                    .stroke(AppColors.border.opacity(0.55), lineWidth: 0.6)
-                            )
-                        
-                        LogoMarkView(size: 24)
-                    }
-                    .contentShape(Circle())
+                    LogoMarkView(size: 26)
+                        .frame(width: 36, height: 36)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(ApplePressableButtonStyle())
                 .accessibilityLabel("Open navigation menu")
@@ -95,7 +86,7 @@ public struct ShellHeaderView: View {
                 }
                 .padding(.horizontal, 12)
                 .frame(height: 36)
-                .background(AppColors.cardBackground)
+                .background(AppColors.secondaryBackground.opacity(0.75))
                 .clipShape(Capsule())
                 .overlay(
                     Capsule().stroke(AppColors.border.opacity(0.5), lineWidth: 0.5)
@@ -107,12 +98,23 @@ public struct ShellHeaderView: View {
         }
         .background(.ultraThinMaterial)
         .overlay(alignment: .bottom) {
-            Rectangle()
-                .fill(AppColors.border.opacity(0.35))
-                .frame(height: 0.5)
+            if !hasSubBar {
+                Rectangle()
+                    .fill(AppColors.border.opacity(0.35))
+                    .frame(height: 0.5)
+            }
         }
         .sheet(isPresented: $showPreTradeAnalysis) {
             PreTradeAnalysisSheet(initialSymbol: "XAUUSD")
+        }
+    }
+    
+    private var hasSubBar: Bool {
+        switch env.selectedTab {
+        case .settings, .reports, .propFirms, .notebook, .calendar, .accounts:
+            return true
+        default:
+            return false
         }
     }
     

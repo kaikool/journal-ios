@@ -34,7 +34,7 @@ public struct ConnectionsSettingsView: View {
                 HStack(spacing: 12) {
                     VStack(alignment: .leading, spacing: 3) {
                         Text("Cloud & Broker Sync")
-                            .font(AppTypography.bodyBold)
+                            .font(.system(size: 14.5, weight: .semibold))
                             .foregroundColor(AppColors.primaryText)
                         
                         Text(SyncManager.shared.isSyncing ? "Syncing..." : SyncManager.shared.formattedLastSyncTime)
@@ -77,7 +77,7 @@ public struct ConnectionsSettingsView: View {
                     HStack(spacing: 12) {
                         VStack(alignment: .leading, spacing: 3) {
                             Text("The5ers")
-                                .font(AppTypography.bodyBold)
+                                .font(.system(size: 14.5, weight: .semibold))
                                 .foregroundColor(AppColors.primaryText)
                             
                             HStack(spacing: 5) {
@@ -126,7 +126,7 @@ public struct ConnectionsSettingsView: View {
                     HStack(spacing: 12) {
                         VStack(alignment: .leading, spacing: 3) {
                             Text("cTrader")
-                                .font(AppTypography.bodyBold)
+                                .font(.system(size: 14.5, weight: .semibold))
                                 .foregroundColor(AppColors.primaryText)
                             
                             HStack(spacing: 5) {
@@ -176,7 +176,7 @@ public struct ConnectionsSettingsView: View {
                     HStack(spacing: 12) {
                         VStack(alignment: .leading, spacing: 3) {
                             Text("Exness")
-                                .font(AppTypography.bodyBold)
+                                .font(.system(size: 14.5, weight: .semibold))
                                 .foregroundColor(AppColors.primaryText)
                             
                             HStack(spacing: 5) {
