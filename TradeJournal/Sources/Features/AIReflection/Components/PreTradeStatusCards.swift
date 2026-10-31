@@ -11,8 +11,7 @@ public struct PreTradeLoadingCard: View {
     public var body: some View {
         AppCard {
             HStack(spacing: 12) {
-                ProgressView()
-                    .scaleEffect(0.9)
+                TradeJournalProLoader(size: 28)
                 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(isLoadingData ? "Streaming Multi-Timeframe Bars..." : "Auditing Liquidity & Formulating Bias...")

@@ -99,8 +99,7 @@ public struct TradeAICoachChartCard: View {
                     .buttonStyle(.plain)
                 } else {
                     HStack(spacing: 10) {
-                        ProgressView()
-                            .scaleEffect(0.8)
+                        TradeJournalProLoader(size: 28)
                         Text("Fetching \(selectedResolution.uppercased()) candlestick flow & chart snapshot...")
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText)

@@ -185,17 +185,7 @@ public struct TradeReplayView: View {
             }
             
             if isLoadingCandles && bars.isEmpty {
-                VStack(spacing: 12) {
-                    ProgressView()
-                        .scaleEffect(1.2)
-                        .tint(AppColors.brand)
-                    Text("Loading Market Data…")
-                        .font(AppTypography.headline)
-                        .foregroundColor(AppColors.primaryText)
-                    Text("Fetching candles for \(trade.symbol) (\(selectedResolution == .d1 ? "1D" : selectedResolution.rawValue))")
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.secondaryText)
-                }
+                LoadingView("Fetching candles for \(trade.symbol) (\(selectedResolution == .d1 ? "1D" : selectedResolution.rawValue))", size: 64)
                 .frame(height: 270)
                 .frame(maxWidth: .infinity)
                 .background(AppColors.cardBackground)

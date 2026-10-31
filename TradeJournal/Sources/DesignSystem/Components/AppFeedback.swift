@@ -99,21 +99,25 @@ public struct EmptyStateView: View {
     }
 }
 
-/// Standardized loading spinner view
+/// Standardized loading view powered by the signature TradeJournal animated candlestick loader
 public struct LoadingView: View {
     private let message: String
+    private let size: CGFloat
     
-    public init(_ message: String = "Loading...") {
+    public init(_ message: String = "Loading...", size: CGFloat = 52) {
         self.message = message
+        self.size = size
     }
     
     public var body: some View {
-        VStack(spacing: 10) {
-            ProgressView()
-                .tint(AppColors.brand)
-            Text(message)
-                .font(AppTypography.caption)
-                .foregroundColor(AppColors.secondaryText)
+        VStack(spacing: 12) {
+            TradeJournalProLoader(size: size)
+            if !message.isEmpty {
+                Text(message)
+                    .font(AppTypography.captionBold)
+                    .foregroundColor(AppColors.secondaryText)
+                    .multilineTextAlignment(.center)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

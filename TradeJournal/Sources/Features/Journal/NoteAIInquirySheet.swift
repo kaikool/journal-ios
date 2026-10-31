@@ -72,9 +72,8 @@ public struct NoteAIInquirySheet: View {
                             }
                             
                             if isLoading && !messages.isEmpty {
-                                HStack(spacing: 6) {
-                                    ProgressView()
-                                        .scaleEffect(0.8)
+                                HStack(spacing: 8) {
+                                    TradeJournalProLoader(size: 20)
                                     Text("AI Coach is examining note & execution...")
                                         .font(AppTypography.caption)
                                         .foregroundColor(AppColors.secondaryText)
@@ -211,16 +210,8 @@ public struct NoteAIInquirySheet: View {
     }
     
     private var initialLoadingState: some View {
-        VStack(spacing: 12) {
-            ProgressView()
-                .scaleEffect(1.1)
-                .padding(.top, 24)
-            Text("AI is examining Note & Plan...")
-                .font(AppTypography.subheadline)
-                .foregroundColor(AppColors.secondaryText)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 30)
+        LoadingView("AI is examining Note & Plan...", size: 52)
+            .padding(.vertical, 30)
     }
     
     private func messageRow(_ msg: AICoachMessage) -> some View {

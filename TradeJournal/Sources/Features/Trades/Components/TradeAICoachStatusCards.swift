@@ -10,20 +10,13 @@ public struct TradeAICoachLoadingCard: View {
     
     public var body: some View {
         AppCard {
-            VStack(spacing: 14) {
-                ProgressView()
-                    .progressViewStyle(CircularProgressViewStyle(tint: AppColors.brand))
-                    .scaleEffect(1.1)
-                
-                Text(isOpen
-                     ? "Risk AI is evaluating market structure, liquidity & position rationality..."
-                     : "Risk AI is auditing execution quality, plan compliance & discipline...")
-                    .font(AppTypography.caption)
-                    .foregroundColor(AppColors.secondaryText)
-                    .multilineTextAlignment(.center)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 36)
+            LoadingView(
+                isOpen
+                ? "Risk AI is evaluating market structure, liquidity & position rationality..."
+                : "Risk AI is auditing execution quality, plan compliance & discipline...",
+                size: 48
+            )
+            .padding(.vertical, 16)
         }
     }
 }

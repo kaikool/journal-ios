@@ -140,18 +140,8 @@ public struct PreTradeChartCard: View {
     }
     
     private var emptyLoadingView: some View {
-        HStack {
-            Spacer()
-            VStack(spacing: 6) {
-                ProgressView()
-                    .scaleEffect(0.8)
-                Text("Fetching \(symbol) \(activeTimeframeTitle) candles...")
-                    .font(AppTypography.caption)
-                    .foregroundColor(AppColors.secondaryText)
-            }
-            .padding(.vertical, 32)
-            Spacer()
-        }
+        LoadingView("Fetching \(symbol) \(activeTimeframeTitle) candles...", size: 36)
+            .padding(.vertical, 24)
     }
     
     private func timeframeTab(title: String, id: String) -> some View {
