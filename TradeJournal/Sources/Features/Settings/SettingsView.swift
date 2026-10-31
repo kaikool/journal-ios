@@ -70,19 +70,7 @@ public struct SettingsView: View {
     public var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                // Section Header
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(activeSection.label)
-                        .font(AppTypography.pageTitle)
-                        .foregroundColor(AppColors.primaryText)
-                    Text(activeSection.description)
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.secondaryText)
-                }
-                .padding(.horizontal, 16)
-                .padding(.top, 10)
-                
-                // Active Section Content (Preserving State)
+                // Active Section Content directly below the sliding bar
                 Group {
                     switch activeSection {
                     case .general:
@@ -103,12 +91,18 @@ public struct SettingsView: View {
                 }
             }
             .padding(.horizontal, 16)
+            .padding(.top, 12)
             .padding(.bottom, 88)
         }
         .safeAreaInset(edge: .top, spacing: 0) {
             sectionSelectorBar
                 .padding(.vertical, 8)
-                .background(Color.clear)
+                .background(.ultraThinMaterial)
+                .overlay(alignment: .bottom) {
+                    Rectangle()
+                        .fill(AppColors.border.opacity(0.3))
+                        .frame(height: 0.5)
+                }
         }
         .scrollDismissesKeyboard(.interactively)
         .background(AppColors.background)

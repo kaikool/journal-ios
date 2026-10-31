@@ -125,30 +125,33 @@ public struct PropFirmLedgerView: View {
                 case .overview:
                     overviewView
                 case .accounts:
+                    propSubToolbar
                     accountsListView
                 case .payouts:
                     payoutsProgressView
                 case .transactions:
+                    propSubToolbar
                     transactionsListView
                 }
             }
             .padding(.horizontal, 14)
-            .padding(.top, 10)
+            .padding(.top, 12)
             .padding(.bottom, 88)
         }
         .safeAreaInset(edge: .top, spacing: 0) {
-            VStack(spacing: 8) {
-                AppleSlidingSegmentedBar(
-                    selection: $selectedTab,
-                    items: PropLedgerTab.allCases,
-                    titleFor: { $0.rawValue }
-                )
-                
-                propSubToolbar
-            }
+            AppleSlidingSegmentedBar(
+                selection: $selectedTab,
+                items: PropLedgerTab.allCases,
+                titleFor: { $0.rawValue }
+            )
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
-            .background(Color.clear)
+            .background(.ultraThinMaterial)
+            .overlay(alignment: .bottom) {
+                Rectangle()
+                    .fill(AppColors.border.opacity(0.3))
+                    .frame(height: 0.5)
+            }
         }
         .scrollDismissesKeyboard(.interactively)
         .background(AppColors.background)

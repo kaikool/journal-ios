@@ -35,9 +35,10 @@ public struct NotebookView: View {
     }
     
     private var filteredNotes: [NotebookNote] {
+        let q = env.isSearchActive ? env.searchQuery : searchQuery
         let (notes, _) = dataStore.filteredNotes(
             folderId: selectedFolderId,
-            searchQuery: searchQuery,
+            searchQuery: q,
             sort: .updated
         )
         return notes
@@ -75,14 +76,20 @@ public struct NotebookView: View {
             .padding(.bottom, 88)
         }
         .safeAreaInset(edge: .top, spacing: 0) {
-            VStack(spacing: 8) {
-                folderChipsBar
-                
-                searchBar
-                    .padding(.horizontal, 14)
+            folderChipsBar
+                .padding(.vertical, 8)
+                .background(.ultraThinMaterial)
+                .overlay(alignment: .bottom) {
+                    Rectangle()
+                        .fill(AppColors.border.opacity(0.3))
+                        .frame(height: 0.5)
+                }
+        }
+        .onReceive(env.$requestNewNote) { requested in
+            if requested {
+                env.requestNewNote = false
+                createNewNote()
             }
-            .padding(.vertical, 8)
-            .background(Color.clear)
         }
         .scrollDismissesKeyboard(.interactively)
         .background(AppColors.background)

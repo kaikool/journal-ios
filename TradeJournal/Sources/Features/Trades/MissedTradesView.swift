@@ -14,19 +14,26 @@ public struct MissedTradesView: View {
     public init() {}
     
     private var filteredTrades: [MissedTrade] {
-        dataStore.missedTrades.filter { trade in
+        let q = (env.isSearchActive ? env.searchQuery : searchText).trimmingCharacters(in: .whitespaces).lowercased()
+        return dataStore.missedTrades.filter { trade in
             let isArchived = trade.archivedAt != nil
             guard isArchived == showArchived else { return false }
             
-            let query = searchText.trimmingCharacters(in: .whitespaces).lowercased()
-            if query.isEmpty { return true }
-            return trade.symbol.lowercased().contains(query) || trade.notes.lowercased().contains(query)
+            if q.isEmpty { return true }
+            return trade.symbol.lowercased().contains(q) || trade.notes.lowercased().contains(q)
         }.sorted { $0.observedAt > $1.observedAt }
     }
     
     public var body: some View {
         ScrollView {
             VStack(spacing: 12) {
+                // Compact Segmented Status Switcher
+                Picker("Status", selection: $showArchived) {
+                    Text("Active").tag(false)
+                    Text("Archived").tag(true)
+                }
+                .pickerStyle(.segmented)
+                
                 if filteredTrades.isEmpty {
                     emptyStateView
                 } else {
@@ -38,67 +45,15 @@ public struct MissedTradesView: View {
                 }
             }
             .padding(.horizontal, 14)
-            .padding(.top, 10)
+            .padding(.top, 12)
             .padding(.bottom, 88)
         }
-        .safeAreaInset(edge: .top, spacing: 0) {
-            VStack(spacing: 10) {
-                HStack {
-                    Text("Record setups you watched but did not take.")
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.secondaryText)
-                    
-                    Spacer()
-                    
-                    AppActionPill("Log Opportunity", icon: "plus") {
-                        editingTrade = nil
-                        showAddSheet = true
-                    }
-                }
-                
-                HStack(spacing: 10) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "magnifyingglass")
-                            .foregroundColor(AppColors.secondaryText)
-                            .font(.system(size: 13))
-                        TextField("Search symbol or notes…", text: $searchText)
-                            .font(AppTypography.body)
-                        if !searchText.isEmpty {
-                            Button {
-                                searchText = ""
-                            } label: {
-                                Image(systemName: "xmark.circle.fill")
-                                    .foregroundColor(AppColors.secondaryText)
-                                    .font(.system(size: 13))
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 12)
-                    .frame(height: 38)
-                    .background(AppColors.cardBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .stroke(AppColors.border.opacity(0.5), lineWidth: 0.5)
-                    )
-                    
-                    AppleMenuChip(
-                        title: "Status",
-                        selectionText: showArchived ? "Archived" : "Active",
-                        icon: showArchived ? "archivebox.fill" : "tray.fill"
-                    ) {
-                        Button("Active") {
-                            showArchived = false
-                        }
-                        Button("Archived") {
-                            showArchived = true
-                        }
-                    }
-                }
+        .onReceive(env.$requestNewMissedTrade) { requested in
+            if requested {
+                env.requestNewMissedTrade = false
+                editingTrade = nil
+                showAddSheet = true
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-            .background(Color.clear)
         }
         .scrollDismissesKeyboard(.interactively)
         .background(AppColors.background)

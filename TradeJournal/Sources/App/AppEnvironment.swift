@@ -31,6 +31,17 @@ public final class AppEnvironment: ObservableObject {
         }
     }
     
+    // MARK: - Global Header Action Triggers & Search State
+    @Published public var requestNewPlaybook: Bool = false
+    @Published public var requestNewNote: Bool = false
+    @Published public var requestNewMissedTrade: Bool = false
+    @Published public var requestNewAccount: Bool = false
+    @Published public var requestNewRoutine: Bool = false
+    @Published public var requestAddTrade: Bool = false
+    @Published public var requestOpenTodayJournal: Bool = false
+    @Published public var isSearchActive: Bool = false
+    @Published public var searchQuery: String = ""
+    
     // Production user identity management (isolated per device)
     @Published public var isAuthenticated: Bool = true
     @Published public var currentUserId: String = AppEnvironment.resolvePersistentUserId()

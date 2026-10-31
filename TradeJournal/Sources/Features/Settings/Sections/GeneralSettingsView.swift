@@ -34,56 +34,28 @@ public struct GeneralSettingsView: View {
         VStack(spacing: 16) {
             // MARK: - 1. Appearance (Theme)
             SettingsCard(title: "Appearance") {
-                VStack(alignment: .leading, spacing: 14) {
-                    Text("Select your preferred visual style or adapt automatically to system settings.")
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.secondaryText)
-                    
-                    HStack(spacing: 10) {
-                        themeOptionButton(
-                            theme: .system,
-                            title: "System",
-                            icon: "circle.lefthalf.filled",
-                            description: "Match iOS"
-                        )
-                        
-                        themeOptionButton(
-                            theme: .dark,
-                            title: "Dark",
-                            icon: "moon.fill",
-                            description: "Terminal"
-                        )
-                        
-                        themeOptionButton(
-                            theme: .light,
-                            title: "Light",
-                            icon: "sun.max.fill",
-                            description: "Daylight"
-                        )
-                    }
+                Picker("Theme", selection: Binding(
+                    get: { env.appTheme },
+                    set: { env.setAppTheme($0) }
+                )) {
+                    Text("System").tag(AppTheme.system)
+                    Text("Dark").tag(AppTheme.dark)
+                    Text("Light").tag(AppTheme.light)
                 }
+                .pickerStyle(.segmented)
             }
             
             // MARK: - 2. Haptics & Vibration
             SettingsCard(title: "Haptics & Touch") {
-                VStack(alignment: .leading, spacing: 12) {
-                    Toggle(isOn: $env.isHapticsEnabled) {
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text("Haptic Feedback")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundColor(AppColors.primaryText)
-                            Text("Tactile vibrations when scrubbing charts, swiping trades, and switching tabs.")
-                                .font(AppTypography.caption)
-                                .foregroundColor(AppColors.secondaryText)
-                        }
-                    }
+                Toggle("Haptic Feedback", isOn: $env.isHapticsEnabled)
+                    .font(.system(size: 14.5, weight: .semibold))
+                    .foregroundColor(AppColors.primaryText)
                     .tint(AppColors.brand)
                     .onChange(of: env.isHapticsEnabled) { enabled in
                         if enabled {
                             NativeHaptics.success()
                         }
                     }
-                }
             }
             
             // MARK: - 3. Timezones
@@ -166,40 +138,5 @@ public struct GeneralSettingsView: View {
             displayTz = dataStore.generalSettings.displayTimeZone
             importTz = dataStore.generalSettings.defaultImportTimeZone
         }
-    }
-    
-    private func themeOptionButton(theme: AppTheme, title: String, icon: String, description: String) -> some View {
-        let isSelected = env.appTheme == theme
-        return Button {
-            NativeHaptics.selection()
-            env.setAppTheme(theme)
-        } label: {
-            VStack(spacing: 8) {
-                Image(systemName: icon)
-                    .font(.system(size: 20, weight: isSelected ? .bold : .medium))
-                    .foregroundColor(isSelected ? AppColors.brand : AppColors.secondaryText)
-                
-                VStack(spacing: 2) {
-                    Text(title)
-                        .font(.system(size: 13, weight: isSelected ? .bold : .medium))
-                        .foregroundColor(isSelected ? AppColors.primaryText : AppColors.secondaryText)
-                    
-                    Text(description)
-                        .font(.system(size: 10, weight: .regular))
-                        .foregroundColor(AppColors.secondaryText.opacity(0.8))
-                }
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
-            .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(isSelected ? AppColors.brand.opacity(env.colorScheme == .dark ? 0.16 : 0.08) : AppColors.secondaryBackground.opacity(0.4))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(isSelected ? AppColors.brand : AppColors.border.opacity(0.4), lineWidth: isSelected ? 1.5 : 0.5)
-            )
-        }
-        .buttonStyle(ApplePressableButtonStyle())
     }
 }

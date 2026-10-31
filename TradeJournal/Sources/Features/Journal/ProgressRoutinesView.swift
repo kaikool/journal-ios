@@ -73,39 +73,14 @@ public struct ProgressRoutinesView: View {
                     archivedSection
                 }
             }
-            .padding(.top, 10)
+            .padding(.top, 14)
             .padding(.bottom, 88)
         }
-        .safeAreaInset(edge: .top, spacing: 0) {
-            HStack {
-                Text("Build a repeatable trading day.")
-                    .font(AppTypography.caption)
-                    .foregroundColor(AppColors.secondaryText)
-                
-                Spacer()
-                
-                Button {
-                    #if canImport(UIKit)
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                    #endif
-                    showAddRoutineSheet = true
-                } label: {
-                    HStack(spacing: 5) {
-                        Image(systemName: "plus")
-                            .font(.system(size: 11, weight: .bold))
-                        Text("New Routine")
-                            .font(.system(size: 12, weight: .semibold))
-                    }
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 7)
-                    .background(AppColors.brandPrimary)
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                }
+        .onReceive(env.$requestNewRoutine) { requested in
+            if requested {
+                env.requestNewRoutine = false
+                showAddRoutineSheet = true
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .background(Color.clear)
         }
         .scrollDismissesKeyboard(.interactively)
         .background(AppColors.background)

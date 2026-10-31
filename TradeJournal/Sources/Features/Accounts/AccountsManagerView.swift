@@ -46,7 +46,8 @@ public struct AccountsManagerView: View {
     }
     
     private var filteredAccounts: [Account] {
-        accounts.filter { acc in
+        let q = (env.isSearchActive ? env.searchQuery : searchText).lowercased().trimmingCharacters(in: .whitespaces)
+        return accounts.filter { acc in
             let isActive = dataStore.isAccountActive(acc)
             let isVisible = dataStore.isAccountVisible(acc)
             
@@ -61,8 +62,7 @@ public struct AccountsManagerView: View {
                 break
             }
             
-            if !searchText.isEmpty {
-                let q = searchText.lowercased()
+            if !q.isEmpty {
                 let matches = acc.name.lowercased().contains(q) ||
                               acc.broker.lowercased().contains(q) ||
                               acc.id.lowercased().contains(q) ||
@@ -109,16 +109,33 @@ public struct AccountsManagerView: View {
             .padding(.bottom, 88)
         }
         .safeAreaInset(edge: .top, spacing: 0) {
-            VStack(spacing: 10) {
-                filterAndSearchHeader
-                
-                bulkVisibilityBar
-                
-                allAccountsScopeCard
-                    .padding(.horizontal, 16)
-            }
+            AppleSlidingSegmentedBar(
+                selection: $filterTab,
+                items: AccountFilterTab.allCases,
+                titleFor: { $0.rawValue },
+                badgeCountFor: { tab in
+                    switch tab {
+                    case .default: return defaultCount
+                    case .active: return activeCount
+                    case .visible: return visibleCount
+                    case .all: return accounts.count
+                    }
+                }
+            )
+            .padding(.horizontal, 16)
             .padding(.vertical, 8)
-            .background(Color.clear)
+            .background(.ultraThinMaterial)
+            .overlay(alignment: .bottom) {
+                Rectangle()
+                    .fill(AppColors.border.opacity(0.3))
+                    .frame(height: 0.5)
+            }
+        }
+        .onReceive(env.$requestNewAccount) { requested in
+            if requested {
+                env.requestNewAccount = false
+                showNewAccountSheet = true
+            }
         }
         .scrollDismissesKeyboard(.interactively)
         .background(AppColors.background)

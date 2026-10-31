@@ -149,23 +149,21 @@ public struct ReportsView: View {
             .padding(.bottom, 88)
         }
         .safeAreaInset(edge: .top, spacing: 0) {
-            HStack(spacing: 8) {
-                AppleSlidingSegmentedBar(
-                    selection: $selectedMode,
-                    items: ReportMode.allCases,
-                    titleFor: { $0.rawValue },
-                    iconFor: { $0.iconName },
-                    isScrollable: true
-                )
-                
-                AppActionPill("Ask AI", icon: "sparkles") {
-                    showAiReflectionSheet = true
-                }
-                .fixedSize()
-            }
+            AppleSlidingSegmentedBar(
+                selection: $selectedMode,
+                items: ReportMode.allCases,
+                titleFor: { $0.rawValue },
+                iconFor: { $0.iconName },
+                isScrollable: true
+            )
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
-            .background(Color.clear)
+            .background(.ultraThinMaterial)
+            .overlay(alignment: .bottom) {
+                Rectangle()
+                    .fill(AppColors.border.opacity(0.3))
+                    .frame(height: 0.5)
+            }
         }
         .scrollDismissesKeyboard(.interactively)
         .background(AppColors.background)

@@ -36,37 +36,14 @@ public struct PlaybooksView: View {
                 }
             }
             .padding(.horizontal, 16)
-            .padding(.top, 10)
+            .padding(.top, 14)
             .padding(.bottom, 88)
         }
-        .safeAreaInset(edge: .top, spacing: 0) {
-            HStack {
-                Text("\(adherenceSummaries.count) Playbook\(adherenceSummaries.count == 1 ? "" : "s")")
-                    .font(AppTypography.caption)
-                    .foregroundColor(AppColors.secondaryText)
-                Spacer()
-                Button {
-                    #if canImport(UIKit)
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                    #endif
-                    showNewPlaybookSheet = true
-                } label: {
-                    HStack(spacing: 5) {
-                        Image(systemName: "plus")
-                            .font(.system(size: 11, weight: .bold))
-                        Text("New Playbook")
-                            .font(.system(size: 12, weight: .semibold))
-                    }
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 7)
-                    .background(AppColors.brandPrimary)
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                }
+        .onReceive(env.$requestNewPlaybook) { requested in
+            if requested {
+                env.requestNewPlaybook = false
+                showNewPlaybookSheet = true
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .background(Color.clear)
         }
         .scrollDismissesKeyboard(.interactively)
         .background(AppColors.background)

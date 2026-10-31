@@ -265,7 +265,12 @@ public struct JournalCalendarView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
-        .background(Color.clear)
+        .background(.ultraThinMaterial)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(AppColors.border.opacity(0.3))
+                .frame(height: 0.5)
+        }
     }
     
     public var body: some View {

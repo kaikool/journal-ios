@@ -51,7 +51,7 @@ public struct DailyJournalListView: View {
     
     private var daysList: [JournalDaySummary] {
         let base = baseDaysList
-        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let query = (env.isSearchActive ? env.searchQuery : searchText).trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty else { return base }
         return base.filter { item in
             item.date.localizedCaseInsensitiveContains(query) ||
@@ -160,11 +160,11 @@ public struct DailyJournalListView: View {
             .padding(.top, 10)
             .padding(.bottom, 88)
         }
-        .safeAreaInset(edge: .top, spacing: 0) {
-            searchAndTodayBar
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-                .background(Color.clear)
+        .onReceive(env.$requestOpenTodayJournal) { requested in
+            if requested {
+                env.requestOpenTodayJournal = false
+                selectedDateForDetail = todayKey
+            }
         }
         .scrollDismissesKeyboard(.interactively)
         .background(AppColors.background)

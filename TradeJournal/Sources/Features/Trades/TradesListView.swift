@@ -46,7 +46,8 @@ public struct TradesListView: View {
     }
     
     private var filteredTrades: [Trade] {
-        let key = "\(dataStore.selectedTimeRange.rawValue)_\(statusFilter.rawValue)_\(searchText)_\(dataStore.selectedAccountId)_\(dataStore.filteredTrades.count)_\(dataStore.cacheVersion)"
+        let q = (env.isSearchActive ? env.searchQuery : searchText).trimmingCharacters(in: .whitespaces).lowercased()
+        let key = "\(dataStore.selectedTimeRange.rawValue)_\(statusFilter.rawValue)_\(q)_\(dataStore.selectedAccountId)_\(dataStore.filteredTrades.count)_\(dataStore.cacheVersion)"
         if cache.lastFilterKey == key {
             return cache.lastFilteredTrades
         }
@@ -63,7 +64,6 @@ public struct TradesListView: View {
             list = list.filter { $0.status == .open }
         }
         
-        let q = searchText.trimmingCharacters(in: .whitespaces).lowercased()
         if !q.isEmpty {
             list = list.filter {
                 $0.symbol.lowercased().contains(q) ||
@@ -130,6 +130,12 @@ public struct TradesListView: View {
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(28)
+        }
+        .onReceive(env.$requestAddTrade) { requested in
+            if requested {
+                env.requestAddTrade = false
+                showAddTradeSheet = true
+            }
         }
     }
     
@@ -257,78 +263,13 @@ public struct TradesListView: View {
     
     @ViewBuilder
     private var searchAndStatusFilter: some View {
-        HStack(spacing: 10) {
-            HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 13))
-                    .foregroundColor(AppColors.secondaryText)
-                TextField("Search symbol, tag, notes...", text: $searchText)
-                    .font(.system(size: 13, weight: .regular))
-                    .foregroundColor(AppColors.primaryText)
-                if !searchText.isEmpty {
-                    Button {
-                        searchText = ""
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 13))
-                            .foregroundColor(AppColors.secondaryText)
-                    }
-                }
-            }
-            .frame(height: 40)
-            .padding(.horizontal, 12)
-            .background(AppColors.cardBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(AppColors.border.opacity(0.5), lineWidth: 0.5)
-            )
-            
-            Menu {
-                ForEach(TradeStatusFilter.allCases) { f in
-                    Button(f.rawValue) {
-                        #if canImport(UIKit)
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        #endif
-                        statusFilter = f
-                    }
-                }
-            } label: {
-                HStack(spacing: 6) {
-                    Text(statusFilter.rawValue)
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(AppColors.primaryText)
-                        .lineLimit(1)
-                    Image(systemName: "chevron.up.chevron.down")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundColor(AppColors.secondaryText)
-                }
-                .frame(height: 40)
-                .padding(.horizontal, 14)
-                .background(AppColors.cardBackground)
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .stroke(AppColors.border.opacity(0.5), lineWidth: 0.5)
-                )
-            }
-            
-            Button {
-                showPreTradeSheet = true
-            } label: {
-                Text("Pre-Trade")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(AppColors.brand)
-                    .frame(height: 40)
-                    .padding(.horizontal, 12)
-                    .background(AppColors.cardBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .stroke(AppColors.border.opacity(0.5), lineWidth: 0.5)
-                    )
+        Picker("Status", selection: $statusFilter) {
+            ForEach(TradeStatusFilter.allCases) { f in
+                Text(f.rawValue).tag(f)
             }
         }
+        .pickerStyle(.segmented)
+        .padding(.vertical, 2)
     }
     
     @ViewBuilder
