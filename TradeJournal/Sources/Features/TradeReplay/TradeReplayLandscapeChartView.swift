@@ -246,83 +246,42 @@ public struct TradeReplayLandscapeChartView: View {
     private var bottomPlayerBar: some View {
         AppFloatingBar {
             // Reset to beginning
-            Button {
-                NativeHaptics.lightImpact()
-                onReset()
-            } label: {
-                Image(systemName: "backward.end.fill")
-                    .font(AppTypography.actionButtonCompact)
-                    .foregroundColor(AppColors.primaryText)
-                    .frame(width: 30, height: 30)
-                    .background(AppColors.secondaryBackground)
-                    .clipShape(Circle())
-            }
-            .buttonStyle(ApplePressableButtonStyle())
+            ModalCircleButton(icon: "backward.end.fill", action: {
+                        NativeHaptics.lightImpact()
+                        onReset()
+                    })
             .disabled(bars.isEmpty)
             .accessibilityLabel("Reset Replay")
             
             // Step back 1 bar
-            Button {
+            ModalCircleButton(icon: "chevron.left", action: {
                 NativeHaptics.lightImpact()
                 onStep(-1)
-            } label: {
-                Image(systemName: "chevron.left")
-                    .font(AppTypography.actionButtonCompact)
-                    .foregroundColor(currentStep <= 1 ? AppColors.secondaryText.opacity(0.3) : AppColors.primaryText)
-                    .frame(width: 30, height: 30)
-                    .background(AppColors.secondaryBackground)
-                    .clipShape(Circle())
-            }
-            .buttonStyle(ApplePressableButtonStyle())
+            })
             .disabled(currentStep <= 1 || bars.isEmpty)
             .accessibilityLabel("Step Backward")
             
             // Play / Pause (Large central button)
-            Button {
-                NativeHaptics.mediumImpact()
-                onTogglePlay()
-            } label: {
-                Image(systemName: isPlaying ? "pause.fill" : "play.fill")
-                    .font(AppTypography.actionButton)
-                    .foregroundColor(.white)
-                    .frame(width: 36, height: 36)
-                    .background(AppColors.brand)
-                    .clipShape(Circle())
-                    .shadow(color: AppColors.brand.opacity(0.35), radius: 4, x: 0, y: 2)
-            }
-            .buttonStyle(ApplePressableButtonStyle())
+            ModalCircleButton(icon: isPlaying ? "pause.fill" : "play.fill", action: {
+                        NativeHaptics.mediumImpact()
+                        onTogglePlay()
+                    })
             .disabled(bars.isEmpty)
             .accessibilityLabel(isPlaying ? "Pause" : "Play")
             
             // Step forward 1 bar
-            Button {
+            ModalCircleButton(icon: "chevron.right", action: {
                 NativeHaptics.lightImpact()
                 onStep(1)
-            } label: {
-                Image(systemName: "chevron.right")
-                    .font(AppTypography.actionButtonCompact)
-                    .foregroundColor(currentStep >= bars.count ? AppColors.secondaryText.opacity(0.3) : AppColors.primaryText)
-                    .frame(width: 30, height: 30)
-                    .background(AppColors.secondaryBackground)
-                    .clipShape(Circle())
-            }
-            .buttonStyle(ApplePressableButtonStyle())
+            })
             .disabled(currentStep >= bars.count || bars.isEmpty)
             .accessibilityLabel("Step Forward")
             
             // Forward to end
-            Button {
-                NativeHaptics.lightImpact()
-                onForwardToEnd()
-            } label: {
-                Image(systemName: "forward.end.fill")
-                    .font(AppTypography.actionButtonCompact)
-                    .foregroundColor(AppColors.primaryText)
-                    .frame(width: 30, height: 30)
-                    .background(AppColors.secondaryBackground)
-                    .clipShape(Circle())
-            }
-            .buttonStyle(ApplePressableButtonStyle())
+            ModalCircleButton(icon: "forward.end.fill", action: {
+                        NativeHaptics.lightImpact()
+                        onForwardToEnd()
+                    })
             .disabled(bars.isEmpty)
             .accessibilityLabel("Forward To End")
             

@@ -29,10 +29,13 @@ extension PropFirmLedgerView {
     internal var accountsListView: some View {
         VStack(spacing: 12) {
             if filteredAccounts.isEmpty {
-                EmptyStateView(
+                AppEmptyState(
                     icon: "building.columns",
                     title: selectedAccountStatus == .all ? "No prop accounts" : "No \(selectedAccountStatus.rawValue.lowercased()) prop accounts",
-                    message: "Tap 'Track account' above to add your Topstep, FTMO, The5ers accounts."
+                    message: "Track your Topstep, FTMO, The5ers accounts and evaluation phases.",
+                    actionTitle: "Track Account",
+                    actionIcon: "plus",
+                    action: { showNewAccountSheet = true }
                 )
             } else {
                 ForEach(filteredAccounts) { acc in

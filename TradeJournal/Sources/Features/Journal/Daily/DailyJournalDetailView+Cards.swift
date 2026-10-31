@@ -247,57 +247,45 @@ extension DailyJournalDetailView {
                 
                 VStack(spacing: 8) {
                     ForEach(dayTrades) { trade in
-                        Button {
-                            selectedTradeForDetail = trade
-                        } label: {
-                            HStack(spacing: 8) {
-                                // Status badge WIN / LOSS / BE
-                                Text(trade.status.rawValue.uppercased())
-                                    .font(AppTypography.badgeStandard)
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 3)
-                                    .background(
-                                        trade.netPnl > 0 ? AppColors.profit.opacity(0.15) :
-                                        (trade.netPnl < 0 ? AppColors.loss.opacity(0.15) : AppColors.secondaryBackground)
-                                    )
-                                    .foregroundColor(
-                                        trade.netPnl > 0 ? AppColors.profit :
-                                        (trade.netPnl < 0 ? AppColors.loss : AppColors.secondaryText)
-                                    )
-                                    .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
-                                    .lineLimit(1)
-                                
-                                Text(trade.symbol)
+                        HStack(spacing: 8) {
+                            AppBadge(
+                                trade.status.rawValue.uppercased(),
+                                variant: trade.netPnl > 0 ? .profit : (trade.netPnl < 0 ? .loss : .secondary)
+                            )
+                            
+                            Text(trade.symbol)
+                                .font(AppTypography.subheadlineBold)
+                                .foregroundColor(AppColors.primaryText)
+                                .lineLimit(1)
+                            
+                            AppBadge(
+                                trade.direction.rawValue.uppercased(),
+                                variant: trade.direction == .long ? .brand : .warning
+                            )
+                            
+                            Spacer(minLength: 4)
+                            
+                            VStack(alignment: .trailing, spacing: 2) {
+                                Text(trade.netPnl >= 0 ? "+" + Formatters.currency(trade.netPnl) : Formatters.currency(trade.netPnl))
                                     .font(AppTypography.subheadlineBold)
-                                    .foregroundColor(AppColors.primaryText)
+                                    .foregroundColor(trade.netPnl >= 0 ? AppColors.profit : AppColors.loss)
                                     .lineLimit(1)
                                 
-                                Text(trade.direction.rawValue.uppercased())
-                                    .font(AppTypography.badgeStandard)
-                                    .foregroundColor(trade.direction == .long ? AppColors.brand : AppColors.warning)
-                                    .lineLimit(1)
-                                
-                                Spacer(minLength: 4)
-                                
-                                VStack(alignment: .trailing, spacing: 2) {
-                                    Text(trade.netPnl >= 0 ? "+\(Formatters.currency(trade.netPnl))" : Formatters.currency(trade.netPnl))
-                                        .font(AppTypography.subheadlineBold)
-                                        .foregroundColor(trade.netPnl >= 0 ? AppColors.profit : AppColors.loss)
-                                        .lineLimit(1)
-                                    
-                                    Text("\(Formatters.formatNumber(trade.quantity)) lots @ \(Formatters.price(trade.avgEntry))")
-                                        .font(AppTypography.captionMicro)
-                                        .foregroundColor(AppColors.secondaryText)
-                                        .lineLimit(1)
-                                }
-                                
-                                Image(systemName: "chevron.right")
+                                Text("\(Formatters.formatNumber(trade.quantity)) lots @ \(Formatters.price(trade.avgEntry))")
                                     .font(AppTypography.captionMicro)
-                                    .foregroundColor(AppColors.secondaryText.opacity(0.4))
+                                    .foregroundColor(AppColors.secondaryText)
+                                    .lineLimit(1)
                             }
-                            .padding(.vertical, 6)
+                            
+                            Image(systemName: "chevron.right")
+                                .font(AppTypography.captionMicro)
+                                .foregroundColor(AppColors.secondaryText.opacity(0.4))
                         }
-                        .buttonStyle(ApplePressableButtonStyle())
+                        .padding(.vertical, 6)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            selectedTradeForDetail = trade
+                        }
                         
                         if trade.id != dayTrades.last?.id {
                             Divider()

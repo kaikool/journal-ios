@@ -37,21 +37,20 @@ extension DashboardView {
                 } else {
                     EdgeRadarView(components: edgeResult.components, height: 210)
                     
-                    Button {
+                    HStack(spacing: 4) {
+                        Text(showEdgeScoreBreakdown ? "Hide component breakdown" : "View component breakdown")
+                            .font(AppTypography.captionBold)
+                        Image(systemName: showEdgeScoreBreakdown ? "chevron.up" : "chevron.down")
+                            .font(AppTypography.captionMicro)
+                    }
+                    .foregroundColor(AppColors.brand)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
                         NativeHaptics.lightImpact()
                         withAnimation {
                             showEdgeScoreBreakdown.toggle()
                         }
-                    } label: {
-                        HStack(spacing: 4) {
-                            Text(showEdgeScoreBreakdown ? "Hide component breakdown" : "View component breakdown")
-                                .font(AppTypography.captionBold)
-                            Image(systemName: showEdgeScoreBreakdown ? "chevron.up" : "chevron.down")
-                                .font(AppTypography.captionMicro)
-                        }
-                        .foregroundColor(AppColors.brand)
                     }
-                    .buttonStyle(ApplePressableButtonStyle())
                     .padding(.top, 2)
                     
                     if showEdgeScoreBreakdown, let b = edgeResult.breakdown {

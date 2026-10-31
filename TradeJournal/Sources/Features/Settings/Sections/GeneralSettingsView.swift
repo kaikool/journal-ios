@@ -91,13 +91,9 @@ public struct GeneralSettingsView: View {
                             }
                         }
                         
-                        Button {
+                        AppActionPill("Use device timezone (\(TimeZone.current.identifier))", icon: "location") {
                             displayTz = TimeZone.current.identifier
                             isSaved = false
-                        } label: {
-                            Text("Use device timezone (\(TimeZone.current.identifier))")
-                                .font(AppTypography.caption)
-                                .foregroundColor(AppColors.brand)
                         }
                     }
                     

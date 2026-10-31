@@ -10,16 +10,10 @@ extension DashboardView {
                         .font(AppTypography.headline)
                         .foregroundColor(AppColors.primaryText)
                     Spacer()
-                    Button {
+                    AppActionPill("Full calendar", icon: "calendar") {
                         NativeHaptics.lightImpact()
                         env.selectedTab = .calendar
-                    } label: {
-                        Text("Full calendar")
-                            .font(AppTypography.captionBold)
-                            .underline()
-                            .foregroundColor(AppColors.brand)
                     }
-                    .buttonStyle(ApplePressableButtonStyle())
                 }
                 
                 // 8-column header (Sun..Sat + Week)
@@ -57,28 +51,27 @@ extension DashboardView {
                                     let stats = snap.daysWithTradesMap[key]
                                     let dayNum = Calendar.current.component(.day, from: date)
                                     
-                                    Button {
-                                        openCalendarDay(dateKey: key, stats: stats)
-                                    } label: {
-                                        VStack(spacing: 1) {
-                                            Text("\(dayNum)")
-                                                .font(stats != nil ? AppTypography.numberMicro : AppTypography.disclaimer)
-                                                .foregroundColor(stats != nil ? AppColors.primaryText : AppColors.secondaryText)
-                                            
-                                            if let s = stats {
-                                                Text(s.netPnl >= 0 ? "+" : "-")
-                                                    .font(AppTypography.badgeMicro)
-                                                    .foregroundColor(s.netPnl >= 0 ? AppColors.profit : AppColors.loss)
-                                            }
+                                    VStack(spacing: 1) {
+                                        Text("\(dayNum)")
+                                            .font(stats != nil ? AppTypography.numberMicro : AppTypography.disclaimer)
+                                            .foregroundColor(stats != nil ? AppColors.primaryText : AppColors.secondaryText)
+                                        
+                                        if let s = stats {
+                                            Text(s.netPnl >= 0 ? "+" : "-")
+                                                .font(AppTypography.badgeMicro)
+                                                .foregroundColor(s.netPnl >= 0 ? AppColors.profit : AppColors.loss)
                                         }
-                                        .frame(height: 26)
-                                        .frame(maxWidth: .infinity)
-                                        .appSubCardStyle(cornerRadius: 6, padding: 0)
-                                        .overlay(
-                                            stats.map { RoundedRectangle(cornerRadius: 6, style: .continuous).stroke($0.netPnl >= 0 ? AppColors.profit.opacity(0.24) : AppColors.loss.opacity(0.24), lineWidth: 0.5) }
-                                        )
                                     }
-                                    .buttonStyle(.plain)
+                                    .frame(height: 26)
+                                    .frame(maxWidth: .infinity)
+                                    .appSubCardStyle(cornerRadius: 6, padding: 0)
+                                    .overlay(
+                                        stats.map { RoundedRectangle(cornerRadius: 6, style: .continuous).stroke($0.netPnl >= 0 ? AppColors.profit.opacity(0.24) : AppColors.loss.opacity(0.24), lineWidth: 0.5) }
+                                    )
+                                    .contentShape(Rectangle())
+                                    .onTapGesture {
+                                        openCalendarDay(dateKey: key, stats: stats)
+                                    }
                                 } else {
                                     Color.clear
                                         .frame(height: 26)

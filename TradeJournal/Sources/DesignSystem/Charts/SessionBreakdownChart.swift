@@ -68,10 +68,11 @@ public struct SessionBreakdownChart: View {
                 .frame(height: 38)
                 
                 if sessions.isEmpty {
-                    EmptyStateView(
+                    AppEmptyState(
                         icon: "clock.badge.checkmark",
                         title: "No Session Data",
-                        message: "Trades with execution times will be aggregated into standard trading sessions."
+                        message: "Trades with execution times will be aggregated into standard trading sessions.",
+                        isInCard: true
                     )
                     .frame(height: 160)
                 } else {

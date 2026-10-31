@@ -184,11 +184,8 @@ public struct NotebookView: View {
     private var notesListView: some View {
         LazyVStack(spacing: 12) {
             ForEach(filteredNotes) { note in
-                    Button {
-                        NativeHaptics.lightImpact()
-                        editingNote = note
-                    } label: {
-                        cardContainer {
+                    cardContainer {
+
                             VStack(alignment: .leading, spacing: 8) {
                                 HStack(alignment: .top) {
                                     Text(note.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Untitled" : note.title)
@@ -239,9 +236,12 @@ public struct NotebookView: View {
                                     }
                                 }
                             }
-                        }
-                    }
-                    .buttonStyle(ApplePressableButtonStyle())
+                                        }
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    NativeHaptics.lightImpact()
+                    editingNote = note
+                }
                 }
             }
         }

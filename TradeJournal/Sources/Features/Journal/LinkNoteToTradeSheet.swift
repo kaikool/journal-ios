@@ -89,14 +89,13 @@ public struct LinkNoteToTradeSheet: View {
                     List {
                         ForEach(filteredTrades, id: \.key) { trade in
                             let isLinked = trade.key == currentTradeKey
-                            Button {
-                                linkTrade(trade)
-                            } label: {
-                                tradeRow(trade, isLinked: isLinked)
-                            }
-                            .buttonStyle(ApplePressableButtonStyle())
-                            .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
-                            .listRowBackground(isLinked ? AppColors.secondaryBackground.opacity(0.4) : Color.clear)
+                            tradeRow(trade, isLinked: isLinked)
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    linkTrade(trade)
+                                }
+                                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                                .listRowBackground(isLinked ? AppColors.secondaryBackground.opacity(0.4) : Color.clear)
                         }
                     }
                     .listStyle(.plain)

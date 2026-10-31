@@ -143,22 +143,12 @@ public struct AIReflectionView: View {
     
     // MARK: - Back to Questions Bar
     private var backToQuestionsBar: some View {
-        Button(action: {
+        AppActionPill("Back to Question List", icon: "chevron.left") {
             withAnimation(.easeInOut(duration: 0.2)) {
                 reflectionResult = ""
             }
-        }) {
-            HStack(spacing: 6) {
-                Image(systemName: "chevron.left")
-                    .font(AppTypography.actionButtonCompact)
-                Text("Back to Question List")
-                    .font(AppTypography.actionButtonCompact)
-                Spacer()
-            }
-            .foregroundColor(AppColors.secondaryText)
-            .padding(.vertical, 4)
         }
-        .buttonStyle(ApplePressableButtonStyle())
+        .padding(.vertical, 4)
     }
     
     // MARK: - Template Filtering

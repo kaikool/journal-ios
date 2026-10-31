@@ -50,11 +50,7 @@ public struct PreTradeErrorCard: View {
                     .foregroundColor(AppColors.secondaryText)
                     .lineSpacing(2)
                 
-                Button(action: onRetry) {
-                    Text("Retry Stream")
-                        .font(AppTypography.actionButtonCompact)
-                        .foregroundColor(AppColors.brand)
-                }
+                AppPrimaryButton("Retry Stream", icon: "arrow.counterclockwise", action: onRetry)
                 .buttonStyle(.plain)
             }
             .padding(.vertical, 2)

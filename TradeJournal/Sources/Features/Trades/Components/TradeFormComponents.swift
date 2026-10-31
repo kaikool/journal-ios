@@ -70,13 +70,8 @@ public struct TradeSymbolSelector: View {
                         .foregroundColor(AppColors.mutedText)
                         .tracking(0.5)
                     Spacer()
-                    Button {
-                        NativeHaptics.lightImpact()
+                    AppActionPill(showCryptoSymbols ? "Forex/Gold" : "Crypto/Indices", icon: "arrow.triangle.swap") {
                         showCryptoSymbols.toggle()
-                    } label: {
-                        Text(showCryptoSymbols ? "Forex/Gold" : "Crypto/Indices")
-                            .font(AppTypography.actionButtonCompact)
-                            .foregroundColor(AppColors.brand)
                     }
                 }
                 
@@ -283,45 +278,42 @@ public struct TradePlaybookRulesCard: View {
                         
                         Spacer()
                         
-                        Button {
-                            NativeHaptics.lightImpact()
+                        AppActionPill(
+                            pb.rules.allSatisfy { ruleAssessments[$0] == true } ? "Clear All" : "Select All",
+                            icon: "checklist"
+                        ) {
                             let allFollowed = pb.rules.allSatisfy { ruleAssessments[$0] == true }
                             for rule in pb.rules {
                                 ruleAssessments[rule] = !allFollowed
                             }
-                        } label: {
-                            Text(pb.rules.allSatisfy { ruleAssessments[$0] == true } ? "Clear All" : "Select All")
-                                .font(AppTypography.actionButtonCompact)
-                                .foregroundColor(AppColors.brand)
                         }
                     }
                     
                     VStack(spacing: 6) {
                         ForEach(pb.rules, id: \.self) { rule in
                             let isFollowed = ruleAssessments[rule] ?? false
-                            Button {
+                            HStack(spacing: 10) {
+                                Image(systemName: isFollowed ? "checkmark.circle.fill" : "circle")
+                                    .font(AppTypography.rowPrimary)
+                                    .foregroundColor(isFollowed ? AppColors.profit : AppColors.secondaryText.opacity(0.6))
+                                
+                                Text(rule)
+                                    .font(AppTypography.caption)
+                                    .foregroundColor(isFollowed ? AppColors.primaryText : AppColors.secondaryText)
+                                    .strikethrough(!isFollowed && ruleAssessments[rule] != nil ? false : false)
+                                
+                                Spacer()
+                            }
+                            .appSubCardStyle(cornerRadius: 8, padding: 8)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .stroke(isFollowed ? AppColors.profit.opacity(0.3) : Color.clear, lineWidth: 0.5)
+                            )
+                            .contentShape(Rectangle())
+                            .onTapGesture {
                                 NativeHaptics.lightImpact()
                                 ruleAssessments[rule] = !isFollowed
-                            } label: {
-                                HStack(spacing: 10) {
-                                    Image(systemName: isFollowed ? "checkmark.circle.fill" : "circle")
-                                        .font(AppTypography.rowPrimary)
-                                        .foregroundColor(isFollowed ? AppColors.profit : AppColors.secondaryText.opacity(0.6))
-                                    
-                                    Text(rule)
-                                        .font(AppTypography.caption)
-                                        .foregroundColor(isFollowed ? AppColors.primaryText : AppColors.secondaryText)
-                                        .strikethrough(!isFollowed && ruleAssessments[rule] != nil ? false : false)
-                                    
-                                    Spacer()
-                                }
-                                .appSubCardStyle(cornerRadius: 8, padding: 8)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                        .stroke(isFollowed ? AppColors.profit.opacity(0.3) : Color.clear, lineWidth: 0.5)
-                                )
                             }
-                            .buttonStyle(ApplePressableButtonStyle())
                         }
                     }
                 }

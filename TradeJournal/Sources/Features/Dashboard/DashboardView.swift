@@ -500,10 +500,8 @@ public struct DashboardView: View {
                 }
                 
                 Section {
-                    Button {
+                    AppSecondaryButton("Restore default layout", icon: "arrow.counterclockwise") {
                         applyPreset(.overview)
-                    } label: {
-                        Label("Restore default layout", systemImage: "arrow.counterclockwise")
                     }
                 }
             } label: {
@@ -525,20 +523,9 @@ public struct DashboardView: View {
             }
             
             // Customize button (Sheet)
-            Button {
+            AppActionPill("Customize", icon: "slider.horizontal.3") {
                 NativeHaptics.lightImpact()
                 showCustomizerSheet = true
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "slider.horizontal.3")
-                        .font(AppTypography.actionButtonCompact)
-                    Text("Customize")
-                        .font(AppTypography.actionButtonCompact)
-                        .lineLimit(1)
-                }
-                .foregroundColor(AppColors.primaryText)
-                .appCardStyle(cornerRadius: 8)
-                .frame(height: 38)
             }
             .buttonStyle(ApplePressableButtonStyle())
         }
@@ -674,13 +661,11 @@ public struct DashboardView: View {
                     .font(AppTypography.caption)
                     .foregroundColor(AppColors.secondaryText)
                 
-                Button("Reset to All") {
+                AppActionPill("Reset to All") {
                     withAnimation {
                         dataStore.selectedTimeRange = .all
                     }
                 }
-                .font(AppTypography.captionBold)
-                .foregroundColor(AppColors.brand)
                 .padding(.top, 4)
             }
             .frame(maxWidth: .infinity)
@@ -743,13 +728,7 @@ public struct DashboardView: View {
                     .font(AppTypography.caption)
                     .foregroundColor(AppColors.primaryText)
                 Spacer()
-                Button {
-                    dataStore.lastSyncSummary = nil
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(AppTypography.captionMicro)
-                        .foregroundColor(AppColors.secondaryText)
-                }
+                ModalCloseButton(action: { dataStore.lastSyncSummary = nil })
             }
             .appSubCardStyle(cornerRadius: 10, padding: 10)
         }
@@ -763,13 +742,7 @@ public struct DashboardView: View {
                     .foregroundColor(AppColors.primaryText)
                     .lineLimit(2)
                 Spacer()
-                Button {
-                    dataStore.lastSyncError = nil
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(AppTypography.captionMicro)
-                        .foregroundColor(AppColors.secondaryText)
-                }
+                ModalCloseButton(action: { dataStore.lastSyncError = nil })
             }
             .appSubCardStyle(cornerRadius: 10, padding: 10)
         }

@@ -317,15 +317,7 @@ public struct PlaybookConditionEdgeChart: View {
     private func divergingRow(stat: ConditionRuleStat) -> some View {
         let isSelected = selectedIndex == stat.index
         
-        Button {
-            NativeHaptics.lightImpact()
-            if selectedIndex == stat.index {
-                selectedIndex = nil
-            } else {
-                selectedIndex = stat.index
-            }
-        } label: {
-            GeometryReader { geo in
+        GeometryReader { geo in
                 let centerWidth: CGFloat = 32
                 let halfWidth = max((geo.size.width - centerWidth) / 2, 40)
                 let maxBar = max(halfWidth - 28, 10)
@@ -403,8 +395,15 @@ public struct PlaybookConditionEdgeChart: View {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .fill(isSelected ? AppColors.secondaryBackground.opacity(0.8) : Color.clear)
             )
-        }
-        .buttonStyle(.plain)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                NativeHaptics.lightImpact()
+                if selectedIndex == stat.index {
+                    selectedIndex = nil
+                } else {
+                    selectedIndex = stat.index
+                }
+            }
     }
     
     // MARK: - Breakdown Table

@@ -68,41 +68,17 @@ public struct TradeReplayControlsCard: View {
                 // Playback controls row
                 HStack(spacing: 8) {
                     // Restart
-                    Button {
-                        NativeHaptics.lightImpact()
-                        onReset()
-                    } label: {
-                        Image(systemName: "backward.end.fill")
-                            .font(AppTypography.actionButtonCompact)
-                            .foregroundColor(AppColors.primaryText)
-                            .frame(width: 34, height: 34)
-                            .background(AppColors.cardBackground.opacity(0.85))
-                            .clipShape(Circle())
-                            .overlay(
-                                Circle()
-                                    .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
-                            )
-                    }
-                    .buttonStyle(ApplePressableButtonStyle())
+                    ModalCircleButton(icon: "backward.end.fill", action: {
+                NativeHaptics.lightImpact()
+                onReset()
+            })
                     .disabled(barsCount == 0)
                     
                     // Step back
-                    Button {
+                    ModalCircleButton(icon: "chevron.left", action: {
                         NativeHaptics.lightImpact()
                         onStep(-1)
-                    } label: {
-                        Image(systemName: "chevron.left")
-                            .font(AppTypography.actionButtonCompact)
-                            .foregroundColor(currentStep <= 1 ? AppColors.secondaryText.opacity(0.3) : AppColors.primaryText)
-                            .frame(width: 34, height: 34)
-                            .background(AppColors.cardBackground.opacity(0.85))
-                            .clipShape(Circle())
-                            .overlay(
-                                Circle()
-                                    .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
-                            )
-                    }
-                    .buttonStyle(ApplePressableButtonStyle())
+                    })
                     .disabled(currentStep <= 1 || barsCount == 0)
                     
                     // Play / Pause
@@ -116,41 +92,17 @@ public struct TradeReplayControlsCard: View {
                     .disabled(barsCount == 0)
                     
                     // Step forward
-                    Button {
+                    ModalCircleButton(icon: "chevron.right", action: {
                         NativeHaptics.lightImpact()
                         onStep(1)
-                    } label: {
-                        Image(systemName: "chevron.right")
-                            .font(AppTypography.actionButtonCompact)
-                            .foregroundColor(currentStep >= barsCount ? AppColors.secondaryText.opacity(0.3) : AppColors.primaryText)
-                            .frame(width: 34, height: 34)
-                            .background(AppColors.cardBackground.opacity(0.85))
-                            .clipShape(Circle())
-                            .overlay(
-                                Circle()
-                                    .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
-                            )
-                    }
-                    .buttonStyle(ApplePressableButtonStyle())
+                    })
                     .disabled(currentStep >= barsCount || barsCount == 0)
                     
                     // Forward to end
-                    Button {
-                        NativeHaptics.lightImpact()
-                        onForwardToEnd()
-                    } label: {
-                        Image(systemName: "forward.end.fill")
-                            .font(AppTypography.actionButtonCompact)
-                            .foregroundColor(AppColors.primaryText)
-                            .frame(width: 34, height: 34)
-                            .background(AppColors.cardBackground.opacity(0.85))
-                            .clipShape(Circle())
-                            .overlay(
-                                Circle()
-                                    .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
-                            )
-                    }
-                    .buttonStyle(ApplePressableButtonStyle())
+                    ModalCircleButton(icon: "forward.end.fill", action: {
+                NativeHaptics.lightImpact()
+                onForwardToEnd()
+            })
                     .disabled(barsCount == 0)
                     
                     Spacer(minLength: 4)
@@ -168,22 +120,10 @@ public struct TradeReplayControlsCard: View {
                     
                     // Fullscreen Landscape Trigger (placed directly next to Speed button)
                     if let onLandscape = onOpenLandscape {
-                        Button {
-                            NativeHaptics.lightImpact()
-                            onLandscape()
-                        } label: {
-                            Image(systemName: "arrow.up.left.and.arrow.down.right")
-                                .font(AppTypography.actionButtonCompact)
-                                .foregroundColor(AppColors.primaryText)
-                                .frame(width: 34, height: 34)
-                                .background(AppColors.secondaryBackground)
-                                .clipShape(Circle())
-                                .overlay(
-                                    Circle()
-                                        .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
-                                )
-                        }
-                        .buttonStyle(ApplePressableButtonStyle())
+                        ModalCircleButton(icon: "arrow.up.left.and.arrow.down.right", action: {
+                NativeHaptics.lightImpact()
+                onLandscape()
+            })
                         .accessibilityLabel("Fullscreen Landscape Chart")
                     }
                 }

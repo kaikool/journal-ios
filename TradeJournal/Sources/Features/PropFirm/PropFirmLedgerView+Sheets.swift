@@ -164,16 +164,8 @@ public struct EditPropAccountSheet: View {
                 }
                 
                 Section {
-                    Button(role: .destructive) {
+                    AppDestructiveButton("Delete Prop Account", icon: "trash") {
                         showDeleteConfirm = true
-                    } label: {
-                        HStack {
-                            Spacer()
-                            Text("Delete Prop Account")
-                                .font(AppTypography.captionBold)
-                                .foregroundColor(AppColors.loss)
-                            Spacer()
-                        }
                     }
                 }
             }

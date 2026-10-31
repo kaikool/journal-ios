@@ -286,10 +286,11 @@ public struct EquityCurveChart: View {
             headerBar
             
             if points.isEmpty {
-                EmptyStateView(
+                AppEmptyState(
                     icon: "chart.line.uptrend.xyaxis",
                     title: "No Data",
-                    message: "Execute or import trades to visualize your cumulative P&L curve."
+                    message: "Execute or import trades to visualize your cumulative P&L curve.",
+                    isInCard: true
                 )
                 .frame(height: height)
             } else {

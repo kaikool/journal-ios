@@ -30,8 +30,8 @@ public struct AppMonetaryText: View {
 /// Standardized empty state view with title, message, and action
 public struct EmptyStateView: View {
     private let title: String
-    private let description: String
-    private let iconName: String
+    private let message: String
+    private let icon: String
     private let actionTitle: String?
     private let action: (() -> Void)?
     
@@ -43,8 +43,8 @@ public struct EmptyStateView: View {
         action: (() -> Void)? = nil
     ) {
         self.title = title
-        self.description = description
-        self.iconName = icon
+        self.message = description
+        self.icon = icon
         self.actionTitle = actionTitle
         self.action = action
     }
@@ -57,45 +57,20 @@ public struct EmptyStateView: View {
         action: (() -> Void)? = nil
     ) {
         self.title = title
-        self.description = message
-        self.iconName = icon
+        self.message = message
+        self.icon = icon
         self.actionTitle = actionTitle
         self.action = action
     }
     
     public var body: some View {
-        VStack(spacing: 12) {
-            Image(systemName: iconName)
-                .font(AppTypography.iconHero)
-                .foregroundColor(AppColors.secondaryText.opacity(0.6))
-            
-            Text(title)
-                .font(AppTypography.pageTitle)
-                .foregroundColor(AppColors.primaryText)
-            
-            if !description.isEmpty {
-                Text(description)
-                    .font(AppTypography.caption)
-                    .foregroundColor(AppColors.secondaryText)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 24)
-            }
-            
-            if let actionTitle = actionTitle, let action = action {
-                Button(action: action) {
-                    Text(actionTitle)
-                        .font(AppTypography.bodyBold)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .background(AppColors.brand)
-                        .foregroundColor(.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                }
-                .padding(.top, 4)
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding()
+        AppEmptyState(
+            icon: icon,
+            title: title,
+            message: message,
+            actionTitle: actionTitle,
+            action: action
+        )
     }
 }
 

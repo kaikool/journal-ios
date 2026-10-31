@@ -94,17 +94,7 @@ public struct TradeAICoachBottomFloatingInput: View {
                     TradeJournalProLoader(size: 20)
                         .frame(width: 34, height: 34)
                 } else {
-                    Button(action: onSubmit) {
-                        ZStack {
-                            Circle()
-                                .fill(hasQueryText ? AppColors.brand : AppColors.secondaryBackground.opacity(0.85))
-                                .frame(width: 34, height: 34)
-                            
-                            Image(systemName: "arrow.up")
-                                .font(AppTypography.actionButton)
-                                .foregroundColor(hasQueryText ? .white : AppColors.secondaryText.opacity(0.4))
-                        }
-                    }
+                    ModalCircleButton(icon: "arrow.up", action: onSubmit)
                     .disabled(!hasQueryText)
                     .animation(.easeInOut(duration: 0.15), value: hasQueryText)
                 }

@@ -205,13 +205,7 @@ public struct EditTargetsSheet: View {
                         .tracking(0.5)
                     Spacer()
                     if stopLoss != nil {
-                        Button {
-                            stopLossText = ""
-                        } label: {
-                            Text("Clear")
-                                .font(AppTypography.actionButtonCompact)
-                                .foregroundColor(AppColors.secondaryText)
-                        }
+                        ModalCloseButton(action: { stopLossText = "" })
                     }
                 }
                 
@@ -275,13 +269,7 @@ public struct EditTargetsSheet: View {
                         .tracking(0.5)
                     Spacer()
                     if profitTarget != nil {
-                        Button {
-                            profitTargetText = ""
-                        } label: {
-                            Text("Clear")
-                                .font(AppTypography.actionButtonCompact)
-                                .foregroundColor(AppColors.secondaryText)
-                        }
+                        ModalCloseButton(action: { profitTargetText = "" })
                     }
                 }
                 

@@ -279,23 +279,21 @@ public struct PropFirmLedgerView: View {
                 ) {
                     showArchivedAccounts.toggle()
                 }
-            }
-            
-            AppActionMenu("New", icon: "plus") {
-                Button {
+                
+                AppActionPill("Track Account", icon: "plus") {
                     showNewAccountSheet = true
-                } label: {
-                    Label("Track Account", systemImage: "briefcase.fill")
                 }
-                Button {
+            } else if selectedTab == .transactions {
+                AppActionPill("Add Expense", icon: "plus") {
                     showNewEntrySheet = true
-                } label: {
-                    Label("Add Expense", systemImage: "arrow.up.right")
                 }
-                Button {
-                    showAddReceiptSheet = true
-                } label: {
-                    Label("Track Payout", systemImage: "arrow.down.left")
+            } else if selectedTab == .payouts {
+                AppActionPill("Track Payout", icon: "arrow.down.left") {
+                    showNewEntrySheet = true
+                }
+            } else {
+                AppActionPill("Track Account", icon: "plus") {
+                    showNewAccountSheet = true
                 }
             }
         }

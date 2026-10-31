@@ -324,40 +324,8 @@ public struct AddMissedTradeSheet: View {
     }
     
     private func directionButton(title: String, isBuy: Bool, isSelected: Bool, action: @escaping () -> Void) -> some View {
-        Button {
-            NativeHaptics.lightImpact()
-            action()
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: isBuy ? "arrow.up.right" : "arrow.down.right")
-                    .font(AppTypography.actionButtonCompact)
-                Text(title)
-                    .font(AppTypography.actionButtonCompact)
-            }
+        AppFilterChip(title, isSelected: isSelected, icon: isBuy ? "arrow.up.right" : "arrow.down.right", activeColor: isBuy ? AppColors.brand : AppColors.warning, action: action)
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 10)
-            .background(
-                isSelected
-                    ? (isBuy ? AppColors.profit.opacity(0.18) : AppColors.loss.opacity(0.18))
-                    : AppColors.secondaryBackground
-            )
-            .foregroundColor(
-                isSelected
-                    ? (isBuy ? AppColors.profit : AppColors.loss)
-                    : AppColors.secondaryText
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .stroke(
-                        isSelected
-                            ? (isBuy ? AppColors.profit.opacity(0.6) : AppColors.loss.opacity(0.6))
-                            : AppColors.border.opacity(0.6),
-                        lineWidth: isSelected ? 1.0 : 0.5
-                    )
-            )
-        }
-        .buttonStyle(.plain)
     }
     
     // MARK: - Planned Prices Card

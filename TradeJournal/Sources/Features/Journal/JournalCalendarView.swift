@@ -388,12 +388,11 @@ public struct JournalCalendarView: View {
             // 7 Days of the Week
             ForEach(0..<7, id: \.self) { dayIndex in
                 if dayIndex < week.days.count, let day = week.days[dayIndex] {
-                    Button {
-                        openDayDetail(for: day.date)
-                    } label: {
-                        dayCellView(day: day)
-                    }
-                    .buttonStyle(ApplePressableButtonStyle())
+                    dayCellView(day: day)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            openDayDetail(for: day.date)
+                        }
                 } else {
                     Color.clear
                         .frame(maxWidth: .infinity)

@@ -212,19 +212,13 @@ public struct ProgressRoutinesView: View {
                     VStack(spacing: 10) {
                         ForEach(rulesForStage) { rule in
                             HStack(alignment: .center, spacing: 12) {
-                                Button {
+                                AppCheckboxRow(
+                                    rule.title,
+                                    isChecked: isRuleChecked(rule.id),
+                                    isStrikethroughWhenChecked: true
+                                ) {
                                     dataStore.toggleProgressCheck(ruleId: rule.id, date: activeDate)
-                                } label: {
-                                    Image(systemName: isRuleChecked(rule.id) ? "checkmark.square.fill" : "square")
-                                        .font(AppTypography.rowPrimary)
-                                        .foregroundColor(isRuleChecked(rule.id) ? AppColors.brand : AppColors.secondaryText)
                                 }
-                                .buttonStyle(.plain)
-                                
-                                Text(rule.title)
-                                    .font(AppTypography.rowTitle)
-                                    .foregroundColor(isRuleChecked(rule.id) ? AppColors.secondaryText : AppColors.primaryText)
-                                    .strikethrough(isRuleChecked(rule.id))
                                 
                                 Spacer()
                                 
@@ -324,18 +318,18 @@ public struct ProgressRoutinesView: View {
                 let columns = Array(repeating: GridItem(.flexible(minimum: 10, maximum: 24), spacing: 4), count: 13)
                 LazyVGrid(columns: columns, spacing: 4) {
                     ForEach(past91Days, id: \.date) { item in
-                        Button {
-                            selectedDate = item.date
-                        } label: {
-                            RoundedRectangle(cornerRadius: 3)
-                                .fill(cellColor(percent: item.percent, total: item.total))
-                                .aspectRatio(1.0, contentMode: .fit)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 3)
-                                        .stroke(activeDate == item.date ? AppColors.primaryText : Color.clear, lineWidth: 1.5)
-                                )
-                        }
-                        .buttonStyle(.plain)
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(cellColor(percent: item.percent, total: item.total))
+                            .aspectRatio(1.0, contentMode: .fit)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 3)
+                                    .stroke(activeDate == item.date ? AppColors.primaryText : Color.clear, lineWidth: 1.5)
+                            )
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                NativeHaptics.lightImpact()
+                                selectedDate = item.date
+                            }
                     }
                 }
                 .padding(.vertical, 4)
@@ -368,12 +362,8 @@ public struct ProgressRoutinesView: View {
                         .font(AppTypography.subheadlineBold)
                         .foregroundColor(AppColors.secondaryText)
                     Spacer()
-                    Button {
+                    AppActionPill("Manage", icon: "slider.horizontal.3") {
                         showArchivedSheet = true
-                    } label: {
-                        Text("Manage")
-                            .font(AppTypography.captionBold)
-                            .foregroundColor(AppColors.brand)
                     }
                 }
                 
@@ -485,28 +475,11 @@ public struct AddProgressRoutineSheet: View {
                     .font(AppTypography.caption)
                     .foregroundColor(AppColors.secondaryText)
                 
-                HStack(spacing: 8) {
-                    Image(systemName: "checklist")
-                        .font(AppTypography.cardHeader)
-                        .foregroundColor(AppColors.brand)
-                    
-                    AppTextField("e.g. Check ForexFactory Calendar", text: $title)
-                    
-                    if !title.isEmpty {
-                        Button {
-                            title = ""
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundColor(AppColors.secondaryText)
-                                .font(AppTypography.caption)
-                        }
-                    }
-                }
-                .frame(height: 42)
-                .appSubCardStyle(cornerRadius: 10, padding: 10)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .stroke(AppColors.border.opacity(0.8), lineWidth: 0.5)
+                AppTextField(
+                    "e.g. Check ForexFactory Calendar",
+                    text: $title,
+                    icon: "checklist",
+                    showClearButton: true
                 )
                 
                 // Quick suggestions
@@ -547,39 +520,38 @@ public struct AddProgressRoutineSheet: View {
                 VStack(spacing: 8) {
                     ForEach(Self.stageMetadata, id: \.id) { meta in
                         let isSelected = stage == meta.id
-                        Button {
+                        HStack(spacing: 12) {
+                            Image(systemName: meta.icon)
+                                .font(AppTypography.cardHeader)
+                                .foregroundColor(isSelected ? AppColors.brand : AppColors.secondaryText)
+                                .frame(width: 24)
+                            
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(meta.id)
+                                    .font(isSelected ? AppTypography.rowPrimary : AppTypography.rowTitle)
+                                    .foregroundColor(isSelected ? AppColors.primaryText : AppColors.secondaryText)
+                                
+                                Text(meta.subtitle)
+                                    .font(AppTypography.captionMicro)
+                                    .foregroundColor(AppColors.secondaryText.opacity(0.8))
+                            }
+                            
+                            Spacer()
+                            
+                            Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                                .font(AppTypography.rowPrimary)
+                                .foregroundColor(isSelected ? AppColors.brand : AppColors.border)
+                        }
+                        .appSubCardStyle(cornerRadius: 10, padding: 10)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .stroke(isSelected ? AppColors.brand.opacity(0.5) : AppColors.border.opacity(0.5), lineWidth: isSelected ? 1.0 : 0.5)
+                        )
+                        .contentShape(Rectangle())
+                        .onTapGesture {
                             NativeHaptics.lightImpact()
                             stage = meta.id
-                        } label: {
-                            HStack(spacing: 12) {
-                                Image(systemName: meta.icon)
-                                    .font(AppTypography.cardHeader)
-                                    .foregroundColor(isSelected ? AppColors.brand : AppColors.secondaryText)
-                                    .frame(width: 24)
-                                
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(meta.id)
-                                        .font(isSelected ? AppTypography.rowPrimary : AppTypography.rowTitle)
-                                        .foregroundColor(isSelected ? AppColors.primaryText : AppColors.secondaryText)
-                                    
-                                    Text(meta.subtitle)
-                                        .font(AppTypography.captionMicro)
-                                        .foregroundColor(AppColors.secondaryText.opacity(0.8))
-                                }
-                                
-                                Spacer()
-                                
-                                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                                    .font(AppTypography.rowPrimary)
-                                    .foregroundColor(isSelected ? AppColors.brand : AppColors.border)
-                            }
-                            .appSubCardStyle(cornerRadius: 10, padding: 10)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                    .stroke(isSelected ? AppColors.brand.opacity(0.5) : AppColors.border.opacity(0.5), lineWidth: isSelected ? 1.0 : 0.5)
-                            )
                         }
-                        .buttonStyle(.plain)
                     }
                 }
             }
@@ -600,23 +572,15 @@ public struct AddProgressRoutineSheet: View {
                     
                     // Quick Presets
                     HStack(spacing: 6) {
-                        Button("Mon-Fri") {
+                        AppFilterChip("Mon-Fri", isSelected: selectedDays == [1, 2, 3, 4, 5], height: 24) {
                             NativeHaptics.lightImpact()
                             selectedDays = [1, 2, 3, 4, 5]
                         }
-                        .font(AppTypography.captionMicro)
-                        .foregroundColor(selectedDays == [1, 2, 3, 4, 5] ? AppColors.brand : AppColors.secondaryText)
                         
-                        Text("•")
-                            .font(AppTypography.captionMicro)
-                            .foregroundColor(AppColors.border)
-                        
-                        Button("All Days") {
+                        AppFilterChip("All Days", isSelected: selectedDays.count == 7, height: 24) {
                             NativeHaptics.lightImpact()
                             selectedDays = [0, 1, 2, 3, 4, 5, 6]
                         }
-                        .font(AppTypography.captionMicro)
-                        .foregroundColor(selectedDays.count == 7 ? AppColors.brand : AppColors.secondaryText)
                     }
                 }
                 

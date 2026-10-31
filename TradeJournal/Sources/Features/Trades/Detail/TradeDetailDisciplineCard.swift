@@ -136,12 +136,8 @@ public struct TradeDetailDisciplineCard: View {
                     .font(AppTypography.caption)
                     .foregroundColor(AppColors.secondaryText)
                 Spacer()
-                Button {
+                ModalCircleButton(icon: showAddMistakeInput ? "chevron.up" : "plus") {
                     showAddMistakeInput.toggle()
-                } label: {
-                    Image(systemName: showAddMistakeInput ? "chevron.up" : "plus.circle")
-                        .font(AppTypography.actionButtonCompact)
-                        .foregroundColor(AppColors.brand)
                 }
             }
             
@@ -211,12 +207,8 @@ public struct TradeDetailDisciplineCard: View {
                     .font(AppTypography.caption)
                     .foregroundColor(AppColors.secondaryText)
                 Spacer()
-                Button {
+                ModalCircleButton(icon: showAddTagInput ? "chevron.up" : "plus") {
                     showAddTagInput.toggle()
-                } label: {
-                    Image(systemName: showAddTagInput ? "chevron.up" : "plus.circle")
-                        .font(AppTypography.actionButtonCompact)
-                        .foregroundColor(AppColors.brand)
                 }
             }
             

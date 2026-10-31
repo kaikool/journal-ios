@@ -387,9 +387,7 @@ extension JournalCalendarView {
                             Divider().background(AppColors.border)
                             
                             ForEach(insights.days) { day in
-                                Button(action: {
-                                    openDayDetail(for: day.date)
-                                }) {
+                                
                                     HStack {
                                         Text(dateLabel(for: day.date))
                                             .font(AppTypography.caption)
@@ -413,6 +411,9 @@ extension JournalCalendarView {
                                         .minimumScaleFactor(0.85)
                                     }
                                     .padding(.vertical, 3)
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    openDayDetail(for: day.date)
                                 }
                             }
                         }
@@ -493,9 +494,7 @@ extension JournalCalendarView {
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 6) {
                                 ForEach(selected.days) { day in
-                                    Button(action: {
-                                        openDayDetail(for: day.date)
-                                    }) {
+                                        
                                         HStack(spacing: 4) {
                                             Text(dateLabel(for: day.date))
                                                 .font(AppTypography.caption)
@@ -505,8 +504,11 @@ extension JournalCalendarView {
                                                 .foregroundColor(AppColors.secondaryText)
                                         }
                                         .appCardStyle(cornerRadius: 6)
+                                        .contentShape(Rectangle())
+                                        .onTapGesture {
+                                            openDayDetail(for: day.date)
+                                        }
                                     }
-                                }
                             }
                         }
                     }
@@ -526,76 +528,75 @@ extension JournalCalendarView {
         let ratio = peakWeekdayAbsPnl > 0 ? (abs(pnlDouble) / peakWeekdayAbsPnl) : 0
         let isProfit = wd.netPnl >= 0
         
-        Button(action: {
+        HStack(spacing: 8) {
+            Text(String(wd.label.prefix(3)))
+                .font(AppTypography.captionBold)
+                .foregroundColor(hasTrades ? AppColors.primaryText : AppColors.mutedText)
+                .frame(width: 28, alignment: .leading)
+            
+            // Bidirectional horizontal bar centered at 50%
+            GeometryReader { geo in
+                let halfWidth = geo.size.width / 2
+                let barWidth = max(2.0, halfWidth * CGFloat(min(1.0, ratio)))
+                
+                ZStack(alignment: .leading) {
+                    // Background track
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(AppColors.secondaryBackground.opacity(0.3))
+                        .frame(height: 6)
+                    
+                    // Center axis mark
+                    Rectangle()
+                        .fill(AppColors.border)
+                        .frame(width: 1, height: 12)
+                        .offset(x: halfWidth)
+                    
+                    if hasTrades {
+                        if isProfit {
+                            RoundedRectangle(cornerRadius: 2)
+                                .fill(AppColors.profit)
+                                .frame(width: barWidth, height: 6)
+                                .offset(x: halfWidth)
+                        } else {
+                            RoundedRectangle(cornerRadius: 2)
+                                .fill(AppColors.loss)
+                                .frame(width: barWidth, height: 6)
+                                .offset(x: halfWidth - barWidth)
+                        }
+                    }
+                }
+                .frame(maxHeight: .infinity)
+            }
+            .frame(height: 14)
+            
+            // Formatted P&L on right
+            if hasTrades {
+                AppMonetaryText(
+                    Formatters.formatPnL(wd.netPnl, currency: env.currentCurrency),
+                    isPrivate: env.isPrivacyModeEnabled,
+                    font: AppTypography.number(11, weight: .semibold),
+                    color: isProfit ? AppColors.profit : AppColors.loss
+                )
+                .frame(width: 76, alignment: .trailing)
+            } else {
+                Text("—")
+                    .font(AppTypography.caption)
+                    .foregroundColor(AppColors.mutedText)
+                    .frame(width: 76, alignment: .trailing)
+            }
+        }
+        .appSubCardStyle(cornerRadius: 6, padding: 6)
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(isSelected ? AppColors.border : Color.clear, lineWidth: 1)
+        )
+        .contentShape(Rectangle())
+        .onTapGesture {
             guard hasTrades else { return }
             withAnimation(AppAnimations.springQuick) {
                 selectedWeekdayIndex = (selectedWeekdayIndex == wd.index) ? nil : wd.index
             }
-        }) {
-            HStack(spacing: 8) {
-                Text(String(wd.label.prefix(3)))
-                    .font(AppTypography.captionBold)
-                    .foregroundColor(hasTrades ? AppColors.primaryText : AppColors.mutedText)
-                    .frame(width: 28, alignment: .leading)
-                
-                // Bidirectional horizontal bar centered at 50%
-                GeometryReader { geo in
-                    let halfWidth = geo.size.width / 2
-                    let barWidth = max(2.0, halfWidth * CGFloat(min(1.0, ratio)))
-                    
-                    ZStack(alignment: .leading) {
-                        // Background track
-                        RoundedRectangle(cornerRadius: 2)
-                            .fill(AppColors.secondaryBackground.opacity(0.3))
-                            .frame(height: 6)
-                        
-                        // Center axis mark
-                        Rectangle()
-                            .fill(AppColors.border)
-                            .frame(width: 1, height: 12)
-                            .offset(x: halfWidth)
-                        
-                        if hasTrades {
-                            if isProfit {
-                                RoundedRectangle(cornerRadius: 2)
-                                    .fill(AppColors.profit)
-                                    .frame(width: barWidth, height: 6)
-                                    .offset(x: halfWidth)
-                            } else {
-                                RoundedRectangle(cornerRadius: 2)
-                                    .fill(AppColors.loss)
-                                    .frame(width: barWidth, height: 6)
-                                    .offset(x: halfWidth - barWidth)
-                            }
-                        }
-                    }
-                    .frame(maxHeight: .infinity)
-                }
-                .frame(height: 14)
-                
-                // Formatted P&L on right
-                if hasTrades {
-                    AppMonetaryText(
-                        Formatters.formatPnL(wd.netPnl, currency: env.currentCurrency),
-                        isPrivate: env.isPrivacyModeEnabled,
-                        font: AppTypography.number(11, weight: .semibold),
-                        color: isProfit ? AppColors.profit : AppColors.loss
-                    )
-                    .frame(width: 76, alignment: .trailing)
-                } else {
-                    Text("—")
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.mutedText)
-                        .frame(width: 76, alignment: .trailing)
-                }
-            }
-            .appSubCardStyle(cornerRadius: 6, padding: 6)
-            .overlay(
-                RoundedRectangle(cornerRadius: 6)
-                    .stroke(isSelected ? AppColors.border : Color.clear, lineWidth: 1)
-            )
         }
-        .disabled(!hasTrades)
     }
     
     // MARK: - Metric Card Component

@@ -28,17 +28,16 @@ public struct AccountCardView: View {
         TradeFormCardContainer {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(alignment: .top) {
-                    // Journal visibility toggle button
-                    Button {
-                        NativeHaptics.lightImpact()
-                        dataStore.toggleAccountVisibility(id: account.id)
-                    } label: {
-                        Image(systemName: isVisible ? "checkmark.circle.fill" : "circle")
-                            .font(AppTypography.displayMedium)
-                            .foregroundColor(isVisible ? AppColors.brand : AppColors.secondaryText)
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.top, 2)
+                    // Journal visibility toggle
+                    Image(systemName: isVisible ? "checkmark.circle.fill" : "circle")
+                        .font(AppTypography.displayMedium)
+                        .foregroundColor(isVisible ? AppColors.brand : AppColors.secondaryText)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            NativeHaptics.lightImpact()
+                            dataStore.toggleAccountVisibility(id: account.id)
+                        }
+                        .padding(.top, 2)
                     
                     VStack(alignment: .leading, spacing: 3) {
                         HStack(spacing: 6) {
@@ -65,13 +64,10 @@ public struct AccountCardView: View {
                     
                     // Primary active view button
                     if !isSelected {
-                        Button {
+                        AppActionPill("Select", icon: "checkmark") {
                             NativeHaptics.lightImpact()
                             dataStore.selectAccount(id: account.id)
-                        } label: {
-                            AppBadge("Select", variant: .brand)
                         }
-                        .buttonStyle(ApplePressableButtonStyle())
                         .fixedSize()
                     } else {
                         AppBadge("Viewing", variant: .profit)

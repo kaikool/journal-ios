@@ -222,27 +222,23 @@ public struct DashboardCustomizerSheet: View {
                 
                 Spacer()
                 
-                Button("Show all") {
-                    withAnimation {
-                        hiddenCardIds.removeAll()
-                        activePreset = .custom
+                AppSecondaryButton("Show all", height: 28) {
+                        withAnimation {
+                            hiddenCardIds.removeAll()
+                            activePreset = .custom
+                        }
                     }
-                }
-                .font(AppTypography.captionBold)
-                .foregroundColor(AppColors.brand)
                 
                 Text("·")
                     .foregroundColor(AppColors.secondaryText)
                 
-                Button("Restore default") {
-                    withAnimation {
-                        hiddenCardIds.removeAll()
-                        cardOrder = DashboardCardRegistry.defaultOrder
-                        activePreset = .overview
+                AppSecondaryButton("Restore default", height: 28) {
+                        withAnimation {
+                            hiddenCardIds.removeAll()
+                            cardOrder = DashboardCardRegistry.defaultOrder
+                            activePreset = .overview
+                        }
                     }
-                }
-                .font(AppTypography.captionBold)
-                .foregroundColor(AppColors.secondaryText)
             }
             .padding(.horizontal, 16)
             .padding(.bottom, 8)
@@ -331,14 +327,12 @@ public struct DashboardCustomizerSheet: View {
                 
                 Spacer()
                 
-                Button("Restore order") {
+                AppSecondaryButton("Restore order", height: 28) {
                     withAnimation {
                         cardOrder = DashboardCardRegistry.defaultOrder
                         activePreset = .overview
                     }
                 }
-                .font(AppTypography.captionBold)
-                .foregroundColor(AppColors.brand)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 8)

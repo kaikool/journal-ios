@@ -70,13 +70,13 @@ public struct AppDropdownField<T: Hashable>: View {
                         .font(AppTypography.captionMicro)
                         .foregroundColor(AppColors.secondaryText)
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 11)
-                .background(AppColors.secondaryBackground.opacity(0.65))
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .padding(.horizontal, 10)
+                .frame(height: 36)
+                .background(AppColors.secondaryBackground.opacity(0.4))
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .stroke(AppColors.border.opacity(0.45), lineWidth: 0.6)
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(AppColors.border.opacity(0.35), lineWidth: 0.5)
                 )
             }
             .buttonStyle(ApplePressableButtonStyle())

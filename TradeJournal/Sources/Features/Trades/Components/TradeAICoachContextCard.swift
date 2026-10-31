@@ -71,29 +71,31 @@ public struct TradeAICoachCompliancePill: View {
     }
     
     public var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 6) {
-                Image(systemName: "person.text.rectangle")
-                    .font(AppTypography.captionBold)
-                    .foregroundColor(AppColors.brand)
-                
-                Text("Profile:")
-                    .font(AppTypography.captionBold)
-                    .foregroundColor(AppColors.primaryText)
-                
-                Text("\(profile.tradingStyle) • Max Risk \(profile.maxRiskPerTrade)")
-                    .font(AppTypography.captionMicro)
-                    .foregroundColor(AppColors.secondaryText)
-                    .lineLimit(1)
-                
-                Spacer()
-                
-                Image(systemName: "chevron.right")
-                    .font(AppTypography.captionMicro)
-                    .foregroundColor(AppColors.secondaryText)
-            }
-            .appCardStyle(cornerRadius: 8, padding: 8)
+        HStack(spacing: 6) {
+            Image(systemName: "person.text.rectangle")
+                .font(AppTypography.captionBold)
+                .foregroundColor(AppColors.brand)
+            
+            Text("Profile:")
+                .font(AppTypography.captionBold)
+                .foregroundColor(AppColors.primaryText)
+            
+            Text("\(profile.tradingStyle) • Max Risk \(profile.maxRiskPerTrade)")
+                .font(AppTypography.captionMicro)
+                .foregroundColor(AppColors.secondaryText)
+                .lineLimit(1)
+            
+            Spacer()
+            
+            Image(systemName: "chevron.right")
+                .font(AppTypography.captionMicro)
+                .foregroundColor(AppColors.secondaryText)
         }
-        .buttonStyle(.plain)
+        .appCardStyle(cornerRadius: 8, padding: 8)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            NativeHaptics.lightImpact()
+            onTap()
+        }
     }
 }

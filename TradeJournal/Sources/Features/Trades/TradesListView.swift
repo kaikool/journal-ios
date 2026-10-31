@@ -291,12 +291,11 @@ public struct TradesListView: View {
             LazyVStack(spacing: 10) {
                 ForEach(filteredTrades) { trade in
                     let isTradeOpen = trade.status == .open || trade.closedAt == nil
-                    Button {
-                        selectedTrade = trade
-                    } label: {
-                        TradeTerminalRow(trade: trade)
-                    }
-                    .buttonStyle(ApplePressableButtonStyle())
+                    TradeTerminalRow(trade: trade)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            selectedTrade = trade
+                        }
                     .contextMenu {
                         Button {
                             tradeForAICoach = trade

@@ -27,34 +27,13 @@ internal struct DashboardCardWrapper<Content: View>: View {
                     Spacer()
                     
                     // Move Up Button
-                    Button {
-                        onMoveUp()
-                    } label: {
-                        Image(systemName: "arrow.up.circle.fill")
-                            .font(AppTypography.iconMedium)
-                            .foregroundColor(AppColors.brand)
-                    }
-                    .buttonStyle(ApplePressableButtonStyle())
+                    ModalCircleButton(icon: "arrow.up", action: onMoveUp)
                     
                     // Move Down Button
-                    Button {
-                        onMoveDown()
-                    } label: {
-                        Image(systemName: "arrow.down.circle.fill")
-                            .font(AppTypography.iconMedium)
-                            .foregroundColor(AppColors.brand)
-                    }
-                    .buttonStyle(ApplePressableButtonStyle())
+                    ModalCircleButton(icon: "arrow.down", action: onMoveDown)
                     
                     // Hide Button
-                    Button {
-                        onHide()
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(AppTypography.iconMedium)
-                            .foregroundColor(AppColors.loss)
-                    }
-                    .buttonStyle(ApplePressableButtonStyle())
+                    ModalCloseButton(action: onHide)
                 }
                 .appSubCardStyle(cornerRadius: 10, padding: 6)
                 .padding(.bottom, 6)
@@ -120,18 +99,10 @@ extension DashboardView {
                 .lineLimit(1)
                 .minimumScaleFactor(0.85)
             Spacer()
-            Button {
+            ModalCircleButton(icon: icon, action: {
                 NativeHaptics.lightImpact()
                 activeTooltip = (title: title, hint: hint)
-            } label: {
-                Image(systemName: icon)
-                    .font(AppTypography.captionMedium)
-                    .foregroundColor(AppColors.secondaryText.opacity(0.8))
-                    .frame(width: 24, height: 24)
-                    .background(AppColors.secondaryBackground.opacity(0.5))
-                    .clipShape(Circle())
-            }
-            .buttonStyle(ApplePressableButtonStyle())
+            })
         }
     }
 }

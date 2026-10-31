@@ -58,43 +58,17 @@ public struct NotebookEditorSheet: View {
                         .onChange(of: title) { _ in scheduleAutoSave() }
                     
                     HStack(spacing: 8) {
-                        // Folder selector matching segmented picker height (32pt)
                         let folderOptions = activeFolders.filter { $0.id != NotebookEngine.systemFolderAll }.map { $0.id }
-                        Menu {
-                            ForEach(folderOptions, id: \.self) { id in
-                                Button {
-                                    selectedFolderId = id
-                                    hasPendingChanges = true
-                                    flushSave()
-                                } label: {
-                                    HStack {
-                                        Image(systemName: "folder")
-                                        Text(activeFolders.first(where: { $0.id == id })?.name ?? id)
-                                        if selectedFolderId == id {
-                                            Image(systemName: "checkmark")
-                                        }
-                                    }
-                                }
-                            }
-                        } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: "folder")
-                                    .font(AppTypography.actionButtonCompact)
-                                    .foregroundColor(AppColors.secondaryText)
-                                Text(activeFolders.first(where: { $0.id == selectedFolderId })?.name ?? "Folder")
-                                    .font(AppTypography.formInput)
-                                    .foregroundColor(AppColors.primaryText)
-                                    .lineLimit(1)
-                                Image(systemName: "chevron.up.chevron.down")
-                                    .font(AppTypography.captionMicro)
-                                    .foregroundColor(AppColors.secondaryText)
-                            }
-                            .frame(height: 34)
-                            .appSubCardStyle(cornerRadius: 8, padding: 10)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                    .stroke(AppColors.border.opacity(0.7), lineWidth: 0.8)
-                            )
+                        AppCompactDropdown(
+                            icon: "folder",
+                            selection: $selectedFolderId,
+                            options: folderOptions,
+                            titleFor: { id in activeFolders.first(where: { $0.id == id })?.name ?? id },
+                            height: 34
+                        )
+                        .onChange(of: selectedFolderId) { _ in
+                            hasPendingChanges = true
+                            flushSave()
                         }
                         
                         Spacer()

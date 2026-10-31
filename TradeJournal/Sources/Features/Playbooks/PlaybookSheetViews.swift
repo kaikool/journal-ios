@@ -116,62 +116,46 @@ public struct NewPlaybookSheet: View {
     
     @ViewBuilder
     private func ruleInputRow(index: Int) -> some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
             // Numbered Badge 1, 2, 3...
             ZStack {
                 Circle()
                     .fill(AppColors.brand.opacity(0.12))
-                    .frame(width: 28, height: 28)
+                    .frame(width: 26, height: 26)
                 Text("\(index + 1)")
-                    .font(AppTypography.badgeStandard)
+                    .font(AppTypography.captionMicroBold)
                     .foregroundColor(AppColors.brand)
             }
             
-            // Sleek text field with clear button
-            HStack(spacing: 8) {
-                AppTextField("Rule condition (e.g. Price above 200 EMA)", text: Binding(
-                    get: {
-                        guard index < rules.count else { return "" }
-                        return rules[index]
-                    },
-                    set: { newVal in
-                        guard index < rules.count else { return }
-                        rules[index] = newVal
-                        // Progressive Disclosure: If user typed in the last row, spawn next row
-                        if !newVal.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && index == rules.count - 1 {
-                            withAnimation(AppAnimations.springQuick) {
+            AppTextField("Rule condition (e.g. Price above 200 EMA)", text: Binding(
+                get: {
+                    guard index < rules.count else { return "" }
+                    return rules[index]
+                },
+                set: { newVal in
+                    guard index < rules.count else { return }
+                    rules[index] = newVal
+                    // Progressive Disclosure: If user typed in the last row, spawn next row
+                    if !newVal.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && index == rules.count - 1 {
+                        withAnimation(AppAnimations.springQuick) {
+                            rules.append("")
+                        }
+                    }
+                }
+            ))
+            
+            if rules.count > 1 || (index < rules.count && !rules[index].isEmpty) {
+                ModalCloseButton {
+                    withAnimation(AppAnimations.springQuick) {
+                        if index < rules.count {
+                            rules.remove(at: index)
+                            if rules.isEmpty {
                                 rules.append("")
                             }
                         }
                     }
-                ))
-                .font(AppTypography.body)
-                .foregroundColor(AppColors.primaryText)
-                
-                if rules.count > 1 || (index < rules.count && !rules[index].isEmpty) {
-                    Button {
-                        NativeHaptics.lightImpact()
-                        withAnimation(AppAnimations.springQuick) {
-                            if index < rules.count {
-                                rules.remove(at: index)
-                                if rules.isEmpty {
-                                    rules.append("")
-                                }
-                            }
-                        }
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(AppTypography.caption)
-                            .foregroundColor(AppColors.secondaryText.opacity(0.4))
-                    }
-                    .buttonStyle(.plain)
                 }
             }
-            .appSubCardStyle(cornerRadius: 12, padding: 12)
-            .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(AppColors.border.opacity(0.5), lineWidth: 0.8)
-            )
         }
     }
     
@@ -305,59 +289,44 @@ public struct EditPlaybookSheet: View {
     
     @ViewBuilder
     private func ruleInputRow(index: Int) -> some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
             ZStack {
                 Circle()
                     .fill(AppColors.brand.opacity(0.12))
-                    .frame(width: 28, height: 28)
+                    .frame(width: 26, height: 26)
                 Text("\(index + 1)")
-                    .font(AppTypography.badgeStandard)
+                    .font(AppTypography.captionMicroBold)
                     .foregroundColor(AppColors.brand)
             }
             
-            HStack(spacing: 8) {
-                AppTextField("Rule condition", text: Binding(
-                    get: {
-                        guard index < rules.count else { return "" }
-                        return rules[index]
-                    },
-                    set: { newVal in
-                        guard index < rules.count else { return }
-                        rules[index] = newVal
-                        if !newVal.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && index == rules.count - 1 {
-                            withAnimation(AppAnimations.springQuick) {
+            AppTextField("Rule condition", text: Binding(
+                get: {
+                    guard index < rules.count else { return "" }
+                    return rules[index]
+                },
+                set: { newVal in
+                    guard index < rules.count else { return }
+                    rules[index] = newVal
+                    if !newVal.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && index == rules.count - 1 {
+                        withAnimation(AppAnimations.springQuick) {
+                            rules.append("")
+                        }
+                    }
+                }
+            ))
+            
+            if rules.count > 1 || (index < rules.count && !rules[index].isEmpty) {
+                ModalCloseButton {
+                    withAnimation(AppAnimations.springQuick) {
+                        if index < rules.count {
+                            rules.remove(at: index)
+                            if rules.isEmpty {
                                 rules.append("")
                             }
                         }
                     }
-                ))
-                .font(AppTypography.body)
-                .foregroundColor(AppColors.primaryText)
-                
-                if rules.count > 1 || (index < rules.count && !rules[index].isEmpty) {
-                    Button {
-                        NativeHaptics.lightImpact()
-                        withAnimation(AppAnimations.springQuick) {
-                            if index < rules.count {
-                                rules.remove(at: index)
-                                if rules.isEmpty {
-                                    rules.append("")
-                                }
-                            }
-                        }
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(AppTypography.caption)
-                            .foregroundColor(AppColors.secondaryText.opacity(0.4))
-                    }
-                    .buttonStyle(.plain)
                 }
             }
-            .appSubCardStyle(cornerRadius: 12, padding: 12)
-            .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(AppColors.border.opacity(0.5), lineWidth: 0.8)
-            )
         }
     }
     

@@ -99,9 +99,18 @@ files.forEach(f => {
   const content = fs.readFileSync(f, 'utf8');
   const lines = content.split('\n');
 
+  let inMenuOrContextMenu = 0;
   lines.forEach((l, idx) => {
     const lineNum = idx + 1;
     const trimmed = l.trim();
+
+    // Track whether we are inside native iOS Menu or contextMenu
+    if (trimmed.includes('Menu {') || trimmed.includes('Menu(') || trimmed.includes('.contextMenu {') || trimmed.includes('AppleMenuChip(')) {
+      inMenuOrContextMenu = 8;
+    }
+    if (inMenuOrContextMenu > 0 && trimmed.startsWith('}')) {
+      inMenuOrContextMenu--;
+    }
 
     // =========================================================================
     // PART 1: CONTENT & CONTROLS (STANDARDS 01 - 11)
@@ -110,28 +119,21 @@ files.forEach(f => {
     // --- STANDARD 01: BUTTONS & ACTIONS ---
     // Prohibits raw button styling with inline backgrounds or custom frames in Feature views.
     if (isFeature && (trimmed.startsWith('Button(') || trimmed.startsWith('Button {') || /\bButton\s*(\(|\{)/.test(trimmed))) {
-      for (let i = 1; i <= 6; i++) {
-        if (idx + i < lines.length) {
-          const next = lines[idx + i].trim();
-          if (next.startsWith('Divider()')) break;
-          if (next.includes('.background(') &&
-              !next.includes('AppPrimaryButton') &&
-              !next.includes('AppSecondaryButton') &&
-              !next.includes('AppDestructiveButton') &&
-              !next.includes('Modal') &&
-              !next.includes('AppActionPill') &&
-              !next.includes('AppBinarySegmentedToggle')) {
-            violations.push({
-              std: 'Standard 01: Buttons & Actions',
-              rule: 'PROHIBIT_INLINE_BUTTON_STYLE',
-              file: rel,
-              line: lineNum,
-              code: trimmed + ' -> ' + next,
-              fix: 'Use AppButton, AppPrimaryButton, AppSecondaryButton, ModalCircleButton, or AppActionPill'
-            });
-            break;
-          }
-        }
+      const isAllowedDSButton = trimmed.includes('AppPrimaryButton') ||
+                                trimmed.includes('AppSecondaryButton') ||
+                                trimmed.includes('AppDestructiveButton') ||
+                                trimmed.includes('AppActionPill') ||
+                                trimmed.includes('Modal') ||
+                                trimmed.includes('.buttonStyle(');
+      if (!isAllowedDSButton && inMenuOrContextMenu <= 0) {
+        violations.push({
+          std: 'Standard 01: Buttons & Actions',
+          rule: 'PROHIBIT_RAW_BUTTON',
+          file: rel,
+          line: lineNum,
+          code: trimmed,
+          fix: 'Use AppPrimaryButton, AppSecondaryButton, AppDestructiveButton, AppActionPill, or ModalCircleButton'
+        });
       }
     }
 
@@ -185,7 +187,7 @@ files.forEach(f => {
     }
 
     // --- STANDARD 05: FORM FIELDS & INPUTS ---
-    // Prohibits raw TextField / SecureField in Feature views without AppTextField / AppNumericField.
+    // Prohibits raw TextField / SecureField / Picker in Feature views without AppTextField / AppNumericField / AppCompactDropdown.
     if (isFeature && (trimmed.startsWith('TextField(') || trimmed.startsWith('SecureField('))) {
       violations.push({
         std: 'Standard 05: Form Fields & Inputs',
@@ -195,6 +197,35 @@ files.forEach(f => {
         code: trimmed,
         fix: 'Use AppTextField, AppNumericField, AppNumericValueField, or AppDecimalField'
       });
+    }
+    if (isFeature && /\bPicker\s*\(/.test(trimmed) && !trimmed.includes('AppSegmentedBar')) {
+      violations.push({
+        std: 'Standard 05: Form Fields & Inputs',
+        rule: 'PROHIBIT_RAW_PICKER',
+        file: rel,
+        line: lineNum,
+        code: trimmed,
+        fix: 'Use AppDropdownField, AppCompactDropdown, or AppSegmentedBar'
+      });
+    }
+    // Prohibits wrapping an AppTextField or AppFormField inside an outer .appSubCardStyle or .appCardStyle container
+    if (isFeature && (trimmed.includes('AppTextField(') || trimmed.includes('AppFormField('))) {
+      for (let i = 1; i <= 6; i++) {
+        if (idx + i < lines.length) {
+          const next = lines[idx + i].trim();
+          if (next.includes('.appSubCardStyle') || next.includes('.appCardStyle')) {
+            violations.push({
+              std: 'Standard 05: Form Fields & Inputs',
+              rule: 'PROHIBIT_NESTED_INPUT_CARD',
+              file: rel,
+              line: lineNum,
+              code: trimmed + ' -> ' + next,
+              fix: 'Do not wrap AppTextField in an outer card. AppTextField provides its own clean container.'
+            });
+            break;
+          }
+        }
+      }
     }
 
     // --- STANDARD 06: SELECTION & CHECKLIST ROWS ---
@@ -261,7 +292,7 @@ files.forEach(f => {
         fix: 'Use LoadingView(...) or TradeJournalProLoader from DesignSystem'
       });
     }
-    if (isFeature && /\bEmptyState\s*\(/.test(trimmed)) {
+    if (isFeature && (/\bEmptyStateView\b/.test(trimmed) || /\bEmptyState\s*\(/.test(trimmed))) {
       violations.push({
         std: 'Standard 09: Feedback & Empty States',
         rule: 'PROHIBIT_RAW_EMPTY_STATE',

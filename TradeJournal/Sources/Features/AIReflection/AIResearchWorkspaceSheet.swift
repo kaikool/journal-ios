@@ -121,15 +121,7 @@ public struct AIResearchWorkspaceSheet: View {
             if isSyncing {
                 TradeJournalProLoader(size: 20)
             } else {
-                Button(action: performSync) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "arrow.triangle.2.circlepath")
-                            .font(AppTypography.actionButtonCompact)
-                        Text("Sync")
-                            .font(AppTypography.actionButtonCompact)
-                    }
-                    .foregroundColor(AppColors.secondaryText)
-                }
+                AppActionPill("Sync", icon: "arrow.triangle.2.circlepath", action: performSync)
                 .buttonStyle(.plain)
             }
         }
@@ -418,22 +410,21 @@ private struct AIResearchProjectCard: View {
     @ViewBuilder
     private var cardCheckpointsTimelineView: some View {
         if !project.checkpoints.isEmpty {
-            Button(action: {
+            HStack(spacing: 4) {
+                Image(systemName: showCheckpoints ? "chevron.down" : "chevron.right")
+                    .font(AppTypography.captionMicro)
+                Text(showCheckpoints ? "Hide checkpoints (\(project.checkpoints.count))" : "View checkpoints (\(project.checkpoints.count))")
+                    .font(AppTypography.captionMicro)
+                Spacer()
+            }
+            .foregroundColor(AppColors.brand)
+            .padding(.top, 2)
+            .contentShape(Rectangle())
+            .onTapGesture {
                 withAnimation(.easeInOut(duration: 0.2)) {
                     showCheckpoints.toggle()
                 }
-            }) {
-                HStack(spacing: 4) {
-                    Image(systemName: showCheckpoints ? "chevron.down" : "chevron.right")
-                        .font(AppTypography.captionMicro)
-                    Text(showCheckpoints ? "Hide checkpoints (\(project.checkpoints.count))" : "View checkpoints (\(project.checkpoints.count))")
-                        .font(AppTypography.captionMicro)
-                    Spacer()
-                }
-                .foregroundColor(AppColors.brand)
-                .padding(.top, 2)
             }
-            .buttonStyle(.plain)
             
             if showCheckpoints {
                 VStack(alignment: .leading, spacing: 6) {

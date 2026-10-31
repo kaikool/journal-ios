@@ -41,8 +41,7 @@ public struct AIReflectionPreTradeBanner: View {
     
     public var body: some View {
         AppCard {
-            Button(action: onOpenPreTrade) {
-                HStack(spacing: 12) {
+            HStack(spacing: 12) {
                     VStack(alignment: .leading, spacing: 3) {
                         HStack(spacing: 6) {
                             Text("Pre-Trade Market Bias")
@@ -64,8 +63,10 @@ public struct AIReflectionPreTradeBanner: View {
                         .font(AppTypography.captionMicro)
                         .foregroundColor(AppColors.secondaryText)
                 }
-            }
-            .buttonStyle(.plain)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    onOpenPreTrade()
+                }
         }
     }
 }
@@ -92,8 +93,7 @@ public struct AIReflectionIntelligenceCards: View {
     public var body: some View {
         HStack(spacing: 10) {
             // Memory Card
-            Button(action: onOpenMemory) {
-                HStack(spacing: 10) {
+            HStack(spacing: 10) {
                     ZStack {
                         RoundedRectangle(cornerRadius: 8)
                             .fill(AppColors.secondaryBackground)
@@ -114,12 +114,13 @@ public struct AIReflectionIntelligenceCards: View {
                     Spacer()
                 }
                 .appCardStyle(cornerRadius: 10)
-            }
-            .buttonStyle(.plain)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    onOpenMemory()
+                }
             
             // Research Lab Card
-            Button(action: onOpenResearch) {
-                HStack(spacing: 10) {
+            HStack(spacing: 10) {
                     ZStack {
                         RoundedRectangle(cornerRadius: 8)
                             .fill(AppColors.brand.opacity(0.15))
@@ -133,15 +134,17 @@ public struct AIReflectionIntelligenceCards: View {
                         Text("Research Lab")
                             .font(AppTypography.captionBold)
                             .foregroundColor(AppColors.primaryText)
-                        Text("\(projectCount) active hypotheses")
+                        Text("\(projectCount) setups & hypotheses")
                             .font(AppTypography.microCaption)
                             .foregroundColor(AppColors.secondaryText)
                     }
                     Spacer()
                 }
                 .appCardStyle(cornerRadius: 10)
-            }
-            .buttonStyle(.plain)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    onOpenResearch()
+                }
         }
     }
 }

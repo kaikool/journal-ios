@@ -14,6 +14,7 @@ public struct AppFormField: View {
     public let isSecure: Bool
     public let errorMessage: String?
     public let height: CGFloat
+    public let showClearButton: Bool
     
     public init(
         _ label: String? = nil,
@@ -24,7 +25,8 @@ public struct AppFormField: View {
         trailingText: String? = nil,
         isSecure: Bool = false,
         errorMessage: String? = nil,
-        height: CGFloat = 40
+        height: CGFloat = 36,
+        showClearButton: Bool = false
     ) {
         self.label = label
         self._text = text
@@ -35,18 +37,20 @@ public struct AppFormField: View {
         self.isSecure = isSecure
         self.errorMessage = errorMessage
         self.height = height
+        self.showClearButton = showClearButton
     }
     
     public init(
         _ placeholder: String,
         text: Binding<String>,
-        icon: String? = nil
+        icon: String? = nil,
+        showClearButton: Bool = false
     ) {
-        self.init(nil, text: text, placeholder: placeholder, icon: icon)
+        self.init(nil, text: text, placeholder: placeholder, icon: icon, showClearButton: showClearButton)
     }
     
     public var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
+        VStack(alignment: .leading, spacing: 4) {
             if label != nil || subtitle != nil {
                 HStack {
                     if let label = label {
@@ -80,6 +84,12 @@ public struct AppFormField: View {
                         .foregroundColor(AppColors.primaryText)
                 }
                 
+                if showClearButton && !text.isEmpty {
+                    ModalCloseButton {
+                        text = ""
+                    }
+                }
+                
                 if let trailingText = trailingText, !trailingText.isEmpty {
                     Text(trailingText)
                         .font(AppTypography.statLabel)
@@ -90,15 +100,15 @@ public struct AppFormField: View {
                         .clipShape(Capsule())
                 }
             }
-            .padding(.horizontal, 11)
+            .padding(.horizontal, 10)
             .frame(height: height)
-            .background(AppColors.secondaryBackground.opacity(0.65))
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .background(AppColors.secondaryBackground.opacity(0.4))
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .stroke(
-                        errorMessage != nil ? AppColors.loss.opacity(0.8) : AppColors.border.opacity(0.45),
-                        lineWidth: errorMessage != nil ? 1.0 : 0.6
+                        errorMessage != nil ? AppColors.loss.opacity(0.8) : AppColors.border.opacity(0.35),
+                        lineWidth: errorMessage != nil ? 1.0 : 0.5
                     )
             )
             
@@ -117,7 +127,7 @@ public struct AppNumericValueField<T: BinaryFloatingPoint>: View {
     @Binding public var value: T?
     public let height: CGFloat
     
-    public init(_ placeholder: String = "", value: Binding<T?>, height: CGFloat = 34) {
+    public init(_ placeholder: String = "", value: Binding<T?>, height: CGFloat = 36) {
         self.placeholder = placeholder
         self._value = value
         self.height = height
@@ -136,11 +146,11 @@ public struct AppNumericValueField<T: BinaryFloatingPoint>: View {
         .keyboardType(.decimalPad)
         .padding(.horizontal, 10)
         .frame(height: height)
-        .background(AppColors.secondaryBackground.opacity(0.65))
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .background(AppColors.secondaryBackground.opacity(0.4))
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(AppColors.border.opacity(0.45), lineWidth: 0.6)
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(AppColors.border.opacity(0.35), lineWidth: 0.5)
         )
     }
 }
@@ -151,7 +161,7 @@ public struct AppDecimalField: View {
     @Binding public var value: Decimal
     public let height: CGFloat
     
-    public init(_ placeholder: String = "", value: Binding<Decimal>, height: CGFloat = 34) {
+    public init(_ placeholder: String = "", value: Binding<Decimal>, height: CGFloat = 36) {
         self.placeholder = placeholder
         self._value = value
         self.height = height
@@ -167,11 +177,11 @@ public struct AppDecimalField: View {
         .keyboardType(.decimalPad)
         .padding(.horizontal, 10)
         .frame(height: height)
-        .background(AppColors.secondaryBackground.opacity(0.65))
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .background(AppColors.secondaryBackground.opacity(0.4))
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(AppColors.border.opacity(0.45), lineWidth: 0.6)
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(AppColors.border.opacity(0.35), lineWidth: 0.5)
         )
     }
 }
@@ -194,7 +204,7 @@ public struct AppNumericField: View {
         subtitle: String? = nil,
         icon: String? = nil,
         unit: String? = nil,
-        height: CGFloat = 40
+        height: CGFloat = 36
     ) {
         self.label = label
         self._text = text
@@ -206,7 +216,7 @@ public struct AppNumericField: View {
     }
     
     public var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
+        VStack(alignment: .leading, spacing: 4) {
             if label != nil || subtitle != nil {
                 HStack {
                     if let label = label {
@@ -245,13 +255,13 @@ public struct AppNumericField: View {
                         .clipShape(Capsule())
                 }
             }
-            .padding(.horizontal, 11)
+            .padding(.horizontal, 10)
             .frame(height: height)
-            .background(AppColors.secondaryBackground.opacity(0.65))
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .background(AppColors.secondaryBackground.opacity(0.4))
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .stroke(AppColors.border.opacity(0.45), lineWidth: 0.6)
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(AppColors.border.opacity(0.35), lineWidth: 0.5)
             )
         }
     }

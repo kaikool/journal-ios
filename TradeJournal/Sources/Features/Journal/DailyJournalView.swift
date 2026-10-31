@@ -137,12 +137,11 @@ public struct DailyJournalListView: View {
                 } else {
                     LazyVStack(spacing: 8) {
                         ForEach(daysList) { day in
-                            Button {
-                                selectedDateForDetail = day.date
-                            } label: {
-                                dayRowCard(day)
-                            }
-                            .buttonStyle(ApplePressableButtonStyle())
+                            dayRowCard(day)
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    selectedDateForDetail = day.date
+                                }
                         }
                     }
                     .padding(.horizontal, 14)

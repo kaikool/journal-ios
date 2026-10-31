@@ -51,26 +51,25 @@ public struct TradeDetailNotesCard: View {
                     )
                 } else {
                     if isNoteEmpty {
-                        Button(action: {
+                        HStack {
+                            Text("Document setup thesis, entry triggers, emotion state, or lessons learned...")
+                                .font(AppTypography.caption)
+                                .foregroundColor(AppColors.secondaryText.opacity(0.8))
+                                .italic()
+                            Spacer()
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 65, alignment: .topLeading)
+                        .appSubCardStyle(cornerRadius: 10, padding: 10)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .stroke(AppColors.border.opacity(0.3), style: StrokeStyle(lineWidth: 0.8, dash: [4]))
+                        )
+                        .contentShape(Rectangle())
+                        .onTapGesture {
                             withAnimation(.easeInOut(duration: 0.2)) {
                                 isEditing = true
                             }
-                        }) {
-                            HStack {
-                                Text("Document setup thesis, entry triggers, emotion state, or lessons learned...")
-                                    .font(AppTypography.caption)
-                                    .foregroundColor(AppColors.secondaryText.opacity(0.6))
-                                    .multilineTextAlignment(.leading)
-                                Spacer()
-                            }
-                            .frame(maxWidth: .infinity, minHeight: 65, alignment: .topLeading)
-                            .appSubCardStyle(cornerRadius: 10, padding: 10)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                    .stroke(AppColors.border.opacity(0.3), style: StrokeStyle(lineWidth: 0.8, dash: [4]))
-                            )
                         }
-                        .buttonStyle(.plain)
                     } else {
                         JournalNotesMarkdownView(text: noteContent)
                             .appSubCardStyle(cornerRadius: 10, padding: 10)

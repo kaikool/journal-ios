@@ -71,22 +71,18 @@ public struct TradeAICoachChartCard: View {
                 
                 // Chart Snapshot Preview (Tap to enlarge in Lightbox)
                 if let image = selectedChartImage {
-                    Button(action: onEnlarge) {
-                        ZStack(alignment: .bottomTrailing) {
-                            Image(uiImage: image)
-                                .resizable()
-                                .scaledToFill()
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 180)
-                                .clipped()
-                                .cornerRadius(8)
-                                .overlay(RoundedRectangle(cornerRadius: 8).stroke(AppColors.border, lineWidth: 0.8))
-                            
-                            AppBadge("Expand", icon: "arrow.up.left.and.arrow.down.right", variant: .secondary)
-                                .padding(6)
-                        }
-                    }
-                    .buttonStyle(.plain)
+                    ZStack(alignment: .bottomTrailing) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(maxWidth: .infinity)
+                        .appCardStyle(cornerRadius: 10, padding: 0)
+                    
+                    ModalCircleButton(icon: "arrow.up.left.and.arrow.down.right", action: onEnlarge)
+                        .padding(6)
+                }
+                .contentShape(Rectangle())
+                .onTapGesture { onEnlarge() }
                 } else {
                     HStack(spacing: 10) {
                         TradeJournalProLoader(size: 28)

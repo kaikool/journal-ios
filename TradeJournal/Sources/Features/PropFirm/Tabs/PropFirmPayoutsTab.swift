@@ -7,10 +7,13 @@ extension PropFirmLedgerView {
     internal var payoutsProgressView: some View {
         VStack(spacing: 12) {
             if payoutItems.isEmpty {
-                EmptyStateView(
+                AppEmptyState(
                     icon: "banknote",
                     title: "No payout requests",
-                    message: "Track approval status, receipts and transfer fee variance for each prop firm payout."
+                    message: "Track approval status, receipts and transfer fee variance for each prop firm payout.",
+                    actionTitle: "Record Payout",
+                    actionIcon: "plus",
+                    action: { showNewEntrySheet = true }
                 )
             } else {
                 ForEach(payoutItems) { p in

@@ -7,10 +7,13 @@ extension PropFirmLedgerView {
     internal var transactionsListView: some View {
         VStack(spacing: 12) {
             if movements.isEmpty {
-                EmptyStateView(
+                AppEmptyState(
                     icon: "arrow.left.arrow.right",
                     title: "No cash movements",
-                    message: "Evaluation fees, refunds, and payout receipts will appear here."
+                    message: "Evaluation fees, refunds, and payout receipts will appear here.",
+                    actionTitle: "Add Expense",
+                    actionIcon: "plus",
+                    action: { showNewEntrySheet = true }
                 )
             } else {
                 ForEach(movements) { m in

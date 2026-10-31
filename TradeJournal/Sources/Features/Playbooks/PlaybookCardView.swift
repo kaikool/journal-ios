@@ -33,32 +33,31 @@ public struct PlaybookCardView: View {
             VStack(alignment: .leading, spacing: 12) {
                 // Header row
                 HStack(alignment: .center) {
-                    Button {
-                        NativeHaptics.lightImpact()
-                        onSelect()
-                    } label: {
-                        HStack(spacing: 8) {
-                            ZStack {
-                                Circle()
-                                    .fill(AppColors.brand.opacity(0.12))
-                                    .frame(width: 28, height: 28)
-                                Image(systemName: "book.pages")
-                                    .font(AppTypography.cardHeader)
-                                    .foregroundColor(AppColors.brand)
-                            }
-                            
-                            Text(summary.playbook.title)
-                                .font(AppTypography.rowPrimary)
-                                .foregroundColor(AppColors.primaryText)
-                                .lineLimit(1)
-                                .truncationMode(.tail)
-                            
-                            if summary.playbook.isDefault {
-                                AppBadge("DEFAULT", variant: .brand)
-                            }
+                    HStack(spacing: 8) {
+                        ZStack {
+                            Circle()
+                                .fill(AppColors.brand.opacity(0.12))
+                                .frame(width: 28, height: 28)
+                            Image(systemName: "book.pages")
+                                .font(AppTypography.cardHeader)
+                                .foregroundColor(AppColors.brand)
+                        }
+                        
+                        Text(summary.playbook.title)
+                            .font(AppTypography.rowPrimary)
+                            .foregroundColor(AppColors.primaryText)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                        
+                        if summary.playbook.isDefault {
+                            AppBadge("DEFAULT", variant: .brand)
                         }
                     }
-                    .buttonStyle(.plain)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        NativeHaptics.lightImpact()
+                        onSelect()
+                    }
                     
                     Spacer()
                     
@@ -73,11 +72,7 @@ public struct PlaybookCardView: View {
                 }
                 
                 // Content area that opens Detail
-                Button {
-                    NativeHaptics.lightImpact()
-                    onSelect()
-                } label: {
-                    VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: 10) {
                         if !summary.playbook.description.isEmpty {
                             Text(summary.playbook.description)
                                 .font(AppTypography.rowSecondary)
@@ -152,8 +147,10 @@ public struct PlaybookCardView: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
+                    .onTapGesture {
+                        NativeHaptics.lightImpact()
+                        onSelect()
+                    }
                 
                 // Bottom Action Row: More rules (left) & Set Default under When broken (right)
                 HStack(alignment: .center) {

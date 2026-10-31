@@ -68,10 +68,11 @@ public struct WeekdayChart: View {
                 .frame(height: 38)
                 
                 if weekdays.isEmpty {
-                    EmptyStateView(
+                    AppEmptyState(
                         icon: "calendar",
                         title: "No Weekday Data",
-                        message: "Trades will be aggregated across days of the week."
+                        message: "Trades will be aggregated across days of the week.",
+                        isInCard: true
                     )
                     .frame(height: 160)
                 } else {

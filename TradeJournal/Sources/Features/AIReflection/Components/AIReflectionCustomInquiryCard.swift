@@ -35,11 +35,7 @@ public struct AIReflectionCustomInquiryCard: View {
                     
                     Spacer()
                     
-                    Button(action: onOpenTraderProfile) {
-                        Text("Trader Profile")
-                            .font(AppTypography.captionMicro)
-                            .foregroundColor(AppColors.secondaryText)
-                    }
+                    AppActionPill("Trader Profile", icon: "person.text.rectangle", action: onOpenTraderProfile)
                 }
                 
                 if let image = selectedChartImage {
@@ -63,40 +59,24 @@ public struct AIReflectionCustomInquiryCard: View {
                         
                         Spacer()
                         
-                        Button(action: { selectedChartImage = nil }) {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(AppTypography.caption)
-                                .foregroundColor(AppColors.secondaryText)
-                        }
+                        ModalCloseButton(action: { selectedChartImage = nil })
                     }
                     .appSubCardStyle(cornerRadius: 6, padding: 6)
                 }
                 
                 HStack(spacing: 8) {
-                    Button(action: onAttachPhoto) {
-                        Image(systemName: selectedChartImage != nil ? "photo.fill" : "photo.badge.plus")
-                            .font(AppTypography.formInput)
-                            .foregroundColor(selectedChartImage != nil ? AppColors.brand : AppColors.secondaryText)
-                    }
+                    ModalCircleButton(icon: selectedChartImage != nil ? "photo.fill" : "photo.badge.plus", action: onAttachPhoto)
                     .buttonStyle(.plain)
                     
                     AppTextField("Enter question or instruction for Risk AI...", text: $userPrompt)
                     
                     if !userPrompt.isEmpty {
-                        Button(action: { userPrompt = "" }) {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundColor(AppColors.secondaryText)
-                                .font(AppTypography.caption)
-                        }
+                        ModalCloseButton(action: { userPrompt = "" })
                     }
                     
-                    Button(action: {
+                    ModalCircleButton(icon: "arrow.up", action: {
                         onSubmit(userPrompt)
-                    }) {
-                        Image(systemName: "arrow.up.circle.fill")
-                            .font(AppTypography.displayHero)
-                            .foregroundColor(userPrompt.trimmingCharacters(in: .whitespaces).isEmpty || isLoading ? AppColors.secondaryText.opacity(0.4) : AppColors.brand)
-                    }
+                    })
                     .disabled(userPrompt.trimmingCharacters(in: .whitespaces).isEmpty || isLoading)
                 }
                 .appSubCardStyle(cornerRadius: 8, padding: 10)

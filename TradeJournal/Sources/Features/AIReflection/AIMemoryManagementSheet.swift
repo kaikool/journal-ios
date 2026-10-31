@@ -128,15 +128,7 @@ public struct AIMemoryManagementSheet: View {
             if isSyncing {
                 TradeJournalProLoader(size: 20)
             } else {
-                Button(action: performSync) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "arrow.triangle.2.circlepath")
-                            .font(AppTypography.actionButtonCompact)
-                        Text("Sync")
-                            .font(AppTypography.actionButtonCompact)
-                    }
-                    .foregroundColor(AppColors.secondaryText)
-                }
+                AppActionPill("Sync", icon: "arrow.triangle.2.circlepath", action: performSync)
                 .buttonStyle(.plain)
             }
         }
@@ -347,16 +339,15 @@ private struct AIMemoryCard: View {
                     Spacer()
                     
                     if memory.content.count > 100 {
-                        Button(action: {
-                            withAnimation(.easeInOut(duration: 0.15)) {
-                                isExpanded.toggle()
+                        Text(isExpanded ? "Show Less" : "Read More")
+                            .font(AppTypography.captionMicro)
+                            .foregroundColor(AppColors.brand)
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                withAnimation(.easeInOut(duration: 0.15)) {
+                                    isExpanded.toggle()
+                                }
                             }
-                        }) {
-                            Text(isExpanded ? "Show Less" : "Read More")
-                                .font(AppTypography.captionMicro)
-                                .foregroundColor(AppColors.brand)
-                        }
-                        .buttonStyle(.plain)
                     }
                 }
                 .padding(.top, 2)

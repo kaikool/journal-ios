@@ -116,33 +116,35 @@ public struct AiSettingsView: View {
             
             // Card 2: Trader Profile
             SettingsCard(title: "Trader Profile", footer: "Customize trading style, risk limits, and behavioral rules for AI audits.") {
-                Button(action: { showTraderProfileSheet = true }) {
-                    HStack(spacing: 10) {
-                        Image(systemName: "person.text.rectangle")
+                HStack(spacing: 10) {
+                    Image(systemName: "person.text.rectangle")
+                        .font(AppTypography.bodyBold)
+                        .foregroundColor(AppColors.brand)
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Style & Discipline Rules")
                             .font(AppTypography.bodyBold)
-                            .foregroundColor(AppColors.brand)
+                            .foregroundColor(AppColors.primaryText)
                         
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Style & Discipline Rules")
-                                .font(AppTypography.bodyBold)
-                                .foregroundColor(AppColors.primaryText)
-                            
-                            let prof = dataStore.aiSettings.traderProfile
-                            Text("\(prof.tradingStyle.isEmpty ? "Standard" : prof.tradingStyle) • Max risk \(prof.maxRiskPerTrade.isEmpty ? "1%" : prof.maxRiskPerTrade)")
-                                .font(AppTypography.caption)
-                                .foregroundColor(AppColors.secondaryText)
-                                .lineLimit(1)
-                        }
-                        
-                        Spacer()
-                        
-                        Image(systemName: "chevron.right")
+                        let prof = dataStore.aiSettings.traderProfile
+                        Text("\(prof.tradingStyle.isEmpty ? "Standard" : prof.tradingStyle) • Max risk \(prof.maxRiskPerTrade.isEmpty ? "1%" : prof.maxRiskPerTrade)")
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText)
+                            .lineLimit(1)
                     }
-                    .padding(.vertical, 4)
+                    
+                    Spacer()
+                    
+                    Image(systemName: "chevron.right")
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.secondaryText)
                 }
-                .buttonStyle(.plain)
+                .padding(.vertical, 4)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    NativeHaptics.lightImpact()
+                    showTraderProfileSheet = true
+                }
             }
         }
         .sheet(isPresented: $showTraderProfileSheet) {

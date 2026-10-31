@@ -276,13 +276,8 @@ public struct NoteAIInquirySheet: View {
             )
             .onSubmit { submitInquiry() }
             
-            Button(action: submitInquiry) {
-                Image(systemName: "arrow.up.circle.fill")
-                    .font(AppTypography.metricLarge)
-                    .foregroundColor(inputText.trimmingCharacters(in: .whitespaces).isEmpty ? AppColors.secondaryText.opacity(0.4) : AppColors.brand)
-            }
-            .buttonStyle(ApplePressableButtonStyle())
-            .disabled(inputText.trimmingCharacters(in: .whitespaces).isEmpty || isLoading)
+            ModalCircleButton(icon: "arrow.up", action: submitInquiry)
+                .disabled(inputText.trimmingCharacters(in: .whitespaces).isEmpty || isLoading)
         }
         .padding(10)
         .background(AppColors.cardBackground)

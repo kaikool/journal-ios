@@ -172,11 +172,7 @@ public struct AccountsManagerView: View {
         let visibleCount = dataStore.visibleAccounts.count
         let totalCount = dataStore.accounts.count
         
-        return Button {
-            NativeHaptics.lightImpact()
-            dataStore.selectAccount(id: "all")
-        } label: {
-            HStack(spacing: 10) {
+        return HStack(spacing: 10) {
                 Image(systemName: "square.stack.3d.up.fill")
                     .font(AppTypography.actionButtonCompact)
                     .foregroundColor(isAllSelected ? AppColors.brand : AppColors.secondaryText)
@@ -201,8 +197,11 @@ public struct AccountsManagerView: View {
                 }
             }
             .appCardStyle(cornerRadius: 12)
-        }
-        .buttonStyle(ApplePressableButtonStyle())
+            .contentShape(Rectangle())
+            .onTapGesture {
+                NativeHaptics.lightImpact()
+                dataStore.selectAccount(id: "all")
+            }
         .padding(.horizontal, 16)
     }
 

@@ -120,13 +120,7 @@ public struct TradingSettingsView: View {
                         Text("Rule #\(index + 1)")
                             .font(AppTypography.captionBold)
                         Spacer()
-                        Button(role: .destructive) {
-                            feeRules.remove(at: index)
-                        } label: {
-                            Text("Remove fee rule")
-                                .font(AppTypography.caption)
-                                .foregroundColor(AppColors.loss)
-                        }
+                        ModalDeleteButton { feeRules.remove(at: index) }
                     }
                     
                     HStack {
@@ -179,13 +173,7 @@ public struct TradingSettingsView: View {
                         Text("Rule #\(index + 1)")
                             .font(AppTypography.captionBold)
                         Spacer()
-                        Button(role: .destructive) {
-                            riskRules.remove(at: index)
-                        } label: {
-                            Text("Remove risk rule")
-                                .font(AppTypography.caption)
-                                .foregroundColor(AppColors.loss)
-                        }
+                        ModalDeleteButton { riskRules.remove(at: index) }
                     }
                     
                     HStack {
