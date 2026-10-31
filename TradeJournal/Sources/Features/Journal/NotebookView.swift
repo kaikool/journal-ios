@@ -8,9 +8,12 @@ import SwiftUI
 /// - Full-featured Note Editor with edit/preview toggle, format actions, autosave, delete, and attachments
 public struct NotebookView: View {
     @ObservedObject private var dataStore = TradeDataStore.shared
-    @ObservedObject private var env = AppEnvironment.shared
+    @EnvironmentObject private var env: AppEnvironment
     
-    @State private var selectedFolderId: String = NotebookEngine.systemFolderAll
+    private var selectedFolderId: String {
+        get { env.notebookFolderId ?? NotebookEngine.systemFolderAll }
+        nonmutating set { env.notebookFolderId = (newValue == NotebookEngine.systemFolderAll) ? nil : newValue }
+    }
     @State private var searchQuery: String = ""
     @State private var editingNote: NotebookNote? = nil
     
@@ -71,19 +74,9 @@ public struct NotebookView: View {
                     notesListView
                 }
             }
-            .padding(.horizontal, 14)
-            .padding(.top, 10)
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
             .padding(.bottom, 88)
-        }
-        .safeAreaInset(edge: .top, spacing: 0) {
-            folderChipsBar
-                .padding(.vertical, 8)
-                .background(.ultraThinMaterial)
-                .overlay(alignment: .bottom) {
-                    Rectangle()
-                        .fill(AppColors.border.opacity(0.3))
-                        .frame(height: 0.5)
-                }
         }
         .onReceive(env.$requestNewNote) { requested in
             if requested {
@@ -331,7 +324,6 @@ public struct NotebookView: View {
                     .buttonStyle(ApplePressableButtonStyle())
                 }
             }
-            .padding(.horizontal, 14)
         }
     
     // MARK: - Empty State

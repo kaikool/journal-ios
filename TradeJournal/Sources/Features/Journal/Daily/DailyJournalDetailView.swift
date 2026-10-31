@@ -47,6 +47,16 @@ public struct DailyJournalDetailView: View {
         f.locale = Locale(identifier: "en_US")
         return f
     }()
+
+    private var formattedNavTitle: String {
+        if let d = Self.detailIsoFormatter.date(from: date) {
+            let f = DateFormatter()
+            f.dateFormat = "EEE, MMM d, yyyy"
+            f.locale = Locale(identifier: "en_US")
+            return f.string(from: d)
+        }
+        return "Journal · \(date)"
+    }
     
     internal var dayTrades: [Trade] {
         Self.detailIsoFormatter.timeZone = env.currentTimeZone
@@ -187,45 +197,95 @@ public struct DailyJournalDetailView: View {
     }
     
     public var body: some View {
-        ScrollView {
-            VStack(spacing: 12) {
-                // Card 1: Day stats KPI grid (port 1:1 from web Day stats)
-                dayStatsCard
-                
-                // Card 2: Intraday cumulative net P&L chart
-                if !intradayPoints.isEmpty {
-                    intradayChartCard
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 12) {
+                    // Card 1: Day stats KPI grid (port 1:1 from web Day stats)
+                    dayStatsCard
+                    
+                    // Card 2: Intraday cumulative net P&L chart
+                    if !intradayPoints.isEmpty {
+                        intradayChartCard
+                    }
+                    
+                    // Card 3: Closed and open trades list
+                    if !dayTrades.isEmpty {
+                        dayTradesCard
+                    }
+                    
+                    // Card 4: Day note editor & AI Recap
+                    dayNoteCard
+                    
+                    // Card 5: Attachments & chart screenshots
+                    AttachmentsSectionView(ownerType: "day", ownerId: date, title: "Attachments")
+                        .padding(.horizontal, 16)
                 }
-                
-                // Card 3: Closed and open trades list
-                if !dayTrades.isEmpty {
-                    dayTradesCard
-                }
-                
-                // Card 4: Day note editor & AI Recap
-                dayNoteCard
-                
-                // Card 5: Attachments & chart screenshots
-                AttachmentsSectionView(ownerType: "day", ownerId: date, title: "Attachments")
-                    .padding(.horizontal, 14)
+                .padding(.top, 10)
+                .padding(.bottom, 48)
             }
-            .padding(.top, 12)
-            .padding(.bottom, 88)
+            .scrollDismissesKeyboard(.interactively)
+            .background(AppColors.background)
+            .navigationTitle(formattedNavTitle)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        #if canImport(UIKit)
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        #endif
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(AppColors.secondaryText)
+                            .frame(width: 28, height: 28)
+                            .background(AppColors.secondaryBackground.opacity(0.85))
+                            .clipShape(Circle())
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .accessibilityLabel("Close")
+                }
+                
+                ToolbarItem(placement: .topBarTrailing) {
+                    HStack(spacing: 8) {
+                        if !noteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            Button {
+                                #if canImport(UIKit)
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                #endif
+                                showDeleteNoteAlert = true
+                            } label: {
+                                Image(systemName: "trash")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundColor(AppColors.loss)
+                                    .frame(width: 28, height: 28)
+                                    .background(AppColors.loss.opacity(0.12))
+                                    .clipShape(Circle())
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            .accessibilityLabel("Delete note")
+                        }
+                        
+                        Button {
+                            #if canImport(UIKit)
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            #endif
+                            saveNoteImmediately(force: true)
+                            dismiss()
+                        } label: {
+                            Text("Done")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(AppColors.brand)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(AppColors.brand.opacity(0.12))
+                                .clipShape(Capsule())
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+                }
+            }
         }
-        .scrollDismissesKeyboard(.interactively)
-        .safeAreaInset(edge: .top, spacing: 0) {
-            FilterBarView(
-                title: "Journal · \(date)",
-                showFilters: false,
-                onBack: { dismiss() },
-                isModal: isModal
-            )
-        }
-        .background(AppColors.background)
-        .navigationBarBackButtonHidden(true)
-        .toolbar(.hidden, for: .navigationBar)
-        .interactiveEdgeBack(onBack: isModal ? nil : { dismiss() })
-        .enableNativePopGesture()
         .sheet(item: $selectedTradeForDetail) { trade in
             TradeDetailView(trade: trade, isModal: true)
                 .presentationDetents([.large])

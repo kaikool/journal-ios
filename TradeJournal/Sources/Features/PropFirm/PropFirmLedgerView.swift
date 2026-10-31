@@ -20,9 +20,9 @@ public enum PropAccountStatusFilter: String, CaseIterable, Identifiable {
 
 public struct PropFirmLedgerView: View {
     @ObservedObject var dataStore = TradeDataStore.shared
-    @ObservedObject var env = AppEnvironment.shared
+    @EnvironmentObject var env: AppEnvironment
     
-    @State var selectedTab: PropLedgerTab = .overview
+    private var selectedTab: PropLedgerTab { env.propLedgerTab }
     @State var selectedCurrency: String = "USD"
     @State var selectedAccountStatus: PropAccountStatusFilter = .active
     @State var showArchivedAccounts: Bool = false
@@ -137,21 +137,6 @@ public struct PropFirmLedgerView: View {
             .padding(.horizontal, 14)
             .padding(.top, 12)
             .padding(.bottom, 88)
-        }
-        .safeAreaInset(edge: .top, spacing: 0) {
-            AppleSlidingSegmentedBar(
-                selection: $selectedTab,
-                items: PropLedgerTab.allCases,
-                titleFor: { $0.rawValue }
-            )
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-            .background(.ultraThinMaterial)
-            .overlay(alignment: .bottom) {
-                Rectangle()
-                    .fill(AppColors.border.opacity(0.3))
-                    .frame(height: 0.5)
-            }
         }
         .scrollDismissesKeyboard(.interactively)
         .background(AppColors.background)

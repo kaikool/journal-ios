@@ -42,6 +42,22 @@ public final class AppEnvironment: ObservableObject {
     @Published public var isSearchActive: Bool = false
     @Published public var searchQuery: String = ""
     
+    // MARK: - Unified Cockpit Header Sub-Bar States
+    @Published public var calendarCurrentMonth: Date = Date()
+    @Published public var settingsActiveSection: SettingsSection = .general
+    @Published public var reportsActiveMode: ReportMode = .overview
+    @Published public var accountFilterTab: AccountFilterTab = .all
+    @Published public var propLedgerTab: PropLedgerTab = .accounts
+    @Published public var notebookFolderId: String? = nil
+    
+    public func changeCalendarMonth(by value: Int) {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = currentTimeZone
+        if let newDate = cal.date(byAdding: .month, value: value, to: calendarCurrentMonth) {
+            calendarCurrentMonth = newDate
+        }
+    }
+    
     // Production user identity management (isolated per device)
     @Published public var isAuthenticated: Bool = true
     @Published public var currentUserId: String = AppEnvironment.resolvePersistentUserId()

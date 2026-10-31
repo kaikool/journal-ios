@@ -63,11 +63,16 @@ public struct ShellHeaderView: View {
             .padding(.vertical, 8)
             .frame(minHeight: 50)
             
-            // Collapsible In-Header Search Bar (Expands smoothly on demand)
+            // Row 2: Dynamic Sub-Bar Slot (Seamlessly inside the same frosted glass container)
+            if hasSubBar {
+                subBarSlot
+            }
+            
+            // Row 3: Collapsible In-Header Search Bar (Expands smoothly on demand)
             if env.isSearchActive && hasSearchCapability {
                 HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass")
-                        .font(.system(size: 13))
+                        .font(.system(size: 13, weight: .semibold))
                         .foregroundColor(AppColors.secondaryText)
                     TextField("Search...", text: $env.searchQuery)
                         .font(.system(size: 13.5, weight: .regular))
@@ -86,10 +91,10 @@ public struct ShellHeaderView: View {
                 }
                 .padding(.horizontal, 12)
                 .frame(height: 36)
-                .background(AppColors.secondaryBackground.opacity(0.75))
+                .background(AppColors.secondaryBackground.opacity(0.85))
                 .clipShape(Capsule())
                 .overlay(
-                    Capsule().stroke(AppColors.border.opacity(0.5), lineWidth: 0.5)
+                    Capsule().stroke(AppColors.border.opacity(0.9), lineWidth: 1.0)
                 )
                 .padding(.horizontal, 16)
                 .padding(.bottom, 8)
@@ -98,11 +103,9 @@ public struct ShellHeaderView: View {
         }
         .background(.ultraThinMaterial)
         .overlay(alignment: .bottom) {
-            if !hasSubBar {
-                Rectangle()
-                    .fill(AppColors.border.opacity(0.35))
-                    .frame(height: 0.5)
-            }
+            Rectangle()
+                .fill(AppColors.border.opacity(0.35))
+                .frame(height: 0.5)
         }
         .sheet(isPresented: $showPreTradeAnalysis) {
             PreTradeAnalysisSheet(initialSymbol: "XAUUSD")
@@ -116,6 +119,168 @@ public struct ShellHeaderView: View {
         default:
             return false
         }
+    }
+    
+    // MARK: - Sub-Bar Slots (100% Unified Translucency)
+    
+    @ViewBuilder
+    private var subBarSlot: some View {
+        switch env.selectedTab {
+        case .calendar:
+            calendarMonthSubBar
+        case .settings:
+            settingsSegmentedSubBar
+        case .reports:
+            reportsSegmentedSubBar
+        case .accounts:
+            accountsSegmentedSubBar
+        case .propFirms:
+            propFirmsSegmentedSubBar
+        case .notebook:
+            notebookFoldersSubBar
+        default:
+            EmptyView()
+        }
+    }
+    
+    private var calendarMonthSubBar: some View {
+        HStack {
+            Button {
+                NativeHaptics.lightImpact()
+                env.changeCalendarMonth(by: -1)
+            } label: {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(AppColors.primaryText)
+                    .frame(width: 32, height: 32)
+                    .background(AppColors.secondaryBackground.opacity(0.75))
+                    .clipShape(Circle())
+                    .overlay(Circle().stroke(AppColors.border.opacity(0.6), lineWidth: 0.5))
+            }
+            .buttonStyle(ApplePressableButtonStyle())
+            .accessibilityLabel("Previous month")
+            
+            Spacer()
+            
+            HStack(spacing: 6) {
+                Image(systemName: "calendar")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(AppColors.brand)
+                Text(Formatters.formatMonthYear(env.calendarCurrentMonth, timeZone: env.currentTimeZone))
+                    .font(.system(size: 14.5, weight: .bold, design: .rounded))
+                    .foregroundColor(AppColors.primaryText)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 6)
+            .background(AppColors.secondaryBackground.opacity(0.75))
+            .clipShape(Capsule())
+            .overlay(
+                Capsule().stroke(AppColors.border.opacity(0.6), lineWidth: 0.6)
+            )
+            
+            Spacer()
+            
+            Button {
+                NativeHaptics.lightImpact()
+                env.changeCalendarMonth(by: 1)
+            } label: {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(AppColors.primaryText)
+                    .frame(width: 32, height: 32)
+                    .background(AppColors.secondaryBackground.opacity(0.75))
+                    .clipShape(Circle())
+                    .overlay(Circle().stroke(AppColors.border.opacity(0.6), lineWidth: 0.5))
+            }
+            .buttonStyle(ApplePressableButtonStyle())
+            .accessibilityLabel("Next month")
+        }
+        .padding(.horizontal, 16)
+        .padding(.bottom, 8)
+    }
+    
+    private var settingsSegmentedSubBar: some View {
+        AppleSlidingSegmentedBar(
+            selection: $env.settingsActiveSection,
+            items: SettingsSection.allCases,
+            titleFor: { $0.label },
+            iconFor: { $0.iconName },
+            isScrollable: true
+        )
+        .padding(.horizontal, 14)
+        .padding(.bottom, 8)
+    }
+    
+    private var reportsSegmentedSubBar: some View {
+        AppleSlidingSegmentedBar(
+            selection: $env.reportsActiveMode,
+            items: ReportMode.allCases,
+            titleFor: { $0.rawValue },
+            iconFor: { $0.iconName },
+            isScrollable: true
+        )
+        .padding(.horizontal, 14)
+        .padding(.bottom, 8)
+    }
+    
+    private var accountsSegmentedSubBar: some View {
+        AppleSlidingSegmentedBar(
+            selection: $env.accountFilterTab,
+            items: AccountFilterTab.allCases,
+            titleFor: { $0.rawValue },
+            badgeCountFor: { tab in
+                switch tab {
+                case .default: return dataStore.accounts.filter { $0.id == dataStore.defaultAccountId }.count
+                case .active: return dataStore.accounts.filter { $0.archivedAt == nil }.count
+                case .visible: return dataStore.visibleAccounts.count
+                case .all: return dataStore.accounts.count
+                }
+            }
+        )
+        .padding(.horizontal, 14)
+        .padding(.bottom, 8)
+    }
+    
+    private var propFirmsSegmentedSubBar: some View {
+        AppleSlidingSegmentedBar(
+            selection: $env.propLedgerTab,
+            items: PropLedgerTab.allCases,
+            titleFor: { $0.rawValue }
+        )
+        .padding(.horizontal, 14)
+        .padding(.bottom, 8)
+    }
+    
+    private var notebookFoldersSubBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(dataStore.notebookFolders) { folder in
+                    let isSelected = (env.notebookFolderId == folder.id) || (env.notebookFolderId == nil && folder.id == NotebookEngine.systemFolderAll)
+                    Button {
+                        NativeHaptics.selection()
+                        env.notebookFolderId = (folder.id == NotebookEngine.systemFolderAll) ? nil : folder.id
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: isSelected ? "folder.fill" : "folder")
+                                .font(.system(size: 11))
+                            Text(folder.name)
+                                .font(.system(size: 11.5, weight: isSelected ? .bold : .medium))
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(isSelected ? AppColors.brand : AppColors.secondaryBackground.opacity(0.75))
+                        .foregroundColor(isSelected ? .white : AppColors.secondaryText)
+                        .clipShape(Capsule())
+                        .overlay(
+                            Capsule().stroke(isSelected ? AppColors.brand : AppColors.border.opacity(0.6), lineWidth: 0.6)
+                        )
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                }
+            }
+            .padding(.horizontal, 16)
+        }
+        .padding(.bottom, 8)
     }
     
     // MARK: - Trailing Action Slot by Page Context

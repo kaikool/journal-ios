@@ -34,6 +34,7 @@ public struct DayDetailSheet: View {
     @State private var rating: Int = 0
     @State private var showDeleteNoteAlert: Bool = false
     @State private var saveStatus: String = ""
+    @State private var showFullJournal: Bool = false
     
     public init(
         dateKey: String,
@@ -63,7 +64,7 @@ public struct DayDetailSheet: View {
     private static let titleOutFormatter: DateFormatter = {
         let f = DateFormatter()
         f.locale = Locale(identifier: "en_US")
-        f.dateFormat = "EEEE, MMM d, yyyy"
+        f.dateFormat = "EEE, MMM d, yyyy"
         f.timeZone = TimeZone(identifier: "UTC")
         return f
     }()
@@ -106,28 +107,50 @@ public struct DayDetailSheet: View {
                         dismiss()
                     } label: {
                         Image(systemName: "xmark")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.system(size: 11, weight: .bold))
                             .foregroundColor(AppColors.secondaryText)
+                            .frame(width: 28, height: 28)
+                            .background(AppColors.secondaryBackground.opacity(0.85))
+                            .clipShape(Circle())
                     }
+                    .buttonStyle(PlainButtonStyle())
+                    .accessibilityLabel("Close")
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    HStack(spacing: 12) {
+                    HStack(spacing: 10) {
                         if !noteContent.isEmpty || rating > 0 {
                             Button {
+                                #if canImport(UIKit)
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                #endif
                                 showDeleteNoteAlert = true
                             } label: {
                                 Image(systemName: "trash")
-                                    .font(.system(size: 13, weight: .regular))
+                                    .font(.system(size: 12, weight: .medium))
                                     .foregroundColor(AppColors.loss.opacity(0.85))
+                                    .frame(width: 28, height: 28)
+                                    .background(AppColors.secondaryBackground.opacity(0.85))
+                                    .clipShape(Circle())
                             }
+                            .buttonStyle(PlainButtonStyle())
+                            .accessibilityLabel("Delete note")
                         }
                         
-                        Button("Done") {
+                        Button {
+                            #if canImport(UIKit)
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            #endif
                             save()
                             dismiss()
+                        } label: {
+                            Text("Done")
+                                .font(.system(size: 13.5, weight: .bold))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 5)
+                                .background(AppColors.brand)
+                                .clipShape(Capsule())
                         }
-                        .font(AppTypography.captionBold)
-                        .foregroundColor(AppColors.brand)
                     }
                 }
             }
@@ -141,6 +164,12 @@ public struct DayDetailSheet: View {
                 }
             } message: {
                 Text("This note will be permanently removed from your calendar and Supabase.")
+            }
+            .sheet(isPresented: $showFullJournal, onDismiss: { reloadNote() }) {
+                DailyJournalDetailView(date: dateKey, isModal: true)
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
+                    .presentationCornerRadius(28)
             }
             .onDisappear {
                 save()
@@ -319,7 +348,12 @@ public struct DayDetailSheet: View {
                 .cornerRadius(6)
             }
             
-            NavigationLink(destination: DailyJournalDetailView(date: dateKey)) {
+            Button {
+                #if canImport(UIKit)
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                #endif
+                showFullJournal = true
+            } label: {
                 HStack(spacing: 6) {
                     Image(systemName: "doc.text")
                     Text("Full Journal")
@@ -335,6 +369,17 @@ public struct DayDetailSheet: View {
                         .stroke(AppColors.border, lineWidth: 1)
                 )
             }
+            .buttonStyle(PlainButtonStyle())
+        }
+    }
+    
+    private func reloadNote() {
+        let saved = TradeDataStore.shared.getJournalDayNote(date: dateKey)
+        if !saved.isEmpty {
+            noteContent = saved
+        } else if let cal = TradeDataStore.shared.calendarNotes[dateKey] {
+            noteContent = cal.content
+            rating = cal.rating ?? 0
         }
     }
     

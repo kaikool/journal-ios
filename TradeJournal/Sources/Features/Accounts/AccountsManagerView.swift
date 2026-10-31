@@ -19,7 +19,7 @@ public struct AccountsManagerView: View {
     @ObservedObject private var dataStore = TradeDataStore.shared
     @EnvironmentObject private var env: AppEnvironment
     
-    @State private var filterTab: AccountFilterTab = .active
+    private var filterTab: AccountFilterTab { env.accountFilterTab }
     @State private var searchText: String = ""
     @State private var showNewAccountSheet: Bool = false
     @State private var accountToEdit: Account? = nil
@@ -107,29 +107,6 @@ public struct AccountsManagerView: View {
             }
             .padding(.top, 10)
             .padding(.bottom, 88)
-        }
-        .safeAreaInset(edge: .top, spacing: 0) {
-            AppleSlidingSegmentedBar(
-                selection: $filterTab,
-                items: AccountFilterTab.allCases,
-                titleFor: { $0.rawValue },
-                badgeCountFor: { tab in
-                    switch tab {
-                    case .default: return defaultCount
-                    case .active: return activeCount
-                    case .visible: return visibleCount
-                    case .all: return accounts.count
-                    }
-                }
-            )
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .background(.ultraThinMaterial)
-            .overlay(alignment: .bottom) {
-                Rectangle()
-                    .fill(AppColors.border.opacity(0.3))
-                    .frame(height: 0.5)
-            }
         }
         .onReceive(env.$requestNewAccount) { requested in
             if requested {

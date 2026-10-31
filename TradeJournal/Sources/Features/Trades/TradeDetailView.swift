@@ -163,17 +163,70 @@ public struct TradeDetailView: View {
             .padding(.bottom, 48)
         }
         .scrollDismissesKeyboard(.interactively)
-        .safeAreaInset(edge: .top, spacing: 0) {
-            FilterBarView(
-                title: trade.symbol,
-                showFilters: false,
-                onBack: { dismiss() },
-                isModal: isModal
-            )
-        }
         .background(AppColors.background)
-        .navigationBarBackButtonHidden(true)
-        .toolbar(.hidden, for: .navigationBar)
+        .navigationTitle(trade.symbol)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button {
+                    #if canImport(UIKit)
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    #endif
+                    dismiss()
+                } label: {
+                    if isModal {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(AppColors.secondaryText)
+                            .frame(width: 28, height: 28)
+                            .background(AppColors.secondaryBackground.opacity(0.85))
+                            .clipShape(Circle())
+                    } else {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(AppColors.brand)
+                    }
+                }
+                .buttonStyle(PlainButtonStyle())
+                .accessibilityLabel(isModal ? "Close" : "Back")
+            }
+            
+            ToolbarItem(placement: .topBarTrailing) {
+                HStack(spacing: 8) {
+                    Button {
+                        #if canImport(UIKit)
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        #endif
+                        showAICoachSheet = true
+                    } label: {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(AppColors.brand)
+                            .frame(width: 28, height: 28)
+                            .background(AppColors.brand.opacity(0.12))
+                            .clipShape(Circle())
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .accessibilityLabel("AI Coach")
+                    
+                    Button {
+                        #if canImport(UIKit)
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        #endif
+                        showEditTradeSheet = true
+                    } label: {
+                        Image(systemName: "pencil")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(AppColors.secondaryText)
+                            .frame(width: 28, height: 28)
+                            .background(AppColors.secondaryBackground.opacity(0.85))
+                            .clipShape(Circle())
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .accessibilityLabel("Edit trade")
+                }
+            }
+        }
         .interactiveEdgeBack(onBack: isModal ? nil : { dismiss() })
         .enableNativePopGesture()
         .sheet(isPresented: $showAICoachSheet) {

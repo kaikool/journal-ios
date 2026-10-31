@@ -36,7 +36,7 @@ public struct ReportsView: View {
     @ObservedObject private var dataStore = TradeDataStore.shared
     @EnvironmentObject private var env: AppEnvironment
     
-    @State private var selectedMode: ReportMode = .overview
+    private var selectedMode: ReportMode { env.reportsActiveMode }
     @State private var primaryDimension: Dimension = .symbol
     @State private var secondaryDimension: Dimension = .weekday
     @State private var showAiReflectionSheet: Bool = false
@@ -147,23 +147,6 @@ public struct ReportsView: View {
             }
             .padding(.top, 10)
             .padding(.bottom, 88)
-        }
-        .safeAreaInset(edge: .top, spacing: 0) {
-            AppleSlidingSegmentedBar(
-                selection: $selectedMode,
-                items: ReportMode.allCases,
-                titleFor: { $0.rawValue },
-                iconFor: { $0.iconName },
-                isScrollable: true
-            )
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .background(.ultraThinMaterial)
-            .overlay(alignment: .bottom) {
-                Rectangle()
-                    .fill(AppColors.border.opacity(0.3))
-                    .frame(height: 0.5)
-            }
         }
         .scrollDismissesKeyboard(.interactively)
         .background(AppColors.background)

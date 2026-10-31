@@ -367,6 +367,14 @@ public enum Formatters {
         dateOnly(date, timeZone: timeZone)
     }
     
+    public static func formatMonthYear(_ date: Date, timeZone: TimeZone = .current) -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US")
+        f.dateFormat = "MMMM yyyy"
+        f.timeZone = timeZone
+        return f.string(from: date)
+    }
+    
     /// Formats Date into standard YYYY-MM-DD day key
     public static func isoDayString(from date: Date, timeZone: TimeZone = .current) -> String {
         isoDayFormatter.timeZone = timeZone

@@ -123,54 +123,8 @@ public struct EditManualTradeSheet: View {
     
     public var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                // Header
-                HStack(alignment: .center) {
-                    Button {
-                        #if canImport(UIKit)
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        #endif
-                        dismiss()
-                    } label: {
-                        Text("Cancel")
-                            .font(AppTypography.body)
-                            .foregroundColor(AppColors.secondaryText)
-                    }
-                    
-                    Spacer()
-                    
-                    Text("EDIT TRADE")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundColor(AppColors.primaryText)
-                        .tracking(0.5)
-                    
-                    Spacer()
-                    
-                    Button {
-                        #if canImport(UIKit)
-                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                        #endif
-                        saveChanges()
-                    } label: {
-                        Text("Save")
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundColor(isValid ? .white : AppColors.secondaryText.opacity(0.6))
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 6)
-                            .background(isValid ? AppColors.brand : AppColors.secondaryBackground)
-                            .clipShape(Capsule())
-                    }
-                    .disabled(!isValid)
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                .background(AppColors.cardBackground)
-                
-                Divider().background(AppColors.border.opacity(0.5))
-                
-                // Form Content
-                ScrollView {
-                    VStack(spacing: 14) {
+            ScrollView {
+                VStack(spacing: 14) {
                         if isSyncedTrade {
                             HStack(spacing: 10) {
                                 Image(systemName: "link.circle.fill")
@@ -234,12 +188,43 @@ public struct EditManualTradeSheet: View {
                 }
                 .scrollDismissesKeyboard(.interactively)
                 .background(AppColors.background)
+                .navigationTitle("Edit Trade")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") {
+                            #if canImport(UIKit)
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            #endif
+                            dismiss()
+                        }
+                        .font(.system(size: 15, weight: .regular))
+                        .foregroundColor(AppColors.secondaryText)
+                    }
+                    
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button {
+                            #if canImport(UIKit)
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            #endif
+                            saveChanges()
+                        } label: {
+                            Text("Save")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundColor(isValid ? .white : AppColors.secondaryText.opacity(0.6))
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 6)
+                                .background(isValid ? AppColors.brand : AppColors.secondaryBackground)
+                                .clipShape(Capsule())
+                        }
+                        .disabled(!isValid)
+                    }
+                }
             }
             .onAppear {
                 loadExistingAssessments()
             }
         }
-    }
     
     private func loadExistingAssessments() {
         for assessment in dataStore.playbookAssessments where assessment.tradeKey == trade.key {

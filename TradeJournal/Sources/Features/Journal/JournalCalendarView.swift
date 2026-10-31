@@ -27,7 +27,7 @@ public struct JournalCalendarView: View {
     @ObservedObject private var dataStore = TradeDataStore.shared
     @ObservedObject private var ffService = ForexFactoryService.shared
     
-    @State private var currentMonth: Date = Date()
+    private var currentMonth: Date { env.calendarCurrentMonth }
     @State private var selectedDayContext: DayDetailContext? = nil
     @State var selectedWeekdayIndex: Int? = nil
     @State private var addTradeDate: Date? = nil
@@ -205,74 +205,6 @@ public struct JournalCalendarView: View {
         return dataStore.availableCurrencies
     }
     
-    private var monthNavigatorBar: some View {
-        HStack {
-            Button(action: {
-                #if os(iOS)
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                #endif
-                changeMonth(by: -1)
-            }) {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(AppColors.primaryText)
-                    .frame(width: 32, height: 32)
-                    .background(AppColors.cardBackground)
-                    .clipShape(Circle())
-                    .overlay(Circle().stroke(AppColors.border.opacity(0.6), lineWidth: 0.5))
-            }
-            .buttonStyle(ApplePressableButtonStyle())
-            .accessibilityLabel("Previous month")
-            
-            Spacer()
-            
-            // Month Title in a Sleek Pill Pod
-            HStack(spacing: 6) {
-                Image(systemName: "calendar")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(AppColors.brand)
-                Text(monthTitle(for: currentMonth))
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
-                    .foregroundColor(AppColors.primaryText)
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 7)
-            .background(AppColors.cardBackground.opacity(0.85))
-            .clipShape(Capsule())
-            .overlay(
-                Capsule()
-                    .stroke(AppColors.border.opacity(0.5), lineWidth: 0.6)
-            )
-            
-            Spacer()
-            
-            Button(action: {
-                #if os(iOS)
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                #endif
-                changeMonth(by: 1)
-            }) {
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(AppColors.primaryText)
-                    .frame(width: 32, height: 32)
-                    .background(AppColors.cardBackground)
-                    .clipShape(Circle())
-                    .overlay(Circle().stroke(AppColors.border.opacity(0.6), lineWidth: 0.5))
-            }
-            .buttonStyle(ApplePressableButtonStyle())
-            .accessibilityLabel("Next month")
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .background(.ultraThinMaterial)
-        .overlay(alignment: .bottom) {
-            Rectangle()
-                .fill(AppColors.border.opacity(0.3))
-                .frame(height: 0.5)
-        }
-    }
-    
     public var body: some View {
         ScrollView {
             VStack(spacing: 14) {
@@ -290,9 +222,6 @@ public struct JournalCalendarView: View {
             .padding(.horizontal, 14)
             .padding(.top, 10)
             .padding(.bottom, 88)
-        }
-        .safeAreaInset(edge: .top, spacing: 0) {
-            monthNavigatorBar
         }
         .background(AppColors.background)
         .task {
@@ -642,9 +571,7 @@ public struct JournalCalendarView: View {
     }
     
     private func changeMonth(by value: Int) {
-        if let newDate = calendar.date(byAdding: .month, value: value, to: currentMonth) {
-            currentMonth = newDate
-        }
+        env.changeCalendarMonth(by: value)
     }
     
     private func monthTitle(for date: Date) -> String {

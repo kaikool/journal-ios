@@ -109,69 +109,51 @@ public struct EditTargetsSheet: View {
     // MARK: - Body
     public var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                headerBar
-                
-                Divider().background(AppColors.border.opacity(0.5))
-                
-                ScrollView {
-                    VStack(spacing: 14) {
-                        tradeSummaryCard
-                        
-                        stopLossCard
-                        
-                        profitTargetCard
-                        
-                        rrAnalysisCard
-                    }
-                    .padding(16)
+            ScrollView {
+                VStack(spacing: 14) {
+                    tradeSummaryCard
+                    
+                    stopLossCard
+                    
+                    profitTargetCard
+                    
+                    rrAnalysisCard
                 }
+                .padding(16)
             }
             .background(AppColors.background)
-        }
-    }
-    
-    // MARK: - Header
-    private var headerBar: some View {
-        HStack(alignment: .center) {
-            Button {
-                #if canImport(UIKit)
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                #endif
-                dismiss()
-            } label: {
-                Text("Cancel")
-                    .font(AppTypography.body)
+            .navigationTitle("Edit Targets (R:R)")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        #if canImport(UIKit)
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        #endif
+                        dismiss()
+                    }
+                    .font(.system(size: 15, weight: .regular))
                     .foregroundColor(AppColors.secondaryText)
-            }
-            
-            Spacer()
-            
-            Text("EDIT TARGETS (R:R)")
-                .font(.system(size: 13, weight: .bold))
-                .foregroundColor(AppColors.primaryText)
-                .tracking(0.5)
-            
-            Spacer()
-            
-            Button {
-                #if canImport(UIKit)
-                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                #endif
-                saveTargets()
-            } label: {
-                Text("Save")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 6)
-                    .background(AppColors.brand)
-                    .clipShape(Capsule())
+                }
+                
+                ToolbarItem(placement: .confirmationAction) {
+                    Button {
+                        #if canImport(UIKit)
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        #endif
+                        saveTargets()
+                    } label: {
+                        Text("Save")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 6)
+                            .background(AppColors.brand)
+                            .clipShape(Capsule())
+                    }
+                }
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(AppColors.cardBackground)
     }
     
     // MARK: - 1. Trade Summary Card

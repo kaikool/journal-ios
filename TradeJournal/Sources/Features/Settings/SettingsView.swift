@@ -63,7 +63,7 @@ public struct SettingsView: View {
     @EnvironmentObject private var env: AppEnvironment
     @ObservedObject private var dataStore = TradeDataStore.shared
     
-    @State private var activeSection: SettingsSection = .general
+    private var activeSection: SettingsSection { env.settingsActiveSection }
     
     public init() {}
     
@@ -94,28 +94,7 @@ public struct SettingsView: View {
             .padding(.top, 12)
             .padding(.bottom, 88)
         }
-        .safeAreaInset(edge: .top, spacing: 0) {
-            sectionSelectorBar
-                .padding(.vertical, 8)
-                .background(.ultraThinMaterial)
-                .overlay(alignment: .bottom) {
-                    Rectangle()
-                        .fill(AppColors.border.opacity(0.3))
-                        .frame(height: 0.5)
-                }
-        }
         .scrollDismissesKeyboard(.interactively)
         .background(AppColors.background)
-    }
-    
-    private var sectionSelectorBar: some View {
-        AppleSlidingSegmentedBar(
-            selection: $activeSection,
-            items: SettingsSection.allCases,
-            titleFor: { $0.label },
-            iconFor: { $0.iconName },
-            isScrollable: true
-        )
-        .padding(.horizontal, 14)
     }
 }

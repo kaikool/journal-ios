@@ -17,10 +17,7 @@ public struct NewPlaybookSheet: View {
     }
     
     public var body: some View {
-        VStack(spacing: 0) {
-            // Apple HIG Frosted Header
-            sheetHeader
-            
+        NavigationStack {
             ScrollView {
                 VStack(spacing: 16) {
                     // Section 1: Playbook Details
@@ -33,51 +30,39 @@ public struct NewPlaybookSheet: View {
                 .padding(.bottom, 24)
             }
             .background(AppColors.background)
-        }
-    }
-    
-    private var sheetHeader: some View {
-        HStack {
-            Button("Cancel") {
-                dismiss()
+            .navigationTitle("New Playbook")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        #if canImport(UIKit)
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        #endif
+                        dismiss()
+                    }
+                    .font(.system(size: 15, weight: .regular))
+                    .foregroundColor(AppColors.secondaryText)
+                }
+                
+                ToolbarItem(placement: .confirmationAction) {
+                    Button {
+                        #if canImport(UIKit)
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        #endif
+                        saveAndDismiss()
+                    } label: {
+                        Text("Create")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundColor(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? AppColors.secondaryText.opacity(0.6) : .white)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 6)
+                            .background(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? AppColors.secondaryBackground : AppColors.brand)
+                            .clipShape(Capsule())
+                    }
+                    .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
             }
-            .font(AppTypography.body)
-            .foregroundColor(AppColors.secondaryText)
-            
-            Spacer()
-            
-            Text("New Playbook")
-                .font(.system(size: 16, weight: .bold))
-                .foregroundColor(AppColors.primaryText)
-            
-            Spacer()
-            
-            Button {
-                #if canImport(UIKit)
-                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                #endif
-                saveAndDismiss()
-            } label: {
-                Text("Create")
-                    .font(.system(size: 14, weight: .bold))
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 6)
-                    .background(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? AppColors.brand.opacity(0.4) : AppColors.brand)
-                    .foregroundColor(AppColors.brandTextOnDark)
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-            }
-            .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 16)
-        .padding(.bottom, 12)
-        .background(.ultraThinMaterial)
-        .overlay(
-            Rectangle()
-                .fill(AppColors.border.opacity(0.3))
-                .frame(height: 0.5),
-            alignment: .bottom
-        )
     }
     
     private var detailsCard: some View {
@@ -342,9 +327,7 @@ public struct EditPlaybookSheet: View {
     }
     
     public var body: some View {
-        VStack(spacing: 0) {
-            sheetHeader
-            
+        NavigationStack {
             ScrollView {
                 VStack(spacing: 16) {
                     detailsCard
@@ -354,51 +337,39 @@ public struct EditPlaybookSheet: View {
                 .padding(.bottom, 24)
             }
             .background(AppColors.background)
-        }
-    }
-    
-    private var sheetHeader: some View {
-        HStack {
-            Button("Cancel") {
-                dismiss()
+            .navigationTitle("Edit Playbook")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        #if canImport(UIKit)
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        #endif
+                        dismiss()
+                    }
+                    .font(.system(size: 15, weight: .regular))
+                    .foregroundColor(AppColors.secondaryText)
+                }
+                
+                ToolbarItem(placement: .confirmationAction) {
+                    Button {
+                        #if canImport(UIKit)
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        #endif
+                        saveAndDismiss()
+                    } label: {
+                        Text("Save")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundColor(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? AppColors.secondaryText.opacity(0.6) : .white)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 6)
+                            .background(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? AppColors.secondaryBackground : AppColors.brand)
+                            .clipShape(Capsule())
+                    }
+                    .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
             }
-            .font(AppTypography.body)
-            .foregroundColor(AppColors.secondaryText)
-            
-            Spacer()
-            
-            Text("Edit Playbook")
-                .font(.system(size: 16, weight: .bold))
-                .foregroundColor(AppColors.primaryText)
-            
-            Spacer()
-            
-            Button {
-                #if canImport(UIKit)
-                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                #endif
-                saveAndDismiss()
-            } label: {
-                Text("Save")
-                    .font(.system(size: 14, weight: .bold))
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 6)
-                    .background(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? AppColors.brand.opacity(0.4) : AppColors.brand)
-                    .foregroundColor(AppColors.brandTextOnDark)
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-            }
-            .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 16)
-        .padding(.bottom, 12)
-        .background(.ultraThinMaterial)
-        .overlay(
-            Rectangle()
-                .fill(AppColors.border.opacity(0.3))
-                .frame(height: 0.5),
-            alignment: .bottom
-        )
     }
     
     private var detailsCard: some View {
