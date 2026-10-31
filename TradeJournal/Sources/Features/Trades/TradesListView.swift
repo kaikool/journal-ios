@@ -291,7 +291,7 @@ public struct TradesListView: View {
                         searchText = ""
                         env.searchQuery = ""
                         statusFilter = .all
-                        dataStore.selectedTimeRange = .allTime
+                        dataStore.selectedTimeRange = .all
                     }
                 }
             }
