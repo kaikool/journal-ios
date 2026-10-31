@@ -232,23 +232,32 @@ public enum AggregateEngine {
         }
     }
 
+    private static let monthFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM"
+        f.locale = Locale(identifier: "en_US_POSIX")
+        return f
+    }()
+
+    private static let dayFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        f.locale = Locale(identifier: "en_US_POSIX")
+        return f
+    }()
+
     public static func byMonth(trades: [Trade], timeZone: TimeZone = utcTimeZone) -> [BucketStats] {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM"
-        formatter.timeZone = timeZone
-        
+        monthFormatter.timeZone = timeZone
         let closedTrades = trades.filter { $0.closedAt != nil }
         return group(trades: closedTrades) { trade in
             guard let closed = trade.closedAt else { return [] }
-            return [formatter.string(from: closed)]
+            return [monthFormatter.string(from: closed)]
         }.sorted { $0.key < $1.key }
     }
 
     public static func dayKeyOf(date: Date, timeZone: TimeZone = .current) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        formatter.timeZone = timeZone
-        return formatter.string(from: date)
+        dayFormatter.timeZone = timeZone
+        return dayFormatter.string(from: date)
     }
 
     public static func dayKeyOf(date: Date, timeZone: String) -> String {

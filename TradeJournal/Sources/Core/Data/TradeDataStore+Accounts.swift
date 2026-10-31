@@ -112,6 +112,9 @@ extension TradeDataStore {
     }
 
     public var visibleAccountIds: Set<String> {
+        if let cached = _cachedVisibleAccountIds {
+            return cached
+        }
         var ids = Set<String>()
         for acc in visibleAccounts {
             ids.insert(acc.id)
@@ -139,6 +142,7 @@ extension TradeDataStore {
                 }
             }
         }
+        _cachedVisibleAccountIds = ids
         return ids
     }
 

@@ -91,7 +91,14 @@ public struct DashboardView: View {
     // MARK: - Filtered Trades by Range
     
     var scopedTrades: [Trade] {
-        dataStore.selectedTimeRange.filterTrades(dataStore.filteredTrades, timeZone: env.currentTimeZone)
+        let key = "\(dataStore.selectedTimeRange.rawValue)_\(dataStore.selectedAccountId)_\(dataStore.filteredTrades.count)_\(dataStore.cacheVersion)_\(env.currentTimeZone.identifier)"
+        if cache.lastScopedKey == key {
+            return cache.lastScopedTrades
+        }
+        let fresh = dataStore.selectedTimeRange.filterTrades(dataStore.filteredTrades, timeZone: env.currentTimeZone)
+        cache.lastScopedKey = key
+        cache.lastScopedTrades = fresh
+        return fresh
     }
     
     // MARK: - Memoized Single-Pass Snapshot
@@ -116,6 +123,8 @@ public struct DashboardView: View {
     private final class DashboardCache {
         var lastKey: String = ""
         var lastSnapshot: DashboardSnapshot? = nil
+        var lastScopedKey: String = ""
+        var lastScopedTrades: [Trade] = []
         var lastCurrencyGroupsKey: String = ""
         var lastCurrencyGroups: [(currency: String, metrics: TradeMetrics, balance: Decimal)] = []
     }

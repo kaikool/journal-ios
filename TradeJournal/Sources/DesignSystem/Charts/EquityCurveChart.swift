@@ -27,41 +27,29 @@ public enum EquityChartMode: String, CaseIterable, Identifiable {
 
 private struct BeaconHeartbeatDotView: View {
     let color: Color
-    @State private var isBeating: Bool = false
     
     var body: some View {
         ZStack {
-            // Outermost pulsing shockwave ring
+            // Radiant aura ring
             Circle()
-                .stroke(color.opacity(isBeating ? 0.0 : 0.75), lineWidth: 2)
-                .frame(width: 14, height: 14)
-                .scaleEffect(isBeating ? 2.8 : 1.0)
+                .stroke(color.opacity(0.40), lineWidth: 1.5)
+                .frame(width: 15, height: 15)
             
             // Soft radiant aura
             Circle()
-                .fill(color.opacity(isBeating ? 0.10 : 0.45))
-                .frame(width: 18, height: 18)
-                .scaleEffect(isBeating ? 1.45 : 0.85)
+                .fill(color.opacity(0.18))
+                .frame(width: 14, height: 14)
             
-            // Solid beacon dot with true rhythmic heartbeat thump
+            // Solid beacon dot
             Circle()
                 .fill(color)
-                .frame(width: 9, height: 9)
-                .scaleEffect(isBeating ? 1.30 : 0.88)
-                .shadow(color: color.opacity(isBeating ? 0.9 : 0.3), radius: isBeating ? 5 : 1)
+                .frame(width: 8, height: 8)
+                .shadow(color: color.opacity(0.85), radius: 3)
             
             // Crisp white center core
             Circle()
                 .fill(Color.white)
-                .frame(width: 3.5, height: 3.5)
-                .scaleEffect(isBeating ? 1.2 : 0.9)
-        }
-        .onAppear {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                withAnimation(.easeInOut(duration: 0.95).repeatForever(autoreverses: true)) {
-                    isBeating = true
-                }
-            }
+                .frame(width: 3, height: 3)
         }
     }
 }
@@ -79,6 +67,13 @@ public struct EquityCurveChart: View {
     public let showArea: Bool
     public let height: CGFloat
     
+    // Precomputed bounds & peak for instant 120 FPS scrubbing
+    public let peakPoint: EquityPointItem?
+    public let pnlDomainMin: Double
+    public let pnlDomainMax: Double
+    public let ddDomainMin: Double
+    public let ddDomainMax: Double
+    
     @State private var selectedDate: Date? = nil
     @State private var lastHapticPointId: String? = nil
     @State private var chartMode: EquityChartMode = .pnl
@@ -94,58 +89,89 @@ public struct EquityCurveChart: View {
         self.currency = currency
         self.showArea = showArea
         self.height = height
+        
+        var peak: EquityPointItem? = nil
+        var maxPnl = -Double.infinity
+        var minPnl = Double.infinity
+        var minDd = 0.0
+        
+        for p in points {
+            let pnlDouble = (p.cumulativePnl as NSDecimalNumber).doubleValue
+            let ddDouble = -((p.drawdown as NSDecimalNumber).doubleValue * 100.0)
+            if pnlDouble > maxPnl {
+                maxPnl = pnlDouble
+                peak = p
+            }
+            if pnlDouble < minPnl {
+                minPnl = pnlDouble
+            }
+            if ddDouble < minDd {
+                minDd = ddDouble
+            }
+        }
+        self.peakPoint = peak
+        
+        if points.isEmpty {
+            self.pnlDomainMin = 0.0
+            self.pnlDomainMax = 100.0
+            self.ddDomainMin = -5.0
+            self.ddDomainMax = 0.5
+        } else {
+            // P&L bounds
+            if maxPnl <= 0 && minPnl < 0 {
+                self.pnlDomainMax = 0.0
+            } else {
+                let top = max(0.0, maxPnl)
+                let span = max(1.0, top - min(0.0, minPnl))
+                self.pnlDomainMax = top + (span * 0.08)
+            }
+            
+            if minPnl >= 0 && maxPnl > 0 {
+                self.pnlDomainMin = 0.0
+            } else {
+                let bottom = min(0.0, minPnl)
+                let span = max(1.0, max(0.0, maxPnl) - bottom)
+                self.pnlDomainMin = bottom - (span * 0.08)
+            }
+            
+            // Drawdown bounds
+            self.ddDomainMax = 0.5
+            self.ddDomainMin = min(-1.0, minDd * 1.15)
+        }
     }
     
     private var activePoint: EquityPointItem? {
-        guard let target = selectedDate else { return nil }
-        return points.min(by: {
-            abs($0.date.timeIntervalSince(target)) < abs($1.date.timeIntervalSince(target))
-        })
+        guard let target = selectedDate, !points.isEmpty else { return nil }
+        var low = 0
+        var high = points.count - 1
+        while low <= high {
+            let mid = (low + high) / 2
+            let midDate = points[mid].date
+            if midDate < target {
+                low = mid + 1
+            } else if midDate > target {
+                high = mid - 1
+            } else {
+                return points[mid]
+            }
+        }
+        if high < 0 { return points[0] }
+        if low >= points.count { return points[points.count - 1] }
+        let diffLow = abs(points[low].date.timeIntervalSince(target))
+        let diffHigh = abs(points[high].date.timeIntervalSince(target))
+        return diffLow < diffHigh ? points[low] : points[high]
     }
     
     private var lastPoint: EquityPointItem? {
         points.last
     }
     
-    private var peakPoint: EquityPointItem? {
-        points.max(by: { $0.cumulativePnl < $1.cumulativePnl })
-    }
-    
-    private var doubleVals: [Double] {
-        points.map { ($0.cumulativePnl as NSDecimalNumber).doubleValue }
-    }
-    
-    private var drawdownVals: [Double] {
-        points.map { -(($0.drawdown as NSDecimalNumber).doubleValue * 100.0) }
-    }
-    
     private var yDomainMax: Double {
-        if chartMode == .drawdown {
-            return 0.5 // Anchored at 0% with slight headroom
-        }
-        let maxData = doubleVals.max() ?? 0.0
-        let minData = doubleVals.min() ?? 0.0
-        if maxData <= 0 && minData < 0 {
-            return 0.0 // Anchor strictly at 0 baseline when entire curve is in loss
-        }
-        let top = max(0.0, maxData)
-        let span = max(1.0, top - min(0.0, minData))
-        return top + (span * 0.08)
+        chartMode == .drawdown ? ddDomainMax : pnlDomainMax
     }
     
     private var yDomainMin: Double {
-        if chartMode == .drawdown {
-            let minDd = drawdownVals.min() ?? 0.0
-            return min(-1.0, minDd * 1.15)
-        }
-        let maxData = doubleVals.max() ?? 0.0
-        let minData = doubleVals.min() ?? 0.0
-        if minData >= 0 && maxData > 0 {
-            return 0.0 // Anchor strictly at 0 baseline when entire curve is in profit
-        }
-        let bottom = min(0.0, minData)
-        let span = max(1.0, max(0.0, maxData) - bottom)
-        return bottom - (span * 0.08)
+        chartMode == .drawdown ? ddDomainMin : pnlDomainMin
     }
     
     private var areaFillGradient: LinearGradient {

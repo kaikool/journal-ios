@@ -42,13 +42,23 @@ public struct CalendarInsights: Equatable {
 /// Ported 1:1 from `apps/web/src/lib/calendar-insights.ts`.
 public enum CalendarInsightsEngine {
     
-    public static func closingWeekday(_ dateString: String) -> Int {
+    private static let isoDayFormatter: DateFormatter = {
         let f = DateFormatter()
         f.dateFormat = "yyyy-MM-dd"
         f.timeZone = TimeZone(identifier: "UTC")
-        guard let d = f.date(from: dateString) else { return 0 }
-        let cal = Calendar(identifier: .gregorian)
-        return (cal.component(.weekday, from: d) - 1) // Sunday = 0
+        f.locale = Locale(identifier: "en_US_POSIX")
+        return f
+    }()
+    
+    private static let utcCalendar: Calendar = {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "UTC") ?? .current
+        return cal
+    }()
+
+    public static func closingWeekday(_ dateString: String) -> Int {
+        guard let d = isoDayFormatter.date(from: dateString) else { return 0 }
+        return (utcCalendar.component(.weekday, from: d) - 1) // Sunday = 0
     }
     
     public static func calendarInsights(calendar: CalendarMonth) -> CalendarInsights {
@@ -70,8 +80,14 @@ public enum CalendarInsightsEngine {
             "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"
         ]
         
+        var daysByWeekday: [Int: [DayStats]] = [:]
+        for day in days {
+            let weekday = closingWeekday(day.date)
+            daysByWeekday[weekday, default: []].append(day)
+        }
+        
         let weekdays: [WeekdayPerformance] = weekdayLabels.enumerated().map { index, label in
-            let matching = days.filter { closingWeekday($0.date) == index }
+            let matching = daysByWeekday[index] ?? []
             return WeekdayPerformance(
                 index: index,
                 label: label,

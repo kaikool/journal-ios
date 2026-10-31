@@ -148,13 +148,12 @@ public enum FinancialMetricsEngine {
             }
         
         var cum: Decimal = 0
-        let formatter = ISO8601DateFormatter()
         return closedTrades.map { trade in
             let date = trade.closedAt ?? trade.openedAt
             cum += trade.netPnl
             return EquityPoint(
                 timestamp: date,
-                dateString: formatter.string(from: date),
+                dateString: sharedIso8601WithFractional.string(from: date),
                 cumNetPnl: cum
             )
         }

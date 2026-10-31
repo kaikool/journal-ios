@@ -107,15 +107,34 @@ public enum TradeAnalysisEngine {
         return NSDecimalNumber(decimal: reward).doubleValue / NSDecimalNumber(decimal: risk).doubleValue
     }
     
+    private static let isoFractionalFormatter: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
+
+    private static let isoBasicFormatter: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime]
+        return f
+    }()
+
+    private static let clockTimeFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "HH:mm"
+        f.locale = Locale(identifier: "en_US_POSIX")
+        return f
+    }()
+
     public static func clockTime(iso: String, timeZone: String) -> String {
-        let isoFormatter = ISO8601DateFormatter()
-        isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        let date = isoFormatter.date(from: iso) ?? ISO8601DateFormatter().date(from: iso) ?? Date()
-        
-        let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm"
-        formatter.timeZone = TimeZone(identifier: timeZone) ?? TimeZone(secondsFromGMT: 0) ?? .current
-        return formatter.string(from: date)
+        let date = isoFractionalFormatter.date(from: iso) ?? isoBasicFormatter.date(from: iso) ?? Date()
+        clockTimeFormatter.timeZone = TimeZone(identifier: timeZone) ?? TimeZone(secondsFromGMT: 0) ?? .current
+        return clockTimeFormatter.string(from: date)
+    }
+
+    public static func clockTime(from date: Date, timeZone: String) -> String {
+        clockTimeFormatter.timeZone = TimeZone(identifier: timeZone) ?? TimeZone(secondsFromGMT: 0) ?? .current
+        return clockTimeFormatter.string(from: date)
     }
     
     private static func list(_ value: String?) -> [String] {
@@ -150,10 +169,8 @@ public enum TradeAnalysisEngine {
     }
     
     public static func matchesFilters(trade: Trade, filters: AnalysisFilters, timeZone: String = "UTC") -> Bool {
-        let isoFormatter = ISO8601DateFormatter()
-        isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        let openedIso = isoFormatter.string(from: trade.openedAt)
-        let closedIso = trade.closedAt.map(isoFormatter.string)
+        let openedIso = isoFractionalFormatter.string(from: trade.openedAt)
+        let closedIso = trade.closedAt.map(isoFractionalFormatter.string)
         
         if let accounts = filters["accounts"], !accounts.isEmpty {
             if !list(accounts).contains(trade.accountId) { return false }
@@ -258,9 +275,7 @@ public enum TradeAnalysisEngine {
     public static func dimensionKeys(trade: Trade, dimension: Dimension, timeZone: String) -> [String] {
         let bucketTime = { (date: Date?, step: Int) -> String in
             guard let d = date else { return "Open" }
-            let f = ISO8601DateFormatter()
-            f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-            let time = clockTime(iso: f.string(from: d), timeZone: timeZone)
+            let time = clockTime(from: d, timeZone: timeZone)
             let prefix = time.prefix(3)
             let minute = Int(time.suffix(2)) ?? 0
             let bucket = (minute / step) * step

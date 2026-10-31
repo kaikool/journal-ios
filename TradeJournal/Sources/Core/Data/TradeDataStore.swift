@@ -65,6 +65,7 @@ public final class TradeDataStore: ObservableObject {
     internal var _cachedFilteredTrades: [Trade]? = nil
     internal var _cachedFilteredTradesAccountId: String? = nil
     internal var _cachedVisibleAccounts: [Account]? = nil
+    internal var _cachedVisibleAccountIds: Set<String>? = nil
     internal var _cachedActiveAccounts: [Account]? = nil
     internal var _cachedMostRecentActiveAccount: Account? = nil
     internal var _cachedMostRecentActiveAccountValid: Bool = false
@@ -75,6 +76,7 @@ public final class TradeDataStore: ObservableObject {
         _cachedFilteredTrades = nil
         _cachedFilteredTradesAccountId = nil
         _cachedVisibleAccounts = nil
+        _cachedVisibleAccountIds = nil
         _cachedActiveAccounts = nil
         _cachedMostRecentActiveAccount = nil
         _cachedMostRecentActiveAccountValid = false

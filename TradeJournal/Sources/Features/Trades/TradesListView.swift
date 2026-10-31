@@ -28,12 +28,21 @@ public struct TradesListView: View {
     private final class TradesListCache {
         var lastMetricsKey: String = ""
         var lastMetrics: TradeMetrics? = nil
+        var lastScopedKey: String = ""
+        var lastScopedTrades: [Trade] = []
         var lastFilterKey: String = ""
         var lastFilteredTrades: [Trade] = []
     }
     
     private var scopedTrades: [Trade] {
-        dataStore.selectedTimeRange.filterTrades(dataStore.filteredTrades, timeZone: env.currentTimeZone)
+        let key = "\(dataStore.selectedTimeRange.rawValue)_\(dataStore.selectedAccountId)_\(dataStore.filteredTrades.count)_\(dataStore.cacheVersion)_\(env.currentTimeZone.identifier)"
+        if cache.lastScopedKey == key {
+            return cache.lastScopedTrades
+        }
+        let fresh = dataStore.selectedTimeRange.filterTrades(dataStore.filteredTrades, timeZone: env.currentTimeZone)
+        cache.lastScopedKey = key
+        cache.lastScopedTrades = fresh
+        return fresh
     }
     
     private var filteredTrades: [Trade] {

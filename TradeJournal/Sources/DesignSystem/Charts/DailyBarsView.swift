@@ -7,64 +7,55 @@ public struct DailyBarDatum: Identifiable, Sendable {
     public let netPnl: Decimal
     public let dateObj: Date
     
-    public init(date: String, netPnl: Decimal) {
-        self.date = date
-        self.netPnl = netPnl
+    private static let isoDayFormatter: DateFormatter = {
         let f = DateFormatter()
         f.dateFormat = "yyyy-MM-dd"
         f.timeZone = TimeZone(identifier: "UTC")
-        self.dateObj = f.date(from: date) ?? Date()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        return f
+    }()
+    
+    public init(date: String, netPnl: Decimal) {
+        self.date = date
+        self.netPnl = netPnl
+        self.dateObj = Self.isoDayFormatter.date(from: date) ?? Date()
+    }
+
+    public init(date: String, netPnl: Decimal, dateObj: Date) {
+        self.date = date
+        self.netPnl = netPnl
+        self.dateObj = dateObj
     }
 }
 
 private struct HeartbeatStarView: View {
-    @State private var isBeating: Bool = false
-    
     var body: some View {
         ZStack {
-            // Golden halo shockwave
+            // Radiant golden halo
             Image(systemName: "star.fill")
                 .font(.system(size: 8, weight: .bold))
-                .foregroundColor(Color.yellow.opacity(isBeating ? 0.0 : 0.70))
-                .scaleEffect(isBeating ? 1.8 : 1.0)
+                .foregroundColor(Color.yellow.opacity(0.35))
+                .scaleEffect(1.35)
             
-            // Core heartbeat golden star
+            // Core golden star
             Image(systemName: "star.fill")
                 .font(.system(size: 8.5, weight: .bold))
                 .foregroundColor(Color.yellow)
-                .shadow(color: Color.yellow.opacity(isBeating ? 0.9 : 0.3), radius: isBeating ? 3 : 1)
-                .scaleEffect(isBeating ? 1.2 : 0.95)
+                .shadow(color: Color.yellow.opacity(0.8), radius: 2.5)
         }
         .frame(width: 18, height: 18)
         .padding(.bottom, 2)
-        .onAppear {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                withAnimation(.easeInOut(duration: 0.90).repeatForever(autoreverses: true)) {
-                    isBeating = true
-                }
-            }
-        }
     }
 }
 
 private struct HeartbeatWarningView: View {
-    @State private var isBeating: Bool = false
-    
     var body: some View {
         Image(systemName: "exclamationmark.triangle.fill")
             .font(.system(size: 8.5, weight: .bold))
             .foregroundColor(AppColors.loss)
-            .shadow(color: AppColors.loss.opacity(isBeating ? 0.8 : 0.2), radius: isBeating ? 3 : 1)
-            .scaleEffect(isBeating ? 1.15 : 0.95)
+            .shadow(color: AppColors.loss.opacity(0.7), radius: 2.5)
             .frame(width: 18, height: 18)
             .padding(.top, 2)
-            .onAppear {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                    withAnimation(.easeInOut(duration: 1.1).repeatForever(autoreverses: true)) {
-                        isBeating = true
-                    }
-                }
-            }
     }
 }
 
@@ -80,6 +71,16 @@ public struct DailyBarsView: View {
     public let isPrivate: Bool
     public let height: CGFloat
     
+    // Precomputed metrics & bounds for smooth 120 FPS scrubbing
+    public let bestDay: DailyBarDatum?
+    public let worstDay: DailyBarDatum?
+    public let yDomainMin: Double
+    public let yDomainMax: Double
+    public let barWidth: CGFloat
+    public let xDomain: ClosedRange<Date>
+    public let visibleDateObjs: [Date]
+    public let visibleDateMarks: [String]
+    
     @State private var selectedDateObj: Date? = nil
     @State private var lastHapticDate: String? = nil
     @State private var animProgress: Double = 0.0
@@ -94,88 +95,85 @@ public struct DailyBarsView: View {
         self.currency = currency
         self.isPrivate = isPrivate
         self.height = height
+        
+        if data.count >= 2 {
+            let profitDays = data.filter { $0.netPnl > 0 }
+            self.bestDay = profitDays.max(by: { $0.netPnl < $1.netPnl })
+            let lossDays = data.filter { $0.netPnl < 0 }
+            self.worstDay = lossDays.min(by: { $0.netPnl < $1.netPnl })
+        } else {
+            self.bestDay = nil
+            self.worstDay = nil
+        }
+        
+        let pnlDoubles = data.map { isPrivate ? 0.0 : ($0.netPnl as NSDecimalNumber).doubleValue }
+        let minVal = pnlDoubles.min() ?? 0.0
+        let maxVal = pnlDoubles.max() ?? 0.0
+        self.yDomainMin = minVal < 0 ? (minVal * 1.28) - 15 : 0.0
+        self.yDomainMax = maxVal > 0 ? (maxVal * 1.28) + 15 : 100.0
+        
+        let count = data.count
+        if count <= 2 { self.barWidth = 18 }
+        else if count <= 5 { self.barWidth = 14 }
+        else if count <= 15 { self.barWidth = 10 }
+        else if count <= 30 { self.barWidth = 6 }
+        else { self.barWidth = 4 }
+        
+        if let first = data.first?.dateObj, let last = data.last?.dateObj {
+            let diff = max(0, last.timeIntervalSince(first))
+            let margin = max(86400.0 * 2.0, diff * 0.15)
+            self.xDomain = first.addingTimeInterval(-margin)...last.addingTimeInterval(margin)
+        } else {
+            let now = Date()
+            self.xDomain = now.addingTimeInterval(-86400 * 2)...now.addingTimeInterval(86400 * 2)
+        }
+        
+        if count <= 5 {
+            self.visibleDateObjs = data.map { $0.dateObj }
+            self.visibleDateMarks = data.map { $0.date }
+        } else {
+            let target = 4
+            let step = Double(count - 1) / Double(target - 1)
+            var marks: [Date] = []
+            for i in 0..<target {
+                let idx = min(count - 1, max(0, Int(round(Double(i) * step))))
+                marks.append(data[idx].dateObj)
+            }
+            self.visibleDateObjs = marks
+            
+            let targetMarks = 5
+            let stepMarks = Double(count - 1) / Double(targetMarks - 1)
+            var indices = [Int]()
+            for i in 0..<targetMarks {
+                let idx = min(count - 1, max(0, Int(round(Double(i) * stepMarks))))
+                if !indices.contains(idx) {
+                    indices.append(idx)
+                }
+            }
+            self.visibleDateMarks = indices.map { data[$0].date }
+        }
     }
     
     private var activeDatum: DailyBarDatum? {
-        guard let target = selectedDateObj else { return nil }
-        return data.min(by: { abs($0.dateObj.timeIntervalSince(target)) < abs($1.dateObj.timeIntervalSince(target)) })
-    }
-    
-    private var bestDay: DailyBarDatum? {
-        guard data.count >= 2 else { return nil }
-        let profitDays = data.filter { $0.netPnl > 0 }
-        return profitDays.max(by: { $0.netPnl < $1.netPnl })
-    }
-    
-    private var worstDay: DailyBarDatum? {
-        guard data.count >= 2 else { return nil }
-        let lossDays = data.filter { $0.netPnl < 0 }
-        return lossDays.min(by: { $0.netPnl < $1.netPnl })
-    }
-    
-    private var yDomainMin: Double {
-        let vals = data.map { isPrivate ? 0 : ($0.netPnl as NSDecimalNumber).doubleValue }
-        let minVal = vals.min() ?? 0
-        return minVal < 0 ? (minVal * 1.28) - 15 : 0
-    }
-    
-    private var yDomainMax: Double {
-        let vals = data.map { isPrivate ? 0 : ($0.netPnl as NSDecimalNumber).doubleValue }
-        let maxVal = vals.max() ?? 0
-        return maxVal > 0 ? (maxVal * 1.28) + 15 : 100
-    }
-    
-    private var barWidth: CGFloat {
-        if data.count <= 2 { return 18 }
-        if data.count <= 5 { return 14 }
-        if data.count <= 15 { return 10 }
-        if data.count <= 30 { return 6 }
-        return 4
-    }
-    
-    private var xDomain: ClosedRange<Date> {
-        guard let first = data.first?.dateObj, let last = data.last?.dateObj else {
-            return Date().addingTimeInterval(-86400 * 2)...Date().addingTimeInterval(86400 * 2)
-        }
-        let diff = max(0, last.timeIntervalSince(first))
-        // Always give at least 1.5 - 2 days margin on both sides so edge bars don't collide with the leading Y-axis or bleed past the trailing chart boundary
-        let margin = max(86400.0 * 2.0, diff * 0.15)
-        return first.addingTimeInterval(-margin)...last.addingTimeInterval(margin)
-    }
-    
-    private var visibleDateObjs: [Date] {
-        guard data.count >= 2 else { return data.map { $0.dateObj } }
-        let count = data.count
-        if count <= 5 {
-            return data.map { $0.dateObj }
-        }
-        let target = 4
-        let step = Double(count - 1) / Double(target - 1)
-        var marks: [Date] = []
-        for i in 0..<target {
-            let idx = min(count - 1, max(0, Int(round(Double(i) * step))))
-            marks.append(data[idx].dateObj)
-        }
-        return marks
-    }
-    
-    /// Evenly spaced date marks (at most 5 labels across the timeline to prevent overlapping text)
-    private var visibleDateMarks: [String] {
-        guard !data.isEmpty else { return [] }
-        let count = data.count
-        if count <= 5 {
-            return data.map { $0.date }
-        }
-        let target = 5
-        let step = Double(count - 1) / Double(target - 1)
-        var indices = [Int]()
-        for i in 0..<target {
-            let idx = min(count - 1, max(0, Int(round(Double(i) * step))))
-            if !indices.contains(idx) {
-                indices.append(idx)
+        guard let target = selectedDateObj, !data.isEmpty else { return nil }
+        var low = 0
+        var high = data.count - 1
+        while low <= high {
+            let mid = (low + high) / 2
+            let midDate = data[mid].dateObj
+            if midDate < target {
+                low = mid + 1
+            } else if midDate > target {
+                high = mid - 1
+            } else {
+                return data[mid]
             }
         }
-        return indices.map { data[$0].date }
+        if high < 0 { return data[0] }
+        if low >= data.count { return data[data.count - 1] }
+        let diffLow = abs(data[low].dateObj.timeIntervalSince(target))
+        let diffHigh = abs(data[high].dateObj.timeIntervalSince(target))
+        return diffLow < diffHigh ? data[low] : data[high]
     }
     
     private static let isoDateFormatter: DateFormatter = {

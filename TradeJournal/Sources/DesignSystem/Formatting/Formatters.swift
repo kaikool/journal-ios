@@ -324,6 +324,24 @@ public enum Formatters {
         f.dateFormat = "yyyy-MM-dd"
         return f
     }()
+
+    private static let weekdayFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "EEEE"
+        return f
+    }()
+
+    private static let isoFractionalFormatter: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
+
+    private static let isoBasicFormatter: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime]
+        return f
+    }()
     
     /// Formats date and time according to designated timezone using cached formatter
     public static func dateTime(_ date: Date, timeZone: TimeZone = .current) -> String {
@@ -363,11 +381,9 @@ public enum Formatters {
     
     /// Returns human-readable weekday name (e.g. "Monday", "Tuesday")
     public static func weekdayName(from date: Date, timeZone: TimeZone = .current, locale: Locale = Locale(identifier: "en_US")) -> String {
-        let f = DateFormatter()
-        f.locale = locale
-        f.timeZone = timeZone
-        f.dateFormat = "EEEE"
-        return f.string(from: date)
+        weekdayFormatter.locale = locale
+        weekdayFormatter.timeZone = timeZone
+        return weekdayFormatter.string(from: date)
     }
     
     // MARK: - Account & Reference Clean Formatters
@@ -658,13 +674,10 @@ public enum Formatters {
         guard let raw = raw?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else {
             return "Pending settlement"
         }
-        let isoFormatter = ISO8601DateFormatter()
-        isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let d = isoFormatter.date(from: raw) {
+        if let d = isoFractionalFormatter.date(from: raw) {
             return dateOnly(d)
         }
-        let isoBasic = ISO8601DateFormatter()
-        if let d = isoBasic.date(from: raw) {
+        if let d = isoBasicFormatter.date(from: raw) {
             return dateOnly(d)
         }
         if let d = date(fromIsoDay: raw) {
