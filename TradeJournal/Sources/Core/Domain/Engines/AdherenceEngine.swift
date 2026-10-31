@@ -34,6 +34,22 @@ public struct PlaybookAdherenceSummary: Identifiable, Sendable, Equatable {
 /// Ported 1:1 from `packages/core/src/adherence.ts`.
 public enum AdherenceEngine {
     
+    public static func defaultSummary(for playbook: Playbook) -> PlaybookAdherenceSummary {
+        PlaybookAdherenceSummary(
+            id: playbook.id,
+            playbook: playbook,
+            total: 0,
+            evaluated: 0,
+            possible: 0,
+            rate: nil,
+            accountIds: [],
+            followed: GroupSummary(trades: 0, netPnl: 0, winRate: nil),
+            broken: GroupSummary(trades: 0, netPnl: 0, winRate: nil),
+            unassessed: 0,
+            rules: []
+        )
+    }
+    
     public static func analyzeAdherence(
         playbooks: [Playbook],
         trades: [Trade],

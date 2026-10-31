@@ -10,6 +10,7 @@ public enum AppTheme: String, CaseIterable, Identifiable {
     public var id: String { rawValue }
 }
 
+@MainActor
 public final class AppEnvironment: ObservableObject {
     public static let shared = AppEnvironment()
     

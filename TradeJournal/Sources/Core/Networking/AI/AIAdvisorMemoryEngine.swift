@@ -350,8 +350,8 @@ public final class AIAdvisorMemoryEngine: @unchecked Sendable {
         
         // 3. Relevant Decisions or Active Context (up to 1)
         if selected.count < maxItems {
-            let contextOrDecisions = eligible.filter {
-                $0.category == .context || ($0.category == .decision && (cleanSym.map { clean in $0.symbol?.contains(clean) == true } ?? false))
+            let contextOrDecisions = eligible.filter { rec in
+                rec.category == .context || (rec.category == .decision && (cleanSym.map { clean in rec.symbol?.contains(clean) == true } ?? false))
             }.sorted { $0.createdAt > $1.createdAt }
             selected.append(contentsOf: contextOrDecisions.prefix(maxItems - selected.count))
         }

@@ -1801,17 +1801,17 @@ public final class The5ersService: ObservableObject {
             return nil
         }()
         
-        let existingLinkedAcc = dataStore.accounts.first(where: {
-            $0.id == journalAccId ||
-            $0.name == acc.label ||
-            (accountNumber.map { accNum in $0.id.cleanAccountId == accNum || $0.name.contains(accNum) } ?? false)
+        let existingLinkedAcc = dataStore.accounts.first(where: { a in
+            a.id == journalAccId ||
+            a.name == acc.label ||
+            (accountNumber.map { accNum in a.id.cleanAccountId == accNum || a.name.contains(accNum) } ?? false)
         })
         let linkedAccountId = existingLinkedAcc?.id ?? journalAccId
         
-        if let existingIndex = dataStore.propAccounts.firstIndex(where: {
-            TradeDataStore.isSameAccountId($0.id, journalAccId) ||
-            $0.name == acc.label ||
-            (accountNumber.map { accNum in $0.id.cleanAccountId == accNum || $0.name.contains(accNum) } ?? false)
+        if let existingIndex = dataStore.propAccounts.firstIndex(where: { p in
+            TradeDataStore.isSameAccountId(p.id, journalAccId) ||
+            p.name == acc.label ||
+            (accountNumber.map { accNum in p.id.cleanAccountId == accNum || p.name.contains(accNum) } ?? false)
         }) {
             let old = dataStore.propAccounts[existingIndex]
             dataStore.propAccounts[existingIndex] = PropAccountItem(
@@ -1879,10 +1879,10 @@ public final class The5ersService: ObservableObject {
             dataStore.propAccounts.append(newPropAccount)
         }
         
-        if let accIdx = dataStore.accounts.firstIndex(where: {
-            TradeDataStore.isSameAccountId($0.id, journalAccId) ||
-            $0.name == acc.label ||
-            (accountNumber.map { accNum in $0.id.cleanAccountId == accNum || $0.name.contains(accNum) } ?? false)
+        if let accIdx = dataStore.accounts.firstIndex(where: { a in
+            TradeDataStore.isSameAccountId(a.id, journalAccId) ||
+            a.name == acc.label ||
+            (accountNumber.map { accNum in a.id.cleanAccountId == accNum || a.name.contains(accNum) } ?? false)
         }) {
             var old = dataStore.accounts[accIdx]
             old.name = acc.label

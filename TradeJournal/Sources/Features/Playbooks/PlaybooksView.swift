@@ -86,19 +86,9 @@ public struct PlaybooksView: View {
         }
         .sheet(item: $selectedPlaybookForDetail) { pb in
             let pbTrades = tradesForPlaybook(pb.id)
-            let fallbackSummary = AdherenceEngine.analyzeAdherence(playbooks: [pb], trades: pbTrades, assessments: dataStore.playbookAssessments).first ?? PlaybookAdherenceSummary(
-                playbook: pb,
-                overallAdherenceRate: 100,
-                fullyAdherentCount: 0,
-                partiallyAdherentCount: 0,
-                nonAdherentCount: 0,
-                unratedCount: 0,
-                ratedTradesCount: 0,
-                totalTradesCount: 0,
-                ruleStats: [],
-                tradesWithAdherence: []
-            )
-            let pbSummary = adherenceSummaries.first(where: { $0.playbook.id == pb.id }) ?? fallbackSummary
+            let pbSummary = adherenceSummaries.first(where: { $0.playbook.id == pb.id })
+                ?? AdherenceEngine.analyzeAdherence(playbooks: [pb], trades: pbTrades, assessments: dataStore.playbookAssessments).first
+                ?? AdherenceEngine.defaultSummary(for: pb)
             PlaybookDetailView(
                 playbook: pb,
                 summary: pbSummary,
