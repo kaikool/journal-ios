@@ -72,33 +72,11 @@ public struct DayEconomicCalendarView: View {
                 if !event.forecast.isEmpty || !event.previous.isEmpty {
                     HStack(spacing: 6) {
                         if !event.forecast.isEmpty {
-                            HStack(spacing: 3) {
-                                Text("Forecast:")
-                                    .font(AppTypography.captionMicro)
-                                    .foregroundColor(AppColors.secondaryText)
-                                Text(event.forecast)
-                                    .font(AppTypography.number(10, weight: .semibold))
-                                    .foregroundColor(AppColors.primaryText)
-                            }
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 1.5)
-                            .background(AppColors.secondaryBackground.opacity(0.8))
-                            .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                            AppBadge("Forecast: \(event.forecast)", style: .neutral)
                         }
                         
                         if !event.previous.isEmpty {
-                            HStack(spacing: 3) {
-                                Text("Prev:")
-                                    .font(AppTypography.captionMicro)
-                                    .foregroundColor(AppColors.secondaryText)
-                                Text(event.previous)
-                                    .font(AppTypography.number(10, weight: .medium))
-                                    .foregroundColor(AppColors.secondaryText)
-                            }
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 1.5)
-                            .background(AppColors.secondaryBackground.opacity(0.5))
-                            .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                            AppBadge("Prev: \(event.previous)", style: .neutral)
                         }
                     }
                 }
@@ -113,52 +91,13 @@ public struct DayEconomicCalendarView: View {
     private func impactBadge(_ impact: ForexFactoryImpact) -> some View {
         switch impact {
         case .high:
-            HStack(spacing: 3) {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .font(AppTypography.badgeMicro)
-                Text("HIGH")
-                    .font(AppTypography.badgeMicro)
-            }
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2.5)
-            .background(AppColors.loss.opacity(0.14))
-            .foregroundColor(AppColors.loss)
-            .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 5, style: .continuous)
-                    .stroke(AppColors.loss.opacity(0.25), lineWidth: 0.5)
-            )
-            
+            AppBadge("HIGH", icon: "exclamationmark.triangle.fill", style: .loss)
         case .medium:
-            Text("MED")
-                .font(AppTypography.badgeMicro)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2.5)
-                .background(AppColors.warning.opacity(0.14))
-                .foregroundColor(AppColors.warning)
-                .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 5, style: .continuous)
-                        .stroke(AppColors.warning.opacity(0.25), lineWidth: 0.5)
-                )
-            
+            AppBadge("MED", style: .warning)
         case .low:
-            Text("LOW")
-                .font(AppTypography.badgeMicro)
-                .padding(.horizontal, 5)
-                .padding(.vertical, 2.5)
-                .background(AppColors.secondaryBackground)
-                .foregroundColor(AppColors.secondaryText)
-                .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
-            
+            AppBadge("LOW", style: .neutral)
         default:
-            Text(impact.shortLabel)
-                .font(AppTypography.badgeMicro)
-                .padding(.horizontal, 4)
-                .padding(.vertical, 2)
-                .background(AppColors.secondaryBackground)
-                .foregroundColor(AppColors.secondaryText)
-                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+            AppBadge(impact.shortLabel, style: .neutral)
         }
     }
 }

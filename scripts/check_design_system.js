@@ -12,13 +12,13 @@
  * --- PART 1: CONTENT & CONTROLS (Standards 01 - 11) ---
  * Standard 01: Buttons & Actions (AppButton, AppPrimaryButton, ModalToolbarButtons)
  * Standard 02: Badges & Tags (AppBadge, AppleMenuChip)
- * Standard 03: Tablist & Segmented Controls (AppSegmentedBar)
+ * Standard 03: Tablist & Segmented Controls (AppSegmentedBar, AppBinarySegmentedToggle)
  * Standard 04: Filter Chips (AppFilterChip)
  * Standard 05: Form Fields & Inputs (AppTextField, AppNumericField, AppDecimalField)
  * Standard 06: Selection & Checklist Rows (AppToggleRow, AppCheckboxRow)
- * Standard 07: Cards & Headers (AppCard, AppSectionHeader)
+ * Standard 07: Cards & Headers (AppCard, AppSectionHeader, appCardStyle, appSubCardStyle)
  * Standard 08: Metric Tiles & Financial Display (AppMetricTile)
- * Standard 09: Feedback & Empty States (AppEmptyState, LoadingView, ErrorBannerView)
+ * Standard 09: Feedback & Empty States (AppEmptyState, LoadingView, TradeJournalProLoader)
  * Standard 10: Chart HUDs & Annotations (badgeMarker, badgeMarkerSmall)
  * Standard 11: Typography System (AppTypography - Zero raw fonts)
  * 
@@ -46,7 +46,7 @@ const path = require('path');
 const ROOT_DIR = path.resolve(__dirname, '..');
 const SOURCES_DIR = path.join(ROOT_DIR, 'TradeJournal', 'Sources');
 
-// Whitelisted Design System Primitives & Core Launch Infrastructure
+// Whitelisted Design System Primitives & Launch Infrastructure
 const WHITELIST_PRIMITIVES = [
   'AppTypography.swift',
   'NativeHaptics.swift',
@@ -108,19 +108,26 @@ files.forEach(f => {
     // =========================================================================
 
     // --- STANDARD 01: BUTTONS & ACTIONS ---
-    // Prohibits raw button styling with inline backgrounds in Feature views.
-    if (isFeature && (trimmed.startsWith('Button(') || trimmed.startsWith('Button {') || trimmed.includes('Button('))) {
+    // Prohibits raw button styling with inline backgrounds or custom frames in Feature views.
+    if (isFeature && (trimmed.startsWith('Button(') || trimmed.startsWith('Button {') || /\bButton\s*(\(|\{)/.test(trimmed))) {
       for (let i = 1; i <= 6; i++) {
         if (idx + i < lines.length) {
           const next = lines[idx + i].trim();
-          if ((next.includes('.background(AppColors.brand') || next.includes('.background(AppColors.loss')) && !next.includes('AppPrimaryButton')) {
+          if (next.startsWith('Divider()')) break;
+          if (next.includes('.background(') &&
+              !next.includes('AppPrimaryButton') &&
+              !next.includes('AppSecondaryButton') &&
+              !next.includes('AppDestructiveButton') &&
+              !next.includes('Modal') &&
+              !next.includes('AppActionPill') &&
+              !next.includes('AppBinarySegmentedToggle')) {
             violations.push({
               std: 'Standard 01: Buttons & Actions',
               rule: 'PROHIBIT_INLINE_BUTTON_STYLE',
               file: rel,
               line: lineNum,
               code: trimmed + ' -> ' + next,
-              fix: 'Use AppButton, AppPrimaryButton, or AppActionPill'
+              fix: 'Use AppButton, AppPrimaryButton, AppSecondaryButton, ModalCircleButton, or AppActionPill'
             });
             break;
           }
@@ -130,7 +137,12 @@ files.forEach(f => {
 
     // --- STANDARD 02: BADGES & TAGS ---
     // Prohibits ad-hoc capsule badge wrappers in Feature views.
-    if (isFeature && trimmed.includes('clipShape(Capsule())') && !trimmed.includes('AppBadge') && !trimmed.includes('AppFilterChip') && !trimmed.includes('AppActionPill')) {
+    if (isFeature && trimmed.includes('clipShape(Capsule())') &&
+        !trimmed.includes('AppBadge') &&
+        !trimmed.includes('AppFilterChip') &&
+        !trimmed.includes('AppActionPill') &&
+        !trimmed.includes('AppleMenuChip') &&
+        !trimmed.includes('AppFloatingBar')) {
       for (let i = 1; i <= 3; i++) {
         if (idx - i >= 0 && lines[idx - i].includes('.background(')) {
           violations.push({
@@ -147,7 +159,7 @@ files.forEach(f => {
     }
 
     // --- STANDARD 03: TABLIST & SEGMENTED CONTROLS ---
-    // Prohibits raw segmented picker loops in Feature views.
+    // Prohibits raw segmented picker loops or ad-hoc button groups in Feature views.
     if (isFeature && trimmed.includes('.pickerStyle(.segmented)') && !trimmed.includes('AppSegmentedBar')) {
       violations.push({
         std: 'Standard 03: Tablist & Segmented Controls',
@@ -200,18 +212,23 @@ files.forEach(f => {
 
     // --- STANDARD 07: CARDS & HEADERS ---
     // Prohibits manual card background + rounded rectangle container styling in Feature views.
-    if (isFeature && (trimmed.includes('.background(AppColors.cardBackground)') || trimmed.includes('.background(AppColors.surface)'))) {
+    if (isFeature && trimmed.includes('.background(')) {
       for (let i = 1; i <= 4; i++) {
         if (idx + i < lines.length) {
           const next = lines[idx + i].trim();
-          if (next.includes('clipShape(RoundedRectangle') || next.includes('cornerRadius(')) {
+          if ((next.includes('clipShape(RoundedRectangle') || next.includes('cornerRadius(')) &&
+              !next.includes('appCardStyle') &&
+              !next.includes('appSubCardStyle') &&
+              !next.includes('AppCard') &&
+              !next.includes('AppChatBubble') &&
+              !next.includes('AppBinarySegmentedToggle')) {
             violations.push({
               std: 'Standard 07: Cards & Headers',
               rule: 'PROHIBIT_ADHOC_CARD',
               file: rel,
               line: lineNum,
               code: trimmed + ' -> ' + next,
-              fix: 'Use AppCard or .appCardStyle() from DesignSystem'
+              fix: 'Use AppCard, .appCardStyle(), or .appSubCardStyle() from DesignSystem'
             });
             break;
           }
@@ -471,11 +488,11 @@ console.log(`Audited ${files.length} Swift files across ${SOURCES_DIR}\n`);
 const standardRegistry = [
   { code: '01', title: 'Buttons & Actions (AppButton, AppPrimaryButton)' },
   { code: '02', title: 'Badges & Tags (AppBadge, AppleMenuChip)' },
-  { code: '03', title: 'Tablist & Segmented Controls (AppSegmentedBar)' },
+  { code: '03', title: 'Tablist & Segmented Controls (AppSegmentedBar, AppBinarySegmentedToggle)' },
   { code: '04', title: 'Filter Chips (AppFilterChip)' },
   { code: '05', title: 'Form Fields & Inputs (AppTextField, AppNumericField, AppDecimalField)' },
   { code: '06', title: 'Selection & Checklist Rows (AppToggleRow, AppCheckboxRow)' },
-  { code: '07', title: 'Cards & Headers (AppCard, AppSectionHeader)' },
+  { code: '07', title: 'Cards & Headers (AppCard, AppSectionHeader, appCardStyle, appSubCardStyle)' },
   { code: '08', title: 'Metric Tiles & Financial Display (AppMetricTile)' },
   { code: '09', title: 'Feedback & Empty States (AppEmptyState, LoadingView)' },
   { code: '10', title: 'Chart HUDs & Annotations (badgeMarker, badgeMarkerSmall)' },

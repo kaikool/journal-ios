@@ -133,15 +133,11 @@ public struct TradeReplayLandscapeChartView: View {
             // Unrealized / Realized P&L Badge
             let pnl = frame.unrealizedPnl
             let pnlColor = pnl >= 0 ? AppColors.profit : AppColors.loss
-            Text("\(pnl >= 0 ? "+" : "")\(Formatters.formatCurrency(pnl, currency: reportingCurrency))")
-                .font(AppTypography.number(12, weight: .bold))
-                .foregroundColor(pnlColor)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 3)
-                .background(pnlColor.opacity(0.12))
-                .cornerRadius(6)
-                .lineLimit(1)
-                .fixedSize()
+            AppBadge(
+                "\(pnl >= 0 ? "+" : "")\(Formatters.formatCurrency(pnl, currency: reportingCurrency))",
+                style: pnl >= 0 ? .profit : .loss
+            )
+            .fixedSize()
             
             Spacer()
             
@@ -160,18 +156,9 @@ public struct TradeReplayLandscapeChartView: View {
             }
             
             // Orientation flip button (toggles 90° rotation for devices with portrait orientation lock)
-            Button {
+            ModalCircleButton(icon: "rotate.right", label: "Toggle Landscape Rotation") {
                 isForceLandscape90.toggle()
-            } label: {
-                Image(systemName: "rotate.right")
-                    .font(AppTypography.actionButtonCompact)
-                    .padding(7)
-                    .background(AppColors.secondaryBackground)
-                    .foregroundColor(AppColors.secondaryText)
-                    .clipShape(Circle())
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Toggle Landscape Rotation")
         }
     }
     

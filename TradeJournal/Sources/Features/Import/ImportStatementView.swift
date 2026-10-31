@@ -88,22 +88,9 @@ public struct ImportStatementView: View {
                                 }
                             }
                             
-                            Button {
-                                NativeHaptics.lightImpact()
+                            AppPrimaryButton("Choose CSV File", icon: "folder") {
                                 isFileImporterPresented = true
-                            } label: {
-                                HStack(spacing: 6) {
-                                    Image(systemName: "folder")
-                                    Text("Choose CSV File")
-                                }
-                                .font(AppTypography.captionBold)
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 18)
-                                .padding(.vertical, 10)
-                                .background(AppColors.brand)
-                                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                             }
-                            .buttonStyle(ApplePressableButtonStyle())
                             .padding(.bottom, 4)
                         }
                         .frame(maxWidth: .infinity)
@@ -270,23 +257,9 @@ public struct ImportStatementView: View {
                                 }
                                 
                                 // Confirm Button
-                                Button {
-                                    NativeHaptics.mediumImpact()
+                                AppPrimaryButton("Confirm Import \(preview.usableExecutions.count) Fills", icon: "arrow.up.circle.fill") {
                                     commitImport(preview.usableExecutions)
-                                } label: {
-                                    HStack(spacing: 8) {
-                                        Image(systemName: "arrow.up.circle.fill")
-                                        Text("Confirm Import \(preview.usableExecutions.count) Fills")
-                                    }
-                                    .font(AppTypography.subheadlineBold)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 14)
-                                    .background(AppColors.brand)
-                                    .foregroundColor(.white)
-                                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                                    .shadow(color: AppColors.brand.opacity(0.25), radius: 6, x: 0, y: 2)
                                 }
-                                .buttonStyle(ApplePressableButtonStyle())
                             }
                         }
                     }

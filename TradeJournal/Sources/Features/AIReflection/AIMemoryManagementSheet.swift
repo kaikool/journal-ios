@@ -471,9 +471,7 @@ private struct AIMemoryEditorSheet: View {
                                 TextEditor(text: $content)
                                     .font(AppTypography.inputText)
                                     .frame(minHeight: 100)
-                                    .padding(8)
-                                    .background(AppColors.secondaryBackground.opacity(0.65))
-                                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                    .appSubCardStyle(cornerRadius: 10, padding: 8)
                                     .overlay(
                                         RoundedRectangle(cornerRadius: 10, style: .continuous)
                                             .stroke(AppColors.border.opacity(0.45), lineWidth: 0.6)

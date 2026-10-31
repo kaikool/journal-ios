@@ -187,10 +187,8 @@ public struct ReportsView: View {
                                     .lineLimit(1)
                                     .minimumScaleFactor(0.75)
                             }
-                            .padding(12)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(AppColors.secondaryBackground)
-                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            .appSubCardStyle(cornerRadius: 10, padding: 12)
                         }
                     }
                 }

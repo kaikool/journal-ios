@@ -198,43 +198,17 @@ public struct AddTradeSheet: View {
                     .tracking(0.5)
                 
                 // Direction Selector
-                HStack(spacing: 8) {
-                    Button {
-                        NativeHaptics.selection()
-                        direction = .long
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "arrow.up.right")
-                                .font(AppTypography.actionButton)
-                            Text("BUY / LONG")
-                                .font(AppTypography.actionButton)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 40)
-                        .background(direction == .long ? AppColors.profit : AppColors.secondaryBackground)
-                        .foregroundColor(direction == .long ? .white : AppColors.secondaryText)
-                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    }
-                    .buttonStyle(ApplePressableButtonStyle())
-                    
-                    Button {
-                        NativeHaptics.selection()
-                        direction = .short
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "arrow.down.right")
-                                .font(AppTypography.actionButton)
-                            Text("SELL / SHORT")
-                                .font(AppTypography.actionButton)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 40)
-                        .background(direction == .short ? AppColors.loss : AppColors.secondaryBackground)
-                        .foregroundColor(direction == .short ? .white : AppColors.secondaryText)
-                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    }
-                    .buttonStyle(ApplePressableButtonStyle())
-                }
+                AppBinarySegmentedToggle(
+                    selection: $direction,
+                    firstOption: .long,
+                    firstTitle: "BUY / LONG",
+                    firstIcon: "arrow.up.right",
+                    firstActiveColor: AppColors.profit,
+                    secondOption: .short,
+                    secondTitle: "SELL / SHORT",
+                    secondIcon: "arrow.down.right",
+                    secondActiveColor: AppColors.loss
+                )
                 
                 // Closed Position Toggle
                 AppToggleRow(

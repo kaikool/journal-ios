@@ -331,10 +331,7 @@ private struct AIResearchProjectCard: View {
                 .foregroundColor(AppColors.secondaryText)
                 .italic()
         }
-        .padding(9)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(AppColors.secondaryBackground)
-        .cornerRadius(8)
+        .appSubCardStyle(cornerRadius: 8, padding: 9)
         .overlay(
             RoundedRectangle(cornerRadius: 8)
                 .stroke(AppColors.border.opacity(0.5), lineWidth: 0.5)
@@ -410,10 +407,7 @@ private struct AIResearchProjectCard: View {
                     .font(AppTypography.caption)
                     .foregroundColor(AppColors.secondaryText)
             }
-            .padding(9)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(AppColors.secondaryBackground)
-            .cornerRadius(8)
+            .appSubCardStyle(cornerRadius: 8, padding: 9)
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
                     .stroke(AppColors.border.opacity(0.8), lineWidth: 0.8)
@@ -472,10 +466,7 @@ private struct AIResearchProjectCard: View {
                                     .foregroundColor(AppColors.secondaryText)
                             }
                         }
-                        .padding(8)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(AppColors.secondaryBackground)
-                        .cornerRadius(6)
+                        .appSubCardStyle(cornerRadius: 6, padding: 8)
                         .overlay(
                             RoundedRectangle(cornerRadius: 6)
                                 .stroke(AppColors.border.opacity(0.5), lineWidth: 0.5)
@@ -558,9 +549,7 @@ private struct NewResearchProjectSheet: View {
                                 TextEditor(text: $hypothesis)
                                     .font(AppTypography.inputText)
                                     .frame(minHeight: 100)
-                                    .padding(8)
-                                    .background(AppColors.secondaryBackground.opacity(0.65))
-                                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                    .appSubCardStyle(cornerRadius: 10, padding: 8)
                                     .overlay(
                                         RoundedRectangle(cornerRadius: 10, style: .continuous)
                                             .stroke(AppColors.border.opacity(0.45), lineWidth: 0.6)
@@ -706,15 +695,11 @@ private struct AddResearchCheckpointSheet: View {
                             TextEditor(text: $notes)
                                 .font(AppTypography.inputText)
                                 .frame(minHeight: 100)
-                                .padding(8)
-                                .background(AppColors.secondaryBackground.opacity(0.65))
-                                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                .appSubCardStyle(cornerRadius: 10, padding: 8)
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 10, style: .continuous)
                                         .stroke(AppColors.border.opacity(0.45), lineWidth: 0.6)
                                 )
-                                .cornerRadius(8)
-                                .overlay(RoundedRectangle(cornerRadius: 8).stroke(AppColors.border.opacity(0.6), lineWidth: 0.8))
                         }
                     }
                 }
@@ -788,9 +773,7 @@ private struct ConcludeResearchProjectSheet: View {
                             TextEditor(text: $conclusionText)
                                 .font(AppTypography.inputText)
                                 .frame(minHeight: 120)
-                                .padding(8)
-                                .background(AppColors.secondaryBackground)
-                                .cornerRadius(8)
+                                .appSubCardStyle(cornerRadius: 8, padding: 8)
                                 .overlay(RoundedRectangle(cornerRadius: 8).stroke(AppColors.border.opacity(0.6), lineWidth: 0.8))
                         }
                     }

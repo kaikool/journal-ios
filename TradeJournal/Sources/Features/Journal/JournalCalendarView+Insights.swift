@@ -357,9 +357,7 @@ extension JournalCalendarView {
                             .foregroundColor(AppColors.mutedText)
                     }
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 24)
-                    .background(AppColors.secondaryBackground.opacity(0.3))
-                    .cornerRadius(6)
+                    .appSubCardStyle(cornerRadius: 6, padding: 24)
                 }
                 
                 // Collapsible Daily Values Table matching calendar-insights.tsx line 247-287
@@ -473,9 +471,7 @@ extension JournalCalendarView {
                     }
                     Spacer()
                 }
-                .padding(8)
-                .background(AppColors.secondaryBackground.opacity(0.4))
-                .cornerRadius(6)
+                .appSubCardStyle(cornerRadius: 6, padding: 8)
                 
                 // 7 Weekday rows with bidirectional progress bar matching calendar-insights.tsx lines 314-360
                 VStack(spacing: 4) {
@@ -593,10 +589,7 @@ extension JournalCalendarView {
                         .frame(width: 76, alignment: .trailing)
                 }
             }
-            .padding(.horizontal, 6)
-            .padding(.vertical, 4)
-            .background(isSelected ? AppColors.cardBackground : Color.clear)
-            .cornerRadius(6)
+            .appSubCardStyle(cornerRadius: 6, padding: 6)
             .overlay(
                 RoundedRectangle(cornerRadius: 6)
                     .stroke(isSelected ? AppColors.border : Color.clear, lineWidth: 1)

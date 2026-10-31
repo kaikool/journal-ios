@@ -502,10 +502,8 @@ public struct AddProgressRoutineSheet: View {
                         }
                     }
                 }
-                .padding(.horizontal, 12)
                 .frame(height: 42)
-                .background(AppColors.secondaryBackground)
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .appSubCardStyle(cornerRadius: 10, padding: 10)
                 .overlay(
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
                         .stroke(AppColors.border.opacity(0.8), lineWidth: 0.5)
@@ -575,10 +573,7 @@ public struct AddProgressRoutineSheet: View {
                                     .font(AppTypography.rowPrimary)
                                     .foregroundColor(isSelected ? AppColors.brand : AppColors.border)
                             }
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 10)
-                            .background(isSelected ? AppColors.brand.opacity(0.12) : AppColors.secondaryBackground)
-                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            .appSubCardStyle(cornerRadius: 10, padding: 10)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 10, style: .continuous)
                                     .stroke(isSelected ? AppColors.brand.opacity(0.5) : AppColors.border.opacity(0.5), lineWidth: isSelected ? 1.0 : 0.5)
@@ -628,8 +623,7 @@ public struct AddProgressRoutineSheet: View {
                 HStack(spacing: 6) {
                     ForEach(weekdayNames, id: \.0) { day in
                         let isSelected = selectedDays.contains(day.0)
-                        Button {
-                            NativeHaptics.lightImpact()
+                        AppFilterChip(day.1, isSelected: isSelected) {
                             if isSelected {
                                 if selectedDays.count > 1 {
                                     selectedDays.remove(day.0)
@@ -637,20 +631,7 @@ public struct AddProgressRoutineSheet: View {
                             } else {
                                 selectedDays.insert(day.0)
                             }
-                        } label: {
-                            Text(day.1)
-                                .font(isSelected ? AppTypography.actionButtonCompact : AppTypography.actionPill)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 10)
-                                .background(isSelected ? AppColors.brand : AppColors.secondaryBackground)
-                                .foregroundColor(isSelected ? AppColors.brandTextOnDark : AppColors.secondaryText)
-                                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                        .stroke(isSelected ? AppColors.brand : AppColors.border.opacity(0.6), lineWidth: 0.6)
-                                )
                         }
-                        .buttonStyle(.plain)
                     }
                 }
                 .padding(.vertical, 2)

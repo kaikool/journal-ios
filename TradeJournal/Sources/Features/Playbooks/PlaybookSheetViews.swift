@@ -167,10 +167,7 @@ public struct NewPlaybookSheet: View {
                     .buttonStyle(.plain)
                 }
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-            .background(AppColors.background)
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .appSubCardStyle(cornerRadius: 12, padding: 12)
             .overlay(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .stroke(AppColors.border.opacity(0.5), lineWidth: 0.8)
@@ -356,10 +353,7 @@ public struct EditPlaybookSheet: View {
                     .buttonStyle(.plain)
                 }
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-            .background(AppColors.background)
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .appSubCardStyle(cornerRadius: 12, padding: 12)
             .overlay(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .stroke(AppColors.border.opacity(0.5), lineWidth: 0.8)

@@ -73,8 +73,7 @@ extension DashboardView {
                                         }
                                         .frame(height: 26)
                                         .frame(maxWidth: .infinity)
-                                        .background(stats.map { $0.netPnl >= 0 ? AppColors.profit.opacity(0.12) : AppColors.loss.opacity(0.12) } ?? Color.clear)
-                                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                                        .appSubCardStyle(cornerRadius: 6, padding: 0)
                                         .overlay(
                                             stats.map { RoundedRectangle(cornerRadius: 6, style: .continuous).stroke($0.netPnl >= 0 ? AppColors.profit.opacity(0.24) : AppColors.loss.opacity(0.24), lineWidth: 0.5) }
                                         )
@@ -139,32 +138,12 @@ extension DashboardView {
                 }
                 
                 // Apple HIG Sliding Pill Segmented Control
-                HStack(spacing: 4) {
-                    ForEach(["recent", "open"], id: \.self) { tab in
-                        let isSelected = activityTab == tab
-                        Button {
-                            NativeHaptics.selection()
-                            withAnimation(AppAnimations.springQuick) {
-                                activityTab = tab
-                            }
-                        } label: {
-                            Text(tab == "recent" ? "Recent trades" : "Open positions")
-                                .font(isSelected ? AppTypography.actionButtonCompact : AppTypography.caption)
-                                .foregroundColor(isSelected ? AppColors.primaryText : AppColors.secondaryText)
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 28)
-                                .background(
-                                    isSelected ? AppColors.cardBackground : Color.clear
-                                )
-                                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                                .shadow(color: isSelected ? Color.black.opacity(0.08) : Color.clear, radius: 4, x: 0, y: 1)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(3)
-                .background(AppColors.secondaryBackground.opacity(0.6))
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                AppSegmentedBar(
+                    selection: $activityTab,
+                    items: ["recent", "open"],
+                    titleFor: { $0 == "recent" ? "Recent trades" : "Open positions" },
+                    height: 32
+                )
                 
                 if activityTab == "recent" {
                     let recent = Array(

@@ -9,6 +9,7 @@ import SwiftUI
 /// - Tactile ApplePressableButtonStyle with native spring feedback
 
 public typealias ModalCloseButton = ModalDismissButton
+public typealias ModalCircleButton = ModalIconButton
 
 // MARK: - Circular Dismiss Button (xmark)
 public struct ModalDismissButton: View {

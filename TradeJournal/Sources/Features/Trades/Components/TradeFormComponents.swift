@@ -150,9 +150,7 @@ public struct TradeEstimatedPnlBanner: View {
                     .font(AppTypography.displayHero)
                     .foregroundColor(pnl >= 0 ? AppColors.profit : AppColors.loss)
             }
-            .padding(12)
-            .background((pnl >= 0 ? AppColors.profit : AppColors.loss).opacity(0.12))
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .appSubCardStyle(cornerRadius: 12, padding: 12)
         }
     }
 }
@@ -317,10 +315,7 @@ public struct TradePlaybookRulesCard: View {
                                     
                                     Spacer()
                                 }
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 8)
-                                .background(isFollowed ? AppColors.profit.opacity(0.08) : AppColors.secondaryBackground)
-                                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                .appSubCardStyle(cornerRadius: 8, padding: 8)
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 8, style: .continuous)
                                         .stroke(isFollowed ? AppColors.profit.opacity(0.3) : Color.clear, lineWidth: 0.5)
@@ -330,9 +325,7 @@ public struct TradePlaybookRulesCard: View {
                         }
                     }
                 }
-                .padding(12)
-                .background(AppColors.secondaryBackground.opacity(0.4))
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .appSubCardStyle(cornerRadius: 12, padding: 12)
             }
         }
     }

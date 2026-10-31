@@ -15,22 +15,9 @@ public struct AIReflectionCategoryChips: View {
             HStack(spacing: 8) {
                 ForEach(categories, id: \.self) { cat in
                     let isSelected = selectedCategory == cat
-                    Button(action: {
+                    AppFilterChip(cat, isSelected: isSelected) {
                         selectedCategory = cat
-                    }) {
-                        Text(cat)
-                            .font(isSelected ? AppTypography.actionButtonCompact : AppTypography.caption)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(isSelected ? AppColors.secondaryBackground : Color.clear)
-                            .foregroundColor(isSelected ? AppColors.primaryText : AppColors.secondaryText)
-                            .cornerRadius(16)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 16)
-                                    .stroke(isSelected ? AppColors.border : AppColors.border.opacity(0.4), lineWidth: 0.8)
-                            )
                     }
-                    .buttonStyle(.plain)
                 }
             }
             .padding(.horizontal, 2)
@@ -59,22 +46,9 @@ public struct AIReflectionQuestionsCatalog: View {
                             
                             Spacer()
                             
-                            Button(action: {
+                            AppActionPill("Analyze", icon: "sparkles") {
                                 onSelectTemplate(t)
-                            }) {
-                                Text("Analyze")
-                                    .font(AppTypography.actionButtonCompact)
-                                    .foregroundColor(AppColors.primaryText)
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 5)
-                                    .background(AppColors.secondaryBackground)
-                                    .cornerRadius(6)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 6)
-                                            .stroke(AppColors.border.opacity(0.8), lineWidth: 0.8)
-                                    )
                             }
-                            .buttonStyle(.plain)
                         }
                         
                         Text(t.subtitle)

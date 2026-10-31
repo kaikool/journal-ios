@@ -17,8 +17,7 @@ public struct ReviewExportModal: View {
                 TextEditor(text: .constant(exportText))
                     .font(AppTypography.monoCaption)
                     .scrollContentBackground(.hidden)
-                    .background(AppColors.secondaryBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .appSubCardStyle(cornerRadius: 10, padding: 8)
                     .padding(16)
                 
                 AppPrimaryButton("Copy to Clipboard", icon: "doc.on.doc", fullWidth: true, height: 42) {

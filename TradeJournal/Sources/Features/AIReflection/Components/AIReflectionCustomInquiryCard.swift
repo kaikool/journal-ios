@@ -69,9 +69,7 @@ public struct AIReflectionCustomInquiryCard: View {
                                 .foregroundColor(AppColors.secondaryText)
                         }
                     }
-                    .padding(6)
-                    .background(AppColors.secondaryBackground.opacity(0.6))
-                    .cornerRadius(6)
+                    .appSubCardStyle(cornerRadius: 6, padding: 6)
                 }
                 
                 HStack(spacing: 8) {
@@ -101,9 +99,7 @@ public struct AIReflectionCustomInquiryCard: View {
                     }
                     .disabled(userPrompt.trimmingCharacters(in: .whitespaces).isEmpty || isLoading)
                 }
-                .padding(.horizontal, 10)
-                .background(AppColors.secondaryBackground)
-                .cornerRadius(8)
+                .appSubCardStyle(cornerRadius: 8, padding: 10)
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
                         .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)

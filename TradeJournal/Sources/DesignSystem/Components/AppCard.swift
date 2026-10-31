@@ -52,6 +52,62 @@ extension View {
     public func appCardStyle(cornerRadius: CGFloat = 16, padding: CGFloat = 16) -> some View {
         modifier(AppCardModifier(cornerRadius: cornerRadius, padding: padding))
     }
+    
+    public func appSubCardStyle(cornerRadius: CGFloat = 8, padding: CGFloat = 10) -> some View {
+        modifier(AppSubCardModifier(cornerRadius: cornerRadius, padding: padding))
+    }
+}
+
+/// Standardized Sub-Card / Inset Pod modifier using secondaryBackground
+public struct AppSubCardModifier: ViewModifier {
+    public var cornerRadius: CGFloat
+    public var padding: CGFloat
+    
+    public init(cornerRadius: CGFloat = 8, padding: CGFloat = 10) {
+        self.cornerRadius = cornerRadius
+        self.padding = padding
+    }
+    
+    public func body(content: Content) -> some View {
+        content
+            .padding(padding)
+            .background(AppColors.secondaryBackground)
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+    }
+}
+
+/// Standardized Chat Message Bubble container for AI Coaching & Reflection threads
+public struct AppChatBubble<Content: View>: View {
+    public enum Role {
+        case user
+        case assistant
+    }
+    
+    public let role: Role
+    public let content: Content
+    
+    public init(role: Role = .user, @ViewBuilder content: () -> Content) {
+        self.role = role
+        self.content = content()
+    }
+    
+    public var body: some View {
+        HStack {
+            if role == .user {
+                Spacer(minLength: 32)
+                content
+                    .font(AppTypography.body)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .background(AppColors.brand)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            } else {
+                content
+                Spacer(minLength: 32)
+            }
+        }
+    }
 }
 
 /// Standardized Floating HUD bar container for landscape charts and floating controls

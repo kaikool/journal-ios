@@ -294,34 +294,18 @@ public struct DashboardCustomizerSheet: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         ForEach(DashboardPreset.allCases.filter { $0 != .custom }) { preset in
-                            Button {
+                            AppFilterChip(
+                                preset.name,
+                                icon: preset.icon,
+                                isSelected: activePreset == preset,
+                                height: 28
+                            ) {
                                 NativeHaptics.mediumImpact()
                                 withAnimation(AppAnimations.springStandard) {
                                     activePreset = preset
                                     cardOrder = preset.canonicalOrder
                                     hiddenCardIds = preset.canonicalHidden
                                 }
-                            } label: {
-                                HStack(spacing: 6) {
-                                    Image(systemName: preset.icon)
-                                        .font(AppTypography.captionBold)
-                                    Text(preset.name)
-                                        .font(AppTypography.captionBold)
-                                    if activePreset == preset {
-                                        Image(systemName: "checkmark")
-                                            .font(AppTypography.badgeStandard)
-                                    }
-                                }
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 6)
-                                .frame(height: 28)
-                                .background(activePreset == preset ? AppColors.brand : AppColors.cardBackground)
-                                .foregroundColor(activePreset == preset ? .white : AppColors.primaryText)
-                                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                        .stroke(activePreset == preset ? Color.clear : AppColors.border, lineWidth: 0.5)
-                                )
                             }
                             .fixedSize()
                         }
@@ -385,13 +369,7 @@ public struct DashboardCustomizerSheet: View {
                             Spacer()
                             
                             if hiddenCardIds.contains(card.id) {
-                                Text("Hidden")
-                                    .font(AppTypography.caption)
-                                    .foregroundColor(AppColors.secondaryText)
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
-                                    .background(AppColors.secondaryBackground)
-                                    .cornerRadius(4)
+                                AppBadge("Hidden", style: .neutral)
                             }
                         }
                         .listRowBackground(AppColors.cardBackground)

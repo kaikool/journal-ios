@@ -20,16 +20,9 @@ public struct PreTradeFollowUpSection: View {
             VStack(spacing: 12) {
                 ForEach(visibleMessages) { msg in
                     if msg.role == "user" {
-                        HStack {
-                            Spacer()
+                        AppChatBubble(role: .user) {
                             Text(msg.content)
                                 .font(AppTypography.bodyMedium)
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
-                                .background(AppColors.brand)
-                                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                                .frame(maxWidth: 280, alignment: .trailing)
                         }
                     } else {
                         AppCard {
@@ -96,16 +89,8 @@ public struct PreTradeBottomFloatingInput: View {
                     }
                 
                 if hasHistory && !hasQueryText {
-                    Button(action: onResetThread) {
-                        Image(systemName: "arrow.counterclockwise")
-                            .font(AppTypography.actionButtonCompact)
-                            .foregroundColor(AppColors.secondaryText)
-                            .frame(width: 30, height: 30)
-                            .background(AppColors.secondaryBackground.opacity(0.85))
-                            .clipShape(Circle())
-                    }
-                    .buttonStyle(.plain)
-                    .help("New Thread")
+                    ModalCircleButton(icon: "arrow.counterclockwise", action: onResetThread)
+                        .help("New Thread")
                 }
                 
                 if isSubmitting {

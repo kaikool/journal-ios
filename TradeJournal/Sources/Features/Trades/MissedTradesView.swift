@@ -221,17 +221,7 @@ public struct AddMissedTradeSheet: View {
                 VStack(spacing: 14) {
                     // Error Banner
                     if let err = errorMessage {
-                        HStack(spacing: 8) {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .foregroundColor(AppColors.loss)
-                            Text(err)
-                                .font(AppTypography.caption)
-                                .foregroundColor(AppColors.loss)
-                            Spacer()
-                        }
-                        .padding(12)
-                        .background(AppColors.loss.opacity(0.12))
-                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        ErrorBannerView(message: err)
                     }
                     
                     // Card 1: Opportunity Details

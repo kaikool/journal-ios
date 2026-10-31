@@ -140,9 +140,7 @@ public struct EditManualTradeSheet: View {
                                 }
                                 Spacer()
                             }
-                            .padding(12)
-                            .background(AppColors.brand.opacity(0.08))
-                            .cornerRadius(10)
+                            .appSubCardStyle(cornerRadius: 10, padding: 12)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 10)
                                     .stroke(AppColors.brand.opacity(0.2), lineWidth: 1)
@@ -225,43 +223,17 @@ public struct EditManualTradeSheet: View {
                     .tracking(0.5)
                 
                 // Direction Selector
-                HStack(spacing: 8) {
-                    Button {
-                        NativeHaptics.lightImpact()
-                        direction = .long
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "arrow.up.right")
-                                .font(AppTypography.actionButton)
-                            Text("BUY / LONG")
-                                .font(AppTypography.actionButton)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        .background(direction == .long ? AppColors.brand : AppColors.secondaryBackground)
-                        .foregroundColor(direction == .long ? .white : AppColors.secondaryText)
-                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    }
-                    .buttonStyle(ApplePressableButtonStyle())
-                    
-                    Button {
-                        NativeHaptics.lightImpact()
-                        direction = .short
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "arrow.down.right")
-                                .font(AppTypography.actionButton)
-                            Text("SELL / SHORT")
-                                .font(AppTypography.actionButton)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        .background(direction == .short ? AppColors.loss : AppColors.secondaryBackground)
-                        .foregroundColor(direction == .short ? .white : AppColors.secondaryText)
-                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    }
-                    .buttonStyle(ApplePressableButtonStyle())
-                }
+                AppBinarySegmentedToggle(
+                    selection: $direction,
+                    firstOption: .long,
+                    firstTitle: "BUY / LONG",
+                    firstIcon: "arrow.up.right",
+                    firstActiveColor: AppColors.profit,
+                    secondOption: .short,
+                    secondTitle: "SELL / SHORT",
+                    secondIcon: "arrow.down.right",
+                    secondActiveColor: AppColors.loss
+                )
                 
                 TradeSymbolSelector(symbol: $symbol, showCryptoSymbols: $showCryptoSymbols)
             }

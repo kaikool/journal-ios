@@ -44,18 +44,7 @@ public struct AIReflectionResultView: View {
                     
                     Spacer()
                     
-                    HStack(spacing: 5) {
-                        Circle()
-                            .fill(AppColors.profit)
-                            .frame(width: 6, height: 6)
-                        Text("RISK AI")
-                            .font(AppTypography.badgeMicro)
-                            .foregroundColor(AppColors.secondaryText)
-                    }
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 3)
-                    .background(AppColors.secondaryBackground)
-                    .cornerRadius(6)
+                    AppBadge("RISK AI", style: .neutral)
                 }
                 .padding(.vertical, 2)
             }

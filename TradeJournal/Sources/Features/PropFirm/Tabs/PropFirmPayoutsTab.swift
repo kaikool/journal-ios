@@ -121,10 +121,7 @@ extension PropFirmLedgerView {
                                         .minimumScaleFactor(0.75)
                                 }
                             }
-                            .padding(.vertical, 6)
-                            .padding(.horizontal, 10)
-                            .background(AppColors.secondaryBackground.opacity(0.6))
-                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            .appSubCardStyle(cornerRadius: 8, padding: 8)
                             
                             if p.varianceMinor != 0 && p.entry.status == .completed {
                                 HStack {

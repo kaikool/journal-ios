@@ -757,17 +757,7 @@ public struct TradeAICoachSheet: View {
                         .foregroundColor(AppColors.secondaryText)
                 }
                 Spacer()
-                Text(plan.bias.uppercased())
-                    .font(AppTypography.badgeMicro)
-                    .foregroundColor(AppColors.primaryText)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(AppColors.secondaryBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 4, style: .continuous)
-                            .stroke(AppColors.border.opacity(0.4), lineWidth: 0.5)
-                    )
+                AppBadge(plan.bias.uppercased(), style: .neutral)
             }
             
             Divider()

@@ -47,9 +47,7 @@ public struct TradingSettingsView: View {
                 TextEditor(text: $multipliersText)
                     .font(AppTypography.codeBlock)
                     .frame(minHeight: 90)
-                    .padding(8)
-                    .background(AppColors.secondaryBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .appSubCardStyle(cornerRadius: 10, padding: 8)
                     .overlay(
                         RoundedRectangle(cornerRadius: 10, style: .continuous)
                             .stroke(AppColors.border.opacity(0.5), lineWidth: 0.5)
@@ -160,9 +158,7 @@ public struct TradingSettingsView: View {
                         )
                     }
                 }
-                .padding(10)
-                .background(AppColors.secondaryBackground)
-                .cornerRadius(8)
+                .appSubCardStyle(cornerRadius: 8, padding: 10)
             }
             
             AppButton("Add fee rule", icon: "plus", style: .outline, size: .compact) {
@@ -229,9 +225,7 @@ public struct TradingSettingsView: View {
                         }
                     }
                 }
-                .padding(10)
-                .background(AppColors.secondaryBackground)
-                .cornerRadius(8)
+                .appSubCardStyle(cornerRadius: 8, padding: 10)
             }
             
             AppButton("Add risk rule", icon: "plus", style: .outline, size: .compact) {

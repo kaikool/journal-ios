@@ -179,9 +179,7 @@ public struct TradeReplayView: View {
                         .foregroundColor(AppColors.secondaryText)
                     Spacer()
                 }
-                .padding(8)
-                .background(AppColors.secondaryBackground)
-                .cornerRadius(6)
+                .appSubCardStyle(cornerRadius: 6, padding: 8)
             }
             
             if isLoadingCandles && bars.isEmpty {

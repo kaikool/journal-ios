@@ -61,15 +61,20 @@ public struct PreTradeChartCard: View {
                     Spacer()
                     
                     // Timeframe Picker Tabs (M15, H1, H4, D1)
-                    HStack(spacing: 2) {
-                        timeframeTab(title: "M15", id: "15m")
-                        timeframeTab(title: "H1", id: "1h")
-                        timeframeTab(title: "H4", id: "4h")
-                        timeframeTab(title: "D1", id: "1d")
-                    }
-                    .padding(2)
-                    .background(AppColors.secondaryBackground)
-                    .cornerRadius(6)
+                    AppSegmentedBar(
+                        selection: $selectedTimeframe,
+                        items: ["15m", "1h", "4h", "1d"],
+                        titleFor: { id in
+                            switch id {
+                            case "15m": return "M15"
+                            case "1h": return "H1"
+                            case "4h": return "H4"
+                            case "1d": return "D1"
+                            default: return id.uppercased()
+                            }
+                        },
+                        height: 28
+                    )
                 }
                 
                 // Chart View Container
@@ -81,8 +86,7 @@ public struct PreTradeChartCard: View {
                             timeframe: activeTimeframeTitle
                         )
                         .frame(height: 210)
-                        .background(AppColors.secondaryBackground.opacity(0.35))
-                        .cornerRadius(8)
+                        .appSubCardStyle(cornerRadius: 8, padding: 0)
                         .contentShape(Rectangle())
                         .onTapGesture(perform: onEnlarge)
                         
@@ -124,23 +128,5 @@ public struct PreTradeChartCard: View {
     private var emptyLoadingView: some View {
         LoadingView("Fetching \(symbol) \(activeTimeframeTitle) candles...", size: 36)
             .padding(.vertical, 24)
-    }
-    
-    private func timeframeTab(title: String, id: String) -> some View {
-        let isSel = selectedTimeframe == id
-        return Button(action: {
-            withAnimation(.easeInOut(duration: 0.15)) {
-                selectedTimeframe = id
-            }
-        }) {
-            Text(title)
-                .font(isSel ? AppTypography.captionBold : AppTypography.captionMicro)
-                .padding(.horizontal, 7)
-                .padding(.vertical, 4)
-                .background(isSel ? AppColors.brand : Color.clear)
-                .foregroundColor(isSel ? .white : AppColors.secondaryText)
-                .cornerRadius(4)
-        }
-        .buttonStyle(.plain)
     }
 }

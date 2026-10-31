@@ -19,15 +19,9 @@ public struct TradeAICoachFollowUpView: View {
             VStack(spacing: 12) {
                 ForEach(followUpMessages) { msg in
                     if msg.role == "user" {
-                        HStack {
-                            Spacer(minLength: 32)
+                        AppChatBubble(role: .user) {
                             Text(msg.content)
                                 .font(AppTypography.body)
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 10)
-                                .background(AppColors.brand)
-                                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                         }
                     } else if msg.role == "assistant" && msg.content != coachingResult {
                         VStack(alignment: .leading, spacing: 6) {
@@ -92,16 +86,8 @@ public struct TradeAICoachBottomFloatingInput: View {
                     }
                 
                 if hasHistory && !hasQueryText {
-                    Button(action: onResetThread) {
-                        Image(systemName: "arrow.counterclockwise")
-                            .font(AppTypography.actionButtonCompact)
-                            .foregroundColor(AppColors.secondaryText)
-                            .frame(width: 30, height: 30)
-                            .background(AppColors.secondaryBackground.opacity(0.85))
-                            .clipShape(Circle())
-                    }
-                    .buttonStyle(.plain)
-                    .help("New Thread")
+                    ModalCircleButton(icon: "arrow.counterclockwise", action: onResetThread)
+                        .help("New Thread")
                 }
                 
                 if isSubmitting {

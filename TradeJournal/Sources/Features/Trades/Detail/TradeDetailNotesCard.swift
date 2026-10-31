@@ -63,11 +63,8 @@ public struct TradeDetailNotesCard: View {
                                     .multilineTextAlignment(.leading)
                                 Spacer()
                             }
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 12)
                             .frame(maxWidth: .infinity, minHeight: 65, alignment: .topLeading)
-                            .background(AppColors.secondaryBackground.opacity(0.3))
-                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            .appSubCardStyle(cornerRadius: 10, padding: 10)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 10, style: .continuous)
                                     .stroke(AppColors.border.opacity(0.3), style: StrokeStyle(lineWidth: 0.8, dash: [4]))
@@ -76,9 +73,7 @@ public struct TradeDetailNotesCard: View {
                         .buttonStyle(.plain)
                     } else {
                         JournalNotesMarkdownView(text: noteContent)
-                            .padding(10)
-                            .background(AppColors.secondaryBackground.opacity(0.35))
-                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            .appSubCardStyle(cornerRadius: 10, padding: 10)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 10, style: .continuous)
                                     .stroke(AppColors.border.opacity(0.35), lineWidth: 0.5)

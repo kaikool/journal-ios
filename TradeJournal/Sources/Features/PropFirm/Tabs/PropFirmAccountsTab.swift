@@ -147,10 +147,7 @@ extension PropFirmLedgerView {
                                 }
                                 .frame(maxWidth: .infinity, alignment: .trailing)
                             }
-                            .padding(.vertical, 8)
-                            .padding(.horizontal, 12)
-                            .background(AppColors.secondaryBackground.opacity(0.45))
-                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            .appSubCardStyle(cornerRadius: 10, padding: 10)
                             
                             // Program Rules, Stop Loss & Progression (Visual Objective Charts & Risk Shields)
                             let hasProgramDetails = acc.profitTargetMinor != nil || acc.maxLossMinor != nil || acc.maxDailyLossMinor != nil || acc.winningDays != nil || acc.minTradingDays != nil || acc.currentStepName != nil || acc.totalTrades != nil

@@ -244,19 +244,17 @@ public struct EditTargetsSheet: View {
                                 .foregroundColor(AppColors.loss)
                         }
                     }
-                    .padding(10)
-                    .background(AppColors.loss.opacity(0.08))
-                    .cornerRadius(8)
+                    .appSubCardStyle(cornerRadius: 8, padding: 10)
                 }
                 
                 if !isStopLossValidDirection {
                     HStack(spacing: 6) {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .font(AppTypography.footnote)
-                            .foregroundColor(.orange)
+                            .foregroundColor(AppColors.warning)
                         Text(trade.direction == .long ? "Stop loss should be below entry price for Buy trades." : "Stop loss should be above entry price for Sell trades.")
                             .font(AppTypography.footnote)
-                            .foregroundColor(.orange)
+                            .foregroundColor(AppColors.warning)
                     }
                 }
             }
@@ -316,19 +314,17 @@ public struct EditTargetsSheet: View {
                                 .foregroundColor(AppColors.profit)
                         }
                     }
-                    .padding(10)
-                    .background(AppColors.profit.opacity(0.08))
-                    .cornerRadius(8)
+                    .appSubCardStyle(cornerRadius: 8, padding: 10)
                 }
                 
                 if !isProfitTargetValidDirection {
                     HStack(spacing: 6) {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .font(AppTypography.footnote)
-                            .foregroundColor(.orange)
+                            .foregroundColor(AppColors.warning)
                         Text(trade.direction == .long ? "Profit target should be above entry price for Buy trades." : "Profit target should be below entry price for Sell trades.")
                             .font(AppTypography.footnote)
-                            .foregroundColor(.orange)
+                            .foregroundColor(AppColors.warning)
                     }
                 }
                 

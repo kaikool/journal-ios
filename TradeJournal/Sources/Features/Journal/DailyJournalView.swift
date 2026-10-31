@@ -174,22 +174,9 @@ public struct DailyJournalListView: View {
         HStack(spacing: 10) {
             AppSearchBar("Search date, note...", text: $searchText, height: 36)
             
-            Button {
+            AppPrimaryButton("Today", icon: "sun.max.fill", fullWidth: false, height: 36) {
                 selectedDateForDetail = todayKey
-            } label: {
-                HStack(spacing: 5) {
-                    Image(systemName: "sun.max.fill")
-                        .font(AppTypography.actionButtonCompact)
-                    Text("Today")
-                        .font(AppTypography.actionButtonCompact)
-                }
-                .foregroundColor(.white)
-                .padding(.horizontal, 12)
-                .frame(height: 36)
-                .background(AppColors.brandPrimary)
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             }
-            .buttonStyle(ApplePressableButtonStyle())
             .fixedSize()
         }
     }

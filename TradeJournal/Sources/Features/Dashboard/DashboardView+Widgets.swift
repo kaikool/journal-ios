@@ -56,10 +56,7 @@ internal struct DashboardCardWrapper<Content: View>: View {
                     }
                     .buttonStyle(ApplePressableButtonStyle())
                 }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(AppColors.secondaryBackground)
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .appSubCardStyle(cornerRadius: 10, padding: 6)
                 .padding(.bottom, 6)
             }
             

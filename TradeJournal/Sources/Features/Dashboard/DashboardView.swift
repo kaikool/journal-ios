@@ -601,9 +601,7 @@ public struct DashboardView: View {
                 }
                 Spacer()
             }
-            .padding(14)
-            .background(AppColors.warning.opacity(0.08))
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .appSubCardStyle(cornerRadius: 16, padding: 14)
             .overlay(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .stroke(AppColors.warning.opacity(0.3), lineWidth: 1)
@@ -753,10 +751,7 @@ public struct DashboardView: View {
                         .foregroundColor(AppColors.secondaryText)
                 }
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(AppColors.profit.opacity(0.12))
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .appSubCardStyle(cornerRadius: 10, padding: 10)
         }
         
         if let err = dataStore.lastSyncError {
@@ -776,10 +771,7 @@ public struct DashboardView: View {
                         .foregroundColor(AppColors.secondaryText)
                 }
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(AppColors.loss.opacity(0.12))
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .appSubCardStyle(cornerRadius: 10, padding: 10)
         }
     }
 }

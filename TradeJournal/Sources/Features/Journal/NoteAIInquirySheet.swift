@@ -217,14 +217,10 @@ public struct NoteAIInquirySheet: View {
     private func messageRow(_ msg: AICoachMessage) -> some View {
         HStack(alignment: .top, spacing: 8) {
             if msg.role == "user" {
-                Spacer(minLength: 32)
-                Text(msg.content)
-                    .font(AppTypography.body)
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(AppColors.brand)
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                AppChatBubble(role: .user) {
+                    Text(msg.content)
+                        .font(AppTypography.body)
+                }
             } else {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 4) {

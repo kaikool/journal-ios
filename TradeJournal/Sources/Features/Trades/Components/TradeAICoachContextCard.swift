@@ -21,21 +21,9 @@ public struct TradeAICoachContextCard: View {
                             .foregroundColor(AppColors.primaryText)
                         
                         let isShort = trade.direction == .short
-                        Text(isShort ? "SELL" : "BUY")
-                            .font(AppTypography.badgeStandard)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(isShort ? AppColors.warning.opacity(0.12) : AppColors.brand.opacity(0.12))
-                            .foregroundColor(isShort ? AppColors.warning : AppColors.brand)
-                            .cornerRadius(4)
+                        AppBadge(isShort ? "SELL" : "BUY", style: isShort ? .loss : .brand)
                         
-                        Text(isOpen ? "🟢 LIVE POSITION" : "🏁 CLOSED AUDIT")
-                            .font(AppTypography.badgeStandard)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2.5)
-                            .background(isOpen ? AppColors.profit.opacity(0.18) : AppColors.secondaryBackground)
-                            .foregroundColor(isOpen ? AppColors.profit : AppColors.secondaryText)
-                            .cornerRadius(4)
+                        AppBadge(isOpen ? "LIVE POSITION" : "CLOSED AUDIT", style: isOpen ? .profit : .neutral)
                     }
                     
                     let volStr = String(format: "%.2f", NSDecimalNumber(decimal: trade.quantity).doubleValue)

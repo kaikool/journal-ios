@@ -49,13 +49,7 @@ public struct AIReflectionPreTradeBanner: View {
                                 .font(AppTypography.rowTitle)
                                 .foregroundColor(AppColors.primaryText)
                             
-                            Text("D1 • H4 • M15")
-                                .font(AppTypography.badgeMicro)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(AppColors.brand.opacity(0.12))
-                                .foregroundColor(AppColors.brand)
-                                .cornerRadius(4)
+                            AppBadge("D1 • H4 • M15", style: .brand)
                         }
                         
                         Text("Scan multi-timeframe liquidity sweeps, order blocks & setups")

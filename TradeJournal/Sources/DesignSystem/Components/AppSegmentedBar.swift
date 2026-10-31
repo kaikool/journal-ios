@@ -115,3 +115,79 @@ public struct AppSegmentedBar<T: Hashable>: View {
         .buttonStyle(ApplePressableButtonStyle())
     }
 }
+
+// MARK: - Standardized 2-choice tactile segmented toggle (Apple HIG)
+public struct AppBinarySegmentedToggle<T: Equatable>: View {
+    @Binding private var selection: T
+    private let firstOption: T
+    private let firstTitle: String
+    private let firstIcon: String
+    private let firstActiveColor: Color
+    
+    private let secondOption: T
+    private let secondTitle: String
+    private let secondIcon: String
+    private let secondActiveColor: Color
+    
+    public init(
+        selection: Binding<T>,
+        firstOption: T,
+        firstTitle: String,
+        firstIcon: String,
+        firstActiveColor: Color = AppColors.profit,
+        secondOption: T,
+        secondTitle: String,
+        secondIcon: String,
+        secondActiveColor: Color = AppColors.loss
+    ) {
+        self._selection = selection
+        self.firstOption = firstOption
+        self.firstTitle = firstTitle
+        self.firstIcon = firstIcon
+        self.firstActiveColor = firstActiveColor
+        self.secondOption = secondOption
+        self.secondTitle = secondTitle
+        self.secondIcon = secondIcon
+        self.secondActiveColor = secondActiveColor
+    }
+    
+    public var body: some View {
+        HStack(spacing: 8) {
+            Button {
+                NativeHaptics.selection()
+                selection = firstOption
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: firstIcon)
+                        .font(AppTypography.actionButton)
+                    Text(firstTitle)
+                        .font(AppTypography.actionButton)
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 40)
+                .background(selection == firstOption ? firstActiveColor : AppColors.secondaryBackground)
+                .foregroundColor(selection == firstOption ? .white : AppColors.secondaryText)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            }
+            .buttonStyle(ApplePressableButtonStyle())
+            
+            Button {
+                NativeHaptics.selection()
+                selection = secondOption
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: secondIcon)
+                        .font(AppTypography.actionButton)
+                    Text(secondTitle)
+                        .font(AppTypography.actionButton)
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 40)
+                .background(selection == secondOption ? secondActiveColor : AppColors.secondaryBackground)
+                .foregroundColor(selection == secondOption ? .white : AppColors.secondaryText)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            }
+            .buttonStyle(ApplePressableButtonStyle())
+        }
+    }
+}

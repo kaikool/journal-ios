@@ -89,10 +89,8 @@ public struct NotebookEditorSheet: View {
                                     .font(AppTypography.captionMicro)
                                     .foregroundColor(AppColors.secondaryText)
                             }
-                            .padding(.horizontal, 12)
                             .frame(height: 34)
-                            .background(AppColors.secondaryBackground)
-                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            .appSubCardStyle(cornerRadius: 8, padding: 10)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                                     .stroke(AppColors.border.opacity(0.7), lineWidth: 0.8)
@@ -279,24 +277,8 @@ public struct NotebookEditorSheet: View {
                 
                 Spacer(minLength: 6)
                 
-                Button {
+                AppSecondaryButton("Inquiry", icon: "sparkles", height: 34) {
                     showInquirySheet = true
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "sparkles")
-                            .font(AppTypography.actionButtonCompact)
-                        Text("Inquiry")
-                            .font(AppTypography.actionButtonCompact)
-                    }
-                    .foregroundColor(AppColors.primaryText)
-                    .padding(.horizontal, 12)
-                    .frame(height: 34)
-                    .background(AppColors.secondaryBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .stroke(AppColors.border.opacity(0.6), lineWidth: 0.6)
-                    )
                 }
             }
         }

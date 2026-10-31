@@ -271,24 +271,14 @@ public struct PropFirmLedgerView: View {
             Spacer()
             
             if selectedTab == .accounts {
-                Button {
-                    NativeHaptics.lightImpact()
+                AppFilterChip(
+                    "Archived",
+                    isSelected: showArchivedAccounts,
+                    icon: showArchivedAccounts ? "archivebox.fill" : "archivebox",
+                    height: 34
+                ) {
                     showArchivedAccounts.toggle()
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: showArchivedAccounts ? "archivebox.fill" : "archivebox")
-                            .font(AppTypography.actionButtonCompact)
-                        Text("Archived")
-                            .font(AppTypography.actionButtonCompact)
-                    }
-                    .foregroundColor(showArchivedAccounts ? AppColors.brand : AppColors.secondaryText)
-                    .padding(.horizontal, 10)
-                    .frame(height: 34)
-                    .background(showArchivedAccounts ? AppColors.brand.opacity(0.12) : AppColors.secondaryBackground.opacity(0.75))
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(showArchivedAccounts ? AppColors.brand.opacity(0.4) : AppColors.border.opacity(0.5), lineWidth: 0.6))
                 }
-                .buttonStyle(ApplePressableButtonStyle())
             }
             
             AppActionMenu("New", icon: "plus") {

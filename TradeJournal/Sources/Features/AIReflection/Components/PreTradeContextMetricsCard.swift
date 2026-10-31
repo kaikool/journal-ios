@@ -165,10 +165,7 @@ public struct PreTradeContextMetricsCard: View {
                             .font(AppTypography.captionMicro)
                             .foregroundColor(AppColors.secondaryText)
                     }
-                    .padding(.vertical, 4)
-                    .padding(.horizontal, 8)
-                    .background((sweep.sweepType == .buySideSwept ? AppColors.loss : AppColors.profit).opacity(0.1))
-                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .appSubCardStyle(cornerRadius: 6, padding: 6)
                 }
             }
         }
@@ -198,10 +195,7 @@ public struct PreTradeContextMetricsCard: View {
                     .lineLimit(1)
             }
         }
-        .padding(.vertical, 4)
-        .padding(.horizontal, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(color.opacity(0.08))
-        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .appSubCardStyle(cornerRadius: 6, padding: 6)
     }
 }
