@@ -40,25 +40,23 @@ extension DailyJournalDetailView {
     internal var dayStatsCard: some View {
         AppCard {
             VStack(alignment: .leading, spacing: 14) {
-                Text("Day stats")
-                    .font(AppTypography.headline)
-                    .foregroundColor(AppColors.primaryText)
+                AppSectionHeader("Day stats", badge: "\(metrics.closedTrades)")
                 
                 if metrics.closedTrades > 0 {
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 14) {
-                        statItem(label: "Net P&L", value: metrics.netPnl >= 0 ? "+\(Formatters.currency(metrics.netPnl))" : Formatters.currency(metrics.netPnl), color: metrics.netPnl >= 0 ? AppColors.profit : AppColors.loss)
-                        statItem(label: "Trades", value: "\(metrics.closedTrades)")
-                        statItem(label: "Winrate", value: Formatters.percent(metrics.winRate))
+                    LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
+                        AppMetricTile("Net P&L", value: metrics.netPnl >= 0 ? "+\(Formatters.currency(metrics.netPnl))" : Formatters.currency(metrics.netPnl), color: metrics.netPnl >= 0 ? AppColors.profit : AppColors.loss, alignment: .leading)
+                        AppMetricTile("Trades", value: "\(metrics.closedTrades)", alignment: .leading)
+                        AppMetricTile("Winrate", value: Formatters.percent(metrics.winRate), alignment: .leading)
                         
-                        statItem(label: "Winners", value: "\(metrics.wins)", color: AppColors.profit)
-                        statItem(label: "Losers", value: "\(metrics.losses)", color: AppColors.loss)
-                        statItem(label: "Gross", value: Formatters.currency(metrics.grossPnl ?? 0))
+                        AppMetricTile("Winners", value: "\(metrics.wins)", color: AppColors.profit, alignment: .leading)
+                        AppMetricTile("Losers", value: "\(metrics.losses)", color: AppColors.loss, alignment: .leading)
+                        AppMetricTile("Gross", value: Formatters.currency(metrics.grossPnl ?? 0), alignment: .leading)
                         
-                        statItem(label: "Fees", value: Formatters.currency(metrics.fees ?? 0))
-                        statItem(label: "Volume", value: "\(metrics.totalVolume.formatted())")
-                        statItem(label: "Profit Factor", value: metrics.profitFactorIsInfinite ? "∞" : (metrics.profitFactor.map { String(format: "%.2f", $0) } ?? "–"))
+                        AppMetricTile("Fees", value: Formatters.currency(metrics.fees ?? 0), alignment: .leading)
+                        AppMetricTile("Volume", value: "\(metrics.totalVolume.formatted())", alignment: .leading)
+                        AppMetricTile("Profit Factor", value: metrics.profitFactorIsInfinite ? "∞" : (metrics.profitFactor.map { String(format: "%.2f", $0) } ?? "–"), alignment: .leading)
                         
-                        statItem(label: "Expectancy", value: metrics.expectancy.map { Formatters.currency($0) } ?? "–")
+                        AppMetricTile("Expectancy", value: metrics.expectancy.map { Formatters.currency($0) } ?? "–", alignment: .leading)
                     }
                 } else {
                     Text("No closed trades this day.")
@@ -70,18 +68,6 @@ extension DailyJournalDetailView {
             }
         }
         .padding(.horizontal, 16)
-    }
-    
-    @ViewBuilder
-    private func statItem(label: String, value: String, color: Color = AppColors.primaryText) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(label)
-                .font(.system(size: 11, weight: .regular))
-                .foregroundColor(AppColors.secondaryText)
-            Text(value)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(color)
-        }
     }
     
     internal var intradayChartCard: some View {
@@ -206,12 +192,7 @@ extension DailyJournalDetailView {
     internal var dayTradesCard: some View {
         AppCard {
             VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Text("Trades (\(dayTrades.count))")
-                        .font(AppTypography.headline)
-                        .foregroundColor(AppColors.primaryText)
-                    Spacer()
-                }
+                AppSectionHeader("Trades", badge: "\(dayTrades.count)")
                 
                 VStack(spacing: 8) {
                     ForEach(dayTrades) { trade in
@@ -280,12 +261,16 @@ extension DailyJournalDetailView {
     internal var dayNoteCard: some View {
         AppCard {
             VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Text("Day note")
-                        .font(AppTypography.headline)
-                        .foregroundColor(AppColors.primaryText)
-                    
-                    Spacer()
+                HStack(alignment: .center) {
+                    AppSectionHeader(
+                        "Day note",
+                        actionTitle: "AI Recap",
+                        actionIcon: "sparkles",
+                        onAction: {
+                            guard !isGeneratingAiRecap && !dayTrades.isEmpty else { return }
+                            generateAiRecap()
+                        }
+                    )
                     
                     if !noteText.isEmpty {
                         Button {
@@ -298,33 +283,6 @@ extension DailyJournalDetailView {
                         }
                         .buttonStyle(.plain)
                     }
-                    
-                    // AI Recap button
-                    Button {
-                        generateAiRecap()
-                    } label: {
-                        HStack(spacing: 4) {
-                            if isGeneratingAiRecap {
-                                ProgressView()
-                                    .scaleEffect(0.7)
-                            } else {
-                                Image(systemName: "sparkles")
-                                    .font(.system(size: 11, weight: .semibold))
-                            }
-                            Text("AI Recap")
-                                .font(.system(size: 12, weight: .semibold, design: .rounded))
-                        }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(AppColors.brand.opacity(0.12))
-                        .foregroundColor(AppColors.brand)
-                        .clipShape(Capsule())
-                        .overlay(
-                            Capsule().stroke(AppColors.brand.opacity(0.25), lineWidth: 0.8)
-                        )
-                    }
-                    .buttonStyle(ApplePressableButtonStyle())
-                    .disabled(isGeneratingAiRecap || dayTrades.isEmpty)
                 }
                 
                 if let err = aiErrorMessage {

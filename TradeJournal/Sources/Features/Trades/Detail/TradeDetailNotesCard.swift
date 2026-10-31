@@ -21,59 +21,24 @@ public struct TradeDetailNotesCard: View {
         TradeFormCardContainer {
             VStack(alignment: .leading, spacing: 10) {
                 // Header Bar with Mode Toggle
-                HStack(alignment: .center) {
-                    Text("JOURNAL NOTES")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(AppColors.secondaryText)
-                        .tracking(0.5)
-                        .lineLimit(1)
-                    
-                    Spacer()
-                    
-                    if isEditing {
-                        Button(action: {
+                AppSectionHeader(
+                    "Journal notes",
+                    actionTitle: isEditing ? "Done" : (isNoteEmpty ? "Add Note" : "Edit"),
+                    actionIcon: isEditing ? "checkmark" : (isNoteEmpty ? "plus" : "pencil"),
+                    actionColor: isEditing ? AppColors.profit : AppColors.brand,
+                    onAction: {
+                        if isEditing {
                             onSave()
                             withAnimation(.easeInOut(duration: 0.2)) {
                                 isEditing = false
                             }
-                        }) {
-                            HStack(spacing: 4) {
-                                Image(systemName: "checkmark")
-                                    .font(.system(size: 10, weight: .bold))
-                                Text("Done")
-                                    .font(.system(size: 11, weight: .semibold))
-                            }
-                            .foregroundColor(AppColors.profit)
-                            .padding(.horizontal, 9)
-                            .padding(.vertical, 3.5)
-                            .background(AppColors.profit.opacity(0.12))
-                            .clipShape(Capsule())
-                        }
-                        .buttonStyle(ApplePressableButtonStyle())
-                    } else {
-                        Button(action: {
+                        } else {
                             withAnimation(.easeInOut(duration: 0.2)) {
                                 isEditing = true
                             }
-                        }) {
-                            HStack(spacing: 4) {
-                                Image(systemName: isNoteEmpty ? "plus" : "pencil")
-                                    .font(.system(size: 10, weight: .medium))
-                                Text(isNoteEmpty ? "Add Note" : "Edit")
-                                    .font(.system(size: 11, weight: .medium))
-                            }
-                            .foregroundColor(AppColors.secondaryText)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(AppColors.secondaryBackground)
-                            .clipShape(Capsule())
-                            .overlay(
-                                Capsule().stroke(AppColors.border.opacity(0.5), lineWidth: 0.5)
-                            )
                         }
-                        .buttonStyle(ApplePressableButtonStyle())
                     }
-                }
+                )
                 
                 // Content: Rendered Markdown or TextEditor
                 if isEditing {

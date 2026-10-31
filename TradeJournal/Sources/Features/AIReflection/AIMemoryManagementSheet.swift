@@ -154,33 +154,7 @@ public struct AIMemoryManagementSheet: View {
     
     // MARK: - 2. Search Bar
     private var searchBarSection: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass")
-                .foregroundColor(AppColors.secondaryText)
-                .font(.system(size: 13, weight: .medium))
-            
-            TextField("Search title, content, instrument...", text: $searchQuery)
-                .font(AppTypography.caption)
-                .foregroundColor(AppColors.primaryText)
-                .autocorrectionDisabled(true)
-            
-            if !searchQuery.isEmpty {
-                Button(action: { searchQuery = "" }) {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundColor(AppColors.secondaryText)
-                        .font(.system(size: 13))
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(AppColors.secondaryBackground)
-        .cornerRadius(10)
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(AppColors.border.opacity(0.8), lineWidth: 0.8)
-        )
+        AppSearchBar("Search title, content, instrument...", text: $searchQuery)
     }
     
     // MARK: - 3. Category Filter Chips (Standardized with AIReflectionCategoryChips)

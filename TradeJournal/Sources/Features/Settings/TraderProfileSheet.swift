@@ -92,20 +92,16 @@ public struct TraderProfileSheet: View {
     private var styleAndPlaybooksCard: some View {
         AppCard {
             VStack(alignment: .leading, spacing: 14) {
-                sectionHeader(title: "METHODOLOGY & PLAYBOOKS", icon: "chart.line.uptrend.xyaxis")
+                AppSectionHeader("Methodology & playbooks", icon: "chart.line.uptrend.xyaxis")
                 
                 // Trading Style
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Trading Style & Timeframe")
-                        .font(AppTypography.captionBold)
-                        .foregroundColor(AppColors.primaryText)
-                    
-                    TextField("e.g. Day Trader / Scalper (M5, M15, H1)", text: $tradingStyle)
-                        .font(AppTypography.inputText)
-                        .padding(10)
-                        .background(AppColors.secondaryBackground)
-                        .cornerRadius(8)
-                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(AppColors.border.opacity(0.6), lineWidth: 0.8))
+                    AppFormField(
+                        "Trading Style & Timeframe",
+                        text: $tradingStyle,
+                        placeholder: "e.g. Day Trader / Scalper (M5, M15, H1)",
+                        height: 42
+                    )
                     
                     // Quick Preset Chips
                     ScrollView(.horizontal, showsIndicators: false) {
@@ -119,18 +115,12 @@ public struct TraderProfileSheet: View {
                 }
                 
                 // Primary Playbooks
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Primary Playbooks & Technical Setups")
-                        .font(AppTypography.captionBold)
-                        .foregroundColor(AppColors.primaryText)
-                    
-                    TextField("e.g. Price Action, Support & Resistance, Liquidity Sweeps, FVG", text: $primaryPlaybooks)
-                        .font(AppTypography.inputText)
-                        .padding(10)
-                        .background(AppColors.secondaryBackground)
-                        .cornerRadius(8)
-                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(AppColors.border.opacity(0.6), lineWidth: 0.8))
-                }
+                AppFormField(
+                    "Primary Playbooks & Technical Setups",
+                    text: $primaryPlaybooks,
+                    placeholder: "e.g. Price Action, Support & Resistance, Liquidity Sweeps, FVG",
+                    height: 42
+                )
             }
             .padding(.vertical, 2)
         }
@@ -140,20 +130,16 @@ public struct TraderProfileSheet: View {
     private var riskAndObjectivesCard: some View {
         AppCard {
             VStack(alignment: .leading, spacing: 14) {
-                sectionHeader(title: "RISK BUDGET & ACCOUNT TARGETS", icon: "shield")
+                AppSectionHeader("Risk budget & account targets", icon: "shield")
                 
                 // Max Risk per Trade
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Maximum Risk Per Trade")
-                        .font(AppTypography.captionBold)
-                        .foregroundColor(AppColors.primaryText)
-                    
-                    TextField("e.g. 0.5% - 1.0% per trade (Strict Stop Loss)", text: $maxRiskPerTrade)
-                        .font(AppTypography.inputText)
-                        .padding(10)
-                        .background(AppColors.secondaryBackground)
-                        .cornerRadius(8)
-                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(AppColors.border.opacity(0.6), lineWidth: 0.8))
+                    AppFormField(
+                        "Maximum Risk Per Trade",
+                        text: $maxRiskPerTrade,
+                        placeholder: "e.g. 0.5% - 1.0% per trade (Strict Stop Loss)",
+                        height: 42
+                    )
                     
                     // Quick Risk Chips
                     HStack(spacing: 6) {
@@ -165,18 +151,12 @@ public struct TraderProfileSheet: View {
                 }
                 
                 // Account Objective
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Account Objective & Max Drawdown")
-                        .font(AppTypography.captionBold)
-                        .foregroundColor(AppColors.primaryText)
-                    
-                    TextField("e.g. The5ers 100K High Stakes (Max 5% Daily Loss)", text: $accountObjective)
-                        .font(AppTypography.inputText)
-                        .padding(10)
-                        .background(AppColors.secondaryBackground)
-                        .cornerRadius(8)
-                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(AppColors.border.opacity(0.6), lineWidth: 0.8))
-                }
+                AppFormField(
+                    "Account Objective & Max Drawdown",
+                    text: $accountObjective,
+                    placeholder: "e.g. The5ers 100K High Stakes (Max 5% Daily Loss)",
+                    height: 42
+                )
             }
             .padding(.vertical, 2)
         }
@@ -186,21 +166,15 @@ public struct TraderProfileSheet: View {
     private var psychologyAndRulesCard: some View {
         AppCard {
             VStack(alignment: .leading, spacing: 14) {
-                sectionHeader(title: "PSYCHOLOGICAL LEAKS & NON-NEGOTIABLES", icon: "exclamationmark.triangle")
+                AppSectionHeader("Psychological leaks & non-negotiables", icon: "exclamationmark.triangle")
                 
                 // Known Psychological Leaks
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Known Behavioral Leaks & Biases")
-                        .font(AppTypography.captionBold)
-                        .foregroundColor(AppColors.primaryText)
-                    
-                    TextField("e.g. Widening Stop Loss, Premature Profit Taking, FOMO re-entry", text: $knownPsychologicalLeaks)
-                        .font(AppTypography.inputText)
-                        .padding(10)
-                        .background(AppColors.secondaryBackground)
-                        .cornerRadius(8)
-                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(AppColors.border.opacity(0.6), lineWidth: 0.8))
-                }
+                AppFormField(
+                    "Known Behavioral Leaks & Biases",
+                    text: $knownPsychologicalLeaks,
+                    placeholder: "e.g. Widening Stop Loss, Premature Profit Taking, FOMO re-entry",
+                    height: 42
+                )
                 
                 // Custom Memory Directives
                 VStack(alignment: .leading, spacing: 6) {
@@ -242,20 +216,6 @@ public struct TraderProfileSheet: View {
     }
     
     // MARK: - Helper UI Builders
-    private func sectionHeader(title: String, icon: String) -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: icon)
-                .font(.system(size: 11, weight: .bold))
-                .foregroundColor(AppColors.brand)
-            
-            Text(title)
-                .font(AppTypography.cardHeader)
-                .foregroundColor(AppColors.secondaryText)
-            
-            Spacer()
-        }
-    }
-    
     private func presetStyleChip(_ style: String) -> some View {
         AppFilterChip(style, isSelected: tradingStyle == style) {
             tradingStyle = style

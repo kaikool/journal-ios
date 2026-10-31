@@ -27,58 +27,44 @@ public struct TradeDetailRiskCard: View {
     
     public var body: some View {
         TradeFormCardContainer {
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 12) {
                 // Header with Action Button
-                HStack(alignment: .center) {
-                    Text("RISK & RETURN (R:R)")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(AppColors.secondaryText)
-                        .tracking(0.5)
-                        .lineLimit(1)
-                    
-                    Spacer()
-                    
-                    Button(action: onEditTargets) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "shield.lefthalf.filled")
-                                .font(.system(size: 10, weight: .semibold))
-                            Text("Edit Targets")
-                                .font(.system(size: 11, weight: .semibold))
-                        }
-                        .foregroundColor(AppColors.brand)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(AppColors.brand.opacity(0.12))
-                        .clipShape(Capsule())
-                    }
-                    .buttonStyle(ApplePressableButtonStyle())
-                }
+                AppSectionHeader(
+                    "Risk & return (R:R)",
+                    actionTitle: "Edit Targets",
+                    actionIcon: "shield.lefthalf.filled",
+                    onAction: onEditTargets
+                )
                 
                 // 2x2 Grid of Risk Metrics
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 14) {
-                    metricTile(
-                        label: "Stop Loss",
+                LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+                    AppMetricTile(
+                        "Stop Loss",
                         value: trade.stopLoss.map { Formatters.price($0, symbol: trade.symbol) } ?? "Not set",
-                        color: trade.stopLoss != nil ? AppColors.primaryText : AppColors.secondaryText
+                        color: trade.stopLoss != nil ? AppColors.primaryText : AppColors.secondaryText,
+                        alignment: .leading
                     )
                     
-                    metricTile(
-                        label: "Profit Target",
+                    AppMetricTile(
+                        "Profit Target",
                         value: trade.profitTarget.map { Formatters.price($0, symbol: trade.symbol) } ?? "Not set",
-                        color: trade.profitTarget != nil ? AppColors.primaryText : AppColors.secondaryText
+                        color: trade.profitTarget != nil ? AppColors.primaryText : AppColors.secondaryText,
+                        alignment: .leading
                     )
                     
-                    metricTile(
-                        label: "Risk at Stake (1R)",
+                    AppMetricTile(
+                        "Risk at Stake (1R)",
                         value: riskAmount.map { Formatters.formatCurrency($0, currency: reportingCurrency) } ?? "–",
-                        color: riskAmount != nil ? AppColors.loss : AppColors.secondaryText
+                        color: riskAmount != nil ? AppColors.loss : AppColors.secondaryText,
+                        alignment: .leading
                     )
                     
-                    metricTile(
-                        label: "Realized Return",
+                    AppMetricTile(
+                        "Realized Return",
                         value: realizedR.map { String(format: "%+.2f R", ($0 as NSDecimalNumber).doubleValue) } ??
                                (plannedR.map { String(format: "Planned %.2f R", ($0 as NSDecimalNumber).doubleValue) } ?? "–"),
-                        color: (realizedR ?? 0) >= 0 ? AppColors.profit : AppColors.loss
+                        color: (realizedR ?? 0) >= 0 ? AppColors.profit : AppColors.loss,
+                        alignment: .leading
                     )
                 }
                 
@@ -113,26 +99,5 @@ public struct TradeDetailRiskCard: View {
                 }
             }
         }
-    }
-    
-    private func metricTile(
-        label: String,
-        value: String,
-        color: Color = AppColors.primaryText
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(label.uppercased())
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundColor(AppColors.secondaryText)
-                .tracking(0.5)
-                .lineLimit(1)
-            
-            Text(value)
-                .font(AppTypography.bodyBold)
-                .monospacedDigit()
-                .foregroundColor(color)
-                .lineLimit(1)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

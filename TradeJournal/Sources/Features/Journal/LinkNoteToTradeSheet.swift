@@ -71,36 +71,10 @@ public struct LinkNoteToTradeSheet: View {
                 
                 Divider().background(AppColors.border.opacity(0.5))
                 
-                // Search Input (Standard 36pt)
-                HStack(spacing: 8) {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundColor(AppColors.secondaryText)
-                        .font(.system(size: 12))
-                    
-                    TextField("Search trade by symbol", text: $searchText)
-                        .font(AppTypography.body)
-                        .foregroundColor(AppColors.primaryText)
-                    
-                    if !searchText.isEmpty {
-                        Button {
-                            searchText = ""
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundColor(AppColors.secondaryText)
-                                .font(.system(size: 12))
-                        }
-                    }
-                }
-                .padding(.horizontal, 12)
-                .frame(height: 36)
-                .background(AppColors.secondaryBackground)
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .stroke(AppColors.border.opacity(0.5), lineWidth: 0.5)
-                )
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
+                // Search Input (Standard 34pt Capsule)
+                AppSearchBar("Search trade by symbol", text: $searchText)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
                 
                 Divider().background(AppColors.border.opacity(0.5))
                 

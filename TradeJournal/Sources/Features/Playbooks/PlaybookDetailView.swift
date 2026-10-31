@@ -104,65 +104,32 @@ public struct PlaybookDetailView: View {
     
     @ViewBuilder
     private var kpiSummaryCard: some View {
-        AppleCard {
-            HStack(alignment: .top, spacing: 0) {
-                kpiCell(
-                    label: "TRADES",
-                    value: "\(trades.count)",
-                    color: AppColors.primaryText
-                )
-                
-                Divider()
-                    .frame(height: 28)
-                    .background(AppColors.border.opacity(0.35))
-                
-                kpiCell(
-                    label: "WIN RATE",
-                    value: winRate != nil ? "\(Int(winRate! * 100))%" : "–",
-                    color: winRate.map { $0 >= 0.5 ? AppColors.profit : AppColors.loss } ?? AppColors.secondaryText
-                )
-                
-                Divider()
-                    .frame(height: 28)
-                    .background(AppColors.border.opacity(0.35))
-                
-                kpiCell(
-                    label: "NET P&L",
-                    value: Formatters.formatPnL(totalNetPnl, currency: env.currentCurrency),
-                    color: Formatters.pnlColor(totalNetPnl)
-                )
-                
-                Divider()
-                    .frame(height: 28)
-                    .background(AppColors.border.opacity(0.35))
-                
-                kpiCell(
-                    label: "ADHERENCE",
-                    value: summary.rate != nil ? "\(Int(summary.rate! * 100))%" : "–",
-                    color: summary.rate.map { $0 >= 0.7 ? AppColors.profit : AppColors.warning } ?? AppColors.secondaryText
-                )
-            }
-            .padding(.vertical, 2)
-        }
-    }
-    
-    @ViewBuilder
-    private func kpiCell(label: String, value: String, color: Color = AppColors.primaryText) -> some View {
-        VStack(spacing: 3) {
-            Text(label)
-                .font(.system(size: 9.5, weight: .semibold))
-                .foregroundColor(AppColors.secondaryText)
-                .tracking(0.4)
-                .lineLimit(1)
+        HStack(spacing: 8) {
+            AppMetricTile(
+                "Trades",
+                value: "\(trades.count)",
+                color: AppColors.primaryText
+            )
             
-            Text(value)
-                .font(.system(size: 14, weight: .bold))
-                .monospacedDigit()
-                .foregroundColor(color)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
+            AppMetricTile(
+                "Win Rate",
+                value: winRate != nil ? "\(Int(winRate! * 100))%" : "–",
+                color: winRate.map { $0 >= 0.5 ? AppColors.profit : AppColors.loss } ?? AppColors.secondaryText,
+                trend: winRate.map { $0 >= 0.5 ? .up : .down }
+            )
+            
+            AppMetricTile(
+                "Net P&L",
+                value: Formatters.formatPnL(totalNetPnl, currency: env.currentCurrency),
+                color: Formatters.pnlColor(totalNetPnl)
+            )
+            
+            AppMetricTile(
+                "Adherence",
+                value: summary.rate != nil ? "\(Int(summary.rate! * 100))%" : "–",
+                color: summary.rate.map { $0 >= 0.7 ? AppColors.profit : AppColors.warning } ?? AppColors.secondaryText
+            )
         }
-        .frame(maxWidth: .infinity)
     }
     
     // MARK: - Strategy Checklist & Description Card
@@ -171,28 +138,13 @@ public struct PlaybookDetailView: View {
     private var strategyChecklistCard: some View {
         AppleCard {
             VStack(alignment: .leading, spacing: 10) {
-                HStack(alignment: .center) {
-                    Image(systemName: "checklist")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(AppColors.brand)
-                    
-                    Text("STRATEGY CHECKLIST (\(currentPlaybook.rules.count))")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(AppColors.secondaryText)
-                        .tracking(0.5)
-                    
-                    Spacer()
-                    
-                    if currentPlaybook.isDefault {
-                        Text("DEFAULT")
-                            .font(AppTypography.badgeMicro)
-                            .foregroundColor(AppColors.brand)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(AppColors.brand.opacity(0.12))
-                            .clipShape(Capsule())
-                    }
-                }
+                AppSectionHeader(
+                    "Strategy checklist",
+                    icon: "checklist",
+                    badge: "\(currentPlaybook.rules.count)",
+                    trailingBadge: currentPlaybook.isDefault ? "DEFAULT" : nil,
+                    trailingBadgeColor: AppColors.brand
+                )
                 
                 if !currentPlaybook.description.isEmpty {
                     Text(currentPlaybook.description)

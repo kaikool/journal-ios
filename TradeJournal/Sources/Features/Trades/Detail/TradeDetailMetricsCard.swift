@@ -24,107 +24,69 @@ public struct TradeDetailMetricsCard: View {
     
     public var body: some View {
         TradeFormCardContainer {
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 12) {
                 // Header
-                HStack(alignment: .center) {
-                    Text("EXECUTION & FINANCIALS")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(AppColors.secondaryText)
-                        .tracking(0.5)
-                        .lineLimit(1)
-                    
-                    Spacer()
-                    
-                    Image(systemName: "dollarsign.circle")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(AppColors.secondaryText.opacity(0.7))
-                        .frame(width: 24, height: 24)
-                        .background(AppColors.secondaryBackground.opacity(0.5))
-                        .clipShape(Circle())
-                }
+                AppSectionHeader("Execution & financials", icon: "dollarsign.circle")
                 
                 // 2x3 Grid of Metrics
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 14) {
-                    metricTile(
-                        label: "Gross P&L",
+                LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+                    AppMetricTile(
+                        "Gross P&L",
                         value: Formatters.formatPnL(trade.grossPnl, currency: reportingCurrency),
-                        color: Formatters.pnlColor(trade.grossPnl)
+                        color: Formatters.pnlColor(trade.grossPnl),
+                        alignment: .leading
                     )
                     
-                    metricTile(
-                        label: "Fees & Commissions",
+                    AppMetricTile(
+                        "Fees & Commissions",
                         value: Formatters.formatCurrency(trade.fees, currency: reportingCurrency),
-                        color: trade.fees > 0 ? AppColors.warning : AppColors.primaryText
+                        color: trade.fees > 0 ? AppColors.warning : AppColors.primaryText,
+                        alignment: .leading
                     )
                     
-                    metricTile(
-                        label: "Net Realized P&L",
+                    AppMetricTile(
+                        "Net Realized P&L",
                         value: Formatters.formatPnL(trade.netPnl, currency: reportingCurrency),
-                        color: Formatters.pnlColor(trade.netPnl)
+                        color: Formatters.pnlColor(trade.netPnl),
+                        alignment: .leading
                     )
                     
                     if trade.swapAmount != 0 {
-                        metricTile(
-                            label: "Overnight Swap",
+                        AppMetricTile(
+                            "Overnight Swap",
                             value: Formatters.formatPnL(trade.swapAmount, currency: reportingCurrency),
-                            color: trade.swapAmount < 0 ? AppColors.warning : AppColors.profit
+                            color: trade.swapAmount < 0 ? AppColors.warning : AppColors.profit,
+                            alignment: .leading
                         )
                     } else if let ticket = ticketDisplay {
-                        metricTile(
-                            label: "Order Ticket",
-                            value: "#\(ticket)"
+                        AppMetricTile(
+                            "Order Ticket",
+                            value: "#\(ticket)",
+                            alignment: .leading
                         )
                     } else {
-                        metricTile(
-                            label: "Duration",
-                            value: durationString ?? "–"
+                        AppMetricTile(
+                            "Duration",
+                            value: durationString ?? "–",
+                            alignment: .leading
                         )
                     }
                     
-                    metricTile(
-                        label: "Avg Entry Price",
+                    AppMetricTile(
+                        "Avg Entry Price",
                         value: Formatters.price(trade.avgEntry, symbol: trade.symbol),
-                        subtext: Formatters.formatDateTime(trade.openedAt, timeZone: timeZone)
+                        subtitle: Formatters.formatDateTime(trade.openedAt, timeZone: timeZone),
+                        alignment: .leading
                     )
                     
-                    metricTile(
-                        label: "Avg Exit Price",
+                    AppMetricTile(
+                        "Avg Exit Price",
                         value: trade.avgExit.map { Formatters.price($0, symbol: trade.symbol) } ?? "Open",
-                        subtext: trade.closedAt.map { Formatters.formatDateTime($0, timeZone: timeZone) }
+                        subtitle: trade.closedAt.map { Formatters.formatDateTime($0, timeZone: timeZone) },
+                        alignment: .leading
                     )
                 }
             }
         }
-    }
-    
-    private func metricTile(
-        label: String,
-        value: String,
-        color: Color = AppColors.primaryText,
-        subtext: String? = nil
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(label.uppercased())
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundColor(AppColors.secondaryText)
-                .tracking(0.5)
-                .lineLimit(1)
-                .minimumScaleFactor(0.85)
-            
-            Text(value)
-                .font(AppTypography.bodyBold)
-                .monospacedDigit()
-                .foregroundColor(color)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-            
-            if let sub = subtext, !sub.isEmpty {
-                Text(sub)
-                    .font(.system(size: 11))
-                    .foregroundColor(AppColors.secondaryText)
-                    .lineLimit(1)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

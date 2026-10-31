@@ -147,33 +147,7 @@ public struct AIResearchWorkspaceSheet: View {
     
     // MARK: - 2. Search Bar
     private var searchBarSection: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass")
-                .foregroundColor(AppColors.secondaryText)
-                .font(.system(size: 13, weight: .medium))
-            
-            TextField("Search projects, hypotheses, instruments...", text: $searchQuery)
-                .font(AppTypography.caption)
-                .foregroundColor(AppColors.primaryText)
-                .autocorrectionDisabled(true)
-            
-            if !searchQuery.isEmpty {
-                Button(action: { searchQuery = "" }) {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundColor(AppColors.secondaryText)
-                        .font(.system(size: 13))
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(AppColors.secondaryBackground)
-        .cornerRadius(10)
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(AppColors.border.opacity(0.8), lineWidth: 0.8)
-        )
+        AppSearchBar("Search projects, hypotheses, instruments...", text: $searchQuery)
     }
     
     // MARK: - 3. Status Filter Chips (Standardized with AIReflectionCategoryChips)
@@ -421,18 +395,19 @@ private struct AIResearchProjectCard: View {
     
     private var cardMetricsView: some View {
         HStack(spacing: 8) {
-            metricCell(
-                title: "WIN RATE",
+            AppMetricTile(
+                "Win Rate",
                 value: project.winRate.map { "\(String(format: "%.1f", $0))%" } ?? "--",
-                color: (project.winRate ?? 0) >= 50.0 ? AppColors.profit : AppColors.primaryText
+                color: (project.winRate ?? 0) >= 50.0 ? AppColors.profit : AppColors.primaryText,
+                trend: project.winRate.map { $0 >= 50.0 ? .up : .down }
             )
-            metricCell(
-                title: "PROFIT FACTOR",
+            AppMetricTile(
+                "Profit Factor",
                 value: project.profitFactor.map { String(format: "%.2f", $0) } ?? "--",
                 color: (project.profitFactor ?? 0) >= 1.5 ? AppColors.profit : AppColors.primaryText
             )
-            metricCell(
-                title: "CHECKPOINTS",
+            AppMetricTile(
+                "Checkpoints",
                 value: "\(project.checkpoints.count)",
                 color: AppColors.primaryText
             )
@@ -541,21 +516,6 @@ private struct AIResearchProjectCard: View {
         .padding(.top, 2)
     }
     
-    private func metricCell(title: String, value: String, color: Color) -> some View {
-        VStack(spacing: 2) {
-            Text(title)
-                .font(AppTypography.microCaption)
-                .foregroundColor(AppColors.secondaryText)
-            Text(value)
-                .font(AppTypography.numberSmall)
-                .foregroundColor(color)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 6)
-        .background(AppColors.secondaryBackground)
-        .cornerRadius(6)
-    }
-    
     private func statusBadge(_ st: AIResearchProjectStatus) -> some View {
         switch st {
         case .active:
@@ -631,73 +591,51 @@ private struct NewResearchProjectSheet: View {
                 VStack(spacing: 14) {
                     AppCard {
                         VStack(alignment: .leading, spacing: 10) {
-                            Text("TITLE & WORKING HYPOTHESIS")
-                                .font(AppTypography.cardHeader)
-                                .foregroundColor(AppColors.secondaryText)
+                            AppSectionHeader("Title & working hypothesis")
                             
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Project Title")
-                                    .font(AppTypography.captionBold)
-                                    .foregroundColor(AppColors.primaryText)
-                                
-                                TextField("e.g. H4 Breaker Block + M15 FVG", text: $title)
-                                    .font(AppTypography.inputText)
-                                    .padding(10)
-                                    .background(AppColors.secondaryBackground)
-                                    .cornerRadius(8)
-                                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(AppColors.border.opacity(0.6), lineWidth: 0.8))
-                            }
+                            AppFormField(
+                                "Project Title",
+                                text: $title,
+                                placeholder: "e.g. H4 Breaker Block + M15 FVG",
+                                height: 42
+                            )
                             
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("Hypothesis Description")
-                                    .font(AppTypography.captionBold)
-                                    .foregroundColor(AppColors.primaryText)
+                                    .font(AppTypography.caption)
+                                    .foregroundColor(AppColors.secondaryText)
                                 
                                 TextEditor(text: $hypothesis)
                                     .font(AppTypography.inputText)
                                     .frame(minHeight: 100)
                                     .padding(8)
-                                    .background(AppColors.secondaryBackground)
-                                    .cornerRadius(8)
-                                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(AppColors.border.opacity(0.6), lineWidth: 0.8))
+                                    .background(AppColors.secondaryBackground.opacity(0.65))
+                                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                            .stroke(AppColors.border.opacity(0.45), lineWidth: 0.6)
+                                    )
                             }
                         }
                     }
                     
                     AppCard {
                         VStack(alignment: .leading, spacing: 10) {
-                            Text("SCOPE & SAMPLE CRITERIA")
-                                .font(AppTypography.cardHeader)
-                                .foregroundColor(AppColors.secondaryText)
+                            AppSectionHeader("Scope & sample criteria")
                             
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Target Symbols")
-                                    .font(AppTypography.captionBold)
-                                    .foregroundColor(AppColors.primaryText)
-                                
-                                TextField("e.g. XAUUSD, EURUSD", text: $symbols)
-                                    .font(AppTypography.inputText)
-                                    .padding(10)
-                                    .background(AppColors.secondaryBackground)
-                                    .cornerRadius(8)
-                                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(AppColors.border.opacity(0.6), lineWidth: 0.8))
-                                    .autocapitalization(.allCharacters)
-                                    .disableAutocorrection(true)
-                            }
+                            AppFormField(
+                                "Target Symbols",
+                                text: $symbols,
+                                placeholder: "e.g. XAUUSD, EURUSD",
+                                height: 42
+                            )
                             
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Timeframes")
-                                    .font(AppTypography.captionBold)
-                                    .foregroundColor(AppColors.primaryText)
-                                
-                                TextField("e.g. 15m, 4h", text: $timeframes)
-                                    .font(AppTypography.inputText)
-                                    .padding(10)
-                                    .background(AppColors.secondaryBackground)
-                                    .cornerRadius(8)
-                                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(AppColors.border.opacity(0.6), lineWidth: 0.8))
-                                    .disableAutocorrection(true)
-                            }
+                            AppFormField(
+                                "Timeframes",
+                                text: $timeframes,
+                                placeholder: "e.g. 15m, 4h",
+                                height: 42
+                            )
                             
                             HStack {
                                 Text("Minimum Sample Size:")
@@ -777,10 +715,8 @@ private struct AddResearchCheckpointSheet: View {
             ScrollView {
                 VStack(spacing: 14) {
                     AppCard {
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text("SAMPLE & PERFORMANCE METRICS")
-                                .font(AppTypography.cardHeader)
-                                .foregroundColor(AppColors.secondaryText)
+                        VStack(alignment: .leading, spacing: 12) {
+                            AppSectionHeader("Sample & performance metrics")
                             
                             HStack {
                                 Text("Trades Sampled:")
@@ -795,46 +731,38 @@ private struct AddResearchCheckpointSheet: View {
                             }
                             
                             HStack(spacing: 10) {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text("Win Rate %")
-                                        .font(AppTypography.captionBold)
-                                        .foregroundColor(AppColors.primaryText)
-                                    TextField("e.g. 62.5", text: $winRateText)
-                                        .font(AppTypography.inputText)
-                                        .keyboardType(.decimalPad)
-                                        .padding(10)
-                                        .background(AppColors.secondaryBackground)
-                                        .cornerRadius(8)
-                                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(AppColors.border.opacity(0.6), lineWidth: 0.8))
-                                }
+                                AppNumericField(
+                                    "Win Rate %",
+                                    text: $winRateText,
+                                    placeholder: "e.g. 62.5",
+                                    unit: "%",
+                                    height: 38
+                                )
                                 
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text("Profit Factor")
-                                        .font(AppTypography.captionBold)
-                                        .foregroundColor(AppColors.primaryText)
-                                    TextField("e.g. 1.85", text: $profitFactorText)
-                                        .font(AppTypography.inputText)
-                                        .keyboardType(.decimalPad)
-                                        .padding(10)
-                                        .background(AppColors.secondaryBackground)
-                                        .cornerRadius(8)
-                                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(AppColors.border.opacity(0.6), lineWidth: 0.8))
-                                }
+                                AppNumericField(
+                                    "Profit Factor",
+                                    text: $profitFactorText,
+                                    placeholder: "e.g. 1.85",
+                                    height: 38
+                                )
                             }
                         }
                     }
                     
                     AppCard {
                         VStack(alignment: .leading, spacing: 10) {
-                            Text("OBSERVATIONS & QUALITATIVE NOTES")
-                                .font(AppTypography.cardHeader)
-                                .foregroundColor(AppColors.secondaryText)
+                            AppSectionHeader("Observations & qualitative notes")
                             
                             TextEditor(text: $notes)
                                 .font(AppTypography.inputText)
                                 .frame(minHeight: 100)
                                 .padding(8)
-                                .background(AppColors.secondaryBackground)
+                                .background(AppColors.secondaryBackground.opacity(0.65))
+                                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                        .stroke(AppColors.border.opacity(0.45), lineWidth: 0.6)
+                                )
                                 .cornerRadius(8)
                                 .overlay(RoundedRectangle(cornerRadius: 8).stroke(AppColors.border.opacity(0.6), lineWidth: 0.8))
                         }

@@ -210,30 +210,9 @@ public struct DashboardCustomizerSheet: View {
     private var visibilityTabView: some View {
         VStack(spacing: 0) {
             // Search bar
-            HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 14))
-                    .foregroundColor(AppColors.secondaryText)
-                
-                TextField("Search cards...", text: $searchQuery)
-                    .font(AppTypography.inputText)
-                
-                if !searchQuery.isEmpty {
-                    Button {
-                        searchQuery = ""
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 14))
-                            .foregroundColor(AppColors.secondaryText)
-                    }
-                }
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(AppColors.cardBackground)
-            .cornerRadius(8)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
+            AppSearchBar("Search cards...", text: $searchQuery)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
             
             // Quick Action Bar: Visible Count & Show all / Restore
             HStack {

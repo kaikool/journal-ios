@@ -37,32 +37,12 @@ public struct TradeNumericInputBlock: View {
     }
     
     public var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Text(title)
-                    .font(AppTypography.caption)
-                    .foregroundColor(AppColors.secondaryText)
-                Spacer()
-                if let sub = subtitle {
-                    Text(sub)
-                        .font(.system(size: 9))
-                        .foregroundColor(AppColors.mutedText)
-                        .lineLimit(1)
-                }
-            }
-            
-            TextField(placeholder, text: $text)
-                .keyboardType(.decimalPad)
-                .font(AppTypography.number(14, weight: .semibold))
-                .padding(.horizontal, 10)
-                .frame(height: 38)
-                .background(AppColors.secondaryBackground)
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(AppColors.border.opacity(0.8), lineWidth: 0.5)
-                )
-        }
+        AppNumericField(
+            title,
+            text: $text,
+            placeholder: placeholder,
+            subtitle: subtitle
+        )
     }
 }
 
@@ -81,23 +61,13 @@ public struct TradeSymbolSelector: View {
     
     public var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Symbol")
-                    .font(AppTypography.caption)
-                    .foregroundColor(AppColors.secondaryText)
-                
-                TextField("Enter symbol (e.g. XAUUSD, EURUSD)...", text: $symbol)
-                    .textInputAutocapitalization(.characters)
-                    .font(.system(size: 15, weight: .semibold))
-                    .padding(.horizontal, 12)
-                    .frame(height: 42)
-                    .background(AppColors.secondaryBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .stroke(AppColors.border.opacity(0.8), lineWidth: 0.5)
-                    )
-            }
+            AppFormField(
+                "Symbol",
+                text: $symbol,
+                placeholder: "Enter symbol (e.g. XAUUSD, EURUSD)...",
+                icon: "chart.line.uptrend.xyaxis",
+                height: 42
+            )
             
             // Quick Instrument Selector Chips
             VStack(alignment: .leading, spacing: 6) {

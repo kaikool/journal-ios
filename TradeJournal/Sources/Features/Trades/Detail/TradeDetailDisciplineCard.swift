@@ -47,19 +47,7 @@ public struct TradeDetailDisciplineCard: View {
         TradeFormCardContainer {
             VStack(alignment: .leading, spacing: 14) {
                 // Header
-                HStack(alignment: .center) {
-                    Text("DISCIPLINE & PLAYBOOK")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(AppColors.secondaryText)
-                        .tracking(0.5)
-                    Spacer()
-                    Image(systemName: "book.pages")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(AppColors.secondaryText.opacity(0.7))
-                        .frame(width: 24, height: 24)
-                        .background(AppColors.secondaryBackground.opacity(0.5))
-                        .clipShape(Circle())
-                }
+                AppSectionHeader("Discipline & playbook", icon: "book.pages")
                 
                 // Execution Rating
                 HStack {

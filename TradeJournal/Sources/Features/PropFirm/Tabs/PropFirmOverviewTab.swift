@@ -38,23 +38,11 @@ extension PropFirmLedgerView {
             // Summary Hero Card
             cardContainer {
                 VStack(spacing: 12) {
-                    HStack {
-                        Text("NET PROP CASH")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundColor(AppColors.secondaryText)
-                            .tracking(0.5)
-                        Spacer()
-                        if let roi = summary.roi {
-                            Text(String(format: "ROI %+.1f%%", roi * 100))
-                                .font(AppTypography.captionBold)
-                                .monospacedDigit()
-                                .foregroundColor(roi >= 0 ? AppColors.profit : AppColors.loss)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 3)
-                                .background(roi >= 0 ? AppColors.profit.opacity(0.12) : AppColors.loss.opacity(0.12))
-                                .clipShape(Capsule())
-                        }
-                    }
+                    AppSectionHeader(
+                        "Net prop cash",
+                        trailingBadge: summary.roi.map { String(format: "ROI %+.1f%%", $0 * 100) },
+                        trailingBadgeColor: (summary.roi ?? 0) >= 0 ? AppColors.profit : AppColors.loss
+                    )
                     
                     HStack(alignment: .firstTextBaseline) {
                         let netDecimal = Decimal(summary.netMinor) / 100
@@ -70,31 +58,31 @@ extension PropFirmLedgerView {
                     Divider().background(AppColors.border.opacity(0.5))
                     
                     // Spending vs Received Grid
-                    Grid(alignment: .leading, horizontalSpacing: 20, verticalSpacing: 12) {
-                        GridRow {
-                            subMetricBlock(
-                                title: "Gross spent",
-                                value: Formatters.formatCurrency(Decimal(summary.spentMinor) / 100, currency: displayCurrency),
-                                color: AppColors.loss
-                            )
-                            subMetricBlock(
-                                title: "Refunded",
-                                value: Formatters.formatCurrency(Decimal(summary.refundsMinor) / 100, currency: displayCurrency),
-                                color: AppColors.profit
-                            )
-                        }
-                        GridRow {
-                            subMetricBlock(
-                                title: "Net spend",
-                                value: Formatters.formatCurrency(Decimal(summary.netSpendMinor) / 100, currency: displayCurrency),
-                                color: AppColors.primaryText
-                            )
-                            subMetricBlock(
-                                title: "Payouts received",
-                                value: Formatters.formatCurrency(Decimal(summary.receivedMinor) / 100, currency: displayCurrency),
-                                color: AppColors.profit
-                            )
-                        }
+                    LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+                        AppMetricTile(
+                            "Gross spent",
+                            value: Formatters.formatCurrency(Decimal(summary.spentMinor) / 100, currency: displayCurrency),
+                            color: AppColors.loss,
+                            alignment: .leading
+                        )
+                        AppMetricTile(
+                            "Refunded",
+                            value: Formatters.formatCurrency(Decimal(summary.refundsMinor) / 100, currency: displayCurrency),
+                            color: AppColors.profit,
+                            alignment: .leading
+                        )
+                        AppMetricTile(
+                            "Net spend",
+                            value: Formatters.formatCurrency(Decimal(summary.netSpendMinor) / 100, currency: displayCurrency),
+                            color: AppColors.primaryText,
+                            alignment: .leading
+                        )
+                        AppMetricTile(
+                            "Payouts received",
+                            value: Formatters.formatCurrency(Decimal(summary.receivedMinor) / 100, currency: displayCurrency),
+                            color: AppColors.profit,
+                            alignment: .leading
+                        )
                     }
                 }
             }
@@ -287,21 +275,4 @@ extension PropFirmLedgerView {
             )
             .shadow(color: isActive ? AppColors.brand.opacity(0.08) : Color.black.opacity(0.04), radius: isActive ? 10 : 8, x: 0, y: 2)
     }
-    
-    internal func subMetricBlock(title: String, value: String, color: Color) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(title.uppercased())
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundColor(AppColors.secondaryText)
-                .tracking(0.5)
-                .lineLimit(1)
-            Text(value)
-                .font(AppTypography.bodyBold)
-                .monospacedDigit()
-                .foregroundColor(color)
-                .lineLimit(1)
-                .minimumScaleFactor(0.85)
-        }
-    }
-    
 }

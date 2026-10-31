@@ -146,27 +146,19 @@ public struct DayDetailSheet: View {
         let pnlColor = isProfit ? AppColors.profit : AppColors.loss
         let tradeCount = stats?.trades ?? trades.count
         
-        AppCard {
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    AppCardHeader("Net P&L")
-                    AppMonetaryText(
-                        Formatters.formatPnL(netPnl, currency: env.currentCurrency),
-                        isPrivate: env.isPrivacyModeEnabled,
-                        font: AppTypography.financialNumber(size: 22, weight: .bold),
-                        color: pnlColor
-                    )
-                }
-                
-                Spacer()
-                
-                VStack(alignment: .trailing, spacing: 2) {
-                    AppCardHeader("Trades")
-                    Text("\(tradeCount)")
-                        .font(AppTypography.financialNumber(size: 22, weight: .bold))
-                        .foregroundColor(AppColors.primaryText)
-                }
-            }
+        HStack(spacing: 10) {
+            AppMetricTile(
+                "Net P&L",
+                value: Formatters.formatPnL(netPnl, currency: env.currentCurrency),
+                color: pnlColor,
+                trend: isProfit ? .up : .down
+            )
+            
+            AppMetricTile(
+                "Trades",
+                value: "\(tradeCount)",
+                color: AppColors.primaryText
+            )
         }
     }
     
@@ -174,8 +166,8 @@ public struct DayDetailSheet: View {
     private var noteCard: some View {
         AppCard {
             VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    AppCardHeader("Daily Note")
+                HStack(alignment: .center) {
+                    AppSectionHeader("Daily note")
                     Spacer()
                     if !noteContent.isEmpty || rating > 0 {
                         Button {
@@ -239,7 +231,7 @@ public struct DayDetailSheet: View {
     private var tradesCard: some View {
         AppCard {
             VStack(alignment: .leading, spacing: 10) {
-                AppCardHeader("Trades (\(trades.count))")
+                AppSectionHeader("Trades", badge: "\(trades.count)")
                 
                 if trades.isEmpty {
                     AppEmptyState(

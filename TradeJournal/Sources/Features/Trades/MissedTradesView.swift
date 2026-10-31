@@ -107,47 +107,22 @@ public struct MissedTradesView: View {
             }
             
             // Pricing grid (Entry, Stop, Target, R:R)
-            HStack(spacing: 16) {
+            HStack(spacing: 8) {
                 if let entry = trade.entry {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Entry").font(AppTypography.caption).foregroundColor(AppColors.secondaryText)
-                        Text(Formatters.price(entry))
-                            .font(AppTypography.captionBold)
-                            .monospacedDigit()
-                            .foregroundColor(AppColors.primaryText)
-                    }
+                    AppMetricTile("Entry", value: Formatters.price(entry), color: AppColors.primaryText, minHeight: 46)
                 }
                 if let stop = trade.stop {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Stop").font(AppTypography.caption).foregroundColor(AppColors.secondaryText)
-                        Text(Formatters.price(stop))
-                            .font(AppTypography.captionBold)
-                            .monospacedDigit()
-                            .foregroundColor(AppColors.loss)
-                    }
+                    AppMetricTile("Stop", value: Formatters.price(stop), color: AppColors.loss, minHeight: 46)
                 }
                 if let target = trade.target {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Target").font(AppTypography.caption).foregroundColor(AppColors.secondaryText)
-                        Text(Formatters.price(target))
-                            .font(AppTypography.captionBold)
-                            .monospacedDigit()
-                            .foregroundColor(AppColors.profit)
-                    }
+                    AppMetricTile("Target", value: Formatters.price(target), color: AppColors.profit, minHeight: 46)
                 }
                 if let entry = trade.entry, let stop = trade.stop, let target = trade.target {
                     let risk = abs(entry - stop)
                     let reward = abs(target - entry)
                     if risk > 0 {
                         let rr = (reward as NSDecimalNumber).doubleValue / (risk as NSDecimalNumber).doubleValue
-                        Spacer()
-                        VStack(alignment: .trailing, spacing: 2) {
-                            Text("R : R").font(AppTypography.caption).foregroundColor(AppColors.secondaryText)
-                            Text(String(format: "1 : %.1f", rr))
-                                .font(AppTypography.captionBold)
-                                .monospacedDigit()
-                                .foregroundColor(AppColors.brand)
-                        }
+                        AppMetricTile("R : R", value: String(format: "1 : %.1f", rr), color: AppColors.brand, minHeight: 46)
                     }
                 }
             }
@@ -307,46 +282,16 @@ public struct AddMissedTradeSheet: View {
     private var opportunityCard: some View {
         TradeFormCardContainer {
             VStack(alignment: .leading, spacing: 14) {
-                Text("OPPORTUNITY")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(AppColors.secondaryText)
-                    .tracking(0.5)
+                AppSectionHeader("Opportunity")
                 
                 // Symbol Input
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Symbol")
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.secondaryText)
-                    
-                    HStack(spacing: 8) {
-                        Image(systemName: "magnifyingglass")
-                            .font(.system(size: 13))
-                            .foregroundColor(AppColors.secondaryText)
-                        
-                        TextField("e.g. EURUSD, XAUUSD, NQ...", text: $symbol)
-                            .textInputAutocapitalization(.characters)
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(AppColors.primaryText)
-                        
-                        if !symbol.isEmpty {
-                            Button {
-                                symbol = ""
-                            } label: {
-                                Image(systemName: "xmark.circle.fill")
-                                    .foregroundColor(AppColors.secondaryText)
-                                    .font(.system(size: 12))
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 12)
-                    .frame(height: 40)
-                    .background(AppColors.secondaryBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .stroke(AppColors.border.opacity(0.8), lineWidth: 0.5)
-                    )
-                }
+                AppFormField(
+                    "Symbol",
+                    text: $symbol,
+                    placeholder: "e.g. EURUSD, XAUUSD, NQ...",
+                    icon: "chart.line.uptrend.xyaxis",
+                    height: 42
+                )
                 
                 // Quick Symbol Chips
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -454,26 +399,11 @@ public struct AddMissedTradeSheet: View {
     private var plannedPricesCard: some View {
         TradeFormCardContainer {
             VStack(alignment: .leading, spacing: 14) {
-                HStack {
-                    Text("PLANNED TARGETS (R:R)")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(AppColors.secondaryText)
-                        .tracking(0.5)
-                    
-                    Spacer()
-                    
-                    if let info = plannedRRInfo {
-                        HStack(spacing: 4) {
-                            Text("1 : \(String(format: "%.2f", info.ratio)) R")
-                                .font(AppTypography.number(11, weight: .bold))
-                                .foregroundColor(info.isValidDirection ? AppColors.brand : .orange)
-                        }
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(info.isValidDirection ? AppColors.brand.opacity(0.12) : Color.orange.opacity(0.12))
-                        .clipShape(Capsule())
-                    }
-                }
+                AppSectionHeader(
+                    "Planned targets (R:R)",
+                    trailingBadge: plannedRRInfo.map { "1 : \(String(format: "%.2f", $0.ratio)) R" },
+                    trailingBadgeColor: (plannedRRInfo?.isValidDirection ?? true) ? AppColors.brand : .orange
+                )
                 
                 // 3 numeric input boxes
                 VStack(spacing: 10) {
@@ -517,10 +447,7 @@ public struct AddMissedTradeSheet: View {
     private var playbookCard: some View {
         TradeFormCardContainer {
             VStack(alignment: .leading, spacing: 10) {
-                Text("PLAYBOOK")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(AppColors.secondaryText)
-                    .tracking(0.5)
+                AppSectionHeader("Playbook", icon: "book.pages")
                 
                 let playbookOptions = [""] + dataStore.playbooks.map { $0.id }
                 AppDropdownField(
@@ -540,10 +467,7 @@ public struct AddMissedTradeSheet: View {
     private var notesCard: some View {
         TradeFormCardContainer {
             VStack(alignment: .leading, spacing: 10) {
-                Text("POST-MORTEM & NOTES")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(AppColors.secondaryText)
-                    .tracking(0.5)
+                AppSectionHeader("Post-mortem & notes", icon: "note.text")
                 
                 Text("Why did you miss this setup? Describe your thesis, entry trigger, hesitation, or psychological factor.")
                     .font(AppTypography.caption)

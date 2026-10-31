@@ -51,51 +51,21 @@ public struct NewPlaybookSheet: View {
     private var detailsCard: some View {
         AppleCard {
             VStack(alignment: .leading, spacing: 14) {
-                HStack(spacing: 6) {
-                    Image(systemName: "pencil.and.outline")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(AppColors.brand)
-                    Text("STRATEGY IDENTITY")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundColor(AppColors.secondaryText)
-                        .tracking(0.5)
-                }
+                AppSectionHeader("Strategy identity", icon: "pencil.and.outline")
                 
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Playbook Name")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(AppColors.secondaryText)
-                    
-                    TextField("e.g. London Breakout, A+ Trend Reversal", text: $title)
-                        .font(AppTypography.body)
-                        .foregroundColor(AppColors.primaryText)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 11)
-                        .background(AppColors.background)
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .stroke(AppColors.border.opacity(0.5), lineWidth: 0.8)
-                        )
-                }
+                AppFormField(
+                    "Playbook Name",
+                    text: $title,
+                    placeholder: "e.g. London Breakout, A+ Trend Reversal",
+                    height: 42
+                )
                 
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Strategy Description")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(AppColors.secondaryText)
-                    
-                    TextField("Setup conditions, context, or entry guidelines", text: $description)
-                        .font(AppTypography.body)
-                        .foregroundColor(AppColors.primaryText)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 11)
-                        .background(AppColors.background)
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .stroke(AppColors.border.opacity(0.5), lineWidth: 0.8)
-                        )
-                }
+                AppFormField(
+                    "Strategy Description",
+                    text: $description,
+                    placeholder: "Setup conditions, context, or entry guidelines",
+                    height: 42
+                )
                 
                 // Default Playbook Checkbox
                 Button {
@@ -137,27 +107,13 @@ public struct NewPlaybookSheet: View {
     private var checklistCard: some View {
         AppleCard {
             VStack(alignment: .leading, spacing: 14) {
-                HStack {
-                    HStack(spacing: 6) {
-                        Image(systemName: "checklist")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(AppColors.brand)
-                        Text("CHECKLIST RULES (\(validRulesCount))")
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundColor(AppColors.secondaryText)
-                            .tracking(0.5)
-                    }
-                    
-                    Spacer()
-                    
-                    Text("Dynamic Entry")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(AppColors.brand)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 2)
-                        .background(AppColors.brand.opacity(0.1))
-                        .clipShape(Capsule())
-                }
+                AppSectionHeader(
+                    "Checklist rules",
+                    icon: "checklist",
+                    badge: "\(validRulesCount)",
+                    trailingBadge: "Dynamic Entry",
+                    trailingBadgeColor: AppColors.brand
+                )
                 
                 Text("Type condition in rule 1. Rule 2 will automatically appear once rule 1 has content.")
                     .font(AppTypography.caption)
@@ -341,51 +297,21 @@ public struct EditPlaybookSheet: View {
     private var detailsCard: some View {
         AppleCard {
             VStack(alignment: .leading, spacing: 14) {
-                HStack(spacing: 6) {
-                    Image(systemName: "pencil.and.outline")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(AppColors.brand)
-                    Text("STRATEGY IDENTITY")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundColor(AppColors.secondaryText)
-                        .tracking(0.5)
-                }
+                AppSectionHeader("Strategy identity", icon: "pencil.and.outline")
                 
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Playbook Name")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(AppColors.secondaryText)
-                    
-                    TextField("Playbook name", text: $title)
-                        .font(AppTypography.body)
-                        .foregroundColor(AppColors.primaryText)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 11)
-                        .background(AppColors.background)
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .stroke(AppColors.border.opacity(0.5), lineWidth: 0.8)
-                        )
-                }
+                AppFormField(
+                    "Playbook Name",
+                    text: $title,
+                    placeholder: "Playbook name",
+                    height: 42
+                )
                 
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Strategy Description")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(AppColors.secondaryText)
-                    
-                    TextField("Setup conditions or notes", text: $description)
-                        .font(AppTypography.body)
-                        .foregroundColor(AppColors.primaryText)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 11)
-                        .background(AppColors.background)
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .stroke(AppColors.border.opacity(0.5), lineWidth: 0.8)
-                        )
-                }
+                AppFormField(
+                    "Strategy Description",
+                    text: $description,
+                    placeholder: "Setup conditions or notes",
+                    height: 42
+                )
             }
         }
     }
@@ -393,27 +319,13 @@ public struct EditPlaybookSheet: View {
     private var checklistCard: some View {
         AppleCard {
             VStack(alignment: .leading, spacing: 14) {
-                HStack {
-                    HStack(spacing: 6) {
-                        Image(systemName: "checklist")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(AppColors.brand)
-                        Text("CHECKLIST RULES (\(validRulesCount))")
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundColor(AppColors.secondaryText)
-                            .tracking(0.5)
-                    }
-                    
-                    Spacer()
-                    
-                    Text("Dynamic Entry")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(AppColors.brand)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 2)
-                        .background(AppColors.brand.opacity(0.1))
-                        .clipShape(Capsule())
-                }
+                AppSectionHeader(
+                    "Checklist rules",
+                    icon: "checklist",
+                    badge: "\(validRulesCount)",
+                    trailingBadge: "Dynamic Entry",
+                    trailingBadgeColor: AppColors.brand
+                )
                 
                 Text("Edit conditions. Line additions happen automatically as you type in the bottom line.")
                     .font(AppTypography.caption)
