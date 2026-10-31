@@ -34,6 +34,13 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Validate Swift Syntax & Design System Adherence
+        run: |
+          echo "==> Running Swift syntax validation..."
+          node check_swift.js
+          echo "==> Running Design System & Typography validation..."
+          node scripts/check_design_system.js
+
       - name: Select Xcode Version
         run: |
           echo "==> Available Xcode versions:"
