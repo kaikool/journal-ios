@@ -96,25 +96,6 @@ public final class AppEnvironment: ObservableObject {
             appTheme = theme
         }
     }
-    
-    // MARK: - Gesture-based Tab Navigation
-    public func navigateToNextTab() {
-        if let next = selectedTab.nextPrimaryTab {
-            NativeHaptics.selection()
-            withAnimation(.spring(response: 0.30, dampingFraction: 0.82)) {
-                selectedTab = next
-            }
-        }
-    }
-    
-    public func navigateToPreviousTab() {
-        if let prev = selectedTab.previousPrimaryTab {
-            NativeHaptics.selection()
-            withAnimation(.spring(response: 0.30, dampingFraction: 0.82)) {
-                selectedTab = prev
-            }
-        }
-    }
 }
 
 /// 13 navigation sections mapped 1:1 from `source-repo/apps/web/src/components/shell.tsx`

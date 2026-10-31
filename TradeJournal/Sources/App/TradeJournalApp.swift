@@ -53,48 +53,6 @@ public struct RootTabView: View {
                 bottomNavigationBar
             }
             .background(AppColors.background.ignoresSafeArea())
-            .simultaneousGesture(
-                DragGesture(minimumDistance: 32, coordinateSpace: .local)
-                    .onEnded { value in
-                        guard !env.isDrawerOpen, env.selectedTab.isPrimaryTab else { return }
-                        let h = value.translation.width
-                        let v = value.translation.height
-                        // Must be a distinct horizontal swipe (at least 1.6x horizontal over vertical, and > 45pt)
-                        guard abs(h) > abs(v) * 1.6, abs(h) > 45 else { return }
-                        
-                        if h < -45 {
-                            // Swipe Left: Next Tab (Dashboard -> Calendar -> Journal -> Trades -> Reports)
-                            env.navigateToNextTab()
-                        } else if h > 45 {
-                            // Swipe Right: Previous Tab (Reports -> Trades -> Journal -> Calendar -> Dashboard)
-                            if env.selectedTab.previousPrimaryTab != nil {
-                                env.navigateToPreviousTab()
-                            } else {
-                                // On Dashboard (first tab), swiping right smoothly pulls open Drawer
-                                NativeHaptics.lightImpact()
-                                withAnimation(.spring(response: 0.30, dampingFraction: 0.82)) {
-                                    env.isDrawerOpen = true
-                                }
-                            }
-                        }
-                    }
-            )
-            
-            // Dedicated Right Edge Swipe Trigger (Active on primary tabs to advance)
-            HStack {
-                Spacer()
-                RightEdgeSwipeTrigger {
-                    NativeHaptics.selection()
-                    if let next = env.selectedTab.nextPrimaryTab {
-                        env.selectedTab = next
-                    } else {
-                        withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
-                            env.isDrawerOpen = true
-                        }
-                    }
-                }
-            }
-            .allowsHitTesting(!env.isDrawerOpen && env.selectedTab.isPrimaryTab)
             
             // Isolated Interactive Drawer & Scrim Overlay Component (Handles Real-time edge drag to open & drag to close)
             InteractiveDrawerOverlay()
@@ -259,54 +217,45 @@ public struct RootTabView: View {
     }
 }
 
-/// Isolated Interactive Drawer & Scrim Overlay with Real-time Edge-Drag Tracking.
-/// Encapsulating drag offset in this view prevents RootTabView and the active screen
-/// from re-rendering their bodies 120 times/second during touch drag interactions.
+/// Isolated Interactive Drawer & Scrim Overlay with Glitch-Free Edge-Drag Tracking.
 private struct InteractiveDrawerOverlay: View {
     @EnvironmentObject private var env: AppEnvironment
     @State private var dragOffset: CGFloat = 0
-    @State private var isDragging: Bool = false
     
     private let drawerWidth: CGFloat = 300
     
-    private var drawerXOffset: CGFloat {
-        if isDragging {
-            if env.isDrawerOpen {
-                return min(0, max(-drawerWidth, dragOffset))
-            } else {
-                return min(0, -drawerWidth + max(0, dragOffset))
-            }
+    // Unified offset: strictly continuous from finger position to target state
+    private var drawerOffset: CGFloat {
+        if env.isDrawerOpen {
+            // Open: dragOffset is <= 0 (user swiping left to close)
+            return min(0, max(-drawerWidth, dragOffset))
         } else {
-            return env.isDrawerOpen ? 0 : -drawerWidth
+            // Closed: dragOffset is >= 0 (user dragging right to open)
+            return min(0, -drawerWidth + max(0, dragOffset))
         }
     }
     
     private var scrimOpacity: Double {
-        if isDragging {
-            let progress: CGFloat
-            if env.isDrawerOpen {
-                progress = max(0, min(1, (drawerWidth + dragOffset) / drawerWidth))
-            } else {
-                progress = max(0, min(1, dragOffset / drawerWidth))
-            }
+        if env.isDrawerOpen {
+            let progress = max(0, min(1, (drawerWidth + dragOffset) / drawerWidth))
             return Double(progress) * 0.45
         } else {
-            return env.isDrawerOpen ? 0.45 : 0.0
+            let progress = max(0, min(1, dragOffset / drawerWidth))
+            return Double(progress) * 0.45
         }
     }
     
     var body: some View {
         ZStack(alignment: .leading) {
-            // Scrim backdrop - persistent to eliminate insertion/removal layout hitches
+            // Scrim backdrop
             Color.black
                 .opacity(scrimOpacity)
                 .ignoresSafeArea()
-                .animation(isDragging ? nil : .spring(response: 0.30, dampingFraction: 0.82), value: env.isDrawerOpen)
                 .contentShape(Rectangle())
-                .allowsHitTesting(env.isDrawerOpen || isDragging)
+                .allowsHitTesting(env.isDrawerOpen || dragOffset > 0)
                 .onTapGesture {
                     NativeHaptics.lightImpact()
-                    withAnimation(.spring(response: 0.30, dampingFraction: 0.82)) {
+                    withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
                         env.isDrawerOpen = false
                         dragOffset = 0
                     }
@@ -315,84 +264,67 @@ private struct InteractiveDrawerOverlay: View {
             // Drawer View with hardware-accelerated translation
             NavigationDrawerView()
                 .frame(width: drawerWidth)
-                .offset(x: drawerXOffset)
-                .animation(isDragging ? nil : .spring(response: 0.30, dampingFraction: 0.82), value: env.isDrawerOpen)
+                .offset(x: drawerOffset)
                 .shadow(
-                    color: Color.black.opacity(env.isDrawerOpen || isDragging ? 0.22 : 0),
+                    color: Color.black.opacity((env.isDrawerOpen || dragOffset > 0) ? 0.22 : 0),
                     radius: 14,
                     x: 4,
                     y: 0
                 )
                 .ignoresSafeArea(.container, edges: .vertical)
             
-            // Left Edge Swipe Sensing Zone (Only active when Drawer is closed)
+            // Left Edge Swipe Sensing Strip (Only active when Drawer is closed)
             if !env.isDrawerOpen {
                 Color.clear
-                    .frame(width: 28)
+                    .frame(width: 24)
                     .contentShape(Rectangle())
                     .gesture(
-                        DragGesture(minimumDistance: 10, coordinateSpace: .local)
+                        DragGesture(minimumDistance: 12, coordinateSpace: .local)
                             .onChanged { value in
                                 let h = value.translation.width
                                 let v = value.translation.height
-                                guard abs(h) > abs(v) * 1.15, h > 6 else { return }
-                                if !isDragging {
-                                    isDragging = true
-                                    NativeHaptics.lightImpact()
-                                }
+                                guard h > 0, abs(h) > abs(v) * 1.15 else { return }
                                 dragOffset = min(drawerWidth, max(0, h))
                             }
                             .onEnded { value in
-                                guard isDragging else { return }
-                                isDragging = false
                                 let h = value.translation.width
                                 let velocity = value.predictedEndTranslation.width - value.translation.width
-                                if h > drawerWidth * 0.28 || velocity > 180 {
+                                let shouldOpen = h > drawerWidth * 0.25 || velocity > 180
+                                if shouldOpen {
                                     NativeHaptics.lightImpact()
-                                    withAnimation(.spring(response: 0.30, dampingFraction: 0.82)) {
-                                        env.isDrawerOpen = true
-                                        dragOffset = 0
-                                    }
-                                } else {
-                                    withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
-                                        env.isDrawerOpen = false
-                                        dragOffset = 0
-                                    }
+                                }
+                                withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
+                                    env.isDrawerOpen = shouldOpen
+                                    dragOffset = 0
                                 }
                             }
                     )
                     .ignoresSafeArea()
             }
         }
+        // Swipe to Close gesture when drawer is open
         .gesture(
-            (env.isDrawerOpen || (isDragging && dragOffset < 0)) ?
+            env.isDrawerOpen ?
             DragGesture(minimumDistance: 10, coordinateSpace: .local)
                 .onChanged { value in
-                    guard env.isDrawerOpen else { return }
-                    if !isDragging && value.translation.width < -6 {
-                        isDragging = true
-                    }
-                    if isDragging {
-                        dragOffset = min(0, max(-drawerWidth, value.translation.width))
-                    }
+                    let h = value.translation.width
+                    let v = value.translation.height
+                    guard abs(h) > abs(v) * 1.1 else { return }
+                    dragOffset = min(0, max(-drawerWidth, h))
                 }
                 .onEnded { value in
-                    guard isDragging else { return }
-                    isDragging = false
+                    let h = value.translation.width
                     let velocity = value.predictedEndTranslation.width - value.translation.width
-                    if dragOffset < -drawerWidth * 0.24 || velocity < -150 {
+                    let shouldClose = h < -drawerWidth * 0.22 || velocity < -160
+                    if shouldClose {
                         NativeHaptics.lightImpact()
-                        withAnimation(.spring(response: 0.30, dampingFraction: 0.82)) {
-                            env.isDrawerOpen = false
-                            dragOffset = 0
-                        }
-                    } else {
-                        withAnimation(.spring(response: 0.30, dampingFraction: 0.82)) {
-                            dragOffset = 0
-                        }
+                    }
+                    withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
+                        env.isDrawerOpen = !shouldClose
+                        dragOffset = 0
                     }
                 } : nil
         )
-        .allowsHitTesting(env.isDrawerOpen || isDragging || !env.isDrawerOpen)
+        .allowsHitTesting(env.isDrawerOpen || dragOffset > 0 || !env.isDrawerOpen)
     }
 }
