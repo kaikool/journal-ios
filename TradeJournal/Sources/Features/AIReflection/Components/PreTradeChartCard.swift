@@ -111,28 +111,10 @@ public struct PreTradeChartCard: View {
             
             HStack(spacing: 8) {
                 // Attach custom chart image icon button
-                Button(action: onAttachPhoto) {
-                    Image(systemName: "photo.badge.plus")
-                        .font(AppTypography.actionPill)
-                        .foregroundColor(AppColors.secondaryText)
-                        .frame(width: 28, height: 28)
-                        .background(AppColors.secondaryBackground.opacity(0.8))
-                        .clipShape(Circle())
-                }
-                .buttonStyle(PlainButtonStyle())
-                .accessibilityLabel("Attach chart image")
+                ModalCircleButton(icon: "photo.badge.plus", label: "Attach chart image", action: onAttachPhoto)
                 
                 // Enlarge full-screen lightbox icon button
-                Button(action: onEnlarge) {
-                    Image(systemName: "arrow.up.left.and.arrow.down.right")
-                        .font(AppTypography.captionBold)
-                        .foregroundColor(AppColors.brand)
-                        .frame(width: 28, height: 28)
-                        .background(AppColors.brand.opacity(0.12))
-                        .clipShape(Circle())
-                }
-                .buttonStyle(PlainButtonStyle())
-                .accessibilityLabel("Enlarge chart")
+                ModalCircleButton(icon: "arrow.up.left.and.arrow.down.right", color: AppColors.brand, label: "Enlarge chart", action: onEnlarge)
             }
         }
         .padding(.horizontal, 2)

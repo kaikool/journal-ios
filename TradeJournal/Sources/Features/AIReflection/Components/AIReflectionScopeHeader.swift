@@ -28,14 +28,7 @@ public struct AIReflectionScopeHeader: View {
             
             Spacer()
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 9)
-        .background(AppColors.surface)
-        .cornerRadius(10)
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(AppColors.border.opacity(0.8), lineWidth: 0.8)
-        )
+        .appCardStyle(cornerRadius: 10)
     }
 }
 
@@ -126,13 +119,7 @@ public struct AIReflectionIntelligenceCards: View {
                     }
                     Spacer()
                 }
-                .padding(10)
-                .background(AppColors.cardBackground)
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10)
-                        .stroke(AppColors.border, lineWidth: 1)
-                )
+                .appCardStyle(cornerRadius: 10)
             }
             .buttonStyle(.plain)
             
@@ -158,13 +145,7 @@ public struct AIReflectionIntelligenceCards: View {
                     }
                     Spacer()
                 }
-                .padding(10)
-                .background(AppColors.cardBackground)
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10)
-                        .stroke(AppColors.border, lineWidth: 1)
-                )
+                .appCardStyle(cornerRadius: 10)
             }
             .buttonStyle(.plain)
         }

@@ -233,8 +233,7 @@ public struct TradeReplayLandscapeChartView: View {
             if bars.isEmpty {
                 LoadingView("Loading Candles…", size: 48)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(AppColors.cardBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .appCardStyle(cornerRadius: 12)
             } else {
                 CandleChartView(
                     visibleBars: frame.visibleBars,
@@ -258,7 +257,7 @@ public struct TradeReplayLandscapeChartView: View {
     
     // MARK: - 4. Bottom Center Replay Playback Controller Capsule
     private var bottomPlayerBar: some View {
-        HStack(spacing: 10) {
+        AppFloatingBar {
             // Reset to beginning
             Button {
                 NativeHaptics.lightImpact()
@@ -378,14 +377,5 @@ public struct TradeReplayLandscapeChartView: View {
                 height: 28
             )
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 5)
-        .background(AppColors.cardBackground.opacity(0.94))
-        .clipShape(Capsule())
-        .overlay(
-            Capsule()
-                .stroke(AppColors.border.opacity(0.8), lineWidth: 0.8)
-        )
-        .shadow(color: Color.black.opacity(0.12), radius: 6, x: 0, y: 3)
     }
 }

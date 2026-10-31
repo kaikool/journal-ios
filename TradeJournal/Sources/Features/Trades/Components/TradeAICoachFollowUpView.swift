@@ -123,16 +123,7 @@ public struct TradeAICoachBottomFloatingInput: View {
                     .animation(.easeInOut(duration: 0.15), value: hasQueryText)
                 }
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .frame(minHeight: 50)
-            .background(AppColors.cardBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .stroke(AppColors.border.opacity(0.65), lineWidth: 1.0)
-            )
-            .shadow(color: Color.black.opacity(0.22), radius: 10, x: 0, y: 4)
+            .appCardStyle(cornerRadius: 24, padding: 8)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)

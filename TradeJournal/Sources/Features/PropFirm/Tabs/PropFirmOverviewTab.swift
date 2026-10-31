@@ -265,14 +265,11 @@ extension PropFirmLedgerView {
     
     internal func cardContainer<Content: View>(isActive: Bool = false, @ViewBuilder content: () -> Content) -> some View {
         content()
-            .padding(16)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(AppColors.cardBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .appCardStyle(cornerRadius: 16)
             .overlay(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(isActive ? AppColors.brand.opacity(0.4) : AppColors.border.opacity(0.5), lineWidth: isActive ? 1.0 : 0.5)
+                    .stroke(isActive ? AppColors.brand.opacity(0.4) : Color.clear, lineWidth: 1.0)
             )
-            .shadow(color: isActive ? AppColors.brand.opacity(0.08) : Color.black.opacity(0.04), radius: isActive ? 10 : 8, x: 0, y: 2)
+            .shadow(color: isActive ? AppColors.brand.opacity(0.08) : Color.clear, radius: 10, x: 0, y: 2)
     }
 }

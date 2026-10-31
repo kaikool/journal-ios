@@ -111,16 +111,7 @@ extension DashboardView {
     // MARK: - Apple HIG Reusable Card Container & Header
     
     internal func cardContainer<Content: View>(@ViewBuilder content: () -> Content) -> some View {
-        content()
-            .padding(16)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(AppColors.cardBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(AppColors.border.opacity(0.6), lineWidth: 0.5)
-            )
-            .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 2)
+        content().appCardStyle(cornerRadius: 16)
     }
     
     internal func statHeader(_ title: String, icon: String, hint: String) -> some View {

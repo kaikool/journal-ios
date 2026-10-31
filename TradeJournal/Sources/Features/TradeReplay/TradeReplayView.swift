@@ -186,34 +186,16 @@ public struct TradeReplayView: View {
             
             if isLoadingCandles && bars.isEmpty {
                 LoadingView("Fetching candles for \(trade.symbol) (\(selectedResolution == .d1 ? "1D" : selectedResolution.rawValue))", size: 64)
-                .frame(height: 270)
-                .frame(maxWidth: .infinity)
-                .background(AppColors.cardBackground)
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .stroke(AppColors.border.opacity(0.6), lineWidth: 1)
-                )
+                    .frame(height: 270)
+                    .appCardStyle(cornerRadius: 16)
             } else if bars.isEmpty {
-                VStack(spacing: 10) {
-                    Image(systemName: "chart.xyaxis.line")
-                        .font(AppTypography.iconHero)
-                        .foregroundColor(AppColors.secondaryText.opacity(0.6))
-                    Text("No Candle Data Available")
-                        .font(AppTypography.headline)
-                        .foregroundColor(AppColors.primaryText)
-                    Text("Market data could not be retrieved for \(trade.symbol)")
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.secondaryText)
-                }
-                .frame(height: 270)
-                .frame(maxWidth: .infinity)
-                .background(AppColors.cardBackground)
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .stroke(AppColors.border.opacity(0.6), lineWidth: 1)
+                AppEmptyState(
+                    icon: "chart.xyaxis.line",
+                    title: "No Candle Data Available",
+                    message: "Market data could not be retrieved for \(trade.symbol)"
                 )
+                .frame(height: 270)
+                .appCardStyle(cornerRadius: 16)
             } else {
                 ZStack(alignment: .topTrailing) {
                     CandleChartView(

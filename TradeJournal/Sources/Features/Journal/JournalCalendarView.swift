@@ -295,13 +295,7 @@ public struct JournalCalendarView: View {
             
             Spacer()
         }
-        .padding(10)
-        .background(AppColors.cardBackground)
-        .cornerRadius(8)
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(AppColors.border, lineWidth: 1)
-        )
+        .appCardStyle(cornerRadius: 8)
     }
     
     // MARK: - Calendar Card (8-Column Grid matching calendar-pnl.tsx)

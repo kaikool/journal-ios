@@ -238,13 +238,7 @@ public struct NoteAIInquirySheet: View {
                     
                     JournalNotesMarkdownView(text: msg.content)
                 }
-                .padding(12)
-                .background(AppColors.cardBackground)
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .stroke(AppColors.border.opacity(0.5), lineWidth: 0.5)
-                )
+                .appCardStyle(cornerRadius: 12)
                 
                 Spacer(minLength: 24)
             }

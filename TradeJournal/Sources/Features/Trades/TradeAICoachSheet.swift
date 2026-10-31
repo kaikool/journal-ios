@@ -804,13 +804,7 @@ public struct TradeAICoachSheet: View {
                 preTradeParamRow(label: "Date time:", value: formatDateTime(plan.timestamp))
             }
         }
-        .padding(10)
-        .background(AppColors.cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(AppColors.border.opacity(0.4), lineWidth: 0.8)
-        )
+        .appCardStyle(cornerRadius: 10, padding: 10)
     }
     
     private func preTradeParamRow(label: String, value: String) -> some View {

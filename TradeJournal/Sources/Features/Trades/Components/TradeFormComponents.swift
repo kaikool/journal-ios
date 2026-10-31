@@ -9,16 +9,9 @@ public struct TradeFormCardContainer<Content: View>: View {
     }
     
     public var body: some View {
-        content()
-            .padding(16)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(AppColors.cardBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(AppColors.border.opacity(0.5), lineWidth: 0.5)
-            )
-            .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 2)
+        AppCard {
+            content()
+        }
     }
 }
 

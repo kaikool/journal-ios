@@ -27,13 +27,16 @@ public typealias AppleCard = AppCard
 
 public struct AppCardModifier: ViewModifier {
     public var cornerRadius: CGFloat
-    public init(cornerRadius: CGFloat = 16) {
+    public var padding: CGFloat
+    
+    public init(cornerRadius: CGFloat = 16, padding: CGFloat = 16) {
         self.cornerRadius = cornerRadius
+        self.padding = padding
     }
     
     public func body(content: Content) -> some View {
         content
-            .padding(16)
+            .padding(padding)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(AppColors.cardBackground)
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
@@ -46,8 +49,32 @@ public struct AppCardModifier: ViewModifier {
 }
 
 extension View {
-    public func appCardStyle(cornerRadius: CGFloat = 16) -> some View {
-        modifier(AppCardModifier(cornerRadius: cornerRadius))
+    public func appCardStyle(cornerRadius: CGFloat = 16, padding: CGFloat = 16) -> some View {
+        modifier(AppCardModifier(cornerRadius: cornerRadius, padding: padding))
+    }
+}
+
+/// Standardized Floating HUD bar container for landscape charts and floating controls
+public struct AppFloatingBar<Content: View>: View {
+    private let content: Content
+    
+    public init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+    
+    public var body: some View {
+        HStack(spacing: 8) {
+            content
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 5)
+        .background(AppColors.cardBackground.opacity(0.94))
+        .clipShape(Capsule())
+        .overlay(
+            Capsule()
+                .stroke(AppColors.border.opacity(0.8), lineWidth: 0.8)
+        )
+        .shadow(color: Color.black.opacity(0.12), radius: 6, x: 0, y: 3)
     }
 }
 

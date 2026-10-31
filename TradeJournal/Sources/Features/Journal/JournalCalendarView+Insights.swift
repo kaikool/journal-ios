@@ -508,14 +508,7 @@ extension JournalCalendarView {
                                                 .font(AppTypography.caption)
                                                 .foregroundColor(AppColors.secondaryText)
                                         }
-                                        .padding(.horizontal, 8)
-                                        .padding(.vertical, 4)
-                                        .background(AppColors.cardBackground)
-                                        .cornerRadius(6)
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 6)
-                                                .stroke(AppColors.border, lineWidth: 1)
-                                        )
+                                        .appCardStyle(cornerRadius: 6)
                                     }
                                 }
                             }

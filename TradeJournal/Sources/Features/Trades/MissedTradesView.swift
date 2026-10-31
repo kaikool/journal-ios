@@ -131,15 +131,7 @@ public struct MissedTradesView: View {
                 JournalNotesMarkdownView(text: trade.notes)
             }
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(AppColors.cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(AppColors.border.opacity(0.5), lineWidth: 0.5)
-        )
-        .shadow(color: Color.black.opacity(0.03), radius: 6, x: 0, y: 1.5)
+        .appCardStyle(cornerRadius: 14, padding: 14)
         .contextMenu {
             Button {
                 editingTrade = trade

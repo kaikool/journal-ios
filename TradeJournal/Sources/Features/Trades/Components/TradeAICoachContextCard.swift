@@ -104,14 +104,7 @@ public struct TradeAICoachCompliancePill: View {
                     .font(AppTypography.captionMicro)
                     .foregroundColor(AppColors.secondaryText)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 7)
-            .background(AppColors.surface)
-            .cornerRadius(8)
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(AppColors.border.opacity(0.7), lineWidth: 0.8)
-            )
+            .appCardStyle(cornerRadius: 8, padding: 8)
         }
         .buttonStyle(.plain)
     }

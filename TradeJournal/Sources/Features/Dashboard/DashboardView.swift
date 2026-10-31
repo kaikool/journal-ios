@@ -468,13 +468,7 @@ public struct DashboardView: View {
                 }
             }
         }
-        .padding(10)
-        .background(AppColors.cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(AppColors.brand.opacity(0.35), lineWidth: 1)
-        )
+        .appCardStyle(cornerRadius: 12)
         .transition(.move(edge: .top).combined(with: .opacity))
     }
     
@@ -526,15 +520,8 @@ public struct DashboardView: View {
                         .font(AppTypography.badgeStandard)
                         .foregroundColor(AppColors.secondaryText)
                 }
-                .padding(.horizontal, 14)
-                .frame(maxWidth: .infinity)
+                .appCardStyle(cornerRadius: 8)
                 .frame(height: 38)
-                .background(AppColors.cardBackground)
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(AppColors.border, lineWidth: 1)
-                )
             }
             
             // Customize button (Sheet)
@@ -550,15 +537,8 @@ public struct DashboardView: View {
                         .lineLimit(1)
                 }
                 .foregroundColor(AppColors.primaryText)
-                .padding(.horizontal, 14)
-                .frame(maxWidth: .infinity)
+                .appCardStyle(cornerRadius: 8)
                 .frame(height: 38)
-                .background(AppColors.cardBackground)
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(AppColors.border, lineWidth: 1)
-                )
             }
             .buttonStyle(ApplePressableButtonStyle())
         }

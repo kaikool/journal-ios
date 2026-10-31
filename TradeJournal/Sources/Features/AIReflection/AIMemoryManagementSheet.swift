@@ -140,14 +140,7 @@ public struct AIMemoryManagementSheet: View {
                 .buttonStyle(.plain)
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 9)
-        .background(AppColors.surface)
-        .cornerRadius(10)
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(AppColors.border.opacity(0.8), lineWidth: 0.8)
-        )
+        .appCardStyle(cornerRadius: 10)
     }
     
     // MARK: - 2. Search Bar

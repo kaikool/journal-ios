@@ -143,15 +143,7 @@ public struct TradesListView: View {
     
     private func cardContainer<Content: View>(@ViewBuilder content: () -> Content) -> some View {
         content()
-            .padding(14)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(AppColors.cardBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(AppColors.border.opacity(0.5), lineWidth: 0.5)
-            )
-            .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 2)
+            .appCardStyle(cornerRadius: 16)
     }
     
     @ViewBuilder
@@ -374,15 +366,7 @@ private struct TradeTerminalRow: View {
             middleLineView
             bottomLineView
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(AppColors.cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(AppColors.border.opacity(0.5), lineWidth: 0.5)
-        )
-        .shadow(color: Color.black.opacity(0.03), radius: 6, x: 0, y: 1.5)
+        .appCardStyle(cornerRadius: 16)
     }
     
     @ViewBuilder

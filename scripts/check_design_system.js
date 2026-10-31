@@ -109,28 +109,41 @@ files.forEach(f => {
 
     // --- STANDARD 01: BUTTONS & ACTIONS ---
     // Prohibits raw button styling with inline backgrounds in Feature views.
-    if (isFeature && (trimmed.includes('.background(AppColors.brand') || trimmed.includes('.background(AppColors.loss')) && (trimmed.includes('Button') || lines[Math.max(0, idx - 4)].includes('Button'))) {
-      violations.push({
-        std: 'Standard 01: Buttons & Actions',
-        rule: 'PROHIBIT_INLINE_BUTTON_STYLE',
-        file: rel,
-        line: lineNum,
-        code: trimmed,
-        fix: 'Use AppButton, AppPrimaryButton, AppSecondaryButton, or ModalToolbarButtons'
-      });
+    if (isFeature && (trimmed.startsWith('Button(') || trimmed.startsWith('Button {') || trimmed.includes('Button('))) {
+      for (let i = 1; i <= 6; i++) {
+        if (idx + i < lines.length) {
+          const next = lines[idx + i].trim();
+          if ((next.includes('.background(AppColors.brand') || next.includes('.background(AppColors.loss')) && !next.includes('AppPrimaryButton')) {
+            violations.push({
+              std: 'Standard 01: Buttons & Actions',
+              rule: 'PROHIBIT_INLINE_BUTTON_STYLE',
+              file: rel,
+              line: lineNum,
+              code: trimmed + ' -> ' + next,
+              fix: 'Use AppButton, AppPrimaryButton, or AppActionPill'
+            });
+            break;
+          }
+        }
+      }
     }
 
     // --- STANDARD 02: BADGES & TAGS ---
     // Prohibits ad-hoc capsule badge wrappers in Feature views.
-    if (isFeature && trimmed.includes('.clipShape(Capsule())') && lines[Math.max(0, idx - 1)].includes('.background(') && (lines[Math.max(0, idx - 2)].includes('Text(') || lines[Math.max(0, idx - 3)].includes('Text('))) {
-      violations.push({
-        std: 'Standard 02: Badges & Tags',
-        rule: 'PROHIBIT_ADHOC_BADGE',
-        file: rel,
-        line: lineNum,
-        code: trimmed,
-        fix: 'Use AppBadge or AppleMenuChip'
-      });
+    if (isFeature && trimmed.includes('clipShape(Capsule())') && !trimmed.includes('AppBadge') && !trimmed.includes('AppFilterChip') && !trimmed.includes('AppActionPill')) {
+      for (let i = 1; i <= 3; i++) {
+        if (idx - i >= 0 && lines[idx - i].includes('.background(')) {
+          violations.push({
+            std: 'Standard 02: Badges & Tags',
+            rule: 'PROHIBIT_ADHOC_BADGE',
+            file: rel,
+            line: lineNum,
+            code: trimmed,
+            fix: 'Use AppBadge or AppleMenuChip'
+          });
+          break;
+        }
+      }
     }
 
     // --- STANDARD 03: TABLIST & SEGMENTED CONTROLS ---
@@ -187,16 +200,23 @@ files.forEach(f => {
 
     // --- STANDARD 07: CARDS & HEADERS ---
     // Prohibits manual card background + rounded rectangle container styling in Feature views.
-    if (isFeature && (trimmed.includes('background(AppColors.cardBackground)') || trimmed.includes('background(AppColors.surface)')) &&
-        (trimmed.includes('clipShape(RoundedRectangle') || trimmed.includes('cornerRadius('))) {
-      violations.push({
-        std: 'Standard 07: Cards & Headers',
-        rule: 'PROHIBIT_ADHOC_CARD',
-        file: rel,
-        line: lineNum,
-        code: trimmed,
-        fix: 'Use AppCard and AppSectionHeader'
-      });
+    if (isFeature && (trimmed.includes('.background(AppColors.cardBackground)') || trimmed.includes('.background(AppColors.surface)'))) {
+      for (let i = 1; i <= 4; i++) {
+        if (idx + i < lines.length) {
+          const next = lines[idx + i].trim();
+          if (next.includes('clipShape(RoundedRectangle') || next.includes('cornerRadius(')) {
+            violations.push({
+              std: 'Standard 07: Cards & Headers',
+              rule: 'PROHIBIT_ADHOC_CARD',
+              file: rel,
+              line: lineNum,
+              code: trimmed + ' -> ' + next,
+              fix: 'Use AppCard or .appCardStyle() from DesignSystem'
+            });
+            break;
+          }
+        }
+      }
     }
 
     // --- STANDARD 08: METRIC TILES & FINANCIAL DISPLAY ---

@@ -200,14 +200,7 @@ public struct AccountsManagerView: View {
                     AppBadge("Select All", variant: .brand)
                 }
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-            .background(AppColors.cardBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(isAllSelected ? AppColors.brand.opacity(0.4) : AppColors.border.opacity(0.5), lineWidth: 0.8)
-            )
+            .appCardStyle(cornerRadius: 12)
         }
         .buttonStyle(ApplePressableButtonStyle())
         .padding(.horizontal, 16)

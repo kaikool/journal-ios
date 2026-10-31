@@ -27,15 +27,7 @@ public struct SettingsCard<Content: View>: View {
             VStack(alignment: .leading, spacing: 10) {
                 content
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 11)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(AppColors.cardBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(AppColors.border.opacity(0.4), lineWidth: 0.5)
-            )
+            .appCardStyle(cornerRadius: 12, padding: 14)
             
             if let f = footer, !f.isEmpty {
                 Text(f)
