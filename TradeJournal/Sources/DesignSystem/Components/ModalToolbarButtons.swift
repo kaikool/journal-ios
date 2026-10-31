@@ -72,11 +72,18 @@ public struct ModalBackButton: View {
     }
 }
 
-// MARK: - Circular Delete Button (trash)
+// MARK: - Destructive Action / Delete Button (trash or pill)
 public struct ModalDeleteButton: View {
+    let title: String?
     let action: () -> Void
     
-    public init(action: @escaping () -> Void) {
+    public init(_ title: String? = nil, action: @escaping () -> Void) {
+        self.title = title
+        self.action = action
+    }
+    
+    public init(title: String, action: @escaping () -> Void) {
+        self.title = title
         self.action = action
     }
     
@@ -85,22 +92,40 @@ public struct ModalDeleteButton: View {
             NativeHaptics.lightImpact()
             action()
         } label: {
-            ZStack {
-                Circle()
-                    .fill(AppColors.loss.opacity(0.12))
-                    .frame(width: 32, height: 32)
-                    .overlay(
-                        Circle()
-                            .stroke(AppColors.loss.opacity(0.3), lineWidth: 0.6)
-                    )
-                Image(systemName: "trash")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(AppColors.loss)
+            if let title = title {
+                HStack(spacing: 5) {
+                    Image(systemName: "trash")
+                        .font(.system(size: 11, weight: .bold))
+                    Text(title)
+                        .font(.system(size: 12.5, weight: .semibold, design: .rounded))
+                }
+                .foregroundColor(AppColors.loss)
+                .padding(.horizontal, 12)
+                .frame(height: 32)
+                .background(AppColors.loss.opacity(0.12))
+                .clipShape(Capsule())
+                .overlay(
+                    Capsule()
+                        .stroke(AppColors.loss.opacity(0.3), lineWidth: 0.8)
+                )
+            } else {
+                ZStack {
+                    Circle()
+                        .fill(AppColors.loss.opacity(0.12))
+                        .frame(width: 32, height: 32)
+                        .overlay(
+                            Circle()
+                                .stroke(AppColors.loss.opacity(0.3), lineWidth: 0.6)
+                        )
+                    Image(systemName: "trash")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(AppColors.loss)
+                }
+                .contentShape(Circle())
             }
-            .contentShape(Circle())
         }
         .buttonStyle(ApplePressableButtonStyle())
-        .accessibilityLabel("Delete")
+        .accessibilityLabel(title ?? "Delete")
     }
 }
 
