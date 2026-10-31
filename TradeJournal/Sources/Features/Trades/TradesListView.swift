@@ -18,6 +18,7 @@ public struct TradesListView: View {
     @State private var searchText: String = ""
     @State private var statusFilter: TradeStatusFilter = .all
     @State private var selectedTrade: Trade? = nil
+    @State private var tradeForAICoach: Trade? = nil
     
     public init() {}
     
@@ -111,6 +112,12 @@ public struct TradesListView: View {
         .sheet(item: $selectedTrade) { trade in
             TradeDetailView(trade: trade, isModal: true)
                 .id(trade.key)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(28)
+        }
+        .sheet(item: $tradeForAICoach) { trade in
+            TradeAICoachSheet(trade: trade)
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(28)
@@ -337,15 +344,31 @@ public struct TradesListView: View {
         } else {
             LazyVStack(spacing: 10) {
                 ForEach(filteredTrades) { trade in
-                    Button {
-                        selectedTrade = trade
-                    } label: {
+                    SwipeableTradeRow(
+                        onDelete: {
+                            withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
+                                dataStore.deleteTrade(key: trade.key)
+                            }
+                        },
+                        onAICoach: {
+                            tradeForAICoach = trade
+                        },
+                        onTap: {
+                            selectedTrade = trade
+                        }
+                    ) {
                         TradeTerminalRow(trade: trade)
                     }
-                    .buttonStyle(ApplePressableButtonStyle())
                     .contextMenu {
+                        Button {
+                            tradeForAICoach = trade
+                        } label: {
+                            Label("AI Coach Audit", systemImage: "sparkles")
+                        }
                         Button(role: .destructive) {
-                            dataStore.deleteTrade(key: trade.key)
+                            withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
+                                dataStore.deleteTrade(key: trade.key)
+                            }
                         } label: {
                             Label("Delete Trade", systemImage: "trash")
                         }

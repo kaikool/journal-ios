@@ -431,6 +431,27 @@ public struct JournalCalendarView: View {
                 .padding(.top, 2)
             }
         }
+        .gesture(
+            DragGesture(minimumDistance: 25, coordinateSpace: .local)
+                .onEnded { value in
+                    let h = value.translation.width
+                    let v = value.translation.height
+                    guard abs(h) > abs(v) * 1.3 else { return }
+                    if h < -30 {
+                        // Swipe Left: Next Month
+                        NativeHaptics.selection()
+                        withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
+                            changeMonth(by: 1)
+                        }
+                    } else if h > 30 {
+                        // Swipe Right: Previous Month
+                        NativeHaptics.selection()
+                        withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
+                            changeMonth(by: -1)
+                        }
+                    }
+                }
+        )
     }
     
     // MARK: - Week Row View (7 Days + 1 Week Total Cell)

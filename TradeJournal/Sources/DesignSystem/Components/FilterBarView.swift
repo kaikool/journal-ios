@@ -279,9 +279,7 @@ public struct FilterBarView<Actions: View>: View {
             ForEach(JournalTimeRange.selectableCases) { range in
                 Button {
                     if selectedRange != range {
-                        #if os(iOS)
-                        UISelectionFeedbackGenerator().selectionChanged()
-                        #endif
+                        NativeHaptics.selection()
                         withAnimation(.spring(response: 0.28, dampingFraction: 0.72)) {
                             selectedRange = range
                         }
@@ -307,6 +305,28 @@ public struct FilterBarView<Actions: View>: View {
         .background(AppColors.secondaryBackground.opacity(colorScheme == .dark ? 0.5 : 0.7))
         .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
         .fixedSize(horizontal: true, vertical: false)
+        .gesture(
+            DragGesture(minimumDistance: 15, coordinateSpace: .local)
+                .onEnded { value in
+                    let h = value.translation.width
+                    let v = value.translation.height
+                    guard abs(h) > abs(v) * 1.2 else { return }
+                    let cases = JournalTimeRange.selectableCases
+                    guard let currentIndex = cases.firstIndex(of: selectedRange) else { return }
+                    
+                    if h < -15 && currentIndex < cases.count - 1 {
+                        NativeHaptics.selection()
+                        withAnimation(.spring(response: 0.28, dampingFraction: 0.76)) {
+                            selectedRange = cases[currentIndex + 1]
+                        }
+                    } else if h > 15 && currentIndex > 0 {
+                        NativeHaptics.selection()
+                        withAnimation(.spring(response: 0.28, dampingFraction: 0.76)) {
+                            selectedRange = cases[currentIndex - 1]
+                        }
+                    }
+                }
+        )
         .overlay(
             RoundedRectangle(cornerRadius: 11, style: .continuous)
                 .stroke(

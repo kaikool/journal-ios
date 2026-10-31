@@ -417,10 +417,6 @@ public struct DailyBarsView: View {
     }
     
     private func triggerHapticFeedback() {
-        #if os(iOS)
-        let generator = UISelectionFeedbackGenerator()
-        generator.prepare()
-        generator.selectionChanged()
-        #endif
+        NativeHaptics.selection()
     }
 }
