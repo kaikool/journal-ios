@@ -345,27 +345,17 @@ public struct TradesListView: View {
             LazyVStack(spacing: 10) {
                 ForEach(filteredTrades) { trade in
                     let isTradeOpen = trade.status == .open || trade.closedAt == nil
-                    SwipeableTradeRow(
-                        isLive: isTradeOpen,
-                        onDelete: {
-                            withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
-                                dataStore.deleteTrade(key: trade.key)
-                            }
-                        },
-                        onAICoach: {
-                            tradeForAICoach = trade
-                        },
-                        onTap: {
-                            selectedTrade = trade
-                        }
-                    ) {
+                    Button {
+                        selectedTrade = trade
+                    } label: {
                         TradeTerminalRow(trade: trade)
                     }
+                    .buttonStyle(ApplePressableButtonStyle())
                     .contextMenu {
                         Button {
                             tradeForAICoach = trade
                         } label: {
-                            Label("AI Coach Audit", systemImage: "sparkles")
+                            Label(isTradeOpen ? "Live Position Coach" : "Post-Trade AI Audit", systemImage: isTradeOpen ? "bolt.fill" : "sparkles")
                         }
                         Button(role: .destructive) {
                             withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
