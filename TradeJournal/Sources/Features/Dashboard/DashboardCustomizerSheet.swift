@@ -296,8 +296,8 @@ public struct DashboardCustomizerSheet: View {
                         ForEach(DashboardPreset.allCases.filter { $0 != .custom }) { preset in
                             AppFilterChip(
                                 preset.name,
-                                icon: preset.icon,
                                 isSelected: activePreset == preset,
+                                icon: preset.icon,
                                 height: 28
                             ) {
                                 NativeHaptics.mediumImpact()

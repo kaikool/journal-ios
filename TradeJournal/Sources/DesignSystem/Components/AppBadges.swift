@@ -46,6 +46,7 @@ public struct AppBadge: View {
         case brand
         case warning
         case secondary
+        case neutral
         case outline
         case custom(color: Color)
     }
@@ -58,6 +59,12 @@ public struct AppBadge: View {
         self.text = text
         self.icon = icon
         self.variant = variant
+    }
+    
+    public init(_ text: String, icon: String? = nil, style: Variant) {
+        self.text = text
+        self.icon = icon
+        self.variant = style
     }
     
     public init(_ text: String, icon: String? = nil, color: Color) {
@@ -112,7 +119,7 @@ public struct AppBadge: View {
         case .loss: return AppColors.loss.opacity(0.14)
         case .brand: return AppColors.brand.opacity(0.12)
         case .warning: return AppColors.warning.opacity(0.12)
-        case .secondary: return AppColors.secondaryBackground
+        case .secondary, .neutral: return AppColors.secondaryBackground
         case .outline: return Color.clear
         case .custom(let color): return color.opacity(0.12)
         }
@@ -124,7 +131,7 @@ public struct AppBadge: View {
         case .loss: return AppColors.loss
         case .brand: return AppColors.brand
         case .warning: return AppColors.warning
-        case .secondary: return AppColors.primaryText
+        case .secondary, .neutral: return AppColors.primaryText
         case .outline: return AppColors.secondaryText
         case .custom(let color): return color
         }
@@ -137,7 +144,7 @@ public struct AppBadge: View {
         case .profit: return AppColors.profit.opacity(0.3)
         case .loss: return AppColors.loss.opacity(0.3)
         case .warning: return AppColors.warning.opacity(0.3)
-        case .secondary: return AppColors.border.opacity(0.4)
+        case .secondary, .neutral: return AppColors.border.opacity(0.4)
         case .custom(let color): return color.opacity(0.3)
         }
     }
