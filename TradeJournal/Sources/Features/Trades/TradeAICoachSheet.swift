@@ -134,7 +134,7 @@ public struct TradeAICoachSheet: View {
                 }
             }
             .background(AppColors.background)
-            .navigationTitle("Risk AI Coach")
+            .navigationTitle(isOpen ? "Live Position Coach" : "Post-Trade AI Audit")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {

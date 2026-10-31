@@ -344,7 +344,9 @@ public struct TradesListView: View {
         } else {
             LazyVStack(spacing: 10) {
                 ForEach(filteredTrades) { trade in
+                    let isTradeOpen = trade.status == .open || trade.closedAt == nil
                     SwipeableTradeRow(
+                        isLive: isTradeOpen,
                         onDelete: {
                             withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
                                 dataStore.deleteTrade(key: trade.key)

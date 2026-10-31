@@ -29,12 +29,12 @@ public struct TradeAICoachContextCard: View {
                             .foregroundColor(isShort ? AppColors.warning : AppColors.brand)
                             .cornerRadius(4)
                         
-                        Text(isOpen ? "OPEN POSITION" : "CLOSED")
-                            .font(AppTypography.badgeMicro)
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 2)
-                            .background(AppColors.secondaryBackground)
-                            .foregroundColor(isOpen ? AppColors.brand : AppColors.secondaryText)
+                        Text(isOpen ? "🟢 LIVE POSITION" : "🏁 CLOSED AUDIT")
+                            .font(.system(size: 10, weight: .bold))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2.5)
+                            .background(isOpen ? AppColors.profit.opacity(0.18) : AppColors.secondaryBackground)
+                            .foregroundColor(isOpen ? AppColors.profit : AppColors.secondaryText)
                             .cornerRadius(4)
                     }
                     
