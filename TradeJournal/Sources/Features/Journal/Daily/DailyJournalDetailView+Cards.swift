@@ -43,20 +43,58 @@ extension DailyJournalDetailView {
                 AppSectionHeader("Day stats", badge: "\(metrics.closedTrades)")
                 
                 if metrics.closedTrades > 0 {
-                    LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
-                        AppMetricTile("Net P&L", value: metrics.netPnl >= 0 ? "+\(Formatters.currency(metrics.netPnl))" : Formatters.currency(metrics.netPnl), color: metrics.netPnl >= 0 ? AppColors.profit : AppColors.loss, alignment: .leading)
-                        AppMetricTile("Trades", value: "\(metrics.closedTrades)", alignment: .leading)
-                        AppMetricTile("Winrate", value: Formatters.percent(metrics.winRate), alignment: .leading)
+                    VStack(alignment: .leading, spacing: 12) {
+                        // 1. Hero Net P&L with Winrate & Profit Factor status badges
+                        HStack(alignment: .firstTextBaseline) {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("Net P&L")
+                                    .font(AppTypography.caption)
+                                    .foregroundColor(AppColors.secondaryText)
+                                
+                                AppMonetaryText(
+                                    Formatters.formatPnL(metrics.netPnl, currency: env.currentCurrency, isPrivate: env.isPrivacyModeEnabled),
+                                    isPrivate: env.isPrivacyModeEnabled,
+                                    font: AppTypography.financialNumber(size: 24, weight: .bold),
+                                    color: metrics.netPnl >= 0 ? AppColors.profit : AppColors.loss
+                                )
+                            }
+                            
+                            Spacer()
+                            
+                            HStack(spacing: 6) {
+                                if let wr = metrics.winRate {
+                                    AppBadge(Formatters.percent(wr), variant: wr >= 0.5 ? .profit : .loss)
+                                }
+                                if metrics.profitFactorIsInfinite {
+                                    AppBadge("PF ∞", variant: .profit)
+                                } else if let pf = metrics.profitFactor {
+                                    AppBadge(String(format: "PF %.2f", pf), variant: pf >= 1.5 ? .profit : .secondary)
+                                }
+                            }
+                        }
                         
-                        AppMetricTile("Winners", value: "\(metrics.wins)", color: AppColors.profit, alignment: .leading)
-                        AppMetricTile("Losers", value: "\(metrics.losses)", color: AppColors.loss, alignment: .leading)
-                        AppMetricTile("Gross", value: Formatters.currency(metrics.grossPnl ?? 0), alignment: .leading)
+                        Divider().background(AppColors.border.opacity(0.35))
                         
-                        AppMetricTile("Fees", value: Formatters.currency(metrics.fees ?? 0), alignment: .leading)
-                        AppMetricTile("Volume", value: "\(metrics.totalVolume.formatted())", alignment: .leading)
-                        AppMetricTile("Profit Factor", value: metrics.profitFactorIsInfinite ? "∞" : (metrics.profitFactor.map { String(format: "%.2f", $0) } ?? "–"), alignment: .leading)
-                        
-                        AppMetricTile("Expectancy", value: metrics.expectancy.map { Formatters.currency($0) } ?? "–", alignment: .leading)
+                        // 2. Structured, balanced financial summary rows
+                        VStack(spacing: 10) {
+                            HStack {
+                                statItem(label: "Trades", value: "\(metrics.closedTrades) (\(metrics.wins)W · \(metrics.losses)L)")
+                                Spacer()
+                                statItem(label: "Gross P&L", value: Formatters.currency(metrics.grossPnl ?? 0, currencyCode: env.currentCurrency, isPrivate: env.isPrivacyModeEnabled), alignment: .trailing)
+                            }
+                            
+                            HStack {
+                                statItem(label: "Fees & Comm", value: Formatters.currency(metrics.fees ?? 0, currencyCode: env.currentCurrency, isPrivate: env.isPrivacyModeEnabled))
+                                Spacer()
+                                statItem(label: "Volume", value: "\(metrics.totalVolume.formatted()) lots", alignment: .trailing)
+                            }
+                            
+                            HStack {
+                                statItem(label: "Expectancy", value: metrics.expectancy.map { Formatters.currency($0, currencyCode: env.currentCurrency, isPrivate: env.isPrivacyModeEnabled) } ?? "–")
+                                Spacer()
+                                statItem(label: "Profit Factor", value: metrics.profitFactorIsInfinite ? "∞" : (metrics.profitFactor.map { String(format: "%.2f", $0) } ?? "–"), alignment: .trailing)
+                            }
+                        }
                     }
                 } else {
                     Text("No closed trades this day.")
@@ -68,6 +106,19 @@ extension DailyJournalDetailView {
             }
         }
         .padding(.horizontal, 16)
+    }
+    
+    @ViewBuilder
+    private func statItem(label: String, value: String, alignment: HorizontalAlignment = .leading) -> some View {
+        VStack(alignment: alignment, spacing: 3) {
+            Text(label)
+                .font(AppTypography.caption)
+                .foregroundColor(AppColors.secondaryText)
+            Text(value)
+                .font(AppTypography.captionBold)
+                .monospacedDigit()
+                .foregroundColor(AppColors.primaryText)
+        }
     }
     
     internal var intradayChartCard: some View {

@@ -145,20 +145,76 @@ public struct DayDetailSheet: View {
         let isProfit = netPnl >= 0
         let pnlColor = isProfit ? AppColors.profit : AppColors.loss
         let tradeCount = stats?.trades ?? trades.count
+        let wins = stats?.wins ?? trades.filter { $0.netPnl > 0 }.count
+        let losses = stats?.losses ?? trades.filter { $0.netPnl < 0 }.count
+        let winRate: Double? = tradeCount > 0 ? (Double(wins) / Double(tradeCount)) : nil
         
-        HStack(spacing: 10) {
-            AppMetricTile(
-                "Net P&L",
-                value: Formatters.formatPnL(netPnl, currency: env.currentCurrency),
-                color: pnlColor,
-                trend: isProfit ? .up : .down
-            )
-            
-            AppMetricTile(
-                "Trades",
-                value: "\(tradeCount)",
-                color: AppColors.primaryText
-            )
+        AppCard {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .firstTextBaseline) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Net P&L")
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.secondaryText)
+                        AppMonetaryText(
+                            Formatters.formatPnL(netPnl, currency: env.currentCurrency, isPrivate: env.isPrivacyModeEnabled),
+                            isPrivate: env.isPrivacyModeEnabled,
+                            font: AppTypography.financialNumber(size: 24, weight: .bold),
+                            color: pnlColor
+                        )
+                    }
+                    
+                    Spacer()
+                    
+                    HStack(spacing: 6) {
+                        if let wr = winRate, tradeCount > 0 {
+                            AppBadge(Formatters.percent(wr), variant: wr >= 0.5 ? .profit : .loss)
+                        }
+                        AppBadge("\(tradeCount) trade\(tradeCount == 1 ? "" : "s")", variant: .secondary)
+                    }
+                }
+                
+                if tradeCount > 0 {
+                    Divider().background(AppColors.border.opacity(0.35))
+                    
+                    HStack {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Win / Loss")
+                                .font(AppTypography.caption)
+                                .foregroundColor(AppColors.secondaryText)
+                            Text("\(wins)W · \(losses)L")
+                                .font(AppTypography.captionBold)
+                                .foregroundColor(AppColors.primaryText)
+                        }
+                        
+                        if let gross = stats?.grossPnl {
+                            Spacer()
+                            VStack(alignment: .trailing, spacing: 3) {
+                                Text("Gross P&L")
+                                    .font(AppTypography.caption)
+                                    .foregroundColor(AppColors.secondaryText)
+                                Text(Formatters.currency(gross, currencyCode: env.currentCurrency, isPrivate: env.isPrivacyModeEnabled))
+                                    .font(AppTypography.captionBold)
+                                    .monospacedDigit()
+                                    .foregroundColor(AppColors.primaryText)
+                            }
+                        }
+                        
+                        if let vol = stats?.volume, vol > 0 {
+                            Spacer()
+                            VStack(alignment: .trailing, spacing: 3) {
+                                Text("Volume")
+                                    .font(AppTypography.caption)
+                                    .foregroundColor(AppColors.secondaryText)
+                                Text("\(vol.formatted()) lots")
+                                    .font(AppTypography.captionBold)
+                                    .monospacedDigit()
+                                    .foregroundColor(AppColors.primaryText)
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
     

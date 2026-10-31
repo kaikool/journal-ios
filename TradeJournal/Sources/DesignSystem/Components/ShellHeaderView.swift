@@ -10,6 +10,7 @@ public struct ShellHeaderView: View {
     @ObservedObject private var dataStore = TradeDataStore.shared
     
     @State private var showPreTradeAnalysis: Bool = false
+    @State private var showAiReflection: Bool = false
     
     public init() {}
     
@@ -109,6 +110,12 @@ public struct ShellHeaderView: View {
         }
         .sheet(isPresented: $showPreTradeAnalysis) {
             PreTradeAnalysisSheet(initialSymbol: "XAUUSD")
+        }
+        .sheet(isPresented: $showAiReflection) {
+            AIReflectionView()
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(28)
         }
     }
     
@@ -332,7 +339,7 @@ public struct ShellHeaderView: View {
                 
             case .reports:
                 primaryActionButton(title: "Ask AI", icon: "sparkles") {
-                    showPreTradeAnalysis = true
+                    showAiReflection = true
                 }
                 
             case .propFirms:
