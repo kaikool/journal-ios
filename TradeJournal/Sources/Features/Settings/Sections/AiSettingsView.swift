@@ -98,7 +98,7 @@ public struct AiSettingsView: View {
                     // Secret Resolution Status Indicator
                     HStack(spacing: 6) {
                         Image(systemName: isProviderConfigured ? "checkmark.shield.fill" : "exclamationmark.triangle.fill")
-                            .font(.system(size: 11, weight: .semibold))
+                            .font(AppTypography.caption)
                             .foregroundColor(isProviderConfigured ? AppColors.profit : AppColors.loss)
                         Text(isProviderConfigured ? "API Key auto-configured from GitHub Secrets" : "API Key missing in secrets")
                             .font(AppTypography.caption)
@@ -119,7 +119,7 @@ public struct AiSettingsView: View {
                 Button(action: { showTraderProfileSheet = true }) {
                     HStack(spacing: 10) {
                         Image(systemName: "person.text.rectangle")
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(AppTypography.bodyBold)
                             .foregroundColor(AppColors.brand)
                         
                         VStack(alignment: .leading, spacing: 2) {
@@ -137,7 +137,7 @@ public struct AiSettingsView: View {
                         Spacer()
                         
                         Image(systemName: "chevron.right")
-                            .font(.system(size: 11, weight: .semibold))
+                            .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText)
                     }
                     .padding(.vertical, 4)

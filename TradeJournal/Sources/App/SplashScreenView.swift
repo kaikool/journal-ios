@@ -32,12 +32,12 @@ public struct SplashScreenView: View {
                 VStack(spacing: 12) {
                     HStack(spacing: 0) {
                         Text("TRADE ")
-                            .font(.system(size: 26, weight: .light))
+                            .font(AppTypography.brandTitleLight)
                             .foregroundColor(colorScheme == .dark ? Color(hex: "E2E8F0") : Color(hex: "0F172A"))
                             .tracking(8)
                         
                         Text("JOURNAL")
-                            .font(.system(size: 26, weight: .bold))
+                            .font(AppTypography.brandTitleBold)
                             .foregroundStyle(
                                 LinearGradient(
                                     colors: colorScheme == .dark
@@ -65,7 +65,7 @@ public struct SplashScreenView: View {
                         .opacity(0.55)
                     
                     Text("PRECISION ANALYTICS")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(AppTypography.cardHeaderUppercase)
                         .tracking(5)
                         .foregroundColor(Color(hex: "64748B"))
                 }

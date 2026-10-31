@@ -453,7 +453,7 @@ public struct DashboardView: View {
         HStack(spacing: 8) {
             Image(systemName: "hand.draw")
                 .foregroundColor(AppColors.brand)
-                .font(.system(size: 14))
+                .font(AppTypography.captionBold)
             
             Text("Reorder mode: tap arrows to move cards")
                 .font(AppTypography.captionBold)
@@ -515,7 +515,7 @@ public struct DashboardView: View {
             } label: {
                 HStack(spacing: 6) {
                     Image(systemName: activePreset.icon)
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(AppTypography.actionButtonCompact)
                         .foregroundColor(AppColors.brand)
                     Text(activePreset.name)
                         .font(AppTypography.actionButtonCompact)
@@ -546,7 +546,7 @@ public struct DashboardView: View {
             } label: {
                 HStack(spacing: 6) {
                     Image(systemName: "slider.horizontal.3")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(AppTypography.actionButtonCompact)
                     Text("Customize")
                         .font(AppTypography.actionButtonCompact)
                         .lineLimit(1)
@@ -615,7 +615,7 @@ public struct DashboardView: View {
             // Notice Banner
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.system(size: 16))
+                    .font(AppTypography.cardHeader)
                     .foregroundColor(Color.orange)
                 
                 VStack(alignment: .leading, spacing: 4) {
@@ -646,7 +646,7 @@ public struct DashboardView: View {
             cardContainer {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("ALL ACCOUNTS")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(AppTypography.cardHeaderUppercase)
                         .foregroundColor(AppColors.secondaryText)
                         .tracking(0.5)
                     
@@ -662,7 +662,7 @@ public struct DashboardView: View {
                     cardContainer {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("\(group.currency) ACCOUNTS")
-                                .font(.system(size: 11, weight: .semibold))
+                                .font(AppTypography.cardHeaderUppercase)
                                 .foregroundColor(AppColors.secondaryText)
                                 .tracking(0.5)
                             
@@ -693,7 +693,7 @@ public struct DashboardView: View {
         cardContainer {
             VStack(spacing: 12) {
                 Image(systemName: "line.3.horizontal.decrease.circle")
-                    .font(.system(size: 32))
+                    .font(AppTypography.iconHero)
                     .foregroundColor(AppColors.secondaryText)
                 
                 Text("No trades match these filters")
@@ -722,7 +722,7 @@ public struct DashboardView: View {
         cardContainer {
             VStack(spacing: 14) {
                 Image(systemName: "tray")
-                    .font(.system(size: 38))
+                    .font(AppTypography.iconEmptyState)
                     .foregroundColor(AppColors.secondaryText)
                 
                 Text("Your journal is empty")
@@ -753,7 +753,7 @@ public struct DashboardView: View {
                 .padding(.top, 6)
                 
                 Text("Demo data lands in its own account; delete it anytime under Accounts.")
-                    .font(.system(size: 11))
+                    .font(AppTypography.caption)
                     .foregroundColor(AppColors.secondaryText.opacity(0.8))
             }
             .frame(maxWidth: .infinity)
@@ -777,7 +777,7 @@ public struct DashboardView: View {
                     dataStore.lastSyncSummary = nil
                 } label: {
                     Image(systemName: "xmark")
-                        .font(.system(size: 10))
+                        .font(AppTypography.captionMicro)
                         .foregroundColor(AppColors.secondaryText)
                 }
             }
@@ -800,7 +800,7 @@ public struct DashboardView: View {
                     dataStore.lastSyncError = nil
                 } label: {
                     Image(systemName: "xmark")
-                        .font(.system(size: 10))
+                        .font(AppTypography.captionMicro)
                         .foregroundColor(AppColors.secondaryText)
                 }
             }

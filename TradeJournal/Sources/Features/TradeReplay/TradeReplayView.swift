@@ -207,7 +207,7 @@ public struct TradeReplayView: View {
             } else if bars.isEmpty {
                 VStack(spacing: 10) {
                     Image(systemName: "chart.xyaxis.line")
-                        .font(.system(size: 32))
+                        .font(AppTypography.iconHero)
                         .foregroundColor(AppColors.secondaryText.opacity(0.6))
                     Text("No Candle Data Available")
                         .font(AppTypography.headline)

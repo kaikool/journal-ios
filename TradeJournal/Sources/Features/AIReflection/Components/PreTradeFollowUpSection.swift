@@ -23,7 +23,7 @@ public struct PreTradeFollowUpSection: View {
                         HStack {
                             Spacer()
                             Text(msg.content)
-                                .font(.system(size: 12, weight: .medium))
+                                .font(AppTypography.bodyMedium)
                                 .foregroundColor(.white)
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 8)
@@ -84,7 +84,7 @@ public struct PreTradeBottomFloatingInput: View {
             // Sleek Floating Input Pill
             HStack(spacing: 10) {
                 Image(systemName: "bubble.left.and.text.bubble.right.fill")
-                    .font(.system(size: 15))
+                    .font(AppTypography.formInput)
                     .foregroundColor(AppColors.secondaryText.opacity(0.8))
                     .padding(.leading, 6)
                 
@@ -100,7 +100,7 @@ public struct PreTradeBottomFloatingInput: View {
                 if hasHistory && !hasQueryText {
                     Button(action: onResetThread) {
                         Image(systemName: "arrow.counterclockwise")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(AppTypography.actionButtonCompact)
                             .foregroundColor(AppColors.secondaryText)
                             .frame(width: 30, height: 30)
                             .background(AppColors.secondaryBackground.opacity(0.85))
@@ -122,7 +122,7 @@ public struct PreTradeBottomFloatingInput: View {
                                 .frame(width: 34, height: 34)
                             
                             Image(systemName: "arrow.up")
-                                .font(.system(size: 14, weight: .bold))
+                                .font(AppTypography.actionButton)
                                 .foregroundColor(hasQueryText ? .white : AppColors.secondaryText.opacity(0.4))
                         }
                     }

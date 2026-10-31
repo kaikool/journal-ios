@@ -58,10 +58,10 @@ public struct AppButton: View {
                         .progressViewStyle(CircularProgressViewStyle(tint: foregroundColor))
                 } else if let icon = iconName {
                     Image(systemName: icon)
-                        .font(.system(size: size == .compact ? 11 : 12.5, weight: .bold))
+                        .font(size == .compact ? AppTypography.actionButtonCompact : AppTypography.actionButton)
                 }
                 Text(title)
-                    .font(.system(size: size == .compact ? 12.5 : 13.5, weight: .semibold, design: .rounded))
+                    .font(size == .compact ? AppTypography.actionButtonCompact : AppTypography.actionButton)
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
             }
@@ -135,10 +135,10 @@ public struct AppPrimaryButton: View {
             HStack(spacing: 5) {
                 if let icon = icon {
                     Image(systemName: icon)
-                        .font(.system(size: 11, weight: .bold))
+                        .font(height <= 32 ? AppTypography.actionButtonCompact : AppTypography.actionButton)
                 }
                 Text(title)
-                    .font(.system(size: height <= 32 ? 12.5 : 13.5, weight: .semibold, design: .rounded))
+                    .font(height <= 32 ? AppTypography.actionButtonCompact : AppTypography.actionButton)
             }
             .foregroundColor(isEnabled ? .white : AppColors.secondaryText.opacity(0.6))
             .padding(.horizontal, 14)
@@ -185,10 +185,10 @@ public struct AppSecondaryButton: View {
             HStack(spacing: 5) {
                 if let icon = icon {
                     Image(systemName: icon)
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(height <= 32 ? AppTypography.actionButtonCompact : AppTypography.actionButton)
                 }
                 Text(title)
-                    .font(.system(size: height <= 32 ? 12.5 : 13.5, weight: .semibold, design: .rounded))
+                    .font(height <= 32 ? AppTypography.actionButtonCompact : AppTypography.actionButton)
             }
             .foregroundColor(isEnabled ? AppColors.primaryText : AppColors.secondaryText.opacity(0.6))
             .padding(.horizontal, 14)
@@ -234,10 +234,10 @@ public struct AppDestructiveButton: View {
             HStack(spacing: 6) {
                 if let icon = icon {
                     Image(systemName: icon)
-                        .font(.system(size: 11.5, weight: .semibold))
+                        .font(height <= 32 ? AppTypography.actionButtonCompact : AppTypography.actionButton)
                 }
                 Text(title)
-                    .font(.system(size: height <= 32 ? 12.5 : 13.5, weight: .semibold, design: .rounded))
+                    .font(height <= 32 ? AppTypography.actionButtonCompact : AppTypography.actionButton)
             }
             .foregroundColor(AppColors.loss)
             .padding(.horizontal, 14)
@@ -287,7 +287,7 @@ public struct AppIconPodButton: View {
                         Circle().stroke(AppColors.border.opacity(0.55), lineWidth: 0.6)
                     )
                 Image(systemName: icon)
-                    .font(.system(size: size <= 32 ? 12 : 14, weight: .semibold))
+                    .font(size <= 32 ? AppTypography.actionButtonCompact : AppTypography.actionButton)
                     .foregroundColor(color)
             }
             .contentShape(Circle())
@@ -326,7 +326,7 @@ public struct AppActionPill: View {
             HStack(spacing: 5) {
                 if let icon = icon {
                     Image(systemName: icon)
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(AppTypography.actionPill)
                 }
                 Text(title)
                     .font(AppTypography.actionPill)
@@ -378,7 +378,7 @@ public struct AppBackButton: View {
         } label: {
             HStack(spacing: 4) {
                 Image(systemName: "chevron.left")
-                    .font(.system(size: 12, weight: .bold))
+                    .font(AppTypography.actionPill)
                 if let title = title, !title.isEmpty {
                     Text(title)
                         .font(AppTypography.actionPill)
@@ -438,7 +438,7 @@ public struct AppActionPillLink<Destination: View>: View {
             HStack(spacing: 5) {
                 if let icon = icon {
                     Image(systemName: icon)
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(AppTypography.actionPill)
                 }
                 Text(title)
                     .font(AppTypography.actionPill)
@@ -497,13 +497,13 @@ public struct AppActionMenu<MenuContent: View>: View {
             HStack(spacing: 4) {
                 if let icon = icon {
                     Image(systemName: icon)
-                        .font(.system(size: 11, weight: .bold))
+                        .font(AppTypography.actionPill)
                 }
                 Text(title)
                     .font(AppTypography.actionPill)
                     .lineLimit(1)
                 Image(systemName: "chevron.down")
-                    .font(.system(size: 9, weight: .semibold))
+                    .font(AppTypography.captionMicro)
             }
             .padding(.horizontal, 12)
             .frame(height: 34)

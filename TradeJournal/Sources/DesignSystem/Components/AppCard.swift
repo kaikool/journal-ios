@@ -74,7 +74,7 @@ public struct AppCardHeader: View {
             
             if let icon = icon {
                 Image(systemName: icon)
-                    .font(.system(size: 11))
+                    .font(AppTypography.caption)
                     .foregroundColor(AppColors.secondaryText.opacity(0.7))
             }
         }

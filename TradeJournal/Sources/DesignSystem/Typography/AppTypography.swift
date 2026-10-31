@@ -77,6 +77,8 @@ public enum AppTypography {
     public static let badge = Font.system(size: 10, weight: .bold, design: .default)
     public static let badgeStandard = Font.system(size: 10, weight: .bold, design: .default)
     public static let badgeMicro = Font.system(size: 9, weight: .bold, design: .default)
+    public static let badgeMarker = Font.system(size: 7.5, weight: .bold, design: .default)
+    public static let badgeMarkerSmall = Font.system(size: 6.5, weight: .black, design: .default)
     
     // MARK: - Tier 9: Micro Metadata & Footers
     public static let caption = Font.system(size: 11.5, weight: .regular, design: .default)
@@ -105,6 +107,17 @@ public enum AppTypography {
     public static let title2 = Font.title2.weight(.bold)
     public static let title3 = Font.title3.weight(.semibold)
     public static let headline = Font.headline.weight(.bold)
+    
+    // MARK: - Specialized Brand & Graphic Icon Tokens
+    public static let brandTitleLight = Font.system(size: 26, weight: .light, design: .default)
+    public static let brandTitleBold = Font.system(size: 26, weight: .bold, design: .default)
+    public static let iconMini = Font.system(size: 10, weight: .bold, design: .default)
+    public static let iconSmall = Font.system(size: 12, weight: .medium, design: .default)
+    public static let iconMedium = Font.system(size: 16, weight: .semibold, design: .default)
+    public static let iconLarge = Font.system(size: 24, weight: .medium, design: .default)
+    public static let iconHero = Font.system(size: 32, weight: .regular, design: .default)
+    public static let iconEmptyState = Font.system(size: 38, weight: .regular, design: .default)
+    public static let iconDocumentPreview = Font.system(size: 64, weight: .regular, design: .default)
 }
 
 public struct AppInputModifier: ViewModifier {

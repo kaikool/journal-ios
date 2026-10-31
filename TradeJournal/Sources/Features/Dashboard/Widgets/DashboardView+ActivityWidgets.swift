@@ -29,7 +29,7 @@ extension DashboardView {
                 HStack(spacing: 4) {
                     ForEach(cols, id: \.self) { c in
                         Text(c)
-                            .font(.system(size: 9, weight: .bold))
+                            .font(AppTypography.badgeMicro)
                             .foregroundColor(AppColors.secondaryText)
                             .frame(maxWidth: .infinity, alignment: c == "Wk" ? .trailing : .center)
                     }
@@ -64,12 +64,12 @@ extension DashboardView {
                                     } label: {
                                         VStack(spacing: 1) {
                                             Text("\(dayNum)")
-                                                .font(.system(size: 9, weight: stats != nil ? .bold : .regular))
+                                                .font(stats != nil ? AppTypography.numberMicro : AppTypography.disclaimer)
                                                 .foregroundColor(stats != nil ? AppColors.primaryText : AppColors.secondaryText)
                                             
                                             if let s = stats {
                                                 Text(s.netPnl >= 0 ? "+" : "-")
-                                                    .font(.system(size: 8, weight: .bold))
+                                                    .font(AppTypography.badgeMicro)
                                                     .foregroundColor(s.netPnl >= 0 ? AppColors.profit : AppColors.loss)
                                             }
                                         }
@@ -134,7 +134,7 @@ extension DashboardView {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
                     Text("ACTIVITY")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(AppTypography.cardHeaderUppercase)
                         .foregroundColor(AppColors.secondaryText)
                         .tracking(0.5)
                     Spacer()
@@ -153,7 +153,7 @@ extension DashboardView {
                             }
                         } label: {
                             Text(tab == "recent" ? "Recent trades" : "Open positions")
-                                .font(.system(size: 12, weight: isSelected ? .semibold : .medium))
+                                .font(isSelected ? AppTypography.actionButtonCompact : AppTypography.caption)
                                 .foregroundColor(isSelected ? AppColors.primaryText : AppColors.secondaryText)
                                 .frame(maxWidth: .infinity)
                                 .frame(height: 28)
@@ -195,7 +195,7 @@ extension DashboardView {
                                     )
                                     
                                     Text(t.symbol)
-                                        .font(.system(size: 13, weight: .bold))
+                                        .font(AppTypography.rowTitle)
                                         .foregroundColor(AppColors.primaryText)
                                         .lineLimit(1)
                                     
@@ -209,7 +209,7 @@ extension DashboardView {
                                     }()
                                     
                                     Text(timeDateText)
-                                        .font(.system(size: 11, weight: .regular))
+                                        .font(AppTypography.captionMicro)
                                         .foregroundColor(AppColors.secondaryText)
                                         .lineLimit(1)
                                     
@@ -245,7 +245,7 @@ extension DashboardView {
                                     AppBadge(p.direction.rawValue.uppercased(), color: p.direction == .long ? AppColors.profit : AppColors.loss)
                                     
                                     Text(p.symbol)
-                                        .font(.system(size: 13, weight: .bold))
+                                        .font(AppTypography.rowTitle)
                                         .foregroundColor(AppColors.primaryText)
                                         .lineLimit(1)
                                     

@@ -324,7 +324,7 @@ public struct AddMissedTradeSheet: View {
                 HStack {
                     HStack(spacing: 6) {
                         Image(systemName: "calendar")
-                            .font(.system(size: 12))
+                            .font(AppTypography.caption)
                             .foregroundColor(AppColors.brand)
                         Text("Observed At")
                             .font(AppTypography.caption)
@@ -350,9 +350,9 @@ public struct AddMissedTradeSheet: View {
         } label: {
             HStack(spacing: 6) {
                 Image(systemName: isBuy ? "arrow.up.right" : "arrow.down.right")
-                    .font(.system(size: 11, weight: .bold))
+                    .font(AppTypography.actionButtonCompact)
                 Text(title)
-                    .font(.system(size: 12, weight: .bold))
+                    .font(AppTypography.actionButtonCompact)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 10)
@@ -417,10 +417,10 @@ public struct AddMissedTradeSheet: View {
                 if let info = plannedRRInfo, !info.isValidDirection {
                     HStack(spacing: 6) {
                         Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.system(size: 11))
+                            .font(AppTypography.caption)
                             .foregroundColor(.orange)
                         Text(direction == "long" ? "For BUY, Stop Loss must be below Entry and Take Profit above." : "For SELL, Stop Loss must be above Entry and Take Profit below.")
-                            .font(.system(size: 11))
+                            .font(AppTypography.caption)
                             .foregroundColor(.orange)
                     }
                 }

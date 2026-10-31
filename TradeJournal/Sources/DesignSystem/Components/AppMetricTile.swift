@@ -59,7 +59,7 @@ public struct AppMetricTile: View {
             HStack(spacing: 4) {
                 if let icon = icon {
                     Image(systemName: icon)
-                        .font(.system(size: 10, weight: .semibold))
+                        .font(AppTypography.microCaption)
                         .foregroundColor(AppColors.secondaryText)
                 }
                 Text(title.uppercased())
@@ -71,7 +71,7 @@ public struct AppMetricTile: View {
             
             HStack(spacing: 3) {
                 Text(value)
-                    .font(.system(size: 14.5, weight: .bold, design: .rounded))
+                    .font(AppTypography.statValue)
                     .monospacedDigit()
                     .foregroundColor(valueColor)
                     .lineLimit(1)
@@ -79,14 +79,14 @@ public struct AppMetricTile: View {
                 
                 if let trend = trend {
                     Image(systemName: trend.icon)
-                        .font(.system(size: 9, weight: .bold))
+                        .font(AppTypography.badgeMicro)
                         .foregroundColor(trend.color)
                 }
             }
             
             if let sub = subtitle, !sub.isEmpty {
                 Text(sub)
-                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                    .font(AppTypography.captionMicro)
                     .foregroundColor(AppColors.secondaryText.opacity(0.85))
                     .lineLimit(1)
             }

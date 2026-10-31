@@ -23,7 +23,7 @@ public struct AppSearchBar: View {
     public var body: some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 12, weight: .medium))
+                .font(AppTypography.caption)
                 .foregroundColor(AppColors.secondaryText)
             
             TextField(placeholder, text: $text, onCommit: {
@@ -40,7 +40,7 @@ public struct AppSearchBar: View {
                     text = ""
                 }) {
                     Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 13))
+                        .font(AppTypography.caption)
                         .foregroundColor(AppColors.secondaryText.opacity(0.85))
                 }
                 .buttonStyle(.plain)

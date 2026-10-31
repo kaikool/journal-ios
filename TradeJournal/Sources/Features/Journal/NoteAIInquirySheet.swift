@@ -163,21 +163,21 @@ public struct NoteAIInquirySheet: View {
             if let trade = linkedTrade {
                 HStack(spacing: 6) {
                     Image(systemName: "link")
-                        .font(.system(size: 12))
+                        .font(AppTypography.caption)
                         .foregroundColor(AppColors.secondaryText)
                     
                     Text(trade.symbol)
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(AppTypography.rowTitle)
                         .foregroundColor(AppColors.primaryText)
                         .lineLimit(1)
                     
                     Text(trade.direction == .short ? "SELL" : "BUY")
-                        .font(.system(size: 12, weight: .medium))
+                        .font(AppTypography.badgeStandard)
                         .foregroundColor(trade.direction == .short ? AppColors.loss : AppColors.profit)
                         .lineLimit(1)
                     
                     Text("Entry \(Formatters.price(trade.avgEntry))")
-                        .font(.system(size: 13))
+                        .font(AppTypography.statLabel)
                         .foregroundColor(AppColors.secondaryText)
                         .lineLimit(1)
                 }
@@ -185,7 +185,7 @@ public struct NoteAIInquirySheet: View {
                 Spacer(minLength: 4)
                 
                 Text(Formatters.currency(trade.netPnl))
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(AppTypography.statValue)
                     .foregroundColor(trade.netPnl >= 0 ? AppColors.profit : AppColors.loss)
                     .lineLimit(1)
                 
@@ -194,7 +194,7 @@ public struct NoteAIInquirySheet: View {
                 }
             } else {
                 Text(noteTitle.isEmpty ? "Notebook Note" : noteTitle)
-                    .font(.system(size: 13, weight: .medium))
+                    .font(AppTypography.rowTitle)
                     .foregroundColor(AppColors.primaryText)
                     .lineLimit(1)
                 
@@ -238,10 +238,10 @@ public struct NoteAIInquirySheet: View {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 4) {
                         Image(systemName: "sparkles")
-                            .font(.system(size: 10, weight: .bold))
+                            .font(AppTypography.captionMicro)
                             .foregroundColor(AppColors.brand)
                         Text("Risk AI Coach")
-                            .font(.system(size: 11, weight: .semibold))
+                            .font(AppTypography.captionBold)
                             .foregroundColor(AppColors.brand)
                     }
                     
@@ -297,7 +297,7 @@ public struct NoteAIInquirySheet: View {
             
             Button(action: submitInquiry) {
                 Image(systemName: "arrow.up.circle.fill")
-                    .font(.system(size: 32))
+                    .font(AppTypography.metricLarge)
                     .foregroundColor(inputText.trimmingCharacters(in: .whitespaces).isEmpty ? AppColors.secondaryText.opacity(0.4) : AppColors.brand)
             }
             .buttonStyle(ApplePressableButtonStyle())

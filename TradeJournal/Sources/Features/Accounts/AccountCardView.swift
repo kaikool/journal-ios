@@ -36,7 +36,7 @@ public struct AccountCardView: View {
                         dataStore.toggleAccountVisibility(id: account.id)
                     } label: {
                         Image(systemName: isVisible ? "checkmark.circle.fill" : "circle")
-                            .font(.system(size: 18))
+                            .font(AppTypography.displayMedium)
                             .foregroundColor(isVisible ? AppColors.brand : AppColors.secondaryText)
                     }
                     .buttonStyle(.plain)
@@ -53,7 +53,7 @@ public struct AccountCardView: View {
                             if isSelected {
                                 Image(systemName: "checkmark.seal.fill")
                                     .foregroundColor(AppColors.profit)
-                                    .font(.system(size: 13))
+                                    .font(AppTypography.captionBold)
                             }
                         }
                         
@@ -175,7 +175,7 @@ public struct AccountCardView: View {
                         get: { account.autoSync },
                         set: { _ in dataStore.toggleAccountAutoSync(id: account.id) }
                     ))
-                    .font(.system(size: 11, weight: .medium))
+                    .font(AppTypography.caption)
                     .tint(AppColors.brand)
                     
                     Spacer()

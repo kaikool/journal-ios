@@ -54,7 +54,7 @@ public struct AppDropdownField<T: Hashable>: View {
                 HStack(spacing: 8) {
                     if let icon = iconFor?(selection) {
                         Image(systemName: icon)
-                            .font(.system(size: 13, weight: .medium))
+                            .font(AppTypography.subheadline)
                             .foregroundColor(AppColors.brand)
                     }
                     
@@ -67,7 +67,7 @@ public struct AppDropdownField<T: Hashable>: View {
                     Spacer()
                     
                     Image(systemName: "chevron.up.chevron.down")
-                        .font(.system(size: 10, weight: .semibold))
+                        .font(AppTypography.captionMicro)
                         .foregroundColor(AppColors.secondaryText)
                 }
                 .padding(.horizontal, 14)
@@ -131,21 +131,21 @@ public struct AppCompactDropdown<T: Hashable>: View {
             HStack(spacing: 5) {
                 if let icon = icon {
                     Image(systemName: icon)
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(AppTypography.actionButtonCompact)
                         .foregroundColor(AppColors.secondaryText)
                 } else if let selIcon = iconFor?(selection) {
                     Image(systemName: selIcon)
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(AppTypography.actionButtonCompact)
                         .foregroundColor(AppColors.brand)
                 }
                 
                 Text(titleFor(selection))
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .font(AppTypography.actionButtonCompact)
                     .foregroundColor(AppColors.primaryText)
                     .lineLimit(1)
                 
                 Image(systemName: "chevron.up.chevron.down")
-                    .font(.system(size: 9, weight: .bold))
+                    .font(AppTypography.captionMicro)
                     .foregroundColor(AppColors.secondaryText.opacity(0.8))
             }
             .padding(.horizontal, 10)

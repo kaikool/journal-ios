@@ -51,7 +51,7 @@ public struct ShellHeaderView: View {
                 
                 // Current Page Title: Clean rounded typography
                 Text(currentTabTitle)
-                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                    .font(AppTypography.pageHeroTitle)
                     .foregroundColor(AppColors.primaryText)
                     .lineLimit(1)
                 
@@ -73,10 +73,10 @@ public struct ShellHeaderView: View {
             if env.isSearchActive && hasSearchCapability {
                 HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(AppTypography.captionBold)
                         .foregroundColor(AppColors.secondaryText)
                     TextField("Search...", text: $env.searchQuery)
-                        .font(.system(size: 13.5, weight: .regular))
+                        .font(AppTypography.formInput)
                         .foregroundColor(AppColors.primaryText)
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.never)
@@ -85,7 +85,7 @@ public struct ShellHeaderView: View {
                             env.searchQuery = ""
                         } label: {
                             Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 13))
+                                .font(AppTypography.caption)
                                 .foregroundColor(AppColors.secondaryText)
                         }
                     }
@@ -157,7 +157,7 @@ public struct ShellHeaderView: View {
                 env.changeCalendarMonth(by: -1)
             } label: {
                 Image(systemName: "chevron.left")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(AppTypography.actionButtonCompact)
                     .foregroundColor(AppColors.primaryText)
                     .frame(width: 32, height: 32)
                     .background(AppColors.secondaryBackground.opacity(0.75))
@@ -171,10 +171,10 @@ public struct ShellHeaderView: View {
             
             HStack(spacing: 6) {
                 Image(systemName: "calendar")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(AppTypography.actionButtonCompact)
                     .foregroundColor(AppColors.brand)
                 Text(Formatters.formatMonthYear(env.calendarCurrentMonth, timeZone: env.currentTimeZone))
-                    .font(.system(size: 14.5, weight: .bold, design: .rounded))
+                    .font(AppTypography.cardHeaderLarge)
                     .foregroundColor(AppColors.primaryText)
             }
             .padding(.horizontal, 14)
@@ -192,7 +192,7 @@ public struct ShellHeaderView: View {
                 env.changeCalendarMonth(by: 1)
             } label: {
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(AppTypography.actionButtonCompact)
                     .foregroundColor(AppColors.primaryText)
                     .frame(width: 32, height: 32)
                     .background(AppColors.secondaryBackground.opacity(0.75))
@@ -360,9 +360,9 @@ public struct ShellHeaderView: View {
         } label: {
             HStack(spacing: 5) {
                 Image(systemName: icon)
-                    .font(.system(size: 11, weight: .bold))
+                    .font(AppTypography.actionButtonCompact)
                 Text(title)
-                    .font(.system(size: 12.5, weight: .semibold, design: .rounded))
+                    .font(AppTypography.actionButtonCompact)
             }
             .foregroundColor(.white)
             .padding(.horizontal, 12)
@@ -383,11 +383,11 @@ public struct ShellHeaderView: View {
         } label: {
             HStack(spacing: 5) {
                 Image(systemName: "arrow.triangle.2.circlepath")
-                    .font(.system(size: 11, weight: .bold))
+                    .font(AppTypography.actionButtonCompact)
                     .rotationEffect(.degrees(dataStore.isSyncing ? 360 : 0))
                     .animation(dataStore.isSyncing ? Animation.linear(duration: 1).repeatForever(autoreverses: false) : .default, value: dataStore.isSyncing)
                 Text(dataStore.isSyncing ? "Syncing" : "Sync")
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .font(AppTypography.actionButtonCompact)
             }
             .foregroundColor(AppColors.brand)
             .padding(.horizontal, 11)
@@ -422,7 +422,7 @@ public struct ShellHeaderView: View {
                             .stroke(env.isSearchActive ? AppColors.brand : AppColors.border.opacity(0.55), lineWidth: 0.6)
                     )
                 Image(systemName: env.isSearchActive ? "xmark" : "magnifyingglass")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(AppTypography.actionButtonCompact)
                     .foregroundColor(env.isSearchActive ? AppColors.brand : AppColors.secondaryText)
             }
             .contentShape(Circle())
@@ -447,7 +447,7 @@ public struct ShellHeaderView: View {
                     )
                 
                 Image(systemName: "sparkles")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(AppTypography.actionButtonCompact)
                     .foregroundColor(AppColors.brand)
             }
             .contentShape(Circle())

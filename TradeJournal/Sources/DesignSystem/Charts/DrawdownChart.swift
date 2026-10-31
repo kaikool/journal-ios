@@ -51,7 +51,7 @@ public struct DrawdownChart: View {
             // Header: Relative Drawdown and Max / Active Value
             HStack(alignment: .center) {
                 Text(activePoint.map { formatDate($0.date) } ?? "Relative Drawdown")
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(AppTypography.cardHeaderUppercase)
                     .foregroundColor(AppColors.secondaryText)
                     .textCase(.uppercase)
                     .tracking(0.6)
@@ -62,13 +62,13 @@ public struct DrawdownChart: View {
                 if let active = activePoint {
                     let activeVal = (active.drawdown as NSDecimalNumber).doubleValue * 100.0
                     Text(String(format: "-%.1f%%", activeVal))
-                        .font(.system(size: 10.5, weight: .bold))
+                        .font(AppTypography.statValue)
                         .monospacedDigit()
                         .foregroundColor(AppColors.loss)
                         .lineLimit(1)
                 } else {
                     Text(String(format: "Max -%.1f%%", maxDrawdownPct))
-                        .font(.system(size: 10.5, weight: .bold))
+                        .font(AppTypography.statValue)
                         .monospacedDigit()
                         .foregroundColor(AppColors.loss)
                         .lineLimit(1)
@@ -130,7 +130,7 @@ public struct DrawdownChart: View {
                         AxisValueLabel {
                             if let doubleVal = value.as(Double.self) {
                                 Text(String(format: "%.0f%%", doubleVal))
-                                    .font(.system(size: 9.5, weight: .medium))
+                                    .font(AppTypography.numberMicro)
                                     .monospacedDigit()
                                     .foregroundStyle(AppColors.secondaryText)
                                     .frame(width: 32, alignment: .trailing)

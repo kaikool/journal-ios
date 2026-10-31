@@ -175,7 +175,7 @@ public struct DailyJournalListView: View {
             HStack {
                 Image(systemName: "magnifyingglass")
                     .foregroundColor(AppColors.secondaryText)
-                    .font(.system(size: 13))
+                    .font(AppTypography.body)
                 TextField("Search date, note...", text: $searchText)
                     .font(AppTypography.body)
                 if !searchText.isEmpty {
@@ -201,9 +201,9 @@ public struct DailyJournalListView: View {
             } label: {
                 HStack(spacing: 5) {
                     Image(systemName: "sun.max.fill")
-                        .font(.system(size: 12))
+                        .font(AppTypography.actionButtonCompact)
                     Text("Today")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(AppTypography.actionButtonCompact)
                 }
                 .foregroundColor(.white)
                 .padding(.horizontal, 12)
@@ -278,7 +278,7 @@ public struct DailyJournalListView: View {
                 // Compact Note badge indicator (circular icon only, preventing overflow)
                 if day.hasNote {
                     Image(systemName: "note.text")
-                        .font(.system(size: 11, weight: .medium))
+                        .font(AppTypography.captionMicro)
                         .foregroundColor(AppColors.secondaryText)
                         .frame(width: 22, height: 22)
                         .background(AppColors.secondaryBackground)
@@ -290,7 +290,7 @@ public struct DailyJournalListView: View {
                 }
                 
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(AppTypography.captionMicro)
                     .foregroundColor(AppColors.secondaryText.opacity(0.4))
             }
         }

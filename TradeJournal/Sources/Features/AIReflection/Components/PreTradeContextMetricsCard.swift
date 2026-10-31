@@ -55,7 +55,7 @@ public struct PreTradeContextMetricsCard: View {
                 HStack(alignment: .center) {
                     HStack(spacing: 6) {
                         Image(systemName: "waveform.path.ecg")
-                            .font(.system(size: 11, weight: .semibold))
+                            .font(AppTypography.cardHeaderUppercase)
                             .foregroundColor(AppColors.brand)
                         
                         Text("TREND & LIQUIDITY CONTEXT")
@@ -103,7 +103,7 @@ public struct PreTradeContextMetricsCard: View {
                 // Section 2: Institutional Liquidity Reference Levels
                 VStack(alignment: .leading, spacing: 6) {
                     Text("INSTITUTIONAL LIQUIDITY LEVELS")
-                        .font(.system(size: 9.5, weight: .semibold))
+                        .font(AppTypography.cardHeaderUppercase)
                         .foregroundColor(AppColors.secondaryText)
                         .tracking(0.3)
                     
@@ -112,7 +112,7 @@ public struct PreTradeContextMetricsCard: View {
                         if let h = liquidityResult.pdh, let l = liquidityResult.pdl {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("D1 PDH / PDL")
-                                    .font(.system(size: 10, weight: .medium))
+                                    .font(AppTypography.statLabel)
                                     .foregroundColor(AppColors.secondaryText)
                                 Text("\(Formatters.price(h, symbol: symbol)) / \(Formatters.price(l, symbol: symbol))")
                                     .font(AppTypography.number(11, weight: .semibold))
@@ -126,7 +126,7 @@ public struct PreTradeContextMetricsCard: View {
                         if let bsl = liquidityResult.nearestBSL {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("Nearest BSL")
-                                    .font(.system(size: 10, weight: .medium))
+                                    .font(AppTypography.statLabel)
                                     .foregroundColor(AppColors.secondaryText)
                                 Text(Formatters.price(bsl.price, symbol: symbol))
                                     .font(AppTypography.number(11, weight: .semibold))
@@ -137,7 +137,7 @@ public struct PreTradeContextMetricsCard: View {
                         if let ssl = liquidityResult.nearestSSL {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("Nearest SSL")
-                                    .font(.system(size: 10, weight: .medium))
+                                    .font(AppTypography.statLabel)
                                     .foregroundColor(AppColors.secondaryText)
                                 Text(Formatters.price(ssl.price, symbol: symbol))
                                     .font(AppTypography.number(11, weight: .semibold))
@@ -153,16 +153,16 @@ public struct PreTradeContextMetricsCard: View {
                         let isBuySweep = sweep.sweepType == .buySideSwept
                         Image(systemName: isBuySweep ? "arrow.down.right.circle.fill" : "arrow.up.right.circle.fill")
                             .foregroundColor(isBuySweep ? AppColors.loss : AppColors.profit)
-                            .font(.system(size: 12))
+                            .font(AppTypography.caption)
                         
                         Text("\(sweep.levelName) Swept (\(sweep.sweepType == .buySideSwept ? "Bearish SFP" : "Bullish SFP"))")
-                            .font(.system(size: 11, weight: .semibold))
+                            .font(AppTypography.captionBold)
                             .foregroundColor(isBuySweep ? AppColors.loss : AppColors.profit)
                         
                         Spacer()
                         
                         Text("\(sweep.barsAgo) bars ago")
-                            .font(.system(size: 10))
+                            .font(AppTypography.captionMicro)
                             .foregroundColor(AppColors.secondaryText)
                     }
                     .padding(.vertical, 4)
@@ -183,11 +183,11 @@ public struct PreTradeContextMetricsCard: View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 4) {
                 Text(tf)
-                    .font(.system(size: 10, weight: .bold))
+                    .font(AppTypography.captionMicro)
                     .foregroundColor(AppColors.primaryText)
                 
                 Text(isBull ? "▲" : (isBear ? "▼" : "⇄"))
-                    .font(.system(size: 9, weight: .bold))
+                    .font(AppTypography.captionMicro)
                     .foregroundColor(color)
             }
             

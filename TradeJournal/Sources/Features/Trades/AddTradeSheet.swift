@@ -165,7 +165,7 @@ public struct AddTradeSheet: View {
         TradeFormCardContainer {
             VStack(alignment: .leading, spacing: 12) {
                 Text("ACCOUNT & INSTRUMENT")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(AppTypography.cardHeaderUppercase)
                     .foregroundColor(AppColors.secondaryText)
                     .tracking(0.5)
                 
@@ -193,7 +193,7 @@ public struct AddTradeSheet: View {
         TradeFormCardContainer {
             VStack(alignment: .leading, spacing: 14) {
                 Text("POSITION & PRICING")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(AppTypography.cardHeaderUppercase)
                     .foregroundColor(AppColors.secondaryText)
                     .tracking(0.5)
                 
@@ -207,9 +207,9 @@ public struct AddTradeSheet: View {
                     } label: {
                         HStack(spacing: 6) {
                             Image(systemName: "arrow.up.right")
-                                .font(.system(size: 12, weight: .bold))
+                                .font(AppTypography.actionButton)
                             Text("BUY / LONG")
-                                .font(.system(size: 13, weight: .bold))
+                                .font(AppTypography.actionButton)
                         }
                         .frame(maxWidth: .infinity)
                         .frame(height: 40)
@@ -227,9 +227,9 @@ public struct AddTradeSheet: View {
                     } label: {
                         HStack(spacing: 6) {
                             Image(systemName: "arrow.down.right")
-                                .font(.system(size: 12, weight: .bold))
+                                .font(AppTypography.actionButton)
                             Text("SELL / SHORT")
-                                .font(.system(size: 13, weight: .bold))
+                                .font(AppTypography.actionButton)
                         }
                         .frame(maxWidth: .infinity)
                         .frame(height: 40)
@@ -302,7 +302,7 @@ public struct AddTradeSheet: View {
         TradeFormCardContainer {
             VStack(alignment: .leading, spacing: 12) {
                 Text("STRATEGY & PLAYBOOK")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(AppTypography.cardHeaderUppercase)
                     .foregroundColor(AppColors.secondaryText)
                     .tracking(0.5)
                 

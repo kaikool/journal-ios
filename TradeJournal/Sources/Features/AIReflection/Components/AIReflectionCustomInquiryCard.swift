@@ -37,7 +37,7 @@ public struct AIReflectionCustomInquiryCard: View {
                     
                     Button(action: onOpenTraderProfile) {
                         Text("Trader Profile")
-                            .font(.system(size: 11, weight: .medium))
+                            .font(AppTypography.captionMicro)
                             .foregroundColor(AppColors.secondaryText)
                     }
                 }
@@ -54,10 +54,10 @@ public struct AIReflectionCustomInquiryCard: View {
                         
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Attached Chart Image (Vision)")
-                                .font(.system(size: 11, weight: .bold))
+                                .font(AppTypography.captionBold)
                                 .foregroundColor(AppColors.brand)
                             Text("Risk AI will analyze this chart alongside your inquiry.")
-                                .font(.system(size: 10))
+                                .font(AppTypography.captionMicro)
                                 .foregroundColor(AppColors.secondaryText)
                         }
                         
@@ -65,7 +65,7 @@ public struct AIReflectionCustomInquiryCard: View {
                         
                         Button(action: { selectedChartImage = nil }) {
                             Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 15))
+                                .font(AppTypography.caption)
                                 .foregroundColor(AppColors.secondaryText)
                         }
                     }
@@ -77,7 +77,7 @@ public struct AIReflectionCustomInquiryCard: View {
                 HStack(spacing: 8) {
                     Button(action: onAttachPhoto) {
                         Image(systemName: selectedChartImage != nil ? "photo.fill" : "photo.badge.plus")
-                            .font(.system(size: 15))
+                            .font(AppTypography.formInput)
                             .foregroundColor(selectedChartImage != nil ? AppColors.brand : AppColors.secondaryText)
                     }
                     .buttonStyle(.plain)
@@ -91,7 +91,7 @@ public struct AIReflectionCustomInquiryCard: View {
                         Button(action: { userPrompt = "" }) {
                             Image(systemName: "xmark.circle.fill")
                                 .foregroundColor(AppColors.secondaryText)
-                                .font(.system(size: 14))
+                                .font(AppTypography.caption)
                         }
                     }
                     
@@ -99,7 +99,7 @@ public struct AIReflectionCustomInquiryCard: View {
                         onSubmit(userPrompt)
                     }) {
                         Image(systemName: "arrow.up.circle.fill")
-                            .font(.system(size: 26))
+                            .font(AppTypography.displayHero)
                             .foregroundColor(userPrompt.trimmingCharacters(in: .whitespaces).isEmpty || isLoading ? AppColors.secondaryText.opacity(0.4) : AppColors.brand)
                     }
                     .disabled(userPrompt.trimmingCharacters(in: .whitespaces).isEmpty || isLoading)

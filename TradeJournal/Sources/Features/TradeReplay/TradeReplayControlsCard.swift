@@ -75,7 +75,7 @@ public struct TradeReplayControlsCard: View {
                         onReset()
                     } label: {
                         Image(systemName: "backward.end.fill")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(AppTypography.actionButtonCompact)
                             .foregroundColor(AppColors.primaryText)
                             .frame(width: 34, height: 34)
                             .background(AppColors.cardBackground.opacity(0.85))
@@ -96,7 +96,7 @@ public struct TradeReplayControlsCard: View {
                         onStep(-1)
                     } label: {
                         Image(systemName: "chevron.left")
-                            .font(.system(size: 13, weight: .bold))
+                            .font(AppTypography.actionButtonCompact)
                             .foregroundColor(currentStep <= 1 ? AppColors.secondaryText.opacity(0.3) : AppColors.primaryText)
                             .frame(width: 34, height: 34)
                             .background(AppColors.cardBackground.opacity(0.85))
@@ -118,9 +118,9 @@ public struct TradeReplayControlsCard: View {
                     } label: {
                         HStack(spacing: 5) {
                             Image(systemName: isPlaying ? "pause.fill" : "play.fill")
-                                .font(.system(size: 12, weight: .bold))
+                                .font(AppTypography.actionButtonCompact)
                             Text(isPlaying ? "Pause" : "Play")
-                                .font(.system(size: 12.5, weight: .semibold, design: .rounded))
+                                .font(AppTypography.actionButtonCompact)
                                 .lineLimit(1)
                         }
                         .frame(height: 34)
@@ -142,7 +142,7 @@ public struct TradeReplayControlsCard: View {
                         onStep(1)
                     } label: {
                         Image(systemName: "chevron.right")
-                            .font(.system(size: 13, weight: .bold))
+                            .font(AppTypography.actionButtonCompact)
                             .foregroundColor(currentStep >= barsCount ? AppColors.secondaryText.opacity(0.3) : AppColors.primaryText)
                             .frame(width: 34, height: 34)
                             .background(AppColors.cardBackground.opacity(0.85))
@@ -163,7 +163,7 @@ public struct TradeReplayControlsCard: View {
                         onForwardToEnd()
                     } label: {
                         Image(systemName: "forward.end.fill")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(AppTypography.actionButtonCompact)
                             .foregroundColor(AppColors.primaryText)
                             .frame(width: 34, height: 34)
                             .background(AppColors.cardBackground.opacity(0.85))
@@ -198,7 +198,7 @@ public struct TradeReplayControlsCard: View {
                             onLandscape()
                         } label: {
                             Image(systemName: "arrow.up.left.and.arrow.down.right")
-                                .font(.system(size: 11, weight: .bold))
+                                .font(AppTypography.actionButtonCompact)
                                 .foregroundColor(AppColors.primaryText)
                                 .frame(width: 34, height: 34)
                                 .background(AppColors.secondaryBackground)

@@ -69,7 +69,7 @@ public struct YourDataSettingsView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     HStack(spacing: 8) {
                         Image(systemName: "internaldrive")
-                            .font(.system(size: 13))
+                            .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText)
                         
                         Text("\(dataStore.trades.count) trades • \(dataStore.executions.count) executions • \(dataStore.accounts.count) accounts")

@@ -39,7 +39,7 @@ public struct ImportStatementView: View {
                         VStack(alignment: .leading, spacing: 8) {
                             HStack(spacing: 6) {
                                 Image(systemName: "creditcard")
-                                    .font(.system(size: 13))
+                                    .font(AppTypography.captionBold)
                                     .foregroundColor(AppColors.brand)
                                 Text("Target Account")
                                     .font(AppTypography.captionBold)
@@ -70,7 +70,7 @@ public struct ImportStatementView: View {
                                     .fill(AppColors.brand.opacity(0.12))
                                     .frame(width: 64, height: 64)
                                 Image(systemName: "doc.badge.plus")
-                                    .font(.system(size: 28))
+                                    .font(AppTypography.displayHeroLarge)
                                     .foregroundColor(AppColors.brand)
                             }
                             .padding(.top, 4)
@@ -125,7 +125,7 @@ public struct ImportStatementView: View {
                         cardContainer {
                             HStack(spacing: 12) {
                                 Image(systemName: "checkmark.circle.fill")
-                                    .font(.title2)
+                                    .font(AppTypography.displayMedium)
                                     .foregroundColor(AppColors.profit)
                                 
                                 VStack(alignment: .leading, spacing: 3) {
@@ -235,7 +235,7 @@ public struct ImportStatementView: View {
                                     VStack(alignment: .leading, spacing: 12) {
                                         HStack {
                                             Image(systemName: "list.clipboard")
-                                                .font(.system(size: 13))
+                                                .font(AppTypography.headline)
                                                 .foregroundColor(AppColors.brand)
                                             Text("Execution Preview (\(min(3, preview.usableExecutions.count))/\(preview.usableExecutions.count))")
                                                 .font(AppTypography.headline)

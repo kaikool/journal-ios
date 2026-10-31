@@ -44,7 +44,7 @@ public struct WeekdayChart: View {
                 HStack(alignment: .center) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(activeBucket.map { $0.key.uppercased() } ?? "PERFORMANCE BY WEEKDAY")
-                            .font(.system(size: 11, weight: .semibold))
+                            .font(AppTypography.cardHeaderUppercase)
                             .foregroundColor(AppColors.secondaryText)
                             .tracking(0.5)
                             .lineLimit(1)
@@ -60,7 +60,7 @@ public struct WeekdayChart: View {
                     
                     let displayPnl = activeBucket?.netPnl ?? totalNetPnl
                     Text(Formatters.formatPnL(displayPnl, currency: currency))
-                        .font(.system(size: 15, weight: .bold))
+                        .font(AppTypography.displayMedium)
                         .monospacedDigit()
                         .foregroundColor(displayPnl >= 0 ? AppColors.profit : AppColors.loss)
                         .frame(height: 36, alignment: .trailing)
@@ -120,7 +120,7 @@ public struct WeekdayChart: View {
                             AxisValueLabel {
                                 if let doubleVal = value.as(Double.self) {
                                     Text(Formatters.compactAxisValue(doubleVal, currency: currency))
-                                        .font(.system(size: 9.5, weight: .medium))
+                                        .font(AppTypography.numberMicro)
                                         .monospacedDigit()
                                         .foregroundStyle(AppColors.secondaryText)
                                         .frame(width: 36, alignment: .trailing)
@@ -131,7 +131,7 @@ public struct WeekdayChart: View {
                     .chartXAxis {
                         AxisMarks { _ in
                             AxisValueLabel()
-                                .font(.system(size: 10, weight: .semibold))
+                                .font(AppTypography.captionBold)
                                 .foregroundStyle(AppColors.primaryText)
                         }
                     }
@@ -161,7 +161,7 @@ public struct WeekdayChart: View {
                         ForEach(weekdays) { bucket in
                             HStack {
                                 Text(bucket.key)
-                                    .font(.system(size: 12, weight: .semibold))
+                                    .font(AppTypography.bodyBold)
                                     .foregroundColor(AppColors.primaryText)
                                     .frame(width: 50, alignment: .leading)
                                 
@@ -173,7 +173,7 @@ public struct WeekdayChart: View {
                                 
                                 if let wr = bucket.winRate {
                                     Text("WR \(Formatters.formatPercent(wr))")
-                                        .font(.system(size: 10, weight: .medium))
+                                        .font(AppTypography.badgeMicro)
                                         .padding(.horizontal, 6)
                                         .padding(.vertical, 2)
                                         .background(AppColors.border.opacity(0.4))
@@ -182,7 +182,7 @@ public struct WeekdayChart: View {
                                 }
                                 
                                 Text(Formatters.formatPnL(bucket.netPnl, currency: currency))
-                                    .font(.system(size: 12, weight: .bold))
+                                    .font(AppTypography.statValue)
                                     .monospacedDigit()
                                     .foregroundColor(bucket.netPnl >= 0 ? AppColors.profit : AppColors.loss)
                                     .frame(minWidth: 70, alignment: .trailing)

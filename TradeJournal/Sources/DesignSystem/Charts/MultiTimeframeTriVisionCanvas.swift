@@ -29,13 +29,13 @@ public struct MultiTimeframeTriVisionCanvas: View {
             // Master Header HUD
             HStack {
                 Text("\(symbol) MULTI-TIMEFRAME STRUCTURE")
-                    .font(.system(size: 13, weight: .bold))
+                    .font(AppTypography.cardHeader)
                     .foregroundColor(AppColors.primaryText)
                 
                 Spacer()
                 
                 Text(h1Bars.isEmpty ? "D1 • H4 • M15" : "D1 • H4 • H1 • M15")
-                    .font(.system(size: 11, weight: .bold))
+                    .font(AppTypography.cardHeaderUppercase)
                     .padding(.horizontal, 7)
                     .padding(.vertical, 3)
                     .background(AppColors.brand.opacity(0.12))

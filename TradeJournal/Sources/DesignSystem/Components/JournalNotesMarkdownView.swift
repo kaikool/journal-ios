@@ -28,14 +28,11 @@ public struct JournalNotesMarkdownView: View {
             HStack(spacing: 6) {
                 if isRiskAiHeader {
                     Image(systemName: "shield.lefthalf.filled")
-                        .font(.system(size: 11, weight: .bold))
+                        .font(level == 1 ? AppTypography.sectionHeader : (level == 2 ? AppTypography.bodyBold : AppTypography.captionBold))
                         .foregroundColor(AppColors.brand)
                 }
                 Text(LocalizedStringKey(text))
-                    .font(.system(
-                        size: level == 1 ? 14 : (level == 2 ? 13 : 12.5),
-                        weight: .bold
-                    ))
+                    .font(level == 1 ? AppTypography.sectionHeader : (level == 2 ? AppTypography.bodyBold : AppTypography.captionBold))
                     .foregroundColor(isRiskAiHeader ? AppColors.brand : AppColors.primaryText)
             }
             .padding(.top, level == 1 ? 6 : 3)
@@ -113,7 +110,7 @@ public struct JournalNotesMarkdownView: View {
                     GridRow {
                         ForEach(Array(headers.enumerated()), id: \.offset) { colIdx, header in
                             Text(LocalizedStringKey(header))
-                                .font(.system(size: 11.5, weight: .bold))
+                                .font(AppTypography.captionBold)
                                 .foregroundColor(AppColors.primaryText)
                                 .lineLimit(2)
                                 .padding(.horizontal, 12)
@@ -141,7 +138,7 @@ public struct JournalNotesMarkdownView: View {
                             ForEach(Array(headers.indices), id: \.self) { colIdx in
                                 let cellText = colIdx < row.count ? row[colIdx] : ""
                                 Text(LocalizedStringKey(cellText))
-                                    .font(.system(size: 11.5, weight: .regular))
+                                    .font(AppTypography.caption)
                                     .foregroundColor(AppColors.primaryText)
                                     .padding(.horizontal, 12)
                                     .padding(.vertical, 7)

@@ -41,7 +41,7 @@ public struct AppSectionHeader: View {
         HStack(spacing: 6) {
             if let icon = icon {
                 Image(systemName: icon)
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(AppTypography.cardHeaderUppercase)
                     .foregroundColor(AppColors.secondaryText)
             }
             
@@ -81,11 +81,11 @@ public struct AppSectionHeader: View {
                     HStack(spacing: 4) {
                         if let actionIcon = actionIcon {
                             Image(systemName: actionIcon)
-                                .font(.system(size: 10.5, weight: .bold))
+                                .font(AppTypography.captionBold)
                         }
                         if let actionTitle = actionTitle {
                             Text(actionTitle)
-                                .font(.system(size: 11.5, weight: .semibold, design: .rounded))
+                                .font(AppTypography.actionButtonCompact)
                         }
                     }
                     .foregroundColor(actionColor)

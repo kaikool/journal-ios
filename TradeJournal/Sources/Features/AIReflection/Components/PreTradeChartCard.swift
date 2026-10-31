@@ -54,7 +54,7 @@ public struct PreTradeChartCard: View {
                 // Header with Timeframe Tabs
                 HStack {
                     Text("CHART STRUCTURE")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(AppTypography.cardHeaderUppercase)
                         .foregroundColor(AppColors.secondaryText)
                         .tracking(0.5)
                     
@@ -103,7 +103,7 @@ public struct PreTradeChartCard: View {
                     .fill(AppColors.profit)
                     .frame(width: 5, height: 5)
                 Text("\(activeBars.count) bars")
-                    .font(.system(size: 11, weight: .medium))
+                    .font(AppTypography.captionMicro)
                     .foregroundColor(AppColors.secondaryText)
             }
             
@@ -113,7 +113,7 @@ public struct PreTradeChartCard: View {
                 // Attach custom chart image icon button
                 Button(action: onAttachPhoto) {
                     Image(systemName: "photo.badge.plus")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(AppTypography.actionPill)
                         .foregroundColor(AppColors.secondaryText)
                         .frame(width: 28, height: 28)
                         .background(AppColors.secondaryBackground.opacity(0.8))
@@ -125,7 +125,7 @@ public struct PreTradeChartCard: View {
                 // Enlarge full-screen lightbox icon button
                 Button(action: onEnlarge) {
                     Image(systemName: "arrow.up.left.and.arrow.down.right")
-                        .font(.system(size: 11, weight: .bold))
+                        .font(AppTypography.captionBold)
                         .foregroundColor(AppColors.brand)
                         .frame(width: 28, height: 28)
                         .background(AppColors.brand.opacity(0.12))
@@ -162,7 +162,7 @@ public struct PreTradeChartCard: View {
             }
         }) {
             Text(title)
-                .font(.system(size: 11, weight: isSel ? .bold : .medium))
+                .font(isSel ? AppTypography.captionBold : AppTypography.captionMicro)
                 .padding(.horizontal, 7)
                 .padding(.vertical, 4)
                 .background(isSel ? AppColors.brand : Color.clear)

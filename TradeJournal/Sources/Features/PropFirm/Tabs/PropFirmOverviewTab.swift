@@ -18,13 +18,13 @@ extension PropFirmLedgerView {
                             HStack(spacing: 12) {
                                 Image(systemName: "bell.badge.fill")
                                     .foregroundColor(AppColors.brand)
-                                    .font(.title3)
+                                    .font(AppTypography.cardHeader)
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text("Upcoming renewal: \(rAcc.firm)")
                                         .font(AppTypography.captionBold)
                                         .foregroundColor(AppColors.primaryText)
                                     Text("\(rAcc.name) • Due: \(rAcc.renewalOn ?? "") • Fee: \(Formatters.formatCurrency(Decimal(rAcc.renewalMinor ?? 0) / 100, currency: rAcc.currency))")
-                                        .font(.system(size: 11))
+                                        .font(AppTypography.captionMicro)
                                         .monospacedDigit()
                                         .foregroundColor(AppColors.secondaryText)
                                 }
@@ -102,7 +102,7 @@ extension PropFirmLedgerView {
                         }
                         Spacer()
                         Image(systemName: "trophy.fill")
-                            .font(.system(size: 24))
+                            .font(AppTypography.metricLarge)
                             .foregroundColor(AppColors.brand)
                             .frame(width: 44, height: 44)
                             .background(AppColors.brand.opacity(0.12))
@@ -116,7 +116,7 @@ extension PropFirmLedgerView {
                 cardContainer {
                     VStack(alignment: .leading, spacing: 10) {
                         Text("CUMULATIVE CASH TIMELINE")
-                            .font(.system(size: 11, weight: .semibold))
+                            .font(AppTypography.cardHeaderUppercase)
                             .foregroundColor(AppColors.secondaryText)
                             .tracking(0.5)
                         
@@ -250,7 +250,7 @@ extension PropFirmLedgerView {
                                 AxisTick(stroke: StrokeStyle(lineWidth: 0.5))
                                     .foregroundStyle(AppColors.border)
                                 AxisValueLabel(format: .dateTime.month(.abbreviated).day())
-                                    .font(.system(size: 9, weight: .medium))
+                                    .font(AppTypography.numberMicro)
                                     .foregroundStyle(AppColors.secondaryText)
                             }
                         }

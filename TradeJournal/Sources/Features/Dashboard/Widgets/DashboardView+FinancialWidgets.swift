@@ -27,7 +27,7 @@ extension DashboardView {
                     if let delta = snap.weekDelta {
                         HStack(spacing: 3) {
                             Text(delta >= 0 ? "▲" : "▼")
-                                .font(.system(size: 9, weight: .bold))
+                                .font(AppTypography.captionMicro)
                             Text(Formatters.formatCurrency(abs(delta), currency: env.currentCurrency))
                                 .font(AppTypography.captionBold)
                                 .monospacedDigit()
@@ -50,7 +50,7 @@ extension DashboardView {
                         Text("·")
                         Text("Fees \(Formatters.formatCurrency(metrics.fees ?? 0, currency: env.currentCurrency))")
                     }
-                    .font(.system(size: 10))
+                    .font(AppTypography.captionMicro)
                     .monospacedDigit()
                     .foregroundColor(AppColors.secondaryText)
                     .lineLimit(1)
@@ -71,7 +71,7 @@ extension DashboardView {
                         if let delta = snap.weekDelta {
                             HStack(spacing: 3) {
                                 Text(delta >= 0 ? "▲" : "▼")
-                                    .font(.system(size: 9, weight: .bold))
+                                    .font(AppTypography.captionMicro)
                                 Text(Formatters.formatCurrency(abs(delta), currency: env.currentCurrency))
                                     .font(AppTypography.captionBold)
                                     .monospacedDigit()

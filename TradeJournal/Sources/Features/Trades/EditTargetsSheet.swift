@@ -197,7 +197,7 @@ public struct EditTargetsSheet: View {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     Image(systemName: "shield.slash.fill")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(AppTypography.cardHeaderUppercase)
                         .foregroundColor(AppColors.loss)
                     Text("STOP LOSS (RISK)")
                         .font(AppTypography.cardHeaderUppercase)
@@ -252,7 +252,7 @@ public struct EditTargetsSheet: View {
                 if !isStopLossValidDirection {
                     HStack(spacing: 6) {
                         Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.system(size: 11))
+                            .font(AppTypography.footnote)
                             .foregroundColor(.orange)
                         Text(trade.direction == .long ? "Stop loss should be below entry price for Buy trades." : "Stop loss should be above entry price for Sell trades.")
                             .font(AppTypography.footnote)
@@ -269,7 +269,7 @@ public struct EditTargetsSheet: View {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     Image(systemName: "target")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(AppTypography.cardHeaderUppercase)
                         .foregroundColor(AppColors.profit)
                     Text("PROFIT TARGET (REWARD)")
                         .font(AppTypography.cardHeaderUppercase)
@@ -324,7 +324,7 @@ public struct EditTargetsSheet: View {
                 if !isProfitTargetValidDirection {
                     HStack(spacing: 6) {
                         Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.system(size: 11))
+                            .font(AppTypography.footnote)
                             .foregroundColor(.orange)
                         Text(trade.direction == .long ? "Profit target should be above entry price for Buy trades." : "Profit target should be below entry price for Sell trades.")
                             .font(AppTypography.footnote)
@@ -336,7 +336,7 @@ public struct EditTargetsSheet: View {
                 if let rDist = riskDistance, rDist > 0 {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("QUICK TARGET PRESETS")
-                            .font(.system(size: 10, weight: .bold))
+                            .font(AppTypography.cardHeaderUppercase)
                             .foregroundColor(AppColors.secondaryText)
                             .tracking(0.5)
                         

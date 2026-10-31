@@ -165,11 +165,11 @@ public struct PlaybookConditionEdgeChart: View {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
                     Image(systemName: "chart.bar.xaxis")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(AppTypography.cardHeaderUppercase)
                         .foregroundColor(AppColors.brand)
                     
                     Text(activeStat.map { "CONDITION (\($0.index)) EDGE" } ?? "CONDITION WIN / LOSS EDGE")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(AppTypography.cardHeaderUppercase)
                         .foregroundColor(AppColors.secondaryText)
                         .tracking(0.5)
                         .lineLimit(1)
@@ -203,13 +203,13 @@ public struct PlaybookConditionEdgeChart: View {
                     HStack(spacing: 4) {
                         Circle().fill(AppColors.loss).frame(width: 6, height: 6)
                         Text("Loss")
-                            .font(.system(size: 10, weight: .medium))
+                            .font(AppTypography.captionMicro)
                             .foregroundColor(AppColors.secondaryText)
                     }
                     HStack(spacing: 4) {
                         Circle().fill(AppColors.profit).frame(width: 6, height: 6)
                         Text("Win")
-                            .font(.system(size: 10, weight: .medium))
+                            .font(AppTypography.captionMicro)
                             .foregroundColor(AppColors.secondaryText)
                     }
                 }
@@ -224,7 +224,7 @@ public struct PlaybookConditionEdgeChart: View {
     private var emptyRulesView: some View {
         VStack(spacing: 8) {
             Image(systemName: "checklist")
-                .font(.system(size: 24))
+                .font(AppTypography.displayMajor)
                 .foregroundColor(AppColors.secondaryText)
             Text("No Checklist Rules")
                 .font(AppTypography.captionBold)
@@ -261,14 +261,14 @@ public struct PlaybookConditionEdgeChart: View {
             // Left: Losses scale ticks (descending towards center)
             HStack(spacing: 0) {
                 Text("LOSSES")
-                    .font(.system(size: 9, weight: .bold))
+                    .font(AppTypography.badgeMicro)
                     .foregroundColor(AppColors.loss.opacity(0.8))
                 
                 Spacer()
                 
                 ForEach(scaleTicks, id: \.self) { tick in
                     Text("\(tick)")
-                        .font(.system(size: 9.5, weight: .medium))
+                        .font(AppTypography.numberMicro)
                         .monospacedDigit()
                         .foregroundColor(AppColors.secondaryText.opacity(0.8))
                         .frame(minWidth: 16)
@@ -281,7 +281,7 @@ public struct PlaybookConditionEdgeChart: View {
             
             // Center Zero indicator
             Text("0")
-                .font(.system(size: 10, weight: .bold))
+                .font(AppTypography.numberMicro)
                 .monospacedDigit()
                 .foregroundColor(AppColors.secondaryText)
                 .frame(width: 32)
@@ -290,7 +290,7 @@ public struct PlaybookConditionEdgeChart: View {
             HStack(spacing: 0) {
                 ForEach(scaleTicks.reversed(), id: \.self) { tick in
                     Text("\(tick)")
-                        .font(.system(size: 9.5, weight: .medium))
+                        .font(AppTypography.numberMicro)
                         .monospacedDigit()
                         .foregroundColor(AppColors.secondaryText.opacity(0.8))
                         .frame(minWidth: 16)
@@ -302,7 +302,7 @@ public struct PlaybookConditionEdgeChart: View {
                 Spacer()
                 
                 Text("WINS")
-                    .font(.system(size: 9, weight: .bold))
+                    .font(AppTypography.badgeMicro)
                     .foregroundColor(AppColors.profit.opacity(0.8))
             }
             .frame(maxWidth: .infinity)
@@ -342,7 +342,7 @@ public struct PlaybookConditionEdgeChart: View {
                         
                         if stat.losses > 0 {
                             Text("\(stat.losses)")
-                                .font(.system(size: 10.5, weight: .bold))
+                                .font(AppTypography.numberMicro)
                                 .monospacedDigit()
                                 .foregroundColor(AppColors.loss)
                                 .lineLimit(1)
@@ -367,7 +367,7 @@ public struct PlaybookConditionEdgeChart: View {
                             .frame(width: 28, height: 20)
                         
                         Text("(\(stat.index))")
-                            .font(.system(size: 10.5, weight: .bold))
+                            .font(AppTypography.numberMicro)
                             .monospacedDigit()
                             .foregroundColor(isSelected ? .white : AppColors.brand)
                     }
@@ -387,7 +387,7 @@ public struct PlaybookConditionEdgeChart: View {
                         
                         if stat.wins > 0 {
                             Text("\(stat.wins)")
-                                .font(.system(size: 10.5, weight: .bold))
+                                .font(AppTypography.numberMicro)
                                 .monospacedDigit()
                                 .foregroundColor(AppColors.profit)
                                 .lineLimit(1)
@@ -420,14 +420,14 @@ public struct PlaybookConditionEdgeChart: View {
                 HStack(spacing: 8) {
                     // Index badge
                     Text("(\(stat.index))")
-                        .font(.system(size: 11, weight: .bold))
+                        .font(AppTypography.badgeStandard)
                         .monospacedDigit()
                         .foregroundColor(AppColors.brand)
                         .frame(width: 26, alignment: .leading)
                     
                     // Rule text
                     Text(stat.rule)
-                        .font(.system(size: 12, weight: .medium))
+                        .font(AppTypography.body)
                         .foregroundColor(AppColors.primaryText)
                         .lineLimit(1)
                         .truncationMode(.tail)
@@ -448,7 +448,7 @@ public struct PlaybookConditionEdgeChart: View {
                         }
                         
                         Text("\(stat.total)")
-                            .font(.system(size: 11, weight: .medium))
+                            .font(AppTypography.numberMicro)
                             .monospacedDigit()
                             .foregroundColor(AppColors.secondaryText)
                             .frame(width: 18, alignment: .trailing)
@@ -463,7 +463,7 @@ public struct PlaybookConditionEdgeChart: View {
                         .frame(width: 44, alignment: .center)
                     } else {
                         Text("–")
-                            .font(.system(size: 10, weight: .medium))
+                            .font(AppTypography.captionMicro)
                             .foregroundColor(AppColors.secondaryText)
                             .frame(width: 44, alignment: .center)
                     }
@@ -471,14 +471,14 @@ public struct PlaybookConditionEdgeChart: View {
                     // Wins / Losses count
                     HStack(spacing: 2) {
                         Text("\(stat.wins)W")
-                            .font(.system(size: 11, weight: .bold))
+                            .font(AppTypography.numberMicro)
                             .monospacedDigit()
                             .foregroundColor(stat.wins > 0 ? AppColors.profit : AppColors.secondaryText)
                         Text("/")
-                            .font(.system(size: 10))
+                            .font(AppTypography.captionMicro)
                             .foregroundColor(AppColors.secondaryText.opacity(0.5))
                         Text("\(stat.losses)L")
-                            .font(.system(size: 11, weight: .bold))
+                            .font(AppTypography.numberMicro)
                             .monospacedDigit()
                             .foregroundColor(stat.losses > 0 ? AppColors.loss : AppColors.secondaryText)
                     }

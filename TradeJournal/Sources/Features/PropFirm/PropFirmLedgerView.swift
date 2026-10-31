@@ -281,9 +281,9 @@ public struct PropFirmLedgerView: View {
                 } label: {
                     HStack(spacing: 4) {
                         Image(systemName: showArchivedAccounts ? "archivebox.fill" : "archivebox")
-                            .font(.system(size: 11))
+                            .font(AppTypography.actionButtonCompact)
                         Text("Archived")
-                            .font(.system(size: 12, weight: showArchivedAccounts ? .semibold : .medium))
+                            .font(AppTypography.actionButtonCompact)
                     }
                     .foregroundColor(showArchivedAccounts ? AppColors.brand : AppColors.secondaryText)
                     .padding(.horizontal, 10)

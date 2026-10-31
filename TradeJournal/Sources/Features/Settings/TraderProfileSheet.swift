@@ -69,13 +69,13 @@ public struct TraderProfileSheet: View {
         AppCard {
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: "person.text.rectangle")
-                    .font(.system(size: 18, weight: .semibold))
+                    .font(AppTypography.displayMedium)
                     .foregroundColor(AppColors.brand)
                     .padding(.top, 2)
                 
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Trader Profile & Discipline Rules")
-                        .font(.system(size: 13, weight: .bold))
+                        .font(AppTypography.cardHeader)
                         .foregroundColor(AppColors.primaryText)
                     
                     Text("Risk AI enforces these parameters when auditing trade thesis, sizing limits, and behavioral compliance.")

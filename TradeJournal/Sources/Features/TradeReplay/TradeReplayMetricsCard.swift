@@ -137,7 +137,7 @@ public struct TradeReplayExcursionCard: View {
                         .lineLimit(1)
                     Spacer()
                     Text("Extremes")
-                        .font(.system(size: 10, weight: .medium))
+                        .font(AppTypography.captionMicro)
                         .foregroundColor(AppColors.secondaryText.opacity(0.7))
                         .lineLimit(1)
                 }

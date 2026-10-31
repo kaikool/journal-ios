@@ -42,7 +42,7 @@ public struct TradeAICoachErrorCard: View {
         AppCard {
             VStack(spacing: 12) {
                 Image(systemName: "exclamationmark.triangle")
-                    .font(.system(size: 26))
+                    .font(AppTypography.displayHero)
                     .foregroundColor(AppColors.warning)
                 
                 Text(message)

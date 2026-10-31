@@ -16,11 +16,11 @@ internal struct DashboardCardWrapper<Content: View>: View {
             if isEditing, let item = DashboardCardRegistry.item(for: cardId) {
                 HStack(spacing: 6) {
                     Image(systemName: "line.3.horizontal")
-                        .font(.system(size: 13, weight: .bold))
+                        .font(AppTypography.captionBold)
                         .foregroundColor(AppColors.secondaryText)
                     
                     Text(item.label)
-                        .font(.system(size: 11, weight: .bold))
+                        .font(AppTypography.captionBold)
                         .foregroundColor(AppColors.primaryText)
                         .lineLimit(1)
                     
@@ -31,7 +31,7 @@ internal struct DashboardCardWrapper<Content: View>: View {
                         onMoveUp()
                     } label: {
                         Image(systemName: "arrow.up.circle.fill")
-                            .font(.system(size: 16))
+                            .font(AppTypography.iconMedium)
                             .foregroundColor(AppColors.brand)
                     }
                     .buttonStyle(ApplePressableButtonStyle())
@@ -41,7 +41,7 @@ internal struct DashboardCardWrapper<Content: View>: View {
                         onMoveDown()
                     } label: {
                         Image(systemName: "arrow.down.circle.fill")
-                            .font(.system(size: 16))
+                            .font(AppTypography.iconMedium)
                             .foregroundColor(AppColors.brand)
                     }
                     .buttonStyle(ApplePressableButtonStyle())
@@ -51,7 +51,7 @@ internal struct DashboardCardWrapper<Content: View>: View {
                         onHide()
                     } label: {
                         Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 16))
+                            .font(AppTypography.iconMedium)
                             .foregroundColor(AppColors.loss)
                     }
                     .buttonStyle(ApplePressableButtonStyle())
@@ -126,7 +126,7 @@ extension DashboardView {
     internal func statHeader(_ title: String, icon: String, hint: String) -> some View {
         HStack(alignment: .center) {
             Text(title.uppercased())
-                .font(.system(size: 11, weight: .semibold))
+                .font(AppTypography.cardHeaderUppercase)
                 .foregroundColor(AppColors.secondaryText)
                 .tracking(0.5)
                 .lineLimit(1)
@@ -139,7 +139,7 @@ extension DashboardView {
                 activeTooltip = (title: title, hint: hint)
             } label: {
                 Image(systemName: icon)
-                    .font(.system(size: 12, weight: .medium))
+                    .font(AppTypography.captionMedium)
                     .foregroundColor(AppColors.secondaryText.opacity(0.8))
                     .frame(width: 24, height: 24)
                     .background(AppColors.secondaryBackground.opacity(0.5))

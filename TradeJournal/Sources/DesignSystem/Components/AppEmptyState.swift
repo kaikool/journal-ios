@@ -53,7 +53,7 @@ public struct AppEmptyState: View {
                         Circle().stroke(iconColor.opacity(0.20), lineWidth: 0.8)
                     )
                 Image(systemName: icon)
-                    .font(.system(size: isInCard ? 20 : 25, weight: .semibold))
+                    .font(isInCard ? AppTypography.displayMedium : AppTypography.iconLarge)
                     .foregroundColor(iconColor)
             }
             .padding(.top, isInCard ? 6 : 0)

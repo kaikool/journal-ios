@@ -144,7 +144,7 @@ public struct AccountsManagerView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
                 Text("Quick display:")
-                    .font(.system(size: 11))
+                    .font(AppTypography.captionMicro)
                     .foregroundColor(AppColors.secondaryText)
                     .lineLimit(1)
                 
@@ -180,18 +180,18 @@ public struct AccountsManagerView: View {
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: "square.stack.3d.up.fill")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(AppTypography.actionButtonCompact)
                     .foregroundColor(isAllSelected ? AppColors.brand : AppColors.secondaryText)
                 
                 Text("All Accounts Combined")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(AppTypography.rowTitle)
                     .foregroundColor(AppColors.primaryText)
                 
                 Text("·")
                     .foregroundColor(AppColors.secondaryText.opacity(0.4))
                 
                 Text("\(visibleCount)/\(totalCount) active")
-                    .font(.system(size: 11, weight: .regular))
+                    .font(AppTypography.captionMicro)
                     .foregroundColor(AppColors.secondaryText)
                 
                 Spacer()

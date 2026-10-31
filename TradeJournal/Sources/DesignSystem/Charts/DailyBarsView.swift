@@ -33,13 +33,13 @@ private struct HeartbeatStarView: View {
         ZStack {
             // Radiant golden halo
             Image(systemName: "star.fill")
-                .font(.system(size: 8, weight: .bold))
+                .font(AppTypography.badgeMarker)
                 .foregroundColor(Color.yellow.opacity(0.35))
                 .scaleEffect(1.35)
             
             // Core golden star
             Image(systemName: "star.fill")
-                .font(.system(size: 8.5, weight: .bold))
+                .font(AppTypography.badgeMarker)
                 .foregroundColor(Color.yellow)
                 .shadow(color: Color.yellow.opacity(0.8), radius: 2.5)
         }
@@ -51,7 +51,7 @@ private struct HeartbeatStarView: View {
 private struct HeartbeatWarningView: View {
     var body: some View {
         Image(systemName: "exclamationmark.triangle.fill")
-            .font(.system(size: 8.5, weight: .bold))
+            .font(AppTypography.badgeMarker)
             .foregroundColor(AppColors.loss)
             .shadow(color: AppColors.loss.opacity(0.7), radius: 2.5)
             .frame(width: 18, height: 18)
@@ -288,7 +288,7 @@ public struct DailyBarsView: View {
                         AxisTick(stroke: StrokeStyle(lineWidth: 0.5))
                             .foregroundStyle(AppColors.border)
                         AxisValueLabel(format: .dateTime.month(.abbreviated).day())
-                            .font(.system(size: 10, weight: .medium))
+                            .font(AppTypography.captionMicro)
                             .foregroundStyle(AppColors.secondaryText)
                     }
                 }
@@ -319,7 +319,7 @@ public struct DailyBarsView: View {
         HStack(spacing: 6) {
             if let active = activeDatum {
                 Text(formatDate(active.date))
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(AppTypography.captionBold)
                     .foregroundColor(AppColors.secondaryText)
                     .lineLimit(1)
                 
@@ -354,7 +354,7 @@ public struct DailyBarsView: View {
                 Spacer(minLength: 4)
                 
                 Text(isPrivate ? "••••" : Formatters.formatPnL(active.netPnl, currency: currency))
-                    .font(.system(size: 13, weight: .bold))
+                    .font(AppTypography.statValue)
                     .monospacedDigit()
                     .foregroundColor(active.netPnl >= 0 ? AppColors.profit : AppColors.loss)
                     .lineLimit(1)
@@ -363,10 +363,10 @@ public struct DailyBarsView: View {
                 if let best = bestDay {
                     HStack(spacing: 3) {
                         Image(systemName: "star.fill")
-                            .font(.system(size: 9))
+                            .font(AppTypography.captionMicro)
                             .foregroundColor(Color.yellow)
                         Text("Best:")
-                            .font(.system(size: 10, weight: .medium))
+                            .font(AppTypography.captionMicro)
                             .foregroundColor(AppColors.secondaryText)
                         Text(isPrivate ? "••••" : Formatters.formatPnL(best.netPnl, currency: currency))
                             .font(AppTypography.number(10, weight: .bold))
@@ -381,13 +381,13 @@ public struct DailyBarsView: View {
                 if let worst = worstDay {
                     HStack(spacing: 3) {
                         Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.system(size: 9))
+                            .font(AppTypography.captionMicro)
                             .foregroundColor(AppColors.loss.opacity(0.85))
                         Text("Worst:")
-                            .font(.system(size: 10, weight: .medium))
+                            .font(AppTypography.captionMicro)
                             .foregroundColor(AppColors.secondaryText)
                         Text(isPrivate ? "••••" : Formatters.formatPnL(worst.netPnl, currency: currency))
-                            .font(.system(size: 10, weight: .bold))
+                            .font(AppTypography.numberMicro)
                             .monospacedDigit()
                             .foregroundColor(AppColors.loss)
                     }

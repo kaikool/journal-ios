@@ -57,10 +57,10 @@ public struct LinkNoteToTradeSheet: View {
                 // Single-line Note Context Banner
                 HStack(spacing: 8) {
                     Image(systemName: "note.text")
-                        .font(.system(size: 11))
+                        .font(AppTypography.caption)
                         .foregroundColor(AppColors.secondaryText)
                     Text(noteTitle.isEmpty ? "Untitled Note" : noteTitle)
-                        .font(.system(size: 13, weight: .medium))
+                        .font(AppTypography.rowTitle)
                         .foregroundColor(AppColors.primaryText)
                         .lineLimit(1)
                     Spacer()
@@ -127,35 +127,35 @@ public struct LinkNoteToTradeSheet: View {
         
         return HStack(spacing: 8) {
             Text(trade.symbol)
-                .font(.system(size: 14, weight: .semibold))
+                .font(AppTypography.rowTitle)
                 .foregroundColor(AppColors.primaryText)
                 .lineLimit(1)
             
             Text(trade.direction == .short ? "SELL" : "BUY")
-                .font(.system(size: 12, weight: .medium))
+                .font(AppTypography.badgeStandard)
                 .foregroundColor(trade.direction == .short ? AppColors.loss : AppColors.profit)
                 .lineLimit(1)
             
             Text("Entry \(Formatters.price(trade.avgEntry))")
-                .font(.system(size: 13))
+                .font(AppTypography.statLabel)
                 .foregroundColor(AppColors.secondaryText)
                 .lineLimit(1)
             
             Text(df.string(from: trade.openedAt))
-                .font(.system(size: 12))
+                .font(AppTypography.captionMicro)
                 .foregroundColor(AppColors.secondaryText.opacity(0.8))
                 .lineLimit(1)
             
             Spacer(minLength: 4)
             
             Text(Formatters.currency(trade.netPnl))
-                .font(.system(size: 13, weight: .semibold))
+                .font(AppTypography.statValue)
                 .foregroundColor(trade.netPnl >= 0 ? AppColors.profit : AppColors.loss)
                 .lineLimit(1)
             
             if isLinked {
                 Image(systemName: "checkmark")
-                    .font(.system(size: 12, weight: .bold))
+                    .font(AppTypography.actionButtonCompact)
                     .foregroundColor(AppColors.brand)
             }
         }

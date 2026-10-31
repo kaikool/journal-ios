@@ -142,7 +142,7 @@ public struct ProgressRoutinesView: View {
                         
                         HStack(spacing: 5) {
                             Image(systemName: "calendar")
-                                .font(.system(size: 11))
+                                .font(AppTypography.caption)
                                 .foregroundColor(AppColors.brand)
                             Text(activeDate == todayKey ? "Today" : activeDate)
                                 .font(AppTypography.actionButtonCompact)
@@ -224,7 +224,7 @@ public struct ProgressRoutinesView: View {
                                     dataStore.toggleProgressCheck(ruleId: rule.id, date: activeDate)
                                 } label: {
                                     Image(systemName: isRuleChecked(rule.id) ? "checkmark.square.fill" : "square")
-                                        .font(.system(size: 17))
+                                        .font(AppTypography.rowPrimary)
                                         .foregroundColor(isRuleChecked(rule.id) ? AppColors.brand : AppColors.secondaryText)
                                 }
                                 .buttonStyle(.plain)
@@ -260,7 +260,7 @@ public struct ProgressRoutinesView: View {
                                     }
                                 } label: {
                                     Image(systemName: "ellipsis")
-                                        .font(.system(size: 14, weight: .bold))
+                                        .font(AppTypography.cardHeader)
                                         .foregroundColor(AppColors.secondaryText.opacity(0.8))
                                         .frame(width: 32, height: 32)
                                         .contentShape(Rectangle())
@@ -485,7 +485,7 @@ public struct AddProgressRoutineSheet: View {
         TradeFormCardContainer {
             VStack(alignment: .leading, spacing: 12) {
                 Text("ROUTINE")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(AppTypography.cardHeaderUppercase)
                     .foregroundColor(AppColors.secondaryText)
                     .tracking(0.5)
                 
@@ -495,7 +495,7 @@ public struct AddProgressRoutineSheet: View {
                 
                 HStack(spacing: 8) {
                     Image(systemName: "checklist")
-                        .font(.system(size: 13))
+                        .font(AppTypography.cardHeader)
                         .foregroundColor(AppColors.brand)
                     
                     TextField("e.g. Check ForexFactory Calendar", text: $title)
@@ -508,7 +508,7 @@ public struct AddProgressRoutineSheet: View {
                         } label: {
                             Image(systemName: "xmark.circle.fill")
                                 .foregroundColor(AppColors.secondaryText)
-                                .font(.system(size: 12))
+                                .font(AppTypography.caption)
                         }
                     }
                 }
@@ -524,7 +524,7 @@ public struct AddProgressRoutineSheet: View {
                 // Quick suggestions
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Suggestions")
-                        .font(.system(size: 10, weight: .semibold))
+                        .font(AppTypography.cardHeaderUppercase)
                         .foregroundColor(AppColors.secondaryText)
                         .textCase(.uppercase)
                     
@@ -548,7 +548,7 @@ public struct AddProgressRoutineSheet: View {
         TradeFormCardContainer {
             VStack(alignment: .leading, spacing: 12) {
                 Text("WHEN")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(AppTypography.cardHeaderUppercase)
                     .foregroundColor(AppColors.secondaryText)
                     .tracking(0.5)
                 
@@ -567,24 +567,24 @@ public struct AddProgressRoutineSheet: View {
                         } label: {
                             HStack(spacing: 12) {
                                 Image(systemName: meta.icon)
-                                    .font(.system(size: 14, weight: .semibold))
+                                    .font(AppTypography.cardHeader)
                                     .foregroundColor(isSelected ? AppColors.brand : AppColors.secondaryText)
                                     .frame(width: 24)
                                 
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(meta.id)
-                                        .font(.system(size: 13, weight: isSelected ? .bold : .semibold))
+                                        .font(isSelected ? AppTypography.rowPrimary : AppTypography.rowTitle)
                                         .foregroundColor(isSelected ? AppColors.primaryText : AppColors.secondaryText)
                                     
                                     Text(meta.subtitle)
-                                        .font(.system(size: 11))
+                                        .font(AppTypography.captionMicro)
                                         .foregroundColor(AppColors.secondaryText.opacity(0.8))
                                 }
                                 
                                 Spacer()
                                 
                                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                                    .font(.system(size: 16, weight: .semibold))
+                                    .font(AppTypography.rowPrimary)
                                     .foregroundColor(isSelected ? AppColors.brand : AppColors.border)
                             }
                             .padding(.horizontal, 12)
@@ -609,7 +609,7 @@ public struct AddProgressRoutineSheet: View {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     Text("SCHEDULED DAYS")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(AppTypography.cardHeaderUppercase)
                         .foregroundColor(AppColors.secondaryText)
                         .tracking(0.5)
                     
@@ -623,11 +623,11 @@ public struct AddProgressRoutineSheet: View {
                             #endif
                             selectedDays = [1, 2, 3, 4, 5]
                         }
-                        .font(.system(size: 10, weight: .semibold))
+                        .font(AppTypography.captionMicro)
                         .foregroundColor(selectedDays == [1, 2, 3, 4, 5] ? AppColors.brand : AppColors.secondaryText)
                         
                         Text("•")
-                            .font(.system(size: 10))
+                            .font(AppTypography.captionMicro)
                             .foregroundColor(AppColors.border)
                         
                         Button("All Days") {
@@ -636,7 +636,7 @@ public struct AddProgressRoutineSheet: View {
                             #endif
                             selectedDays = [0, 1, 2, 3, 4, 5, 6]
                         }
-                        .font(.system(size: 10, weight: .semibold))
+                        .font(AppTypography.captionMicro)
                         .foregroundColor(selectedDays.count == 7 ? AppColors.brand : AppColors.secondaryText)
                     }
                 }
@@ -657,7 +657,7 @@ public struct AddProgressRoutineSheet: View {
                             }
                         } label: {
                             Text(day.1)
-                                .font(.system(size: 12, weight: isSelected ? .bold : .medium))
+                                .font(isSelected ? AppTypography.actionButtonCompact : AppTypography.actionPill)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 10)
                                 .background(isSelected ? AppColors.brand : AppColors.secondaryBackground)

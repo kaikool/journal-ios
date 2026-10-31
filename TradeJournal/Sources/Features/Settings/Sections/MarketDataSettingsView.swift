@@ -25,7 +25,7 @@ public struct MarketDataSettingsView: View {
                     HStack(spacing: 12) {
                         VStack(alignment: .leading, spacing: 3) {
                             Text("Binance")
-                                .font(.system(size: 14.5, weight: .semibold))
+                                .font(AppTypography.rowPrimary)
                                 .foregroundColor(AppColors.primaryText)
                             
                             HStack(spacing: 5) {
@@ -61,7 +61,7 @@ public struct MarketDataSettingsView: View {
                     HStack(spacing: 12) {
                         VStack(alignment: .leading, spacing: 3) {
                             Text("OANDA")
-                                .font(.system(size: 14.5, weight: .semibold))
+                                .font(AppTypography.rowPrimary)
                                 .foregroundColor(AppColors.primaryText)
                             
                             HStack(spacing: 5) {

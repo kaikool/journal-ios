@@ -43,7 +43,7 @@ public struct MarketCandleChartView: View {
         return HStack(alignment: .center, spacing: 8) {
             // Symbol (without redundant timeframe, as tab is active right above)
             Text(symbol)
-                .font(.system(size: 12, weight: .bold))
+                .font(AppTypography.cardHeaderUppercase)
                 .foregroundColor(AppColors.primaryText)
             
             // Trend Regime Pill
@@ -54,14 +54,14 @@ public struct MarketCandleChartView: View {
                 
                 HStack(spacing: 4) {
                     Text(isBull ? "▲" : (isBear ? "▼" : "⇄"))
-                        .font(.system(size: 8.5, weight: .bold))
+                        .font(AppTypography.captionMicro)
                     Text(t.label.replacingOccurrences(of: " ▲▲", with: "")
                                 .replacingOccurrences(of: " ▲", with: "")
                                 .replacingOccurrences(of: " ▼▼", with: "")
                                 .replacingOccurrences(of: " ▼", with: "")
                                 .replacingOccurrences(of: " ⇄", with: "")
                                 .replacingOccurrences(of: " ▬", with: ""))
-                        .font(.system(size: 9.5, weight: .bold))
+                        .font(AppTypography.badgeMicro)
                 }
                 .padding(.horizontal, 7)
                 .padding(.vertical, 2.5)

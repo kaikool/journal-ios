@@ -184,18 +184,18 @@ public struct NavigationDrawerView: View {
                 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Trade Journal")
-                        .font(.system(size: isCompact ? 15 : 16, weight: .bold))
+                        .font(AppTypography.pageHeroTitle)
                         .foregroundColor(AppColors.primaryText)
                     
                     if dataStore.isSyncing {
                         HStack(spacing: 4) {
                             Image(systemName: "arrow.triangle.2.circlepath")
-                                .font(.system(size: 10, weight: .semibold))
+                                .font(AppTypography.captionMicro)
                                 .foregroundColor(AppColors.brand)
                                 .rotationEffect(dataStore.isSyncing ? .degrees(360) : .zero)
                                 .animation(Animation.linear(duration: 1).repeatForever(autoreverses: false), value: dataStore.isSyncing)
                             Text("Syncing...")
-                                .font(.system(size: 11, weight: .medium))
+                                .font(AppTypography.captionMicro)
                                 .foregroundColor(AppColors.brand)
                         }
                     }
@@ -211,7 +211,7 @@ public struct NavigationDrawerView: View {
                     }
                 } label: {
                     Image(systemName: "xmark")
-                        .font(.system(size: 11, weight: .bold))
+                        .font(AppTypography.actionButtonCompact)
                         .foregroundColor(AppColors.secondaryText)
                         .frame(width: isCompact ? 26 : 28, height: isCompact ? 26 : 28)
                         .background(AppColors.secondaryBackground.opacity(0.8))
@@ -277,19 +277,19 @@ public struct NavigationDrawerView: View {
                 }
                 
                 Text(shortAccountDisplayName)
-                    .font(.system(size: isCompact ? 12 : 13, weight: .semibold))
+                    .font(AppTypography.rowTitle)
                     .foregroundColor(AppColors.primaryText)
                     .lineLimit(1)
                 
                 Spacer(minLength: 6)
                 
                 Text(currentAccountBalanceFormatted)
-                    .font(.system(size: isCompact ? 12 : 13, weight: .bold, design: .rounded))
+                    .font(AppTypography.statValue)
                     .foregroundColor(AppColors.profit)
                     .lineLimit(1)
                 
                 Image(systemName: "chevron.up.chevron.down")
-                    .font(.system(size: isCompact ? 9 : 10, weight: .semibold))
+                    .font(AppTypography.captionMicro)
                     .foregroundColor(AppColors.secondaryText.opacity(0.8))
             }
             .padding(.horizontal, 12)
@@ -314,7 +314,7 @@ public struct NavigationDrawerView: View {
     @ViewBuilder
     private func sectionHeader(title: String, isCompact: Bool = false) -> some View {
         Text(title)
-            .font(.system(size: isCompact ? 10 : 10.5, weight: .bold))
+            .font(AppTypography.cardHeaderUppercase)
             .tracking(1.0)
             .foregroundColor(AppColors.mutedText)
             .padding(.horizontal, 10)
@@ -348,12 +348,12 @@ public struct NavigationDrawerView: View {
             HStack(spacing: 12) {
                 // Clean SF Symbol Icon (no background box, Apple HIG standard)
                 Image(systemName: isActive ? tab.selectedIconName : tab.iconName)
-                    .font(.system(size: iconSize, weight: isActive ? .semibold : .regular))
+                    .font(isActive ? AppTypography.rowPrimary : AppTypography.rowTitle)
                     .foregroundColor(isActive ? AppColors.brand : AppColors.secondaryText)
                     .frame(width: 22, height: 22, alignment: .center)
                 
                 Text(tab.rawValue)
-                    .font(.system(size: fontSize, weight: isActive ? .semibold : .medium))
+                    .font(isActive ? AppTypography.rowPrimary : AppTypography.rowTitle)
                     .foregroundColor(isActive ? AppColors.primaryText : AppColors.secondaryText)
                 
                 Spacer()
@@ -361,7 +361,7 @@ public struct NavigationDrawerView: View {
                 // Active Indicator
                 if isActive {
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 10, weight: .bold))
+                        .font(AppTypography.captionMicro)
                         .foregroundColor(AppColors.brand)
                 }
             }
@@ -393,18 +393,18 @@ public struct NavigationDrawerView: View {
             } label: {
                 HStack(spacing: 10) {
                     Image(systemName: "arrow.triangle.2.circlepath")
-                        .font(.system(size: isCompact ? 13 : 14, weight: .semibold))
+                        .font(AppTypography.rowTitle)
                         .foregroundColor(dataStore.isSyncing ? AppColors.brand : AppColors.secondaryText)
                         .rotationEffect(dataStore.isSyncing ? .degrees(360) : .zero)
                         .animation(dataStore.isSyncing ? Animation.linear(duration: 1).repeatForever(autoreverses: false) : .default, value: dataStore.isSyncing)
                     
                     VStack(alignment: .leading, spacing: 1) {
                         Text("Cloud & Broker Sync")
-                            .font(.system(size: isCompact ? 12 : 13, weight: .semibold))
+                            .font(AppTypography.rowTitle)
                             .foregroundColor(AppColors.primaryText)
                         
                         Text(dataStore.isSyncing ? "Syncing..." : SyncManager.shared.formattedLastSyncTime)
-                            .font(.system(size: isCompact ? 10 : 11))
+                            .font(AppTypography.captionMicro)
                             .foregroundColor(AppColors.secondaryText)
                     }
                     
@@ -431,11 +431,11 @@ public struct NavigationDrawerView: View {
                 } label: {
                     HStack(spacing: 6) {
                         Image(systemName: themeIcon)
-                            .font(.system(size: 13))
+                            .font(AppTypography.actionButtonCompact)
                             .foregroundColor(themeIconColor)
                         
                         Text(env.appTheme.rawValue)
-                            .font(.system(size: 12, weight: .semibold))
+                            .font(AppTypography.actionButtonCompact)
                             .foregroundColor(AppColors.primaryText)
                     }
                     .frame(maxWidth: .infinity)
@@ -456,11 +456,11 @@ public struct NavigationDrawerView: View {
                 } label: {
                     HStack(spacing: 6) {
                         Image(systemName: env.isPrivacyModeEnabled ? "eye.slash.fill" : "eye.fill")
-                            .font(.system(size: 13))
+                            .font(AppTypography.actionButtonCompact)
                             .foregroundColor(env.isPrivacyModeEnabled ? AppColors.brand : AppColors.secondaryText)
                         
                         Text(env.isPrivacyModeEnabled ? "Hidden" : "Public")
-                            .font(.system(size: 12, weight: .semibold))
+                            .font(AppTypography.actionButtonCompact)
                             .foregroundColor(env.isPrivacyModeEnabled ? AppColors.brand : AppColors.primaryText)
                     }
                     .frame(maxWidth: .infinity)

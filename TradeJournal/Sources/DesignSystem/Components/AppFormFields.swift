@@ -56,7 +56,7 @@ public struct AppFormField: View {
             HStack(spacing: 8) {
                 if let icon = icon {
                     Image(systemName: icon)
-                        .font(.system(size: 12, weight: .medium))
+                        .font(AppTypography.captionMedium)
                         .foregroundColor(AppColors.secondaryText)
                 }
                 
@@ -152,7 +152,7 @@ public struct AppNumericField: View {
             HStack(spacing: 8) {
                 if let icon = icon {
                     Image(systemName: icon)
-                        .font(.system(size: 12, weight: .medium))
+                        .font(AppTypography.captionMedium)
                         .foregroundColor(AppColors.secondaryText)
                 }
                 

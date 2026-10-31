@@ -38,19 +38,19 @@ public struct AppToggleRow: View {
             HStack(spacing: 10) {
                 if let icon = icon {
                     Image(systemName: icon)
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(AppTypography.rowTitle)
                         .foregroundColor(iconColor)
                         .frame(width: 24, height: 24)
                 }
                 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
-                        .font(.system(size: 14, weight: .medium))
+                        .font(AppTypography.rowTitle)
                         .foregroundColor(AppColors.primaryText)
                     
                     if let subtitle = subtitle, !subtitle.isEmpty {
                         Text(subtitle)
-                            .font(.system(size: 11, weight: .regular))
+                            .font(AppTypography.captionMicro)
                             .foregroundColor(AppColors.secondaryText)
                             .lineLimit(2)
                     }
@@ -105,18 +105,18 @@ public struct AppCheckboxRow: View {
                     
                     if isChecked {
                         Image(systemName: "checkmark")
-                            .font(.system(size: 10, weight: .heavy))
+                            .font(AppTypography.badgeStandard)
                             .foregroundColor(.white)
                     } else if let index = index {
                         Text("\(index)")
-                            .font(.system(size: 10, weight: .bold))
+                            .font(AppTypography.badgeStandard)
                             .foregroundColor(AppColors.secondaryText)
                     }
                 }
                 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
-                        .font(.system(size: 13, weight: .medium))
+                        .font(AppTypography.bodyMedium)
                         .foregroundColor(isChecked && isStrikethroughWhenChecked ? AppColors.secondaryText : AppColors.primaryText)
                         .strikethrough(isChecked && isStrikethroughWhenChecked, color: AppColors.secondaryText)
                         .lineLimit(2)

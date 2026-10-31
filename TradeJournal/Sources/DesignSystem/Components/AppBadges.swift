@@ -84,10 +84,10 @@ public struct AppBadge: View {
         HStack(spacing: 3.5) {
             if let icon = icon {
                 Image(systemName: icon)
-                    .font(.system(size: 8.5, weight: .bold))
+                    .font(AppTypography.badgeMicro)
             }
             Text(text)
-                .font(.system(size: 10, weight: .bold, design: .rounded))
+                .font(AppTypography.badgeStandard)
                 .lineLimit(1)
         }
         .padding(.horizontal, 7)
@@ -169,12 +169,12 @@ public struct AppleMenuChip<Content: View>: View {
             HStack(spacing: 5) {
                 if let icon = icon {
                     Image(systemName: icon)
-                        .font(.system(size: 11, weight: .medium))
+                        .font(AppTypography.actionButtonCompact)
                         .foregroundColor(AppColors.secondaryText)
                 }
                 if !title.isEmpty {
                     Text("\(title):")
-                        .font(.system(size: 11, weight: .regular))
+                        .font(AppTypography.captionMicro)
                         .foregroundColor(AppColors.secondaryText)
                 }
                 Text(selectionText)
@@ -184,7 +184,7 @@ public struct AppleMenuChip<Content: View>: View {
                     .truncationMode(.tail)
                 
                 Image(systemName: "chevron.up.chevron.down")
-                    .font(.system(size: 9, weight: .semibold))
+                    .font(AppTypography.captionMicro)
                     .foregroundColor(AppColors.secondaryText.opacity(0.8))
             }
             .padding(.horizontal, 10)

@@ -128,14 +128,14 @@ public struct EditManualTradeSheet: View {
                         if isSyncedTrade {
                             HStack(spacing: 10) {
                                 Image(systemName: "link.circle.fill")
-                                    .font(.system(size: 16))
+                                    .font(AppTypography.cardHeader)
                                     .foregroundColor(AppColors.brand)
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text("Broker Synced Trade (\(accountName))")
-                                        .font(.system(size: 12, weight: .bold))
+                                        .font(AppTypography.captionBold)
                                         .foregroundColor(AppColors.primaryText)
                                     Text("Financial execution fills are managed by your broker. Targets, strategy, playbook, and journal notes are fully editable.")
-                                        .font(.system(size: 11))
+                                        .font(AppTypography.captionMicro)
                                         .foregroundColor(AppColors.secondaryText)
                                 }
                                 Spacer()
@@ -220,7 +220,7 @@ public struct EditManualTradeSheet: View {
         TradeFormCardContainer {
             VStack(alignment: .leading, spacing: 14) {
                 Text("ASSET & DIRECTION")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(AppTypography.cardHeaderUppercase)
                     .foregroundColor(AppColors.secondaryText)
                     .tracking(0.5)
                 
@@ -234,9 +234,9 @@ public struct EditManualTradeSheet: View {
                     } label: {
                         HStack(spacing: 6) {
                             Image(systemName: "arrow.up.right")
-                                .font(.system(size: 13, weight: .bold))
+                                .font(AppTypography.actionButton)
                             Text("BUY / LONG")
-                                .font(.system(size: 13, weight: .bold))
+                                .font(AppTypography.actionButton)
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 10)
@@ -254,9 +254,9 @@ public struct EditManualTradeSheet: View {
                     } label: {
                         HStack(spacing: 6) {
                             Image(systemName: "arrow.down.right")
-                                .font(.system(size: 13, weight: .bold))
+                                .font(AppTypography.actionButton)
                             Text("SELL / SHORT")
-                                .font(.system(size: 13, weight: .bold))
+                                .font(AppTypography.actionButton)
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 10)
@@ -277,7 +277,7 @@ public struct EditManualTradeSheet: View {
         TradeFormCardContainer {
             VStack(alignment: .leading, spacing: 14) {
                 Text("POSITION & PRICING")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(AppTypography.cardHeaderUppercase)
                     .foregroundColor(AppColors.secondaryText)
                     .tracking(0.5)
                 
@@ -340,7 +340,7 @@ public struct EditManualTradeSheet: View {
         TradeFormCardContainer {
             VStack(alignment: .leading, spacing: 12) {
                 Text("STRATEGY & PLAYBOOK")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(AppTypography.cardHeaderUppercase)
                     .foregroundColor(AppColors.secondaryText)
                     .tracking(0.5)
                 

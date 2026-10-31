@@ -11,8 +11,7 @@ private struct CountingPercentageText: View, Animatable {
     
     var body: some View {
         Text(String(format: "%.1f%%", max(0, value) * 100))
-            .font(.system(size: max(11, size * 0.19), weight: .bold))
-            .monospacedDigit()
+            .font(AppTypography.financialNumber(size: max(11, size * 0.19), weight: .bold))
             .foregroundColor(AppColors.primaryText)
             .padding(.bottom, 2)
     }
@@ -84,8 +83,7 @@ public struct GaugeView: View {
                 Spacer()
                 if value == nil {
                     Text("–")
-                        .font(.system(size: max(11, size * 0.19), weight: .bold))
-                        .monospacedDigit()
+                        .font(AppTypography.financialNumber(size: max(11, size * 0.19), weight: .bold))
                         .foregroundColor(AppColors.primaryText)
                         .padding(.bottom, 2)
                 } else {

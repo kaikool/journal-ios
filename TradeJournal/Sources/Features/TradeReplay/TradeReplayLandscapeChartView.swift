@@ -119,7 +119,7 @@ public struct TradeReplayLandscapeChartView: View {
             
             // Symbol & Direction
             Text(trade.symbol)
-                .font(.system(size: 15, weight: .bold))
+                .font(AppTypography.rowPrimary)
                 .foregroundColor(AppColors.primaryText)
                 .lineLimit(1)
                 .fixedSize()
@@ -149,7 +149,7 @@ public struct TradeReplayLandscapeChartView: View {
             if let curBar = frame.currentBar {
                 HStack(spacing: 4) {
                     Image(systemName: "clock")
-                        .font(.system(size: 10))
+                        .font(AppTypography.captionMicro)
                         .foregroundColor(AppColors.secondaryText)
                     Text(Formatters.formatDateTime(curBar.date, timeZone: timeZone))
                         .font(AppTypography.number(11, weight: .medium))
@@ -164,7 +164,7 @@ public struct TradeReplayLandscapeChartView: View {
                 isForceLandscape90.toggle()
             } label: {
                 Image(systemName: "rotate.right")
-                    .font(.system(size: 11, weight: .bold))
+                    .font(AppTypography.actionButtonCompact)
                     .padding(7)
                     .background(AppColors.secondaryBackground)
                     .foregroundColor(AppColors.secondaryText)
@@ -273,7 +273,7 @@ public struct TradeReplayLandscapeChartView: View {
                 onReset()
             } label: {
                 Image(systemName: "backward.end.fill")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(AppTypography.actionButtonCompact)
                     .foregroundColor(AppColors.primaryText)
                     .frame(width: 30, height: 30)
                     .background(AppColors.secondaryBackground)
@@ -291,7 +291,7 @@ public struct TradeReplayLandscapeChartView: View {
                 onStep(-1)
             } label: {
                 Image(systemName: "chevron.left")
-                    .font(.system(size: 12, weight: .bold))
+                    .font(AppTypography.actionButtonCompact)
                     .foregroundColor(currentStep <= 1 ? AppColors.secondaryText.opacity(0.3) : AppColors.primaryText)
                     .frame(width: 30, height: 30)
                     .background(AppColors.secondaryBackground)
@@ -309,7 +309,7 @@ public struct TradeReplayLandscapeChartView: View {
                 onTogglePlay()
             } label: {
                 Image(systemName: isPlaying ? "pause.fill" : "play.fill")
-                    .font(.system(size: 14, weight: .bold))
+                    .font(AppTypography.actionButton)
                     .foregroundColor(.white)
                     .frame(width: 36, height: 36)
                     .background(AppColors.brand)
@@ -328,7 +328,7 @@ public struct TradeReplayLandscapeChartView: View {
                 onStep(1)
             } label: {
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .bold))
+                    .font(AppTypography.actionButtonCompact)
                     .foregroundColor(currentStep >= bars.count ? AppColors.secondaryText.opacity(0.3) : AppColors.primaryText)
                     .frame(width: 30, height: 30)
                     .background(AppColors.secondaryBackground)
@@ -346,7 +346,7 @@ public struct TradeReplayLandscapeChartView: View {
                 onForwardToEnd()
             } label: {
                 Image(systemName: "forward.end.fill")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(AppTypography.actionButtonCompact)
                     .foregroundColor(AppColors.primaryText)
                     .frame(width: 30, height: 30)
                     .background(AppColors.secondaryBackground)

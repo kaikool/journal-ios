@@ -48,7 +48,7 @@ public struct TradeDetailHeroCard: View {
                 HStack(spacing: 12) {
                     HStack(spacing: 4) {
                         Image(systemName: "calendar")
-                            .font(.system(size: 11))
+                            .font(AppTypography.caption)
                         Text(Formatters.formatDateTime(trade.openedAt, timeZone: env.currentTimeZone))
                             .font(AppTypography.caption)
                     }
@@ -59,7 +59,7 @@ public struct TradeDetailHeroCard: View {
                             .foregroundColor(AppColors.secondaryText.opacity(0.4))
                         HStack(spacing: 4) {
                             Image(systemName: "hourglass")
-                                .font(.system(size: 11))
+                                .font(AppTypography.caption)
                             Text(dur)
                                 .font(AppTypography.caption)
                         }

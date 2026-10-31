@@ -45,7 +45,7 @@ public struct PlaybookCardView: View {
                                     .fill(AppColors.brand.opacity(0.12))
                                     .frame(width: 28, height: 28)
                                 Image(systemName: "book.pages")
-                                    .font(.system(size: 13, weight: .semibold))
+                                    .font(AppTypography.cardHeader)
                                     .foregroundColor(AppColors.brand)
                             }
                             

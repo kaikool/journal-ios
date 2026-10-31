@@ -76,10 +76,10 @@ public struct AppSegmentedBar<T: Hashable>: View {
             HStack(spacing: 4) {
                 if let icon = iconFor?(item) {
                     Image(systemName: icon)
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(isSelected ? AppTypography.actionButtonCompact : AppTypography.captionMedium)
                 }
                 Text(titleFor(item))
-                    .font(.system(size: 11.5, weight: isSelected ? .bold : .medium, design: .rounded))
+                    .font(isSelected ? AppTypography.actionButtonCompact : AppTypography.captionMedium)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
                 

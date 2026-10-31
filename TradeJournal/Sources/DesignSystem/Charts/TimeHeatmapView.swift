@@ -58,32 +58,32 @@ public struct TimeHeatmapView: View {
             HStack {
                 if let active = activeBucket {
                     Text("\(active.key):00")
-                        .font(.system(size: 11, weight: .bold))
+                        .font(AppTypography.captionBold)
                         .foregroundColor(AppColors.primaryText)
                     
                     Spacer()
                     
                     Text("\(active.trades) trades")
-                        .font(.system(size: 11, weight: .medium))
+                        .font(AppTypography.captionMicro)
                         .foregroundColor(AppColors.secondaryText)
                     
                     Text("·")
                         .foregroundColor(AppColors.secondaryText)
                     
                     Text(isPrivate ? "••••" : Formatters.formatPnL(active.netPnl, currency: currency))
-                        .font(.system(size: 11, weight: .bold))
+                        .font(AppTypography.statValue)
                         .monospacedDigit()
                         .foregroundColor(active.netPnl >= 0 ? AppColors.profit : AppColors.loss)
                 } else {
                     Text("HOURLY BREAKDOWN")
-                        .font(.system(size: 10.5, weight: .semibold))
+                        .font(AppTypography.cardHeaderUppercase)
                         .foregroundColor(AppColors.secondaryText)
                         .tracking(0.5)
                     
                     Spacer()
                     
                     Text("Hold bar to inspect hour")
-                        .font(.system(size: 10, weight: .medium))
+                        .font(AppTypography.captionMicro)
                         .foregroundColor(AppColors.secondaryText.opacity(0.8))
                 }
             }
@@ -97,7 +97,7 @@ public struct TimeHeatmapView: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
                     Text(isPrivate ? "Net P&L (hidden)" : "Net P&L (\(currency))")
-                        .font(.system(size: 10, weight: .semibold))
+                        .font(AppTypography.cardHeaderUppercase)
                         .foregroundColor(AppColors.secondaryText)
                         .textCase(.uppercase)
                         .tracking(0.5)
@@ -149,7 +149,7 @@ public struct TimeHeatmapView: View {
                         AxisValueLabel(anchor: .trailing) {
                             if let d = value.as(Double.self) {
                                 Text(isPrivate ? "••••" : Formatters.compactCurrency(Decimal(d), currency: currency))
-                                    .font(.system(size: 8.5, weight: .medium))
+                                    .font(AppTypography.captionMicro)
                                     .monospacedDigit()
                                     .foregroundColor(AppColors.secondaryText)
                                     .frame(width: 32, alignment: .trailing)
@@ -165,7 +165,7 @@ public struct TimeHeatmapView: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
                     Text("Trades")
-                        .font(.system(size: 10, weight: .semibold))
+                        .font(AppTypography.cardHeaderUppercase)
                         .foregroundColor(AppColors.secondaryText)
                         .textCase(.uppercase)
                         .tracking(0.5)
@@ -218,7 +218,7 @@ public struct TimeHeatmapView: View {
                         AxisValueLabel(anchor: .trailing) {
                             if let intVal = value.as(Int.self) {
                                 Text("\(intVal)")
-                                    .font(.system(size: 8.5, weight: .medium))
+                                    .font(AppTypography.captionMicro)
                                     .monospacedDigit()
                                     .foregroundColor(AppColors.secondaryText)
                                     .frame(width: 32, alignment: .trailing)
@@ -246,7 +246,7 @@ public struct TimeHeatmapView: View {
                                     }
                                 }()
                                 Text(shortLabel)
-                                    .font(.system(size: 8.5, weight: .semibold))
+                                    .font(AppTypography.captionMicro)
                                     .foregroundStyle(AppColors.secondaryText)
                                     .fixedSize()
                             }

@@ -202,7 +202,7 @@ public struct CandleChartView: View {
         return HStack(alignment: .center, spacing: 8) {
             // 1. Symbol
             Text(trade.symbol)
-                .font(.system(size: 12, weight: .bold))
+                .font(AppTypography.actionButtonCompact)
                 .foregroundColor(AppColors.primaryText)
             
             // 2. Trend Capsule Pill (▲ Bullish, ▼ Bearish, ⇄ Pullback)
@@ -213,14 +213,14 @@ public struct CandleChartView: View {
                 
                 HStack(spacing: 4) {
                     Text(isBull ? "▲" : (isBear ? "▼" : "⇄"))
-                        .font(.system(size: 8.5, weight: .bold))
+                        .font(AppTypography.badgeMicro)
                     Text(t.label.replacingOccurrences(of: " ▲▲", with: "")
                                 .replacingOccurrences(of: " ▲", with: "")
                                 .replacingOccurrences(of: " ▼▼", with: "")
                                 .replacingOccurrences(of: " ▼", with: "")
                                 .replacingOccurrences(of: " ⇄", with: "")
                                 .replacingOccurrences(of: " ▬", with: ""))
-                        .font(.system(size: 9.5, weight: .bold))
+                        .font(AppTypography.badgeMicro)
                 }
                 .padding(.horizontal, 7)
                 .padding(.vertical, 2.5)
@@ -241,7 +241,7 @@ public struct CandleChartView: View {
             // 4. Zoom Indicator (if user pinched)
             if abs(zoomScale - 1.0) > 0.05 {
                 Text(String(format: "%.1fx", zoomScale))
-                    .font(.system(size: 8.5, weight: .bold))
+                    .font(AppTypography.badgeMicro)
                     .padding(.horizontal, 5)
                     .padding(.vertical, 1.5)
                     .background(AppColors.brand.opacity(0.15))
@@ -261,7 +261,7 @@ public struct CandleChartView: View {
                         onResolutionChange?(res)
                     } label: {
                         Text(label)
-                            .font(.system(size: 10, weight: isSelected ? .bold : .medium))
+                            .font(isSelected ? AppTypography.badgeStandard : AppTypography.captionMicro)
                             .foregroundColor(isSelected ? .white : AppColors.secondaryText)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 3)
@@ -379,7 +379,7 @@ public struct CandleChartView: View {
             // Zoom scale pill indicator (shows dynamically during pinch zoom in landscape)
             if isLandscape && abs(zoomScale - 1.0) > 0.05 {
                 Text(String(format: "%.1fx", zoomScale))
-                    .font(.system(size: 9, weight: .bold))
+                    .font(AppTypography.badgeMicro)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
                     .background(AppColors.brand.opacity(0.2))
@@ -491,7 +491,7 @@ public struct CandleChartView: View {
                 let entryX = CGFloat(entryIdx) * stepX + (stepX / 2.0) + panOffset
                 
                 Text("EN")
-                    .font(.system(size: 8, weight: .black))
+                    .font(AppTypography.badgeMarker)
                     .padding(.horizontal, 4)
                     .padding(.vertical, 1.5)
                     .background(AppColors.profit)
@@ -500,7 +500,7 @@ public struct CandleChartView: View {
                     .position(x: min(plotWidth - 20, max(20, entryX)), y: max(8, yEntry - 10))
                 
                 Image(systemName: trade.direction == .long ? "arrowtriangle.up.fill" : "arrowtriangle.down.fill")
-                    .font(.system(size: 8))
+                    .font(AppTypography.badgeMarker)
                     .foregroundColor(AppColors.profit)
                     .position(x: entryX, y: trade.direction == .long ? yEntry + 8 : yEntry - 8)
             }
@@ -531,7 +531,7 @@ public struct CandleChartView: View {
                 
                 // Exit badge: "EX" đỏ
                 Text("EX")
-                    .font(.system(size: 8, weight: .black))
+                    .font(AppTypography.badgeMarker)
                     .padding(.horizontal, 4)
                     .padding(.vertical, 1.5)
                     .background(exitColor)
@@ -541,7 +541,7 @@ public struct CandleChartView: View {
                 
                 // Exit arrow marker
                 Image(systemName: trade.direction == .long ? "arrowtriangle.down.fill" : "arrowtriangle.up.fill")
-                    .font(.system(size: 8))
+                    .font(AppTypography.badgeMarker)
                     .foregroundColor(exitColor)
                     .position(x: exitX, y: trade.direction == .long ? yExit - 8 : yExit + 8)
             } else if let entryIdx = entryBarIdx, let curBar = visibleBars.last {
@@ -735,7 +735,7 @@ public struct CandleChartView: View {
                     
                     // Pool tag badge
                     Text(poolLabel)
-                        .font(.system(size: 7.5, weight: .bold))
+                        .font(AppTypography.badgeMarker)
                         .padding(.horizontal, 4)
                         .padding(.vertical, 1.5)
                         .background(poolColor.opacity(0.18))
@@ -759,21 +759,21 @@ public struct CandleChartView: View {
                             VStack(spacing: 1) {
                                 if isHighSweep {
                                     Text("SW")
-                                        .font(.system(size: 6.5, weight: .black))
+                                        .font(AppTypography.badgeMarkerSmall)
                                         .padding(.horizontal, 3)
                                         .padding(.vertical, 1)
                                         .background(sweepColor)
                                         .foregroundColor(.white)
                                         .cornerRadius(2)
                                     Image(systemName: "arrowtriangle.down.fill")
-                                        .font(.system(size: 5))
+                                        .font(AppTypography.badgeMarkerSmall)
                                         .foregroundColor(sweepColor)
                                 } else {
                                     Image(systemName: "arrowtriangle.up.fill")
-                                        .font(.system(size: 5))
+                                        .font(AppTypography.badgeMarkerSmall)
                                         .foregroundColor(sweepColor)
                                     Text("SW")
-                                        .font(.system(size: 6.5, weight: .black))
+                                        .font(AppTypography.badgeMarkerSmall)
                                         .padding(.horizontal, 3)
                                         .padding(.vertical, 1)
                                         .background(sweepColor)

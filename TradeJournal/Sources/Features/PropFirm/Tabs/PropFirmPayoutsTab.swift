@@ -19,7 +19,7 @@ extension PropFirmLedgerView {
                             HStack {
                                 HStack(spacing: 6) {
                                     Image(systemName: "banknote")
-                                        .font(.system(size: 13))
+                                        .font(AppTypography.subheadlineBold)
                                         .foregroundColor(AppColors.brand)
                                     Text("\(p.entry.firm) Payout")
                                         .font(AppTypography.subheadlineBold)
@@ -146,7 +146,7 @@ extension PropFirmLedgerView {
                             
                             HStack {
                                 Text("Requested: \(p.entry.occurredOn)")
-                                    .font(.system(size: 11))
+                                    .font(AppTypography.captionMicro)
                                     .foregroundColor(AppColors.secondaryText)
                                     .lineLimit(1)
                                 Spacer()

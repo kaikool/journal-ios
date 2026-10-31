@@ -221,13 +221,13 @@ public struct NotebookView: View {
                                    let trade = dataStore.trades.first(where: { $0.key == key || $0.executionIds.contains(key) || $0.id == key }) {
                                     HStack(spacing: 5) {
                                         Image(systemName: "link")
-                                            .font(.system(size: 9))
+                                            .font(AppTypography.captionMicro)
                                             .foregroundColor(AppColors.secondaryText)
                                         Text("\(trade.symbol) \(trade.direction == .short ? "SELL" : "BUY")")
-                                            .font(.system(size: 10, weight: .medium))
+                                            .font(AppTypography.captionMicro)
                                             .foregroundColor(AppColors.secondaryText)
                                         Text(Formatters.currency(trade.netPnl))
-                                            .font(.system(size: 10, weight: .semibold))
+                                            .font(AppTypography.numberMicro)
                                             .foregroundColor(trade.netPnl >= 0 ? AppColors.profit : AppColors.loss)
                                     }
                                     .lineLimit(1)
@@ -243,7 +243,7 @@ public struct NotebookView: View {
                                 
                                 HStack {
                                     Text(String(note.updatedAt.prefix(10)))
-                                        .font(.system(size: 11))
+                                        .font(AppTypography.captionMicro)
                                         .monospacedDigit()
                                         .foregroundColor(AppColors.secondaryText.opacity(0.8))
                                     Spacer()

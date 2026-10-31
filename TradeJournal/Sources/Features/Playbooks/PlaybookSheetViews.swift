@@ -123,7 +123,7 @@ public struct NewPlaybookSheet: View {
                     .fill(AppColors.brand.opacity(0.12))
                     .frame(width: 28, height: 28)
                 Text("\(index + 1)")
-                    .font(.system(size: 12, weight: .bold))
+                    .font(AppTypography.badgeStandard)
                     .foregroundColor(AppColors.brand)
             }
             
@@ -163,7 +163,7 @@ public struct NewPlaybookSheet: View {
                         }
                     } label: {
                         Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 16))
+                            .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText.opacity(0.4))
                     }
                     .buttonStyle(.plain)
@@ -316,7 +316,7 @@ public struct EditPlaybookSheet: View {
                     .fill(AppColors.brand.opacity(0.12))
                     .frame(width: 28, height: 28)
                 Text("\(index + 1)")
-                    .font(.system(size: 12, weight: .bold))
+                    .font(AppTypography.badgeStandard)
                     .foregroundColor(AppColors.brand)
             }
             
@@ -354,7 +354,7 @@ public struct EditPlaybookSheet: View {
                         }
                     } label: {
                         Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 16))
+                            .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText.opacity(0.4))
                     }
                     .buttonStyle(.plain)

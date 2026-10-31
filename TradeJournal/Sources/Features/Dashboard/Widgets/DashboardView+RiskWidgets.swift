@@ -47,9 +47,9 @@ extension DashboardView {
                     } label: {
                         HStack(spacing: 4) {
                             Text(showEdgeScoreBreakdown ? "Hide component breakdown" : "View component breakdown")
-                                .font(.system(size: 11, weight: .semibold))
+                                .font(AppTypography.captionBold)
                             Image(systemName: showEdgeScoreBreakdown ? "chevron.up" : "chevron.down")
-                                .font(.system(size: 9))
+                                .font(AppTypography.captionMicro)
                         }
                         .foregroundColor(AppColors.brand)
                     }

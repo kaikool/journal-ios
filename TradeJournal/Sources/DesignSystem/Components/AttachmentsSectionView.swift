@@ -39,7 +39,7 @@ public struct AttachmentsSectionView: View {
                 Spacer()
                 
                 Text("\(attachments.count) files · Up to 8 MB each")
-                    .font(.system(size: 11))
+                    .font(AppTypography.captionMicro)
                     .foregroundColor(AppColors.secondaryText)
             }
             
@@ -51,9 +51,9 @@ public struct AttachmentsSectionView: View {
                 } label: {
                     HStack(spacing: 5) {
                         Image(systemName: "photo.badge.plus")
-                            .font(.system(size: 11, weight: .bold))
+                            .font(AppTypography.actionButtonCompact)
                         Text("Add screenshot")
-                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .font(AppTypography.actionButtonCompact)
                     }
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
@@ -73,9 +73,9 @@ public struct AttachmentsSectionView: View {
                 } label: {
                     HStack(spacing: 5) {
                         Image(systemName: "doc.badge.plus")
-                            .font(.system(size: 11, weight: .semibold))
+                            .font(AppTypography.actionButtonCompact)
                         Text("File / PDF")
-                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .font(AppTypography.actionButtonCompact)
                     }
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
@@ -97,7 +97,7 @@ public struct AttachmentsSectionView: View {
             
             if let err = errorMessage {
                 Text(err)
-                    .font(.system(size: 11))
+                    .font(AppTypography.captionMicro)
                     .foregroundColor(AppColors.loss)
             }
             
@@ -215,10 +215,10 @@ public struct AttachmentCardView: View {
                     } else {
                         VStack(spacing: 6) {
                             Image(systemName: isImage ? "photo" : "doc.text.fill")
-                                .font(.system(size: 28))
+                                .font(AppTypography.iconLarge)
                                 .foregroundColor(AppColors.accent)
                             Text(isImage ? "Chart screenshot" : "PDF document")
-                                .font(.system(size: 10))
+                                .font(AppTypography.captionMicro)
                                 .foregroundColor(AppColors.secondaryText)
                         }
                     }
@@ -229,12 +229,12 @@ public struct AttachmentCardView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(attachment.name)
-                        .font(.system(size: 11, weight: .medium))
+                        .font(AppTypography.captionBold)
                         .foregroundColor(AppColors.primaryText)
                         .lineLimit(1)
                     
                     Text("\(max(1, attachment.size / 1024)) KB")
-                        .font(.system(size: 10))
+                        .font(AppTypography.captionMicro)
                         .foregroundColor(AppColors.secondaryText)
                 }
                 
@@ -275,7 +275,7 @@ public struct AttachmentPreviewSheet: View {
                 } else {
                     VStack(spacing: 16) {
                         Image(systemName: "doc.text.fill")
-                            .font(.system(size: 64))
+                            .font(AppTypography.iconDocumentPreview)
                             .foregroundColor(AppColors.accent)
                         Text(attachment.name)
                             .font(AppTypography.headline)

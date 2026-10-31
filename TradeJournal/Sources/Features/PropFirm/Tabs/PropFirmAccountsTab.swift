@@ -41,7 +41,7 @@ extension PropFirmLedgerView {
                             HStack {
                                 HStack(spacing: 6) {
                                     Image(systemName: "building.columns")
-                                        .font(.system(size: 13))
+                                        .font(AppTypography.captionBold)
                                         .foregroundColor(AppColors.brand)
                                     Text(acc.firm)
                                         .font(AppTypography.captionBold)
@@ -70,7 +70,7 @@ extension PropFirmLedgerView {
                             if let parentId = acc.parentId, let parentAcc = dataStore.propAccounts.first(where: { $0.id == parentId }) {
                                 HStack(spacing: 4) {
                                     Image(systemName: "arrow.turn.down.right")
-                                        .font(.system(size: 10))
+                                        .font(AppTypography.caption)
                                         .foregroundColor(AppColors.brand)
                                     Text("Next phase of: \(Formatters.cleanAccountName(parentAcc.name))")
                                         .font(AppTypography.caption)
@@ -164,12 +164,12 @@ extension PropFirmLedgerView {
                             VStack(spacing: 8) {
                                 HStack(spacing: 6) {
                                     Text("Opened: \(acc.openedOn)")
-                                        .font(.system(size: 11))
+                                        .font(AppTypography.caption)
                                         .foregroundColor(AppColors.secondaryText)
                                         .lineLimit(1)
                                     if let closed = acc.closedOn {
                                         Text("• Closed: \(closed)")
-                                            .font(.system(size: 11))
+                                            .font(AppTypography.caption)
                                             .foregroundColor(AppColors.secondaryText)
                                             .lineLimit(1)
                                     }

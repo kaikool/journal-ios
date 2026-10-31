@@ -206,7 +206,7 @@ public struct PreTradeAnalysisSheet: View {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Institutional Structure Audit")
-                            .font(.system(size: 13, weight: .bold))
+                            .font(AppTypography.cardHeader)
                             .foregroundColor(AppColors.primaryText)
                         
                         Text("Cross-references D1 macro trend, H4 swing structure, and M15 execution trigger.")
@@ -220,7 +220,7 @@ public struct PreTradeAnalysisSheet: View {
                     Task { await runFullAnalysis() }
                 }) {
                     Text("Analyze Market Bias")
-                        .font(.system(size: 13, weight: .bold))
+                        .font(AppTypography.actionButton)
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
                         .frame(height: 42)

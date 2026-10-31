@@ -33,7 +33,7 @@ public struct TradeAICoachFollowUpView: View {
                         VStack(alignment: .leading, spacing: 6) {
                             HStack(spacing: 5) {
                                 Image(systemName: "sparkles")
-                                    .font(.system(size: 11, weight: .bold))
+                                    .font(AppTypography.cardHeader)
                                     .foregroundColor(AppColors.brand)
                                 Text("RISK AI FOLLOW-UP")
                                     .font(AppTypography.cardHeader)
@@ -80,12 +80,12 @@ public struct TradeAICoachBottomFloatingInput: View {
             // Sleek Floating Input Pill
             HStack(spacing: 10) {
                 Image(systemName: "bubble.left.and.text.bubble.right.fill")
-                    .font(.system(size: 15))
+                    .font(AppTypography.formInput)
                     .foregroundColor(AppColors.secondaryText.opacity(0.8))
                     .padding(.leading, 6)
                 
                 TextField("Ask a follow-up question...", text: $followUpQuery)
-                    .font(.system(size: 15, weight: .medium))
+                    .font(AppTypography.formInput)
                     .foregroundColor(AppColors.primaryText)
                     .onSubmit {
                         if hasQueryText && !isSubmitting {
@@ -96,7 +96,7 @@ public struct TradeAICoachBottomFloatingInput: View {
                 if hasHistory && !hasQueryText {
                     Button(action: onResetThread) {
                         Image(systemName: "arrow.counterclockwise")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(AppTypography.actionButtonCompact)
                             .foregroundColor(AppColors.secondaryText)
                             .frame(width: 30, height: 30)
                             .background(AppColors.secondaryBackground.opacity(0.85))
@@ -118,7 +118,7 @@ public struct TradeAICoachBottomFloatingInput: View {
                                 .frame(width: 34, height: 34)
                             
                             Image(systemName: "arrow.up")
-                                .font(.system(size: 14, weight: .bold))
+                                .font(AppTypography.actionButton)
                                 .foregroundColor(hasQueryText ? .white : AppColors.secondaryText.opacity(0.4))
                         }
                     }

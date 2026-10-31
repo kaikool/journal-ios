@@ -757,16 +757,16 @@ public struct TradeAICoachSheet: View {
             HStack {
                 HStack(spacing: 5) {
                     Image(systemName: "link")
-                        .font(.system(size: 10, weight: .semibold))
+                        .font(AppTypography.cardHeaderUppercase)
                         .foregroundColor(AppColors.secondaryText)
                     Text("LINKED PRE-TRADE SETUP")
-                        .font(.system(size: 10, weight: .semibold))
+                        .font(AppTypography.cardHeaderUppercase)
                         .tracking(0.5)
                         .foregroundColor(AppColors.secondaryText)
                 }
                 Spacer()
                 Text(plan.bias.uppercased())
-                    .font(.system(size: 9, weight: .semibold))
+                    .font(AppTypography.badgeMicro)
                     .foregroundColor(AppColors.primaryText)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
@@ -824,12 +824,12 @@ public struct TradeAICoachSheet: View {
     private func preTradeParamRow(label: String, value: String) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
             Text(label)
-                .font(.system(size: 11, weight: .regular))
+                .font(AppTypography.statLabel)
                 .foregroundColor(AppColors.secondaryText)
                 .frame(width: 85, alignment: .leading)
             
             Text(value)
-                .font(.system(size: 11, weight: .medium))
+                .font(AppTypography.statValueMedium)
                 .foregroundColor(AppColors.primaryText)
                 .lineLimit(2)
             

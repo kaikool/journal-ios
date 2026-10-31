@@ -19,7 +19,7 @@ public struct AIReflectionCategoryChips: View {
                         selectedCategory = cat
                     }) {
                         Text(cat)
-                            .font(.system(size: 12, weight: isSelected ? .semibold : .regular))
+                            .font(isSelected ? AppTypography.actionButtonCompact : AppTypography.caption)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 6)
                             .background(isSelected ? AppColors.secondaryBackground : Color.clear)
@@ -54,7 +54,7 @@ public struct AIReflectionQuestionsCatalog: View {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
                             Text(t.title)
-                                .font(.system(size: 13, weight: .semibold))
+                                .font(AppTypography.rowTitle)
                                 .foregroundColor(AppColors.primaryText)
                             
                             Spacer()
@@ -63,7 +63,7 @@ public struct AIReflectionQuestionsCatalog: View {
                                 onSelectTemplate(t)
                             }) {
                                 Text("Analyze")
-                                    .font(.system(size: 11, weight: .medium))
+                                    .font(AppTypography.actionButtonCompact)
                                     .foregroundColor(AppColors.primaryText)
                                     .padding(.horizontal, 10)
                                     .padding(.vertical, 5)

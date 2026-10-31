@@ -180,7 +180,7 @@ public struct FilterBarView<Actions: View>: View {
             }
             
             Text(title)
-                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .font(AppTypography.actionButtonCompact)
                 .foregroundColor(AppColors.primaryText)
                 .lineLimit(1)
                 .truncationMode(.tail)
@@ -229,16 +229,16 @@ public struct FilterBarView<Actions: View>: View {
         } label: {
             HStack(spacing: 5) {
                 Image(systemName: "creditcard.fill")
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(AppTypography.captionBold)
                     .foregroundColor(AppColors.brand)
                 
                 Text(currentAccountName)
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(AppTypography.captionBold)
                     .foregroundColor(AppColors.primaryText)
                     .lineLimit(1)
                 
                 Image(systemName: "chevron.down")
-                    .font(.system(size: 9, weight: .bold))
+                    .font(AppTypography.captionMicro)
                     .foregroundColor(AppColors.secondaryText.opacity(0.8))
             }
             .padding(.horizontal, 10)
@@ -286,7 +286,7 @@ public struct FilterBarView<Actions: View>: View {
                     }
                 } label: {
                     Text(range.rawValue)
-                        .font(.system(size: 11, weight: selectedRange == range ? .bold : .medium))
+                        .font(selectedRange == range ? AppTypography.captionBold : AppTypography.captionMicro)
                         .lineLimit(1)
                         .fixedSize()
                         .padding(.horizontal, 7)
@@ -352,9 +352,9 @@ public struct FilterBarView<Actions: View>: View {
         } label: {
             HStack(spacing: 4) {
                 Image(systemName: "slider.horizontal.3")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(AppTypography.captionBold)
                 Text("Filters")
-                    .font(.system(size: 11, weight: .medium))
+                    .font(AppTypography.captionBold)
                 
                 if activeFilterCount > 0 {
                     Text("\(activeFilterCount)")

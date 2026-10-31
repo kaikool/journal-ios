@@ -172,11 +172,10 @@ public struct EdgeRadarView: View {
                     
                     HStack(spacing: 3) {
                         Text(m.label)
-                            .font(.system(size: 9, weight: .medium))
+                            .font(AppTypography.captionMicro)
                             .foregroundColor(AppColors.secondaryText)
                         Text("\(Int(round(m.value)))")
-                            .font(.system(size: 9, weight: .bold))
-                            .monospacedDigit()
+                            .font(AppTypography.numberMicro)
                             .foregroundColor(AppColors.primaryText)
                     }
                     .padding(.horizontal, 6)

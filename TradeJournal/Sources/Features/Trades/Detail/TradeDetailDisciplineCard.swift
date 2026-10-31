@@ -59,7 +59,7 @@ public struct TradeDetailDisciplineCard: View {
                         ForEach(1...5, id: \.self) { star in
                             Image(systemName: star <= (trade.rating ?? 0) ? "star.fill" : "star")
                                 .foregroundColor(star <= (trade.rating ?? 0) ? .yellow : AppColors.secondaryText.opacity(0.3))
-                                .font(.system(size: 18))
+                                .font(AppTypography.displayMedium)
                                 .onTapGesture {
                                     #if canImport(UIKit)
                                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -142,7 +142,7 @@ public struct TradeDetailDisciplineCard: View {
                     showAddMistakeInput.toggle()
                 } label: {
                     Image(systemName: showAddMistakeInput ? "chevron.up" : "plus.circle")
-                        .font(.system(size: 13))
+                        .font(AppTypography.actionButtonCompact)
                         .foregroundColor(AppColors.brand)
                 }
             }
@@ -217,7 +217,7 @@ public struct TradeDetailDisciplineCard: View {
                     showAddTagInput.toggle()
                 } label: {
                     Image(systemName: showAddTagInput ? "chevron.up" : "plus.circle")
-                        .font(.system(size: 13))
+                        .font(AppTypography.actionButtonCompact)
                         .foregroundColor(AppColors.brand)
                 }
             }

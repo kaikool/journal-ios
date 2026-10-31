@@ -173,7 +173,7 @@ public struct ReportsView: View {
                 VStack(alignment: .leading, spacing: 14) {
                     HStack {
                         Image(systemName: "chart.pie")
-                            .font(.system(size: 13))
+                            .font(AppTypography.cardHeader)
                             .foregroundColor(AppColors.brand)
                         Text("Performance Summary")
                             .font(AppTypography.cardHeader)
@@ -265,7 +265,7 @@ public struct ReportsView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
                         Image(systemName: "chart.line.uptrend.xyaxis")
-                            .font(.system(size: 13))
+                            .font(AppTypography.cardHeaderUppercase)
                             .foregroundColor(AppColors.brand)
                         Text("EQUITY CURVE")
                             .font(AppTypography.cardHeaderUppercase)
@@ -283,7 +283,7 @@ public struct ReportsView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     HStack {
                         Image(systemName: "chart.bar.xaxis")
-                            .font(.system(size: 13))
+                            .font(AppTypography.cardHeaderUppercase)
                             .foregroundColor(AppColors.loss)
                         Text("DRAWDOWN ANALYSIS")
                             .font(AppTypography.cardHeaderUppercase)
@@ -304,7 +304,7 @@ public struct ReportsView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     HStack {
                         Image(systemName: "list.bullet.rectangle")
-                            .font(.system(size: 12))
+                            .font(AppTypography.cardHeader)
                             .foregroundColor(AppColors.brand)
                         Text("Trade explorer (\(trades.count))")
                             .font(AppTypography.cardHeader)
@@ -365,7 +365,7 @@ public struct ReportsView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
                         Image(systemName: "slider.horizontal.3")
-                            .font(.system(size: 13))
+                            .font(AppTypography.cardHeader)
                             .foregroundColor(AppColors.brand)
                         Text("Analysis Dimensions")
                             .font(AppTypography.cardHeader)
@@ -421,7 +421,7 @@ public struct ReportsView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
                         Image(systemName: "tablecells")
-                            .font(.system(size: 13))
+                            .font(AppTypography.cardHeader)
                             .foregroundColor(AppColors.brand)
                         Text(selectedMode == .cross ? "\(primaryDimension.label) × \(secondaryDimension.label)" : "\(primaryDimension.label) Performance")
                             .font(AppTypography.cardHeader)
@@ -447,14 +447,14 @@ public struct ReportsView: View {
                                         
                                         HStack(spacing: 6) {
                                             Text("\(g.summary.trades) trades")
-                                                .font(.system(size: 11))
+                                                .font(AppTypography.captionMicro)
                                                 .monospacedDigit()
                                                 .foregroundColor(AppColors.secondaryText)
                                                 .lineLimit(1)
                                             
                                             if let wr = g.summary.winRate {
                                                 Text("• Win \(Int(wr * 100))%")
-                                                    .font(.system(size: 11, weight: .semibold))
+                                                    .font(AppTypography.captionBold)
                                                     .monospacedDigit()
                                                     .foregroundColor(AppColors.primaryText)
                                                     .lineLimit(1)
@@ -462,7 +462,7 @@ public struct ReportsView: View {
                                             
                                             if let r = g.summary.avgRealizedR {
                                                 Text("• \(String(format: "%.1f", r))R")
-                                                    .font(.system(size: 11))
+                                                    .font(AppTypography.captionMicro)
                                                     .monospacedDigit()
                                                     .foregroundColor(AppColors.secondaryText)
                                                     .lineLimit(1)
@@ -498,7 +498,7 @@ public struct ReportsView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
                         Image(systemName: "person.2")
-                            .font(.system(size: 13))
+                            .font(AppTypography.subheadlineBold)
                             .foregroundColor(AppColors.brand)
                         Text("Playbooks Comparison")
                             .font(AppTypography.subheadlineBold)

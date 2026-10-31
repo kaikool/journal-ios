@@ -85,12 +85,12 @@ public struct RootTabView: View {
             } label: {
                 VStack(spacing: 3) {
                     Image(systemName: env.isDrawerOpen ? "xmark" : "line.3.horizontal")
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(AppTypography.actionButton)
                         .scaleEffect(env.isDrawerOpen ? 1.05 : 1.0)
                         .animation(.spring(response: 0.28, dampingFraction: 0.72), value: env.isDrawerOpen)
                     
                     Text("Menu")
-                        .font(.system(size: 10, weight: env.isDrawerOpen ? .bold : .medium))
+                        .font(env.isDrawerOpen ? AppTypography.captionBold : AppTypography.captionMicro)
                         .lineLimit(1)
                     
                     Circle()
@@ -151,11 +151,11 @@ public struct RootTabView: View {
         } label: {
             VStack(spacing: 3) {
                 Image(systemName: isSelected ? selectedIcon : icon)
-                    .font(.system(size: 16, weight: isSelected ? .semibold : .regular))
+                    .font(AppTypography.iconMedium)
                     .scaleEffect(isSelected ? 1.08 : 1.0)
                 
                 Text(label)
-                    .font(.system(size: 10, weight: isSelected ? .bold : .medium))
+                    .font(isSelected ? AppTypography.captionBold : AppTypography.captionMicro)
                     .lineLimit(1)
                 
                 Circle()

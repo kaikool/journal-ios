@@ -19,7 +19,7 @@ public struct CurrencyConversionSettingsView: View {
         SettingsCard(title: "Currency conversion", footer: "Set reporting currency and exchange rates for combined analytics.") {
             VStack(alignment: .leading, spacing: 14) {
                 Toggle("Convert Dashboard & Calendar", isOn: $enabled)
-                    .font(.system(size: 14.5, weight: .semibold))
+                    .font(AppTypography.rowPrimary)
                     .foregroundColor(AppColors.primaryText)
                     .tint(AppColors.brand)
                 
@@ -51,7 +51,7 @@ public struct CurrencyConversionSettingsView: View {
                     ForEach(allCurrencies, id: \.self) { code in
                         HStack(spacing: 8) {
                             Text("1 \(code) =")
-                                .font(.system(size: 13, weight: .semibold))
+                                .font(AppTypography.statLabel)
                                 .foregroundColor(AppColors.primaryText)
                                 .frame(width: 75, alignment: .leading)
                             
@@ -59,14 +59,14 @@ public struct CurrencyConversionSettingsView: View {
                                 get: { code == reportingCurrency ? "1" : (rates[code] ?? "") },
                                 set: { rates[code] = $0 }
                             ))
-                            .font(.system(size: 13.5, weight: .regular))
+                            .font(AppTypography.formInput)
                             .keyboardType(.decimalPad)
                             .textFieldStyle(.roundedBorder)
                             .disabled(code == reportingCurrency)
                             .frame(maxWidth: 130)
                             
                             Text(reportingCurrency)
-                                .font(.system(size: 12, weight: .medium))
+                                .font(AppTypography.captionMicro)
                                 .foregroundColor(AppColors.secondaryText)
                         }
                     }

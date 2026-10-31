@@ -150,9 +150,9 @@ public struct AIReflectionView: View {
         }) {
             HStack(spacing: 6) {
                 Image(systemName: "chevron.left")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(AppTypography.actionButtonCompact)
                 Text("Back to Question List")
-                    .font(.system(size: 12, weight: .medium))
+                    .font(AppTypography.actionButtonCompact)
                 Spacer()
             }
             .foregroundColor(AppColors.secondaryText)

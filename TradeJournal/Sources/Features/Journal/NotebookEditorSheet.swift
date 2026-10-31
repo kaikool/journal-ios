@@ -81,14 +81,14 @@ public struct NotebookEditorSheet: View {
                         } label: {
                             HStack(spacing: 6) {
                                 Image(systemName: "folder")
-                                    .font(.system(size: 12, weight: .medium))
+                                    .font(AppTypography.actionButtonCompact)
                                     .foregroundColor(AppColors.secondaryText)
                                 Text(activeFolders.first(where: { $0.id == selectedFolderId })?.name ?? "Folder")
-                                    .font(.system(size: 13, weight: .medium))
+                                    .font(AppTypography.formInput)
                                     .foregroundColor(AppColors.primaryText)
                                     .lineLimit(1)
                                 Image(systemName: "chevron.up.chevron.down")
-                                    .font(.system(size: 10, weight: .semibold))
+                                    .font(AppTypography.captionMicro)
                                     .foregroundColor(AppColors.secondaryText)
                             }
                             .padding(.horizontal, 12)
@@ -246,21 +246,21 @@ public struct NotebookEditorSheet: View {
             if let trade = linkedTrade {
                 HStack(spacing: 8) {
                     Image(systemName: "link")
-                        .font(.system(size: 13))
+                        .font(AppTypography.caption)
                         .foregroundColor(AppColors.secondaryText)
                     
                     Text("\(trade.symbol) \(trade.direction == .short ? "SELL" : "BUY")")
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(AppTypography.rowTitle)
                         .foregroundColor(AppColors.primaryText)
                         .lineLimit(1)
                     
                     Text("Entry \(Formatters.price(trade.avgEntry))")
-                        .font(.system(size: 13))
+                        .font(AppTypography.statLabel)
                         .foregroundColor(AppColors.secondaryText)
                         .lineLimit(1)
                     
                     Text(Formatters.currency(trade.netPnl))
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(AppTypography.statValue)
                         .foregroundColor(trade.netPnl >= 0 ? AppColors.profit : AppColors.loss)
                         .lineLimit(1)
                 }
@@ -287,9 +287,9 @@ public struct NotebookEditorSheet: View {
                 } label: {
                     HStack(spacing: 4) {
                         Image(systemName: "sparkles")
-                            .font(.system(size: 12))
+                            .font(AppTypography.actionButtonCompact)
                         Text("Inquiry")
-                            .font(.system(size: 13, weight: .medium))
+                            .font(AppTypography.actionButtonCompact)
                     }
                     .foregroundColor(AppColors.primaryText)
                     .padding(.horizontal, 12)

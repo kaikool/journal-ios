@@ -288,7 +288,7 @@ public struct JournalCalendarView: View {
         HStack(alignment: .top, spacing: 8) {
             Image(systemName: "info.circle")
                 .foregroundColor(AppColors.brand)
-                .font(.system(size: 14))
+                .font(AppTypography.captionBold)
             
             Text("These trades use multiple currencies (\(availableCurrencies.joined(separator: ", "))). Select accounts with one currency to compare monetary performance; no exchange-rate conversion is applied.")
                 .font(AppTypography.caption)
@@ -318,13 +318,13 @@ public struct JournalCalendarView: View {
                 HStack(spacing: 4) {
                     ForEach(headers, id: \.self) { header in
                         Text(header)
-                            .font(.system(size: 10, weight: .medium))
+                            .font(AppTypography.captionMicro)
                             .foregroundColor(AppColors.secondaryText)
                             .frame(maxWidth: .infinity)
                     }
                     
                     Text("Week")
-                        .font(.system(size: 10, weight: .medium))
+                        .font(AppTypography.captionMicro)
                         .foregroundColor(AppColors.secondaryText)
                         .frame(width: 48, alignment: .trailing)
                 }
@@ -433,7 +433,7 @@ public struct JournalCalendarView: View {
         VStack(spacing: 1) {
             HStack(spacing: 2) {
                 Text("\(dayNum)")
-                    .font(.system(size: 10, weight: isToday ? .bold : .medium))
+                    .font(isToday ? AppTypography.captionBold : AppTypography.captionMicro)
                     .foregroundColor(isToday ? AppColors.brand : AppColors.primaryText)
                 
                 if hasNote {
@@ -460,7 +460,7 @@ public struct JournalCalendarView: View {
                 .minimumScaleFactor(0.7)
                 
                 Text("\(day.trades)t")
-                    .font(.system(size: 8.5, weight: .medium))
+                    .font(AppTypography.badgeMicro)
                     .foregroundColor(AppColors.secondaryText)
             } else {
                 Spacer().frame(height: 14)
@@ -491,7 +491,7 @@ public struct JournalCalendarView: View {
     private func weekTotalCellView(week: CalendarWeek) -> some View {
         VStack(spacing: 1) {
             Text("W")
-                .font(.system(size: 9, weight: .medium))
+                .font(AppTypography.badgeMicro)
                 .foregroundColor(AppColors.mutedText)
             
             if week.weekTrades > 0 {
@@ -505,11 +505,11 @@ public struct JournalCalendarView: View {
                 .minimumScaleFactor(0.7)
                 
                 Text("\(week.weekTrades)t")
-                    .font(.system(size: 8.5, weight: .medium))
+                    .font(AppTypography.badgeMicro)
                     .foregroundColor(AppColors.secondaryText)
             } else {
                 Text("–")
-                    .font(.system(size: 10, weight: .regular))
+                    .font(AppTypography.captionMicro)
                     .foregroundColor(AppColors.mutedText)
             }
         }

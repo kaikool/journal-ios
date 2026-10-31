@@ -65,7 +65,7 @@ public struct DayEconomicCalendarView: View {
             // Title & Forecast / Previous
             VStack(alignment: .leading, spacing: 4) {
                 Text(event.title)
-                    .font(.system(size: 12, weight: event.impact == .high ? .bold : .medium))
+                    .font(event.impact == .high ? AppTypography.captionBold : AppTypography.captionMedium)
                     .foregroundColor(AppColors.primaryText)
                     .lineLimit(2)
                 
@@ -74,7 +74,7 @@ public struct DayEconomicCalendarView: View {
                         if !event.forecast.isEmpty {
                             HStack(spacing: 3) {
                                 Text("Forecast:")
-                                    .font(.system(size: 10, weight: .regular))
+                                    .font(AppTypography.captionMicro)
                                     .foregroundColor(AppColors.secondaryText)
                                 Text(event.forecast)
                                     .font(AppTypography.number(10, weight: .semibold))
@@ -89,7 +89,7 @@ public struct DayEconomicCalendarView: View {
                         if !event.previous.isEmpty {
                             HStack(spacing: 3) {
                                 Text("Prev:")
-                                    .font(.system(size: 10, weight: .regular))
+                                    .font(AppTypography.captionMicro)
                                     .foregroundColor(AppColors.secondaryText)
                                 Text(event.previous)
                                     .font(AppTypography.number(10, weight: .medium))
@@ -115,7 +115,7 @@ public struct DayEconomicCalendarView: View {
         case .high:
             HStack(spacing: 3) {
                 Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.system(size: 8, weight: .bold))
+                    .font(AppTypography.badgeMicro)
                 Text("HIGH")
                     .font(AppTypography.badgeMicro)
             }

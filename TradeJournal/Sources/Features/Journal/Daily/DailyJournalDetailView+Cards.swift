@@ -131,7 +131,7 @@ extension DailyJournalDetailView {
                 HStack(alignment: .center) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(selectedTime.map { "At \($0)" } ?? "Intraday Cumulative Net P&L")
-                            .font(.system(size: 11, weight: .medium))
+                            .font(AppTypography.cardHeaderUppercase)
                             .foregroundColor(AppColors.secondaryText)
                             .textCase(.uppercase)
                             .tracking(0.5)
@@ -139,7 +139,7 @@ extension DailyJournalDetailView {
                             .frame(height: 14, alignment: .leading)
                         
                         Text(Formatters.formatPnL(activePoint?.cumPnl ?? metrics.netPnl, currency: env.currentCurrency))
-                            .font(.system(size: 22, weight: .bold))
+                            .font(AppTypography.displayMajor)
                             .monospacedDigit()
                             .foregroundColor(chartColor)
                             .lineLimit(1)
@@ -227,7 +227,7 @@ extension DailyJournalDetailView {
                         AxisValueLabel {
                             if let str = value.as(String.self) {
                                 Text(str)
-                                    .font(.system(size: 9, weight: .medium))
+                                    .font(AppTypography.numberMicro)
                                     .foregroundStyle(AppColors.secondaryText)
                                     .lineLimit(1)
                             }
@@ -253,7 +253,7 @@ extension DailyJournalDetailView {
                             HStack(spacing: 8) {
                                 // Status badge WIN / LOSS / BE
                                 Text(trade.status.rawValue.uppercased())
-                                    .font(.system(size: 10, weight: .bold))
+                                    .font(AppTypography.badgeStandard)
                                     .padding(.horizontal, 6)
                                     .padding(.vertical, 3)
                                     .background(
@@ -273,7 +273,7 @@ extension DailyJournalDetailView {
                                     .lineLimit(1)
                                 
                                 Text(trade.direction.rawValue.uppercased())
-                                    .font(.system(size: 10, weight: .heavy))
+                                    .font(AppTypography.badgeStandard)
                                     .foregroundColor(trade.direction == .long ? AppColors.brand : AppColors.warning)
                                     .lineLimit(1)
                                 
@@ -286,13 +286,13 @@ extension DailyJournalDetailView {
                                         .lineLimit(1)
                                     
                                     Text("\(Formatters.formatNumber(trade.quantity)) lots @ \(Formatters.price(trade.avgEntry))")
-                                        .font(.system(size: 11, weight: .regular))
+                                        .font(AppTypography.captionMicro)
                                         .foregroundColor(AppColors.secondaryText)
                                         .lineLimit(1)
                                 }
                                 
                                 Image(systemName: "chevron.right")
-                                    .font(.system(size: 10, weight: .semibold))
+                                    .font(AppTypography.captionMicro)
                                     .foregroundColor(AppColors.secondaryText.opacity(0.4))
                             }
                             .padding(.vertical, 6)
@@ -348,7 +348,7 @@ extension DailyJournalDetailView {
                 HStack(spacing: 12) {
                     if !saveStatusMessage.isEmpty {
                         Text(saveStatusMessage)
-                            .font(.system(size: 11))
+                            .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText)
                     }
                     

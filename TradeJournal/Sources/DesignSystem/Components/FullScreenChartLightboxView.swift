@@ -78,10 +78,10 @@ public struct FullScreenChartLightboxView: View {
                 HStack {
                     HStack(spacing: 6) {
                         Image(systemName: "chart.xyaxis.line")
-                            .font(.system(size: 11, weight: .bold))
+                            .font(AppTypography.actionButtonCompact)
                             .foregroundColor(AppColors.brand)
                         Text("Chart Vision")
-                            .font(.system(size: 12, weight: .bold))
+                            .font(AppTypography.actionButtonCompact)
                             .foregroundColor(.white)
                     }
                     .padding(.horizontal, 10)
@@ -95,7 +95,7 @@ public struct FullScreenChartLightboxView: View {
                         dismiss()
                     } label: {
                         Image(systemName: "xmark")
-                            .font(.system(size: 13, weight: .bold))
+                            .font(AppTypography.actionButtonCompact)
                             .foregroundColor(.white)
                             .frame(width: 32, height: 32)
                             .background(Color.black.opacity(0.65))
@@ -112,7 +112,7 @@ public struct FullScreenChartLightboxView: View {
                 // Subtle zoom hint at bottom
                 if scale == 1.0 {
                     Text("Pinch or double-tap to zoom")
-                        .font(.system(size: 10, weight: .medium))
+                        .font(AppTypography.captionMicro)
                         .foregroundColor(.white.opacity(0.6))
                         .padding(.horizontal, 12)
                         .padding(.vertical, 4)

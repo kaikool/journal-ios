@@ -308,7 +308,7 @@ public struct EquityCurveChart: View {
                             .annotation(position: .top, alignment: .leading) {
                                 HStack(spacing: 3) {
                                     Image(systemName: "crown.fill")
-                                        .font(.system(size: 9))
+                                        .font(AppTypography.badgeMicro)
                                     Text("ATH \(Formatters.formatCurrency(peak.cumulativePnl, currency: currency))")
                                         .font(AppTypography.number(9, weight: .bold))
                                 }
@@ -417,7 +417,7 @@ public struct EquityCurveChart: View {
                         AxisTick(stroke: StrokeStyle(lineWidth: 0.5))
                             .foregroundStyle(AppColors.border)
                         AxisValueLabel(format: .dateTime.month(.abbreviated).day())
-                            .font(.system(size: 10, weight: .medium))
+                            .font(AppTypography.captionMicro)
                             .foregroundStyle(AppColors.secondaryText)
                     }
                 }
@@ -475,7 +475,7 @@ public struct EquityCurveChart: View {
                 if let active = activePoint {
                     // Top sub-row: Date
                     Text(Self.hudDateFormatter.string(from: active.date))
-                        .font(.system(size: 10.5, weight: .semibold))
+                        .font(AppTypography.captionBold)
                         .foregroundColor(AppColors.secondaryText)
                         .lineLimit(1)
                         .frame(height: 14, alignment: .leading)
@@ -485,13 +485,13 @@ public struct EquityCurveChart: View {
                         if chartMode == .drawdown {
                             let ddPct = (active.drawdown as NSDecimalNumber).doubleValue * 100.0
                             Text(String(format: "-%.1f%% DD", ddPct))
-                                .font(.system(size: 13, weight: .bold))
+                                .font(AppTypography.statValue)
                                 .monospacedDigit()
                                 .foregroundColor(AppColors.loss)
                                 .lineLimit(1)
                         } else {
                             Text(Formatters.formatPnL(active.cumulativePnl, currency: currency))
-                                .font(.system(size: 13, weight: .bold))
+                                .font(AppTypography.statValue)
                                 .monospacedDigit()
                                 .foregroundColor(active.cumulativePnl >= 0 ? AppColors.brand : AppColors.loss)
                                 .lineLimit(1)
@@ -500,7 +500,7 @@ public struct EquityCurveChart: View {
                             if let peak = peakPoint, active.id == peak.id, peak.cumulativePnl > 0 {
                                 HStack(spacing: 2) {
                                     Image(systemName: "crown.fill")
-                                        .font(.system(size: 9))
+                                        .font(AppTypography.badgeMicro)
                                     Text("ATH")
                                         .font(AppTypography.badgeMicro)
                                 }
@@ -513,7 +513,7 @@ public struct EquityCurveChart: View {
                             } else if active.netPnl != 0 {
                                 HStack(spacing: 2) {
                                     Image(systemName: active.netPnl > 0 ? "arrow.up.right" : "arrow.down.right")
-                                        .font(.system(size: 9, weight: .bold))
+                                        .font(AppTypography.badgeMicro)
                                     Text(Formatters.formatPnL(active.netPnl, currency: currency))
                                         .font(AppTypography.number(10, weight: .bold))
                                         .lineLimit(1)
@@ -535,25 +535,25 @@ public struct EquityCurveChart: View {
                     if chartMode == .drawdown {
                         let lastDdPct = (last.drawdown as NSDecimalNumber).doubleValue * 100.0
                         Text("Current Drawdown")
-                            .font(.system(size: 11, weight: .medium))
+                            .font(AppTypography.cardHeaderUppercase)
                             .foregroundColor(AppColors.secondaryText)
                             .lineLimit(1)
                             .frame(height: 14, alignment: .leading)
                         
                         Text(String(format: "-%.1f%%", lastDdPct))
-                            .font(AppTypography.number(13, weight: .bold))
+                            .font(AppTypography.statValue)
                             .foregroundColor(lastDdPct > 0.05 ? AppColors.loss : AppColors.profit)
                             .lineLimit(1)
                             .frame(height: 20, alignment: .leading)
                     } else {
                         Text("Running Equity")
-                            .font(.system(size: 11, weight: .medium))
+                            .font(AppTypography.cardHeaderUppercase)
                             .foregroundColor(AppColors.secondaryText)
                             .lineLimit(1)
                             .frame(height: 14, alignment: .leading)
                         
                         Text(Formatters.formatPnL(last.cumulativePnl, currency: currency))
-                            .font(AppTypography.number(13, weight: .bold))
+                            .font(AppTypography.statValue)
                             .foregroundColor(last.cumulativePnl >= 0 ? AppColors.brand : AppColors.loss)
                             .lineLimit(1)
                             .minimumScaleFactor(0.8)
@@ -576,7 +576,7 @@ public struct EquityCurveChart: View {
                         }
                     } label: {
                         Text(mode.rawValue)
-                            .font(.system(size: 10, weight: chartMode == mode ? .bold : .medium))
+                            .font(chartMode == mode ? AppTypography.badgeStandard : AppTypography.captionMicro)
                             .foregroundColor(chartMode == mode ? AppColors.primaryText : AppColors.secondaryText)
                             .padding(.horizontal, 7)
                             .padding(.vertical, 3)

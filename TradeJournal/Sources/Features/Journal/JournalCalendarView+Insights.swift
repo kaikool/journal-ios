@@ -22,7 +22,7 @@ extension JournalCalendarView {
                 AppCard {
                     VStack(spacing: 8) {
                         Image(systemName: "calendar")
-                            .font(.system(size: 26))
+                            .font(AppTypography.displayHero)
                             .foregroundColor(AppColors.secondaryText)
                         
                         Text("No closed trades in this view")
@@ -245,7 +245,7 @@ extension JournalCalendarView {
                     HStack(alignment: .center) {
                         if let active = activeTrend {
                             Text(dateLabel(for: active.date))
-                                .font(.system(size: 11, weight: .semibold))
+                                .font(AppTypography.cardHeaderUppercase)
                                 .foregroundColor(AppColors.secondaryText)
                                 .lineLimit(1)
                             Spacer()
@@ -255,7 +255,7 @@ extension JournalCalendarView {
                                 .lineLimit(1)
                         } else {
                             Text("Cumulative Trend")
-                                .font(.system(size: 11, weight: .semibold))
+                                .font(AppTypography.cardHeaderUppercase)
                                 .foregroundColor(AppColors.secondaryText)
                                 .lineLimit(1)
                             Spacer()
@@ -337,7 +337,7 @@ extension JournalCalendarView {
                             AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
                                 .foregroundStyle(AppColors.border.opacity(0.25))
                             AxisValueLabel()
-                                .font(.system(size: 9, weight: .medium))
+                                .font(AppTypography.captionMicro)
                                 .foregroundStyle(AppColors.secondaryText)
                         }
                     }
@@ -449,7 +449,7 @@ extension JournalCalendarView {
                 HStack {
                     VStack(alignment: .leading, spacing: 1) {
                         Text("Most profitable weekday")
-                            .font(.system(size: 10, weight: .regular))
+                            .font(AppTypography.caption)
                             .foregroundColor(AppColors.mutedText)
                         
                         if let bestWd = insights.mostProfitableWeekday {
@@ -545,7 +545,7 @@ extension JournalCalendarView {
         }) {
             HStack(spacing: 8) {
                 Text(String(wd.label.prefix(3)))
-                    .font(.system(size: 11, weight: .medium))
+                    .font(AppTypography.captionBold)
                     .foregroundColor(hasTrades ? AppColors.primaryText : AppColors.mutedText)
                     .frame(width: 28, alignment: .leading)
                 
@@ -595,7 +595,7 @@ extension JournalCalendarView {
                     .frame(width: 76, alignment: .trailing)
                 } else {
                     Text("—")
-                        .font(.system(size: 11, weight: .regular))
+                        .font(AppTypography.caption)
                         .foregroundColor(AppColors.mutedText)
                         .frame(width: 76, alignment: .trailing)
                 }

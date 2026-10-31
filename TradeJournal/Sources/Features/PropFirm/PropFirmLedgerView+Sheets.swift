@@ -248,11 +248,11 @@ public struct PropAuditTrailSheet: View {
                         VStack(alignment: .leading, spacing: 6) {
                             HStack {
                                 Text(a.entityType.uppercased())
-                                    .font(.system(size: 11, weight: .bold))
+                                    .font(AppTypography.badgeStandard)
                                     .foregroundColor(AppColors.accent)
                                 Spacer()
                                 Text(a.createdAt.prefix(19))
-                                    .font(.system(size: 10))
+                                    .font(AppTypography.captionMicro)
                                     .foregroundColor(AppColors.secondaryText)
                             }
                             Text(a.reason)
@@ -269,7 +269,7 @@ public struct PropAuditTrailSheet: View {
                                 return Formatters.formatEntityId(a.entityId)
                             }()
                             Text("Target: \(entityName)")
-                                .font(.system(size: 10))
+                                .font(AppTypography.captionMicro)
                                 .foregroundColor(AppColors.secondaryText)
                         }
                         .padding(.vertical, 4)
@@ -563,14 +563,14 @@ public struct PropCsvImportSheet: View {
             Form {
                 Section("Standard CSV Template (/prop-cash-template.csv)") {
                     Text("id,kind,firm,account_id,currency,date,amount,category,expense_id,reference,notes")
-                        .font(.system(size: 11, design: .monospaced))
+                        .font(AppTypography.codeBlock)
                         .foregroundColor(AppColors.secondaryText)
                 }
                 
                 Section("CSV Content") {
                     TextEditor(text: $csvContent)
                         .frame(minHeight: 160)
-                        .font(.system(size: 12, design: .monospaced))
+                        .font(AppTypography.codeBlock)
                     
                     if let err = errorMessage {
                         Text(err)

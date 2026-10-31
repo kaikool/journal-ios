@@ -306,12 +306,12 @@ public struct DashboardCustomizerSheet: View {
                             } label: {
                                 HStack(spacing: 6) {
                                     Image(systemName: preset.icon)
-                                        .font(.system(size: 12))
+                                        .font(AppTypography.captionBold)
                                     Text(preset.name)
                                         .font(AppTypography.captionBold)
                                     if activePreset == preset {
                                         Image(systemName: "checkmark")
-                                            .font(.system(size: 10, weight: .bold))
+                                            .font(AppTypography.badgeStandard)
                                     }
                                 }
                                 .padding(.horizontal, 10)
@@ -368,10 +368,10 @@ public struct DashboardCustomizerSheet: View {
                         HStack(spacing: 12) {
                             Image(systemName: "line.3.horizontal")
                                 .foregroundColor(AppColors.secondaryText)
-                                .font(.system(size: 14))
+                                .font(AppTypography.rowTitle)
                             
                             Image(systemName: card.icon)
-                                .font(.system(size: 14))
+                                .font(AppTypography.rowTitle)
                                 .foregroundColor(hiddenCardIds.contains(card.id) ? AppColors.secondaryText.opacity(0.5) : AppColors.brand)
                                 .frame(width: 22)
                             

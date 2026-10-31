@@ -22,7 +22,7 @@ public struct AIReflectionScopeHeader: View {
     public var body: some View {
         HStack {
             Text(scopeSummaryText)
-                .font(.system(size: 12, weight: .medium))
+                .font(AppTypography.captionBold)
                 .foregroundColor(AppColors.primaryText)
                 .lineLimit(1)
             
@@ -53,7 +53,7 @@ public struct AIReflectionPreTradeBanner: View {
                     VStack(alignment: .leading, spacing: 3) {
                         HStack(spacing: 6) {
                             Text("Pre-Trade Market Bias")
-                                .font(.system(size: 14, weight: .semibold))
+                                .font(AppTypography.rowTitle)
                                 .foregroundColor(AppColors.primaryText)
                             
                             Text("D1 • H4 • M15")
@@ -74,7 +74,7 @@ public struct AIReflectionPreTradeBanner: View {
                     Spacer()
                     
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(AppTypography.captionMicro)
                         .foregroundColor(AppColors.secondaryText)
                 }
             }
@@ -112,7 +112,7 @@ public struct AIReflectionIntelligenceCards: View {
                             .fill(AppColors.secondaryBackground)
                             .frame(width: 36, height: 36)
                         Image(systemName: "brain.head.profile")
-                            .font(.system(size: 16, weight: .semibold))
+                            .font(AppTypography.cardHeader)
                             .foregroundColor(AppColors.brand)
                     }
                     
@@ -144,7 +144,7 @@ public struct AIReflectionIntelligenceCards: View {
                             .fill(AppColors.brand.opacity(0.15))
                             .frame(width: 36, height: 36)
                         Image(systemName: "flask.fill")
-                            .font(.system(size: 15, weight: .semibold))
+                            .font(AppTypography.cardHeader)
                             .foregroundColor(AppColors.brand)
                     }
                     

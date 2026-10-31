@@ -28,7 +28,7 @@ public struct TradeReplayHubView: View {
             if trades.isEmpty {
                 VStack(spacing: 12) {
                     Image(systemName: "play.rectangle.on.rectangle")
-                        .font(.system(size: 40))
+                        .font(AppTypography.iconEmptyState)
                         .foregroundColor(AppColors.secondaryText.opacity(0.6))
                     Text("No Trades to Replay")
                         .font(AppTypography.headline)
@@ -47,7 +47,7 @@ public struct TradeReplayHubView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(spacing: 6) {
                             Image(systemName: "play.circle")
-                                .font(.system(size: 13))
+                                .font(AppTypography.captionBold)
                                 .foregroundColor(AppColors.brand)
                             Text("Select Trade to Replay")
                                 .font(AppTypography.captionBold)

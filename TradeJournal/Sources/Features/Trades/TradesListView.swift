@@ -439,7 +439,7 @@ private struct TradeTerminalRow: View {
                     .foregroundColor(AppColors.primaryText)
                 
                 Image(systemName: "arrow.right")
-                    .font(.system(size: 9, weight: .bold))
+                    .font(AppTypography.captionMicro)
                     .foregroundColor(AppColors.secondaryText.opacity(0.6))
                 
                 if let exit = trade.avgExit {
@@ -467,7 +467,7 @@ private struct TradeTerminalRow: View {
                         .foregroundColor(AppColors.secondaryText.opacity(0.5))
                     HStack(spacing: 2) {
                         Image(systemName: "clock")
-                            .font(.system(size: 9))
+                            .font(AppTypography.statLabel)
                         Text(dur)
                     }
                     .font(AppTypography.statLabel)

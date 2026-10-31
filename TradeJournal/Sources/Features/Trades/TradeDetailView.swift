@@ -248,12 +248,12 @@ public struct TradeDetailView: View {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(alignment: .center) {
                     Text("CHART SCREENSHOTS")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(AppTypography.cardHeaderUppercase)
                         .foregroundColor(AppColors.secondaryText)
                         .tracking(0.5)
                     Spacer()
                     Image(systemName: "photo.stack")
-                        .font(.system(size: 12, weight: .medium))
+                        .font(AppTypography.cardHeaderUppercase)
                         .foregroundColor(AppColors.secondaryText.opacity(0.7))
                         .frame(width: 24, height: 24)
                         .background(AppColors.secondaryBackground.opacity(0.5))

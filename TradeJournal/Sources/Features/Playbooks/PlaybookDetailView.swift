@@ -159,12 +159,12 @@ public struct PlaybookDetailView: View {
                                         .fill(AppColors.brand.opacity(0.12))
                                         .frame(width: 18, height: 18)
                                     Text("\(index + 1)")
-                                        .font(.system(size: 10, weight: .bold))
+                                        .font(AppTypography.badgeStandard)
                                         .foregroundColor(AppColors.brand)
                                 }
                                 
                                 Text(rule)
-                                    .font(.system(size: 12, weight: .medium))
+                                    .font(AppTypography.body)
                                     .foregroundColor(AppColors.primaryText)
                                     .lineLimit(2)
                                 

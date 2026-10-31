@@ -66,7 +66,7 @@ public struct EmptyStateView: View {
     public var body: some View {
         VStack(spacing: 12) {
             Image(systemName: iconName)
-                .font(.system(size: 36))
+                .font(AppTypography.iconHero)
                 .foregroundColor(AppColors.secondaryText.opacity(0.6))
             
             Text(title)
@@ -133,7 +133,7 @@ public struct ErrorBannerView: View {
         HStack(spacing: 10) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundColor(AppColors.loss)
-                .font(.system(size: 14))
+                .font(AppTypography.cardHeader)
             
             Text(message)
                 .font(AppTypography.caption)

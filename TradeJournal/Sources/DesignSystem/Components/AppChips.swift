@@ -36,16 +36,16 @@ public struct AppFilterChip: View {
             HStack(spacing: 4.5) {
                 if let icon = icon {
                     Image(systemName: icon)
-                        .font(.system(size: 10.5, weight: isSelected ? .bold : .semibold))
+                        .font(isSelected ? AppTypography.captionBold : AppTypography.captionMicro)
                 }
                 
                 Text(title)
-                    .font(.system(size: 11.5, weight: isSelected ? .bold : .medium, design: .rounded))
+                    .font(isSelected ? AppTypography.captionBold : AppTypography.captionMicro)
                     .lineLimit(1)
                 
                 if let count = count {
                     Text("\(count)")
-                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .font(AppTypography.badgeTiny)
                         .padding(.horizontal, 5)
                         .padding(.vertical, 1.5)
                         .background(isSelected ? activeColor.opacity(0.25) : AppColors.secondaryBackground)
@@ -89,7 +89,7 @@ public struct AppTag: View {
     public var body: some View {
         HStack(spacing: 4) {
             Text("\(prefix ?? "")\(title)")
-                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .font(AppTypography.badgeStandard)
                 .foregroundColor(color)
                 .lineLimit(1)
             
@@ -99,7 +99,7 @@ public struct AppTag: View {
                     onRemove()
                 } label: {
                     Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 11, weight: .medium))
+                        .font(AppTypography.captionMicro)
                         .foregroundColor(color.opacity(0.75))
                 }
                 .buttonStyle(.plain)

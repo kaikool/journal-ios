@@ -240,7 +240,7 @@ public struct AIDocumentReaderView: View {
                             }
                             
                             Text(section.title)
-                                .font(.system(size: 13, weight: .bold))
+                                .font(AppTypography.cardHeader)
                                 .foregroundColor(AppColors.primaryText)
                             
                             Spacer()
@@ -340,7 +340,7 @@ public struct AIDocumentReaderView: View {
                     GridRow {
                         ForEach(Array(headers.enumerated()), id: \.offset) { colIdx, header in
                             Text(LocalizedStringKey(header))
-                                .font(.system(size: 11.5, weight: .bold))
+                                .font(AppTypography.captionBold)
                                 .foregroundColor(AppColors.primaryText)
                                 .lineLimit(2)
                                 .padding(.horizontal, 12)
@@ -368,7 +368,7 @@ public struct AIDocumentReaderView: View {
                             ForEach(Array(headers.indices), id: \.self) { colIdx in
                                 let cellText = colIdx < row.count ? row[colIdx] : ""
                                 Text(LocalizedStringKey(cellText))
-                                    .font(.system(size: 11.5, weight: .regular))
+                                    .font(AppTypography.caption)
                                     .foregroundColor(AppColors.primaryText)
                                     .padding(.horizontal, 12)
                                     .padding(.vertical, 7)

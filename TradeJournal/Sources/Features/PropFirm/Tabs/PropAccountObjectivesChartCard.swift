@@ -29,7 +29,7 @@ internal struct PropAccountObjectivesChartCard: View {
                     .tracking(0.5)
                 Spacer()
                 Image(systemName: "shield.lefthalf.filled")
-                    .font(.system(size: 11))
+                    .font(AppTypography.cardHeader)
                     .foregroundColor(AppColors.secondaryText.opacity(0.7))
             }
             .padding(.top, 2)
@@ -148,7 +148,7 @@ internal struct PropAccountObjectivesChartCard: View {
                             if winDays >= minDays {
                                 Image(systemName: "checkmark.circle.fill")
                                     .foregroundColor(AppColors.profit)
-                                    .font(.system(size: 11))
+                                    .font(AppTypography.caption)
                             }
                         }
                     }

@@ -119,7 +119,7 @@ public struct AIMemoryManagementSheet: View {
         HStack {
             let verifiedCount = memories.filter { $0.status == .verified }.count
             Text("AI Memory Hub • \(memories.count) Rules • \(verifiedCount) Verified")
-                .font(.system(size: 12, weight: .medium))
+                .font(AppTypography.captionBold)
                 .foregroundColor(AppColors.primaryText)
                 .lineLimit(1)
             
@@ -133,9 +133,9 @@ public struct AIMemoryManagementSheet: View {
                 Button(action: performSync) {
                     HStack(spacing: 4) {
                         Image(systemName: "arrow.triangle.2.circlepath")
-                            .font(.system(size: 11, weight: .medium))
+                            .font(AppTypography.actionButtonCompact)
                         Text("Sync")
-                            .font(.system(size: 11, weight: .medium))
+                            .font(AppTypography.actionButtonCompact)
                     }
                     .foregroundColor(AppColors.secondaryText)
                 }
@@ -329,7 +329,7 @@ private struct AIMemoryCard: View {
                         }
                     } label: {
                         Image(systemName: "ellipsis")
-                            .font(.system(size: 12, weight: .semibold))
+                            .font(AppTypography.actionButtonCompact)
                             .foregroundColor(AppColors.secondaryText)
                             .padding(4)
                     }
@@ -337,7 +337,7 @@ private struct AIMemoryCard: View {
                 
                 // Title
                 Text(memory.title)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(AppTypography.rowTitle)
                     .foregroundColor(AppColors.primaryText)
                     .lineLimit(2)
                 
@@ -362,7 +362,7 @@ private struct AIMemoryCard: View {
                             }
                         }) {
                             Text(isExpanded ? "Show Less" : "Read More")
-                                .font(.system(size: 11, weight: .medium))
+                                .font(AppTypography.captionMicro)
                                 .foregroundColor(AppColors.brand)
                         }
                         .buttonStyle(.plain)

@@ -101,9 +101,9 @@ public struct RichNoteEditor: View {
                     } label: {
                         HStack(spacing: 4) {
                             Image(systemName: isPreviewMode ? "pencil" : "eye")
-                                .font(.system(size: 10, weight: .semibold))
+                                .font(AppTypography.actionButtonCompact)
                             Text(isPreviewMode ? "Edit" : "Preview")
-                                .font(.system(size: 11, weight: .semibold))
+                                .font(AppTypography.actionButtonCompact)
                         }
                         .foregroundColor(isPreviewMode ? AppColors.brand : AppColors.secondaryText)
                         .padding(.horizontal, 9)
@@ -200,7 +200,7 @@ public struct RichNoteEditor: View {
             action()
         } label: {
             Image(systemName: systemName)
-                .font(.system(size: 11, weight: .bold))
+                .font(AppTypography.actionButtonCompact)
                 .foregroundColor(isActive ? .white : AppColors.primaryText)
                 .frame(width: 32, height: 28)
                 .background(isActive ? AppColors.brand : AppColors.secondaryBackground)

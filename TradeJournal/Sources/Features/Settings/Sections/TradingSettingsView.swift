@@ -28,7 +28,7 @@ public struct TradingSettingsView: View {
                         .foregroundColor(AppColors.secondaryText)
                     
                     TextEditor(text: $multipliersText)
-                        .font(.system(size: 13, design: .monospaced))
+                        .font(AppTypography.codeBlock)
                         .frame(minHeight: 90)
                         .padding(8)
                         .background(AppColors.secondaryBackground)

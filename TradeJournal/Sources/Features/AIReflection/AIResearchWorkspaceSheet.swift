@@ -112,7 +112,7 @@ public struct AIResearchWorkspaceSheet: View {
         HStack {
             let activeCount = projects.filter { $0.status == .active }.count
             Text("Research Lab • \(projects.count) Projects • \(activeCount) Active")
-                .font(.system(size: 12, weight: .medium))
+                .font(AppTypography.captionBold)
                 .foregroundColor(AppColors.primaryText)
                 .lineLimit(1)
             
@@ -126,9 +126,9 @@ public struct AIResearchWorkspaceSheet: View {
                 Button(action: performSync) {
                     HStack(spacing: 4) {
                         Image(systemName: "arrow.triangle.2.circlepath")
-                            .font(.system(size: 11, weight: .medium))
+                            .font(AppTypography.actionButtonCompact)
                         Text("Sync")
-                            .font(.system(size: 11, weight: .medium))
+                            .font(AppTypography.actionButtonCompact)
                     }
                     .foregroundColor(AppColors.secondaryText)
                 }
@@ -263,7 +263,7 @@ private struct AIResearchProjectCard: View {
                 
                 // Title
                 Text(project.title)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(AppTypography.rowTitle)
                     .foregroundColor(AppColors.primaryText)
                     .lineLimit(2)
                 
@@ -322,7 +322,7 @@ private struct AIResearchProjectCard: View {
                 }
             } label: {
                 Image(systemName: "ellipsis")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(AppTypography.actionButtonCompact)
                     .foregroundColor(AppColors.secondaryText)
                     .padding(4)
             }
@@ -332,7 +332,7 @@ private struct AIResearchProjectCard: View {
     private var cardHypothesisView: some View {
         HStack(alignment: .top, spacing: 8) {
             Image(systemName: "quote.opening")
-                .font(.system(size: 10))
+                .font(AppTypography.captionMicro)
                 .foregroundColor(AppColors.secondaryText.opacity(0.6))
             
             Text(project.hypothesis)
@@ -409,7 +409,7 @@ private struct AIResearchProjectCard: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 4) {
                     Image(systemName: project.status == .validated ? "checkmark.circle.fill" : "xmark.circle.fill")
-                        .font(.system(size: 10))
+                        .font(AppTypography.badgeMicro)
                     Text(project.status == .validated ? "CONCLUSION: VALIDATED" : "CONCLUSION: INVALIDATED")
                         .font(AppTypography.badgeMicro)
                 }
@@ -440,9 +440,9 @@ private struct AIResearchProjectCard: View {
             }) {
                 HStack(spacing: 4) {
                     Image(systemName: showCheckpoints ? "chevron.down" : "chevron.right")
-                        .font(.system(size: 9, weight: .bold))
+                        .font(AppTypography.captionMicro)
                     Text(showCheckpoints ? "Hide checkpoints (\(project.checkpoints.count))" : "View checkpoints (\(project.checkpoints.count))")
-                        .font(.system(size: 11, weight: .medium))
+                        .font(AppTypography.captionMicro)
                     Spacer()
                 }
                 .foregroundColor(AppColors.brand)
@@ -456,7 +456,7 @@ private struct AIResearchProjectCard: View {
                         VStack(alignment: .leading, spacing: 3) {
                             HStack {
                                 Text("Sample: \(chk.sampleCount) trades")
-                                    .font(.system(size: 11, weight: .semibold))
+                                    .font(AppTypography.captionBold)
                                     .foregroundColor(AppColors.primaryText)
                                 
                                 if let wr = chk.winRate {
@@ -788,7 +788,7 @@ private struct ConcludeResearchProjectSheet: View {
                             
                             HStack(spacing: 6) {
                                 Image(systemName: targetStatus == .validated ? "checkmark.circle.fill" : "xmark.circle.fill")
-                                    .font(.system(size: 12))
+                                    .font(AppTypography.captionBold)
                                 Text(targetStatus == .validated ? "Confirming hypothesis as validated rule" : "Refuting hypothesis due to adverse metrics")
                                     .font(AppTypography.captionBold)
                             }

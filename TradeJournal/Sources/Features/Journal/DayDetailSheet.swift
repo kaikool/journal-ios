@@ -228,7 +228,7 @@ public struct DayDetailSheet: View {
                     HStack(spacing: 4) {
                         ForEach(1...5, id: \.self) { star in
                             Image(systemName: star <= rating ? "star.fill" : "star")
-                                .font(.system(size: 13))
+                                .font(AppTypography.cardHeader)
                                 .foregroundColor(star <= rating ? .yellow : AppColors.mutedText)
                                 .onTapGesture {
                                     rating = (rating == star) ? 0 : star
@@ -252,7 +252,7 @@ public struct DayDetailSheet: View {
                 HStack(spacing: 12) {
                     if !saveStatus.isEmpty {
                         Text(saveStatus)
-                            .font(.system(size: 11))
+                            .font(AppTypography.captionMicro)
                             .foregroundColor(AppColors.secondaryText)
                     }
                     

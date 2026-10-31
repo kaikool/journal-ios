@@ -30,7 +30,7 @@ public struct ModalDismissButton: View {
                             .stroke(AppColors.border.opacity(0.55), lineWidth: 0.6)
                     )
                 Image(systemName: "xmark")
-                    .font(.system(size: 11, weight: .bold))
+                    .font(AppTypography.actionButtonCompact)
                     .foregroundColor(AppColors.secondaryText)
             }
             .contentShape(Circle())
@@ -62,7 +62,7 @@ public struct ModalBackButton: View {
                             .stroke(AppColors.border.opacity(0.55), lineWidth: 0.6)
                     )
                 Image(systemName: "chevron.left")
-                    .font(.system(size: 12, weight: .bold))
+                    .font(AppTypography.actionButtonCompact)
                     .foregroundColor(AppColors.primaryText)
             }
             .contentShape(Circle())
@@ -95,9 +95,9 @@ public struct ModalDeleteButton: View {
             if let title = title {
                 HStack(spacing: 5) {
                     Image(systemName: "trash")
-                        .font(.system(size: 11, weight: .bold))
+                        .font(AppTypography.actionButtonCompact)
                     Text(title)
-                        .font(.system(size: 12.5, weight: .semibold, design: .rounded))
+                        .font(AppTypography.actionButtonCompact)
                 }
                 .foregroundColor(AppColors.loss)
                 .padding(.horizontal, 12)
@@ -118,7 +118,7 @@ public struct ModalDeleteButton: View {
                                 .stroke(AppColors.loss.opacity(0.3), lineWidth: 0.6)
                         )
                     Image(systemName: "trash")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(AppTypography.actionButtonCompact)
                         .foregroundColor(AppColors.loss)
                 }
                 .contentShape(Circle())
@@ -151,10 +151,10 @@ public struct ModalPrimaryButton: View {
             HStack(spacing: 5) {
                 if let icon = icon {
                     Image(systemName: icon)
-                        .font(.system(size: 11, weight: .bold))
+                        .font(AppTypography.actionButtonCompact)
                 }
                 Text(title)
-                    .font(.system(size: 12.5, weight: .semibold, design: .rounded))
+                    .font(AppTypography.actionButtonCompact)
             }
             .foregroundColor(isEnabled ? .white : AppColors.secondaryText.opacity(0.6))
             .padding(.horizontal, 12)
@@ -184,7 +184,7 @@ public struct ModalSecondaryButton: View {
             action()
         } label: {
             Text(title)
-                .font(.system(size: 12.5, weight: .semibold, design: .rounded))
+                .font(AppTypography.actionButtonCompact)
                 .foregroundColor(AppColors.secondaryText)
                 .padding(.horizontal, 12)
                 .frame(height: 32)
@@ -226,7 +226,7 @@ public struct ModalIconButton: View {
                             .stroke(AppColors.border.opacity(0.55), lineWidth: 0.6)
                     )
                 Image(systemName: icon)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(AppTypography.actionButtonCompact)
                     .foregroundColor(color)
             }
             .contentShape(Circle())

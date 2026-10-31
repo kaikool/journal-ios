@@ -17,12 +17,12 @@ public struct TradeAICoachContextCard: View {
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 6) {
                         Text(trade.symbol)
-                            .font(.system(size: 15, weight: .bold))
+                            .font(AppTypography.rowPrimary)
                             .foregroundColor(AppColors.primaryText)
                         
                         let isShort = trade.direction == .short
                         Text(isShort ? "SELL" : "BUY")
-                            .font(.system(size: 10, weight: .bold))
+                            .font(AppTypography.badgeStandard)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
                             .background(isShort ? AppColors.warning.opacity(0.12) : AppColors.brand.opacity(0.12))
@@ -30,7 +30,7 @@ public struct TradeAICoachContextCard: View {
                             .cornerRadius(4)
                         
                         Text(isOpen ? "🟢 LIVE POSITION" : "🏁 CLOSED AUDIT")
-                            .font(.system(size: 10, weight: .bold))
+                            .font(AppTypography.badgeStandard)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2.5)
                             .background(isOpen ? AppColors.profit.opacity(0.18) : AppColors.secondaryBackground)
@@ -86,22 +86,22 @@ public struct TradeAICoachCompliancePill: View {
         Button(action: onTap) {
             HStack(spacing: 6) {
                 Image(systemName: "person.text.rectangle")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(AppTypography.captionBold)
                     .foregroundColor(AppColors.brand)
                 
                 Text("Profile:")
-                    .font(.system(size: 11, weight: .bold))
+                    .font(AppTypography.captionBold)
                     .foregroundColor(AppColors.primaryText)
                 
                 Text("\(profile.tradingStyle) • Max Risk \(profile.maxRiskPerTrade)")
-                    .font(.system(size: 11))
+                    .font(AppTypography.captionMicro)
                     .foregroundColor(AppColors.secondaryText)
                     .lineLimit(1)
                 
                 Spacer()
                 
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 10))
+                    .font(AppTypography.captionMicro)
                     .foregroundColor(AppColors.secondaryText)
             }
             .padding(.horizontal, 12)

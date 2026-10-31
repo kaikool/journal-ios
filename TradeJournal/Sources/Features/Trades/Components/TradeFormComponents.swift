@@ -73,7 +73,7 @@ public struct TradeSymbolSelector: View {
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
                     Text("POPULAR INSTRUMENTS")
-                        .font(.system(size: 10, weight: .semibold))
+                        .font(AppTypography.cardHeaderUppercase)
                         .foregroundColor(AppColors.mutedText)
                         .tracking(0.5)
                     Spacer()
@@ -84,7 +84,7 @@ public struct TradeSymbolSelector: View {
                         showCryptoSymbols.toggle()
                     } label: {
                         Text(showCryptoSymbols ? "Forex/Gold" : "Crypto/Indices")
-                            .font(.system(size: 11, weight: .medium))
+                            .font(AppTypography.actionButtonCompact)
                             .foregroundColor(AppColors.brand)
                     }
                 }
@@ -134,29 +134,29 @@ public struct TradeEstimatedPnlBanner: View {
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {
                         Text("ESTIMATED NET P&L")
-                            .font(.system(size: 10, weight: .bold))
+                            .font(AppTypography.cardHeaderUppercase)
                             .foregroundColor(AppColors.secondaryText)
                             .tracking(0.5)
                         
                         if let deltaStr = estimatedDeltaText {
                             Text("· \(deltaStr)")
-                                .font(.system(size: 10, weight: .bold))
+                                .font(AppTypography.badgeStandard)
                                 .foregroundColor(Formatters.pnlColor(pnl))
                         }
                     }
                     
                     Text(Formatters.formatPnL(pnl, currency: reportingCurrency))
-                        .font(.system(size: 20, weight: .bold))
+                        .font(AppTypography.displayMajor)
                         .monospacedDigit()
                         .foregroundColor(Formatters.pnlColor(pnl))
                     
                     Text("\(symbolSpec.cleanSymbol): \(quantity) lot · \(symbolSpec.lotDescription)")
-                        .font(.system(size: 10))
+                        .font(AppTypography.captionMicro)
                         .foregroundColor(AppColors.secondaryText)
                 }
                 Spacer()
                 Image(systemName: pnl >= 0 ? "arrow.up.circle.fill" : "arrow.down.circle.fill")
-                    .font(.system(size: 26))
+                    .font(AppTypography.displayHero)
                     .foregroundColor(pnl >= 0 ? AppColors.profit : AppColors.loss)
             }
             .padding(12)
@@ -182,7 +182,7 @@ public struct TradeTimestampsCard: View {
         TradeFormCardContainer {
             VStack(alignment: .leading, spacing: 12) {
                 Text("EXECUTION TIMESTAMPS")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(AppTypography.cardHeaderUppercase)
                     .foregroundColor(AppColors.secondaryText)
                     .tracking(0.5)
                 
@@ -211,7 +211,7 @@ public struct TradeTimestampsCard: View {
                 // Quick Time Presets
                 HStack(spacing: 6) {
                     Text("Quick open:")
-                        .font(.system(size: 10))
+                        .font(AppTypography.captionMicro)
                         .foregroundColor(AppColors.secondaryText)
                     
                     presetButton("Now") {
@@ -283,12 +283,12 @@ public struct TradePlaybookRulesCard: View {
                 VStack(alignment: .leading, spacing: 10) {
                     HStack {
                         Image(systemName: "checklist")
-                            .font(.system(size: 12))
+                            .font(AppTypography.cardHeader)
                             .foregroundColor(AppColors.brand)
                         
                         let followedCount = pb.rules.filter { ruleAssessments[$0] == true }.count
                         Text("RULE CHECKLIST (\(followedCount)/\(pb.rules.count))")
-                            .font(.system(size: 10, weight: .bold))
+                            .font(AppTypography.cardHeaderUppercase)
                             .foregroundColor(AppColors.secondaryText)
                             .tracking(0.5)
                         
@@ -304,7 +304,7 @@ public struct TradePlaybookRulesCard: View {
                             }
                         } label: {
                             Text(pb.rules.allSatisfy { ruleAssessments[$0] == true } ? "Clear All" : "Select All")
-                                .font(.system(size: 10, weight: .semibold))
+                                .font(AppTypography.actionButtonCompact)
                                 .foregroundColor(AppColors.brand)
                         }
                     }
@@ -320,7 +320,7 @@ public struct TradePlaybookRulesCard: View {
                             } label: {
                                 HStack(spacing: 10) {
                                     Image(systemName: isFollowed ? "checkmark.circle.fill" : "circle")
-                                        .font(.system(size: 16))
+                                        .font(AppTypography.rowPrimary)
                                         .foregroundColor(isFollowed ? AppColors.profit : AppColors.secondaryText.opacity(0.6))
                                     
                                     Text(rule)
@@ -383,7 +383,7 @@ public struct TradeDisciplineAndNotesCard: View {
         TradeFormCardContainer {
             VStack(alignment: .leading, spacing: 14) {
                 Text("DISCIPLINE & NOTES")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(AppTypography.cardHeaderUppercase)
                     .foregroundColor(AppColors.secondaryText)
                     .tracking(0.5)
                 
@@ -396,7 +396,7 @@ public struct TradeDisciplineAndNotesCard: View {
                     HStack(spacing: 6) {
                         ForEach(1...5, id: \.self) { star in
                             Image(systemName: star <= rating ? "star.fill" : "star")
-                                .font(.system(size: 16))
+                                .font(AppTypography.headline)
                                 .foregroundColor(star <= rating ? .yellow : AppColors.secondaryText.opacity(0.4))
                                 .onTapGesture {
                                     #if canImport(UIKit)
@@ -440,7 +440,7 @@ public struct TradeDisciplineAndNotesCard: View {
                                     }
                                 } label: {
                                     Text(m)
-                                        .font(.system(size: 11, weight: isAdded ? .bold : .medium))
+                                        .font(isAdded ? AppTypography.badgeStandard : AppTypography.captionMicro)
                                         .padding(.horizontal, 8)
                                         .padding(.vertical, 5)
                                         .background(isAdded ? AppColors.loss.opacity(0.15) : AppColors.secondaryBackground)

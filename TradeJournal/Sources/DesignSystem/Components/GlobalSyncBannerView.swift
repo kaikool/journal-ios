@@ -15,7 +15,7 @@ public struct GlobalSyncBannerView: View {
             if let error = dataStore.lastSyncError, !isDismissed, !error.lowercased().contains("cancel") {
                 HStack(spacing: 8) {
                     Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(AppTypography.captionBold)
                         .foregroundColor(AppColors.loss)
                     Text(error)
                         .font(AppTypography.caption)
@@ -26,7 +26,7 @@ public struct GlobalSyncBannerView: View {
                         env.selectedTab = .settings
                     } label: {
                         Text("Settings")
-                            .font(.system(size: 11, weight: .bold))
+                            .font(AppTypography.badgeStandard)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 3)
                             .background(AppColors.loss.opacity(0.18))
@@ -37,7 +37,7 @@ public struct GlobalSyncBannerView: View {
                         withAnimation { isDismissed = true }
                     } label: {
                         Image(systemName: "xmark")
-                            .font(.system(size: 10, weight: .bold))
+                            .font(AppTypography.captionMicro)
                             .foregroundColor(AppColors.secondaryText)
                             .padding(4)
                     }
@@ -53,7 +53,7 @@ public struct GlobalSyncBannerView: View {
             } else if let summary = dataStore.lastSyncSummary, !isDismissed && (summary.contains("completed") || summary.contains("successful") || summary.contains("synchronized")) {
                 HStack(spacing: 8) {
                     Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(AppTypography.captionBold)
                         .foregroundColor(AppColors.profit)
                     Text(summary)
                         .font(AppTypography.caption)
@@ -64,7 +64,7 @@ public struct GlobalSyncBannerView: View {
                         withAnimation { isDismissed = true }
                     } label: {
                         Image(systemName: "xmark")
-                            .font(.system(size: 10, weight: .bold))
+                            .font(AppTypography.captionMicro)
                             .foregroundColor(AppColors.secondaryText)
                             .padding(4)
                     }
