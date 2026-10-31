@@ -100,29 +100,19 @@ public struct TradeDetailDisciplineCard: View {
                 
                 // Interactive Playbook Rules
                 if let pb = activePlaybook {
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 6) {
                         ForEach(pb.rules, id: \.self) { rule in
                             let isChecked = playbookAssessments.first(where: {
                                 $0.tradeKey == trade.key && $0.playbookId == pb.id && $0.rule == rule
                             })?.followed ?? false
                             
-                            Button {
-                                #if canImport(UIKit)
-                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                #endif
+                            AppCheckboxRow(
+                                rule,
+                                isChecked: isChecked,
+                                isStrikethroughWhenChecked: false
+                            ) {
                                 onToggleRule(pb.id, rule, !isChecked)
-                            } label: {
-                                HStack(spacing: 8) {
-                                    Image(systemName: isChecked ? "checkmark.circle.fill" : "circle")
-                                        .foregroundColor(isChecked ? AppColors.profit : AppColors.secondaryText)
-                                        .font(.system(size: 15))
-                                    Text(rule)
-                                        .font(AppTypography.caption)
-                                        .foregroundColor(AppColors.primaryText)
-                                    Spacer()
-                                }
                             }
-                            .buttonStyle(.plain)
                         }
                     }
                     .padding(.top, 2)

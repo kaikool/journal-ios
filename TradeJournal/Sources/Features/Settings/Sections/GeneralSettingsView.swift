@@ -34,23 +34,38 @@ public struct GeneralSettingsView: View {
         VStack(spacing: 16) {
             // MARK: - 1. Appearance (Theme)
             SettingsCard(title: "Appearance") {
-                Picker("Theme", selection: Binding(
-                    get: { env.appTheme },
-                    set: { env.setAppTheme($0) }
-                )) {
-                    Label("System", systemImage: "circle.lefthalf.filled").tag(AppTheme.system)
-                    Label("Dark", systemImage: "moon.fill").tag(AppTheme.dark)
-                    Label("Light", systemImage: "sun.max.fill").tag(AppTheme.light)
-                }
-                .pickerStyle(.segmented)
+                AppSegmentedBar(
+                    selection: Binding(
+                        get: { env.appTheme },
+                        set: { env.setAppTheme($0) }
+                    ),
+                    items: [AppTheme.system, AppTheme.dark, AppTheme.light],
+                    titleFor: { theme in
+                        switch theme {
+                        case .system: return "System"
+                        case .dark: return "Dark"
+                        case .light: return "Light"
+                        }
+                    },
+                    iconFor: { theme in
+                        switch theme {
+                        case .system: return "circle.lefthalf.filled"
+                        case .dark: return "moon.fill"
+                        case .light: return "sun.max.fill"
+                        }
+                    },
+                    height: 36
+                )
             }
             
             // MARK: - 2. Haptics & Vibration
             SettingsCard(title: "Haptics & Touch") {
-                Toggle("Haptic Feedback", isOn: $env.isHapticsEnabled)
-                    .font(.system(size: 14.5, weight: .semibold))
-                    .foregroundColor(AppColors.primaryText)
-                    .tint(AppColors.brand)
+                AppToggleRow(
+                    "Haptic Feedback",
+                    subtitle: "Tactile vibration on taps, saves, and trade actions",
+                    icon: "iphone.radiowaves.left.and.right",
+                    isOn: $env.isHapticsEnabled
+                )
                     .onChange(of: env.isHapticsEnabled) { enabled in
                         if enabled {
                             NativeHaptics.success()

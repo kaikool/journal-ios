@@ -104,13 +104,14 @@ public struct NotebookEditorSheet: View {
                         Spacer()
                         
                         // Mode toggle: Preview prioritized over Edit
-                        Picker("Mode", selection: $isPreviewMode) {
-                            Text("Preview").tag(true)
-                            Text("Edit").tag(false)
-                        }
-                        .pickerStyle(.segmented)
-                        .frame(width: 160)
-                        .frame(height: 34)
+                        AppSegmentedBar(
+                            selection: $isPreviewMode,
+                            items: [true, false],
+                            titleFor: { $0 ? "Preview" : "Edit" },
+                            iconFor: { $0 ? "eye" : "pencil" },
+                            height: 34
+                        )
+                        .frame(width: 170)
                         .onChange(of: isPreviewMode) { _ in
                             flushSave()
                         }

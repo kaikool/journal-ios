@@ -75,11 +75,12 @@ public struct TradingSettingsView: View {
                             .keyboardType(.decimalPad)
                             .textFieldStyle(.roundedBorder)
                         
-                        Picker("Range unit", selection: $breakevenMode) {
-                            Text("Account currency").tag("money")
-                            Text("% of entry notional").tag("percent")
-                        }
-                        .pickerStyle(.segmented)
+                        AppSegmentedBar(
+                            selection: $breakevenMode,
+                            items: ["money", "percent"],
+                            titleFor: { $0 == "money" ? "Account currency" : "% of notional" },
+                            height: 32
+                        )
                     }
                     
                     Divider()
@@ -106,13 +107,17 @@ public struct TradingSettingsView: View {
                                 }
                                 
                                 HStack {
-                                    Picker("Account", selection: $feeRules[index].accountId) {
-                                        Text("All accounts").tag("")
-                                        ForEach(dataStore.accounts) { acc in
-                                            Text(acc.name).tag(acc.id)
-                                        }
-                                    }
-                                    .pickerStyle(.menu)
+                                    let accIds = [""] + dataStore.accounts.map { $0.id }
+                                    AppCompactDropdown(
+                                        icon: "wallet.pass",
+                                        selection: $feeRules[index].accountId,
+                                        options: accIds,
+                                        titleFor: { id in
+                                            if id.isEmpty { return "All accounts" }
+                                            return dataStore.accounts.first(where: { $0.id == id })?.name ?? id
+                                        },
+                                        height: 32
+                                    )
                                     
                                     TextField("Symbol (e.g. ES)", text: $feeRules[index].symbol)
                                         .font(AppTypography.inputText)
@@ -127,11 +132,12 @@ public struct TradingSettingsView: View {
                                         .textFieldStyle(.roundedBorder)
                                         .frame(maxWidth: 100)
                                     
-                                    Picker("Mode", selection: $feeRules[index].mode) {
-                                        Text("Execution").tag("execution")
-                                        Text("Unit / contract").tag("unit")
-                                    }
-                                    .pickerStyle(.segmented)
+                                    AppSegmentedBar(
+                                        selection: $feeRules[index].mode,
+                                        items: ["execution", "unit"],
+                                        titleFor: { $0 == "execution" ? "Execution" : "Unit" },
+                                        height: 32
+                                    )
                                 }
                             }
                             .padding(10)
@@ -168,13 +174,17 @@ public struct TradingSettingsView: View {
                                 }
                                 
                                 HStack {
-                                    Picker("Account", selection: $riskRules[index].accountId) {
-                                        Text("All accounts").tag("")
-                                        ForEach(dataStore.accounts) { acc in
-                                            Text(acc.name).tag(acc.id)
-                                        }
-                                    }
-                                    .pickerStyle(.menu)
+                                    let accIds = [""] + dataStore.accounts.map { $0.id }
+                                    AppCompactDropdown(
+                                        icon: "wallet.pass",
+                                        selection: $riskRules[index].accountId,
+                                        options: accIds,
+                                        titleFor: { id in
+                                            if id.isEmpty { return "All accounts" }
+                                            return dataStore.accounts.first(where: { $0.id == id })?.name ?? id
+                                        },
+                                        height: 32
+                                    )
                                     
                                     TextField("Symbol (e.g. NQ)", text: $riskRules[index].symbol)
                                         .font(AppTypography.inputText)
@@ -199,11 +209,12 @@ public struct TradingSettingsView: View {
                                     }
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text("Unit").font(AppTypography.caption)
-                                        Picker("Mode", selection: $riskRules[index].mode) {
-                                            Text("Price pts").tag("price")
-                                            Text("% entry").tag("percent")
-                                        }
-                                        .pickerStyle(.menu)
+                                        AppCompactDropdown(
+                                            selection: $riskRules[index].mode,
+                                            options: ["price", "percent"],
+                                            titleFor: { $0 == "price" ? "Price pts" : "% entry" },
+                                            height: 32
+                                        )
                                     }
                                 }
                             }

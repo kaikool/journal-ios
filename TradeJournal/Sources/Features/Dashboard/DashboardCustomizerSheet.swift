@@ -170,12 +170,12 @@ public struct DashboardCustomizerSheet: View {
         NavigationStack {
             VStack(spacing: 0) {
                 // Segmented Tab Switcher (Apple HIG Sliding Bar)
-                Picker("Tab", selection: $selectedTab) {
-                    ForEach(CustomizerTab.allCases) { tab in
-                        Text(tab.rawValue).tag(tab)
-                    }
-                }
-                .pickerStyle(.segmented)
+                AppSegmentedBar(
+                    selection: $selectedTab,
+                    items: CustomizerTab.allCases,
+                    titleFor: { $0.rawValue },
+                    height: 36
+                )
                 .padding(.horizontal, 16)
                 .padding(.vertical, 10)
                 .background(AppColors.cardBackground)
@@ -252,29 +252,13 @@ public struct DashboardCustomizerSheet: View {
             // Card list with switches
             List {
                 ForEach(filteredCards) { card in
-                    HStack(spacing: 12) {
-                        Image(systemName: card.icon)
-                            .font(.system(size: 15))
-                            .foregroundColor(AppColors.brand)
-                            .frame(width: 24)
-                        
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(card.label)
-                                .font(AppTypography.body)
-                                .foregroundColor(AppColors.primaryText)
-                            Text("\(card.size.rawValue.capitalized) card · \(card.group)")
-                                .font(AppTypography.caption)
-                                .foregroundColor(AppColors.secondaryText)
-                        }
-                        
-                        Spacer()
-                        
-                        Toggle("", isOn: Binding(
+                    AppToggleRow(
+                        card.label,
+                        subtitle: "\(card.size.rawValue.capitalized) card · \(card.group)",
+                        icon: card.icon,
+                        isOn: Binding(
                             get: { !hiddenCardIds.contains(card.id) },
                             set: { isVisible in
-                                #if canImport(UIKit)
-                                UISelectionFeedbackGenerator().selectionChanged()
-                                #endif
                                 withAnimation {
                                     if isVisible {
                                         hiddenCardIds.remove(card.id)
@@ -284,10 +268,8 @@ public struct DashboardCustomizerSheet: View {
                                     activePreset = .custom
                                 }
                             }
-                        ))
-                        .labelsHidden()
-                        .tint(AppColors.brand)
-                    }
+                        )
+                    )
                     .listRowBackground(AppColors.cardBackground)
                     .listRowSeparatorTint(AppColors.border.opacity(0.6))
                 }

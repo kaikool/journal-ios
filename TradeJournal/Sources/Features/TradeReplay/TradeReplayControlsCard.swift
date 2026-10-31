@@ -179,29 +179,15 @@ public struct TradeReplayControlsCard: View {
                     Spacer(minLength: 4)
                     
                     // Replay Speed menu
-                    Menu {
-                        Button("1×") { replaySpeed = 1.0; onSpeedChanged() }
-                        Button("2×") { replaySpeed = 2.0; onSpeedChanged() }
-                        Button("4×") { replaySpeed = 4.0; onSpeedChanged() }
-                    } label: {
-                        HStack(spacing: 3) {
-                            Text("\(Int(replaySpeed))×")
-                                .font(.system(size: 11, weight: .bold))
-                                .lineLimit(1)
-                            Image(systemName: "chevron.up.chevron.down")
-                                .font(.system(size: 9, weight: .bold))
-                        }
-                        .frame(height: 34)
-                        .padding(.horizontal, 10)
-                        .background(AppColors.secondaryBackground)
-                        .foregroundColor(AppColors.primaryText)
-                        .clipShape(Capsule())
-                        .overlay(
-                            Capsule()
-                                .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
-                        )
-                    }
-                    .fixedSize()
+                    AppCompactDropdown(
+                        selection: Binding(
+                            get: { replaySpeed },
+                            set: { replaySpeed = $0; onSpeedChanged() }
+                        ),
+                        options: [1.0, 2.0, 4.0],
+                        titleFor: { "\(Int($0))×" },
+                        height: 34
+                    )
                     
                     // Fullscreen Landscape Trigger (placed directly next to Speed button)
                     if let onLandscape = onOpenLandscape {

@@ -476,91 +476,67 @@ private struct AIMemoryEditorSheet: View {
                 VStack(spacing: 14) {
                     // Classification Card
                     AppCard {
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text("CLASSIFICATION & INSTRUMENT")
-                                .font(AppTypography.cardHeader)
-                                .foregroundColor(AppColors.secondaryText)
+                        VStack(alignment: .leading, spacing: 12) {
+                            AppSectionHeader("Classification & instrument")
                             
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Category")
-                                    .font(AppTypography.captionBold)
-                                    .foregroundColor(AppColors.primaryText)
-                                
-                                Picker("Category", selection: $category) {
-                                    ForEach(AIMemoryCategory.allCases, id: \.rawValue) { cat in
-                                        Text(cat.localizedTitle).tag(cat)
-                                    }
-                                }
-                                .pickerStyle(.segmented)
-                            }
+                            AppDropdownField(
+                                label: "Category",
+                                selection: $category,
+                                options: AIMemoryCategory.allCases,
+                                titleFor: { $0.localizedTitle }
+                            )
                             
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Symbol (Optional)")
-                                    .font(AppTypography.captionBold)
-                                    .foregroundColor(AppColors.primaryText)
-                                
-                                TextField("e.g. XAUUSD (leave blank for general rule)", text: $symbol)
-                                    .font(AppTypography.inputText)
-                                    .padding(10)
-                                    .background(AppColors.secondaryBackground)
-                                    .cornerRadius(8)
-                                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(AppColors.border.opacity(0.6), lineWidth: 0.8))
-                                    .autocapitalization(.allCharacters)
-                                    .disableAutocorrection(true)
-                            }
+                            AppFormField(
+                                "Symbol (Optional)",
+                                text: $symbol,
+                                placeholder: "e.g. XAUUSD (leave blank for general rule)",
+                                height: 42
+                            )
                         }
                     }
                     
                     // Content Card
                     AppCard {
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text("TITLE & RULE CONTENT")
-                                .font(AppTypography.cardHeader)
-                                .foregroundColor(AppColors.secondaryText)
+                        VStack(alignment: .leading, spacing: 12) {
+                            AppSectionHeader("Title & rule content")
                             
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Rule Title")
-                                    .font(AppTypography.captionBold)
-                                    .foregroundColor(AppColors.primaryText)
-                                
-                                TextField("e.g. Wait for 15m MSS before entry", text: $title)
-                                    .font(AppTypography.inputText)
-                                    .padding(10)
-                                    .background(AppColors.secondaryBackground)
-                                    .cornerRadius(8)
-                                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(AppColors.border.opacity(0.6), lineWidth: 0.8))
-                            }
+                            AppFormField(
+                                "Rule Title",
+                                text: $title,
+                                placeholder: "e.g. Wait for 15m MSS before entry",
+                                height: 42
+                            )
                             
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("Rule / Lesson Description")
-                                    .font(AppTypography.captionBold)
-                                    .foregroundColor(AppColors.primaryText)
+                                    .font(AppTypography.caption)
+                                    .foregroundColor(AppColors.secondaryText)
                                 
                                 TextEditor(text: $content)
                                     .font(AppTypography.inputText)
                                     .frame(minHeight: 100)
                                     .padding(8)
-                                    .background(AppColors.secondaryBackground)
-                                    .cornerRadius(8)
-                                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(AppColors.border.opacity(0.6), lineWidth: 0.8))
+                                    .background(AppColors.secondaryBackground.opacity(0.65))
+                                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                            .stroke(AppColors.border.opacity(0.45), lineWidth: 0.6)
+                                    )
                             }
                         }
                     }
                     
                     // Status & Confidence Card
                     AppCard {
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text("STATUS & CONFIDENCE")
-                                .font(AppTypography.cardHeader)
-                                .foregroundColor(AppColors.secondaryText)
+                        VStack(alignment: .leading, spacing: 12) {
+                            AppSectionHeader("Status & confidence")
                             
-                            Picker("Status", selection: $status) {
-                                Text("Active").tag(AIMemoryStatus.active)
-                                Text("Verified").tag(AIMemoryStatus.verified)
-                                Text("Deprecated").tag(AIMemoryStatus.deprecated)
-                                Text("Refuted").tag(AIMemoryStatus.refuted)
-                            }
-                            .pickerStyle(.segmented)
+                            AppSegmentedBar(
+                                selection: $status,
+                                items: [AIMemoryStatus.active, AIMemoryStatus.verified, AIMemoryStatus.deprecated, AIMemoryStatus.refuted],
+                                titleFor: { $0.rawValue.capitalized },
+                                height: 34
+                            )
                             
                             VStack(alignment: .leading, spacing: 4) {
                                 HStack {

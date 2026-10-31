@@ -67,39 +67,13 @@ public struct NewPlaybookSheet: View {
                     height: 42
                 )
                 
-                // Default Playbook Checkbox
-                Button {
-                    #if canImport(UIKit)
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    #endif
-                    isDefault.toggle()
-                } label: {
-                    HStack(spacing: 12) {
-                        Image(systemName: isDefault ? "checkmark.square.fill" : "square")
-                            .font(.system(size: 20))
-                            .foregroundColor(isDefault ? AppColors.brand : AppColors.secondaryText)
-                        
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Set as Default Playbook")
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundColor(AppColors.primaryText)
-                            Text("Automatically assigned to newly opened and imported trades")
-                                .font(AppTypography.caption)
-                                .foregroundColor(AppColors.secondaryText)
-                        }
-                        
-                        Spacer()
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .background(AppColors.background)
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .stroke(isDefault ? AppColors.brand.opacity(0.4) : AppColors.border.opacity(0.5), lineWidth: 0.8)
-                    )
-                }
-                .buttonStyle(.plain)
+                // Default Playbook Toggle
+                AppToggleRow(
+                    "Set as Default Playbook",
+                    subtitle: "Automatically assigned to newly opened and imported trades",
+                    icon: "star.circle.fill",
+                    isOn: $isDefault
+                )
             }
         }
     }

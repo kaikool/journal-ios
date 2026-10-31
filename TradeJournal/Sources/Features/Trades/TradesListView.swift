@@ -263,12 +263,12 @@ public struct TradesListView: View {
     
     @ViewBuilder
     private var searchAndStatusFilter: some View {
-        Picker("Status", selection: $statusFilter) {
-            ForEach(TradeStatusFilter.allCases) { f in
-                Text(f.rawValue).tag(f)
-            }
-        }
-        .pickerStyle(.segmented)
+        AppSegmentedBar(
+            selection: $statusFilter,
+            items: TradeStatusFilter.allCases,
+            titleFor: { $0.rawValue },
+            height: 34
+        )
         .padding(.vertical, 2)
     }
     

@@ -83,11 +83,13 @@ public struct AiSettingsView: View {
                             .font(AppTypography.captionBold)
                             .foregroundColor(AppColors.secondaryText)
                         
-                        Picker("Response Language", selection: $language) {
-                            Text("English").tag("en")
-                            Text("Vietnamese").tag("vi")
-                        }
-                        .pickerStyle(.segmented)
+                        AppSegmentedBar(
+                            selection: $language,
+                            items: ["en", "vi"],
+                            titleFor: { $0 == "en" ? "English" : "Tiếng Việt" },
+                            iconFor: { _ in "globe" },
+                            height: 34
+                        )
                         .onChange(of: language) { _ in
                             saveSettings()
                         }

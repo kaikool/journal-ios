@@ -28,11 +28,13 @@ public struct MissedTradesView: View {
         ScrollView {
             VStack(spacing: 12) {
                 // Compact Segmented Status Switcher
-                Picker("Status", selection: $showArchived) {
-                    Text("Active").tag(false)
-                    Text("Archived").tag(true)
-                }
-                .pickerStyle(.segmented)
+                AppSegmentedBar(
+                    selection: $showArchived,
+                    items: [false, true],
+                    titleFor: { $0 ? "Archived" : "Active" },
+                    iconFor: { $0 ? "archivebox" : "bolt.fill" },
+                    height: 34
+                )
                 
                 if filteredTrades.isEmpty {
                     emptyStateView

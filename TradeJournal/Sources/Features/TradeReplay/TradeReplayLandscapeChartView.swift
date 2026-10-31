@@ -423,27 +423,15 @@ public struct TradeReplayLandscapeChartView: View {
                 .fixedSize()
             
             // Speed Menu
-            Menu {
-                Button("1×") { replaySpeed = 1.0; onSpeedChanged() }
-                Button("2×") { replaySpeed = 2.0; onSpeedChanged() }
-                Button("4×") { replaySpeed = 4.0; onSpeedChanged() }
-            } label: {
-                HStack(spacing: 2) {
-                    Text("\(Int(replaySpeed))×")
-                        .font(.system(size: 11, weight: .bold))
-                    Image(systemName: "chevron.up.chevron.down")
-                        .font(.system(size: 8, weight: .bold))
-                }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(AppColors.secondaryBackground)
-                .foregroundColor(AppColors.primaryText)
-                .clipShape(Capsule())
-                .overlay(
-                    Capsule().stroke(AppColors.border.opacity(0.5), lineWidth: 0.8)
-                )
-            }
-            .fixedSize()
+            AppCompactDropdown(
+                selection: Binding(
+                    get: { replaySpeed },
+                    set: { replaySpeed = $0; onSpeedChanged() }
+                ),
+                options: [1.0, 2.0, 4.0],
+                titleFor: { "\(Int($0))×" },
+                height: 28
+            )
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 5)
