@@ -83,6 +83,7 @@ public enum AppTypography {
     public static let captionMedium = Font.system(size: 11.5, weight: .medium, design: .default)
     public static let captionBold = Font.system(size: 11.5, weight: .bold, design: .default)
     public static let monoCaption = Font.system(size: 11.5, weight: .regular, design: .default).monospacedDigit()
+    public static let captionMicro = Font.system(size: 10, weight: .medium, design: .default)
     public static let microCaption = Font.system(size: 10, weight: .medium, design: .default)
     public static let numberMicro = Font.system(size: 10, weight: .medium, design: .default).monospacedDigit()
     public static let footnote = Font.system(size: 11, weight: .regular, design: .default)
