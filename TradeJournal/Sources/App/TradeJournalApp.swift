@@ -131,46 +131,6 @@ public struct RootTabView: View {
         .shadow(color: AppColors.brand.opacity(env.colorScheme == .dark ? 0.06 : 0.02), radius: 6, x: 0, y: 2)
         .padding(.horizontal, 14)
         .padding(.bottom, 6)
-        .gesture(
-            DragGesture(minimumDistance: 15, coordinateSpace: .local)
-                .onEnded { value in
-                    let h = value.translation.width
-                    let v = value.translation.height
-                    guard abs(h) > abs(v) * 1.3 && abs(h) > 20 else { return }
-                    
-                    if h < -20 {
-                        // Swipe Left: Next Tab
-                        if let next = env.selectedTab.nextPrimaryTab {
-                            #if canImport(UIKit)
-                            UISelectionFeedbackGenerator().selectionChanged()
-                            #endif
-                            env.selectedTab = next
-                        } else {
-                            #if canImport(UIKit)
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            #endif
-                            withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
-                                env.isDrawerOpen = true
-                            }
-                        }
-                    } else if h > 20 {
-                        // Swipe Right: Previous Tab
-                        if let prev = env.selectedTab.previousPrimaryTab {
-                            #if canImport(UIKit)
-                            UISelectionFeedbackGenerator().selectionChanged()
-                            #endif
-                            env.selectedTab = prev
-                        } else {
-                            #if canImport(UIKit)
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            #endif
-                            withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
-                                env.isDrawerOpen = true
-                            }
-                        }
-                    }
-                }
-        )
     }
     
     private func bottomBarItem(tab: AppTab, label: String, icon: String, selectedIcon: String) -> some View {
