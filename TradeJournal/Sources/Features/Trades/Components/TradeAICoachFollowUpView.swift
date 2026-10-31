@@ -78,14 +78,14 @@ public struct TradeAICoachBottomFloatingInput: View {
     public var body: some View {
         HStack(spacing: 8) {
             // Sleek Floating Input Pill
-            HStack(spacing: 8) {
+            HStack(spacing: 10) {
                 Image(systemName: "bubble.left.and.text.bubble.right.fill")
-                    .font(.system(size: 12))
-                    .foregroundColor(AppColors.secondaryText.opacity(0.7))
-                    .padding(.leading, 4)
+                    .font(.system(size: 15))
+                    .foregroundColor(AppColors.secondaryText.opacity(0.8))
+                    .padding(.leading, 6)
                 
                 TextField("Ask a follow-up question...", text: $followUpQuery)
-                    .font(.system(size: 13, weight: .regular))
+                    .font(.system(size: 15, weight: .medium))
                     .foregroundColor(AppColors.primaryText)
                     .onSubmit {
                         if hasQueryText && !isSubmitting {
@@ -96,10 +96,10 @@ public struct TradeAICoachBottomFloatingInput: View {
                 if hasHistory && !hasQueryText {
                     Button(action: onResetThread) {
                         Image(systemName: "arrow.counterclockwise")
-                            .font(.system(size: 10, weight: .semibold))
+                            .font(.system(size: 13, weight: .semibold))
                             .foregroundColor(AppColors.secondaryText)
-                            .frame(width: 24, height: 24)
-                            .background(AppColors.secondaryBackground.opacity(0.8))
+                            .frame(width: 30, height: 30)
+                            .background(AppColors.secondaryBackground.opacity(0.85))
                             .clipShape(Circle())
                     }
                     .buttonStyle(.plain)
@@ -108,17 +108,17 @@ public struct TradeAICoachBottomFloatingInput: View {
                 
                 if isSubmitting {
                     ProgressView()
-                        .scaleEffect(0.75)
-                        .frame(width: 28, height: 28)
+                        .scaleEffect(0.85)
+                        .frame(width: 34, height: 34)
                 } else {
                     Button(action: onSubmit) {
                         ZStack {
                             Circle()
-                                .fill(hasQueryText ? AppColors.brand : AppColors.secondaryBackground.opacity(0.8))
-                                .frame(width: 28, height: 28)
+                                .fill(hasQueryText ? AppColors.brand : AppColors.secondaryBackground.opacity(0.85))
+                                .frame(width: 34, height: 34)
                             
                             Image(systemName: "arrow.up")
-                                .font(.system(size: 12, weight: .bold))
+                                .font(.system(size: 14, weight: .bold))
                                 .foregroundColor(hasQueryText ? .white : AppColors.secondaryText.opacity(0.4))
                         }
                     }
@@ -126,18 +126,19 @@ public struct TradeAICoachBottomFloatingInput: View {
                     .animation(.easeInOut(duration: 0.15), value: hasQueryText)
                 }
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 7)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .frame(minHeight: 50)
             .background(AppColors.cardBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(AppColors.border.opacity(0.55), lineWidth: 0.8)
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .stroke(AppColors.border.opacity(0.65), lineWidth: 1.0)
             )
-            .shadow(color: Color.black.opacity(0.25), radius: 8, x: 0, y: 3)
+            .shadow(color: Color.black.opacity(0.22), radius: 10, x: 0, y: 4)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
         .background(Color.clear)
     }
 }
