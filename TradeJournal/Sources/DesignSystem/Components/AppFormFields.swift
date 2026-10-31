@@ -145,6 +145,37 @@ public struct AppNumericValueField<T: BinaryFloatingPoint>: View {
     }
 }
 
+/// Standardized Decimal input field for financial and configuration values
+public struct AppDecimalField: View {
+    public let placeholder: String
+    @Binding public var value: Decimal
+    public let height: CGFloat
+    
+    public init(_ placeholder: String = "", value: Binding<Decimal>, height: CGFloat = 34) {
+        self.placeholder = placeholder
+        self._value = value
+        self.height = height
+    }
+    
+    public var body: some View {
+        TextField(
+            placeholder,
+            value: $value,
+            format: .number
+        )
+        .font(AppTypography.formInputMono)
+        .keyboardType(.decimalPad)
+        .padding(.horizontal, 10)
+        .frame(height: height)
+        .background(AppColors.secondaryBackground.opacity(0.65))
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(AppColors.border.opacity(0.45), lineWidth: 0.6)
+        )
+    }
+}
+
 /// Unified Apple HIG Numeric / Decimal Form Field
 /// Tailored for financial quantities, prices, pips, stops, and targets with monospaced digits.
 public struct AppNumericField: View {
