@@ -344,7 +344,8 @@ private struct AIMemoryCard: View {
                             .foregroundColor(AppColors.brand)
                             .contentShape(Rectangle())
                             .onTapGesture {
-                                withAnimation(.easeInOut(duration: 0.15)) {
+                                NativeHaptics.lightImpact()
+                                withAnimation(AppAnimations.easeInOutFast) {
                                     isExpanded.toggle()
                                 }
                             }

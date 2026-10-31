@@ -150,9 +150,9 @@ public struct TradesListView: View {
     private var summaryCardsGrid: some View {
         let isProfit = overviewMetrics.netPnl >= 0
         let pnlColor = isProfit ? AppColors.profit : AppColors.loss
-        let pfStr = overviewMetrics.profitFactorIsInfinite ? "∞" : (overviewMetrics.profitFactor.map { String(format: "%.2f", $0) } ?? "–")
-        let winRateStr = overviewMetrics.winRate.map { String(format: "%.1f%%", $0 * 100) } ?? "–"
-        let avgWlStr = overviewMetrics.avgWinLossRatio.map { String(format: "%.2f", $0) } ?? "–"
+        let pfStr = overviewMetrics.profitFactorIsInfinite ? "∞" : (overviewMetrics.profitFactor.map { Formatters.formatDecimal(Decimal($0), maxDecimals: 2) } ?? "–")
+        let winRateStr = overviewMetrics.winRate.map { Formatters.formatPercent($0 * 100) } ?? "–"
+        let avgWlStr = overviewMetrics.avgWinLossRatio.map { Formatters.formatDecimal(Decimal($0), maxDecimals: 2) } ?? "–"
         
         LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
             cardContainer {
@@ -294,6 +294,7 @@ public struct TradesListView: View {
                     TradeTerminalRow(trade: trade)
                         .contentShape(Rectangle())
                         .onTapGesture {
+                            NativeHaptics.lightImpact()
                             selectedTrade = trade
                         }
                     .contextMenu {

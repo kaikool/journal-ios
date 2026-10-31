@@ -228,8 +228,10 @@ public struct DayDetailSheet: View {
                         ForEach(1...5, id: \.self) { star in
                             Image(systemName: star <= rating ? "star.fill" : "star")
                                 .font(AppTypography.cardHeader)
-                                .foregroundColor(star <= rating ? .yellow : AppColors.mutedText)
+                                .foregroundColor(star <= rating ? AppColors.warning : AppColors.mutedText)
+                                .contentShape(Rectangle())
                                 .onTapGesture {
+                                    NativeHaptics.lightImpact()
                                     rating = (rating == star) ? 0 : star
                                     save()
                                 }

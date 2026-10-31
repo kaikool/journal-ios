@@ -210,7 +210,7 @@ public struct TradeAICoachSheet: View {
         let curPriceStr = Formatters.price(curPrice, symbol: currentTrade.symbol)
         let slStr = currentTrade.stopLoss.map { Formatters.price($0, symbol: currentTrade.symbol) } ?? (isVi ? "Chưa cài SL" : "Not Set")
         let tpStr = currentTrade.profitTarget.map { Formatters.price($0, symbol: currentTrade.symbol) } ?? (isVi ? "Chưa cài TP" : "Not Set")
-        let volStr = String(format: "%.2f", NSDecimalNumber(decimal: currentTrade.quantity).doubleValue)
+        let volStr = Formatters.formatDecimal(currentTrade.quantity, maxDecimals: 2)
         
         // P&L and Points
         let priceDelta = isShort ? (currentTrade.avgEntry - curPrice) : (curPrice - currentTrade.avgEntry)
@@ -218,7 +218,7 @@ public struct TradeAICoachSheet: View {
         let pipDivisor: Decimal = spec.pipSize > 0 ? spec.pipSize : 0.0001
         let pipsDelta = priceDelta / pipDivisor
         let pipsDeltaDouble = (pipsDelta as NSDecimalNumber).doubleValue
-        let pipsDeltaStr = String(format: "%@%.1f pips", pipsDeltaDouble >= 0 ? "+" : "", pipsDeltaDouble)
+        let pipsDeltaStr = Formatters.pips(pipsDeltaDouble, signed: true)
         
         // Unrealized P&L
         let unpnl: Decimal = {
@@ -236,8 +236,7 @@ public struct TradeAICoachSheet: View {
                 return currentTrade.netPnl
             }
         }()
-        let pnlDouble = (unpnl as NSDecimalNumber).doubleValue
-        let pnlStr = (unpnl >= 0 ? "+$" : "-$") + String(format: "%.2f", abs(pnlDouble))
+        let pnlStr = Formatters.formatPnL(unpnl, currency: "USD")
         
         // R-Multiple
         let rStr: String = {
@@ -246,7 +245,7 @@ public struct TradeAICoachSheet: View {
             guard riskPerUnit > 0 else { return "N/A" }
             let r = priceDelta / riskPerUnit
             let rDouble = (r as NSDecimalNumber).doubleValue
-            return String(format: "%@%.2fR", rDouble >= 0 ? "+" : "", rDouble)
+            return Formatters.formatRMultiple(rDouble)
         }()
         
         // Target Distances
@@ -254,13 +253,13 @@ public struct TradeAICoachSheet: View {
             guard let sl = currentTrade.stopLoss else { return isVi ? "Chưa cài" : "Not set" }
             let dist = abs(curPrice - sl)
             let pips = dist / pipDivisor
-            return String(format: "%.1f pips (SL @ %@)", (pips as NSDecimalNumber).doubleValue, Formatters.price(sl, symbol: currentTrade.symbol))
+            return "\(Formatters.pips(pips)) (SL @ \(Formatters.price(sl, symbol: currentTrade.symbol)))"
         }()
         let tpDistStr: String = {
             guard let tp = currentTrade.profitTarget else { return isVi ? "Chưa cài" : "Not set" }
             let dist = abs(tp - curPrice)
             let pips = dist / pipDivisor
-            return String(format: "%.1f pips (TP @ %@)", (pips as NSDecimalNumber).doubleValue, Formatters.price(tp, symbol: currentTrade.symbol))
+            return "\(Formatters.pips(pips)) (TP @ \(Formatters.price(tp, symbol: currentTrade.symbol)))"
         }()
         
         // Extremes reached (MFE / MAE)
@@ -277,11 +276,13 @@ public struct TradeAICoachSheet: View {
             let worstPips = (worstDelta / pipDivisor as NSDecimalNumber).doubleValue
             let bestPriceStr = Formatters.price(bestPrice, symbol: currentTrade.symbol)
             let worstPriceStr = Formatters.price(worstPrice, symbol: currentTrade.symbol)
+            let bestPipsStr = Formatters.pips(bestPips, signed: true)
+            let worstPipsStr = Formatters.pips(worstPips, signed: true)
             
             if isVi {
-                return "\n  • Đỉnh lợi nhuận từng đạt (MFE): \(bestPriceStr) (\(String(format: "%@%.1f pips", bestPips >= 0 ? "+" : "", bestPips)))\n  • Mức sụt giảm tối đa từng chịu (MAE): \(worstPriceStr) (\(String(format: "%@%.1f pips", worstPips >= 0 ? "+" : "", worstPips)))"
+                return "\n  • Đỉnh lợi nhuận từng đạt (MFE): \(bestPriceStr) (\(bestPipsStr))\n  • Mức sụt giảm tối đa từng chịu (MAE): \(worstPriceStr) (\(worstPipsStr))"
             } else {
-                return "\n  • Max Favorable Excursion (MFE Peak): \(bestPriceStr) (\(String(format: "%@%.1f pips", bestPips >= 0 ? "+" : "", bestPips)))\n  • Max Adverse Excursion (MAE Drawdown): \(worstPriceStr) (\(String(format: "%@%.1f pips", worstPips >= 0 ? "+" : "", worstPips)))"
+                return "\n  • Max Favorable Excursion (MFE Peak): \(bestPriceStr) (\(bestPipsStr))\n  • Max Adverse Excursion (MAE Drawdown): \(worstPriceStr) (\(worstPipsStr))"
             }
         }()
         
@@ -828,7 +829,7 @@ public struct TradeAICoachSheet: View {
     private func resolvedVolume(plan: AdvisorCommitmentRecord) -> String? {
         if let v = plan.volume, !v.isEmpty { return v }
         if trade.quantity > 0 {
-            return String(format: "%.2f lots", (trade.quantity as NSDecimalNumber).doubleValue)
+            return "\(Formatters.formatDecimal(trade.quantity, maxDecimals: 2)) lots"
         }
         return nil
     }

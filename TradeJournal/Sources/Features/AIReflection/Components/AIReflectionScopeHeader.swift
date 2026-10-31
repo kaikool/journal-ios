@@ -12,10 +12,8 @@ public struct AIReflectionScopeHeader: View {
     
     private var scopeSummaryText: String {
         let count = metrics.totalTrades
-        let wr = String(format: "%.2f%%", (metrics.winRate ?? 0) * 100)
-        let pnl = metrics.netPnl
-        let pnlVal = NSDecimalNumber(decimal: pnl).doubleValue
-        let pnlStr = (pnl >= 0 ? "+$" : "-$") + String(format: "%.2f", abs(pnlVal))
+        let wr = Formatters.formatPercent(metrics.winRate)
+        let pnlStr = Formatters.formatPnL(metrics.netPnl, currency: "USD")
         return "\(activeAccountName) • \(count) Trades • WR: \(wr) • P&L: \(pnlStr)"
     }
     
@@ -65,6 +63,7 @@ public struct AIReflectionPreTradeBanner: View {
                 }
                 .contentShape(Rectangle())
                 .onTapGesture {
+                    NativeHaptics.lightImpact()
                     onOpenPreTrade()
                 }
         }
@@ -116,6 +115,7 @@ public struct AIReflectionIntelligenceCards: View {
                 .appCardStyle(cornerRadius: 10)
                 .contentShape(Rectangle())
                 .onTapGesture {
+                    NativeHaptics.lightImpact()
                     onOpenMemory()
                 }
             
@@ -143,6 +143,7 @@ public struct AIReflectionIntelligenceCards: View {
                 .appCardStyle(cornerRadius: 10)
                 .contentShape(Rectangle())
                 .onTapGesture {
+                    NativeHaptics.lightImpact()
                     onOpenResearch()
                 }
         }

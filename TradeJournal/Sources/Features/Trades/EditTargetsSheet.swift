@@ -393,7 +393,7 @@ public struct EditTargetsSheet: View {
                                 .font(AppTypography.badgeStandard)
                                 .foregroundColor(AppColors.loss)
                             Spacer()
-                            Text(String(format: "%.1fR Reward", plannedVal))
+                            Text("\(Formatters.formatDecimal(Decimal(plannedVal), maxDecimals: 1))R Reward")
                                 .font(AppTypography.badgeStandard)
                                 .foregroundColor(AppColors.profit)
                         }

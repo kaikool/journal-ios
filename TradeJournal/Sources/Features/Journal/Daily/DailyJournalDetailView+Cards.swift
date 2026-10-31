@@ -92,7 +92,7 @@ extension DailyJournalDetailView {
                             HStack {
                                 statItem(label: "Expectancy", value: metrics.expectancy.map { Formatters.currency($0, currencyCode: env.currentCurrency, isPrivate: env.isPrivacyModeEnabled) } ?? "–")
                                 Spacer()
-                                statItem(label: "Profit Factor", value: metrics.profitFactorIsInfinite ? "∞" : (metrics.profitFactor.map { String(format: "%.2f", $0) } ?? "–"), alignment: .trailing)
+                                statItem(label: "Profit Factor", value: metrics.profitFactorIsInfinite ? "∞" : (metrics.profitFactor.map { Formatters.formatDecimal(Decimal($0), maxDecimals: 2) } ?? "–"), alignment: .trailing)
                             }
                         }
                     }
@@ -284,6 +284,7 @@ extension DailyJournalDetailView {
                         .padding(.vertical, 6)
                         .contentShape(Rectangle())
                         .onTapGesture {
+                            NativeHaptics.lightImpact()
                             selectedTradeForDetail = trade
                         }
                         

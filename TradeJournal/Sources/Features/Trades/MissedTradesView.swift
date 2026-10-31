@@ -334,8 +334,8 @@ public struct AddMissedTradeSheet: View {
             VStack(alignment: .leading, spacing: 14) {
                 AppSectionHeader(
                     "Planned targets (R:R)",
-                    trailingBadge: plannedRRInfo.map { "1 : \(String(format: "%.2f", $0.ratio)) R" },
-                    trailingBadgeColor: (plannedRRInfo?.isValidDirection ?? true) ? AppColors.brand : .orange
+                    trailingBadge: plannedRRInfo.map { "1 : \(Formatters.formatDecimal(Decimal($0.ratio), maxDecimals: 2)) R" },
+                    trailingBadgeColor: (plannedRRInfo?.isValidDirection ?? true) ? AppColors.brand : AppColors.warning
                 )
                 
                 // 3 numeric input boxes

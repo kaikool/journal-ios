@@ -61,8 +61,8 @@ public struct TradeDetailRiskCard: View {
                     
                     AppMetricTile(
                         "Realized Return",
-                        value: realizedR.map { String(format: "%+.2f R", ($0 as NSDecimalNumber).doubleValue) } ??
-                               (plannedR.map { String(format: "Planned %.2f R", ($0 as NSDecimalNumber).doubleValue) } ?? "–"),
+                        value: realizedR.map { Formatters.formatRMultiple(($0 as NSDecimalNumber).doubleValue) } ??
+                               (plannedR.map { "Planned \(Formatters.formatRMultiple(($0 as NSDecimalNumber).doubleValue))" } ?? "–"),
                         color: (realizedR ?? 0) >= 0 ? AppColors.profit : AppColors.loss,
                         alignment: .leading
                     )

@@ -255,6 +255,17 @@ public enum Formatters {
         }
     }
     
+    /// Formats excursion / delta in pips (e.g. "+15.2 pips", "8 pips")
+    public static func pips(_ value: Double, signed: Bool = false) -> String {
+        let prefix = (signed && value > 0) ? "+" : ""
+        return "\(prefix)\(points(value)) pips"
+    }
+
+    public static func pips(_ value: Decimal, signed: Bool = false) -> String {
+        let num = (value as NSDecimalNumber).doubleValue
+        return pips(num, signed: signed)
+    }
+    
     public static func formatNumber(_ value: Decimal) -> String {
         return priceFormatter.string(from: value as NSDecimalNumber) ?? "\(value)"
     }

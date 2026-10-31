@@ -56,7 +56,7 @@ extension JournalCalendarView {
                     
                     metricCard(
                         title: "Trade win rate",
-                        value: String(format: "%.1f%%", (insights.winRate ?? 0) * 100),
+                        value: Formatters.formatPercent((insights.winRate ?? 0) * 100),
                         detail: "\(insights.wins) wins · \(insights.losses) losses · \(insights.breakevens) break-even",
                         valueColor: AppColors.primaryText
                     )
@@ -182,7 +182,7 @@ extension JournalCalendarView {
                             Spacer()
                             
                             let rate = (insights.profitableDayRate ?? 0) * 100
-                            Text(String(format: "%.1f%%", rate))
+                            Text(Formatters.formatPercent(rate))
                                 .font(AppTypography.financialNumber(size: 18, weight: .semibold))
                                 .foregroundColor(rate >= 50 ? AppColors.profit : AppColors.secondaryText)
                         }
@@ -413,6 +413,7 @@ extension JournalCalendarView {
                                     .padding(.vertical, 3)
                                 .contentShape(Rectangle())
                                 .onTapGesture {
+                                    NativeHaptics.lightImpact()
                                     openDayDetail(for: day.date)
                                 }
                             }
@@ -506,6 +507,7 @@ extension JournalCalendarView {
                                         .appCardStyle(cornerRadius: 6)
                                         .contentShape(Rectangle())
                                         .onTapGesture {
+                                            NativeHaptics.lightImpact()
                                             openDayDetail(for: day.date)
                                         }
                                     }
@@ -593,6 +595,7 @@ extension JournalCalendarView {
         .contentShape(Rectangle())
         .onTapGesture {
             guard hasTrades else { return }
+            NativeHaptics.lightImpact()
             withAnimation(AppAnimations.springQuick) {
                 selectedWeekdayIndex = (selectedWeekdayIndex == wd.index) ? nil : wd.index
             }

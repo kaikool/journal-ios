@@ -26,7 +26,7 @@ public struct TradeAICoachContextCard: View {
                         AppBadge(isOpen ? "LIVE POSITION" : "CLOSED AUDIT", style: isOpen ? .profit : .neutral)
                     }
                     
-                    let volStr = String(format: "%.2f", NSDecimalNumber(decimal: trade.quantity).doubleValue)
+                    let volStr = Formatters.formatDecimal(trade.quantity, maxDecimals: 2)
                     let entryStr = Formatters.price(trade.avgEntry, symbol: trade.symbol)
                     let exitStr = trade.avgExit.map { Formatters.price($0, symbol: trade.symbol) } ?? (isOpen ? "Live" : "N/A")
                     
@@ -37,8 +37,7 @@ public struct TradeAICoachContextCard: View {
                 
                 Spacer()
                 
-                let pnlVal = NSDecimalNumber(decimal: trade.netPnl).doubleValue
-                let pnlStr = (trade.netPnl >= 0 ? "+$" : "-$") + String(format: "%.2f", abs(pnlVal))
+                let pnlStr = Formatters.formatPnL(trade.netPnl, currency: trade.currency ?? "USD")
                 
                 VStack(alignment: .trailing, spacing: 2) {
                     Text(pnlStr)

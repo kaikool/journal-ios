@@ -130,7 +130,7 @@ extension DashboardView {
                 
                 Spacer(minLength: 4)
                 
-                Text(metrics.profitFactorIsInfinite ? "∞" : (metrics.profitFactor.map { String(format: "%.2f", $0) } ?? "–"))
+                Text(metrics.profitFactorIsInfinite ? "∞" : (metrics.profitFactor.map { Formatters.formatDecimal(Decimal($0), maxDecimals: 2) } ?? "–"))
                     .font(AppTypography.displayHero)
                     .monospacedDigit()
                     .foregroundColor(AppColors.primaryText)
@@ -185,7 +185,7 @@ extension DashboardView {
                 
                 Spacer(minLength: 2)
                 
-                Text(metrics.avgWinLossRatio.map { String(format: "%.2f", $0) } ?? "–")
+                Text(metrics.avgWinLossRatio.map { Formatters.formatDecimal(Decimal($0), maxDecimals: 2) } ?? "–")
                     .font(AppTypography.displayHero)
                     .monospacedDigit()
                     .foregroundColor(AppColors.primaryText)

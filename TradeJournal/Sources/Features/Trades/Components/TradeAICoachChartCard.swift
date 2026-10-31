@@ -82,7 +82,10 @@ public struct TradeAICoachChartCard: View {
                         .padding(6)
                 }
                 .contentShape(Rectangle())
-                .onTapGesture { onEnlarge() }
+                .onTapGesture {
+                    NativeHaptics.lightImpact()
+                    onEnlarge()
+                }
                 } else {
                     HStack(spacing: 10) {
                         TradeJournalProLoader(size: 28)

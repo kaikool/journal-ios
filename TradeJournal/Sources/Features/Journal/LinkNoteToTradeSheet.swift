@@ -92,6 +92,7 @@ public struct LinkNoteToTradeSheet: View {
                             tradeRow(trade, isLinked: isLinked)
                                 .contentShape(Rectangle())
                                 .onTapGesture {
+                                    NativeHaptics.lightImpact()
                                     linkTrade(trade)
                                 }
                                 .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))

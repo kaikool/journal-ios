@@ -66,7 +66,8 @@ public struct TradeDetailNotesCard: View {
                         )
                         .contentShape(Rectangle())
                         .onTapGesture {
-                            withAnimation(.easeInOut(duration: 0.2)) {
+                            NativeHaptics.lightImpact()
+                            withAnimation(AppAnimations.springQuick) {
                                 isEditing = true
                             }
                         }

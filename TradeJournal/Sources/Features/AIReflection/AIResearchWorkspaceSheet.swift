@@ -365,13 +365,13 @@ private struct AIResearchProjectCard: View {
         HStack(spacing: 8) {
             AppMetricTile(
                 "Win Rate",
-                value: project.winRate.map { "\(String(format: "%.1f", $0))%" } ?? "--",
+                value: project.winRate.map { Formatters.formatPercent($0) } ?? "--",
                 color: (project.winRate ?? 0) >= 50.0 ? AppColors.profit : AppColors.primaryText,
                 trend: project.winRate.map { $0 >= 50.0 ? .up : .down }
             )
             AppMetricTile(
                 "Profit Factor",
-                value: project.profitFactor.map { String(format: "%.2f", $0) } ?? "--",
+                value: project.profitFactor.map { Formatters.formatDecimal(Decimal($0), maxDecimals: 2) } ?? "--",
                 color: (project.profitFactor ?? 0) >= 1.5 ? AppColors.profit : AppColors.primaryText
             )
             AppMetricTile(
@@ -421,7 +421,8 @@ private struct AIResearchProjectCard: View {
             .padding(.top, 2)
             .contentShape(Rectangle())
             .onTapGesture {
-                withAnimation(.easeInOut(duration: 0.2)) {
+                NativeHaptics.lightImpact()
+                withAnimation(AppAnimations.springQuick) {
                     showCheckpoints.toggle()
                 }
             }
@@ -436,12 +437,12 @@ private struct AIResearchProjectCard: View {
                                     .foregroundColor(AppColors.primaryText)
                                 
                                 if let wr = chk.winRate {
-                                    Text("• WR: \(String(format: "%.1f", wr))%")
+                                    Text("• WR: \(Formatters.formatPercent(wr))")
                                         .font(AppTypography.numberMicro)
                                         .foregroundColor(wr >= 50.0 ? AppColors.profit : AppColors.secondaryText)
                                 }
                                 if let pf = chk.profitFactor {
-                                    Text("• PF: \(String(format: "%.2f", pf))")
+                                    Text("• PF: \(Formatters.formatDecimal(Decimal(pf), maxDecimals: 2))")
                                         .font(AppTypography.numberMicro)
                                         .foregroundColor(pf >= 1.5 ? AppColors.profit : AppColors.secondaryText)
                                 }
@@ -636,8 +637,8 @@ private struct AddResearchCheckpointSheet: View {
         self.project = project
         self.onSaved = onSaved
         _sampleCount = State(initialValue: max(project.sampleCount + 1, 1))
-        _winRateText = State(initialValue: project.winRate.map { String(format: "%.1f", $0) } ?? "")
-        _profitFactorText = State(initialValue: project.profitFactor.map { String(format: "%.2f", $0) } ?? "")
+        _winRateText = State(initialValue: project.winRate.map { Formatters.formatDecimalInput(Decimal($0), maxDecimals: 1) } ?? "")
+        _profitFactorText = State(initialValue: project.profitFactor.map { Formatters.formatDecimalInput(Decimal($0), maxDecimals: 2) } ?? "")
     }
     
     public var body: some View {

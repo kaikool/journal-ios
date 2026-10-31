@@ -60,6 +60,7 @@ public struct AIReflectionQuestionsCatalog: View {
                 }
                 .contentShape(Rectangle())
                 .onTapGesture {
+                    NativeHaptics.lightImpact()
                     onSelectTemplate(t)
                 }
             }

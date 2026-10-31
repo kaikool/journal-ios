@@ -291,8 +291,7 @@ public struct PreTradeAnalysisSheet: View {
             let balVal = sessionSummary.balance.map { Formatters.formatCurrency($0, currency: sessionSummary.accountCurrency) } ?? "N/A"
             let eqVal = sessionSummary.equity.map { Formatters.formatCurrency($0, currency: sessionSummary.accountCurrency) } ?? balVal
             
-            let pnlToday = NSDecimalNumber(decimal: sessionSummary.netPnlToday).doubleValue
-            let pnlTodayStr = (pnlToday >= 0 ? "+$" : "-$") + String(format: "%.2f", abs(pnlToday))
+            let pnlTodayStr = Formatters.formatPnL(sessionSummary.netPnlToday, currency: sessionSummary.accountCurrency)
             let streakToday = sessionSummary.currentStreakToday
             let streakDesc: String = {
                 if streakToday > 0 { return isVi ? "Thắng \(streakToday) lệnh liên tiếp (+)" : "\(streakToday) wins in a row (+)" }
@@ -302,11 +301,11 @@ public struct PreTradeAnalysisSheet: View {
             
             let bufferStr: String = {
                 if let buf = sessionSummary.dailyLossBufferRemainingUsd {
-                    let limit = sessionSummary.dailyLossLimitUsd.map { String(format: "$%.2f", ($0 as NSDecimalNumber).doubleValue) } ?? (isVi ? "Quy định" : "Rule")
-                    let bufVal = (buf as NSDecimalNumber).doubleValue
+                    let limit = sessionSummary.dailyLossLimitUsd.map { Formatters.formatCurrency($0, currency: "USD") } ?? (isVi ? "Quy định" : "Rule")
+                    let formattedBuf = Formatters.formatCurrency(buf, currency: "USD")
                     return isVi
-                        ? "Hạn mức lỗ ngày: \(limit) | Đệm lỗ còn lại hôm nay: $\(String(format: "%.2f", bufVal))"
-                        : "Daily Limit: \(limit) | Remaining Buffer: $\(String(format: "%.2f", bufVal))"
+                        ? "Hạn mức lỗ ngày: \(limit) | Đệm lỗ còn lại hôm nay: \(formattedBuf)"
+                        : "Daily Limit: \(limit) | Remaining Buffer: \(formattedBuf)"
                 }
                 return isVi ? "Hạn mức rủi ro ngày: Tối đa 2-3 lệnh (2-3% vốn)" : "Daily Risk Budget: Max 2-3 trades (2-3% capital)"
             }()

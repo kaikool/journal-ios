@@ -391,6 +391,7 @@ public struct JournalCalendarView: View {
                     dayCellView(day: day)
                         .contentShape(Rectangle())
                         .onTapGesture {
+                            NativeHaptics.lightImpact()
                             openDayDetail(for: day.date)
                         }
                 } else {

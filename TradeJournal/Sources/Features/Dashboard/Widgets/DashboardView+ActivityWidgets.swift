@@ -70,6 +70,7 @@ extension DashboardView {
                                     )
                                     .contentShape(Rectangle())
                                     .onTapGesture {
+                                        NativeHaptics.lightImpact()
                                         openCalendarDay(dateKey: key, stats: stats)
                                     }
                                 } else {

@@ -140,6 +140,7 @@ public struct DailyJournalListView: View {
                             dayRowCard(day)
                                 .contentShape(Rectangle())
                                 .onTapGesture {
+                                    NativeHaptics.lightImpact()
                                     selectedDateForDetail = day.date
                                 }
                         }

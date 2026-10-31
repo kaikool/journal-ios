@@ -91,12 +91,12 @@ extension DashboardView {
                 )
                 
                 HStack(spacing: 3) {
-                    Text(metrics.maxDrawdownPct.map { String(format: "-%.1f%%", $0 * 100) } ?? "set balance for %")
+                    Text(metrics.maxDrawdownPct.map { "-\(Formatters.formatPercent($0 * 100))" } ?? "set balance for %")
                         .font(AppTypography.caption)
                         .foregroundColor(AppColors.secondaryText)
                     
                     if let rec = metrics.recoveryFactor {
-                        Text("· rec \(String(format: "%.1f", rec))x")
+                        Text("· rec \(Formatters.formatDecimal(Decimal(rec), maxDecimals: 1))x")
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.secondaryText)
                     }
@@ -141,7 +141,7 @@ extension DashboardView {
                 .font(AppTypography.caption)
                 .foregroundColor(AppColors.secondaryText)
             Spacer()
-            Text(String(format: "%.1f / %.0f", value, max))
+            Text("\(Formatters.formatDecimal(Decimal(value), maxDecimals: 1)) / \(Int(max))")
                 .font(AppTypography.captionBold)
                 .monospacedDigit()
                 .foregroundColor(AppColors.primaryText)

@@ -123,8 +123,7 @@ files.forEach(f => {
                                 trimmed.includes('AppSecondaryButton') ||
                                 trimmed.includes('AppDestructiveButton') ||
                                 trimmed.includes('AppActionPill') ||
-                                trimmed.includes('Modal') ||
-                                trimmed.includes('.buttonStyle(');
+                                trimmed.includes('Modal');
       if (!isAllowedDSButton && inMenuOrContextMenu <= 0) {
         violations.push({
           std: 'Standard 01: Buttons & Actions',
@@ -209,8 +208,8 @@ files.forEach(f => {
       });
     }
     // Prohibits wrapping an AppTextField or AppFormField inside an outer .appSubCardStyle or .appCardStyle container
-    if (isFeature && (trimmed.includes('AppTextField(') || trimmed.includes('AppFormField('))) {
-      for (let i = 1; i <= 6; i++) {
+    if (isFeature && (trimmed.includes('AppTextField(') || trimmed.includes('AppFormField(') || trimmed.includes('AppNumericField(') || trimmed.includes('AppDropdownField('))) {
+      for (let i = 1; i <= 8; i++) {
         if (idx + i < lines.length) {
           const next = lines[idx + i].trim();
           if (next.includes('.appSubCardStyle') || next.includes('.appCardStyle')) {
@@ -220,7 +219,7 @@ files.forEach(f => {
               file: rel,
               line: lineNum,
               code: trimmed + ' -> ' + next,
-              fix: 'Do not wrap AppTextField in an outer card. AppTextField provides its own clean container.'
+              fix: 'Do not wrap input fields in an outer card. Inputs provide their own clean container.'
             });
             break;
           }
@@ -400,6 +399,26 @@ files.forEach(f => {
         fix: 'Use NativeHaptics.lightImpact(), NativeHaptics.mediumImpact(), or NativeHaptics.selection()'
       });
     }
+    // Prohibits interactive tap gestures without native haptic feedback
+    if (isFeature && trimmed.startsWith('.onTapGesture {')) {
+      let hasHaptics = false;
+      for (let k = 1; k <= 4; k++) {
+        if (idx + k < lines.length && lines[idx + k].includes('NativeHaptics.')) {
+          hasHaptics = true;
+          break;
+        }
+      }
+      if (!hasHaptics) {
+        violations.push({
+          std: 'Standard 16: Native Haptics Feedback',
+          rule: 'PROHIBIT_TAP_WITHOUT_HAPTICS',
+          file: rel,
+          line: lineNum,
+          code: trimmed,
+          fix: 'All interactive taps in Feature views must trigger NativeHaptics.lightImpact()'
+        });
+      }
+    }
 
     // --- STANDARD 17: ANIMATION PRESETS ---
     // Prohibits hardcoded .spring or withAnimation with raw spring configs.
@@ -419,15 +438,24 @@ files.forEach(f => {
     // =========================================================================
 
     // --- STANDARD 18: FINANCIAL FORMATTERS ---
-    // Prohibits raw string concatenation for currency values.
-    if (isFeature && (trimmed.includes('"$(\\(') || trimmed.includes('"$+\\(') || trimmed.includes('"$-\\('))) {
+    // Prohibits raw string concatenation or manual formatting for currency or pips.
+    const isManualFinancial = isFeature && (
+      trimmed.includes('"$(\\(') ||
+      trimmed.includes('"$+\\(') ||
+      trimmed.includes('"$-\\(') ||
+      trimmed.includes('"+$\\(') ||
+      trimmed.includes('"-$\\(') ||
+      /String\(format:\s*"[+-]?\$/.test(trimmed) ||
+      /String\(format:\s*".*pips/.test(trimmed)
+    );
+    if (isManualFinancial) {
       violations.push({
         std: 'Standard 18: Financial Formatters',
         rule: 'PROHIBIT_RAW_CURRENCY_INTERPOLATION',
         file: rel,
         line: lineNum,
         code: trimmed,
-        fix: 'Use Formatters.formatCurrency(amount, currency: ...)'
+        fix: 'Use Formatters.formatCurrency(amount, currency: ...) or Formatters.pips(...)'
       });
     }
 

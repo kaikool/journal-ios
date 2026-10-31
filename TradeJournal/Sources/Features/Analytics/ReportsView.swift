@@ -91,16 +91,16 @@ public struct ReportsView: View {
     
     private var summaryKPIs: [(label: String, value: String, isNet: Bool)] {
         let s = metrics
-        let pfStr: String = s.profitFactorIsInfinite ? "∞" : (s.profitFactor.map { String(format: "%.2f", $0) } ?? "–")
-        let netStr = s.netPnl >= 0 ? "+\(Formatters.currency(s.netPnl))" : Formatters.currency(s.netPnl)
+        let pfStr: String = s.profitFactorIsInfinite ? "∞" : (s.profitFactor.map { Formatters.formatDecimal(Decimal($0), maxDecimals: 2) } ?? "–")
+        let netStr = Formatters.formatPnL(s.netPnl, currency: "USD")
         let wrStr = s.winRate != nil ? Formatters.percent(s.winRate) : "–"
         let volStr = "\(s.totalVolume.formatted())"
         
         let summary = TradeAnalysisEngine.summarizeGroup(all: trades)
         let avgRealizedR = summary.avgRealizedR
         let avgPlannedR = summary.avgPlannedR
-        let avgRStr = avgRealizedR.map { String(format: "%.2f R", $0) } ?? "–"
-        let avgPlanRStr = avgPlannedR.map { String(format: "%.2f R", $0) } ?? "–"
+        let avgRStr = avgRealizedR.map { Formatters.formatRMultiple($0) } ?? "–"
+        let avgPlanRStr = avgPlannedR.map { Formatters.formatRMultiple($0) } ?? "–"
         
         return [
             ("Closed trades", "\(s.closedTrades)", false),
@@ -450,7 +450,7 @@ public struct ReportsView: View {
                                             }
                                             
                                             if let r = g.summary.avgRealizedR {
-                                                Text("• \(String(format: "%.1f", r))R")
+                                                Text("• \(Formatters.formatDecimal(Decimal(r), maxDecimals: 1))R")
                                                     .font(AppTypography.captionMicro)
                                                     .monospacedDigit()
                                                     .foregroundColor(AppColors.secondaryText)

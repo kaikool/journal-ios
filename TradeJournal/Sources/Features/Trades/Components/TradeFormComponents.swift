@@ -389,7 +389,10 @@ public struct TradeDisciplineAndNotesCard: View {
                             HStack {
                                 ForEach(mistakes, id: \.self) { m in
                                     AppBadge(text: "⚠️ \(m)", color: AppColors.loss)
-                                        .onTapGesture { mistakes.removeAll { $0 == m } }
+                                        .onTapGesture {
+                                            NativeHaptics.lightImpact()
+                                            mistakes.removeAll { $0 == m }
+                                        }
                                 }
                             }
                         }
