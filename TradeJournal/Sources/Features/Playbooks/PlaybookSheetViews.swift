@@ -123,7 +123,7 @@ public struct NewPlaybookSheet: View {
                     .fill(AppColors.brand.opacity(0.12))
                     .frame(width: 26, height: 26)
                 Text("\(index + 1)")
-                    .font(AppTypography.captionMicroBold)
+                    .font(AppTypography.badgeStandard)
                     .foregroundColor(AppColors.brand)
             }
             
@@ -295,7 +295,7 @@ public struct EditPlaybookSheet: View {
                     .fill(AppColors.brand.opacity(0.12))
                     .frame(width: 26, height: 26)
                 Text("\(index + 1)")
-                    .font(AppTypography.captionMicroBold)
+                    .font(AppTypography.badgeStandard)
                     .foregroundColor(AppColors.brand)
             }
             
