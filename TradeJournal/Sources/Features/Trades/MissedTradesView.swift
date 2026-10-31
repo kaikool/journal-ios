@@ -66,29 +66,16 @@ public struct MissedTradesView: View {
     }
     
     private var emptyStateView: some View {
-        VStack(spacing: 16) {
-            Spacer()
-            Image(systemName: "bookmark.slash")
-                .font(.system(size: 48))
-                .foregroundColor(AppColors.secondaryText)
-            
-            Text(showArchived ? "No archived opportunities here yet" : "No opportunities recorded yet")
-                .font(AppTypography.headline)
-                .foregroundColor(AppColors.primaryText)
-            
-            Text("Record setups you watched but did not take, to review execution discipline and identify hesitation patterns.")
-                .font(AppTypography.caption)
-                .foregroundColor(AppColors.secondaryText)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 32)
-            
-            if !showArchived {
-                AppPrimaryButton("Log Opportunity", icon: "plus", height: 38) {
-                    editingTrade = nil
-                    showAddSheet = true
-                }
-            }
-            Spacer()
+        AppEmptyState(
+            icon: "bookmark.slash",
+            title: showArchived ? "No archived opportunities here yet" : "No opportunities recorded yet",
+            message: "Record setups you watched but did not take, to review execution discipline and identify hesitation patterns.",
+            iconColor: AppColors.secondaryText,
+            actionTitle: showArchived ? nil : "Log Opportunity",
+            actionIcon: "plus"
+        ) {
+            editingTrade = nil
+            showAddSheet = true
         }
     }
     

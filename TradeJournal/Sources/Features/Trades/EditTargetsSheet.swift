@@ -356,24 +356,10 @@ public struct EditTargetsSheet: View {
     }
     
     private func presetButton(ratio: Decimal, title: String) -> some View {
-        Button {
-            #if canImport(UIKit)
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            #endif
+        AppFilterChip(title, isSelected: true, height: 32) {
             applyRPreset(ratio: ratio)
-        } label: {
-            Text(title)
-                .font(.system(size: 12, weight: .semibold, design: .rounded))
-                .foregroundColor(AppColors.brand)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 7)
-                .background(AppColors.brand.opacity(0.12))
-                .clipShape(Capsule())
-                .overlay(
-                    Capsule().stroke(AppColors.brand.opacity(0.25), lineWidth: 0.8)
-                )
         }
-        .buttonStyle(ApplePressableButtonStyle())
+        .frame(maxWidth: .infinity)
     }
     
     private func applyRPreset(ratio: Decimal) {

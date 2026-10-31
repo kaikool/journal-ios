@@ -276,20 +276,23 @@ public struct TradesListView: View {
     private var tradesListContent: some View {
         if filteredTrades.isEmpty {
             cardContainer {
-                VStack(spacing: 10) {
-                    Image(systemName: "line.3.horizontal.decrease.circle")
-                        .font(.system(size: 32))
-                        .foregroundColor(AppColors.secondaryText)
-                    Text("No trades match these filters")
-                        .font(AppTypography.headline)
-                        .foregroundColor(AppColors.primaryText)
-                    Text("Try clearing your search query or selecting a broader range.")
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.secondaryText)
-                        .multilineTextAlignment(.center)
+                AppEmptyState(
+                    icon: "line.3.horizontal.decrease.circle",
+                    title: "No trades match these filters",
+                    message: "Try clearing your search query or selecting a broader range.",
+                    iconColor: AppColors.secondaryText,
+                    actionTitle: dataStore.trades.isEmpty ? "Log Trade" : "Clear Filters",
+                    actionIcon: dataStore.trades.isEmpty ? "plus" : "xmark.circle",
+                    isInCard: true
+                ) {
+                    if dataStore.trades.isEmpty {
+                        showAddTradeSheet = true
+                    } else {
+                        searchQuery = ""
+                        selectedAccountFilter = "All Accounts"
+                        selectedStatusFilter = "All"
+                    }
                 }
-                .frame(maxWidth: .infinity, alignment: .center)
-                .padding(.vertical, 24)
             }
         } else {
             LazyVStack(spacing: 10) {

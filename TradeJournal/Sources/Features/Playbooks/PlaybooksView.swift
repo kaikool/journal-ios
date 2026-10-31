@@ -92,33 +92,16 @@ public struct PlaybooksView: View {
     @ViewBuilder
     private var emptyState: some View {
         AppleCard {
-            VStack(spacing: 14) {
-                ZStack {
-                    Circle()
-                        .fill(AppColors.brand.opacity(0.12))
-                        .frame(width: 64, height: 64)
-                    Image(systemName: "book.pages")
-                        .font(.system(size: 28))
-                        .foregroundColor(AppColors.brand)
-                }
-                .padding(.top, 8)
-                
-                Text("Build Trading Playbooks")
-                    .font(AppTypography.subheadlineBold)
-                    .foregroundColor(AppColors.primaryText)
-                
-                Text("A playbook is a setup you trade on purpose — name it, write its checklist rules, then tag trades with it and let Reports reveal its true edge.")
-                    .font(AppTypography.caption)
-                    .foregroundColor(AppColors.secondaryText)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 16)
-                
-                AppPrimaryButton("New Playbook", icon: "plus", height: 38) {
-                    showNewPlaybookSheet = true
-                }
-                .padding(.bottom, 8)
+            AppEmptyState(
+                icon: "book.pages",
+                title: "Build Trading Playbooks",
+                message: "A playbook is a setup you trade on purpose — name it, write its checklist rules, then tag trades with it and let Reports reveal its true edge.",
+                actionTitle: "New Playbook",
+                actionIcon: "plus",
+                isInCard: true
+            ) {
+                showNewPlaybookSheet = true
             }
-            .frame(maxWidth: .infinity)
         }
         .padding(.top, 16)
     }

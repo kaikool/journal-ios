@@ -173,18 +173,7 @@ public struct TradeDetailDisciplineCard: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 6) {
                         ForEach(trade.mistakes, id: \.self) { mistake in
-                            HStack(spacing: 4) {
-                                Text("⚠️ \(mistake)")
-                                Image(systemName: "xmark")
-                                    .font(.system(size: 9, weight: .bold))
-                            }
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundColor(AppColors.loss)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(AppColors.loss.opacity(0.12))
-                            .clipShape(Capsule())
-                            .onTapGesture {
+                            AppTag(mistake, color: AppColors.loss, prefix: "⚠️ ") {
                                 trade.mistakes.removeAll { $0 == mistake }
                                 onUpdate()
                             }
@@ -197,26 +186,19 @@ public struct TradeDetailDisciplineCard: View {
                 HStack(spacing: 6) {
                     ForEach(commonMistakes, id: \.self) { m in
                         let isAdded = trade.mistakes.contains(m)
-                        Button {
-                            #if canImport(UIKit)
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            #endif
+                        AppFilterChip(
+                            m,
+                            isSelected: isAdded,
+                            height: 26,
+                            activeColor: AppColors.loss
+                        ) {
                             if isAdded {
                                 trade.mistakes.removeAll { $0 == m }
                             } else {
                                 trade.mistakes.append(m)
                             }
                             onUpdate()
-                        } label: {
-                            Text(m)
-                                .font(.system(size: 11, weight: isAdded ? .bold : .medium))
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(isAdded ? AppColors.loss.opacity(0.15) : AppColors.secondaryBackground)
-                                .foregroundColor(isAdded ? AppColors.loss : AppColors.secondaryText)
-                                .clipShape(Capsule())
                         }
-                        .buttonStyle(ApplePressableButtonStyle())
                     }
                 }
             }
@@ -271,18 +253,7 @@ public struct TradeDetailDisciplineCard: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 6) {
                         ForEach(trade.tags, id: \.self) { tag in
-                            HStack(spacing: 4) {
-                                Text("#\(tag)")
-                                Image(systemName: "xmark")
-                                    .font(.system(size: 9, weight: .bold))
-                            }
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundColor(AppColors.brand)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(AppColors.brand.opacity(0.12))
-                            .clipShape(Capsule())
-                            .onTapGesture {
+                            AppTag(tag, color: AppColors.brand, prefix: "#") {
                                 trade.tags.removeAll { $0 == tag }
                                 onUpdate()
                             }
@@ -295,26 +266,19 @@ public struct TradeDetailDisciplineCard: View {
                 HStack(spacing: 6) {
                     ForEach(commonTags, id: \.self) { t in
                         let isAdded = trade.tags.contains(t)
-                        Button {
-                            #if canImport(UIKit)
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            #endif
+                        AppFilterChip(
+                            "#\(t)",
+                            isSelected: isAdded,
+                            height: 26,
+                            activeColor: AppColors.brand
+                        ) {
                             if isAdded {
                                 trade.tags.removeAll { $0 == t }
                             } else {
                                 trade.tags.append(t)
                             }
                             onUpdate()
-                        } label: {
-                            Text("#\(t)")
-                                .font(.system(size: 11, weight: isAdded ? .bold : .medium))
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(isAdded ? AppColors.brand.opacity(0.15) : AppColors.secondaryBackground)
-                                .foregroundColor(isAdded ? AppColors.brand : AppColors.secondaryText)
-                                .clipShape(Capsule())
                         }
-                        .buttonStyle(ApplePressableButtonStyle())
                     }
                 }
             }

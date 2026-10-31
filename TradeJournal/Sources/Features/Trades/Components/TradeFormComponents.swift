@@ -517,10 +517,11 @@ public struct TradeDisciplineAndNotesCard: View {
                     
                     if !tags.isEmpty {
                         ScrollView(.horizontal, showsIndicators: false) {
-                            HStack {
+                            HStack(spacing: 6) {
                                 ForEach(tags, id: \.self) { t in
-                                    AppBadge(text: "#\(t)", color: AppColors.brand)
-                                        .onTapGesture { tags.removeAll { $0 == t } }
+                                    AppTag(t, color: AppColors.brand, prefix: "#") {
+                                        tags.removeAll { $0 == t }
+                                    }
                                 }
                             }
                         }

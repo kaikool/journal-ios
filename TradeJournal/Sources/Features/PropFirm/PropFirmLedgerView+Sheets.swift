@@ -235,8 +235,14 @@ public struct PropAuditTrailSheet: View {
         NavigationStack {
             List {
                 if audits.isEmpty {
-                    Text("No audit history recorded.")
-                        .foregroundColor(AppColors.secondaryText)
+                    AppEmptyState(
+                        icon: "clock.arrow.circlepath",
+                        title: "No audit history recorded",
+                        message: "Changes to prop firm accounts, payouts, and expenses will be logged here automatically.",
+                        iconColor: AppColors.secondaryText,
+                        isInCard: true
+                    )
+                    .listRowBackground(Color.clear)
                 } else {
                     ForEach(audits.reversed()) { a in
                         VStack(alignment: .leading, spacing: 6) {

@@ -187,51 +187,27 @@ public struct AIMemoryManagementSheet: View {
     private var categoryFilterSection: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                // All Chip
-                let isAllSelected = selectedCategory == nil
-                Button(action: {
+                AppFilterChip(
+                    "All",
+                    isSelected: selectedCategory == nil,
+                    count: memories.count
+                ) {
                     withAnimation(.easeInOut(duration: 0.15)) { selectedCategory = nil }
-                }) {
-                    Text("All (\(memories.count))")
-                        .font(.system(size: 12, weight: isAllSelected ? .semibold : .regular))
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(isAllSelected ? AppColors.secondaryBackground : Color.clear)
-                        .foregroundColor(isAllSelected ? AppColors.primaryText : AppColors.secondaryText)
-                        .cornerRadius(16)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 16)
-                                .stroke(isAllSelected ? AppColors.border : AppColors.border.opacity(0.4), lineWidth: 0.8)
-                        )
                 }
-                .buttonStyle(.plain)
                 
-                // Specific Categories
                 ForEach(AIMemoryCategory.allCases, id: \.rawValue) { cat in
                     let isSelected = selectedCategory == cat
                     let count = memories.filter { $0.category == cat }.count
-                    Button(action: {
+                    AppFilterChip(
+                        cat.localizedTitle,
+                        isSelected: isSelected,
+                        icon: iconForCategory(cat),
+                        count: count
+                    ) {
                         withAnimation(.easeInOut(duration: 0.15)) {
                             selectedCategory = isSelected ? nil : cat
                         }
-                    }) {
-                        HStack(spacing: 4) {
-                            Image(systemName: iconForCategory(cat))
-                                .font(.system(size: 10))
-                            Text("\(cat.localizedTitle) (\(count))")
-                        }
-                        .font(.system(size: 12, weight: isSelected ? .semibold : .regular))
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(isSelected ? AppColors.secondaryBackground : Color.clear)
-                        .foregroundColor(isSelected ? AppColors.primaryText : AppColors.secondaryText)
-                        .cornerRadius(16)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 16)
-                                .stroke(isSelected ? AppColors.border : AppColors.border.opacity(0.4), lineWidth: 0.8)
-                        )
                     }
-                    .buttonStyle(.plain)
                 }
             }
             .padding(.horizontal, 2)
@@ -253,25 +229,11 @@ public struct AIMemoryManagementSheet: View {
     }
     
     private func statusFilterChip(title: String, status: AIMemoryStatus?) -> some View {
-        let isSelected = selectedStatus == status
-        return Button(action: {
+        AppFilterChip(title, isSelected: selectedStatus == status, height: 28) {
             withAnimation(.easeInOut(duration: 0.15)) {
                 selectedStatus = status
             }
-        }) {
-            Text(title)
-                .font(.system(size: 11, weight: isSelected ? .semibold : .regular))
-                .padding(.horizontal, 10)
-                .padding(.vertical, 4)
-                .background(isSelected ? AppColors.secondaryBackground : Color.clear)
-                .foregroundColor(isSelected ? AppColors.primaryText : AppColors.secondaryText)
-                .cornerRadius(12)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(isSelected ? AppColors.border : AppColors.border.opacity(0.3), lineWidth: 0.7)
-                )
         }
-        .buttonStyle(.plain)
     }
     
     // MARK: - 5. Memory Cards List
@@ -303,29 +265,17 @@ public struct AIMemoryManagementSheet: View {
     // MARK: - Empty State View
     private var emptyStateView: some View {
         AppCard {
-            VStack(spacing: 12) {
-                Image(systemName: "brain.head.profile")
-                    .font(.system(size: 32))
-                    .foregroundColor(AppColors.secondaryText.opacity(0.6))
-                    .padding(.top, 8)
-                
-                Text("No Memories Found")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(AppColors.primaryText)
-                
-                Text(memories.isEmpty ? "AI automatically retains your trading habits, loss forensics, and commitments after review sessions." : "No memories match the current filter or search criteria.")
-                    .font(AppTypography.caption)
-                    .foregroundColor(AppColors.secondaryText)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 16)
-                
-                AppPrimaryButton("Add Rule Manually", icon: "plus", height: 36) {
-                    isCreatingMemory = true
-                }
-                .padding(.bottom, 6)
+            AppEmptyState(
+                icon: "brain.head.profile",
+                title: "No Memories Found",
+                message: memories.isEmpty ? "AI automatically retains your trading habits, loss forensics, and commitments after review sessions." : "No memories match the current filter or search criteria.",
+                iconColor: AppColors.brand,
+                actionTitle: "Add Rule Manually",
+                actionIcon: "plus",
+                isInCard: true
+            ) {
+                isCreatingMemory = true
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 8)
         }
     }
     

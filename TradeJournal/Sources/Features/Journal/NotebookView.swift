@@ -317,23 +317,16 @@ public struct NotebookView: View {
     // MARK: - Empty State
     
     private var emptyNotesState: some View {
-        VStack(spacing: 14) {
-            Spacer()
-            Image(systemName: "note.text")
-                .font(.system(size: 40))
-                .foregroundColor(AppColors.secondaryText.opacity(0.5))
-            Text("No notes here yet.")
-                .font(AppTypography.headline)
-                .foregroundColor(AppColors.primaryText)
-            Text("Create your first note in this folder to begin.")
-                .font(AppTypography.caption)
-                .foregroundColor(AppColors.secondaryText)
-            AppPrimaryButton("New Note", icon: "plus", height: 38) {
-                createNewNote()
-            }
-            Spacer()
+        AppEmptyState(
+            icon: "note.text",
+            title: "No notes here yet",
+            message: "Create your first note in this folder to begin.",
+            iconColor: AppColors.secondaryText,
+            actionTitle: "New Note",
+            actionIcon: "plus"
+        ) {
+            createNewNote()
         }
-        .frame(maxWidth: .infinity)
     }
     
     private func folderIcon(for folder: NotebookFolder) -> String {

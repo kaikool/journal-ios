@@ -756,17 +756,12 @@ public struct ArchivedProgressRoutinesSheet: View {
     }
     
     private var emptyArchivedView: some View {
-        VStack(spacing: 12) {
-            Spacer()
-            Image(systemName: "archivebox")
-                .font(.system(size: 40))
-                .foregroundColor(AppColors.secondaryText.opacity(0.4))
-            Text("No archived routines")
-                .font(AppTypography.subheadline)
-                .foregroundColor(AppColors.secondaryText)
-            Spacer()
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        AppEmptyState(
+            icon: "archivebox",
+            title: "No archived routines",
+            message: "Routines you archive will be stored here for future reactivation.",
+            iconColor: AppColors.secondaryText
+        )
     }
     
     private var archivedListView: some View {

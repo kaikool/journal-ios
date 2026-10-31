@@ -281,21 +281,17 @@ public struct AccountsManagerView: View {
 
     private var emptyStateView: some View {
         TradeFormCardContainer {
-            VStack(spacing: 12) {
-                Image(systemName: "creditcard.and.123")
-                    .font(.system(size: 40))
-                    .foregroundColor(AppColors.secondaryText.opacity(0.6))
-                Text("No accounts found")
-                    .font(AppTypography.headline)
-                    .foregroundColor(AppColors.primaryText)
-                Text("Create a new account or connect your broker sync credentials in Settings.")
-                    .font(AppTypography.caption)
-                    .foregroundColor(AppColors.secondaryText)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 32)
+            AppEmptyState(
+                icon: "creditcard.and.123",
+                title: "No accounts found",
+                message: "Create a new account or connect your broker sync credentials in Settings.",
+                iconColor: AppColors.secondaryText,
+                actionTitle: "New Account",
+                actionIcon: "plus",
+                isInCard: true
+            ) {
+                showNewAccountSheet = true
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 40)
         }
         .padding(.horizontal, 16)
     }

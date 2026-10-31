@@ -278,22 +278,10 @@ public struct NoteAIInquirySheet: View {
     }
     
     private func quickChipButton(_ prompt: String) -> some View {
-        Button(action: {
+        AppFilterChip(prompt, isSelected: false, height: 28) {
             inputText = prompt
             submitInquiry()
-        }) {
-            Text(prompt)
-                .font(.system(size: 11.5, weight: .semibold, design: .rounded))
-                .foregroundColor(AppColors.primaryText)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 5)
-                .background(AppColors.secondaryBackground)
-                .clipShape(Capsule())
-                .overlay(
-                    Capsule().stroke(AppColors.border.opacity(0.5), lineWidth: 0.8)
-                )
         }
-        .buttonStyle(ApplePressableButtonStyle())
         .disabled(isLoading)
     }
     

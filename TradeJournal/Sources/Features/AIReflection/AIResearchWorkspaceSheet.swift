@@ -194,28 +194,11 @@ public struct AIResearchWorkspaceSheet: View {
         let isSelected = selectedStatus == status
         let count = projects.filter { status == nil ? true : $0.status == status }.count
         
-        return Button(action: {
+        return AppFilterChip(title, isSelected: isSelected, count: count) {
             withAnimation(.easeInOut(duration: 0.15)) {
                 selectedStatus = status
             }
-        }) {
-            HStack(spacing: 4) {
-                Text(title)
-                Text("(\(count))")
-                    .opacity(0.7)
-            }
-            .font(.system(size: 12, weight: isSelected ? .semibold : .regular))
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(isSelected ? AppColors.secondaryBackground : Color.clear)
-            .foregroundColor(isSelected ? AppColors.primaryText : AppColors.secondaryText)
-            .cornerRadius(16)
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(isSelected ? AppColors.border : AppColors.border.opacity(0.4), lineWidth: 0.8)
-            )
         }
-        .buttonStyle(.plain)
     }
     
     // MARK: - 4. Project Cards List
@@ -252,29 +235,17 @@ public struct AIResearchWorkspaceSheet: View {
     // MARK: - Empty State View
     private var emptyStateView: some View {
         AppCard {
-            VStack(spacing: 12) {
-                Image(systemName: "flask.fill")
-                    .font(.system(size: 32))
-                    .foregroundColor(AppColors.secondaryText.opacity(0.6))
-                    .padding(.top, 8)
-                
-                Text("No Research Projects Found")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(AppColors.primaryText)
-                
-                Text(projects.isEmpty ? "Track systematic hypotheses with live trade sample sizes before committing them to your playbook." : "No projects match the current filter or search criteria.")
-                    .font(AppTypography.caption)
-                    .foregroundColor(AppColors.secondaryText)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 16)
-                
-                AppPrimaryButton("Create Project", icon: "plus", height: 36) {
-                    isCreatingProject = true
-                }
-                .padding(.bottom, 6)
+            AppEmptyState(
+                icon: "flask.fill",
+                title: "No Research Projects Found",
+                message: projects.isEmpty ? "Track systematic hypotheses with live trade sample sizes before committing them to your playbook." : "No projects match the current filter or search criteria.",
+                iconColor: AppColors.brand,
+                actionTitle: "Create Project",
+                actionIcon: "plus",
+                isInCard: true
+            ) {
+                isCreatingProject = true
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 8)
         }
     }
     

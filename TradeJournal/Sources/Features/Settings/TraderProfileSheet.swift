@@ -257,35 +257,15 @@ public struct TraderProfileSheet: View {
     }
     
     private func presetStyleChip(_ style: String) -> some View {
-        Button(action: {
+        AppFilterChip(style, isSelected: tradingStyle == style) {
             tradingStyle = style
-        }) {
-            Text(style)
-                .font(.system(size: 11.5, weight: .semibold, design: .rounded))
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(AppColors.secondaryBackground)
-                .foregroundColor(tradingStyle == style ? AppColors.brand : AppColors.secondaryText)
-                .clipShape(Capsule())
-                .overlay(Capsule().stroke(tradingStyle == style ? AppColors.brand.opacity(0.5) : AppColors.border.opacity(0.4), lineWidth: 0.8))
         }
-        .buttonStyle(ApplePressableButtonStyle())
     }
     
     private func presetRiskChip(_ risk: String) -> some View {
-        Button(action: {
+        AppFilterChip(risk, isSelected: maxRiskPerTrade == risk) {
             maxRiskPerTrade = risk
-        }) {
-            Text(risk)
-                .font(.system(size: 11.5, weight: .semibold, design: .rounded))
-                .padding(.horizontal, 12)
-                .padding(.vertical, 5)
-                .background(AppColors.secondaryBackground)
-                .foregroundColor(maxRiskPerTrade == risk ? AppColors.brand : AppColors.secondaryText)
-                .clipShape(Capsule())
-                .overlay(Capsule().stroke(maxRiskPerTrade == risk ? AppColors.brand.opacity(0.5) : AppColors.border.opacity(0.4), lineWidth: 0.8))
         }
-        .buttonStyle(ApplePressableButtonStyle())
     }
     
     // MARK: - Data Handlers

@@ -242,16 +242,16 @@ public struct DayDetailSheet: View {
                 AppCardHeader("Trades (\(trades.count))")
                 
                 if trades.isEmpty {
-                    VStack(spacing: 6) {
-                        Image(systemName: "tray")
-                            .font(.system(size: 20))
-                            .foregroundColor(AppColors.secondaryText)
-                        Text("No closed trades on this day")
-                            .font(AppTypography.caption)
-                            .foregroundColor(AppColors.secondaryText)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
+                    AppEmptyState(
+                        icon: "tray",
+                        title: "No closed trades",
+                        message: "There are no closed trade executions recorded on this day.",
+                        iconColor: AppColors.secondaryText,
+                        actionTitle: "Add Trade",
+                        actionIcon: "plus",
+                        isInCard: true,
+                        action: onAddTrade
+                    )
                 } else {
                     ForEach(trades) { trade in
                         tradeRow(trade)
