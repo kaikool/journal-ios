@@ -37,18 +37,19 @@ public struct TradeAICoachActionBar: View {
                     Image(systemName: isSavedToNotes ? "checkmark" : "note.text.badge.plus")
                         .font(.system(size: 11, weight: .semibold))
                     Text(isSavedToNotes ? "Appended" : "Append to Notes")
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.system(size: 12, weight: .semibold, design: .rounded))
                 }
                 .foregroundColor(isSavedToNotes ? AppColors.profit : AppColors.primaryText)
                 .frame(maxWidth: .infinity)
                 .frame(height: 36)
                 .background(AppColors.secondaryBackground)
-                .cornerRadius(8)
+                .clipShape(Capsule())
                 .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(AppColors.border.opacity(0.7), lineWidth: 0.8)
+                    Capsule()
+                        .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
                 )
             }
+            .buttonStyle(ApplePressableButtonStyle())
             .disabled(isSavedToNotes)
             
             // Save to Notebook
@@ -57,18 +58,19 @@ public struct TradeAICoachActionBar: View {
                     Image(systemName: isSavedToNotebook ? "checkmark" : "bookmark")
                         .font(.system(size: 11, weight: .semibold))
                     Text(isSavedToNotebook ? "Saved" : "Notebook")
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.system(size: 12, weight: .semibold, design: .rounded))
                 }
                 .foregroundColor(isSavedToNotebook ? AppColors.profit : AppColors.primaryText)
                 .frame(maxWidth: .infinity)
                 .frame(height: 36)
                 .background(AppColors.secondaryBackground)
-                .cornerRadius(8)
+                .clipShape(Capsule())
                 .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(AppColors.border.opacity(0.7), lineWidth: 0.8)
+                    Capsule()
+                        .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
                 )
             }
+            .buttonStyle(ApplePressableButtonStyle())
             .disabled(isSavedToNotebook)
             
             // Copy Button
@@ -77,32 +79,22 @@ public struct TradeAICoachActionBar: View {
                     Image(systemName: showCopiedAlert ? "checkmark" : "doc.on.doc")
                         .font(.system(size: 11, weight: .semibold))
                     Text(showCopiedAlert ? "Copied" : "Copy")
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.system(size: 12, weight: .semibold, design: .rounded))
                 }
                 .foregroundColor(AppColors.primaryText)
-                .padding(.horizontal, 12)
+                .padding(.horizontal, 14)
                 .frame(height: 36)
                 .background(AppColors.secondaryBackground)
-                .cornerRadius(8)
+                .clipShape(Capsule())
                 .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(AppColors.border.opacity(0.7), lineWidth: 0.8)
+                    Capsule()
+                        .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
                 )
             }
+            .buttonStyle(ApplePressableButtonStyle())
             
             // Regenerate
-            Button(action: onRegenerate) {
-                Image(systemName: "arrow.clockwise")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(AppColors.primaryText)
-                    .frame(width: 36, height: 36)
-                    .background(AppColors.secondaryBackground)
-                    .cornerRadius(8)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(AppColors.border.opacity(0.7), lineWidth: 0.8)
-                    )
-            }
+            AppIconPodButton(icon: "arrow.clockwise", size: 36, label: "Regenerate", action: onRegenerate)
         }
     }
 }

@@ -220,23 +220,11 @@ public struct NotebookView: View {
                 isScrollable: true
             )
             
-            Button {
-                #if canImport(UIKit)
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                #endif
+            AppIconPodButton(icon: "folder.badge.plus", color: AppColors.brand, size: 32, label: "New folder") {
                 newFolderName = ""
                 folderError = nil
                 showNewFolderSheet = true
-            } label: {
-                Image(systemName: "folder.badge.plus")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(AppColors.brand)
-                    .frame(width: 32, height: 32)
-                    .background(AppColors.secondaryBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             }
-            .buttonStyle(ApplePressableButtonStyle())
-            .accessibilityLabel("New folder")
         }
         .padding(.horizontal, 14)
     }
@@ -340,21 +328,9 @@ public struct NotebookView: View {
             Text("Create your first note in this folder to begin.")
                 .font(AppTypography.caption)
                 .foregroundColor(AppColors.secondaryText)
-            Button {
-                #if canImport(UIKit)
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                #endif
+            AppPrimaryButton("New Note", icon: "plus", height: 38) {
                 createNewNote()
-            } label: {
-                Text("New note")
-                    .font(AppTypography.captionBold)
-                    .foregroundColor(AppColors.brandTextOnDark)
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 10)
-                    .background(AppColors.brand)
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
-            .buttonStyle(ApplePressableButtonStyle())
             Spacer()
         }
         .frame(maxWidth: .infinity)
@@ -397,11 +373,11 @@ public struct NotebookView: View {
             .navigationTitle("New folder")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { showNewFolderSheet = false }
+                ToolbarItem(placement: .topBarLeading) {
+                    ModalDismissButton { showNewFolderSheet = false }
                 }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Create folder") {
+                ToolbarItem(placement: .topBarTrailing) {
+                    ModalPrimaryButton("Create") {
                         do {
                             let folder = try dataStore.createFolder(name: newFolderName)
                             selectedFolderId = folder.id
@@ -435,11 +411,11 @@ public struct NotebookView: View {
             .navigationTitle("Rename folder")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { showRenameFolderSheet = false }
+                ToolbarItem(placement: .topBarLeading) {
+                    ModalDismissButton { showRenameFolderSheet = false }
                 }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
+                ToolbarItem(placement: .topBarTrailing) {
+                    ModalPrimaryButton("Save") {
                         if let folder = folderToRename {
                             do {
                                 try dataStore.renameFolder(id: folder.id, name: renameFolderName)

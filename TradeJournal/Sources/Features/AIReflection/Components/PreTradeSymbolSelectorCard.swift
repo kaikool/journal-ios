@@ -81,16 +81,12 @@ public struct PreTradeSymbolSelectorCard: View {
                             onSubmitCustom()
                         }
                     
-                    Button(action: onSubmitCustom) {
-                        Text("Analyze")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 7)
-                            .background(customSymbolText.trimmingCharacters(in: .whitespaces).isEmpty ? AppColors.secondaryText.opacity(0.4) : AppColors.brand)
-                            .cornerRadius(8)
-                    }
-                    .disabled(customSymbolText.trimmingCharacters(in: .whitespaces).isEmpty)
+                    AppPrimaryButton(
+                        "Analyze",
+                        isEnabled: !customSymbolText.trimmingCharacters(in: .whitespaces).isEmpty,
+                        height: 32,
+                        action: onSubmitCustom
+                    )
                 }
             }
             .padding(.vertical, 2)

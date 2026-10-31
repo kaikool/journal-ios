@@ -83,26 +83,10 @@ public struct MissedTradesView: View {
                 .padding(.horizontal, 32)
             
             if !showArchived {
-                Button {
-                    #if canImport(UIKit)
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    #endif
+                AppPrimaryButton("Log Opportunity", icon: "plus", height: 38) {
                     editingTrade = nil
                     showAddSheet = true
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "plus")
-                            .font(.system(size: 11, weight: .bold))
-                        Text("Log Opportunity")
-                            .font(.system(size: 13, weight: .semibold))
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                    .background(AppColors.brand)
-                    .foregroundColor(.white)
-                    .clipShape(Capsule())
                 }
-                .buttonStyle(ApplePressableButtonStyle())
             }
             Spacer()
         }

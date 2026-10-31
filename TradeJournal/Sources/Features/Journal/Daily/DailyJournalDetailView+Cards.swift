@@ -309,16 +309,21 @@ extension DailyJournalDetailView {
                                     .scaleEffect(0.7)
                             } else {
                                 Image(systemName: "sparkles")
+                                    .font(.system(size: 11, weight: .semibold))
                             }
                             Text("AI Recap")
+                                .font(.system(size: 12, weight: .semibold, design: .rounded))
                         }
-                        .font(AppTypography.captionBold)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(AppColors.accent.opacity(0.12))
-                        .foregroundColor(AppColors.accent)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(AppColors.brand.opacity(0.12))
+                        .foregroundColor(AppColors.brand)
                         .clipShape(Capsule())
+                        .overlay(
+                            Capsule().stroke(AppColors.brand.opacity(0.25), lineWidth: 0.8)
+                        )
                     }
+                    .buttonStyle(ApplePressableButtonStyle())
                     .disabled(isGeneratingAiRecap || dayTrades.isEmpty)
                 }
                 
@@ -353,23 +358,16 @@ extension DailyJournalDetailView {
                     Spacer()
                     
                     if !noteText.isEmpty {
-                        Button("Clear") {
+                        AppSecondaryButton("Clear", height: 28) {
                             noteText = ""
                             dataStore.deleteCalendarNote(for: date)
                             saveStatusMessage = "Cleared"
                         }
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.secondaryText)
                     }
                     
-                    Button("Save now") {
-                        #if canImport(UIKit)
-                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                        #endif
+                    AppPrimaryButton("Save now", icon: "checkmark", height: 28) {
                         saveNoteImmediately(force: true)
                     }
-                    .font(AppTypography.captionBold)
-                    .foregroundColor(AppColors.accent)
                 }
             }
         }

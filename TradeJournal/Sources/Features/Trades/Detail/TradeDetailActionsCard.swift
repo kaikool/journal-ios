@@ -25,101 +25,22 @@ public struct TradeDetailActionsCard: View {
     public var body: some View {
         VStack(spacing: 8) {
             // Row 1: AI Trade Coach
-            Button {
-                #if canImport(UIKit)
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                #endif
-                onAICoach()
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 13, weight: .semibold))
-                    Text(isTradeOpen ? "AI Trade Coach • Live Advisory" : "AI Trade Coach • Post-Mortem")
-                        .font(.system(size: 13, weight: .semibold))
-                }
-                .foregroundColor(AppColors.primaryText)
-                .frame(maxWidth: .infinity)
-                .frame(height: 38)
-                .background(AppColors.secondaryBackground)
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .stroke(AppColors.border.opacity(0.8), lineWidth: 0.8)
-                )
-            }
-            .buttonStyle(ApplePressableButtonStyle())
+            AppSecondaryButton(
+                isTradeOpen ? "AI Trade Coach • Live Advisory" : "AI Trade Coach • Post-Mortem",
+                icon: "sparkles",
+                fullWidth: true,
+                height: 38,
+                action: onAICoach
+            )
             
             // Row 2: Side-by-side Replay & Edit
             HStack(spacing: 8) {
-                Button {
-                    #if canImport(UIKit)
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    #endif
-                    onReplay()
-                } label: {
-                    HStack(spacing: 5) {
-                        Image(systemName: "play.fill")
-                            .font(.system(size: 11))
-                        Text("Replay")
-                            .font(.system(size: 12, weight: .medium))
-                    }
-                    .foregroundColor(AppColors.primaryText)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 36)
-                    .background(AppColors.secondaryBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
-                    )
-                }
-                .buttonStyle(ApplePressableButtonStyle())
-                
-                Button {
-                    #if canImport(UIKit)
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    #endif
-                    onEdit()
-                } label: {
-                    HStack(spacing: 5) {
-                        Image(systemName: "pencil")
-                            .font(.system(size: 11))
-                        Text("Edit Trade")
-                            .font(.system(size: 12, weight: .medium))
-                    }
-                    .foregroundColor(AppColors.primaryText)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 36)
-                    .background(AppColors.secondaryBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
-                    )
-                }
-                .buttonStyle(ApplePressableButtonStyle())
+                AppSecondaryButton("Replay", icon: "play.fill", fullWidth: true, height: 36, action: onReplay)
+                AppSecondaryButton("Edit Trade", icon: "pencil", fullWidth: true, height: 36, action: onEdit)
             }
             
             // Row 3: Delete Trade
-            Button {
-                #if canImport(UIKit)
-                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                #endif
-                onDelete()
-            } label: {
-                HStack(spacing: 5) {
-                    Image(systemName: "trash")
-                        .font(.system(size: 11))
-                    Text("Delete Trade")
-                        .font(.system(size: 12, weight: .medium))
-                }
-                .foregroundColor(AppColors.loss.opacity(0.85))
-                .frame(maxWidth: .infinity)
-                .frame(height: 34)
-                .background(AppColors.loss.opacity(0.06))
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-            }
-            .buttonStyle(ApplePressableButtonStyle())
+            AppDestructiveButton("Delete Trade", icon: "trash", fullWidth: true, height: 34, action: onDelete)
         }
     }
 }

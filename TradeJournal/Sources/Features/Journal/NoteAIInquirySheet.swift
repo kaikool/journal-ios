@@ -105,32 +105,24 @@ public struct NoteAIInquirySheet: View {
             .navigationTitle("Note AI Inquiry")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") { dismiss() }
+                ToolbarItem(placement: .topBarLeading) {
+                    ModalDismissButton { dismiss() }
                 }
                 
-                ToolbarItem(placement: .secondaryAction) {
-                    Button {
-                        NoteInquirySessionStore.shared.clear(noteId: noteId)
-                        self.messages = []
-                        Task { await startInitialAssessment() }
-                    } label: {
-                        Label("Re-analyze", systemImage: "arrow.clockwise")
-                    }
-                    .disabled(isLoading)
-                }
-                
-                ToolbarItem(placement: .primaryAction) {
-                    Button(action: saveLessonToNoteAndMemory) {
-                        HStack(spacing: 5) {
-                            Image(systemName: showSavedToast ? "checkmark.circle.fill" : "bookmark.fill")
-                                .font(.system(size: 11))
-                            Text(showSavedToast ? "Saved" : "Save Lesson")
-                                .font(.system(size: 13, weight: .semibold))
+                ToolbarItem(placement: .topBarTrailing) {
+                    HStack(spacing: 8) {
+                        ModalIconButton(icon: "arrow.clockwise", color: AppColors.secondaryText, label: "Re-analyze") {
+                            NoteInquirySessionStore.shared.clear(noteId: noteId)
+                            self.messages = []
+                            Task { await startInitialAssessment() }
                         }
-                        .foregroundColor(showSavedToast ? AppColors.profit : AppColors.brand)
+                        .disabled(isLoading)
+                        
+                        ModalPrimaryButton(showSavedToast ? "Saved" : "Save Lesson", icon: showSavedToast ? "checkmark" : "bookmark.fill") {
+                            saveLessonToNoteAndMemory()
+                        }
+                        .disabled(messages.isEmpty || showSavedToast || isLoading)
                     }
-                    .disabled(messages.isEmpty || showSavedToast || isLoading)
                 }
             }
             .sheet(isPresented: $showLinkTradeSheet) {
@@ -197,15 +189,8 @@ public struct NoteAIInquirySheet: View {
                     .foregroundColor(trade.netPnl >= 0 ? AppColors.profit : AppColors.loss)
                     .lineLimit(1)
                 
-                Button {
+                AppIconPodButton(icon: "pencil", size: 30, label: "Edit linked trade") {
                     showLinkTradeSheet = true
-                } label: {
-                    Image(systemName: "pencil")
-                        .font(.system(size: 13))
-                        .foregroundColor(AppColors.secondaryText)
-                        .frame(width: 30, height: 30)
-                        .background(AppColors.secondaryBackground)
-                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                 }
             } else {
                 Text(noteTitle.isEmpty ? "Notebook Note" : noteTitle)
@@ -215,24 +200,8 @@ public struct NoteAIInquirySheet: View {
                 
                 Spacer(minLength: 4)
                 
-                Button {
+                AppSecondaryButton("Link Trade", icon: "link", height: 30) {
                     showLinkTradeSheet = true
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "link")
-                            .font(.system(size: 12))
-                        Text("Link Trade")
-                            .font(.system(size: 13, weight: .medium))
-                    }
-                    .foregroundColor(AppColors.primaryText)
-                    .padding(.horizontal, 10)
-                    .frame(height: 30)
-                    .background(AppColors.secondaryBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .stroke(AppColors.border.opacity(0.4), lineWidth: 0.5)
-                    )
                 }
             }
         }
@@ -314,17 +283,17 @@ public struct NoteAIInquirySheet: View {
             submitInquiry()
         }) {
             Text(prompt)
-                .font(.system(size: 11, weight: .medium))
+                .font(.system(size: 11.5, weight: .semibold, design: .rounded))
                 .foregroundColor(AppColors.primaryText)
-                .padding(.horizontal, 10)
+                .padding(.horizontal, 12)
                 .padding(.vertical, 5)
                 .background(AppColors.secondaryBackground)
-                .cornerRadius(12)
+                .clipShape(Capsule())
                 .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(AppColors.border.opacity(0.5), lineWidth: 0.5)
+                    Capsule().stroke(AppColors.border.opacity(0.5), lineWidth: 0.8)
                 )
         }
+        .buttonStyle(ApplePressableButtonStyle())
         .disabled(isLoading)
     }
     

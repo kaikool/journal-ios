@@ -319,20 +319,9 @@ public struct AIMemoryManagementSheet: View {
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 16)
                 
-                Button(action: { isCreatingMemory = true }) {
-                    Text("+ Add Rule Manually")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(AppColors.primaryText)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(AppColors.secondaryBackground)
-                        .cornerRadius(6)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 6)
-                                .stroke(AppColors.border.opacity(0.8), lineWidth: 0.8)
-                        )
+                AppPrimaryButton("Add Rule Manually", icon: "plus", height: 36) {
+                    isCreatingMemory = true
                 }
-                .buttonStyle(.plain)
                 .padding(.bottom, 6)
             }
             .frame(maxWidth: .infinity)

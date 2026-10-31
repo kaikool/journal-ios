@@ -49,41 +49,45 @@ public struct AttachmentsSectionView: View {
                 Button {
                     showPhotoPicker = true
                 } label: {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 5) {
                         Image(systemName: "photo.badge.plus")
+                            .font(.system(size: 11, weight: .bold))
                         Text("Add screenshot")
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
                     }
-                    .font(.system(size: 12, weight: .medium))
-                    .padding(.horizontal, 10)
+                    .padding(.horizontal, 12)
                     .padding(.vertical, 6)
                     .background(AppColors.cardBackground)
-                    .foregroundColor(AppColors.accent)
-                    .cornerRadius(8)
+                    .foregroundColor(AppColors.brand)
+                    .clipShape(Capsule())
                     .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(AppColors.border, lineWidth: 1)
+                        Capsule()
+                            .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
                     )
                 }
+                .buttonStyle(ApplePressableButtonStyle())
                 
                 // 2. Document file / PDF importer
                 Button {
                     showFileImporter = true
                 } label: {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 5) {
                         Image(systemName: "doc.badge.plus")
+                            .font(.system(size: 11, weight: .semibold))
                         Text("File / PDF")
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
                     }
-                    .font(.system(size: 12, weight: .medium))
-                    .padding(.horizontal, 10)
+                    .padding(.horizontal, 12)
                     .padding(.vertical, 6)
                     .background(AppColors.cardBackground)
                     .foregroundColor(AppColors.secondaryText)
-                    .cornerRadius(8)
+                    .clipShape(Capsule())
                     .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(AppColors.border, lineWidth: 1)
+                        Capsule()
+                            .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
                     )
                 }
+                .buttonStyle(ApplePressableButtonStyle())
                 
                 if isProcessing {
                     ProgressView()
@@ -291,8 +295,8 @@ public struct AttachmentPreviewSheet: View {
             .navigationTitle(attachment.name)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
+                ToolbarItem(placement: .topBarLeading) {
+                    ModalDismissButton { dismiss() }
                 }
             }
         }

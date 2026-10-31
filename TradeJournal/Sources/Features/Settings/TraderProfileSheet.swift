@@ -261,15 +261,15 @@ public struct TraderProfileSheet: View {
             tradingStyle = style
         }) {
             Text(style)
-                .font(.system(size: 11, weight: .medium))
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
+                .font(.system(size: 11.5, weight: .semibold, design: .rounded))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
                 .background(AppColors.secondaryBackground)
                 .foregroundColor(tradingStyle == style ? AppColors.brand : AppColors.secondaryText)
-                .cornerRadius(6)
-                .overlay(RoundedRectangle(cornerRadius: 6).stroke(tradingStyle == style ? AppColors.brand.opacity(0.5) : AppColors.border.opacity(0.4), lineWidth: 0.8))
+                .clipShape(Capsule())
+                .overlay(Capsule().stroke(tradingStyle == style ? AppColors.brand.opacity(0.5) : AppColors.border.opacity(0.4), lineWidth: 0.8))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ApplePressableButtonStyle())
     }
     
     private func presetRiskChip(_ risk: String) -> some View {
@@ -277,15 +277,15 @@ public struct TraderProfileSheet: View {
             maxRiskPerTrade = risk
         }) {
             Text(risk)
-                .font(.system(size: 11, weight: .medium))
-                .padding(.horizontal, 10)
-                .padding(.vertical, 4)
+                .font(.system(size: 11.5, weight: .semibold, design: .rounded))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 5)
                 .background(AppColors.secondaryBackground)
                 .foregroundColor(maxRiskPerTrade == risk ? AppColors.brand : AppColors.secondaryText)
-                .cornerRadius(6)
-                .overlay(RoundedRectangle(cornerRadius: 6).stroke(maxRiskPerTrade == risk ? AppColors.brand.opacity(0.5) : AppColors.border.opacity(0.4), lineWidth: 0.8))
+                .clipShape(Capsule())
+                .overlay(Capsule().stroke(maxRiskPerTrade == risk ? AppColors.brand.opacity(0.5) : AppColors.border.opacity(0.4), lineWidth: 0.8))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ApplePressableButtonStyle())
     }
     
     // MARK: - Data Handlers

@@ -183,15 +183,15 @@ public struct NewPlaybookSheet: View {
                         Image(systemName: "plus.circle")
                         Text("Add rule condition")
                     }
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: 12.5, weight: .semibold, design: .rounded))
                     .foregroundColor(AppColors.brand)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 10)
+                    .frame(height: 38)
                     .background(AppColors.brand.opacity(0.06))
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .clipShape(Capsule())
                     .overlay(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .stroke(AppColors.brand.opacity(0.2), style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+                        Capsule()
+                            .stroke(AppColors.brand.opacity(0.3), style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
                     )
                 }
                 .buttonStyle(ApplePressableButtonStyle())
@@ -437,15 +437,15 @@ public struct EditPlaybookSheet: View {
                         Image(systemName: "plus.circle")
                         Text("Add rule condition")
                     }
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: 12.5, weight: .semibold, design: .rounded))
                     .foregroundColor(AppColors.brand)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 10)
+                    .frame(height: 38)
                     .background(AppColors.brand.opacity(0.06))
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .clipShape(Capsule())
                     .overlay(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .stroke(AppColors.brand.opacity(0.2), style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+                        Capsule()
+                            .stroke(AppColors.brand.opacity(0.3), style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
                     )
                 }
                 .buttonStyle(ApplePressableButtonStyle())

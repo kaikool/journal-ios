@@ -544,12 +544,15 @@ public struct TradeDisciplineAndNotesCard: View {
                                 tagInput = ""
                             }
                         }
-                        .font(AppTypography.captionBold)
+                        .font(.system(size: 12.5, weight: .semibold, design: .rounded))
                         .foregroundColor(AppColors.brand)
-                        .padding(.horizontal, 12)
+                        .padding(.horizontal, 14)
                         .frame(height: 36)
                         .background(AppColors.brand.opacity(0.12))
-                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .clipShape(Capsule())
+                        .overlay(
+                            Capsule().stroke(AppColors.brand.opacity(0.25), lineWidth: 0.8)
+                        )
                     }
                     .buttonStyle(ApplePressableButtonStyle())
                 }

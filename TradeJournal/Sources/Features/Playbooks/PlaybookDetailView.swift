@@ -237,25 +237,9 @@ public struct PlaybookDetailView: View {
     
     @ViewBuilder
     private var deleteButton: some View {
-        Button {
-            #if canImport(UIKit)
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            #endif
+        AppDestructiveButton("Delete Playbook", icon: "trash", fullWidth: true, height: 38) {
             showDeleteAlert = true
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: "trash")
-                    .font(.system(size: 12, weight: .medium))
-                Text("Delete Playbook")
-                    .font(.system(size: 12, weight: .semibold))
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 10)
-            .background(AppColors.loss.opacity(0.1))
-            .foregroundColor(AppColors.loss)
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
-        .buttonStyle(ApplePressableButtonStyle())
         .padding(.top, 4)
     }
 }

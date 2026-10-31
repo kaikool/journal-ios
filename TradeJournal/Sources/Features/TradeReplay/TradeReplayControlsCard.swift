@@ -79,9 +79,9 @@ public struct TradeReplayControlsCard: View {
                             .foregroundColor(AppColors.primaryText)
                             .frame(width: 34, height: 34)
                             .background(AppColors.cardBackground.opacity(0.85))
-                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            .clipShape(Circle())
                             .overlay(
-                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                Circle()
                                     .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
                             )
                     }
@@ -100,9 +100,9 @@ public struct TradeReplayControlsCard: View {
                             .foregroundColor(currentStep <= 1 ? AppColors.secondaryText.opacity(0.3) : AppColors.primaryText)
                             .frame(width: 34, height: 34)
                             .background(AppColors.cardBackground.opacity(0.85))
-                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            .clipShape(Circle())
                             .overlay(
-                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                Circle()
                                     .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
                             )
                     }
@@ -120,15 +120,15 @@ public struct TradeReplayControlsCard: View {
                             Image(systemName: isPlaying ? "pause.fill" : "play.fill")
                                 .font(.system(size: 12, weight: .bold))
                             Text(isPlaying ? "Pause" : "Play")
-                                .font(.system(size: 12, weight: .bold))
+                                .font(.system(size: 12.5, weight: .semibold, design: .rounded))
                                 .lineLimit(1)
                         }
                         .frame(height: 34)
                         .padding(.horizontal, 14)
                         .background(AppColors.brand)
                         .foregroundColor(.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                        .shadow(color: AppColors.brand.opacity(0.25), radius: 3, x: 0, y: 1.5)
+                        .clipShape(Capsule())
+                        .shadow(color: AppColors.brand.opacity(0.3), radius: 3, x: 0, y: 1)
                     }
                     .buttonStyle(ApplePressableButtonStyle())
                     .disabled(barsCount == 0)
@@ -146,9 +146,9 @@ public struct TradeReplayControlsCard: View {
                             .foregroundColor(currentStep >= barsCount ? AppColors.secondaryText.opacity(0.3) : AppColors.primaryText)
                             .frame(width: 34, height: 34)
                             .background(AppColors.cardBackground.opacity(0.85))
-                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            .clipShape(Circle())
                             .overlay(
-                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                Circle()
                                     .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
                             )
                     }
@@ -167,9 +167,9 @@ public struct TradeReplayControlsCard: View {
                             .foregroundColor(AppColors.primaryText)
                             .frame(width: 34, height: 34)
                             .background(AppColors.cardBackground.opacity(0.85))
-                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            .clipShape(Circle())
                             .overlay(
-                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                Circle()
                                     .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
                             )
                     }
@@ -192,10 +192,14 @@ public struct TradeReplayControlsCard: View {
                                 .font(.system(size: 9, weight: .bold))
                         }
                         .frame(height: 34)
-                        .padding(.horizontal, 8)
+                        .padding(.horizontal, 10)
                         .background(AppColors.secondaryBackground)
                         .foregroundColor(AppColors.primaryText)
-                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .clipShape(Capsule())
+                        .overlay(
+                            Capsule()
+                                .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
+                        )
                     }
                     .fixedSize()
                     
@@ -212,9 +216,9 @@ public struct TradeReplayControlsCard: View {
                                 .foregroundColor(AppColors.primaryText)
                                 .frame(width: 34, height: 34)
                                 .background(AppColors.secondaryBackground)
-                                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                .clipShape(Circle())
                                 .overlay(
-                                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    Circle()
                                         .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
                                 )
                         }

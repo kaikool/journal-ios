@@ -58,25 +58,25 @@ public struct AppButton: View {
                         .progressViewStyle(CircularProgressViewStyle(tint: foregroundColor))
                 } else if let icon = iconName {
                     Image(systemName: icon)
-                        .font(.system(size: size == .compact ? 11 : 13, weight: .semibold))
+                        .font(.system(size: size == .compact ? 11 : 12.5, weight: .bold))
                 }
                 Text(title)
-                    .font(size == .compact ? AppTypography.captionBold : AppTypography.bodyBold)
+                    .font(.system(size: size == .compact ? 12.5 : 13.5, weight: .semibold, design: .rounded))
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
             }
-            .padding(.vertical, size == .compact ? 6 : 9)
-            .padding(.horizontal, size == .compact ? 8 : 14)
+            .padding(.vertical, size == .compact ? 6 : 8)
+            .padding(.horizontal, size == .compact ? 12 : 14)
             .frame(maxWidth: fullWidth ? .infinity : nil)
-            .frame(minHeight: size == .compact ? 30 : 38)
+            .frame(height: size == .compact ? 32 : 38)
             .background(backgroundColor)
             .foregroundColor(foregroundColor)
-            .clipShape(RoundedRectangle(cornerRadius: size == .compact ? 8 : 10, style: .continuous))
+            .clipShape(Capsule())
             .overlay(
-                RoundedRectangle(cornerRadius: size == .compact ? 8 : 10, style: .continuous)
-                    .stroke(AppColors.border.opacity(0.6), lineWidth: style == .outline ? 1 : 0)
+                Capsule()
+                    .stroke(style == .outline ? AppColors.border.opacity(0.6) : (style == .secondary ? AppColors.border.opacity(0.4) : Color.clear), lineWidth: 0.8)
             )
-            .shadow(color: style == .primary ? AppColors.brand.opacity(0.25) : Color.clear, radius: 4, x: 0, y: 2)
+            .shadow(color: style == .primary ? AppColors.brand.opacity(0.3) : Color.clear, radius: 3, x: 0, y: 1)
         }
         .frame(maxWidth: fullWidth ? .infinity : nil)
         .buttonStyle(ApplePressableButtonStyle())
@@ -86,18 +86,210 @@ public struct AppButton: View {
     private var backgroundColor: Color {
         switch style {
         case .primary: return AppColors.brand
-        case .secondary: return AppColors.secondaryBackground
+        case .secondary: return AppColors.secondaryBackground.opacity(0.85)
         case .outline: return Color.clear
-        case .destructive: return AppColors.loss
+        case .destructive: return AppColors.loss.opacity(0.12)
         }
     }
     
     private var foregroundColor: Color {
         switch style {
-        case .primary, .destructive: return .white
-        case .secondary: return AppColors.primaryText
-        case .outline: return AppColors.primaryText
+        case .primary: return .white
+        case .destructive: return AppColors.loss
+        case .secondary, .outline: return AppColors.primaryText
         }
+    }
+}
+
+// MARK: - Specialized Single Source of Truth Buttons
+
+public struct AppPrimaryButton: View {
+    let title: String
+    let icon: String?
+    let isEnabled: Bool
+    let fullWidth: Bool
+    let height: CGFloat
+    let action: () -> Void
+    
+    public init(
+        _ title: String,
+        icon: String? = nil,
+        isEnabled: Bool = true,
+        fullWidth: Bool = false,
+        height: CGFloat = 38,
+        action: @escaping () -> Void
+    ) {
+        self.title = title
+        self.icon = icon
+        self.isEnabled = isEnabled
+        self.fullWidth = fullWidth
+        self.height = height
+        self.action = action
+    }
+    
+    public var body: some View {
+        Button {
+            NativeHaptics.mediumImpact()
+            action()
+        } label: {
+            HStack(spacing: 5) {
+                if let icon = icon {
+                    Image(systemName: icon)
+                        .font(.system(size: 11, weight: .bold))
+                }
+                Text(title)
+                    .font(.system(size: height <= 32 ? 12.5 : 13.5, weight: .semibold, design: .rounded))
+            }
+            .foregroundColor(isEnabled ? .white : AppColors.secondaryText.opacity(0.6))
+            .padding(.horizontal, 14)
+            .frame(maxWidth: fullWidth ? .infinity : nil)
+            .frame(height: height)
+            .background(isEnabled ? AppColors.brand : AppColors.secondaryBackground)
+            .clipShape(Capsule())
+            .shadow(color: isEnabled ? AppColors.brand.opacity(0.3) : .clear, radius: 3, x: 0, y: 1)
+        }
+        .buttonStyle(ApplePressableButtonStyle())
+        .disabled(!isEnabled)
+    }
+}
+
+public struct AppSecondaryButton: View {
+    let title: String
+    let icon: String?
+    let fullWidth: Bool
+    let height: CGFloat
+    let action: () -> Void
+    
+    public init(
+        _ title: String,
+        icon: String? = nil,
+        fullWidth: Bool = false,
+        height: CGFloat = 38,
+        action: @escaping () -> Void
+    ) {
+        self.title = title
+        self.icon = icon
+        self.fullWidth = fullWidth
+        self.height = height
+        self.action = action
+    }
+    
+    public var body: some View {
+        Button {
+            NativeHaptics.lightImpact()
+            action()
+        } label: {
+            HStack(spacing: 5) {
+                if let icon = icon {
+                    Image(systemName: icon)
+                        .font(.system(size: 11, weight: .semibold))
+                }
+                Text(title)
+                    .font(.system(size: height <= 32 ? 12.5 : 13.5, weight: .semibold, design: .rounded))
+            }
+            .foregroundColor(AppColors.primaryText)
+            .padding(.horizontal, 14)
+            .frame(maxWidth: fullWidth ? .infinity : nil)
+            .frame(height: height)
+            .background(AppColors.cardBackground)
+            .clipShape(Capsule())
+            .overlay(
+                Capsule().stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
+            )
+        }
+        .buttonStyle(ApplePressableButtonStyle())
+    }
+}
+
+public struct AppDestructiveButton: View {
+    let title: String
+    let icon: String?
+    let fullWidth: Bool
+    let height: CGFloat
+    let action: () -> Void
+    
+    public init(
+        _ title: String,
+        icon: String? = "trash",
+        fullWidth: Bool = false,
+        height: CGFloat = 38,
+        action: @escaping () -> Void
+    ) {
+        self.title = title
+        self.icon = icon
+        self.fullWidth = fullWidth
+        self.height = height
+        self.action = action
+    }
+    
+    public var body: some View {
+        Button {
+            NativeHaptics.lightImpact()
+            action()
+        } label: {
+            HStack(spacing: 6) {
+                if let icon = icon {
+                    Image(systemName: icon)
+                        .font(.system(size: 11.5, weight: .semibold))
+                }
+                Text(title)
+                    .font(.system(size: height <= 32 ? 12.5 : 13.5, weight: .semibold, design: .rounded))
+            }
+            .foregroundColor(AppColors.loss)
+            .padding(.horizontal, 14)
+            .frame(maxWidth: fullWidth ? .infinity : nil)
+            .frame(height: height)
+            .background(AppColors.loss.opacity(0.12))
+            .clipShape(Capsule())
+            .overlay(
+                Capsule().stroke(AppColors.loss.opacity(0.3), lineWidth: 0.8)
+            )
+        }
+        .buttonStyle(ApplePressableButtonStyle())
+    }
+}
+
+public struct AppIconPodButton: View {
+    let icon: String
+    let color: Color
+    let size: CGFloat
+    let label: String
+    let action: () -> Void
+    
+    public init(
+        icon: String,
+        color: Color = AppColors.secondaryText,
+        size: CGFloat = 32,
+        label: String = "",
+        action: @escaping () -> Void
+    ) {
+        self.icon = icon
+        self.color = color
+        self.size = size
+        self.label = label
+        self.action = action
+    }
+    
+    public var body: some View {
+        Button {
+            NativeHaptics.lightImpact()
+            action()
+        } label: {
+            ZStack {
+                Circle()
+                    .fill(AppColors.secondaryBackground.opacity(0.85))
+                    .frame(width: size, height: size)
+                    .overlay(
+                        Circle().stroke(AppColors.border.opacity(0.55), lineWidth: 0.6)
+                    )
+                Image(systemName: icon)
+                    .font(.system(size: size <= 32 ? 12 : 14, weight: .semibold))
+                    .foregroundColor(color)
+            }
+            .contentShape(Circle())
+        }
+        .buttonStyle(ApplePressableButtonStyle())
+        .accessibilityLabel(label.isEmpty ? icon : label)
     }
 }
 

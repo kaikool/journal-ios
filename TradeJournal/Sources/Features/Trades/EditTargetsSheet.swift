@@ -363,13 +363,17 @@ public struct EditTargetsSheet: View {
             applyRPreset(ratio: ratio)
         } label: {
             Text(title)
-                .font(.system(size: 12, weight: .semibold))
+                .font(.system(size: 12, weight: .semibold, design: .rounded))
                 .foregroundColor(AppColors.brand)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 7)
                 .background(AppColors.brand.opacity(0.12))
-                .cornerRadius(6)
+                .clipShape(Capsule())
+                .overlay(
+                    Capsule().stroke(AppColors.brand.opacity(0.25), lineWidth: 0.8)
+                )
         }
+        .buttonStyle(ApplePressableButtonStyle())
     }
     
     private func applyRPreset(ratio: Decimal) {

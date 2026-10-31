@@ -21,22 +21,11 @@ public struct ReviewExportModal: View {
                     .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                     .padding(16)
                 
-                Button {
+                AppPrimaryButton("Copy to Clipboard", icon: "doc.on.doc", fullWidth: true, height: 42) {
                     #if canImport(UIKit)
                     UIPasteboard.general.string = exportText
                     #endif
                     dismiss()
-                } label: {
-                    HStack {
-                        Image(systemName: "doc.on.doc")
-                        Text("Copy to Clipboard")
-                    }
-                    .font(AppTypography.headline)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(AppColors.accent)
-                    .foregroundColor(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 16)
@@ -44,10 +33,8 @@ public struct ReviewExportModal: View {
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
-                        dismiss()
-                    }
+                ToolbarItem(placement: .topBarLeading) {
+                    ModalDismissButton { dismiss() }
                 }
             }
         }

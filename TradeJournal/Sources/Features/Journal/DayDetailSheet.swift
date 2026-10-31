@@ -221,23 +221,14 @@ public struct DayDetailSheet: View {
                     Spacer()
                     
                     if !noteContent.isEmpty {
-                        Button("Clear") {
+                        AppSecondaryButton("Clear", height: 28) {
                             noteContent = ""
                             save()
                         }
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.secondaryText)
                     }
                     
-                    Button {
+                    AppPrimaryButton("Save", icon: "checkmark", height: 28) {
                         save()
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "checkmark")
-                            Text("Save")
-                        }
-                        .font(AppTypography.captionBold)
-                        .foregroundColor(AppColors.brand)
                     }
                 }
             }
@@ -297,41 +288,10 @@ public struct DayDetailSheet: View {
     @ViewBuilder
     private var actionButtons: some View {
         HStack(spacing: 10) {
-            Button(action: onAddTrade) {
-                HStack(spacing: 6) {
-                    Image(systemName: "plus")
-                    Text("Add Trade")
-                }
-                .font(AppTypography.captionBold)
-                .foregroundColor(AppColors.brandTextOnDark)
-                .frame(maxWidth: .infinity)
-                .frame(height: 38)
-                .background(AppColors.brand)
-                .cornerRadius(6)
-            }
-            
-            Button {
-                #if canImport(UIKit)
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                #endif
+            AppPrimaryButton("Add Trade", icon: "plus", fullWidth: true, height: 38, action: onAddTrade)
+            AppSecondaryButton("Full Journal", icon: "doc.text", fullWidth: true, height: 38) {
                 showFullJournal = true
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "doc.text")
-                    Text("Full Journal")
-                }
-                .font(AppTypography.captionBold)
-                .foregroundColor(AppColors.primaryText)
-                .frame(maxWidth: .infinity)
-                .frame(height: 38)
-                .background(AppColors.cardBackground)
-                .cornerRadius(6)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 6)
-                        .stroke(AppColors.border, lineWidth: 1)
-                )
             }
-            .buttonStyle(PlainButtonStyle())
         }
     }
     

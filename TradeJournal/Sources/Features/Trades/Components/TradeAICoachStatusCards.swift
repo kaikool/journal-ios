@@ -50,15 +50,7 @@ public struct TradeAICoachErrorCard: View {
                     .foregroundColor(AppColors.secondaryText)
                     .multilineTextAlignment(.center)
                 
-                Button(action: onRetry) {
-                    Text("Retry Analysis")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(AppColors.primaryText)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 7)
-                        .background(AppColors.secondaryBackground)
-                        .cornerRadius(6)
-                }
+                AppSecondaryButton("Retry Analysis", icon: "arrow.clockwise", height: 32, action: onRetry)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 20)

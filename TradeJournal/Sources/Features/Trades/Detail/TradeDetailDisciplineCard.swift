@@ -238,12 +238,13 @@ public struct TradeDetailDisciplineCard: View {
                             onUpdate()
                         }
                     }
-                    .font(.system(size: 11, weight: .bold))
-                    .padding(.horizontal, 10)
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .padding(.horizontal, 12)
                     .frame(height: 32)
                     .background(AppColors.loss)
                     .foregroundColor(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .clipShape(Capsule())
+                    .buttonStyle(ApplePressableButtonStyle())
                 }
                 .padding(.top, 2)
             }
@@ -335,12 +336,13 @@ public struct TradeDetailDisciplineCard: View {
                             onUpdate()
                         }
                     }
-                    .font(.system(size: 11, weight: .bold))
-                    .padding(.horizontal, 10)
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .padding(.horizontal, 12)
                     .frame(height: 32)
                     .background(AppColors.brand)
                     .foregroundColor(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .clipShape(Capsule())
+                    .buttonStyle(ApplePressableButtonStyle())
                 }
                 .padding(.top, 2)
             }

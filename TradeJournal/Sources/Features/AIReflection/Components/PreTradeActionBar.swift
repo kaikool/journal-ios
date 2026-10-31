@@ -33,18 +33,19 @@ public struct PreTradeActionBar: View {
                     Image(systemName: isSavedToNotebook ? "checkmark" : "bookmark")
                         .font(.system(size: 11, weight: .semibold))
                     Text(isSavedToNotebook ? "Saved" : "Save Note")
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.system(size: 12, weight: .semibold, design: .rounded))
                 }
                 .foregroundColor(isSavedToNotebook ? AppColors.profit : AppColors.primaryText)
                 .frame(maxWidth: .infinity)
                 .frame(height: 36)
                 .background(AppColors.secondaryBackground)
-                .cornerRadius(8)
+                .clipShape(Capsule())
                 .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(AppColors.border.opacity(0.7), lineWidth: 0.8)
+                    Capsule()
+                        .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
                 )
             }
+            .buttonStyle(ApplePressableButtonStyle())
             .disabled(isSavedToNotebook)
             
             // Link to Trade (available when note is saved)
@@ -52,20 +53,21 @@ public struct PreTradeActionBar: View {
                 Button(action: linkAction) {
                     HStack(spacing: 4) {
                         Image(systemName: "link")
-                            .font(.system(size: 11, weight: .medium))
+                            .font(.system(size: 11, weight: .semibold))
                         Text("Link Trade")
-                            .font(.system(size: 12, weight: .medium))
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
                     }
                     .foregroundColor(AppColors.primaryText)
-                    .padding(.horizontal, 10)
+                    .padding(.horizontal, 12)
                     .frame(height: 36)
                     .background(AppColors.secondaryBackground)
-                    .cornerRadius(8)
+                    .clipShape(Capsule())
                     .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(AppColors.border.opacity(0.7), lineWidth: 0.8)
+                        Capsule()
+                            .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
                     )
                 }
+                .buttonStyle(ApplePressableButtonStyle())
             }
             
             // Copy
@@ -74,32 +76,22 @@ public struct PreTradeActionBar: View {
                     Image(systemName: showCopiedAlert ? "checkmark" : "doc.on.doc")
                         .font(.system(size: 11, weight: .semibold))
                     Text(showCopiedAlert ? "Copied" : "Copy")
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.system(size: 12, weight: .semibold, design: .rounded))
                 }
                 .foregroundColor(AppColors.primaryText)
-                .padding(.horizontal, 12)
+                .padding(.horizontal, 14)
                 .frame(height: 36)
                 .background(AppColors.secondaryBackground)
-                .cornerRadius(8)
+                .clipShape(Capsule())
                 .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(AppColors.border.opacity(0.7), lineWidth: 0.8)
+                    Capsule()
+                        .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
                 )
             }
+            .buttonStyle(ApplePressableButtonStyle())
             
             // Regenerate
-            Button(action: onRegenerate) {
-                Image(systemName: "arrow.clockwise")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(AppColors.primaryText)
-                    .frame(width: 36, height: 36)
-                    .background(AppColors.secondaryBackground)
-                    .cornerRadius(8)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(AppColors.border.opacity(0.7), lineWidth: 0.8)
-                    )
-            }
+            AppIconPodButton(icon: "arrow.clockwise", size: 36, label: "Regenerate", action: onRegenerate)
         }
     }
 }

@@ -113,25 +113,9 @@ public struct PlaybooksView: View {
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 16)
                 
-                Button {
-                    #if canImport(UIKit)
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                    #endif
+                AppPrimaryButton("New Playbook", icon: "plus", height: 38) {
                     showNewPlaybookSheet = true
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "plus")
-                            .font(.system(size: 13, weight: .bold))
-                        Text("New Playbook")
-                    }
-                    .font(AppTypography.captionBold)
-                    .foregroundColor(AppColors.brandTextOnDark)
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 10)
-                    .background(AppColors.brand)
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 }
-                .buttonStyle(ApplePressableButtonStyle())
                 .padding(.bottom, 8)
             }
             .frame(maxWidth: .infinity)

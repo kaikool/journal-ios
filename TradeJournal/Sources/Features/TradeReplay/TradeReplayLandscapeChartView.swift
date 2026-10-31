@@ -120,16 +120,19 @@ public struct TradeReplayLandscapeChartView: View {
                     Image(systemName: "xmark")
                         .font(.system(size: 11, weight: .bold))
                     Text("Exit")
-                        .font(AppTypography.pill)
+                        .font(.system(size: 12, weight: .semibold, design: .rounded))
                         .lineLimit(1)
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 5)
                 .background(AppColors.secondaryBackground)
                 .foregroundColor(AppColors.primaryText)
-                .cornerRadius(6)
+                .clipShape(Capsule())
+                .overlay(
+                    Capsule().stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
+                )
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ApplePressableButtonStyle())
             .accessibilityLabel("Exit Landscape View")
             
             // Symbol & Direction
@@ -220,16 +223,19 @@ public struct TradeReplayLandscapeChartView: View {
                     selectedResolution = res
                 } label: {
                     Text(title)
-                        .font(AppTypography.pill)
+                        .font(.system(size: 11.5, weight: .semibold, design: .rounded))
                         .lineLimit(1)
                         .fixedSize()
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 4)
-                        .background(isSelected ? AppColors.accent : AppColors.secondaryBackground)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4.5)
+                        .background(isSelected ? AppColors.brand : AppColors.secondaryBackground)
                         .foregroundColor(isSelected ? .white : AppColors.secondaryText)
-                        .cornerRadius(6)
+                        .clipShape(Capsule())
+                        .overlay(
+                            Capsule().stroke(isSelected ? AppColors.brand : AppColors.border.opacity(0.5), lineWidth: 0.8)
+                        )
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ApplePressableButtonStyle())
             }
             
             Spacer()
@@ -428,11 +434,14 @@ public struct TradeReplayLandscapeChartView: View {
                     Image(systemName: "chevron.up.chevron.down")
                         .font(.system(size: 8, weight: .bold))
                 }
-                .padding(.horizontal, 7)
+                .padding(.horizontal, 8)
                 .padding(.vertical, 4)
                 .background(AppColors.secondaryBackground)
                 .foregroundColor(AppColors.primaryText)
-                .cornerRadius(6)
+                .clipShape(Capsule())
+                .overlay(
+                    Capsule().stroke(AppColors.border.opacity(0.5), lineWidth: 0.8)
+                )
             }
             .fixedSize()
         }

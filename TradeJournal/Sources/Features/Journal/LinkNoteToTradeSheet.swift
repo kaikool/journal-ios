@@ -133,15 +133,13 @@ public struct LinkNoteToTradeSheet: View {
             .navigationTitle("Link Trade")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                        .foregroundColor(AppColors.secondaryText)
+                ToolbarItem(placement: .topBarLeading) {
+                    ModalDismissButton { dismiss() }
                 }
                 
                 if currentTradeKey != nil {
-                    ToolbarItem(placement: .destructiveAction) {
-                        Button("Unlink") { unlinkTrade() }
-                            .foregroundColor(AppColors.loss)
+                    ToolbarItem(placement: .topBarTrailing) {
+                        ModalDeleteButton(title: "Unlink") { unlinkTrade() }
                     }
                 }
             }

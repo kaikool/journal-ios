@@ -69,29 +69,14 @@ public struct AIResearchWorkspaceSheet: View {
             .navigationTitle("Research Lab")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") {
-                        dismiss()
-                    }
-                    .font(AppTypography.captionBold)
-                    .foregroundColor(AppColors.primaryText)
+                ToolbarItem(placement: .topBarLeading) {
+                    ModalDismissButton { dismiss() }
                 }
                 
-                ToolbarItem(placement: .primaryAction) {
-                    Button(action: { isCreatingProject = true }) {
-                        Text("+ New Project")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(AppColors.primaryText)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
-                            .background(AppColors.secondaryBackground)
-                            .cornerRadius(6)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .stroke(AppColors.border.opacity(0.8), lineWidth: 0.8)
-                            )
+                ToolbarItem(placement: .topBarTrailing) {
+                    ModalPrimaryButton("New Project", icon: "plus") {
+                        isCreatingProject = true
                     }
-                    .buttonStyle(.plain)
                 }
             }
             .onAppear(perform: reloadProjects)
@@ -283,20 +268,9 @@ public struct AIResearchWorkspaceSheet: View {
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 16)
                 
-                Button(action: { isCreatingProject = true }) {
-                    Text("+ Create Project")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(AppColors.primaryText)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(AppColors.secondaryBackground)
-                        .cornerRadius(6)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 6)
-                                .stroke(AppColors.border.opacity(0.8), lineWidth: 0.8)
-                        )
+                AppPrimaryButton("Create Project", icon: "plus", height: 36) {
+                    isCreatingProject = true
                 }
-                .buttonStyle(.plain)
                 .padding(.bottom, 6)
             }
             .frame(maxWidth: .infinity)
@@ -590,21 +564,7 @@ private struct AIResearchProjectCard: View {
     
     private var cardBottomBarView: some View {
         HStack {
-            Button(action: onAddCheckpoint) {
-                Text("+ Record Checkpoint")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(AppColors.primaryText)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(AppColors.secondaryBackground)
-                    .cornerRadius(6)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 6)
-                            .stroke(AppColors.border.opacity(0.8), lineWidth: 0.8)
-                    )
-            }
-            .buttonStyle(.plain)
-            
+            AppSecondaryButton("Record Checkpoint", icon: "plus", height: 32, action: onAddCheckpoint)
             Spacer()
         }
         .padding(.top, 2)
@@ -789,15 +749,11 @@ private struct NewResearchProjectSheet: View {
             .navigationTitle("New Research Project")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                    .font(AppTypography.captionBold)
-                    .foregroundColor(AppColors.secondaryText)
+                ToolbarItem(placement: .topBarLeading) {
+                    ModalDismissButton { dismiss() }
                 }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Create") {
+                ToolbarItem(placement: .topBarTrailing) {
+                    ModalPrimaryButton("Create", isEnabled: isFormValid) {
                         let symArr = symbols.components(separatedBy: ",")
                             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).uppercased() }
                             .filter { !$0.isEmpty }
@@ -819,9 +775,6 @@ private struct NewResearchProjectSheet: View {
                         onCreated(newProj)
                         dismiss()
                     }
-                    .font(AppTypography.captionBold)
-                    .foregroundColor(AppColors.brand)
-                    .disabled(!isFormValid)
                 }
             }
         }
@@ -923,15 +876,11 @@ private struct AddResearchCheckpointSheet: View {
             .navigationTitle("Record Checkpoint")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                    .font(AppTypography.captionBold)
-                    .foregroundColor(AppColors.secondaryText)
+                ToolbarItem(placement: .topBarLeading) {
+                    ModalDismissButton { dismiss() }
                 }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
+                ToolbarItem(placement: .topBarTrailing) {
+                    ModalPrimaryButton("Save") {
                         let wr = Double(winRateText.replacingOccurrences(of: ",", with: "."))
                         let pf = Double(profitFactorText.replacingOccurrences(of: ",", with: "."))
                         
@@ -946,8 +895,6 @@ private struct AddResearchCheckpointSheet: View {
                         onSaved()
                         dismiss()
                     }
-                    .font(AppTypography.captionBold)
-                    .foregroundColor(AppColors.brand)
                 }
             }
         }
@@ -1006,15 +953,11 @@ private struct ConcludeResearchProjectSheet: View {
             .navigationTitle(targetStatus == .validated ? "Validate Hypothesis" : "Invalidate Hypothesis")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                    .font(AppTypography.captionBold)
-                    .foregroundColor(AppColors.secondaryText)
+                ToolbarItem(placement: .topBarLeading) {
+                    ModalDismissButton { dismiss() }
                 }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
+                ToolbarItem(placement: .topBarTrailing) {
+                    ModalPrimaryButton("Save") {
                         AIResearchWorkspaceEngine.shared.updateStatus(
                             projectId: project.id,
                             status: targetStatus,
@@ -1023,8 +966,6 @@ private struct ConcludeResearchProjectSheet: View {
                         onSaved()
                         dismiss()
                     }
-                    .font(AppTypography.captionBold)
-                    .foregroundColor(AppColors.brand)
                 }
             }
         }

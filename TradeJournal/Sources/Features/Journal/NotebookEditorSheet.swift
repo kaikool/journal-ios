@@ -267,59 +267,16 @@ public struct NotebookEditorSheet: View {
                 
                 Spacer(minLength: 6)
                 
-                Button {
+                AppSecondaryButton("Inquiry", icon: "sparkles", height: 34) {
                     showInquirySheet = true
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "sparkles")
-                            .font(.system(size: 12))
-                        Text("Inquiry")
-                            .font(.system(size: 13, weight: .medium))
-                    }
-                    .foregroundColor(AppColors.primaryText)
-                    .padding(.horizontal, 12)
-                    .frame(height: 34)
-                    .background(AppColors.secondaryBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .stroke(AppColors.border.opacity(0.6), lineWidth: 0.6)
-                    )
                 }
                 
-                Button {
+                AppIconPodButton(icon: "pencil", size: 34, label: "Edit linked trade") {
                     showLinkTradeSheet = true
-                } label: {
-                    Image(systemName: "pencil")
-                        .font(.system(size: 13))
-                        .foregroundColor(AppColors.secondaryText)
-                        .frame(width: 34, height: 34)
-                        .background(AppColors.secondaryBackground)
-                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .stroke(AppColors.border.opacity(0.6), lineWidth: 0.6)
-                        )
                 }
             } else {
-                Button {
+                AppSecondaryButton("Link Trade", icon: "link", height: 34) {
                     showLinkTradeSheet = true
-                } label: {
-                    HStack(spacing: 5) {
-                        Image(systemName: "link")
-                            .font(.system(size: 12))
-                        Text("Link Trade")
-                            .font(.system(size: 13, weight: .medium))
-                    }
-                    .foregroundColor(AppColors.primaryText)
-                    .padding(.horizontal, 12)
-                    .frame(height: 34)
-                    .background(AppColors.secondaryBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .stroke(AppColors.border.opacity(0.6), lineWidth: 0.6)
-                    )
                 }
                 
                 Spacer(minLength: 6)
