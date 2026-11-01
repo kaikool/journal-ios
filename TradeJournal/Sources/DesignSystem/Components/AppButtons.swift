@@ -315,7 +315,7 @@ public struct AppActionPill: View {
     public init(
         _ title: String,
         icon: String? = nil,
-        isPrimary: Bool = true,
+        isPrimary: Bool = false,
         action: @escaping () -> Void
     ) {
         self.title = title
@@ -432,7 +432,7 @@ public struct AppActionPillLink<Destination: View>: View {
     public init(
         _ title: String,
         icon: String? = nil,
-        isPrimary: Bool = true,
+        isPrimary: Bool = false,
         destination: Destination
     ) {
         self.title = title

@@ -374,12 +374,12 @@ extension JournalCalendarView {
                                 Text("Trades")
                                     .font(AppTypography.cardHeader)
                                     .foregroundColor(AppColors.secondaryText)
-                                    .frame(width: 44, alignment: .trailing)
+                                    .frame(minWidth: 56, alignment: .trailing)
                                     .lineLimit(1)
                                 Text("Net P&L")
                                     .font(AppTypography.cardHeader)
                                     .foregroundColor(AppColors.secondaryText)
-                                    .frame(width: 108, alignment: .trailing)
+                                    .frame(minWidth: 90, alignment: .trailing)
                                     .lineLimit(1)
                             }
                             .padding(.top, 4)
@@ -387,29 +387,28 @@ extension JournalCalendarView {
                             Divider().background(AppColors.border)
                             
                             ForEach(insights.days) { day in
-                                
-                                    HStack {
-                                        Text(dateLabel(for: day.date))
-                                            .font(AppTypography.caption)
-                                            .foregroundColor(AppColors.brand)
-                                            .lineLimit(1)
-                                        Spacer()
-                                        Text("\(day.trades)")
-                                            .font(AppTypography.caption)
-                                            .monospacedDigit()
-                                            .foregroundColor(AppColors.primaryText)
-                                            .frame(width: 44, alignment: .trailing)
-                                            .lineLimit(1)
-                                        AppMonetaryText(
-                                            Formatters.formatPnL(day.netPnl, currency: env.currentCurrency),
-                                            isPrivate: env.isPrivacyModeEnabled,
-                                            font: AppTypography.captionBold,
-                                            color: day.netPnl >= 0 ? AppColors.profit : AppColors.loss
-                                        )
-                                        .frame(width: 108, alignment: .trailing)
+                                HStack {
+                                    Text(dateLabel(for: day.date))
+                                        .font(AppTypography.caption)
+                                        .foregroundColor(AppColors.brand)
                                         .lineLimit(1)
-                                        .minimumScaleFactor(0.85)
-                                    }
+                                    Spacer()
+                                    Text("\(day.trades)")
+                                        .font(AppTypography.caption)
+                                        .monospacedDigit()
+                                        .foregroundColor(AppColors.primaryText)
+                                        .frame(minWidth: 56, alignment: .trailing)
+                                        .lineLimit(1)
+                                    AppMonetaryText(
+                                        Formatters.formatPnL(day.netPnl, currency: env.currentCurrency),
+                                        isPrivate: env.isPrivacyModeEnabled,
+                                        font: AppTypography.captionBold,
+                                        color: day.netPnl >= 0 ? AppColors.profit : AppColors.loss
+                                    )
+                                    .frame(minWidth: 90, alignment: .trailing)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.85)
+                                }
                                     .padding(.vertical, 3)
                                 .contentShape(Rectangle())
                                 .onTapGesture {

@@ -16,25 +16,38 @@ public struct SessionBreakdownChart: View {
         self.currency = currency
     }
     
+    private var displaySessions: [BucketStats] {
+        sessions.filter { $0.key != TradingSession.offHours.rawValue && $0.key.lowercased() != "off-hours" }
+    }
+    
     private var activeBucket: BucketStats? {
         guard let name = selectedSession else { return nil }
-        return sessions.first { $0.key == name }
+        return displaySessions.first { $0.key == name }
     }
     
     private var totalNetPnl: Decimal {
-        sessions.reduce(Decimal.zero) { $0 + $1.netPnl }
+        displaySessions.reduce(Decimal.zero) { $0 + $1.netPnl }
     }
     
     private var yDomainMin: Double {
-        let vals = sessions.map { ($0.netPnl as NSDecimalNumber).doubleValue }
+        let vals = displaySessions.map { ($0.netPnl as NSDecimalNumber).doubleValue }
         let minVal = vals.min() ?? 0
         return minVal < 0 ? minVal * 1.15 : 0
     }
     
     private var yDomainMax: Double {
-        let vals = sessions.map { ($0.netPnl as NSDecimalNumber).doubleValue }
+        let vals = displaySessions.map { ($0.netPnl as NSDecimalNumber).doubleValue }
         let maxVal = vals.max() ?? 0
         return maxVal > 0 ? maxVal * 1.15 : 100
+    }
+    
+    private func axisLabel(for key: String) -> String {
+        switch key {
+        case "London/NY Overlap", "London / NY Overlap", "London/NY":
+            return "Overlap"
+        default:
+            return key
+        }
     }
     
     public var body: some View {
@@ -67,7 +80,7 @@ public struct SessionBreakdownChart: View {
                 }
                 .frame(height: 38)
                 
-                if sessions.isEmpty {
+                if displaySessions.isEmpty {
                     AppEmptyState(
                         icon: "clock.badge.checkmark",
                         title: "No Session Data",
@@ -81,7 +94,7 @@ public struct SessionBreakdownChart: View {
                             .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
                             .foregroundStyle(AppColors.border.opacity(0.8))
                         
-                        ForEach(sessions) { bucket in
+                        ForEach(displaySessions) { bucket in
                             let rawVal = (bucket.netPnl as NSDecimalNumber).doubleValue
                             let val = rawVal * animProgress
                             
@@ -124,16 +137,19 @@ public struct SessionBreakdownChart: View {
                                         .font(AppTypography.numberMicro)
                                         .monospacedDigit()
                                         .foregroundStyle(AppColors.secondaryText)
-                                        .frame(width: 36, alignment: .trailing)
                                 }
                             }
                         }
                     }
                     .chartXAxis {
-                        AxisMarks { _ in
-                            AxisValueLabel()
-                                .font(AppTypography.captionBold)
-                                .foregroundStyle(AppColors.primaryText)
+                        AxisMarks { value in
+                            AxisValueLabel {
+                                if let key = value.as(String.self) {
+                                    Text(axisLabel(for: key))
+                                        .font(AppTypography.captionBold)
+                                        .foregroundStyle(AppColors.primaryText)
+                                }
+                            }
                         }
                     }
                     .animation(AppAnimations.chartEntrance, value: animProgress)
@@ -158,19 +174,22 @@ public struct SessionBreakdownChart: View {
                     Divider().background(AppColors.border.opacity(0.5))
                     
                     // Detailed breakdown table
-                    VStack(spacing: 6) {
-                        ForEach(sessions) { bucket in
-                            HStack {
-                                Text(bucket.key)
-                                    .font(AppTypography.bodyBold)
-                                    .foregroundColor(AppColors.primaryText)
-                                    .frame(width: 90, alignment: .leading)
+                    VStack(spacing: 8) {
+                        ForEach(displaySessions) { bucket in
+                            HStack(alignment: .center) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(bucket.key)
+                                        .font(AppTypography.captionBold)
+                                        .foregroundColor(AppColors.primaryText)
+                                        .lineLimit(1)
+                                    
+                                    Text("\(bucket.trades) trades")
+                                        .font(AppTypography.captionMicro)
+                                        .foregroundColor(AppColors.secondaryText)
+                                        .lineLimit(1)
+                                }
                                 
-                                Text("\(bucket.trades) trades")
-                                    .font(AppTypography.caption)
-                                    .foregroundColor(AppColors.secondaryText)
-                                
-                                Spacer()
+                                Spacer(minLength: 12)
                                 
                                 if let wr = bucket.winRate {
                                     Text("WR \(Formatters.formatPercent(wr))")
@@ -180,13 +199,14 @@ public struct SessionBreakdownChart: View {
                                         .background(AppColors.border.opacity(0.4))
                                         .clipShape(Capsule())
                                         .foregroundColor(AppColors.secondaryText)
+                                        .lineLimit(1)
                                 }
                                 
                                 Text(Formatters.formatPnL(bucket.netPnl, currency: currency))
                                     .font(AppTypography.statValue)
                                     .monospacedDigit()
                                     .foregroundColor(bucket.netPnl >= 0 ? AppColors.profit : AppColors.loss)
-                                    .frame(minWidth: 70, alignment: .trailing)
+                                    .lineLimit(1)
                             }
                             .padding(.vertical, 2)
                         }
