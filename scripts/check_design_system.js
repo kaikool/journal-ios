@@ -95,7 +95,10 @@ files.forEach(f => {
   const base = path.basename(f);
   if (WHITELIST_PRIMITIVES.includes(base)) return;
   const rel = path.relative(ROOT_DIR, f).replace(/\\/g, '/');
-  const isFeature = rel.includes('/Features/');
+  const isCompositeDS = rel.includes('AttachmentsSectionView.swift') ||
+                        rel.includes('FullScreenChartLightboxView.swift') ||
+                        rel.includes('GlobalSyncBannerView.swift');
+  const isFeature = rel.includes('/Features/') || isCompositeDS;
   const content = fs.readFileSync(f, 'utf8');
   const lines = content.split('\n');
 
@@ -220,6 +223,26 @@ files.forEach(f => {
               line: lineNum,
               code: trimmed + ' -> ' + next,
               fix: 'Do not wrap input fields in an outer card. Inputs provide their own clean container.'
+            });
+            break;
+          }
+        }
+      }
+    }
+
+    // Prohibits custom ad-hoc Menu labels with appCardStyle or background (e.g. ad-hoc dropdowns)
+    if (isFeature && (trimmed.includes('Menu {') || trimmed.includes('Menu('))) {
+      for (let k = 1; k <= 35; k++) {
+        if (idx + k < lines.length) {
+          const next = lines[idx + k].trim();
+          if (next.includes('} label:') && lines.slice(idx + k, idx + k + 12).some(x => x.includes('.appCardStyle'))) {
+            violations.push({
+              std: 'Standard 05: Form Fields & Inputs',
+              rule: 'PROHIBIT_ADHOC_MENU_LABEL',
+              file: rel,
+              line: lineNum,
+              code: trimmed + ' -> custom card label',
+              fix: 'Use AppleMenuChip or AppCompactDropdown instead of custom Menu card labels'
             });
             break;
           }

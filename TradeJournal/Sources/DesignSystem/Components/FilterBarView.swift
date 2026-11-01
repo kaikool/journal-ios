@@ -342,35 +342,14 @@ public struct FilterBarView<Actions: View>: View {
     }
     
     private func filterDialogButton(onFilter: @escaping () -> Void) -> some View {
-        Button {
-            NativeHaptics.lightImpact()
-            onFilter()
-        } label: {
-            HStack(spacing: 4) {
-                Image(systemName: "slider.horizontal.3")
-                    .font(AppTypography.captionBold)
-                Text("Filters")
-                    .font(AppTypography.captionBold)
-                
-                if activeFilterCount > 0 {
-                    Text("\(activeFilterCount)")
-                        .font(AppTypography.badgeMicro)
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 1.5)
-                        .background(AppColors.brand)
-                        .clipShape(Capsule())
-                }
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(activeFilterCount > 0 ? AppColors.brand.opacity(colorScheme == .dark ? 0.2 : 0.12) : AppColors.cardBackground.opacity(colorScheme == .dark ? 0.65 : 0.85))
-            .foregroundColor(activeFilterCount > 0 ? AppColors.brand : AppColors.secondaryText)
-            .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
-            .overlay(filterButtonBorder)
-            .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.2 : 0.04), radius: 4, x: 0, y: 1.5)
-        }
-        .buttonStyle(ApplePressableButtonStyle())
+        AppFilterChip(
+            "Filters",
+            isSelected: activeFilterCount > 0,
+            icon: "slider.horizontal.3",
+            count: activeFilterCount > 0 ? activeFilterCount : nil,
+            height: 32,
+            action: onFilter
+        )
     }
     
     @ViewBuilder

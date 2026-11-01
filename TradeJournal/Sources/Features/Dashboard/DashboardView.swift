@@ -476,8 +476,8 @@ public struct DashboardView: View {
     
     private var dashboardActions: some View {
         HStack(spacing: 10) {
-            // Presets Menu
-            Menu {
+            // Presets Menu Chip
+            AppleMenuChip(title: "Preset", selectionText: activePreset.name, icon: activePreset.icon) {
                 Section("Presets") {
                     ForEach(DashboardPreset.allCases.filter { $0 != .custom }) { preset in
                         Button {
@@ -504,22 +504,6 @@ public struct DashboardView: View {
                         applyPreset(.overview)
                     }
                 }
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: activePreset.icon)
-                        .font(AppTypography.actionButtonCompact)
-                        .foregroundColor(AppColors.brand)
-                    Text(activePreset.name)
-                        .font(AppTypography.actionButtonCompact)
-                        .foregroundColor(AppColors.primaryText)
-                        .lineLimit(1)
-                    Spacer()
-                    Image(systemName: "chevron.up.chevron.down")
-                        .font(AppTypography.badgeStandard)
-                        .foregroundColor(AppColors.secondaryText)
-                }
-                .appCardStyle(cornerRadius: 8)
-                .frame(height: 38)
             }
             
             // Customize button (Sheet)

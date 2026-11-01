@@ -76,33 +76,13 @@ public struct FullScreenChartLightboxView: View {
             // Floating Top Controls
             VStack {
                 HStack {
-                    HStack(spacing: 6) {
-                        Image(systemName: "chart.xyaxis.line")
-                            .font(AppTypography.actionButtonCompact)
-                            .foregroundColor(AppColors.brand)
-                        Text("Chart Vision")
-                            .font(AppTypography.actionButtonCompact)
-                            .foregroundColor(.white)
-                    }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(Color.black.opacity(0.65))
-                    .clipShape(Capsule())
+                    AppBadge("Chart Vision", style: .brand)
                     
                     Spacer()
                     
-                    Button {
+                    ModalCloseButton {
                         dismiss()
-                    } label: {
-                        Image(systemName: "xmark")
-                            .font(AppTypography.actionButtonCompact)
-                            .foregroundColor(.white)
-                            .frame(width: 32, height: 32)
-                            .background(Color.black.opacity(0.65))
-                            .clipShape(Circle())
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Close")
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 16)
@@ -111,13 +91,7 @@ public struct FullScreenChartLightboxView: View {
                 
                 // Subtle zoom hint at bottom
                 if scale == 1.0 {
-                    Text("Pinch or double-tap to zoom")
-                        .font(AppTypography.captionMicro)
-                        .foregroundColor(.white.opacity(0.6))
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 4)
-                        .background(Color.black.opacity(0.5))
-                        .clipShape(Capsule())
+                    AppBadge("Pinch or double-tap to zoom", style: .neutral)
                         .padding(.bottom, 16)
                 }
             }

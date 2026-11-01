@@ -22,24 +22,11 @@ public struct GlobalSyncBannerView: View {
                         .foregroundColor(AppColors.loss)
                         .lineLimit(2)
                     Spacer()
-                    Button {
+                    AppActionPill("Settings", icon: "gearshape") {
                         env.selectedTab = .settings
-                    } label: {
-                        Text("Settings")
-                            .font(AppTypography.badgeStandard)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(AppColors.loss.opacity(0.18))
-                            .foregroundColor(AppColors.loss)
-                            .clipShape(Capsule())
                     }
-                    Button {
+                    ModalDismissButton {
                         withAnimation { isDismissed = true }
-                    } label: {
-                        Image(systemName: "xmark")
-                            .font(AppTypography.captionMicro)
-                            .foregroundColor(AppColors.secondaryText)
-                            .padding(4)
                     }
                 }
                 .padding(.horizontal, 14)
@@ -60,13 +47,8 @@ public struct GlobalSyncBannerView: View {
                         .foregroundColor(AppColors.primaryText)
                         .lineLimit(1)
                     Spacer()
-                    Button {
+                    ModalDismissButton {
                         withAnimation { isDismissed = true }
-                    } label: {
-                        Image(systemName: "xmark")
-                            .font(AppTypography.captionMicro)
-                            .foregroundColor(AppColors.secondaryText)
-                            .padding(4)
                     }
                 }
                 .padding(.horizontal, 14)

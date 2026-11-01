@@ -354,52 +354,16 @@ public struct ShellHeaderView: View {
     // MARK: - Reusable Standardized Buttons
     
     private func primaryActionButton(title: String, icon: String = "plus", action: @escaping () -> Void) -> some View {
-        Button {
-            NativeHaptics.mediumImpact()
-            action()
-        } label: {
-            HStack(spacing: 5) {
-                Image(systemName: icon)
-                    .font(AppTypography.actionButtonCompact)
-                Text(title)
-                    .font(AppTypography.actionButtonCompact)
-            }
-            .foregroundColor(.white)
-            .padding(.horizontal, 12)
-            .frame(height: 32)
-            .background(AppColors.brand)
-            .clipShape(Capsule())
-            .shadow(color: AppColors.brand.opacity(0.3), radius: 3, x: 0, y: 1)
-        }
-        .buttonStyle(ApplePressableButtonStyle())
+        AppActionPill(title, icon: icon, action: action)
     }
     
     private var syncActionButton: some View {
-        Button {
+        AppActionPill(dataStore.isSyncing ? "Syncing" : "Sync", icon: "arrow.triangle.2.circlepath") {
             NativeHaptics.mediumImpact()
             Task {
                 await dataStore.performGlobalSync()
             }
-        } label: {
-            HStack(spacing: 5) {
-                Image(systemName: "arrow.triangle.2.circlepath")
-                    .font(AppTypography.actionButtonCompact)
-                    .rotationEffect(.degrees(dataStore.isSyncing ? 360 : 0))
-                    .animation(dataStore.isSyncing ? Animation.linear(duration: 1).repeatForever(autoreverses: false) : .default, value: dataStore.isSyncing)
-                Text(dataStore.isSyncing ? "Syncing" : "Sync")
-                    .font(AppTypography.actionButtonCompact)
-            }
-            .foregroundColor(AppColors.brand)
-            .padding(.horizontal, 11)
-            .frame(height: 32)
-            .background(AppColors.cardBackground)
-            .clipShape(Capsule())
-            .overlay(
-                Capsule()
-                    .stroke(AppColors.brand.opacity(0.35), lineWidth: 0.8)
-            )
         }
-        .buttonStyle(ApplePressableButtonStyle())
         .disabled(dataStore.isSyncing)
     }
     

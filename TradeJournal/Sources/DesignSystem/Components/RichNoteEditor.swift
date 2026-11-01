@@ -90,29 +90,13 @@ public struct RichNoteEditor: View {
                 Spacer()
                 
                 if allowPreviewToggle {
-                    Button {
+                    AppActionPill(isPreviewMode ? "Edit" : "Preview", icon: isPreviewMode ? "pencil" : "eye") {
                         NativeHaptics.lightImpact()
                         hasUserManuallyToggled = true
                         withAnimation(AppAnimations.springQuick) {
                             isPreviewMode.toggle()
                         }
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: isPreviewMode ? "pencil" : "eye")
-                                .font(AppTypography.actionButtonCompact)
-                            Text(isPreviewMode ? "Edit" : "Preview")
-                                .font(AppTypography.actionButtonCompact)
-                        }
-                        .foregroundColor(isPreviewMode ? AppColors.brand : AppColors.secondaryText)
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 4.5)
-                        .background(isPreviewMode ? AppColors.brand.opacity(0.12) : AppColors.secondaryBackground)
-                        .clipShape(Capsule())
-                        .overlay(
-                            Capsule().stroke(isPreviewMode ? AppColors.brand.opacity(0.3) : AppColors.border.opacity(0.5), lineWidth: 0.6)
-                        )
                     }
-                    .buttonStyle(.plain)
                 }
             }
             .opacity(isPreviewMode ? 0.85 : 1.0)

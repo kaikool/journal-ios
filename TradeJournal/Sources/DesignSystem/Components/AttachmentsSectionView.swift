@@ -44,54 +44,21 @@ public struct AttachmentsSectionView: View {
             }
             
             // Add attachment actions toolbar
-            HStack(spacing: 12) {
+            HStack(spacing: 10) {
                 // 1. Photo library / Chart screenshot picker
-                Button {
+                AppActionPill("Add screenshot", icon: "photo.badge.plus") {
+                    NativeHaptics.lightImpact()
                     showPhotoPicker = true
-                } label: {
-                    HStack(spacing: 5) {
-                        Image(systemName: "photo.badge.plus")
-                            .font(AppTypography.actionButtonCompact)
-                        Text("Add screenshot")
-                            .font(AppTypography.actionButtonCompact)
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(AppColors.cardBackground)
-                    .foregroundColor(AppColors.brand)
-                    .clipShape(Capsule())
-                    .overlay(
-                        Capsule()
-                            .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
-                    )
                 }
-                .buttonStyle(ApplePressableButtonStyle())
                 
                 // 2. Document file / PDF importer
-                Button {
+                AppActionPill("File / PDF", icon: "doc.badge.plus") {
+                    NativeHaptics.lightImpact()
                     showFileImporter = true
-                } label: {
-                    HStack(spacing: 5) {
-                        Image(systemName: "doc.badge.plus")
-                            .font(AppTypography.actionButtonCompact)
-                        Text("File / PDF")
-                            .font(AppTypography.actionButtonCompact)
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(AppColors.cardBackground)
-                    .foregroundColor(AppColors.secondaryText)
-                    .clipShape(Capsule())
-                    .overlay(
-                        Capsule()
-                            .stroke(AppColors.border.opacity(0.6), lineWidth: 0.8)
-                    )
                 }
-                .buttonStyle(ApplePressableButtonStyle())
                 
                 if isProcessing {
-                    ProgressView()
-                        .scaleEffect(0.8)
+                    TradeJournalProLoader(scale: 0.8)
                 }
             }
             
@@ -197,33 +164,35 @@ public struct AttachmentCardView: View {
     
     public var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Button(action: onPreview) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(AppColors.cardBackground)
+            ZStack {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(AppColors.cardBackground)
+                    .frame(height: 110)
+                
+                if isImage, let data = TradeDataStore.shared.attachmentFileData(storagePath: attachment.storagePath),
+                   let uiImage = UIImage(data: data) {
+                    Image(uiImage: uiImage)
+                        .resizable()
+                        .scaledToFill()
                         .frame(height: 110)
-                    
-                    if isImage, let data = TradeDataStore.shared.attachmentFileData(storagePath: attachment.storagePath),
-                       let uiImage = UIImage(data: data) {
-                        Image(uiImage: uiImage)
-                            .resizable()
-                            .scaledToFill()
-                            .frame(height: 110)
-                            .clipped()
-                            .cornerRadius(8)
-                    } else {
-                        VStack(spacing: 6) {
-                            Image(systemName: isImage ? "photo" : "doc.text.fill")
-                                .font(AppTypography.iconLarge)
-                                .foregroundColor(AppColors.accent)
-                            Text(isImage ? "Chart screenshot" : "PDF document")
-                                .font(AppTypography.captionMicro)
-                                .foregroundColor(AppColors.secondaryText)
-                        }
+                        .clipped()
+                        .cornerRadius(8)
+                } else {
+                    VStack(spacing: 6) {
+                        Image(systemName: isImage ? "photo" : "doc.text.fill")
+                            .font(AppTypography.iconLarge)
+                            .foregroundColor(AppColors.accent)
+                        Text(isImage ? "Chart screenshot" : "PDF document")
+                            .font(AppTypography.captionMicro)
+                            .foregroundColor(AppColors.secondaryText)
                     }
                 }
             }
-            .buttonStyle(.plain)
+            .contentShape(RoundedRectangle(cornerRadius: 8))
+            .onTapGesture {
+                NativeHaptics.lightImpact()
+                onPreview()
+            }
             
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
@@ -242,13 +211,7 @@ public struct AttachmentCardView: View {
                 ModalDeleteButton(action: onDelete)
             }
         }
-        .padding(8)
-        .background(AppColors.surface)
-        .cornerRadius(10)
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(AppColors.border, lineWidth: 1)
-        )
+        .appSubCardStyle(cornerRadius: 10, padding: 8)
     }
 }
 
