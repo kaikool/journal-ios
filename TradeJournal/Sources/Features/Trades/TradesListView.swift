@@ -22,10 +22,11 @@ public struct TradesListView: View {
     
     public init() {}
     
-    @State private var cache = TradesListCache()
+    private var cache: TradesListCache { TradesListCache.shared }
     
     @MainActor
     private final class TradesListCache {
+        static let shared = TradesListCache()
         var lastMetricsKey: String = ""
         var lastMetrics: TradeMetrics? = nil
         var lastScopedKey: String = ""
@@ -288,10 +289,18 @@ public struct TradesListView: View {
                 }
             }
         } else {
+            let playbookMap: [String: String] = {
+                var map: [String: String] = [:]
+                for p in dataStore.playbooks {
+                    map[p.id] = p.name
+                }
+                return map
+            }()
             LazyVStack(spacing: 10) {
                 ForEach(filteredTrades) { trade in
                     let isTradeOpen = trade.status == .open || trade.closedAt == nil
-                    TradeTerminalRow(trade: trade)
+                    let pName = trade.playbookId.flatMap { playbookMap[$0] ?? $0 }
+                    TradeTerminalRow(trade: trade, playbookName: pName)
                         .contentShape(Rectangle())
                         .onTapGesture {
                             NativeHaptics.lightImpact()
@@ -319,8 +328,8 @@ public struct TradesListView: View {
 
 private struct TradeTerminalRow: View {
     @EnvironmentObject private var env: AppEnvironment
-    @EnvironmentObject private var dataStore: TradeDataStore
     let trade: Trade
+    let playbookName: String?
     
     private var durationText: String? {
         if let dur = trade.durationMs, dur > 0 {
@@ -352,11 +361,6 @@ private struct TradeTerminalRow: View {
     
     private var rMultiple: Double? {
         TradeAnalysisEngine.tradeR(trade: trade)
-    }
-    
-    private var playbookName: String? {
-        guard let id = trade.playbookId, !id.isEmpty else { return nil }
-        return dataStore.playbooks.first(where: { $0.id == id })?.name ?? id
     }
     
     var body: some View {

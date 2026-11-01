@@ -45,10 +45,11 @@ public struct ReportsView: View {
     
     public init() {}
     
-    @State private var cache = ReportsCache()
+    private var cache: ReportsCache { ReportsCache.shared }
     
     @MainActor
     private final class ReportsCache {
+        static let shared = ReportsCache()
         var lastKey: String = ""
         var lastMetrics: TradeMetrics? = nil
         var lastGroupKey: String = ""

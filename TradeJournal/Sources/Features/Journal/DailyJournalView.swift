@@ -12,12 +12,14 @@ public struct DailyJournalListView: View {
     
     public init() {}
     
-    @State private var cache = DailyJournalCache()
+    private var cache: DailyJournalCache { DailyJournalCache.shared }
     
     @MainActor
     private final class DailyJournalCache {
+        static let shared = DailyJournalCache()
         var lastKey: String = ""
         var lastList: [JournalDaySummary] = []
+        var weekdayCache: [String: String] = [:]
     }
     
     private static let isoFormatter: DateFormatter = {
@@ -96,8 +98,15 @@ public struct DailyJournalListView: View {
         
         return sortedDates.compactMap { dKey -> JournalDaySummary? in
             let dayTrades = dateMap[dKey] ?? []
-            let dateObj = isoFormatter.date(from: dKey) ?? Date()
-            let weekday = weekdayFormatter.string(from: dateObj).capitalized
+            let weekday: String
+            if let cachedW = cache.weekdayCache[dKey] {
+                weekday = cachedW
+            } else {
+                let dateObj = isoFormatter.date(from: dKey) ?? Date()
+                let computed = weekdayFormatter.string(from: dateObj).capitalized
+                cache.weekdayCache[dKey] = computed
+                weekday = computed
+            }
             
             let closed = dayTrades.filter { $0.status != .open }
             let net = closed.reduce(Decimal.zero) { $0 + $1.netPnl }

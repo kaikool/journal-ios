@@ -26,29 +26,30 @@ extension DashboardView {
                     }
                 }
                 
-                let isoFormatter: DateFormatter = {
-                    let f = DateFormatter()
-                    f.dateFormat = "yyyy-MM-dd"
-                    f.timeZone = env.currentTimeZone
-                    return f
+                let currentTz = env.currentTimeZone
+                let cal: Calendar = {
+                    var c = Calendar(identifier: .gregorian)
+                    c.timeZone = currentTz
+                    return c
                 }()
+                let weeks = calendarWeeks
                 
                 // Calendar Weeks with Week Total Column
                 VStack(spacing: 4) {
-                    ForEach(0..<calendarWeeks.count, id: \.self) { wIndex in
-                        let week = calendarWeeks[wIndex]
+                    ForEach(0..<weeks.count, id: \.self) { wIndex in
+                        let week = weeks[wIndex]
                         let weekDays = week.compactMap { $0 }
                         let weekPnl = weekDays.compactMap { d -> Decimal? in
-                            let key = isoFormatter.string(from: d)
+                            let key = Formatters.isoDayString(from: d, timeZone: currentTz)
                             return snap.daysWithTradesMap[key]?.netPnl
                         }.reduce(Decimal.zero, +)
                         
                         HStack(spacing: 4) {
                             ForEach(0..<7, id: \.self) { dayIdx in
                                 if let date = week[dayIdx] {
-                                    let key = isoFormatter.string(from: date)
+                                    let key = Formatters.isoDayString(from: date, timeZone: currentTz)
                                     let stats = snap.daysWithTradesMap[key]
-                                    let dayNum = Calendar.current.component(.day, from: date)
+                                    let dayNum = cal.component(.day, from: date)
                                     
                                     VStack(spacing: 1) {
                                         Text("\(dayNum)")

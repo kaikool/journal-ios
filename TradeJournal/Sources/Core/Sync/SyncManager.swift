@@ -259,7 +259,6 @@ public final class SyncManager: ObservableObject {
                     Task { @MainActor in
                         guard let self = self, !self.isCancelledByUser else { return }
                         self.currentProgress = "\(update.providerName): \(update.message)"
-                        TradeDataStore.shared.lastSyncSummary = self.currentProgress
                     }
                 }
                 results.append(res)
@@ -308,7 +307,6 @@ public final class SyncManager: ObservableObject {
                     Task { @MainActor in
                         guard let self = self, !self.isCancelledByUser else { return }
                         self.currentProgress = update.message
-                        TradeDataStore.shared.lastSyncSummary = self.currentProgress
                     }
                 }
                 results.append(cloudRes)

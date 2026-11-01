@@ -48,12 +48,16 @@ public struct DailyJournalDetailView: View {
         return f
     }()
 
+    internal static let navTitleFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "EEE, MMM d, yyyy"
+        f.locale = Locale(identifier: "en_US")
+        return f
+    }()
+
     private var formattedNavTitle: String {
         if let d = Self.detailIsoFormatter.date(from: date) {
-            let f = DateFormatter()
-            f.dateFormat = "EEE, MMM d, yyyy"
-            f.locale = Locale(identifier: "en_US")
-            return f.string(from: d)
+            return Self.navTitleFormatter.string(from: d)
         }
         return "Journal · \(date)"
     }

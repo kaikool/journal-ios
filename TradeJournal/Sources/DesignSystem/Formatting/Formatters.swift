@@ -389,12 +389,16 @@ public enum Formatters {
         dateOnly(date, timeZone: timeZone)
     }
     
-    public static func formatMonthYear(_ date: Date, timeZone: TimeZone = .current) -> String {
+    private static let monthYearFormatter: DateFormatter = {
         let f = DateFormatter()
         f.locale = Locale(identifier: "en_US")
         f.dateFormat = "MMMM yyyy"
-        f.timeZone = timeZone
-        return f.string(from: date)
+        return f
+    }()
+
+    public static func formatMonthYear(_ date: Date, timeZone: TimeZone = .current) -> String {
+        monthYearFormatter.timeZone = timeZone
+        return monthYearFormatter.string(from: date)
     }
     
     /// Formats Date into standard YYYY-MM-DD day key

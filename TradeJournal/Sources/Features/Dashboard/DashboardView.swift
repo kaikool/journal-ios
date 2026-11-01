@@ -117,16 +117,19 @@ public struct DashboardView: View {
         let currentMonthStats: (tradingDays: Int, winningDays: Int, monthPnl: Decimal)
     }
     
-    @State private var cache = DashboardCache()
+    private var cache: DashboardCache { DashboardCache.shared }
     
     @MainActor
     private final class DashboardCache {
+        static let shared = DashboardCache()
         var lastKey: String = ""
         var lastSnapshot: DashboardSnapshot? = nil
         var lastScopedKey: String = ""
         var lastScopedTrades: [Trade] = []
         var lastCurrencyGroupsKey: String = ""
         var lastCurrencyGroups: [(currency: String, metrics: TradeMetrics, balance: Decimal)] = []
+        var lastCalendarWeeksKey: String = ""
+        var lastCalendarWeeks: [[Date?]] = []
     }
     
     private static let monthPrefixFormatter: DateFormatter = {
@@ -267,6 +270,10 @@ public struct DashboardView: View {
     // MARK: - Calendar Widget Helpers
     
     var calendarWeeks: [[Date?]] {
+        let key = "\(env.currentTimeZone.identifier)_\(Self.monthPrefixFormatter.string(from: Date()))"
+        if cache.lastCalendarWeeksKey == key && !cache.lastCalendarWeeks.isEmpty {
+            return cache.lastCalendarWeeks
+        }
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = env.currentTimeZone
         let now = Date()
@@ -299,6 +306,8 @@ public struct DashboardView: View {
             }
             weeks.append(currentWeek)
         }
+        cache.lastCalendarWeeksKey = key
+        cache.lastCalendarWeeks = weeks
         return weeks
     }
     
