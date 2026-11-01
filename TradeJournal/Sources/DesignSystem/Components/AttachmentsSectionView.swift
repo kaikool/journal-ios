@@ -58,7 +58,7 @@ public struct AttachmentsSectionView: View {
                 }
                 
                 if isProcessing {
-                    TradeJournalProLoader(scale: 0.8)
+                    TradeJournalProLoader(size: 20)
                 }
             }
             
