@@ -197,9 +197,9 @@ public struct AppleMenuChip<Content: View>: View {
             .padding(.horizontal, 10)
             .frame(height: 34)
             .background(AppColors.secondaryBackground.opacity(0.8))
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .clipShape(Capsule())
             .overlay(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                Capsule()
                     .stroke(AppColors.border.opacity(0.6), lineWidth: 0.5)
             )
         }

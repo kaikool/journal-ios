@@ -56,17 +56,22 @@ public struct TradeAICoachChartCard: View {
                     
                     Spacer()
                     
-                    // Timeframe Picker: M5 | M15 | H1 | H4
-                    HStack(spacing: 4) {
-                        ForEach(resolutions, id: \.0) { tf in
-                            let isSelected = selectedResolution == tf.0
-                            AppFilterChip(tf.1, isSelected: isSelected, height: 26) {
-                                guard selectedResolution != tf.0 else { return }
-                                selectedResolution = tf.0
-                                onResolutionChanged(tf.0)
+                    // Timeframe Picker Tabs (M5, M15, H1, H4) matching Market Structure Bias standard
+                    AppSegmentedBar(
+                        selection: Binding(
+                            get: { selectedResolution },
+                            set: { newRes in
+                                guard selectedResolution != newRes else { return }
+                                selectedResolution = newRes
+                                onResolutionChanged(newRes)
                             }
-                        }
-                    }
+                        ),
+                        items: resolutions.map { $0.0 },
+                        titleFor: { id in
+                            resolutions.first(where: { $0.0 == id })?.1 ?? id.uppercased()
+                        },
+                        height: 28
+                    )
                 }
                 
                 // Chart Snapshot Preview (Tap to enlarge in Lightbox)

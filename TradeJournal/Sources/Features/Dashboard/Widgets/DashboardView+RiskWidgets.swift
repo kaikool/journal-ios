@@ -91,7 +91,7 @@ extension DashboardView {
                 )
                 
                 HStack(spacing: 3) {
-                    Text(metrics.maxDrawdownPct.map { "-\(Formatters.formatPercent($0 * 100))" } ?? "set balance for %")
+                    Text(metrics.maxDrawdownPct.map { "-\(Formatters.formatPercent($0))" } ?? "set balance for %")
                         .font(AppTypography.caption)
                         .foregroundColor(AppColors.secondaryText)
                     

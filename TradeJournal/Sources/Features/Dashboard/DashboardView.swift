@@ -591,7 +591,7 @@ public struct DashboardView: View {
                         .foregroundColor(AppColors.secondaryText)
                         .tracking(0.5)
                     
-                    Text("\(totalClosed) closed trades · \(combinedWinRate.map { Formatters.formatPercent($0 * 100) } ?? "–") trade win rate")
+                    Text("\(totalClosed) closed trades · \(combinedWinRate.map { Formatters.formatPercent($0) } ?? "–") trade win rate")
                         .font(AppTypography.body)
                         .foregroundColor(AppColors.secondaryText)
                 }
@@ -614,7 +614,7 @@ public struct DashboardView: View {
                                 color: group.metrics.netPnl >= 0 ? AppColors.profit : AppColors.loss
                             )
                             
-                            Text("\(group.metrics.closedTrades) closed · \(group.metrics.winRate.map { Formatters.formatPercent($0 * 100) } ?? "–") win")
+                            Text("\(group.metrics.closedTrades) closed · \(group.metrics.winRate.map { Formatters.formatPercent($0) } ?? "–") win")
                                 .font(AppTypography.caption)
                                 .foregroundColor(AppColors.secondaryText)
                             

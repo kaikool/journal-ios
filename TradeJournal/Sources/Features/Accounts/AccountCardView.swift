@@ -59,18 +59,17 @@ public struct AccountCardView: View {
                             .foregroundColor(AppColors.secondaryText)
                             .lineLimit(1)
                     }
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        guard !isSelected else { return }
+                        NativeHaptics.selection()
+                        dataStore.selectAccount(id: account.id)
+                    }
                     
                     Spacer()
                     
-                    // Primary active view button
-                    if !isSelected {
-                        AppActionPill("Select", icon: "checkmark") {
-                            NativeHaptics.lightImpact()
-                            dataStore.selectAccount(id: account.id)
-                        }
-                        .fixedSize()
-                    } else {
-                        AppBadge("Viewing", variant: .profit)
+                    if isSelected {
+                        AppBadge("Active", variant: .profit)
                             .fixedSize()
                     }
                 }

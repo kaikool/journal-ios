@@ -56,7 +56,7 @@ extension JournalCalendarView {
                     
                     metricCard(
                         title: "Trade win rate",
-                        value: Formatters.formatPercent((insights.winRate ?? 0) * 100),
+                        value: Formatters.formatPercent(insights.winRate ?? 0),
                         detail: "\(insights.wins) wins · \(insights.losses) losses · \(insights.breakevens) break-even",
                         valueColor: AppColors.primaryText
                     )

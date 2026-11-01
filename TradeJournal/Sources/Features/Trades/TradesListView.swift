@@ -151,7 +151,7 @@ public struct TradesListView: View {
         let isProfit = overviewMetrics.netPnl >= 0
         let pnlColor = isProfit ? AppColors.profit : AppColors.loss
         let pfStr = overviewMetrics.profitFactorIsInfinite ? "∞" : (overviewMetrics.profitFactor.map { Formatters.formatDecimal(Decimal($0), maxDecimals: 2) } ?? "–")
-        let winRateStr = overviewMetrics.winRate.map { Formatters.formatPercent($0 * 100) } ?? "–"
+        let winRateStr = overviewMetrics.winRate.map { Formatters.formatPercent($0) } ?? "–"
         let avgWlStr = overviewMetrics.avgWinLossRatio.map { Formatters.formatDecimal(Decimal($0), maxDecimals: 2) } ?? "–"
         
         LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {

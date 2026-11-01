@@ -40,7 +40,7 @@ extension PropFirmLedgerView {
                 VStack(spacing: 12) {
                     AppSectionHeader(
                         "Net prop cash",
-                        trailingBadge: summary.roi.map { "ROI \(Formatters.formatPercent($0 * 100))" },
+                        trailingBadge: summary.roi.map { "ROI \(Formatters.formatPercent($0))" },
                         trailingBadgeColor: (summary.roi ?? 0) >= 0 ? AppColors.profit : AppColors.loss
                     )
                     
@@ -95,7 +95,7 @@ extension PropFirmLedgerView {
                             Text("Phase pass rate")
                                 .font(AppTypography.caption)
                                 .foregroundColor(AppColors.secondaryText)
-                            Text(Formatters.formatPercent(pr * 100))
+                            Text(Formatters.formatPercent(pr))
                                 .font(AppTypography.headline)
                                 .monospacedDigit()
                                 .foregroundColor(pr >= 0.5 ? AppColors.profit : AppColors.brand)

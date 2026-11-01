@@ -33,7 +33,7 @@ public struct TradeAICoachActionBar: View {
         HStack(spacing: 8) {
             // Append to Trade Notes
             AppSecondaryButton(
-                isSavedToNotes ? "Appended" : "Append to Notes",
+                isSavedToNotes ? "Appended" : "Append",
                 icon: isSavedToNotes ? "checkmark" : "note.text.badge.plus",
                 isEnabled: !isSavedToNotes,
                 fullWidth: true,

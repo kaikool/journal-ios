@@ -141,6 +141,8 @@ public struct AppPrimaryButton: View {
                 }
                 Text(title)
                     .font(height <= 32 ? AppTypography.actionButtonCompact : AppTypography.actionButton)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
             }
             .foregroundColor(isEnabled ? .white : AppColors.secondaryText.opacity(0.6))
             .padding(.horizontal, 14)
@@ -191,6 +193,8 @@ public struct AppSecondaryButton: View {
                 }
                 Text(title)
                     .font(height <= 32 ? AppTypography.actionButtonCompact : AppTypography.actionButton)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
             }
             .foregroundColor(isEnabled ? AppColors.primaryText : AppColors.secondaryText.opacity(0.6))
             .padding(.horizontal, 14)
@@ -240,6 +244,8 @@ public struct AppDestructiveButton: View {
                 }
                 Text(title)
                     .font(height <= 32 ? AppTypography.actionButtonCompact : AppTypography.actionButton)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
             }
             .foregroundColor(AppColors.loss)
             .padding(.horizontal, 14)
@@ -341,9 +347,9 @@ public struct AppActionPill: View {
             .frame(height: 34)
             .background(isPrimary ? AppColors.brand : AppColors.cardBackground.opacity(0.85))
             .foregroundColor(isPrimary ? AppColors.brandTextOnDark : AppColors.primaryText)
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .clipShape(Capsule())
             .overlay(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                Capsule()
                     .stroke(
                         LinearGradient(
                             colors: [
@@ -391,9 +397,9 @@ public struct AppBackButton: View {
             .padding(.vertical, 7)
             .frame(minWidth: 36, minHeight: 32)
             .background(AppColors.cardBackground.opacity(0.95))
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .clipShape(Capsule())
             .overlay(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                Capsule()
                     .stroke(
                         LinearGradient(
                             colors: [
@@ -451,9 +457,9 @@ public struct AppActionPillLink<Destination: View>: View {
             .frame(height: 34)
             .background(isPrimary ? AppColors.brand : AppColors.cardBackground.opacity(0.85))
             .foregroundColor(isPrimary ? AppColors.brandTextOnDark : AppColors.primaryText)
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .clipShape(Capsule())
             .overlay(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                Capsule()
                     .stroke(
                         LinearGradient(
                             colors: [
@@ -511,9 +517,9 @@ public struct AppActionMenu<MenuContent: View>: View {
             .frame(height: 34)
             .background(isPrimary ? AppColors.brand : AppColors.cardBackground.opacity(0.85))
             .foregroundColor(isPrimary ? AppColors.brandTextOnDark : AppColors.primaryText)
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .clipShape(Capsule())
             .overlay(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                Capsule()
                     .stroke(
                         LinearGradient(
                             colors: [
@@ -530,5 +536,38 @@ public struct AppActionMenu<MenuContent: View>: View {
         }
         .buttonStyle(ApplePressableButtonStyle())
         .fixedSize()
+    }
+}
+
+/// Standardized Apple HIG Hyperlink Action Button (e.g. "Full calendar >", "View all >")
+public struct AppLinkButton: View {
+    private let title: String
+    private let icon: String?
+    private let action: () -> Void
+    
+    public init(_ title: String, icon: String? = "chevron.right", action: @escaping () -> Void) {
+        self.title = title
+        self.icon = icon
+        self.action = action
+    }
+    
+    public var body: some View {
+        Button {
+            NativeHaptics.lightImpact()
+            action()
+        } label: {
+            HStack(spacing: 3) {
+                Text(title)
+                    .font(AppTypography.captionBold)
+                    .lineLimit(1)
+                if let icon = icon {
+                    Image(systemName: icon)
+                        .font(AppTypography.badgeMicro)
+                }
+            }
+            .foregroundColor(AppColors.brand)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(ApplePressableButtonStyle())
     }
 }

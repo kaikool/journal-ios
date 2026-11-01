@@ -240,35 +240,27 @@ public struct CandleChartView: View {
             
             // 4. Zoom Indicator (if user pinched)
             if abs(zoomScale - 1.0) > 0.05 {
-                Text(String(format: "%.1fx", zoomScale))
-                    .font(AppTypography.badgeMicro)
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 1.5)
-                    .background(AppColors.brand.opacity(0.15))
-                    .foregroundColor(AppColors.brand)
-                    .clipShape(Capsule())
+                AppBadge(String(format: "%.1fx", zoomScale), style: .brand)
             }
             
-            // Timeframe Resolution Selector Pills: 15m, 1h, 4h (No "TF:" label, sleek and minimal)
-            HStack(spacing: 5) {
-                ForEach([MarketResolution.m15, .h1, .h4], id: \.self) { res in
-                    let isSelected = res == resolution
-                    let label = res == .m15 ? "15m" : (res == .h1 ? "1h" : "4h")
-                    Button {
-                        NativeHaptics.selection()
-                        onResolutionChange?(res)
-                    } label: {
-                        Text(label)
-                            .font(isSelected ? AppTypography.badgeStandard : AppTypography.captionMicro)
-                            .foregroundColor(isSelected ? .white : AppColors.secondaryText)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(isSelected ? AppColors.brand : AppColors.secondaryBackground)
-                            .clipShape(Capsule())
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(onResolutionChange == nil)
-                }
+            // Timeframe Resolution Selector Tabs: 15m, 1h, 4h
+            if onResolutionChange != nil {
+                AppSegmentedBar(
+                    selection: Binding(
+                        get: { resolution },
+                        set: { onResolutionChange?($0) }
+                    ),
+                    items: [MarketResolution.m15, .h1, .h4],
+                    titleFor: { res in
+                        switch res {
+                        case .m15: return "15m"
+                        case .h1: return "1h"
+                        case .h4: return "4h"
+                        default: return res.rawValue.uppercased()
+                        }
+                    },
+                    height: 28
+                )
             }
         }
         .padding(.horizontal, 8)

@@ -36,35 +36,31 @@ public struct TradeDetailRiskCard: View {
                     onAction: onEditTargets
                 )
                 
-                // 2x2 Grid of Risk Metrics
-                LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
-                    AppMetricTile(
-                        "Stop Loss",
+                // 2x2 Grid of Clean Text Risk Metrics
+                LazyVGrid(columns: [GridItem(.flexible(), spacing: 14), GridItem(.flexible(), spacing: 14)], spacing: 12) {
+                    textMetric(
+                        title: "Stop Loss",
                         value: trade.stopLoss.map { Formatters.price($0, symbol: trade.symbol) } ?? "Not set",
-                        color: trade.stopLoss != nil ? AppColors.primaryText : AppColors.secondaryText,
-                        alignment: .leading
+                        color: trade.stopLoss != nil ? AppColors.primaryText : AppColors.secondaryText
                     )
                     
-                    AppMetricTile(
-                        "Profit Target",
+                    textMetric(
+                        title: "Profit Target",
                         value: trade.profitTarget.map { Formatters.price($0, symbol: trade.symbol) } ?? "Not set",
-                        color: trade.profitTarget != nil ? AppColors.primaryText : AppColors.secondaryText,
-                        alignment: .leading
+                        color: trade.profitTarget != nil ? AppColors.primaryText : AppColors.secondaryText
                     )
                     
-                    AppMetricTile(
-                        "Risk at Stake (1R)",
+                    textMetric(
+                        title: "Risk at Stake (1R)",
                         value: riskAmount.map { Formatters.formatCurrency($0, currency: reportingCurrency) } ?? "–",
-                        color: riskAmount != nil ? AppColors.loss : AppColors.secondaryText,
-                        alignment: .leading
+                        color: riskAmount != nil ? AppColors.loss : AppColors.secondaryText
                     )
                     
-                    AppMetricTile(
-                        "Realized Return",
+                    textMetric(
+                        title: "Realized Return",
                         value: realizedR.map { Formatters.formatRMultiple(($0 as NSDecimalNumber).doubleValue) } ??
                                (plannedR.map { "Planned \(Formatters.formatRMultiple(($0 as NSDecimalNumber).doubleValue))" } ?? "–"),
-                        color: (realizedR ?? 0) >= 0 ? AppColors.profit : AppColors.loss,
-                        alignment: .leading
+                        color: (realizedR ?? 0) >= 0 ? AppColors.profit : AppColors.loss
                     )
                 }
                 
@@ -99,5 +95,31 @@ public struct TradeDetailRiskCard: View {
                 }
             }
         }
+    }
+    
+    private func textMetric(
+        title: String,
+        value: String,
+        subtitle: String? = nil,
+        color: Color = AppColors.primaryText
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title)
+                .font(AppTypography.caption)
+                .foregroundColor(AppColors.secondaryText)
+                .lineLimit(1)
+            Text(value)
+                .font(AppTypography.statValue)
+                .foregroundColor(color)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+            if let s = subtitle {
+                Text(s)
+                    .font(AppTypography.captionMicro)
+                    .foregroundColor(AppColors.secondaryText.opacity(0.8))
+                    .lineLimit(1)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

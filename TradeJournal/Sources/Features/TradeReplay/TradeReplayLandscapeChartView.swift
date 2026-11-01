@@ -177,21 +177,19 @@ public struct TradeReplayLandscapeChartView: View {
                 .lineLimit(1)
                 .fixedSize()
             
-            ForEach(TradeReplayView.replayResolutions) { res in
-                let isSelected = res == selectedResolution
-                let title: String = {
+            AppSegmentedBar(
+                selection: $selectedResolution,
+                items: TradeReplayView.replayResolutions,
+                titleFor: { res in
                     switch res {
                     case .m15: return "15m"
                     case .h1: return "1h"
                     case .h4: return "4h"
                     default: return res.rawValue.uppercased()
                     }
-                }()
-                AppFilterChip(title, isSelected: isSelected, height: 28) {
-                    guard selectedResolution != res else { return }
-                    selectedResolution = res
-                }
-            }
+                },
+                height: 28
+            )
             
             Spacer()
             

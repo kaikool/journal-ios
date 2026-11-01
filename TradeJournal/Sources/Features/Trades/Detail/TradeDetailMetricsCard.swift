@@ -28,65 +28,83 @@ public struct TradeDetailMetricsCard: View {
                 // Header
                 AppSectionHeader("Execution & financials", icon: "dollarsign.circle")
                 
-                // 2x3 Grid of Metrics
-                LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
-                    AppMetricTile(
-                        "Gross P&L",
+                // 2x3 Grid of Clean Text Metrics
+                LazyVGrid(columns: [GridItem(.flexible(), spacing: 14), GridItem(.flexible(), spacing: 14)], spacing: 12) {
+                    textMetric(
+                        title: "Gross P&L",
                         value: Formatters.formatPnL(trade.grossPnl, currency: reportingCurrency),
-                        color: Formatters.pnlColor(trade.grossPnl),
-                        alignment: .leading
+                        color: Formatters.pnlColor(trade.grossPnl)
                     )
                     
-                    AppMetricTile(
-                        "Fees & Commissions",
+                    textMetric(
+                        title: "Fees & Commissions",
                         value: Formatters.formatCurrency(trade.fees, currency: reportingCurrency),
-                        color: trade.fees > 0 ? AppColors.warning : AppColors.primaryText,
-                        alignment: .leading
+                        color: trade.fees > 0 ? AppColors.warning : AppColors.primaryText
                     )
                     
-                    AppMetricTile(
-                        "Net Realized P&L",
+                    textMetric(
+                        title: "Net Realized P&L",
                         value: Formatters.formatPnL(trade.netPnl, currency: reportingCurrency),
-                        color: Formatters.pnlColor(trade.netPnl),
-                        alignment: .leading
+                        color: Formatters.pnlColor(trade.netPnl)
                     )
                     
                     if trade.swapAmount != 0 {
-                        AppMetricTile(
-                            "Overnight Swap",
+                        textMetric(
+                            title: "Overnight Swap",
                             value: Formatters.formatPnL(trade.swapAmount, currency: reportingCurrency),
-                            color: trade.swapAmount < 0 ? AppColors.warning : AppColors.profit,
-                            alignment: .leading
+                            color: trade.swapAmount < 0 ? AppColors.warning : AppColors.profit
                         )
                     } else if let ticket = ticketDisplay {
-                        AppMetricTile(
-                            "Order Ticket",
-                            value: "#\(ticket)",
-                            alignment: .leading
+                        textMetric(
+                            title: "Order Ticket",
+                            value: "#\(ticket)"
                         )
                     } else {
-                        AppMetricTile(
-                            "Duration",
-                            value: durationString ?? "–",
-                            alignment: .leading
+                        textMetric(
+                            title: "Duration",
+                            value: durationString ?? "–"
                         )
                     }
                     
-                    AppMetricTile(
-                        "Avg Entry Price",
+                    textMetric(
+                        title: "Avg Entry Price",
                         value: Formatters.price(trade.avgEntry, symbol: trade.symbol),
-                        subtitle: Formatters.formatDateTime(trade.openedAt, timeZone: timeZone),
-                        alignment: .leading
+                        subtitle: Formatters.formatDateTime(trade.openedAt, timeZone: timeZone)
                     )
                     
-                    AppMetricTile(
-                        "Avg Exit Price",
+                    textMetric(
+                        title: "Avg Exit Price",
                         value: trade.avgExit.map { Formatters.price($0, symbol: trade.symbol) } ?? "Open",
-                        subtitle: trade.closedAt.map { Formatters.formatDateTime($0, timeZone: timeZone) },
-                        alignment: .leading
+                        subtitle: trade.closedAt.map { Formatters.formatDateTime($0, timeZone: timeZone) }
                     )
                 }
             }
         }
+    }
+    
+    private func textMetric(
+        title: String,
+        value: String,
+        subtitle: String? = nil,
+        color: Color = AppColors.primaryText
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title)
+                .font(AppTypography.caption)
+                .foregroundColor(AppColors.secondaryText)
+                .lineLimit(1)
+            Text(value)
+                .font(AppTypography.statValue)
+                .foregroundColor(color)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+            if let s = subtitle {
+                Text(s)
+                    .font(AppTypography.captionMicro)
+                    .foregroundColor(AppColors.secondaryText.opacity(0.8))
+                    .lineLimit(1)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

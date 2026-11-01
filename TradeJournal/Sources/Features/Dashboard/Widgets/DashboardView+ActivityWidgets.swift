@@ -10,8 +10,7 @@ extension DashboardView {
                         .font(AppTypography.headline)
                         .foregroundColor(AppColors.primaryText)
                     Spacer()
-                    AppActionPill("Full calendar", icon: "calendar") {
-                        NativeHaptics.lightImpact()
+                    AppLinkButton("Full calendar") {
                         env.selectedTab = .calendar
                     }
                 }
