@@ -159,7 +159,7 @@ public struct TraderProfileConfig: Codable, Equatable, Sendable {
         maxDailyLossPercent: Double = 3.0,
         targetRiskRewardRatio: Double = 2.0,
         knownPsychologicalLeaks: String = "Moving Stop Loss, Premature Profit Taking, FOMO re-entry after taking a loss",
-        customMemoryNotes: "Focus on risk-to-reward ratio >= 2:1. Protect capital during consolidation. Never revenge trade."
+        customMemoryNotes: String = "Focus on risk-to-reward ratio >= 2:1. Protect capital during consolidation. Never revenge trade."
     ) {
         self.tradingStyle = tradingStyle
         self.accountObjective = accountObjective
