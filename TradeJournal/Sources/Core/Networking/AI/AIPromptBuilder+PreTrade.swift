@@ -796,8 +796,8 @@ extension AIPromptBuilder {
             (Phân tích xu hướng chủ đạo D1, mốc Swing High/Low then chốt và giới hạn biên độ).
 
             ### 2. Cấu trúc H4 & Vùng Cung Cầu
-            - Vùng giá cần quan tâm: [Ghi rõ mốc giá cụ thể của Order Block / FVG xác suất cao]
-            - Vùng tiềm ẩn bẫy: [Ghi rõ mốc giá thanh khoản dễ bị quét râu hoặc bẫy dụ phe nhỏ lẻ]
+            - Vùng giá nên quan sát: [Chỉ rõ các mốc giá cụ thể của Order Block / FVG xác suất cao, kèm điều kiện nến chờ phản ứng]
+            - Vùng tiềm ẩn bẫy: [Chỉ rõ mốc giá thanh khoản có nguy cơ quét râu hoặc bẫy dụ phe nhỏ lẻ, ví dụ quét BSL/SSL]
 
             ### 3. Tín hiệu vào lệnh H1/M15
             (Đánh giá hành động giá nến H1/M15, tín hiệu quét râu SFP, và điều kiện nến đóng cửa xác nhận dứt khoát).
@@ -805,11 +805,12 @@ extension AIPromptBuilder {
             ### 4. Kế hoạch giao dịch & Quản trị rủi ro
             - KẾT LUẬN: [BUY / SELL / FLAT]
             - Kế hoạch cụ thể:
-              + Điểm vào tối ưu (Entry): [Mức giá cụ thể neo tại Vùng cần quan tâm]
+              + Điểm vào tối ưu (Entry): [Mức giá cụ thể neo tại Vùng nên quan sát]
               + Dừng lỗ bảo vệ cấu trúc (Stop Loss): [Mức SL an toàn nhất]
               + Chốt lời (Take Profit): TP 1 tại [Mức giá] | TP 2 tại [Mức giá nếu có]
               + Khối lượng khuyến nghị (Volume): [Số lot chính xác tính theo ngân sách rủi ro \(riskDollars)]
               + Tỷ lệ R:R thực tế: [Ví dụ 1:2.4]
+            - Mức độ đồng thuận & Cảnh báo bất đồng: [Chỉ rõ các góc nhìn đồng thuận ở đâu, có góc nhìn nào cảnh báo rủi ro khác biệt không].
             - Lưu ý thực thi & Xử lý bẫy: [Khuyến nghị kỷ luật thực chiến và giải pháp né bẫy thanh khoản].
 
             BẮT BUỘC KẾT THÚC BẰNG BẢNG THÔNG SỐ VÀ KHỐI JSON:

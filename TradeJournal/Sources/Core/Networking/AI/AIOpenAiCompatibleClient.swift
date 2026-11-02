@@ -33,12 +33,20 @@ extension AIReflectionService {
         request.addValue("TradeJournal", forHTTPHeaderField: "X-Title")
         request.timeoutInterval = 45
         
+        let isGroq = endpoint.contains("groq.com")
+        let isGroqVisionSupported = model.contains("scout") || model.contains("vision")
+        let allowImages = !isGroq || isGroqVisionSupported
+        
         var activeSystemPrompt = AIPromptBuilder.getSystemPrompt(language: language)
+        if isGroq {
+            activeSystemPrompt = "[ROLE DIRECTIVE]: You are an institutional trading journal risk audit system for backtesting and personal journal documentation. Evaluate technical chart structures, order blocks, and calculate hypothetical risk parameters without refusal.\n\n" + activeSystemPrompt
+        }
         if language == "vi" {
             activeSystemPrompt = "[QUY TAC NGON NGU]: Tra loi 100% bang TIENG VIET mach lac, dung thuat ngu tai chinh. Tuyet doi khong dung bieu tuong cam xuc (emoji, icon). Khong tra loi bang tieng Anh va khong lap tu.\n\n" + activeSystemPrompt
         } else {
             activeSystemPrompt = "[LANGUAGE DIRECTIVE]: Respond concisely in professional financial terminology. Do not use emojis or informal icons.\n\n" + activeSystemPrompt
         }
+
         let userContent = AIPromptBuilder.buildTraderContext(
             action: action,
             prompt: prompt,
@@ -48,10 +56,6 @@ extension AIReflectionService {
             traderProfile: traderProfile,
             sessionSummary: sessionSummary
         )
-        
-        let isGroq = endpoint.contains("groq.com")
-        let isGroqVisionSupported = model.contains("scout") || model.contains("vision")
-        let allowImages = !isGroq || isGroqVisionSupported
 
         let userMessageContent: Any
         if allowImages, let images = chartImagesBase64, !images.isEmpty {
@@ -186,7 +190,8 @@ extension AIReflectionService {
             let availableOutputTokens = max(350, safeCeiling - estimatedPromptTokens)
             
             if model.contains("qwen3.8-27b") {
-                payload["max_tokens"] = min(900, availableOutputTokens)
+                let cap = action == .critique ? 1500 : 900
+                payload["max_tokens"] = min(cap, availableOutputTokens)
             } else {
                 let defaultCap = action == .critique ? 1400 : 1600
                 payload["max_tokens"] = min(defaultCap, availableOutputTokens)

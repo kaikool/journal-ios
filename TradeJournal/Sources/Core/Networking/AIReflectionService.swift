@@ -738,12 +738,12 @@ public actor AIReflectionService {
                     isVi: isVi
                 )
                 
-                // VÒNG 2: Chief Risk Officer Synthesizer (Groq 120B with fallback to Gemini)
+                // VÒNG 2: Chief Risk Officer Synthesizer (Qwen-27B on Groq, fallback to GPT-120B then Gemini)
                 do {
                     return try await callOpenAiCompatible(
                         endpoint: Self.groqEndpoint,
                         apiKey: effectiveGroqKey,
-                        model: "openai/gpt-oss-120b",
+                        model: "qwen/qwen3.8-27b",
                         action: .critique,
                         prompt: synthesisPrompt,
                         metrics: metrics,
@@ -756,31 +756,51 @@ public actor AIReflectionService {
                         conversationHistory: nil
                     )
                 } catch {
-                    AppLogger.warning("Groq ensemble synthesis failed: \(error.localizedDescription). Falling back to Gemini synthesis...")
-                    if !geminiKey.isEmpty {
-                        do {
-                            return try await callOpenAiCompatible(
-                                endpoint: Self.geminiEndpoint,
-                                apiKey: geminiKey,
-                                model: "gemini-3.5-flash-lite",
-                                action: .critique,
-                                prompt: synthesisPrompt,
-                                metrics: metrics,
-                                edgeScore: nil,
-                                language: activeLang,
-                                traderProfile: traderProfile,
-                                chartImageBase64: nil,
-                                chartImagesBase64: nil,
-                                sessionSummary: nil,
-                                conversationHistory: nil
-                            )
-                        } catch {
-                            AppLogger.warning("Gemini ensemble synthesis failed: \(error.localizedDescription)")
+                    AppLogger.warning("Qwen ensemble synthesis failed: \(error.localizedDescription). Falling back to GPT-120B...")
+                    do {
+                        return try await callOpenAiCompatible(
+                            endpoint: Self.groqEndpoint,
+                            apiKey: effectiveGroqKey,
+                            model: "openai/gpt-oss-120b",
+                            action: .critique,
+                            prompt: synthesisPrompt,
+                            metrics: metrics,
+                            edgeScore: nil,
+                            language: activeLang,
+                            traderProfile: traderProfile,
+                            chartImageBase64: nil,
+                            chartImagesBase64: nil,
+                            sessionSummary: nil,
+                            conversationHistory: nil
+                        )
+                    } catch {
+                        AppLogger.warning("Groq ensemble synthesis failed: \(error.localizedDescription). Falling back to Gemini synthesis...")
+                        if !geminiKey.isEmpty {
+                            do {
+                                return try await callOpenAiCompatible(
+                                    endpoint: Self.geminiEndpoint,
+                                    apiKey: geminiKey,
+                                    model: "gemini-3.5-flash-lite",
+                                    action: .critique,
+                                    prompt: synthesisPrompt,
+                                    metrics: metrics,
+                                    edgeScore: nil,
+                                    language: activeLang,
+                                    traderProfile: traderProfile,
+                                    chartImageBase64: nil,
+                                    chartImagesBase64: nil,
+                                    sessionSummary: nil,
+                                    conversationHistory: nil
+                                )
+                            } catch {
+                                AppLogger.warning("Gemini ensemble synthesis failed: \(error.localizedDescription)")
+                            }
                         }
                     }
-                    if let best = validAnalyses.first {
-                        return best
-                    }
+                }
+                
+                if let best = validAnalyses.first {
+                    return best
                 }
             } else if let single = validAnalyses.first {
                 return single
