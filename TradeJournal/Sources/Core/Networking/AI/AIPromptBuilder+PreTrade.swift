@@ -242,7 +242,7 @@ extension AIPromptBuilder {
             return isVi ? "Chưa có chuỗi lệnh hôm nay" : "No active streak today"
         }()
         
-        let balVal = sessionSummary.map { NSDecimalNumber(decimal: $0.balance).doubleValue } ?? 0.0
+        let balVal = sessionSummary?.balance.map { ($0 as NSDecimalNumber).doubleValue } ?? 0.0
         let maxDailyLossPct = traderProfile?.maxDailyLossPercent ?? 3.0
         let todayLossPct: Double = {
             if balVal > 0 && pnlTodayVal < 0 {
