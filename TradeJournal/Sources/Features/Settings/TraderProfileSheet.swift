@@ -156,22 +156,12 @@ public struct TraderProfileSheet: View {
                 }
                 
                 // Maximum Daily Loss Limit (%)
-                VStack(alignment: .leading, spacing: 6) {
-                    AppFormField(
-                        "Maximum Daily Loss Limit (%)",
-                        text: $maxDailyLossPercentText,
-                        placeholder: "e.g. 3.0 (Trading halts when daily loss is breached)",
-                        height: 42
-                    )
-                    
-                    // Quick Daily Loss Chips
-                    HStack(spacing: 6) {
-                        presetDailyLossChip("2.0%")
-                        presetDailyLossChip("3.0%")
-                        presetDailyLossChip("5.0%")
-                    }
-                    .padding(.top, 2)
-                }
+                AppFormField(
+                    "Maximum Daily Loss Limit (%)",
+                    text: $maxDailyLossPercentText,
+                    placeholder: "e.g. 3.0 (Trading halts when daily loss is breached)",
+                    height: 42
+                )
                 
                 // Account Objective
                 AppFormField(
@@ -246,14 +236,6 @@ public struct TraderProfileSheet: View {
     private func presetRiskChip(_ risk: String) -> some View {
         AppFilterChip(risk, isSelected: maxRiskPerTrade == risk) {
             maxRiskPerTrade = risk
-        }
-    }
-    
-    private func presetDailyLossChip(_ loss: String) -> some View {
-        let clean = loss.replacingOccurrences(of: "%", with: "").trimmingCharacters(in: .whitespaces)
-        let isSel = maxDailyLossPercentText.replacingOccurrences(of: "%", with: "").trimmingCharacters(in: .whitespaces) == clean
-        return AppFilterChip(loss, isSelected: isSel) {
-            maxDailyLossPercentText = clean
         }
     }
     
