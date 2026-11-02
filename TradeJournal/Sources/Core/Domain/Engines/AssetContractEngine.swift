@@ -468,6 +468,57 @@ public enum AssetContractEngine {
         return (pips: pips, points: rawDiff)
     }
     
+    // MARK: - Mathematical Position Sizing (Volume / Lots)
+    
+    /// Computes the exact mathematically sound position size (in lots) for a given account balance,
+    /// risk percentage (e.g. 5.0 for 5%), entry price, and stop loss.
+    /// Zero hardcoding: Uses authentic contract size, pip size, quote currency, and live conversion rates.
+    public static func calculatePositionSize(
+        symbol: String,
+        balance: Decimal,
+        riskPercentage: Decimal,
+        entryPrice: Decimal,
+        stopLoss: Decimal,
+        customMultiplier: Decimal? = nil,
+        context: CurrencyContext = .default
+    ) -> (lots: Decimal, riskAmount: Decimal, pips: Decimal, riskPerOneLot: Decimal)? {
+        guard balance > 0, riskPercentage > 0, entryPrice > 0, stopLoss > 0, entryPrice != stopLoss else {
+            return nil
+        }
+        let riskRatio = riskPercentage > 1 ? (riskPercentage / 100) : riskPercentage
+        let riskAmount = balance * riskRatio
+        let instrumentSpec = spec(for: symbol)
+        let pipUnit = instrumentSpec.pipSize > 0 ? instrumentSpec.pipSize : 0.0001
+        let pips = abs(entryPrice - stopLoss) / pipUnit
+        
+        // Calculate the risk for exactly 1.0 standard lot
+        let oneLotResult = calculateGrossPnlDetailed(
+            symbol: symbol,
+            direction: entryPrice > stopLoss ? .long : .short,
+            quantity: 1.0,
+            entryPrice: entryPrice,
+            exitPrice: stopLoss,
+            customMultiplier: customMultiplier,
+            context: context
+        )
+        let riskPerOneLot = abs(oneLotResult.amount)
+        guard riskPerOneLot > 0 else { return nil }
+        
+        let rawLots = riskAmount / riskPerOneLot
+        // Round to 2 decimal places (standard micro-lots 0.01)
+        let handler = NSDecimalNumberHandler(
+            roundingMode: .plain,
+            scale: 2,
+            raiseOnExactness: false,
+            raiseOnOverflow: false,
+            raiseOnUnderflow: false,
+            raiseOnDivideByZero: false
+        )
+        let roundedLots = (rawLots as NSDecimalNumber).rounding(accordingToBehavior: handler) as Decimal
+        
+        return (lots: max(0.01, roundedLots), riskAmount: riskAmount, pips: pips, riskPerOneLot: riskPerOneLot)
+    }
+    
     /// Formats human-readable pip and point movement string (e.g. "+4.00 giá (+40.0 pips)").
     public static func formatDeltaText(
         symbol: String,

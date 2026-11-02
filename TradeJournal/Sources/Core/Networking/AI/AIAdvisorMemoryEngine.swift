@@ -14,6 +14,7 @@ public struct AdvisorCommitmentRecord: Codable, Identifiable, Sendable {
     public let takeProfit2: String?
     public let volume: String?
     public let balance: String?
+    public let riskRewardRatio: String?
     public let triggerCondition: String?
     public let thesisSummary: String
     public var linkedOrderTicket: String?
@@ -31,6 +32,7 @@ public struct AdvisorCommitmentRecord: Codable, Identifiable, Sendable {
         takeProfit2: String? = nil,
         volume: String? = nil,
         balance: String? = nil,
+        riskRewardRatio: String? = nil,
         triggerCondition: String? = nil,
         thesisSummary: String,
         linkedOrderTicket: String? = nil,
@@ -47,6 +49,7 @@ public struct AdvisorCommitmentRecord: Codable, Identifiable, Sendable {
         self.takeProfit2 = takeProfit2
         self.volume = volume
         self.balance = balance
+        self.riskRewardRatio = riskRewardRatio
         self.triggerCondition = triggerCondition
         self.thesisSummary = thesisSummary
         self.linkedOrderTicket = linkedOrderTicket
@@ -713,7 +716,6 @@ public final class AIAdvisorMemoryEngine: @unchecked Sendable {
         fallbackBalance: String? = nil,
         fallbackVolume: String? = nil
     ) -> AdvisorCommitmentRecord {
-        let lines = analysisText.components(separatedBy: .newlines)
         var bias = "FLAT"
         var entry: String? = nil
         var sl: String? = nil
@@ -721,8 +723,31 @@ public final class AIAdvisorMemoryEngine: @unchecked Sendable {
         var tp2: String? = nil
         var volume: String? = fallbackVolume
         var balance: String? = fallbackBalance
+        var rrRatio: String? = nil
         var trigger: String? = nil
         
+        // 1. Structured JSON Extraction (First priority)
+        if let jsonStart = analysisText.range(of: "{"),
+           let jsonEnd = analysisText.range(of: "}", options: .backwards),
+           jsonStart.lowerBound < jsonEnd.upperBound {
+            let jsonString = String(analysisText[jsonStart.lowerBound...jsonEnd.lowerBound])
+            if let data = jsonString.data(using: .utf8),
+               let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                if let d = obj["direction"] as? String {
+                    let u = d.uppercased()
+                    bias = u.contains("BUY") ? "BUY" : (u.contains("SELL") ? "SELL" : "FLAT")
+                }
+                if let e = obj["entry"] { entry = "\(e)" }
+                if let s = obj["stopLoss"] { sl = "\(s)" }
+                if let t1 = obj["takeProfit1"] { tp1 = "\(t1)" }
+                if let t2 = obj["takeProfit2"] { tp2 = "\(t2)" }
+                if let v = obj["volume"] { volume = "\(v)" }
+                if let rr = obj["riskRewardRatio"] { rrRatio = "\(rr)" }
+                if let trig = obj["trigger"] as? String { trigger = trig }
+            }
+        }
+        
+        // 2. Line-by-Line Regex Fallback Parser
         func cleanField(_ raw: String) -> String {
             var s = raw.trimmingCharacters(in: .whitespacesAndNewlines)
             s = s.replacingOccurrences(of: "^[-•*\\s>\\[\\]]+", with: "", options: .regularExpression)
@@ -734,11 +759,12 @@ public final class AIAdvisorMemoryEngine: @unchecked Sendable {
             return s
         }
         
+        let lines = analysisText.components(separatedBy: .newlines)
         for line in lines {
             let lower = line.lowercased()
             let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
             
-            // 1. Direction / Bias
+            // Direction / Bias
             if lower.contains("direction:") || lower.contains("hướng:") || lower.contains("bias:") || lower.contains("kết luận:") || lower.contains("verdict:") {
                 if lower.contains("sell") || lower.contains("short") || lower.contains("bán") {
                     bias = "SELL"
@@ -749,7 +775,7 @@ public final class AIAdvisorMemoryEngine: @unchecked Sendable {
                 }
             }
             
-            // 2. Balance
+            // Balance
             if lower.contains("balance:") || lower.contains("số dư:") || lower.contains("vốn:") {
                 let val = cleanField(trimmed)
                 if !val.isEmpty && val != "N/A" {
@@ -757,24 +783,24 @@ public final class AIAdvisorMemoryEngine: @unchecked Sendable {
                 }
             }
             
-            // 3. Entry
-            if lower.contains("entry:") || lower.contains("optimal entry") || lower.contains("điểm vào") || lower.contains("vùng vào lệnh") || lower.contains("vào lệnh tại:") {
+            // Entry
+            if entry == nil, lower.contains("entry:") || lower.contains("optimal entry") || lower.contains("điểm vào") || lower.contains("vùng vào lệnh") || lower.contains("vào lệnh tại:") {
                 let val = cleanField(trimmed)
                 if !val.isEmpty && val != "N/A" {
                     entry = val
                 }
             }
             
-            // 4. Stop Loss
-            if lower.contains("stop loss:") || lower.contains("sl:") || lower.contains("cắt lỗ:") || lower.contains("invalidation:") {
+            // Stop Loss
+            if sl == nil, lower.contains("stop loss:") || lower.contains("sl:") || lower.contains("cắt lỗ:") || lower.contains("invalidation:") {
                 let val = cleanField(trimmed)
                 if !val.isEmpty && val != "N/A" {
                     sl = val
                 }
             }
             
-            // 5. Take Profit 1
-            if lower.contains("take profit 1:") || lower.contains("tp 1:") || lower.contains("tp1:") || lower.contains("chốt lời 1:") || lower.contains("mục tiêu 1:") {
+            // Take Profit 1
+            if tp1 == nil, lower.contains("take profit 1:") || lower.contains("tp 1:") || lower.contains("tp1:") || lower.contains("chốt lời 1:") || lower.contains("mục tiêu 1:") {
                 let val = cleanField(trimmed)
                 if !val.isEmpty && val != "N/A" {
                     tp1 = val
@@ -786,25 +812,66 @@ public final class AIAdvisorMemoryEngine: @unchecked Sendable {
                 }
             }
             
-            // 6. Take Profit 2 (nếu có)
-            if lower.contains("take profit 2:") || lower.contains("tp 2:") || lower.contains("tp2:") || lower.contains("chốt lời 2:") || lower.contains("mục tiêu 2:") {
+            // Take Profit 2
+            if tp2 == nil, lower.contains("take profit 2:") || lower.contains("tp 2:") || lower.contains("tp2:") || lower.contains("chốt lời 2:") || lower.contains("mục tiêu 2:") {
                 let val = cleanField(trimmed)
                 if !val.isEmpty && !val.lowercased().contains("không") && !val.lowercased().contains("none") && !val.lowercased().contains("n/a") {
                     tp2 = val
                 }
             }
             
-            // 7. Volume
-            if lower.contains("volume:") || lower.contains("khối lượng:") || lower.contains("lot:") || lower.contains("size:") {
+            // Volume
+            if volume == fallbackVolume, lower.contains("volume:") || lower.contains("khối lượng:") || lower.contains("lot:") || lower.contains("size:") {
                 let val = cleanField(trimmed)
                 if !val.isEmpty && val != "N/A" {
                     volume = val
                 }
             }
             
-            // 8. Trigger
-            if lower.contains("điều kiện kích hoạt:") || lower.contains("trigger:") || lower.contains("điều kiện cần chờ:") {
+            // R:R
+            if rrRatio == nil, lower.contains("r:r") || lower.contains("risk/reward") || lower.contains("tỷ lệ r:r") {
+                let val = cleanField(trimmed)
+                if !val.isEmpty && val != "N/A" {
+                    rrRatio = val
+                }
+            }
+            
+            // Trigger
+            if trigger == nil, lower.contains("điều kiện kích hoạt:") || lower.contains("trigger:") || lower.contains("điều kiện cần chờ:") {
                 trigger = cleanField(trimmed)
+            }
+        }
+        
+        // 3. Mathematical Verification of Volume and R:R via AssetContractEngine
+        if let entryStr = entry, let slStr = sl {
+            let cleanEntry = entryStr.replacingOccurrences(of: "[^0-9.]", with: "", options: .regularExpression)
+            let cleanSL = slStr.replacingOccurrences(of: "[^0-9.]", with: "", options: .regularExpression)
+            if let eNum = Decimal(string: cleanEntry), let sNum = Decimal(string: cleanSL), eNum > 0, sNum > 0, eNum != sNum {
+                let session = AIAccountContextProvider.captureContext(dataStore: TradeDataStore.shared)
+                let riskPct = TradeDataStore.shared.aiSettings.traderProfile.numericRiskPercent
+                if let b = session.balance, b > 0 {
+                    if let size = AssetContractEngine.calculatePositionSize(
+                        symbol: symbol,
+                        balance: b,
+                        riskPercentage: riskPct,
+                        entryPrice: eNum,
+                        stopLoss: sNum
+                    ) {
+                        volume = String(format: "%.2f lots (Rủi ro $%.2f)", (size.lots as NSDecimalNumber).doubleValue, (size.riskAmount as NSDecimalNumber).doubleValue)
+                    }
+                }
+                
+                if let tpStr = tp1 {
+                    let cleanTP = tpStr.replacingOccurrences(of: "[^0-9.]", with: "", options: .regularExpression)
+                    if let tNum = Decimal(string: cleanTP), tNum > 0 {
+                        let riskDist = abs(eNum - sNum)
+                        let rewardDist = abs(tNum - eNum)
+                        if riskDist > 0 {
+                            let rr = (rewardDist / riskDist as NSDecimalNumber).doubleValue
+                            rrRatio = String(format: "1:%.2f", rr)
+                        }
+                    }
+                }
             }
         }
         
@@ -822,9 +889,11 @@ public final class AIAdvisorMemoryEngine: @unchecked Sendable {
             takeProfit2: tp2,
             volume: volume,
             balance: balance,
+            riskRewardRatio: rrRatio,
             triggerCondition: trigger,
             thesisSummary: summary.isEmpty ? analysisText.prefix(200).description : summary
         )
+    }
     }
     
     // MARK: - 5. Persistence & Automatic Migration

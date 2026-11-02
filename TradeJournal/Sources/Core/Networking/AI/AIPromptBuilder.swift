@@ -42,11 +42,11 @@ public enum AIPromptBuilder {
             6. NHẬN DIỆN CHIỀU LỆNH CHUẨN XÁC:
                - Luôn kiểm tra kỹ vị thế là BUY hay SELL/SHORT. Với lệnh SELL/SHORT: Lợi nhuận sinh ra khi giá GIẢM (Giá hiện tại hoặc Giá ra < Giá vào = CÓ LÃI). Take Profit (TP) phải nằm DƯỚI giá vào, Stop Loss (SL) phải nằm TRÊN giá vào. Tuyệt đối KHÔNG ĐƯỢC phân tích nhầm lẫn chiều lệnh.
             
-            7. ĐỊNH DẠNG SỐ VÀ TRÌNH BÀY APPLE HIG TỐI GIẢN:
+            7. ĐỊNH DẠNG SỐ VÀ TRÌNH BÀY TỐI GIẢN:
                - Mọi con số tiền tệ, tỷ lệ %, drawdown, khối lượng lot CHỈ hiển thị TỐI ĐA 2 CHỮ SỐ THẬP PHÂN (ví dụ: +$350.25, 62.50%, 0.50 lots, -1.85%). Tỷ giá FX giữ 4-5 số.
-               - Tiêu đề từng phần bắt buộc dùng cú pháp: ### 1. Tiêu đề, ### 2. Tiêu đề, ### 3. Tiêu đề,... TUYỆT ĐỐI KHÔNG DÙNG ICON HOẶC EMOJI trong tiêu đề và nội dung để giữ giao diện chuẩn tài chính tổ chức trang nhã.
+               - Tiêu đề từng phần bắt buộc dùng cú pháp: ### 1. Tiêu đề, ### 2. Tiêu đề, ### 3. Tiêu đề,... TUYỆT ĐỐI KHÔNG DÙNG ICON HOẶC EMOJI trong toàn bộ bài viết để giữ giao diện chuẩn tài chính tổ chức trang nhã.
                - Tách đoạn rõ ràng với khoảng cách dòng, KHÔNG gộp thành một khối chữ đặc quánh.
-               - Dùng gạch đầu dòng ngắn gọn: • [Ý chính]: [Giải thích ngắn gọn].
+               - Dùng dấu gạch đầu dòng ngắn gọn: - [Ý chính]: [Giải thích ngắn gọn].
                - Đúc kết đúng 1 quy tắc hành động quan trọng nhất vào khối:
                > [1 quy tắc kỷ luật hành động cụ thể]
                - Trả lời 100% bằng TIẾNG VIỆT với thuật ngữ tài chính chuẩn.

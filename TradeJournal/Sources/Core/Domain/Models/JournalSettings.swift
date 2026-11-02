@@ -162,6 +162,31 @@ public struct TraderProfileConfig: Codable, Equatable, Sendable {
         self.knownPsychologicalLeaks = knownPsychologicalLeaks
         self.customMemoryNotes = customMemoryNotes
     }
+    
+    /// Authoritative numeric risk percentage (e.g. 5.0 for 5%) dynamically parsed from user setting.
+    public var numericRiskPercent: Decimal {
+        let clean = maxRiskPerTrade.replacingOccurrences(of: "%", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if let match = clean.range(of: #"[0-9]+(\.[0-9]+)?"#, options: .regularExpression) {
+            let numStr = String(clean[match])
+            if let val = Decimal(string: numStr), val > 0 {
+                return val
+            }
+        }
+        return Decimal(1.0)
+    }
+    
+    /// Authoritative numeric target R:R ratio (e.g. 3.0 for 1:3) dynamically parsed from user profile.
+    public var targetRiskRewardRatio: Double {
+        let combined = "\(customMemoryNotes) \(accountObjective) \(primaryPlaybooks)".lowercased()
+        if let match = combined.range(of: #"1\s*:\s*([0-9]+(\.[0-9]+)?)"#, options: .regularExpression) {
+            let matchedStr = String(combined[match])
+            let parts = matchedStr.components(separatedBy: ":")
+            if parts.count == 2, let r = Double(parts[1].trimmingCharacters(in: .whitespaces)), r > 0 {
+                return r
+            }
+        }
+        return 3.0 // Institutional default: R:R >= 1:3
+    }
 }
 
 // MARK: - 6. AI Provider Settings

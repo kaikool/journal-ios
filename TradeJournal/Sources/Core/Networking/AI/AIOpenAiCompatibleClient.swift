@@ -35,7 +35,9 @@ extension AIReflectionService {
         
         var activeSystemPrompt = AIPromptBuilder.getSystemPrompt(language: language)
         if language == "vi" {
-            activeSystemPrompt = "⚠️ BẮT BUỘC: Bạn PHẢI trả lời 100% bằng TIẾNG VIỆT mạch lạc, sắc bén, đúng thuật ngữ tài chính. Tuyệt đối KHÔNG trả lời bằng tiếng Anh và KHÔNG được lặp từ hay phát sinh chuỗi suy nghĩ nội bộ ('also mention').\n\n" + activeSystemPrompt
+            activeSystemPrompt = "[QUY TAC NGON NGU]: Tra loi 100% bang TIENG VIET mach lac, dung thuat ngu tai chinh. Tuyet doi khong dung bieu tuong cam xuc (emoji, icon). Khong tra loi bang tieng Anh va khong lap tu.\n\n" + activeSystemPrompt
+        } else {
+            activeSystemPrompt = "[LANGUAGE DIRECTIVE]: Respond concisely in professional financial terminology. Do not use emojis or informal icons.\n\n" + activeSystemPrompt
         }
         let userContent = AIPromptBuilder.buildTraderContext(
             action: action,
@@ -91,21 +93,21 @@ extension AIReflectionService {
                     \"\"\"
                     \(trimmedAnchor)
                     \"\"\"
-                    ⚠️ NGUYÊN TẮC BẮT BUỘC VỀ TÍNH NHẤT QUÁN & THÍCH ỨNG:
-                    - Đây là luận điểm cam kết gốc của bạn cho phiên phân tích này.
-                    - BẮT BUỘC giữ tính nhất quán kỹ thuật với kế hoạch này.
-                    - Không được lật kèo hoặc xin lỗi chỉ vì trader nghi ngờ hay chất vấn.
-                    - Chỉ tuyên bố BÁC BỎ (INVALIDATED) khi giá thực tế đã phá vỡ mốc dừng lỗ (SL) cấu trúc hoặc xuất hiện tín hiệu đảo chiều rõ ràng.
+                    [NGUYEN TAC BAT BUOC VE TINH NHAT QUAN]:
+                    - Day la luan diem cam ket goc cua ban cho phien phan tich nay.
+                    - Bat buoc giu tinh nhat quan ky thuat voi ke hoach nay.
+                    - Khong duoc lat keo hoac xin loi chi vi trader nghi ngo hay chat van.
+                    - Chi tuyen bo BAC BO (INVALIDATED) khi gia thuc te da pha vo moc dung lo (SL) cau truc hoac xuat hien tin hieu dao chieu ro rang.
                     """
                     : """
                     [COMMITTED ANCHOR THESIS (PERSISTENT CONTEXT)]:
                     \"\"\"
                     \(trimmedAnchor)
                     \"\"\"
-                    ⚠️ MANDATORY ANCHOR CONSISTENCY & ADAPTATION PROTOCOL:
+                    [MANDATORY ANCHOR CONSISTENCY]:
                     - This is your initial committed thesis for this symbol and session.
-                    - Maintain technical consistency with this plan. Do NOT apologize or flip-flop under user pressure.
-                    - Declare INVALIDATED only if live market price action has broken your structural Stop Loss or confirmed an opposing regime shift.
+                    - Maintain technical consistency with this plan. Do not flip stance under user pressure.
+                    - Declare INVALIDATED only if live market price action has broken your structural Stop Loss.
                     """
                 apiMessages.append(["role": "system", "content": anchorNotice])
                 unpinnedHistory.removeFirst()
@@ -306,7 +308,9 @@ extension AIReflectionService {
         )
         var activeSystemPrompt = AIPromptBuilder.getSystemPrompt(language: language)
         if language == "vi" {
-            activeSystemPrompt = "⚠️ BẮT BUỘC: Bạn PHẢI trả lời 100% bằng TIẾNG VIỆT mạch lạc, sắc bén, đúng thuật ngữ tài chính. Tuyệt đối KHÔNG trả lời bằng tiếng Anh và KHÔNG được lặp từ hay phát sinh chuỗi suy nghĩ nội bộ ('also mention').\n\n" + activeSystemPrompt
+            activeSystemPrompt = "[QUY TAC NGON NGU]: Tra loi 100% bang TIENG VIET mach lac, dung thuat ngu tai chinh. Tuyet doi khong dung bieu tuong cam xuc (emoji, icon). Khong tra loi bang tieng Anh va khong lap tu.\n\n" + activeSystemPrompt
+        } else {
+            activeSystemPrompt = "[LANGUAGE DIRECTIVE]: Respond concisely in professional financial terminology. Do not use emojis or informal icons.\n\n" + activeSystemPrompt
         }
         
         let userMessageContent: Any

@@ -139,6 +139,7 @@ public struct AIMemoryRecord: Identifiable, Codable, Equatable, Sendable {
             "takeProfit2": commitment.takeProfit2 ?? "",
             "volume": commitment.volume ?? "",
             "balance": commitment.balance ?? "",
+            "riskRewardRatio": commitment.riskRewardRatio ?? "",
             "triggerCondition": commitment.triggerCondition ?? "",
             "linkedOrderTicket": commitment.linkedOrderTicket ?? "",
             "linkedTradeKey": commitment.linkedTradeKey ?? ""
@@ -172,6 +173,7 @@ public struct AIMemoryRecord: Identifiable, Codable, Equatable, Sendable {
         var takeProfit2: String? = nil
         var volume: String? = nil
         var balance: String? = nil
+        var riskRewardRatio: String? = nil
         var triggerCondition: String? = nil
         var linkedOrderTicket: String? = nil
         var linkedTradeKey: String? = nil
@@ -186,6 +188,7 @@ public struct AIMemoryRecord: Identifiable, Codable, Equatable, Sendable {
             takeProfit2 = dict["takeProfit2"]?.isEmpty == false ? dict["takeProfit2"] : nil
             volume = dict["volume"]?.isEmpty == false ? dict["volume"] : nil
             balance = dict["balance"]?.isEmpty == false ? dict["balance"] : nil
+            riskRewardRatio = dict["riskRewardRatio"]?.isEmpty == false ? dict["riskRewardRatio"] : nil
             triggerCondition = dict["triggerCondition"]?.isEmpty == false ? dict["triggerCondition"] : nil
             linkedOrderTicket = dict["linkedOrderTicket"]?.isEmpty == false ? dict["linkedOrderTicket"] : nil
             linkedTradeKey = dict["linkedTradeKey"]?.isEmpty == false ? dict["linkedTradeKey"] : nil
@@ -203,6 +206,7 @@ public struct AIMemoryRecord: Identifiable, Codable, Equatable, Sendable {
             takeProfit2: takeProfit2,
             volume: volume,
             balance: balance,
+            riskRewardRatio: riskRewardRatio,
             triggerCondition: triggerCondition,
             thesisSummary: content,
             linkedOrderTicket: linkedOrderTicket,

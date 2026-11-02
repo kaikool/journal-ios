@@ -788,6 +788,10 @@ public struct TradeAICoachSheet: View {
                     preTradeParamRow(label: "Take profit 2:", value: tp2)
                 }
                 
+                if let rr = plan.riskRewardRatio, !rr.isEmpty {
+                    preTradeParamRow(label: "R:R Ratio:", value: rr)
+                }
+                
                 if let vol = resolvedVolume(plan: plan) {
                     preTradeParamRow(label: "Volume:", value: vol)
                 }

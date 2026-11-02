@@ -295,7 +295,7 @@ public struct PreTradeAnalysisSheet: View {
             let streakToday = sessionSummary.currentStreakToday
             let streakDesc: String = {
                 if streakToday > 0 { return isVi ? "Thắng \(streakToday) lệnh liên tiếp (+)" : "\(streakToday) wins in a row (+)" }
-                if streakToday < 0 { return isVi ? "⚠️ Đang thua \(abs(streakToday)) lệnh liên tiếp (-)" : "⚠️ In a \(abs(streakToday))-loss streak (-)" }
+                if streakToday < 0 { return isVi ? "Đang thua \(abs(streakToday)) lệnh liên tiếp (-)" : "In a \(abs(streakToday))-loss streak (-)" }
                 return isVi ? "Chưa có chuỗi lệnh hôm nay" : "No streak today"
             }()
             
@@ -313,8 +313,8 @@ public struct PreTradeAnalysisSheet: View {
             let isRiskBreached = streakToday <= -2 || (sessionSummary.dailyLossBufferRemainingUsd.map { $0 <= 0 } ?? false)
             let riskAlert = isRiskBreached
                 ? (isVi
-                    ? "\n🚨 CẢNH BÁO RỦI RO ĐỎ: Trader đang dính chuỗi thua hoặc đệm lỗ ngày đã cạn. AI BẮT BUỘC KHUYẾN NGHỊ ĐỨNG NGOÀI (FLAT), TUYỆT ĐỐI KHÔNG GỢI Ý MỞ LỆNH MỚI!\n"
-                    : "\n🚨 CRITICAL RISK GUARDRAIL: Trader is on a losing streak or daily buffer exhausted. AI MUST ADVISE FLAT (STAND ASIDE), NO NEW TRADES!\n")
+                    ? "\n[CẢNH BÁO RỦI RO]: Trader đang có chuỗi thua hoặc đệm lỗ ngày đã chạm ngưỡng. AI BẮT BUỘC KHUYẾN NGHỊ ĐỨNG NGOÀI (FLAT), KHÔNG MỞ LỆNH MỚI.\n"
+                    : "\n[CRITICAL RISK GUARDRAIL]: Trader is on a losing streak or daily buffer exhausted. AI MUST ADVISE FLAT (STAND ASIDE), NO NEW TRADES.\n")
                 : ""
             
             // 3. Multi-Timeframe Context: H4 Context & 15-Candle H1 Series
@@ -384,12 +384,12 @@ public struct PreTradeAnalysisSheet: View {
             if isVi {
                 augmentedPrompt += """
                 
-                ⚠️ YÊU CẦU: Trả lời trực diện, ngắn gọn, súc tích bằng tiếng Việt. Đối chiếu biến động giá hiện tại với mốc Invalidation SL và điểm kích hoạt trong kế hoạch ban đầu để xác định kế hoạch còn hiệu lực hay đã bị thị trường bác bỏ.
+                [YEU CAU]: Tra loi truc dien, ngan gon, dung thuat ngu tai chinh. Doi chieu bien dong gia hien tai voi moc Invalidation SL va diem kich hoat trong ke hoach ban dau de xac dinh ke hoach con hieu luc hay da bi thi truong bac bo.
                 """
             } else {
                 augmentedPrompt += """
                 
-                ⚠️ DIRECTIVE: Answer directly and concisely. Cross-reference current price with the structural Invalidation SL and entry triggers from the original plan to state if the thesis remains valid or is invalidated.
+                [DIRECTIVE]: Answer directly and concisely. Cross-reference current price with the structural Invalidation SL and entry triggers from the original plan to state if the thesis remains valid or is invalidated.
                 """
             }
             
@@ -492,7 +492,7 @@ public struct PreTradeAnalysisSheet: View {
                 h1Bars: h1Bars,
                 m15Bars: m15Bars,
                 language: dataStore.aiSettings.language,
-                chartImageBase64: singleChartBase64,
+                chartImageBase64: nil,
                 chartImagesBase64: nil,
                 conversationHistory: followUpMessages,
                 previousAnalysis: prevAnalysis
