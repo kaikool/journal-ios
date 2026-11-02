@@ -135,6 +135,7 @@ public struct TraderProfileConfig: Codable, Equatable, Sendable {
     public var accountObjective: String
     public var primaryPlaybooks: String
     public var maxRiskPerTrade: String
+    public var maxDailyLossPercent: Double
     public var knownPsychologicalLeaks: String
     public var customMemoryNotes: String
     
@@ -143,6 +144,7 @@ public struct TraderProfileConfig: Codable, Equatable, Sendable {
         accountObjective: "Sustainable Compounding & Capital Preservation",
         primaryPlaybooks: "Price Action, Trend Following, Support & Resistance",
         maxRiskPerTrade: "0.5% - 1.0% per trade (Strict Stop Loss)",
+        maxDailyLossPercent: 3.0,
         knownPsychologicalLeaks: "Moving Stop Loss, Premature Profit Taking, FOMO re-entry after taking a loss",
         customMemoryNotes: "Focus on risk-to-reward ratio >= 2:1. Protect capital during consolidation. Never revenge trade."
     )
@@ -152,6 +154,7 @@ public struct TraderProfileConfig: Codable, Equatable, Sendable {
         accountObjective: String = "The5ers / Prop Firm High Stakes Evaluation & Sustainable Compounding",
         primaryPlaybooks: String = "Liquidity Sweeps, Order Blocks, Market Structure Breaks, Fair Value Gaps",
         maxRiskPerTrade: String = "0.5% - 1.0% per trade (Strict Stop Loss)",
+        maxDailyLossPercent: Double = 3.0,
         knownPsychologicalLeaks: String = "Moving Stop Loss, Premature Profit Taking, FOMO re-entry after taking a loss",
         customMemoryNotes: String = "Focus on risk-to-reward ratio >= 2:1. Protect capital during consolidation. Never revenge trade."
     ) {
@@ -159,8 +162,30 @@ public struct TraderProfileConfig: Codable, Equatable, Sendable {
         self.accountObjective = accountObjective
         self.primaryPlaybooks = primaryPlaybooks
         self.maxRiskPerTrade = maxRiskPerTrade
+        self.maxDailyLossPercent = maxDailyLossPercent
         self.knownPsychologicalLeaks = knownPsychologicalLeaks
         self.customMemoryNotes = customMemoryNotes
+    }
+    
+    enum CodingKeys: String, CodingKey {
+        case tradingStyle
+        case accountObjective
+        case primaryPlaybooks
+        case maxRiskPerTrade
+        case maxDailyLossPercent
+        case knownPsychologicalLeaks
+        case customMemoryNotes
+    }
+    
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        tradingStyle = try container.decodeIfPresent(String.self, forKey: .tradingStyle) ?? "Day Trader / Intraday Scalper"
+        accountObjective = try container.decodeIfPresent(String.self, forKey: .accountObjective) ?? "The5ers / Prop Firm High Stakes Evaluation & Sustainable Compounding"
+        primaryPlaybooks = try container.decodeIfPresent(String.self, forKey: .primaryPlaybooks) ?? "Liquidity Sweeps, Order Blocks, Market Structure Breaks, Fair Value Gaps"
+        maxRiskPerTrade = try container.decodeIfPresent(String.self, forKey: .maxRiskPerTrade) ?? "0.5% - 1.0% per trade (Strict Stop Loss)"
+        maxDailyLossPercent = try container.decodeIfPresent(Double.self, forKey: .maxDailyLossPercent) ?? 3.0
+        knownPsychologicalLeaks = try container.decodeIfPresent(String.self, forKey: .knownPsychologicalLeaks) ?? "Moving Stop Loss, Premature Profit Taking, FOMO re-entry after taking a loss"
+        customMemoryNotes = try container.decodeIfPresent(String.self, forKey: .customMemoryNotes) ?? "Focus on risk-to-reward ratio >= 2:1. Protect capital during consolidation. Never revenge trade."
     }
     
     /// Authoritative numeric risk percentage (e.g. 5.0 for 5%) dynamically parsed from user setting.
@@ -173,6 +198,11 @@ public struct TraderProfileConfig: Codable, Equatable, Sendable {
             }
         }
         return Decimal(1.0)
+    }
+    
+    /// Authoritative numeric daily loss limit percentage (e.g. 3.0 for 3%)
+    public var numericMaxDailyLossPercent: Decimal {
+        Decimal(maxDailyLossPercent > 0 ? maxDailyLossPercent : 3.0)
     }
     
     /// Authoritative numeric target R:R ratio (e.g. 3.0 for 1:3) dynamically parsed from user profile.

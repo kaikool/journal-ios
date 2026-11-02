@@ -17,6 +17,7 @@ public struct AIReflectionView: View {
     @State private var isLoading: Bool = false
     @State private var showTraderProfileSheet: Bool = false
     @State private var showPreTradeSheet: Bool = false
+    @State private var showBehaviorLeaksSheet: Bool = false
     @State private var showMemoryManagementSheet: Bool = false
     @State private var showResearchWorkspaceSheet: Bool = false
     @State private var selectedChartImage: UIImage? = nil
@@ -80,6 +81,9 @@ public struct AIReflectionView: View {
                         // 2C. Pre-Trade Forward-Looking Bias Card
                         AIReflectionPreTradeBanner(onOpenPreTrade: { showPreTradeSheet = true })
                         
+                        // 2D. Empirical Behavioral Leaks Card
+                        AIReflectionBehaviorLeaksBanner(onOpenLeaks: { showBehaviorLeaksSheet = true })
+                        
                         // 3. Custom Inquiry Input Bar (Always available to type questions + optional chart image)
                         AIReflectionCustomInquiryCard(
                             userPrompt: $userPrompt,
@@ -123,6 +127,9 @@ public struct AIReflectionView: View {
             }
             .sheet(isPresented: $showPreTradeSheet) {
                 PreTradeAnalysisSheet()
+            }
+            .sheet(isPresented: $showBehaviorLeaksSheet) {
+                TraderBehavioralLeaksSheet()
             }
             .sheet(isPresented: $showMemoryManagementSheet) {
                 AIMemoryManagementSheet()

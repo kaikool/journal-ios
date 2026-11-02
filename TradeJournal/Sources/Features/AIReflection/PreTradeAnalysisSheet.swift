@@ -124,16 +124,16 @@ public struct PreTradeAnalysisSheet: View {
                             }
                         )
                         
-                        // 5.1 Dedicated Pre-Trade Setup Card (3-second immediate glance)
-                        if let plan = currentCommitment {
+                        // 6. Structured Section Cards Reader
+                        AIDocumentReaderView(text: AIDocumentParser.stripTechnicalMetadata(from: analysisResult))
+                        
+                        // 6.1 Dedicated Pre-Trade Setup Card (Placed below AI analysis, only when actionable setup exists)
+                        if let plan = currentCommitment, plan.hasActionableSetup {
                             PreTradeSetupCard(
                                 plan: plan,
                                 timeZone: dataStore.generalSettings.displayTimeZone
                             )
                         }
-                        
-                        // 6. Structured Section Cards Reader
-                        AIDocumentReaderView(text: AIDocumentParser.stripTechnicalMetadata(from: analysisResult))
                         
                         // 7. Follow-up conversation turns (message bubbles in scroll view)
                         PreTradeFollowUpSection(

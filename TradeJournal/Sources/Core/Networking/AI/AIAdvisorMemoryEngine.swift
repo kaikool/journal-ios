@@ -55,6 +55,20 @@ public struct AdvisorCommitmentRecord: Codable, Identifiable, Sendable {
         self.linkedOrderTicket = linkedOrderTicket
         self.linkedTradeKey = linkedTradeKey
     }
+    
+    /// Whether this commitment specifies an actionable execution setup (not FLAT/WAIT and has valid entry/SL parameters).
+    public var hasActionableSetup: Bool {
+        let b = bias.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        if b.contains("FLAT") || b.contains("WAIT") || b.contains("NO_TRADE") || b.contains("STAND ASIDE") || b.contains("ĐỨNG NGOÀI") || b.isEmpty {
+            return false
+        }
+        func isValidValue(_ val: String?) -> Bool {
+            guard let v = val?.trimmingCharacters(in: .whitespacesAndNewlines), !v.isEmpty else { return false }
+            let lower = v.lowercased()
+            return lower != "<null>" && lower != "null" && lower != "none" && lower != "n/a" && lower != "nil" && lower != "không" && lower != "khong"
+        }
+        return isValidValue(plannedEntry) || isValidValue(invalidationSL) || isValidValue(takeProfit1) || isValidValue(targetTP)
+    }
 }
 
 // MARK: - Trader AI Lesson Record

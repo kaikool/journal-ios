@@ -1,10 +1,16 @@
 import SwiftUI
 
 // MARK: - Dedicated Pre-Trade Setup Specification Card
-// Displays the authoritative execution parameters parsed from AI in an immediate 3-second glanceable card
+// Displays the authoritative execution parameters parsed from AI in an immediate glanceable card
 public struct PreTradeSetupCard: View {
     public let plan: AdvisorCommitmentRecord
     public let timeZone: String
+    
+    private static let dateFormatter: DateFormatter = {
+        let df = DateFormatter()
+        df.dateFormat = "yyyy-MM-dd HH:mm"
+        return df
+    }()
     
     public init(plan: AdvisorCommitmentRecord, timeZone: String = "UTC") {
         self.plan = plan
@@ -22,70 +28,78 @@ public struct PreTradeSetupCard: View {
     }
     
     private var formattedDateTime: String {
-        let df = DateFormatter()
-        df.dateFormat = "yyyy-MM-dd HH:mm"
+        let df = Self.dateFormatter
         df.timeZone = TimeZone(identifier: timeZone) ?? .current
         return df.string(from: plan.timestamp)
     }
     
+    private func isValidValue(_ val: String?) -> Bool {
+        guard let v = val?.trimmingCharacters(in: .whitespacesAndNewlines), !v.isEmpty else { return false }
+        let lower = v.lowercased()
+        return lower != "<null>" && lower != "null" && lower != "none" && lower != "n/a" && lower != "nil" && lower != "không" && lower != "khong"
+    }
+    
+    @ViewBuilder
     public var body: some View {
-        AppCard {
-            VStack(alignment: .leading, spacing: 8) {
-                // Header
-                HStack {
-                    Text("PRE-TRADE SETUP SPECIFICATION")
-                        .font(AppTypography.cardHeaderUppercase)
-                        .tracking(0.5)
-                        .foregroundColor(AppColors.secondaryText)
+        if plan.hasActionableSetup {
+            AppCard {
+                VStack(alignment: .leading, spacing: 8) {
+                    // Header
+                    HStack {
+                        Text("PRE-TRADE SETUP SPECIFICATION")
+                            .font(AppTypography.cardHeaderUppercase)
+                            .tracking(0.5)
+                            .foregroundColor(AppColors.secondaryText)
+                        
+                        Spacer()
+                        
+                        AppBadge(plan.bias.uppercased(), variant: badgeVariant)
+                    }
                     
-                    Spacer()
+                    Divider()
+                        .background(AppColors.border.opacity(0.35))
                     
-                    AppBadge(plan.bias.uppercased(), variant: badgeVariant)
+                    // Key-Value Specification Rows
+                    VStack(spacing: 5) {
+                        paramRow(label: "Direction:", value: plan.bias.uppercased())
+                        
+                        if let bal = plan.balance, isValidValue(bal) {
+                            paramRow(label: "Balance:", value: bal)
+                        }
+                        
+                        if let entry = plan.plannedEntry, isValidValue(entry) {
+                            paramRow(label: "Entry:", value: entry)
+                        }
+                        
+                        if let sl = plan.invalidationSL, isValidValue(sl) {
+                            paramRow(label: "Stop loss:", value: sl)
+                        }
+                        
+                        if let tp1 = plan.takeProfit1 ?? plan.targetTP, isValidValue(tp1) {
+                            paramRow(label: "Take profit 1:", value: tp1)
+                        }
+                        
+                        if let tp2 = plan.takeProfit2, isValidValue(tp2) {
+                            paramRow(label: "Take profit 2:", value: tp2)
+                        }
+                        
+                        if let rr = plan.riskRewardRatio, isValidValue(rr) {
+                            paramRow(label: "R:R Ratio:", value: rr)
+                        }
+                        
+                        if let vol = plan.volume, isValidValue(vol) {
+                            paramRow(label: "Volume:", value: vol)
+                        }
+                        
+                        if let trigger = plan.triggerCondition, isValidValue(trigger) {
+                            paramRow(label: "Trigger:", value: trigger)
+                        }
+                        
+                        paramRow(label: "Date time:", value: formattedDateTime)
+                    }
                 }
-                
-                Divider()
-                    .background(AppColors.border.opacity(0.35))
-                
-                // Key-Value Specification Rows
-                VStack(spacing: 5) {
-                    paramRow(label: "Direction:", value: plan.bias.uppercased())
-                    
-                    if let bal = plan.balance, !bal.isEmpty {
-                        paramRow(label: "Balance:", value: bal)
-                    }
-                    
-                    if let entry = plan.plannedEntry, !entry.isEmpty {
-                        paramRow(label: "Entry:", value: entry)
-                    }
-                    
-                    if let sl = plan.invalidationSL, !sl.isEmpty {
-                        paramRow(label: "Stop loss:", value: sl)
-                    }
-                    
-                    if let tp1 = plan.takeProfit1 ?? plan.targetTP, !tp1.isEmpty {
-                        paramRow(label: "Take profit 1:", value: tp1)
-                    }
-                    
-                    if let tp2 = plan.takeProfit2, !tp2.isEmpty, !tp2.lowercased().contains("khong"), !tp2.lowercased().contains("none") {
-                        paramRow(label: "Take profit 2:", value: tp2)
-                    }
-                    
-                    if let rr = plan.riskRewardRatio, !rr.isEmpty {
-                        paramRow(label: "R:R Ratio:", value: rr)
-                    }
-                    
-                    if let vol = plan.volume, !vol.isEmpty {
-                        paramRow(label: "Volume:", value: vol)
-                    }
-                    
-                    if let trigger = plan.triggerCondition, !trigger.isEmpty {
-                        paramRow(label: "Trigger:", value: trigger)
-                    }
-                    
-                    paramRow(label: "Date time:", value: formattedDateTime)
-                }
+                .padding(.vertical, 2)
             }
-            .padding(.vertical, 2)
         }
     }
     

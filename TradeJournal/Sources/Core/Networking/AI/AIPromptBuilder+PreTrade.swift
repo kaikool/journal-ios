@@ -147,27 +147,27 @@ extension AIPromptBuilder {
         
         let nearestBSLStr: String = {
             if let bsl = liquidity.nearestBSL {
-                let dist = liquidity.distanceToBSLPips.map { " (khoang cach \(formatPrice($0)))" } ?? ""
-                return "\(bsl.label) tai \(formatPrice(bsl.price))\(dist)"
+                let dist = liquidity.distanceToBSLPips.map { " (khoảng cách \(formatPrice($0)))" } ?? ""
+                return "\(bsl.label) tại \(formatPrice(bsl.price))\(dist)"
             }
-            return isVi ? "Khong co moc BSL gan" : "No nearby BSL pool"
+            return isVi ? "Không có mốc BSL gần" : "No nearby BSL pool"
         }()
         
         let nearestSSLStr: String = {
             if let ssl = liquidity.nearestSSL {
-                let dist = liquidity.distanceToSSLPips.map { " (khoang cach \(formatPrice($0)))" } ?? ""
-                return "\(ssl.label) tai \(formatPrice(ssl.price))\(dist)"
+                let dist = liquidity.distanceToSSLPips.map { " (khoảng cách \(formatPrice($0)))" } ?? ""
+                return "\(ssl.label) tại \(formatPrice(ssl.price))\(dist)"
             }
-            return isVi ? "Khong co moc SSL gan" : "No nearby SSL pool"
+            return isVi ? "Không có mốc SSL gần" : "No nearby SSL pool"
         }()
         
         let sweepsStr: String = {
             if liquidity.recentSweeps.isEmpty {
-                return isVi ? "Khong co nhip quet gan day" : "No recent sweeps"
+                return isVi ? "Không có nhịp quét gần đây" : "No recent sweeps"
             }
             return liquidity.recentSweeps.prefix(2).map { sw in
-                let typeStr = sw.sweepType == .buySideSwept ? "Quet dinh (Bearish SFP)" : "Quet day (Bullish SFP)"
-                return "\(sw.levelName) [\(typeStr)] tai \(formatPrice(sw.sweptPrice)), rau \(formatPrice(sw.wickExtreme))"
+                let typeStr = sw.sweepType == .buySideSwept ? "Quét đỉnh (Bearish SFP)" : "Quét đáy (Bullish SFP)"
+                return "\(sw.levelName) [\(typeStr)] tại \(formatPrice(sw.sweptPrice)), râu \(formatPrice(sw.wickExtreme))"
             }.joined(separator: "; ")
         }()
         
@@ -178,10 +178,10 @@ extension AIPromptBuilder {
             guard let val = rsiVal else { return "N/A" }
             let zone: String
             if isVi {
-                if val >= 70 { zone = "Qua Mua (>70)" }
-                else if val <= 30 { zone = "Qua Ban (<30)" }
-                else if val >= 50 { zone = "Thien Tang / Phe Mua kiem soat (50-70)" }
-                else { zone = "Thien Giam / Phe Ban kiem soat (30-50)" }
+                if val >= 70 { zone = "Quá Mua (>70)" }
+                else if val <= 30 { zone = "Quá Bán (<30)" }
+                else if val >= 50 { zone = "Thiên Tăng / Phe Mua kiểm soát (50-70)" }
+                else { zone = "Thiên Giảm / Phe Bán kiểm soát (30-50)" }
             } else {
                 if val >= 70 { zone = "Overbought (>70)" }
                 else if val <= 30 { zone = "Oversold (<30)" }
@@ -197,14 +197,14 @@ extension AIPromptBuilder {
             }
             let status: String
             if isVi {
-                status = rsi >= ema ? "RSI tren Signal (Dong luong Mua)" : "RSI duoi Signal (Dong luong Ban)"
+                status = rsi >= ema ? "RSI trên Signal (Động lượng Mua)" : "RSI dưới Signal (Động lượng Bán)"
             } else {
                 status = rsi >= ema ? "RSI above Signal (Bullish)" : "RSI below Signal (Bearish)"
             }
             return String(format: "%.1f [%@]", ema, status)
         }()
         
-        let divStr = isVi ? (momentumWindow.divergenceVi ?? "Khong co phan ky") : (momentumWindow.divergenceEn ?? "None")
+        let divStr = isVi ? (momentumWindow.divergenceVi ?? "Không có phân kỳ") : (momentumWindow.divergenceEn ?? "None")
         
         // 5. Macro News Catalyst
         let newsBlock: String = {
@@ -213,15 +213,15 @@ extension AIPromptBuilder {
             if let nextEvent = highImpacts.first(where: { ($0.date ?? Date.distantPast) > now }),
                let eventDate = nextEvent.date {
                 let diffMin = Int(eventDate.timeIntervalSince(now) / 60)
-                let timeDesc = diffMin >= 60 ? "\(diffMin / 60)h \(diffMin % 60)m" : "\(diffMin) phut"
+                let timeDesc = diffMin >= 60 ? "\(diffMin / 60)h \(diffMin % 60)m" : "\(diffMin) phút"
                 return isVi
-                    ? "[LICH TIN TUC]: \(nextEvent.title) (\(nextEvent.country)) cong bo trong \(timeDesc)"
+                    ? "[LỊCH TIN TỨC]: \(nextEvent.title) (\(nextEvent.country)) công bố trong \(timeDesc)"
                     : "[CATALYST EVENT]: \(nextEvent.title) (\(nextEvent.country)) in \(timeDesc)"
             }
-            return isVi ? "Khong co tin tuc quan trong trong 12h toi" : "No high-impact events within 12h"
+            return isVi ? "Không có tin tức quan trọng trong 12h tới" : "No high-impact events within 12h"
         }()
         
-        // 6. Active Account Context & Official Contract Sizing
+        // 6. Active Account Context & Mathematical Risk Guardrails
         let tradesToday = sessionSummary?.totalTradesToday ?? 0
         let winsToday = sessionSummary?.winsToday ?? 0
         let lossesToday = sessionSummary?.lossesToday ?? 0
@@ -229,7 +229,7 @@ extension AIPromptBuilder {
         let openToday = sessionSummary?.openTradesToday ?? 0
         
         let todayTradesDesc = isVi
-            ? "Tong \(tradesToday) lenh (\(winsToday) Thang | \(lossesToday) Thua | \(beToday) Hoa) | Lenh dang mo: \(openToday)"
+            ? "Tổng \(tradesToday) lệnh (\(winsToday) Thắng | \(lossesToday) Thua | \(beToday) Hoà) | Lệnh đang mở: \(openToday)"
             : "Total \(tradesToday) trades (\(winsToday) W | \(lossesToday) L | \(beToday) BE) | Open: \(openToday)"
             
         let pnlTodayVal = sessionSummary.map { NSDecimalNumber(decimal: $0.netPnlToday).doubleValue } ?? 0.0
@@ -237,31 +237,52 @@ extension AIPromptBuilder {
         
         let streak = sessionSummary?.currentStreakToday ?? 0
         let streakStr: String = {
-            if streak > 0 { return isVi ? "Thang \(streak) lenh lien tiep (+)" : "\(streak) wins in a row (+)" }
-            if streak < 0 { return isVi ? "Dang thua \(abs(streak)) lenh lien tiep (-)" : "In a \(abs(streak))-loss losing streak (-)" }
-            return isVi ? "Chua co chuoi lenh hom nay" : "No active streak today"
+            if streak > 0 { return isVi ? "Thắng \(streak) lệnh liên tiếp (+)" : "\(streak) wins in a row (+)" }
+            if streak < 0 { return isVi ? "Đang thua \(abs(streak)) lệnh liên tiếp (-)" : "In a \(abs(streak))-loss losing streak (-)" }
+            return isVi ? "Chưa có chuỗi lệnh hôm nay" : "No active streak today"
+        }()
+        
+        let balVal = sessionSummary.map { NSDecimalNumber(decimal: $0.balance).doubleValue } ?? 0.0
+        let maxDailyLossPct = traderProfile?.maxDailyLossPercent ?? 3.0
+        let todayLossPct: Double = {
+            if balVal > 0 && pnlTodayVal < 0 {
+                return (abs(pnlTodayVal) / balVal) * 100.0
+            }
+            return 0.0
+        }()
+        
+        let isDailyLossLimitBreached: Bool = {
+            if let buf = sessionSummary?.dailyLossBufferRemainingUsd, (buf as NSDecimalNumber).doubleValue <= 0 {
+                return true
+            }
+            if balVal > 0 && todayLossPct >= maxDailyLossPct {
+                return true
+            }
+            return false
         }()
         
         let dailyBufferStr: String = {
             if let buf = sessionSummary?.dailyLossBufferRemainingUsd {
-                let limit = sessionSummary?.dailyLossLimitUsd.map { String(format: "$%.2f", ($0 as NSDecimalNumber).doubleValue) } ?? (isVi ? "Theo quy dinh" : "Rule-based")
+                let limit = sessionSummary?.dailyLossLimitUsd.map { String(format: "$%.2f", ($0 as NSDecimalNumber).doubleValue) } ?? (isVi ? "Theo quy định" : "Rule-based")
                 let bufVal = (buf as NSDecimalNumber).doubleValue
                 return isVi
-                    ? "Han muc lo ngay: \(limit) | Dem lo con lai: $\(String(format: "%.2f", bufVal))"
-                    : "Daily Loss Limit: \(limit) | Remaining Buffer: $\(String(format: "%.2f", bufVal))"
+                    ? "Hạn mức lỗ ngày: \(limit) | Đệm lỗ còn lại: $\(String(format: "%.2f", bufVal)) (Tối đa \(String(format: "%.1f", maxDailyLossPct))% vốn)"
+                    : "Daily Loss Limit: \(limit) | Remaining Buffer: $\(String(format: "%.2f", bufVal)) (Max \(String(format: "%.1f", maxDailyLossPct))%)"
             }
             return isVi
-                ? "Han muc rui ro ngay: 2-3 lenh | Dang tuan thu ky luat"
-                : "Daily Risk Budget: 2-3 trades | Disciplined"
+                ? "Hạn mức rủi ro ngày: Tối đa \(String(format: "%.1f", maxDailyLossPct))% vốn | Đang lỗ \(String(format: "%.1f", todayLossPct))%"
+                : "Daily Risk Budget: Max \(String(format: "%.1f", maxDailyLossPct))% | Currently down \(String(format: "%.1f", todayLossPct))%"
         }()
         
-        let isStreakOrBufferBreached = streak <= -2 || (sessionSummary?.dailyLossBufferRemainingUsd.map { $0 <= 0 } ?? false)
-        
         let riskGuardrailWarning: String = {
-            if isStreakOrBufferBreached {
+            if isDailyLossLimitBreached {
                 return isVi
-                    ? "\n[CANH BAO RUI RO BAT BUOC]: Trader dang co chuoi thua (-2 lenh tro len) hoac dem lo ngay da cham nguong. AI BAT BUOC TU VAN DUNG NGOAI (FLAT), KHONG MO LENH MOI DE BAO VE TAI KHOAN.\n"
-                    : "\n[CRITICAL RISK GUARDRAIL]: Trader is on a losing streak (-2 or worse) or daily loss buffer is exhausted. AI MUST ADVISE FLAT (STAND ASIDE), NO NEW TRADES.\n"
+                    ? "\n[CẢNH BÁO VI PHẠM HẠN MỨC LỖ NGÀY]: Mức lỗ hôm nay đã chạm hoặc vượt giới hạn tối đa cho phép (\(String(format: "%.1f", todayLossPct))% >= \(String(format: "%.1f", maxDailyLossPct))%). AI BẮT BUỘC TƯ VẤN ĐỨNG NGOÀI (FLAT / HALT), TUYỆT ĐỐI KHÔNG MỞ THÊM LỆNH MỚI ĐỂ BẢO VỆ VỐN.\n"
+                    : "\n[CRITICAL MAX DAILY LOSS BREACH]: Daily loss has reached or exceeded max limit (\(String(format: "%.1f", todayLossPct))% >= \(String(format: "%.1f", maxDailyLossPct))%). AI MUST ADVISE FLAT (HALT), NO NEW TRADES ALLOWED.\n"
+            } else if streak <= -2 {
+                return isVi
+                    ? "\n[LƯU Ý TÂM LÝ & QUẢN TRỊ RỦI RO]: Trader đang có chuỗi thua \(abs(streak)) lệnh liên tiếp hôm nay. Chưa vi phạm hạn mức lỗ ngày (\(String(format: "%.1f", todayLossPct))% / \(String(format: "%.1f", maxDailyLossPct))%). AI CẦN KHẮT KHE TUYỆT ĐỐI VỚI ĐIỀU KIỆN VÀO LỆNH, chỉ gợi ý setup nếu cấu trúc nến và R:R đạt chuẩn tối đa, ngược lại ưu tiên đứng ngoài (FLAT).\n"
+                    : "\n[PSYCHOLOGY & RISK CAUTION]: Trader is on a \(abs(streak))-loss streak. Daily loss limit not yet breached (\(String(format: "%.1f", todayLossPct))% / \(String(format: "%.1f", maxDailyLossPct))%). Scrutinize setups strictly; prioritize standing aside (FLAT) unless structure and R:R are pristine.\n"
             }
             return ""
         }()
@@ -295,17 +316,17 @@ extension AIPromptBuilder {
         let targetRiskDollarsStr = String(format: "$%.2f", (targetRiskDollars as NSDecimalNumber).doubleValue)
         
         let contractSizingBlockVi = """
-        [QUY CACH HOP DONG VA TOAN HOC KHOI LUONG LENH (ASSET CONTRACT SIZING)]:
-        - Tai san: \(symbol) | Nhom: \(instrumentSpec.assetCategory.rawValue)
-        - Kich thuoc hop dong chuan (1.00 lot): \(instrumentSpec.contractSize) don vi
-        - Buoc gia Pip: \(instrumentSpec.pipSize)
-        - So du thuc te: \(realBalStr) \(equityStr)
-        - Ty le rui ro cai dat: \(numericRisk)% von
-        - Ngan sach rui ro toi da: \(targetRiskDollarsStr) USD (So tien lo toi da neu cham SL)
-        - Muc tieu Ty le Risk/Reward bat buoc: Toi thieu 1:\(String(format: "%.1f", targetRR)) (BAT BUOC TUAN THU)
-        - CONG THUC TOAN HOC TINH SO LOT:
-          So Lot = (So tien rui ro $) / (|Entry - SL| x Kich thuoc hop dong x Ty gia quy doi)
-          Luu y: Khi dua ra thong so Volume trong Setup, bat buoc tinh theo so tien rui ro \(targetRiskDollarsStr) o tren.
+        [QUY CÁCH HỢP ĐỒNG VÀ TOÁN HỌC KHỐI LƯỢNG LỆNH (ASSET CONTRACT SIZING)]:
+        - Tài sản: \(symbol) | Nhóm: \(instrumentSpec.assetCategory.rawValue)
+        - Kích thước hợp đồng chuẩn (1.00 lot): \(instrumentSpec.contractSize) đơn vị
+        - Bước giá Pip: \(instrumentSpec.pipSize)
+        - Số dư thực tế: \(realBalStr) \(equityStr)
+        - Tỷ lệ rủi ro cài đặt: \(numericRisk)% vốn
+        - Ngân sách rủi ro tối đa: \(targetRiskDollarsStr) USD (Số tiền lỗ tối đa nếu chạm SL)
+        - Mục tiêu Tỷ lệ Risk/Reward bắt buộc: Tối thiểu 1:\(String(format: "%.1f", targetRR)) (BẮT BUỘC TUÂN THỦ)
+        - CÔNG THỨC TOÁN HỌC TÍNH SỐ LOT:
+          Số Lot = (Số tiền rủi ro $) / (|Entry - SL| x Kích thước hợp đồng x Tỷ giá quy đổi)
+          Lưu ý: Khi đưa ra thông số Volume trong Setup, bắt buộc tính theo số tiền rủi ro \(targetRiskDollarsStr) ở trên.
         """
         
         let contractSizingBlockEn = """
@@ -332,121 +353,117 @@ extension AIPromptBuilder {
         var liveUpdateBlock = ""
         if let update = liveCandleUpdate, !update.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             liveUpdateBlock = isVi
-                ? "\n[DIEN BIEN GIA THUC TE VUA CAP NHAT]:\n\(update)\n"
+                ? "\n[DIỄN BIẾN GIÁ THỰC TẾ VỪA CẬP NHẬT]:\n\(update)\n"
                 : "\n[LIVE MARKET PRICE ACTION UPDATE]:\n\(update)\n"
         }
         
         var thesisContinuityBlock = ""
         if let prev = previousAnalysis, !prev.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             let condensedPrev = prev.count > 600
-                ? String(prev.prefix(600)) + "\n[...trich luoc ke hoach truoc...]"
+                ? String(prev.prefix(600)) + "\n[...trích lược kế hoạch trước...]"
                 : prev
             thesisContinuityBlock = isVi
-                ? "\n[KE HOACH DA DUA RA TRUOC DO]:\n\"\"\"\n\(condensedPrev)\n\"\"\"\n[DOI CHIEU]: Kiem tra nen moi xem dieu kien kich hoat da dien ra chua, hay cau truc ban dau da bi vi pham.\n"
+                ? "\n[KẾ HOẠCH ĐÃ ĐƯA RA TRƯỚC ĐÓ]:\n\"\"\"\n\(condensedPrev)\n\"\"\"\n[ĐỐI CHIẾU]: Kiểm tra nến mới xem điều kiện kích hoạt đã diễn ra chưa, hay cấu trúc ban đầu đã bị vi phạm.\n"
                 : "\n[PRIOR TRADING PLAN]:\n\"\"\"\n\(condensedPrev)\n\"\"\"\n[CONTINUITY]: Check if the entry trigger occurred or if the structure was invalidated.\n"
         }
         
         if isVi {
             return """
-            [THONG TIN TAI KHOAN VA TRANG THAI RUI RO]:
-            - So du thuc te: \(realBalStr) \(equityStr)
-            - Trang thai lenh hom nay: \(todayTradesDesc)
-            - PnL rong hom nay: \(pnlTodayStr) | Chuoi lenh: \(streakStr)
+            [THÔNG TIN TÀI KHOẢN VÀ TRẠNG THÁI RỦI RO]:
+            - Số dư thực tế: \(realBalStr) \(equityStr)
+            - Trạng thái lệnh hôm nay: \(todayTradesDesc)
+            - PnL ròng hôm nay: \(pnlTodayStr) | Chuỗi lệnh: \(streakStr)
             - \(dailyBufferStr)\(riskGuardrailWarning)
             \(contractSizingBlockVi)
             \(behavioralLeaksBlock)
-            [CAU TRUC THI TRUONG VA CHI BAO KY THUAT (EMA 21/50 & RSI 14)]:
-            - Cap tien: \(symbol) | Thi gia hien tai: \(currentPrice)
+            [CẤU TRÚC THỊ TRƯỜNG VÀ CHỈ BÁO KỸ THUẬT (EMA 21/50 & RSI 14)]:
+            - Cặp tiền: \(symbol) | Thị giá hiện tại: \(currentPrice)
 
-            - Khung D1 (Macro Bias): Xu huong [\(emaAnalysis.d1?.trend.label ?? "N/A")]
+            - Khung D1 (Macro Bias): Xu hướng [\(emaAnalysis.d1?.trend.label ?? "N/A")]
               EMA D1: \(d1EMAStr)
-              Moc gia then chot: Dinh PDH: \(d1PDH) | Day PDL: \(d1PDL) | ADR 14 ngay: \(d1ADR)
+              Mốc giá then chốt: Đỉnh PDH: \(d1PDH) | Đáy PDL: \(d1PDL) | ADR 14 ngày: \(d1ADR)
 
-            - Khung H4 (Cau truc song va Can TP/SL): Xu huong [\(emaAnalysis.h4?.trend.label ?? "N/A")]
+            - Khung H4 (Cấu trúc sóng và Cản TP/SL): Xu hướng [\(emaAnalysis.h4?.trend.label ?? "N/A")]
               EMA H4: \(h4EMAStr)
-              Moc gia then chot: Swing High: \(h4SwingHighStr) | Swing Low: \(h4SwingLowStr)
-              3 nen H4 gan nhat:
+              Mốc giá then chốt: Swing High: \(h4SwingHighStr) | Swing Low: \(h4SwingLowStr)
+              3 nến H4 gần nhất:
             \(h4CandlesSummary)
 
-            - Khung H1 (Thuc thi va Dong luong): Xu huong [\(emaAnalysis.h1?.trend.label ?? "N/A")]
+            - Khung H1 (Thực thi và Động lượng): Xu hướng [\(emaAnalysis.h1?.trend.label ?? "N/A")]
               EMA H1: \(h1EMAStr)
-              RSI(14) Wilder: Muc hien tai: \(rsiStr) | Signal: \(rsiSignalStr) | Phan ky: [\(divStr)]
-              Vung thanh khoan: BSL gan nhat: \(nearestBSLStr) | SSL gan nhat: \(nearestSSLStr)
-              Quet thanh khoan SFP: \(sweepsStr)
+              RSI(14) Wilder: Mức hiện tại: \(rsiStr) | Signal: \(rsiSignalStr) | Phân kỳ: [\(divStr)]
+              Vùng thanh khoản: BSL gần nhất: \(nearestBSLStr) | SSL gần nhất: \(nearestSSLStr)
+              Quét thanh khoản SFP: \(sweepsStr)
 
-            - HANH DONG GIA SONG (LIVE CANDLE PULSE):
+            - HÀNH ĐỘNG GIÁ SỐNG (LIVE CANDLE PULSE):
             \(liveCandlePulse)
 
-            - Chuoi 24 nen H1 gan nhat (24 gio giao dich lien tuc):
+            - Chuỗi 24 nến H1 gần nhất (24 giờ giao dịch liên tục):
             \(h1CandlesSummary)
 
-            - Chuoi 16 nen M15 gan nhat (4 gio vi mo thuc thi):
+            - Chuỗi 16 nến M15 gần nhất (4 giờ vi mô thực thi):
             \(m15CandlesSummary)
 
-            - Tin tuc kinh te: \(newsBlock)
+            - Tin tức kinh tế: \(newsBlock)
             \(liveUpdateBlock)\(thesisContinuityBlock)
-            VAI TRO VA NGUYEN TAC CUA NHA GIAO DICH CHUYEN NGHIEP:
-            Ban la mot Senior Institutional Portfolio Manager & Master Trader (Nha Giao Dich Chuyen Nghiep kiem Truong Phong Rui Ro Quy).
-            Triet ly giao dich:
-            1. Giao dich la bai toan bao ve von va cho doi loi the bat doi xung. Tha dung ngoai (FLAT) con hon vao mot lenh kem chat luong hoac R:R khong dat chuan.
-            2. Luon nhin thi truong bang con mat hoai nghi, boc tach bay thanh khoan cua phe to chuc.
-            3. Phan bien toan dien: Tu chu ky xu huong, can bay thanh khoan, den tin hieu kich hoat nen song va ty le R:R.
+            VAI TRÒ VÀ NGUYÊN TẮC CỦA NHÀ GIAO DỊCH CHUYÊN NGHIỆP:
+            Bạn là một Senior Institutional Portfolio Manager & Master Trader (Chuyên gia Phân tích & Quản lý Quỹ).
+            Triết lý giao dịch:
+            1. Giao dịch là bài toán bảo vệ vốn và chờ đợi lợi thế bất đối xứng. Thà đứng ngoài (FLAT) còn hơn vào một lệnh kém chất lượng hoặc R:R không đạt chuẩn.
+            2. Luôn nhìn thị trường bằng con mắt hoài nghi, bóc tách bẫy thanh khoản của phe tổ chức.
+            3. Phản biện toàn diện: Từ cấu trúc xu hướng, bẫy thanh khoản, đến tín hiệu kích hoạt nến sống và tỷ lệ R:R.
 
-            NHIEM VU PHAN TICH VA LAP KE HOACH GIAO DICH (4 PHAN):
+            NHIỆM VỤ PHÂN TÍCH VÀ LẬP KẾ HOẠCH GIAO DỊCH (4 PHẦN):
 
-            ### 1. Phan bien Xu huong vi mo D1 va Chu ky dong tien
-            - Xu huong D1 dang o giai doan nao: Chan song mo rong hay da keo dan bien do (Overextended) xa khoi EMA(21) D1 va sap can kiet luc mua/ban?
-            - Phan bien xung dot da khung: D1 tang nhung H4 suy kiet hoac dang tiep can can lon thi tuyet doi khong du dinh.
-            - Muc tieu thanh khoan ngay: Kha nang tim ve PDH (\(d1PDH)) hoac PDL (\(d1PDL)).
+            ### 1. Cấu trúc D1
+            - Xu hướng D1: Vị trí sóng, khoảng cách so với EMA(21) D1 và các mốc thanh khoản PDH (\(d1PDH)) / PDL (\(d1PDL)).
+            - Đánh giá xung đột đa khung: D1 tăng nhưng H4 suy kiệt hoặc đang tiếp cận cản lớn thì tuyệt đối không đu đỉnh.
 
-            ### 2. Cau truc song H4 va Boc tach Bay thanh khoan to chuc
-            - Phan dinh ro: Dau la cac vung can bay (Retail Support/Resistance / Equal Highs-Lows) - noi dam dong nho le dat SL de to chuc quet sach?
-            - Xac dinh cac vung Cung/Cau to chuc thuc thu (Unmitigated Order Block, Fair Value Gap, Liquidity Void) de lam can muc tieu TP hoac bao ve SL.
-            - Neu gia dang o vung tranh chap vo dinh (No-man's land) khong co loi the cau truc: Phan bien ro khong co co so thiet lap can tin cay.
+            ### 2. Cấu trúc H4 & Vùng Cung Cầu
+            - Cấu trúc sóng H4: Đỉnh/đáy Swing, các vùng Cung/Cầu tổ chức then chốt (Order Block, Fair Value Gap) và bẫy thanh khoản phe nhỏ lẻ (Equal Highs/Lows).
+            - Nếu giá đang ở vùng tranh chấp không có lợi thế cấu trúc: Nêu rõ không có cơ sở thiết lập cản tin cậy.
 
-            ### 3. Doc vi Hanh dong Gia Song H1/M15 (Live Price Action Tape Reading) va Tin hieu kich hoat
-            - Doc vi cay nen song hien tai va chuoi nen H1/M15: Than nen co hep hay mo rong? Rau nen dang bi tu choi gia the nao? Phe Mua hay Ban dang chiem uu the thuc te ngay luc nay?
-            - Tin hieu kich hoat: Da co nhip quet thanh khoan SFP, pha vo cau truc vi mo MSS/CHoCH hoac nen dong than xac nhan chua?
-            - Phan bien thoi diem: Cam doan dinh day, cam vao lenh don dau khi nen chua xac nhan. Neu chua co tin hieu kich hoat: Bat buoc dung ngoai (FLAT).
+            ### 3. Tín hiệu vào lệnh H1/M15
+            - Hành động giá nến H1/M15 thời gian thực: Thân nến, râu nến từ chối giá, tín hiệu quét thanh khoản (SFP) hoặc xác nhận cấu trúc (MSS/CHoCH).
+            - Không đoán đỉnh đáy, không vào lệnh đón đầu khi nến chưa xác nhận. Nếu chưa có tín hiệu kích hoạt: Bắt buộc đứng ngoài (FLAT).
 
-            ### 4. Ke hoach lenh hoan chinh (Trading Blueprint) va Ky luat R:R >= 1:\(String(format: "%.1f", targetRR))
-            - KET LUAN RO RANG: [BUY (LONG) / SELL (SHORT) / FLAT (DUNG NGOAI)].
-            - LOAI SETUP: [THUAN XU HUONG DONG TIEN] hoac [NGHICH XU HUONG BAT SONG HOI TU CAN H4].
-            - KHOA CHAT TY LE R:R: Toi thieu 1:\(String(format: "%.1f", targetRR)).
-              NGUYEN TAC TU CHOI: Neu khoang cach tu Entry toi can TP1 khong du dat ty le R:R 1:\(String(format: "%.1f", targetRR)): Bat buoc ket luan FLAT (Dung ngoai), tu choi vao lenh kem chat luong va giai thich ro vung gia nao moi dat chuan.
-            - NEU KHUYEN NGHI VAO LENH (BUY/SELL):
-              - Diem vao toi uu (Entry).
-              - Cat lo bat buoc (Structural Invalidation SL): Muc gia SL cu the vi pham cau truc.
-              - Chot loi (Targets): TP 1 va TP 2 tai can H4.
-              - Khoi luong (Volume): Tinh chinh xac so lot theo muc rui ro \(numericRisk)% va so tien rui ro \(targetRiskDollarsStr).
-              - Ty le R:R thuc te dat duoc: [Ghi ro so R:R, vi du 1:3.2].
-            - NEU KHUYEN NGHI FLAT (DUNG NGOAI): Giai thich ro dieu kien nen/can gi can kien nhan cho them.
+            ### 4. Kế hoạch giao dịch & Quản lý vốn
+            - KẾT LUẬN RÕ RÀNG: [BUY (LONG) / SELL (SHORT) / FLAT (ĐỨNG NGOÀI)].
+            - KHÓA CHẶT TỶ LỆ R:R: Tối thiểu 1:\(String(format: "%.1f", targetRR)).
+              NGUYÊN TẮC TỪ CHỐI: Nếu khoảng cách từ Entry tới cản TP1 không đủ đạt tỷ lệ R:R 1:\(String(format: "%.1f", targetRR)): Bắt buộc kết luận FLAT (Đứng ngoài), từ chối vào lệnh kém chất lượng và giải thích rõ vùng giá nào mới đạt chuẩn.
+            - NẾU KHUYẾN NGHỊ VÀO LỆNH (BUY/SELL):
+              - Điểm vào tối ưu (Entry).
+              - Cắt lỗ bắt buộc (Structural Invalidation SL): Mức giá SL cụ thể vi phạm cấu trúc.
+              - Chốt lời (Targets): TP 1 và TP 2 tại cản H4.
+              - Khối lượng (Volume): Tính chính xác số lot theo mức rủi ro \(numericRisk)% và số tiền rủi ro \(targetRiskDollarsStr).
+              - Tỷ lệ R:R thực tế đạt được: [Ghi rõ số R:R, ví dụ 1:3.2].
+            - NẾU KHUYẾN NGHỊ FLAT (ĐỨNG NGOÀI): Giải thích rõ điều kiện nến/cản gì cần kiên nhẫn chờ thêm.
 
-            BAT BUOC KET THUC BANG BANG THONG SO SETUP DUNG DINH DANG SAU:
+            BẮT BUỘC KẾT THÚC BẰNG BẢNG THÔNG SỐ SETUP ĐÚNG ĐỊNH DẠNG SAU:
             [PRE-TRADE SETUP SPECIFICATION]
-            - Direction: [BUY hoac SELL hoac FLAT]
+            - Direction: [BUY hoặc SELL hoặc FLAT]
             - Balance: \(realBalStr)
-            - Entry: [Muc gia hoac vung gia vao lenh]
-            - Stop loss: [Muc gia SL cu the]
-            - Take profit 1: [Muc gia TP 1]
-            - Take profit 2: [Muc gia TP 2 neu co, neu khong ghi Khong]
-            - R:R Ratio: [Ty le R:R, vi du 1:3.2]
-            - Volume: [Khoi luong lot khuyen nghi tinh theo so tien rui ro \(targetRiskDollarsStr), vi du 1.00 lot]
-            - Date time: [Thoi gian hien tai]
+            - Entry: [Mức giá hoặc vùng giá vào lệnh]
+            - Stop loss: [Mức giá SL cụ thể]
+            - Take profit 1: [Mức giá TP 1]
+            - Take profit 2: [Mức giá TP 2 nếu có, nếu không ghi None]
+            - R:R Ratio: [Tỷ lệ R:R, ví dụ 1:3.2]
+            - Volume: [Khối lượng lot khuyến nghị tính theo số tiền rủi ro \(targetRiskDollarsStr), ví dụ 1.00 lot]
+            - Date time: [Thời gian hiện tại]
 
             ```json
             {
-              "direction": "[BUY hoac SELL hoac FLAT]",
-              "entry": [muc gia entry dang so hoac null],
-              "stopLoss": [muc gia sl dang so hoac null],
-              "takeProfit1": [muc gia tp1 dang so hoac null],
-              "takeProfit2": [muc gia tp2 dang so hoac null],
-              "riskRewardRatio": "[vi du 1:3.2]",
-              "volume": "[vi du 1.00 lot]"
+              "direction": "[BUY hoặc SELL hoặc FLAT]",
+              "entry": [mức giá entry dạng số hoặc null],
+              "stopLoss": [mức giá sl dạng số hoặc null],
+              "takeProfit1": [mức giá tp1 dạng số hoặc null],
+              "takeProfit2": [mức giá tp2 dạng số hoặc null],
+              "riskRewardRatio": "[ví dụ 1:3.2]",
+              "volume": "[ví dụ 1.00 lot]"
             }
             ```
 
-            > [Dung 1 cau quy tac ky luat hanh dong khong khoan nhuong cua nha giao dich chuyen nghiep]
+            > [Đúng 1 câu quy tắc kỷ luật hành động không khoan nhượng của nhà giao dịch chuyên nghiệp]
             """
         } else {
             return """
@@ -493,21 +510,26 @@ extension AIPromptBuilder {
             2. Maintain a skeptical institutional mindset, identifying retail traps set by Smart Money.
             3. Full-spectrum critique: from trend exhaustion and fake barriers to live tape reading and strict R:R.
 
-            TASK: INSTITUTIONAL PRE-TRADE PLAN & FULL-SPECTRUM CRITIQUE:
+            TASK: INSTITUTIONAL PRE-TRADE PLAN (4 SECTIONS):
 
-            ### 1. D1 Macro Regime & Trend Cycle Audit
+            ### 1. D1 Structure
             - Evaluate current trend stage: Healthy expansion or overextended and due for exhaustion?
             - Identify multi-timeframe conflicts: Never buy into HTF resistance.
+            - Key liquidity targets: Potential draw on liquidity at PDH (\(d1PDH)) or PDL (\(d1PDL)).
 
-            ### 2. H4 Structure & Liquidity Trap Unmasking
-            - Differentiate retail liquidity traps (Equal Highs/Lows) from genuine unmitigated Order Blocks and Fair Value Gaps.
+            ### 2. H4 Structure & Key Zones
+            - Differentiate retail liquidity traps (Equal Highs/Lows) from genuine institutional Order Blocks and Fair Value Gaps.
+            - Confirm key structural invalidation levels for Stop Loss placement.
 
-            ### 3. H1/M15 Live Price Action Tape Reading & Trigger Confirmation
+            ### 3. H1/M15 Confirmation & Trigger
             - Read live unclosed candle pulse and wick dynamics. Look for displacement and SFP sweeps. Forbid front-running.
+            - If no valid entry trigger is formed: Conclude FLAT (stand aside).
 
-            ### 4. Actionable Execution Blueprint & Strict R:R >= 1:\(String(format: "%.1f", targetRR))
+            ### 4. Trade Plan & Risk Management
             - Decisive Verdict: [BUY / SELL / FLAT].
-            - Strict R:R Enforcement: If setup space to TP1 cannot yield at least 1:\(String(format: "%.1f", targetRR)), conclude FLAT immediately.
+            - Strict R:R Enforcement: Minimum 1:\(String(format: "%.1f", targetRR)). If setup space to TP1 cannot yield at least 1:\(String(format: "%.1f", targetRR)), conclude FLAT immediately.
+            - If BUY/SELL: Specific Entry, Invalidation SL, TP1 & TP2, and calculated volume for \(numericRisk)% risk (\(targetRiskDollarsStr) budget).
+            - If FLAT: State specific conditions to wait for.
 
             [PRE-TRADE SETUP SPECIFICATION]
             - Direction: [BUY or SELL or FLAT]
@@ -540,7 +562,7 @@ extension AIPromptBuilder {
     // MARK: - Live Unclosed Candle Dynamics Helper
     public static func buildLiveUnclosedCandlePulse(bar: MarketBar?, isVi: Bool) -> String {
         guard let b = bar else {
-            return isVi ? "Chua co du lieu nen song" : "No live candle data"
+            return isVi ? "Chưa có dữ liệu nến sống" : "No live candle data"
         }
         func fmt(_ p: Decimal) -> String {
             let d = (p as NSDecimalNumber).doubleValue
@@ -552,7 +574,7 @@ extension AIPromptBuilder {
         
         let delta = b.close - b.open
         let deltaStr = (delta >= 0 ? "+" : "") + fmt(delta)
-        let bodyType = delta >= 0 ? (isVi ? "TANG" : "BULLISH") : (isVi ? "GIAM" : "BEARISH")
+        let bodyType = delta >= 0 ? (isVi ? "TĂNG" : "BULLISH") : (isVi ? "GIẢM" : "BEARISH")
         
         let upperWick = b.high - max(b.open, b.close)
         let lowerWick = min(b.open, b.close) - b.low
@@ -561,16 +583,16 @@ extension AIPromptBuilder {
         
         let rejectionDesc: String = {
             if upperWick > lowerWick * 2 && upperWick > 0 {
-                return isVi ? "Rau tren dai (\(upperWickStr)) -> Phe Ban dang tu choi gia cao" : "Long upper wick (\(upperWickStr)) -> Sellers rejecting highs"
+                return isVi ? "Râu trên dài (\(upperWickStr)) -> Phe Bán đang từ chối giá cao" : "Long upper wick (\(upperWickStr)) -> Sellers rejecting highs"
             }
             if lowerWick > upperWick * 2 && lowerWick > 0 {
-                return isVi ? "Rau duoi dai (\(lowerWickStr)) -> Phe Mua dang tu choi gia thap (Rut chan)" : "Long lower wick (\(lowerWickStr)) -> Buyers rejecting lows"
+                return isVi ? "Râu dưới dài (\(lowerWickStr)) -> Phe Mua đang từ chối giá thấp (Rút chân)" : "Long lower wick (\(lowerWickStr)) -> Buyers rejecting lows"
             }
-            return isVi ? "Than nen dang phat trien can bang" : "Developing candle body"
+            return isVi ? "Thân nến đang phát triển cân bằng" : "Developing candle body"
         }()
         
         if isVi {
-            return "  - Nen hien tai: Mo: \(fmt(b.open)) | Cao: \(fmt(b.high)) | Thap: \(fmt(b.low)) | Hien tai: \(fmt(b.close))\n  - Trang thai nen song: [\(bodyType) \(deltaStr)] | Rau tren: \(upperWickStr) | Rau duoi: \(lowerWickStr)\n  - Hanh vi gia song: \(rejectionDesc)"
+            return "  - Nến hiện tại: Mở: \(fmt(b.open)) | Cao: \(fmt(b.high)) | Thấp: \(fmt(b.low)) | Hiện tại: \(fmt(b.close))\n  - Trạng thái nến sống: [\(bodyType) \(deltaStr)] | Râu trên: \(upperWickStr) | Râu dưới: \(lowerWickStr)\n  - Hành vi giá sống: \(rejectionDesc)"
         } else {
             return "  - Live Candle: O: \(fmt(b.open)) | H: \(fmt(b.high)) | L: \(fmt(b.low)) | Live: \(fmt(b.close))\n  - Real-time State: [\(bodyType) \(deltaStr)] | Upper Wick: \(upperWickStr) | Lower Wick: \(lowerWickStr)\n  - Live Action Insight: \(rejectionDesc)"
         }
@@ -578,7 +600,7 @@ extension AIPromptBuilder {
 
     // MARK: - 3-Candle H4 Summary Helper
     public static func buildH4CandleSummary(bars: [MarketBar], count: Int = 3, isVi: Bool = true) -> String {
-        guard !bars.isEmpty else { return isVi ? "Khong co du lieu nen H4" : "No H4 candle data" }
+        guard !bars.isEmpty else { return isVi ? "Không có dữ liệu nến H4" : "No H4 candle data" }
         let slice = bars.suffix(count)
         func fmt(_ p: Decimal) -> String {
             let d = (p as NSDecimalNumber).doubleValue
@@ -592,7 +614,7 @@ extension AIPromptBuilder {
         var lines: [String] = []
         for (idx, b) in slice.enumerated() {
             let offset = n - 1 - idx
-            let label = offset == 0 ? (isVi ? "H4 [Nen hien tai]" : "H4 [Live Candle]") : "H4 [-\(offset * 4)h]"
+            let label = offset == 0 ? (isVi ? "H4 [Nến hiện tại]" : "H4 [Live Candle]") : "H4 [-\(offset * 4)h]"
             lines.append("  - \(label): O: \(fmt(b.open)) | H: \(fmt(b.high)) | L: \(fmt(b.low)) | C: \(fmt(b.close))")
         }
         return lines.joined(separator: "\n")
@@ -605,7 +627,7 @@ extension AIPromptBuilder {
         symbol: String = "",
         isVi: Bool = true
     ) -> String {
-        guard !bars.isEmpty else { return isVi ? "Khong co du lieu nen H1" : "No H1 candle data" }
+        guard !bars.isEmpty else { return isVi ? "Không có dữ liệu nến H1" : "No H1 candle data" }
         
         let ema21 = MovingAverageEngine.calculateEMA(period: 21, bars: bars)
         let ema50 = MovingAverageEngine.calculateEMA(period: 50, bars: bars)
@@ -635,7 +657,7 @@ extension AIPromptBuilder {
         for i in startIndex..<n {
             let bar = bars[i]
             let offset = n - 1 - i
-            let timeLabel = offset == 0 ? (isVi ? "[Nen song]" : "[Live]") : "[-t-\(offset)h]"
+            let timeLabel = offset == 0 ? (isVi ? "[Nến sống]" : "[Live]") : "[-t-\(offset)h]"
             
             let e21Str = i < ema21.count ? fmt(ema21[i]) : "N/A"
             let e50Str = i < ema50.count ? fmt(ema50[i]) : "N/A"
@@ -668,7 +690,7 @@ extension AIPromptBuilder {
         symbol: String = "",
         isVi: Bool = true
     ) -> String {
-        guard !bars.isEmpty else { return isVi ? "Khong co du lieu nen M15" : "No M15 candle data" }
+        guard !bars.isEmpty else { return isVi ? "Không có dữ liệu nến M15" : "No M15 candle data" }
         
         let n = bars.count
         let takeCount = min(count, n)
@@ -686,7 +708,7 @@ extension AIPromptBuilder {
         for i in startIndex..<n {
             let bar = bars[i]
             let offset = n - 1 - i
-            let timeLabel = offset == 0 ? (isVi ? "[Nen song]" : "[Live]") : "[-t-\(offset * 15)m]"
+            let timeLabel = offset == 0 ? (isVi ? "[Nến sống]" : "[Live]") : "[-t-\(offset * 15)m]"
             let num = lines.count + 1
             let numStr = num < 10 ? "0\(num)" : "\(num)"
             let line = "  - #\(numStr) \(timeLabel): O: \(fmt(bar.open)) | H: \(fmt(bar.high)) | L: \(fmt(bar.low)) | C: \(fmt(bar.close))"

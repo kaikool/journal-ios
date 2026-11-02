@@ -40,32 +40,82 @@ public struct AIReflectionPreTradeBanner: View {
     public var body: some View {
         AppCard {
             HStack(spacing: 12) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        HStack(spacing: 6) {
-                            Text("Pre-Trade Market Bias")
-                                .font(AppTypography.rowTitle)
-                                .foregroundColor(AppColors.primaryText)
-                            
-                            AppBadge("D1 • H4 • M15", style: .brand)
-                        }
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 6) {
+                        Text("Pre-Trade Market Bias")
+                            .font(AppTypography.rowTitle)
+                            .foregroundColor(AppColors.primaryText)
                         
-                        Text("Scan multi-timeframe liquidity sweeps, order blocks & setups")
-                            .font(AppTypography.caption)
-                            .foregroundColor(AppColors.secondaryText)
-                            .lineLimit(1)
+                        AppBadge("D1 • H4 • M15", style: .brand)
                     }
                     
-                    Spacer()
-                    
-                    Image(systemName: "chevron.right")
-                        .font(AppTypography.captionMicro)
+                    Text("Scan multi-timeframe liquidity sweeps, order blocks & setups")
+                        .font(AppTypography.caption)
                         .foregroundColor(AppColors.secondaryText)
+                        .lineLimit(1)
                 }
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    NativeHaptics.lightImpact()
-                    onOpenPreTrade()
+                
+                Spacer()
+                
+                Image(systemName: "chevron.right")
+                    .font(AppTypography.captionMicro)
+                    .foregroundColor(AppColors.secondaryText)
+            }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                NativeHaptics.lightImpact()
+                onOpenPreTrade()
+            }
+        }
+    }
+}
+
+// MARK: - Dedicated Behavioral Leaks Banner
+public struct AIReflectionBehaviorLeaksBanner: View {
+    public let onOpenLeaks: () -> Void
+    
+    public init(onOpenLeaks: @escaping () -> Void) {
+        self.onOpenLeaks = onOpenLeaks
+    }
+    
+    public var body: some View {
+        AppCard {
+            HStack(spacing: 12) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(AppColors.loss.opacity(0.12))
+                        .frame(width: 36, height: 36)
+                    Image(systemName: "waveform.path.ecg")
+                        .font(AppTypography.cardHeader)
+                        .foregroundColor(AppColors.loss)
                 }
+                
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 6) {
+                        Text("Behavioral Leaks & Risk Mining")
+                            .font(AppTypography.rowTitle)
+                            .foregroundColor(AppColors.primaryText)
+                        
+                        AppBadge("Engine", style: .brand)
+                    }
+                    
+                    Text("Audit toxic hours, revenge trading & R:R asymmetry")
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.secondaryText)
+                        .lineLimit(1)
+                }
+                
+                Spacer()
+                
+                Image(systemName: "chevron.right")
+                    .font(AppTypography.captionMicro)
+                    .foregroundColor(AppColors.secondaryText)
+            }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                NativeHaptics.lightImpact()
+                onOpenLeaks()
+            }
         }
     }
 }

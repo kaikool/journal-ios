@@ -12,10 +12,12 @@ public struct TraderProfileSheet: View {
     @State private var accountObjective: String = ""
     @State private var primaryPlaybooks: String = ""
     @State private var maxRiskPerTrade: String = ""
+    @State private var maxDailyLossPercentText: String = ""
     @State private var knownPsychologicalLeaks: String = ""
     @State private var customMemoryNotes: String = ""
     
     @State private var showSavedToast: Bool = false
+    @State private var showBehaviorLeaksSheet: Bool = false
     
     public init() {}
     
@@ -60,6 +62,9 @@ public struct TraderProfileSheet: View {
             }
             .onAppear {
                 loadProfile()
+            }
+            .sheet(isPresented: $showBehaviorLeaksSheet) {
+                TraderBehavioralLeaksSheet()
             }
         }
     }
@@ -150,6 +155,24 @@ public struct TraderProfileSheet: View {
                     .padding(.top, 2)
                 }
                 
+                // Maximum Daily Loss Limit (%)
+                VStack(alignment: .leading, spacing: 6) {
+                    AppFormField(
+                        "Maximum Daily Loss Limit (%)",
+                        text: $maxDailyLossPercentText,
+                        placeholder: "e.g. 3.0 (Trading halts when daily loss is breached)",
+                        height: 42
+                    )
+                    
+                    // Quick Daily Loss Chips
+                    HStack(spacing: 6) {
+                        presetDailyLossChip("2.0%")
+                        presetDailyLossChip("3.0%")
+                        presetDailyLossChip("5.0%")
+                    }
+                    .padding(.top, 2)
+                }
+                
                 // Account Objective
                 AppFormField(
                     "Account Objective & Max Drawdown",
@@ -169,12 +192,21 @@ public struct TraderProfileSheet: View {
                 AppSectionHeader("Psychological leaks & non-negotiables", icon: "exclamationmark.triangle")
                 
                 // Known Psychological Leaks
-                AppFormField(
-                    "Known Behavioral Leaks & Biases",
-                    text: $knownPsychologicalLeaks,
-                    placeholder: "e.g. Widening Stop Loss, Premature Profit Taking, FOMO re-entry",
-                    height: 42
-                )
+                VStack(alignment: .leading, spacing: 6) {
+                    AppFormField(
+                        "Known Behavioral Leaks & Biases",
+                        text: $knownPsychologicalLeaks,
+                        placeholder: "e.g. Widening Stop Loss, Premature Profit Taking, FOMO re-entry",
+                        height: 42
+                    )
+                    
+                    HStack {
+                        Spacer()
+                        AppActionPill("Mine Historical Leaks", icon: "sparkles") {
+                            showBehaviorLeaksSheet = true
+                        }
+                    }
+                }
                 
                 // Custom Memory Directives
                 VStack(alignment: .leading, spacing: 6) {
@@ -217,6 +249,14 @@ public struct TraderProfileSheet: View {
         }
     }
     
+    private func presetDailyLossChip(_ loss: String) -> some View {
+        let clean = loss.replacingOccurrences(of: "%", with: "").trimmingCharacters(in: .whitespaces)
+        let isSel = maxDailyLossPercentText.replacingOccurrences(of: "%", with: "").trimmingCharacters(in: .whitespaces) == clean
+        return AppFilterChip(loss, isSelected: isSel) {
+            maxDailyLossPercentText = clean
+        }
+    }
+    
     // MARK: - Data Handlers
     private func loadProfile() {
         let prof = dataStore.aiSettings.traderProfile
@@ -224,17 +264,22 @@ public struct TraderProfileSheet: View {
         accountObjective = prof.accountObjective
         primaryPlaybooks = prof.primaryPlaybooks
         maxRiskPerTrade = prof.maxRiskPerTrade
+        maxDailyLossPercentText = String(format: "%.1f", prof.maxDailyLossPercent)
         knownPsychologicalLeaks = prof.knownPsychologicalLeaks
         customMemoryNotes = prof.customMemoryNotes
     }
     
     private func saveProfile() {
         var conf = dataStore.aiSettings
+        let cleanDaily = maxDailyLossPercentText.replacingOccurrences(of: "%", with: "").trimmingCharacters(in: .whitespaces)
+        let parsedDailyLoss = Double(cleanDaily) ?? 3.0
+        
         conf.traderProfile = TraderProfileConfig(
             tradingStyle: tradingStyle.trimmingCharacters(in: .whitespaces),
             accountObjective: accountObjective.trimmingCharacters(in: .whitespaces),
             primaryPlaybooks: primaryPlaybooks.trimmingCharacters(in: .whitespaces),
             maxRiskPerTrade: maxRiskPerTrade.trimmingCharacters(in: .whitespaces),
+            maxDailyLossPercent: parsedDailyLoss,
             knownPsychologicalLeaks: knownPsychologicalLeaks.trimmingCharacters(in: .whitespaces),
             customMemoryNotes: customMemoryNotes.trimmingCharacters(in: .whitespaces)
         )
