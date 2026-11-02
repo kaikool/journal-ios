@@ -539,7 +539,7 @@ public actor AIReflectionService {
         conversationHistory: [AICoachMessage] = [],
         previousAnalysis: String? = nil
     ) async throws -> String {
-        let (config, sessionSummary, metrics, traderProfile, displayTimeZone, events) = await MainActor.run { () -> (AiSettingsConfig, AIAccountSessionSummary, TradeMetrics, TraderProfileConfig, String, [ForexFactoryEvent]) in
+        let (config, sessionSummary, metrics, traderProfile, displayTimeZone, events, historicalTrades) = await MainActor.run { () -> (AiSettingsConfig, AIAccountSessionSummary, TradeMetrics, TraderProfileConfig, String, [ForexFactoryEvent], [Trade]) in
             let ds = TradeDataStore.shared
             let cfg = ds.aiSettings
             let summary = AIAccountContextProvider.captureContext(dataStore: ds)
@@ -547,7 +547,8 @@ public actor AIReflectionService {
             let prof = cfg.traderProfile
             let tz = ds.generalSettings.displayTimeZone
             let evs = ForexFactoryService.shared.usdEvents
-            return (cfg, summary, m, prof, tz, evs)
+            let trades = ds.trades
+            return (cfg, summary, m, prof, tz, evs, trades)
         }
         
         let activeLang = language ?? config.language
@@ -564,7 +565,8 @@ public actor AIReflectionService {
             traderProfile: traderProfile,
             displayTimeZone: displayTimeZone,
             previousAnalysis: previousAnalysis,
-            hasImage: hasImage
+            hasImage: hasImage,
+            historicalTrades: historicalTrades
         )
         
         return try await requestReflection(

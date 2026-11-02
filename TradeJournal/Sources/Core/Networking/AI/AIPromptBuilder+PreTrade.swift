@@ -20,7 +20,8 @@ extension AIPromptBuilder {
         displayTimeZone: String = "UTC",
         previousAnalysis: String? = nil,
         liveCandleUpdate: String? = nil,
-        hasImage: Bool = false
+        hasImage: Bool = false,
+        historicalTrades: [Trade] = []
     ) -> String {
         let isVi = language == "vi"
         
@@ -322,7 +323,8 @@ extension AIPromptBuilder {
         
         // 7. Empirical Behavioral Leaks Mined from Database
         let behavioralLeaksBlock: String = {
-            let mining = TraderBehaviorMiningEngine.mineLeaks(from: TradeDataStore.shared.trades, targetSymbol: symbol)
+            guard !historicalTrades.isEmpty else { return "" }
+            let mining = TraderBehaviorMiningEngine.mineLeaks(from: historicalTrades, targetSymbol: symbol)
             return TraderBehaviorMiningEngine.formatForPrompt(result: mining, isVi: isVi)
         }()
         
