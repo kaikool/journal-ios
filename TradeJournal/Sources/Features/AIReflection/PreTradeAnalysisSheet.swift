@@ -506,12 +506,15 @@ public struct PreTradeAnalysisSheet: View {
                 // Capture account balance for setup record
                 let session = AIAccountContextProvider.captureContext(dataStore: self.dataStore)
                 let balStr = session.balance.map { Formatters.formatCurrency($0, currency: session.accountCurrency) }
+                let riskPct = self.dataStore.aiSettings.traderProfile.numericRiskPercent
                 
                 // Persist structured advisor commitment so Trade Coach can automatically link and honor it
                 let commitment = AIAdvisorMemoryEngine.shared.extractCommitment(
                     from: response,
                     symbol: self.selectedSymbol,
-                    fallbackBalance: balStr
+                    fallbackBalance: balStr,
+                    accountBalance: session.balance,
+                    riskPercentage: riskPct
                 )
                 AIAdvisorMemoryEngine.shared.saveCommitment(commitment)
             }

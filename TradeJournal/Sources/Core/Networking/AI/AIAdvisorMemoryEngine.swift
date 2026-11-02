@@ -714,7 +714,9 @@ public final class AIAdvisorMemoryEngine: @unchecked Sendable {
         from analysisText: String,
         symbol: String,
         fallbackBalance: String? = nil,
-        fallbackVolume: String? = nil
+        fallbackVolume: String? = nil,
+        accountBalance: Decimal? = nil,
+        riskPercentage: Decimal? = nil
     ) -> AdvisorCommitmentRecord {
         var bias = "FLAT"
         var entry: String? = nil
@@ -847,13 +849,17 @@ public final class AIAdvisorMemoryEngine: @unchecked Sendable {
             let cleanEntry = entryStr.replacingOccurrences(of: "[^0-9.]", with: "", options: .regularExpression)
             let cleanSL = slStr.replacingOccurrences(of: "[^0-9.]", with: "", options: .regularExpression)
             if let eNum = Decimal(string: cleanEntry), let sNum = Decimal(string: cleanSL), eNum > 0, sNum > 0, eNum != sNum {
-                let session = AIAccountContextProvider.captureContext(dataStore: TradeDataStore.shared)
-                let riskPct = TradeDataStore.shared.aiSettings.traderProfile.numericRiskPercent
-                if let b = session.balance, b > 0 {
+                var balNum = accountBalance
+                if balNum == nil, let bStr = balance ?? fallbackBalance {
+                    let clean = bStr.replacingOccurrences(of: "[^0-9.]", with: "", options: .regularExpression)
+                    balNum = Decimal(string: clean)
+                }
+                let activeRiskPct = riskPercentage ?? Decimal(1)
+                if let b = balNum, b > 0 {
                     if let size = AssetContractEngine.calculatePositionSize(
                         symbol: symbol,
                         balance: b,
-                        riskPercentage: riskPct,
+                        riskPercentage: activeRiskPct,
                         entryPrice: eNum,
                         stopLoss: sNum
                     ) {
@@ -893,7 +899,6 @@ public final class AIAdvisorMemoryEngine: @unchecked Sendable {
             triggerCondition: trigger,
             thesisSummary: summary.isEmpty ? analysisText.prefix(200).description : summary
         )
-    }
     }
     
     // MARK: - 5. Persistence & Automatic Migration
