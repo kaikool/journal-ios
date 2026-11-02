@@ -32,8 +32,81 @@ public struct AIAnalysisBlock: Identifiable {
 
 // MARK: - Robust Markdown Parser for AI Responses
 public enum AIDocumentParser {
+    /// Strips code fence blocks (```json ... ```), raw JSON objects ({ "direction": ... }),
+    /// and duplicate [PRE-TRADE SETUP SPECIFICATION] blocks from user-facing reading text.
+    public static func stripTechnicalMetadata(from raw: String) -> String {
+        let lines = raw.components(separatedBy: .newlines)
+        var output: [String] = []
+        var i = 0
+        
+        while i < lines.count {
+            let line = lines[i]
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            let lower = trimmed.lowercased()
+            
+            // 1. Skip code fence blocks (```json ... ``` or ``` ... ```)
+            if trimmed.hasPrefix("```") {
+                i += 1
+                while i < lines.count && !lines[i].trimmingCharacters(in: .whitespaces).hasPrefix("```") {
+                    i += 1
+                }
+                if i < lines.count { i += 1 }
+                continue
+            }
+            
+            // 2. Skip [PRE-TRADE SETUP SPECIFICATION] and its parameters
+            if lower.contains("[pre-trade setup specification]") || lower.contains("[setup specification]") || lower.contains("[thông số setup]") || lower.contains("[bảng thông số setup]") {
+                i += 1
+                while i < lines.count {
+                    let next = lines[i].trimmingCharacters(in: .whitespaces)
+                    if next.hasPrefix("### ") || next.hasPrefix("## ") || next.hasPrefix("# ") || next.hasPrefix(">") {
+                        break
+                    }
+                    i += 1
+                }
+                continue
+            }
+            
+            // 3. Skip standalone JSON blocks { ... "direction" ... }
+            if trimmed.hasPrefix("{") {
+                var braceCount = 0
+                var j = i
+                var isJsonBlock = false
+                while j < lines.count {
+                    let rawL = lines[j]
+                    let lowerL = rawL.lowercased()
+                    if lowerL.contains("\"direction\"") || lowerL.contains("\"entry\"") || lowerL.contains("\"stoploss\"") || lowerL.contains("\"volume\"") {
+                        isJsonBlock = true
+                    }
+                    for ch in rawL {
+                        if ch == "{" { braceCount += 1 }
+                        if ch == "}" { braceCount -= 1 }
+                    }
+                    j += 1
+                    if braceCount <= 0 { break }
+                }
+                if isJsonBlock {
+                    i = j
+                    continue
+                }
+            }
+            
+            // 4. Skip stray JSON key lines
+            if trimmed.hasPrefix("\"direction\":") || trimmed.hasPrefix("\"entry\":") || trimmed.hasPrefix("\"stoploss\":") || trimmed.hasPrefix("\"takeprofit") || trimmed.hasPrefix("\"riskrewardratio\":") || trimmed.hasPrefix("\"volume\":") || trimmed == "{" || trimmed == "}" || trimmed == "}," {
+                i += 1
+                continue
+            }
+            
+            output.append(line)
+            i += 1
+        }
+        
+        return output.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     public static func parse(_ text: String) -> [AIAnalysisSection] {
-        let lines = text.components(separatedBy: .newlines)
+        let cleanText = stripTechnicalMetadata(from: text)
+        let lines = cleanText.components(separatedBy: .newlines)
         var sections: [AIAnalysisSection] = []
         
         var currentNumber: String? = nil

@@ -637,4 +637,64 @@ final class FeatureVerificationTests: XCTestCase {
         XCTAssertTrue(formattedEn.contains("TECHNICAL MOMENTUM: WILDER RSI 14 / EMA 9 / WMA 45"))
         XCTAssertTrue(formattedEn.contains("Momentum Alignment:"))
     }
+    
+    func testAIDocumentParserStripsJsonAndSetupSpecification() {
+        let raw = """
+        ### 1. D1 Macro Regime & Trend Cycle Audit
+        Trend is bearish.
+
+        ### 2. H4 Structure
+        Key resistance at 2740.
+
+        ### 4. Actionable Execution Blueprint
+        - KẾT LUẬN: SELL (SHORT)
+
+        [PRE-TRADE SETUP SPECIFICATION]
+        - Direction: SELL
+        - Balance: $10,000.00
+        - Entry: 2735.50
+        - Stop loss: 2742.00
+        - Take profit 1: 2715.00
+        - Take profit 2: 2700.00
+        - R:R Ratio: 1:3.15
+        - Volume: 0.38 lots
+        - Date time: 2026-11-02 18:15
+
+        ```json
+        {
+          "direction": "SELL",
+          "entry": 2735.50,
+          "stopLoss": 2742.00,
+          "takeProfit1": 2715.00,
+          "takeProfit2": 2700.00,
+          "riskRewardRatio": "1:3.15",
+          "volume": "0.38 lots"
+        }
+        ```
+
+        > Kỷ luật là sức mạnh tối thượng.
+        """
+        
+        let cleaned = AIDocumentParser.stripTechnicalMetadata(from: raw)
+        XCTAssertFalse(cleaned.contains("```json"))
+        XCTAssertFalse(cleaned.contains("\"direction\":"))
+        XCTAssertFalse(cleaned.contains("[PRE-TRADE SETUP SPECIFICATION]"))
+        XCTAssertTrue(cleaned.contains("### 1. D1 Macro Regime & Trend Cycle Audit"))
+        XCTAssertTrue(cleaned.contains("> Kỷ luật là sức mạnh tối thượng."))
+        
+        let sections = AIDocumentParser.parse(raw)
+        XCTAssertFalse(sections.isEmpty)
+        for section in sections {
+            XCTAssertFalse(section.title.contains("JSON"))
+            for block in section.blocks {
+                switch block.kind {
+                case .paragraph(let text), .bullet(let text), .quote(let text):
+                    XCTAssertFalse(text.contains("\"direction\":"))
+                    XCTAssertFalse(text.contains("```"))
+                default:
+                    break
+                }
+            }
+        }
+    }
 }

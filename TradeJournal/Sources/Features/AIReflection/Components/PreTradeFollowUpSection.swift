@@ -35,7 +35,7 @@ public struct PreTradeFollowUpSection: View {
                                         .font(AppTypography.badgeMicro)
                                         .foregroundColor(AppColors.secondaryText)
                                 }
-                                JournalNotesMarkdownView(text: msg.content)
+                                JournalNotesMarkdownView(text: AIDocumentParser.stripTechnicalMetadata(from: msg.content))
                             }
                         }
                     }

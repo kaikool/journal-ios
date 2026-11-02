@@ -19,6 +19,7 @@ public struct PreTradeAnalysisSheet: View {
     @State private var activeProvider: String = ""
     
     @State private var analysisResult: String = ""
+    @State private var currentCommitment: AdvisorCommitmentRecord? = nil
     @State private var isLoadingData: Bool = false
     @State private var isAnalyzing: Bool = false
     @State private var errorMessage: String? = nil
@@ -123,8 +124,16 @@ public struct PreTradeAnalysisSheet: View {
                             }
                         )
                         
+                        // 5.1 Dedicated Pre-Trade Setup Card (3-second immediate glance)
+                        if let plan = currentCommitment {
+                            PreTradeSetupCard(
+                                plan: plan,
+                                timeZone: dataStore.generalSettings.displayTimeZone
+                            )
+                        }
+                        
                         // 6. Structured Section Cards Reader
-                        AIDocumentReaderView(text: analysisResult)
+                        AIDocumentReaderView(text: AIDocumentParser.stripTechnicalMetadata(from: analysisResult))
                         
                         // 7. Follow-up conversation turns (message bubbles in scroll view)
                         PreTradeFollowUpSection(
@@ -230,11 +239,27 @@ public struct PreTradeAnalysisSheet: View {
         if let cached = AICoachSessionStore.shared.get(key: cacheKey) {
             self.analysisResult = cached.result
             self.followUpMessages = cached.followUps
+            self.currentCommitment = extractCommitmentSafely(from: cached.result, symbol: sym)
         } else {
             self.analysisResult = ""
             self.followUpMessages = []
+            self.currentCommitment = nil
         }
         Task { await fetchAllTimeframeBars(for: sym, forceRefresh: true) }
+    }
+    
+    private func extractCommitmentSafely(from text: String, symbol: String) -> AdvisorCommitmentRecord? {
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        let session = AIAccountContextProvider.captureContext(dataStore: self.dataStore)
+        let balStr = session.balance.map { Formatters.formatCurrency($0, currency: session.accountCurrency) }
+        let riskPct = self.dataStore.aiSettings.traderProfile.numericRiskPercent
+        return AIAdvisorMemoryEngine.shared.extractCommitment(
+            from: text,
+            symbol: symbol,
+            fallbackBalance: balStr,
+            accountBalance: session.balance,
+            riskPercentage: riskPct
+        )
     }
     
     private func submitCustomSymbol() {
@@ -516,6 +541,7 @@ public struct PreTradeAnalysisSheet: View {
                     accountBalance: session.balance,
                     riskPercentage: riskPct
                 )
+                self.currentCommitment = commitment
                 AIAdvisorMemoryEngine.shared.saveCommitment(commitment)
             }
         } catch {
@@ -604,7 +630,7 @@ public struct PreTradeAnalysisSheet: View {
     
     // MARK: - Document Content Builder
     private func fullAnalysisContent() -> String {
-        var fullText = analysisResult
+        var fullText = AIDocumentParser.stripTechnicalMetadata(from: analysisResult)
         let followUps = followUpMessages.filter { $0.content != analysisResult }
         if !followUps.isEmpty {
             fullText += "\n\n### Follow-Up Discussion\n"
@@ -612,7 +638,7 @@ public struct PreTradeAnalysisSheet: View {
                 if msg.role == "user" {
                     fullText += "\n• **Trader**: \(msg.content)\n"
                 } else {
-                    fullText += "\n• **Risk AI**: \(msg.content)\n"
+                    fullText += "\n• **Risk AI**: \(AIDocumentParser.stripTechnicalMetadata(from: msg.content))\n"
                 }
             }
         }
