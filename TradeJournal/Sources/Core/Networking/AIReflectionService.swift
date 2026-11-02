@@ -50,6 +50,32 @@ public actor AIReflectionService {
         }
         
         switch config.provider {
+        case "ensemble":
+            // Route general reflection/coaching to Groq 120B with fallback to Gemini
+            let activeGroqKey = config.groqKey.trimmingCharacters(in: .whitespaces).isEmpty ? AiSettingsConfig.defaultGroqKey : config.groqKey.trimmingCharacters(in: .whitespaces)
+            if !activeGroqKey.isEmpty {
+                do {
+                    return try await callOpenAiCompatible(
+                        endpoint: Self.groqEndpoint,
+                        apiKey: activeGroqKey,
+                        model: "openai/gpt-oss-120b",
+                        action: action,
+                        prompt: prompt,
+                        metrics: activeMetrics,
+                        edgeScore: edgeScore,
+                        language: activeLang,
+                        traderProfile: profile,
+                        chartImageBase64: chartImageBase64,
+                        chartImagesBase64: chartImagesBase64,
+                        sessionSummary: activeSessionSummary,
+                        conversationHistory: conversationHistory
+                    )
+                } catch {
+                    AppLogger.warning("Groq ensemble general call failed: \(error.localizedDescription). Falling back to default provider...")
+                }
+            }
+            return try await callDefaultProvider(action: action, prompt: prompt, metrics: activeMetrics, edgeScore: edgeScore, language: activeLang, traderProfile: profile, chartImageBase64: chartImageBase64, chartImagesBase64: chartImagesBase64, sessionSummary: activeSessionSummary, conversationHistory: conversationHistory)
+            
         case "github":
             if !config.githubKey.trimmingCharacters(in: .whitespaces).isEmpty {
                 do {
@@ -362,6 +388,31 @@ public actor AIReflectionService {
     /// Tests provider connectivity with a test prompt
     public func testConnection(config: AiSettingsConfig) async throws -> String {
         switch config.provider {
+        case "ensemble":
+            let activeGroqKey = config.groqKey.trimmingCharacters(in: .whitespaces).isEmpty ? AiSettingsConfig.defaultGroqKey : config.groqKey.trimmingCharacters(in: .whitespaces)
+            if !activeGroqKey.isEmpty {
+                return try await callOpenAiCompatible(
+                    endpoint: Self.groqEndpoint,
+                    apiKey: activeGroqKey,
+                    model: "openai/gpt-oss-120b",
+                    action: .ask,
+                    prompt: "Say 'RISK AI Multi-Model Ensemble connected successfully.' in one short sentence.",
+                    metrics: nil,
+                    edgeScore: nil
+                )
+            } else {
+                let activeGeminiKey = config.geminiKey.trimmingCharacters(in: .whitespaces).isEmpty ? AiSettingsConfig.defaultGeminiKey : config.geminiKey.trimmingCharacters(in: .whitespaces)
+                return try await callOpenAiCompatible(
+                    endpoint: Self.geminiEndpoint,
+                    apiKey: activeGeminiKey,
+                    model: "gemini-3.5-flash-lite",
+                    action: .ask,
+                    prompt: "Say 'RISK AI Engine connected successfully.' in one short sentence.",
+                    metrics: nil,
+                    edgeScore: nil
+                )
+            }
+            
         case "github":
             guard !config.githubKey.trimmingCharacters(in: .whitespaces).isEmpty else {
                 throw NSError(domain: "GitHub", code: 400, userInfo: [NSLocalizedDescriptionKey: "Please enter your GitHub Personal Access Token (PAT)."])
@@ -526,7 +577,43 @@ public actor AIReflectionService {
         )
     }
     
-    // MARK: - Pre-Trade Multi-Timeframe Analysis Request
+    // MARK: - Safe Model Execution for Multi-Model Ensemble
+    private func callModelSafe(
+        endpoint: String,
+        apiKey: String,
+        model: String,
+        action: AIReflectionAction,
+        prompt: String,
+        metrics: TradeMetrics?,
+        language: String,
+        traderProfile: TraderProfileConfig?,
+        sessionSummary: AIAccountSessionSummary?,
+        conversationHistory: [AICoachMessage]?
+    ) async -> String? {
+        guard !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        do {
+            return try await callOpenAiCompatible(
+                endpoint: endpoint,
+                apiKey: apiKey,
+                model: model,
+                action: action,
+                prompt: prompt,
+                metrics: metrics,
+                edgeScore: nil,
+                language: language,
+                traderProfile: traderProfile,
+                chartImageBase64: nil,
+                chartImagesBase64: nil,
+                sessionSummary: sessionSummary,
+                conversationHistory: conversationHistory
+            )
+        } catch {
+            AppLogger.warning("Ensemble worker '\(model)' encountered error: \(error.localizedDescription)")
+            return nil
+        }
+    }
+    
+    // MARK: - Pre-Trade Multi-Timeframe Analysis Request (3-Model Consensus Ensemble)
     public func requestPreTradeMarketAnalysis(
         symbol: String,
         d1Bars: [MarketBar],
@@ -552,6 +639,7 @@ public actor AIReflectionService {
         }
         
         let activeLang = language ?? config.language
+        let isVi = activeLang == "vi"
         let hasImage = (chartImageBase64?.isEmpty == false) || (chartImagesBase64?.isEmpty == false)
         let prompt = AIPromptBuilder.buildPreTradeAnalysisPrompt(
             symbol: symbol,
@@ -569,6 +657,137 @@ public actor AIReflectionService {
             historicalTrades: historicalTrades
         )
         
+        // 1. Resolve API Keys for Ensemble Execution
+        let groqKey = config.groqKey.trimmingCharacters(in: .whitespaces).isEmpty ? AiSettingsConfig.defaultGroqKey : config.groqKey.trimmingCharacters(in: .whitespaces)
+        let groqBackupKey = config.groqBackupKey.trimmingCharacters(in: .whitespaces).isEmpty ? AiSettingsConfig.defaultGroqBackupKey : config.groqBackupKey.trimmingCharacters(in: .whitespaces)
+        let geminiKey = config.geminiKey.trimmingCharacters(in: .whitespaces).isEmpty ? AiSettingsConfig.defaultGeminiKey : config.geminiKey.trimmingCharacters(in: .whitespaces)
+        let effectiveGroqKey = !groqKey.isEmpty ? groqKey : groqBackupKey
+        
+        // 2. Multi-Model Parallel Ensemble: Run 3 independent workers concurrently
+        if !effectiveGroqKey.isEmpty {
+            async let worker1 = self.callModelSafe(
+                endpoint: Self.groqEndpoint,
+                apiKey: effectiveGroqKey,
+                model: "openai/gpt-oss-120b",
+                action: .critique,
+                prompt: prompt,
+                metrics: metrics,
+                language: activeLang,
+                traderProfile: traderProfile,
+                sessionSummary: sessionSummary,
+                conversationHistory: conversationHistory
+            )
+            async let worker2 = self.callModelSafe(
+                endpoint: Self.groqEndpoint,
+                apiKey: effectiveGroqKey,
+                model: "qwen/qwen3.8-27b",
+                action: .critique,
+                prompt: prompt,
+                metrics: metrics,
+                language: activeLang,
+                traderProfile: traderProfile,
+                sessionSummary: sessionSummary,
+                conversationHistory: conversationHistory
+            )
+            async let worker3 = self.callModelSafe(
+                endpoint: Self.geminiEndpoint,
+                apiKey: geminiKey,
+                model: "gemini-3.5-flash-lite",
+                action: .critique,
+                prompt: prompt,
+                metrics: metrics,
+                language: activeLang,
+                traderProfile: traderProfile,
+                sessionSummary: sessionSummary,
+                conversationHistory: conversationHistory
+            )
+            
+            let (res1, res2, res3) = await (worker1, worker2, worker3)
+            let validAnalyses = [res1, res2, res3].compactMap { $0 }.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            
+            if validAnalyses.count >= 2 {
+                let currentPriceStr: String = {
+                    if let lastBar = m15Bars.last ?? h1Bars.last ?? h4Bars.last ?? d1Bars.last {
+                        let d = (lastBar.close as NSDecimalNumber).doubleValue
+                        if d >= 1000 { return String(format: "%.2f", d) }
+                        if d >= 100 { return String(format: "%.2f", d) }
+                        if d >= 10 { return String(format: "%.3f", d) }
+                        return String(format: "%.5f", d)
+                    }
+                    return "Market Price"
+                }()
+                
+                let balStr = sessionSummary.balance.map { Formatters.formatCurrency($0, currency: sessionSummary.accountCurrency) } ?? "$100,000.00"
+                let riskNum = traderProfile.numericRiskPercent
+                let targetRiskDollars: Decimal = {
+                    if let bal = sessionSummary.balance, bal > 0 {
+                        return bal * (riskNum / 100)
+                    }
+                    return 0
+                }()
+                let targetRiskDollarsStr = String(format: "$%.2f", (targetRiskDollars as NSDecimalNumber).doubleValue)
+                
+                let synthesisPrompt = AIPromptBuilder.buildEnsembleSynthesisPrompt(
+                    symbol: symbol,
+                    currentPrice: currentPriceStr,
+                    balance: balStr,
+                    riskDollars: targetRiskDollarsStr,
+                    riskPercent: riskNum,
+                    targetRR: traderProfile.targetRiskRewardRatio,
+                    analyses: validAnalyses,
+                    isVi: isVi
+                )
+                
+                // VÒNG 2: Chief Risk Officer Synthesizer (Groq 120B with fallback to Gemini)
+                do {
+                    return try await callOpenAiCompatible(
+                        endpoint: Self.groqEndpoint,
+                        apiKey: effectiveGroqKey,
+                        model: "openai/gpt-oss-120b",
+                        action: .critique,
+                        prompt: synthesisPrompt,
+                        metrics: metrics,
+                        edgeScore: nil,
+                        language: activeLang,
+                        traderProfile: traderProfile,
+                        chartImageBase64: nil,
+                        chartImagesBase64: nil,
+                        sessionSummary: nil,
+                        conversationHistory: nil
+                    )
+                } catch {
+                    AppLogger.warning("Groq ensemble synthesis failed: \(error.localizedDescription). Falling back to Gemini synthesis...")
+                    if !geminiKey.isEmpty {
+                        do {
+                            return try await callOpenAiCompatible(
+                                endpoint: Self.geminiEndpoint,
+                                apiKey: geminiKey,
+                                model: "gemini-3.5-flash-lite",
+                                action: .critique,
+                                prompt: synthesisPrompt,
+                                metrics: metrics,
+                                edgeScore: nil,
+                                language: activeLang,
+                                traderProfile: traderProfile,
+                                chartImageBase64: nil,
+                                chartImagesBase64: nil,
+                                sessionSummary: nil,
+                                conversationHistory: nil
+                            )
+                        } catch {
+                            AppLogger.warning("Gemini ensemble synthesis failed: \(error.localizedDescription)")
+                        }
+                    }
+                    if let best = validAnalyses.first {
+                        return best
+                    }
+                }
+            } else if let single = validAnalyses.first {
+                return single
+            }
+        }
+        
+        // Single provider or fallback pipeline
         return try await requestReflection(
             action: .critique,
             prompt: prompt,
@@ -577,7 +796,7 @@ public actor AIReflectionService {
             language: activeLang,
             chartImageBase64: chartImageBase64,
             chartImagesBase64: chartImagesBase64,
-            sessionSummary: nil, // Session summary is already comprehensively formatted into prompt
+            sessionSummary: nil,
             conversationHistory: conversationHistory
         )
     }
@@ -594,10 +813,10 @@ public actor AIReflectionService {
         switch action {
         case .critique:
             // High capacity 120B reasoning model with 3,200 token budget guarantees complete, untruncated 4-section Pre-Trade SMC analysis
-            return ("openai/gpt-oss-120b", "openai/gpt-oss-20b")
+            return ("openai/gpt-oss-120b", "qwen/qwen3.8-27b")
         case .ask:
-            // High speed 20B reasoning model for conversational inquiries (1.5s latency, complete answers without truncation)
-            return ("openai/gpt-oss-20b", "openai/gpt-oss-120b")
+            // High speed 27B/20B model for conversational inquiries (< 0.5s latency, complete answers without truncation)
+            return ("qwen/qwen3.8-27b", "openai/gpt-oss-20b")
         case .recap:
             // Comprehensive 120B reasoning model for daily forensic recap
             return ("openai/gpt-oss-120b", "openai/gpt-oss-20b")

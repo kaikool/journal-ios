@@ -164,7 +164,7 @@ public struct AiSettingsView: View {
         
         switch newProvider {
         case "groq":
-            model = "qwen/qwen3.8-27b"
+            model = "openai/gpt-oss-120b"
         case "openrouter":
             model = "nvidia/nemotron-3.5-super-vl:free"
         case "gemini":

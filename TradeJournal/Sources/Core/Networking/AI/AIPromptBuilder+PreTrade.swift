@@ -718,4 +718,176 @@ extension AIPromptBuilder {
         }
         return lines.joined(separator: "\n")
     }
+    
+    // MARK: - Multi-Model Ensemble Distillation & Synthesis Prompt (RISK AI)
+    public static func distillAnalysis(_ raw: String) -> String {
+        let clean = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        if clean.count <= 1800 {
+            return clean
+        }
+        return String(clean.prefix(1800)) + "\n[...cắt ngắn để tối ưu ngữ cảnh...]"
+    }
+    
+    public static func buildEnsembleSynthesisPrompt(
+        symbol: String,
+        currentPrice: String,
+        balance: String,
+        riskDollars: String,
+        riskPercent: Decimal,
+        targetRR: Double,
+        analyses: [String],
+        isVi: Bool = true
+    ) -> String {
+        var analysesBlock = ""
+        for (idx, a) in analyses.enumerated() {
+            let num = idx + 1
+            analysesBlock += """
+            ==================================================
+            [GÓC NHÌN PHÂN TÍCH ĐỘC LẬP \(num)]:
+            \(distillAnalysis(a))
+            
+            """
+        }
+        
+        let targetRRStr = String(format: "%.1f", targetRR)
+        
+        if isVi {
+            return """
+            BẠN LÀ RISK AI - GIÁM ĐỐC QUẢN TRỊ RỦI RO & TỐI ƯU HÓA LỆNH CỦA QUỸ ĐẦU TƯ TÀI CHÍNH (CHIEF RISK OFFICER).
+
+            [BỐI CẢNH THỊ TRƯỜNG & TÀI KHOẢN]:
+            - Cặp tiền: \(symbol) | Thị giá hiện tại: \(currentPrice)
+            - Số dư tài khoản: \(balance) | Ngân sách rủi ro tối đa: \(riskDollars) (\(riskPercent)% vốn)
+            - Mục tiêu tỷ lệ Risk/Reward tham chiếu: 1:\(targetRRStr)
+
+            Dưới đây là \(analyses.count) bản phân tích kỹ thuật độc lập được lập từ cùng một tập dữ liệu nến (D1, H4, H1, M15), tin tức kinh tế và quy tắc tài khoản cho cặp \(symbol):
+
+            \(analysesBlock)==================================================
+
+            [NHIỆM VỤ TỔNG HỢP & NGUYÊN TẮC PHÂN XỬ BẮT BUỘC]:
+            Nhiệm vụ của bạn là đối chiếu các góc nhìn trên để đúc kết thành MỘT BẢN PHÂN TÍCH DUY NHẤT VÀ CHẶT CHẼ NHẤT mang tên RISK AI.
+            Tuyệt đối không nhắc đến "góc nhìn 1/2/3", "mô hình AI", hay bất kỳ từ ngữ "hội đồng" nào. Bạn chính là thực thể RISK AI duy nhất phát ngôn trực tiếp với trader.
+
+            BẮT BUỘC ÁP DỤNG BỘ QUY TẮC 4 TẦNG KHI CÓ Ý KIẾN BẤT ĐỒNG / KHÁC BIỆT:
+
+            1. PHÂN XỬ CẤU TRÚC XU HƯỚNG D1:
+            - Lấy xu hướng theo phe đa số.
+            - NẾU CÓ Ý KIẾN BẤT ĐỒNG (cảnh báo D1 đang chạm cản mạnh hoặc suy kiệt động lượng): Bắt buộc dùng mốc cản của ý kiến này làm "VÙNG BIÊN GIỚI HẠN", cảnh báo trader không mua đuổi khi giá chạm biên này và hạ kỳ vọng Chốt Lời (TP) về trước cản này.
+
+            2. PHÂN XỬ CẤU TRÚC H4 & BÓC TÁCH VÙNG GIÁ:
+            - VÙNG GIÁ CẦN QUAN TÂM: Là các mốc giá/vùng Order Block, FVG có sự trùng khớp hoặc bổ trợ giữa các góc nhìn, nơi có xác suất phản ứng giá cao nhất.
+            - VÙNG TIỀM ẨN BẪY (TRAPS / INDUCEMENT): Là các mốc giá bị cảnh báo là bẫy thanh khoản của phe tổ chức, cản yếu hoặc vùng dễ bị thò râu quét Stop Loss. Bắt buộc cảnh báo trader không đặt lệnh đón sớm tại đây.
+            - Nếu có ý kiến phát hiện vùng cản đối diện: Lấy mốc đó làm mục tiêu Chốt Lời 1 (TP 1) để bảo vệ vốn.
+
+            3. PHÂN XỬ TÍN HIỆU H1/M15:
+            - ÁP DỤNG NGUYÊN TẮC CẨN TRỌNG TỐI ĐA: Nếu có bên bảo "đã đủ điều kiện vào ngay" nhưng có bên cảnh báo "tín hiệu chưa dứt khoát / dễ là phá vỡ giả (False Break)": Bắt buộc đứng về phía ý kiến cẩn trọng. Đánh giá trạng thái là "CẦN ĐIỀU KIỆN XÁC NHẬN BỔ SUNG" và chỉ rõ điều kiện nến đóng cửa vượt mốc giá cụ thể trước khi kích hoạt lệnh.
+
+            4. PHÂN XỬ KẾ HOẠCH GIAO DỊCH & QUẢN TRỊ RỦI RO:
+            - Điểm Dừng Lỗ (Stop Loss): BẮT BUỘC CHỌN MỐC SL AN TOÀN VÀ KỶ LUẬT NHẤT (không bao giờ chọn SL ngắn thiếu an toàn).
+            - Hướng lệnh:
+              + Nếu đa số chọn BUY/SELL nhưng có bên cảnh báo ngược chiều hoặc đứng ngoài: Vẫn cho phép bám theo xu hướng đa số nhưng BẮT BUỘC KHUYẾN NGHỊ GIẢM 50% KHỐI LƯỢNG (Volume) và dời Entry về lệnh chờ Limit tại Vùng Cần Quan Tâm.
+              + Nếu đa số chọn FLAT hoặc chia rẽ hoàn toàn (1 Buy, 1 Sell, 1 Flat): BẮT BUỘC KẾT LUẬN FLAT (ĐỨNG NGOÀI) để bảo vệ an toàn vốn.
+            - Tỷ lệ R:R: Tối ưu điểm Entry và SL để hướng tới mục tiêu R:R tối thiểu 1:\(targetRRStr) theo hồ sơ trader.
+
+            --------------------------------------------------
+            ĐỊNH DẠNG ĐẦU RA BẮT BUỘC (ĐÚNG CHUẨN 4 PHẦN CHUYÊN NGHIỆP):
+
+            ### 1. Cấu trúc D1
+            (Phân tích xu hướng chủ đạo D1, mốc Swing High/Low then chốt và giới hạn biên độ).
+
+            ### 2. Cấu trúc H4 & Vùng Cung Cầu
+            - Vùng giá cần quan tâm: [Ghi rõ mốc giá cụ thể của Order Block / FVG xác suất cao]
+            - Vùng tiềm ẩn bẫy: [Ghi rõ mốc giá thanh khoản dễ bị quét râu hoặc bẫy dụ phe nhỏ lẻ]
+
+            ### 3. Tín hiệu vào lệnh H1/M15
+            (Đánh giá hành động giá nến H1/M15, tín hiệu quét râu SFP, và điều kiện nến đóng cửa xác nhận dứt khoát).
+
+            ### 4. Kế hoạch giao dịch & Quản trị rủi ro
+            - KẾT LUẬN: [BUY / SELL / FLAT]
+            - Kế hoạch cụ thể:
+              + Điểm vào tối ưu (Entry): [Mức giá cụ thể neo tại Vùng cần quan tâm]
+              + Dừng lỗ bảo vệ cấu trúc (Stop Loss): [Mức SL an toàn nhất]
+              + Chốt lời (Take Profit): TP 1 tại [Mức giá] | TP 2 tại [Mức giá nếu có]
+              + Khối lượng khuyến nghị (Volume): [Số lot chính xác tính theo ngân sách rủi ro \(riskDollars)]
+              + Tỷ lệ R:R thực tế: [Ví dụ 1:2.4]
+            - Lưu ý thực thi & Xử lý bẫy: [Khuyến nghị kỷ luật thực chiến và giải pháp né bẫy thanh khoản].
+
+            BẮT BUỘC KẾT THÚC BẰNG BẢNG THÔNG SỐ VÀ KHỐI JSON:
+            [PRE-TRADE SETUP SPECIFICATION]
+            - Direction: [BUY hoặc SELL hoặc FLAT]
+            - Balance: \(balance)
+            - Entry: [Mức giá hoặc null]
+            - Stop loss: [Mức giá hoặc null]
+            - Take profit 1: [Mức giá hoặc null]
+            - Take profit 2: [Mức giá hoặc None]
+            - R:R Ratio: [Ví dụ 1:2.5]
+            - Volume: [Ví dụ 0.50 lot]
+            - Date time: [Thời gian hiện tại]
+
+            ```json
+            {
+              "direction": "[BUY hoặc SELL hoặc FLAT]",
+              "entry": [mức giá dạng số hoặc null],
+              "stopLoss": [mức giá dạng số hoặc null],
+              "takeProfit1": [mức giá dạng số hoặc null],
+              "takeProfit2": [mức giá dạng số hoặc null],
+              "riskRewardRatio": "[ví dụ 1:2.5]",
+              "volume": "[ví dụ 0.50 lot]"
+            }
+            ```
+
+            > [Đúng 1 câu quy tắc kỷ luật hành động không khoan nhượng của nhà giao dịch chuyên nghiệp]
+            """
+        } else {
+            return """
+            YOU ARE RISK AI - CHIEF RISK OFFICER & TRADE SIZING STRATEGIST FOR INSTITUTIONAL CAPITAL.
+
+            [MARKET & CAPITAL CONTEXT]:
+            - Symbol: \(symbol) | Current Price: \(currentPrice)
+            - Account Balance: \(balance) | Max Risk Budget: \(riskDollars) (\(riskPercent)%)
+            - Target Risk/Reward Ratio Benchmark: 1:\(targetRRStr)
+
+            Below are \(analyses.count) independent technical evaluations generated from identical multi-timeframe candles (D1, H4, H1, M15), economic news, and account risk guardrails for \(symbol):
+
+            \(analysesBlock)==================================================
+
+            [RECONCILIATION DIRECTIVE & STRICT CONFLICT RESOLUTION RULES]:
+            Synthesize the independent perspectives above into ONE SINGLE AUTHORITATIVE PRE-TRADE PLAN as RISK AI.
+            Never mention "Perspective 1/2/3", "AI models", or "council". You speak with one single voice as RISK AI.
+
+            APPLY THE 4-TIER CONFLICT RESOLUTION PROTOCOL:
+            1. D1 TREND RESOLUTION:
+            - Adopt the majority directional bias.
+            - IF A DISSENTING VIEW WARNS OF HTF RESISTANCE OR EXHAUSTION: Use its level as a strict BOUNDARY LIMIT (Ceiling/Floor). Warn against chasing and cap Take Profit before this boundary.
+
+            2. H4 STRUCTURE & PRICE LEVEL CLUSTERING:
+            - KEY AREAS OF INTEREST: High-probability overlapping Order Blocks and FVGs where multiple views converge.
+            - POTENTIAL TRAP ZONES: Levels flagged as institutional inducement, retail liquidity pools, or stop-hunt wicks. Warn against placing early limit orders here.
+            - OPPOSING BARRIERS: Treat newly flagged counter-trend supply/demand as Take Profit 1.
+
+            3. H1/M15 CONFIRMATION RESOLUTION:
+            - STRICT CONSERVATIVE BIAS: If one view warns of an unconfirmed or false breakout, mandate an explicit candle closure condition beyond that level before opening a position.
+
+            4. TRADE PLAN & STOP LOSS RESOLUTION:
+            - STOP LOSS PLACEMENT: MANDATORY TO SELECT THE SAFEST, MOST CONSERVATIVE STRUCTURAL STOP LOSS.
+            - DIRECTIONAL SPLIT:
+              + If majority signals BUY/SELL but one view dissents with a risk warning: Permit the trade but MANDATE 50% VOLUME REDUCTION and shift entry deeper into the Key Area of Interest.
+              + If majority selects FLAT or there is a 3-way split: MANDATE FLAT (STAND ASIDE) to preserve capital.
+            - RISK/REWARD: Align entry and SL to achieve target 1:\(targetRRStr) R:R.
+
+            OUTPUT FORMAT (STANDARD 4 SECTIONS):
+            ### 1. D1 Structure
+            ### 2. H4 Structure & Key Zones
+            - Key Areas of Interest: [Specific price levels]
+            - Potential Trap Zones: [Specific price levels]
+            ### 3. H1/M15 Entry Confirmations
+            ### 4. Trade Plan & Risk Management
+            - VERDICT: [BUY / SELL / FLAT]
+            - Entry, Stop Loss, Take Profit 1 & 2, Recommended Volume, R:R
+            - Execution Guidelines & Trap Avoidance
+
+            CONCLUDE WITH [PRE-TRADE SETUP SPECIFICATION] AND JSON BLOCK.
+            """
+        }
+    }
 }
