@@ -13,6 +13,7 @@ public struct TraderProfileSheet: View {
     @State private var primaryPlaybooks: String = ""
     @State private var maxRiskPerTrade: String = ""
     @State private var maxDailyLossPercentText: String = ""
+    @State private var targetRiskRewardRatioText: String = ""
     @State private var knownPsychologicalLeaks: String = ""
     @State private var customMemoryNotes: String = ""
     
@@ -163,6 +164,14 @@ public struct TraderProfileSheet: View {
                     height: 42
                 )
                 
+                // Target Risk:Reward Ratio
+                AppFormField(
+                    "Target Risk:Reward Ratio",
+                    text: $targetRiskRewardRatioText,
+                    placeholder: "e.g. 2.0 (for 1:2 R:R) or 1.5, 3.0",
+                    height: 42
+                )
+                
                 // Account Objective
                 AppFormField(
                     "Account Objective & Max Drawdown",
@@ -247,6 +256,7 @@ public struct TraderProfileSheet: View {
         primaryPlaybooks = prof.primaryPlaybooks
         maxRiskPerTrade = prof.maxRiskPerTrade
         maxDailyLossPercentText = String(format: "%.1f", prof.maxDailyLossPercent)
+        targetRiskRewardRatioText = String(format: "%.1f", prof.targetRiskRewardRatio)
         knownPsychologicalLeaks = prof.knownPsychologicalLeaks
         customMemoryNotes = prof.customMemoryNotes
     }
@@ -256,12 +266,16 @@ public struct TraderProfileSheet: View {
         let cleanDaily = maxDailyLossPercentText.replacingOccurrences(of: "%", with: "").trimmingCharacters(in: .whitespaces)
         let parsedDailyLoss = Double(cleanDaily) ?? 3.0
         
+        let cleanRR = targetRiskRewardRatioText.replacingOccurrences(of: "1:", with: "").trimmingCharacters(in: .whitespaces)
+        let parsedRR = Double(cleanRR) ?? 2.0
+        
         conf.traderProfile = TraderProfileConfig(
             tradingStyle: tradingStyle.trimmingCharacters(in: .whitespaces),
             accountObjective: accountObjective.trimmingCharacters(in: .whitespaces),
             primaryPlaybooks: primaryPlaybooks.trimmingCharacters(in: .whitespaces),
             maxRiskPerTrade: maxRiskPerTrade.trimmingCharacters(in: .whitespaces),
             maxDailyLossPercent: parsedDailyLoss,
+            targetRiskRewardRatio: parsedRR,
             knownPsychologicalLeaks: knownPsychologicalLeaks.trimmingCharacters(in: .whitespaces),
             customMemoryNotes: customMemoryNotes.trimmingCharacters(in: .whitespaces)
         )

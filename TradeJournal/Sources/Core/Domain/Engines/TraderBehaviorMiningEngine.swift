@@ -174,8 +174,8 @@ public enum TraderBehaviorMiningEngine {
             : "\n[HISTORICAL EXECUTION LEAKS FROM \(result.totalTradesAnalyzed) TRADES]:\n"
         
         let footer = isVi
-            ? "[CHỈ ĐẠO QUẢN TRỊ RỦI RO]: Đối chiếu kế hoạch vào lệnh với các điểm yếu lịch sử trên. Từ chối thiết lập lệnh nếu chuẩn bị tái phạm.\n"
-            : "[RISK DIRECTIVE]: Cross-examine trading plan against historical leaks. Reject setups if repeating past vulnerabilities.\n"
+            ? "[DỮ LIỆU THAM KHẢO HÀNH VI LỊCH SỬ]: Đối chiếu với các điểm yếu thống kê trên để cảnh báo rủi ro và tối ưu điểm vào lệnh / mức dừng lỗ, không dùng để cấm hoặc từ chối đưa ra kế hoạch giao dịch.\n"
+            : "[HISTORICAL BEHAVIOR REFERENCE]: Cross-reference statistical weaknesses above to highlight risks and refine entry/SL levels. Do NOT use to forbid or refuse trade setups.\n"
             
         return header + items.joined(separator: "\n") + "\n" + footer
     }

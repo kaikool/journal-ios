@@ -277,12 +277,12 @@ extension AIPromptBuilder {
         let riskGuardrailWarning: String = {
             if isDailyLossLimitBreached {
                 return isVi
-                    ? "\n[CẢNH BÁO VI PHẠM HẠN MỨC LỖ NGÀY]: Mức lỗ hôm nay đã chạm hoặc vượt giới hạn tối đa cho phép (\(String(format: "%.1f", todayLossPct))% >= \(String(format: "%.1f", maxDailyLossPct))%). AI BẮT BUỘC TƯ VẤN ĐỨNG NGOÀI (FLAT / HALT), TUYỆT ĐỐI KHÔNG MỞ THÊM LỆNH MỚI ĐỂ BẢO VỆ VỐN.\n"
-                    : "\n[CRITICAL MAX DAILY LOSS BREACH]: Daily loss has reached or exceeded max limit (\(String(format: "%.1f", todayLossPct))% >= \(String(format: "%.1f", maxDailyLossPct))%). AI MUST ADVISE FLAT (HALT), NO NEW TRADES ALLOWED.\n"
+                    ? "\n[CẢNH BÁO HẠN MỨC LỖ NGÀY]: Mức lỗ hôm nay đã chạm ngưỡng cho phép (\(String(format: "%.1f", todayLossPct))% >= \(String(format: "%.1f", maxDailyLossPct))%). AI CẢNH BÁO RỦI RO CAO: Khuyến nghị cân nhắc dừng giao dịch hoặc chỉ đi volume tối thiểu (giảm 50% lot) để bảo vệ tài khoản; quyền quyết định vào lệnh thuộc về trader.\n"
+                    : "\n[DAILY LOSS WARNING]: Daily loss has reached limit (\(String(format: "%.1f", todayLossPct))% >= \(String(format: "%.1f", maxDailyLossPct))%). HIGH RISK CAUTION: Recommend pausing or strictly reducing volume by 50% to preserve capital; decision remains with the trader.\n"
             } else if streak <= -2 {
                 return isVi
-                    ? "\n[LƯU Ý TÂM LÝ & QUẢN TRỊ RỦI RO]: Trader đang có chuỗi thua \(abs(streak)) lệnh liên tiếp hôm nay. Chưa vi phạm hạn mức lỗ ngày (\(String(format: "%.1f", todayLossPct))% / \(String(format: "%.1f", maxDailyLossPct))%). AI CẦN KHẮT KHE TUYỆT ĐỐI VỚI ĐIỀU KIỆN VÀO LỆNH, chỉ gợi ý setup nếu cấu trúc nến và R:R đạt chuẩn tối đa, ngược lại ưu tiên đứng ngoài (FLAT).\n"
-                    : "\n[PSYCHOLOGY & RISK CAUTION]: Trader is on a \(abs(streak))-loss streak. Daily loss limit not yet breached (\(String(format: "%.1f", todayLossPct))% / \(String(format: "%.1f", maxDailyLossPct))%). Scrutinize setups strictly; prioritize standing aside (FLAT) unless structure and R:R are pristine.\n"
+                    ? "\n[LƯU Ý TÂM LÝ & QUẢN TRỊ RỦI RO]: Trader đang có chuỗi thua \(abs(streak)) lệnh liên tiếp hôm nay. AI cảnh báo tâm lý và khuyến nghị giảm khối lượng giao dịch. Nếu thị trường có setup đẹp thì đưa ra kịch bản rõ ràng kèm mức rủi ro kiểm soát chặt chẽ.\n"
+                    : "\n[PSYCHOLOGY & RISK CAUTION]: Trader is on a \(abs(streak))-loss streak. AI warns of psychological bias and recommends reduced volume. If a high-probability setup exists, provide clear parameters with strictly controlled risk.\n"
             }
             return ""
         }()
@@ -323,7 +323,7 @@ extension AIPromptBuilder {
         - Số dư thực tế: \(realBalStr) \(equityStr)
         - Tỷ lệ rủi ro cài đặt: \(numericRisk)% vốn
         - Ngân sách rủi ro tối đa: \(targetRiskDollarsStr) USD (Số tiền lỗ tối đa nếu chạm SL)
-        - Mục tiêu Tỷ lệ Risk/Reward bắt buộc: Tối thiểu 1:\(String(format: "%.1f", targetRR)) (BẮT BUỘC TUÂN THỦ)
+        - Mục tiêu Tỷ lệ Risk/Reward tham chiếu: 1:\(String(format: "%.1f", targetRR)) (Cấu hình theo hồ sơ trader)
         - CÔNG THỨC TOÁN HỌC TÍNH SỐ LOT:
           Số Lot = (Số tiền rủi ro $) / (|Entry - SL| x Kích thước hợp đồng x Tỷ giá quy đổi)
           Lưu ý: Khi đưa ra thông số Volume trong Setup, bắt buộc tính theo số tiền rủi ro \(targetRiskDollarsStr) ở trên.
@@ -337,7 +337,7 @@ extension AIPromptBuilder {
         - Authoritative Balance: \(realBalStr) \(equityStr)
         - Configured Risk Per Trade: \(numericRisk)%
         - Max Risk Dollar Budget: \(targetRiskDollarsStr) USD (Maximum allowed loss at Stop Loss)
-        - Mandatory Target Risk/Reward Ratio: Minimum 1:\(String(format: "%.1f", targetRR)) (NON-NEGOTIABLE)
+        - Target Risk/Reward Ratio Benchmark: 1:\(String(format: "%.1f", targetRR)) (Configured in trader profile)
         - MATHEMATICAL POSITION SIZING FORMULA:
           Lots = (Risk Budget $) / (|Entry - SL| x Contract Size x Conversion Rate)
         """
@@ -409,35 +409,34 @@ extension AIPromptBuilder {
             VAI TRÒ VÀ NGUYÊN TẮC CỦA NHÀ GIAO DỊCH CHUYÊN NGHIỆP:
             Bạn là một Senior Institutional Portfolio Manager & Master Trader (Chuyên gia Phân tích & Quản lý Quỹ).
             Triết lý giao dịch:
-            1. Giao dịch là bài toán bảo vệ vốn và chờ đợi lợi thế bất đối xứng. Thà đứng ngoài (FLAT) còn hơn vào một lệnh kém chất lượng hoặc R:R không đạt chuẩn.
-            2. Luôn nhìn thị trường bằng con mắt hoài nghi, bóc tách bẫy thanh khoản của phe tổ chức.
-            3. Phản biện toàn diện: Từ cấu trúc xu hướng, bẫy thanh khoản, đến tín hiệu kích hoạt nến sống và tỷ lệ R:R.
+            1. Giao dịch là bài toán bảo vệ vốn và tìm kiếm lợi thế xác suất cao. Nếu thị trường có cơ hội rõ ràng thì chủ động lên kế hoạch giao dịch cụ thể; nếu thị trường tranh chấp hoặc chưa có lợi thế thì phân tích rõ lý do và khuyến nghị kiên nhẫn quan sát.
+            2. Luôn nhìn thị trường bằng con mắt khách quan, bóc tách cấu trúc giá và các vùng thanh khoản của phe tổ chức.
+            3. Phản biện toàn diện: Từ cấu trúc xu hướng, bẫy thanh khoản, đến tín hiệu kích hoạt nến và tỷ lệ R:R.
 
             NHIỆM VỤ PHÂN TÍCH VÀ LẬP KẾ HOẠCH GIAO DỊCH (4 PHẦN):
 
             ### 1. Cấu trúc D1
             - Xu hướng D1: Vị trí sóng, khoảng cách so với EMA(21) D1 và các mốc thanh khoản PDH (\(d1PDH)) / PDL (\(d1PDL)).
-            - Đánh giá xung đột đa khung: D1 tăng nhưng H4 suy kiệt hoặc đang tiếp cận cản lớn thì tuyệt đối không đu đỉnh.
+            - Đánh giá xung đột đa khung: D1 tăng nhưng H4 suy kiệt hoặc đang tiếp cận cản lớn thì lưu ý không đu đỉnh.
 
             ### 2. Cấu trúc H4 & Vùng Cung Cầu
             - Cấu trúc sóng H4: Đỉnh/đáy Swing, các vùng Cung/Cầu tổ chức then chốt (Order Block, Fair Value Gap) và bẫy thanh khoản phe nhỏ lẻ (Equal Highs/Lows).
-            - Nếu giá đang ở vùng tranh chấp không có lợi thế cấu trúc: Nêu rõ không có cơ sở thiết lập cản tin cậy.
+            - Nếu giá đang ở vùng tranh chấp không có lợi thế cấu trúc: Phân tích rõ các ranh giới cần theo dõi.
 
             ### 3. Tín hiệu vào lệnh H1/M15
             - Hành động giá nến H1/M15 thời gian thực: Thân nến, râu nến từ chối giá, tín hiệu quét thanh khoản (SFP) hoặc xác nhận cấu trúc (MSS/CHoCH).
-            - Không đoán đỉnh đáy, không vào lệnh đón đầu khi nến chưa xác nhận. Nếu chưa có tín hiệu kích hoạt: Bắt buộc đứng ngoài (FLAT).
+            - Nếu nến chưa chạm vùng giá trị: Có thể lên kịch bản đón đầu có điều kiện (Pending/Limit Setup) tại các vùng cản then chốt.
 
             ### 4. Kế hoạch giao dịch & Quản lý vốn
-            - KẾT LUẬN RÕ RÀNG: [BUY (LONG) / SELL (SHORT) / FLAT (ĐỨNG NGOÀI)].
-            - KHÓA CHẶT TỶ LỆ R:R: Tối thiểu 1:\(String(format: "%.1f", targetRR)).
-              NGUYÊN TẮC TỪ CHỐI: Nếu khoảng cách từ Entry tới cản TP1 không đủ đạt tỷ lệ R:R 1:\(String(format: "%.1f", targetRR)): Bắt buộc kết luận FLAT (Đứng ngoài), từ chối vào lệnh kém chất lượng và giải thích rõ vùng giá nào mới đạt chuẩn.
-            - NẾU KHUYẾN NGHỊ VÀO LỆNH (BUY/SELL):
+            - KẾT LUẬN: [BUY (LONG) / SELL (SHORT) / FLAT (ĐỨNG NGOÀI)].
+            - TỶ LỆ R:R THAM CHIẾU: Mục tiêu theo hồ sơ trader là 1:\(String(format: "%.1f", targetRR)). Khi đưa ra setup, ưu tiên tối ưu hóa điểm vào và cắt lỗ để hướng tới tỷ lệ R:R này.
+            - NẾU THẤY CÓ SETUP KHẢ THI (BUY/SELL hoặc Limit/Stop Order):
               - Điểm vào tối ưu (Entry).
-              - Cắt lỗ bắt buộc (Structural Invalidation SL): Mức giá SL cụ thể vi phạm cấu trúc.
+              - Cắt lỗ bảo vệ cấu trúc (Structural Invalidation SL): Mức giá SL cụ thể.
               - Chốt lời (Targets): TP 1 và TP 2 tại cản H4.
               - Khối lượng (Volume): Tính chính xác số lot theo mức rủi ro \(numericRisk)% và số tiền rủi ro \(targetRiskDollarsStr).
-              - Tỷ lệ R:R thực tế đạt được: [Ghi rõ số R:R, ví dụ 1:3.2].
-            - NẾU KHUYẾN NGHỊ FLAT (ĐỨNG NGOÀI): Giải thích rõ điều kiện nến/cản gì cần kiên nhẫn chờ thêm.
+              - Tỷ lệ R:R thực tế đạt được: [Ghi rõ số R:R, ví dụ 1:\(String(format: "%.1f", targetRR))].
+            - NẾU ĐÁNH GIÁ THỊ TRƯỜNG CHƯA ĐỦ ĐIỀU KIỆN / KHÔNG CÓ LỢI THẾ: Kết luận FLAT (Đứng ngoài) và phân tích rõ lý do kỹ thuật vì sao chưa nên vào lệnh lúc này.
 
             BẮT BUỘC KẾT THÚC BẰNG BẢNG THÔNG SỐ SETUP ĐÚNG ĐỊNH DẠNG SAU:
             [PRE-TRADE SETUP SPECIFICATION]
@@ -506,30 +505,33 @@ extension AIPromptBuilder {
             ROLE & INSTITUTIONAL MINDSET:
             You are a SENIOR INSTITUTIONAL PORTFOLIO MANAGER & MASTER TRADER.
             Core philosophy:
-            1. Capital preservation and asymmetric edge come first. Standing aside (FLAT) is far better than taking low-quality or sub-3R trades.
-            2. Maintain a skeptical institutional mindset, identifying retail traps set by Smart Money.
-            3. Full-spectrum critique: from trend exhaustion and fake barriers to live tape reading and strict R:R.
+            1. Capital preservation and probabilistic edge come first. Actively identify quality setups when market structure offers clear asymmetrical advantage; when structure is ambiguous, explain why and recommend observation.
+            2. Maintain an objective institutional mindset, mapping liquidity pools and structural order flow.
+            3. Full-spectrum critique: multi-timeframe alignment, key barriers, and dynamic R:R.
 
             TASK: INSTITUTIONAL PRE-TRADE PLAN (4 SECTIONS):
 
             ### 1. D1 Structure
-            - Evaluate current trend stage: Healthy expansion or overextended and due for exhaustion?
+            - Evaluate current trend stage, extension relative to EMA(21), and key PDH (\(d1PDH)) / PDL (\(d1PDL)) liquidity targets.
             - Identify multi-timeframe conflicts: Never buy into HTF resistance.
-            - Key liquidity targets: Potential draw on liquidity at PDH (\(d1PDH)) or PDL (\(d1PDL)).
 
             ### 2. H4 Structure & Key Zones
-            - Differentiate retail liquidity traps (Equal Highs/Lows) from genuine institutional Order Blocks and Fair Value Gaps.
+            - Map H4 swing high/low structure, institutional Supply/Demand zones (Order Blocks, Fair Value Gaps), and retail liquidity traps.
             - Confirm key structural invalidation levels for Stop Loss placement.
 
             ### 3. H1/M15 Confirmation & Trigger
-            - Read live unclosed candle pulse and wick dynamics. Look for displacement and SFP sweeps. Forbid front-running.
-            - If no valid entry trigger is formed: Conclude FLAT (stand aside).
+            - Read live candle pulse and rejection wicks. If market hasn't reached key zones yet, condition-based pending setups (Limit/Stop orders) are permitted.
 
             ### 4. Trade Plan & Risk Management
             - Decisive Verdict: [BUY / SELL / FLAT].
-            - Strict R:R Enforcement: Minimum 1:\(String(format: "%.1f", targetRR)). If setup space to TP1 cannot yield at least 1:\(String(format: "%.1f", targetRR)), conclude FLAT immediately.
-            - If BUY/SELL: Specific Entry, Invalidation SL, TP1 & TP2, and calculated volume for \(numericRisk)% risk (\(targetRiskDollarsStr) budget).
-            - If FLAT: State specific conditions to wait for.
+            - Target R:R Ratio: Benchmark goal configured in trader profile is 1:\(String(format: "%.1f", targetRR)). Optimize entry and invalidation SL to target this ratio.
+            - IF A VALID SETUP EXISTS (BUY/SELL or Pending Order):
+              - Precise Entry price.
+              - Structural Invalidation SL.
+              - Take Profit Targets (TP1 & TP2).
+              - Calculated lot volume based on \(numericRisk)% risk (\(targetRiskDollarsStr)).
+              - Expected R:R ratio.
+            - IF MARKET OFFERS NO EDGE / UNFAVORABLE: Conclude FLAT (stand aside) with specific technical reasons explaining why risk is unfavorable now.
 
             [PRE-TRADE SETUP SPECIFICATION]
             - Direction: [BUY or SELL or FLAT]

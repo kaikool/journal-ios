@@ -136,6 +136,7 @@ public struct TraderProfileConfig: Codable, Equatable, Sendable {
     public var primaryPlaybooks: String
     public var maxRiskPerTrade: String
     public var maxDailyLossPercent: Double
+    public var targetRiskRewardRatio: Double
     public var knownPsychologicalLeaks: String
     public var customMemoryNotes: String
     
@@ -145,6 +146,7 @@ public struct TraderProfileConfig: Codable, Equatable, Sendable {
         primaryPlaybooks: "Price Action, Trend Following, Support & Resistance",
         maxRiskPerTrade: "0.5% - 1.0% per trade (Strict Stop Loss)",
         maxDailyLossPercent: 3.0,
+        targetRiskRewardRatio: 2.0,
         knownPsychologicalLeaks: "Moving Stop Loss, Premature Profit Taking, FOMO re-entry after taking a loss",
         customMemoryNotes: "Focus on risk-to-reward ratio >= 2:1. Protect capital during consolidation. Never revenge trade."
     )
@@ -155,14 +157,16 @@ public struct TraderProfileConfig: Codable, Equatable, Sendable {
         primaryPlaybooks: String = "Liquidity Sweeps, Order Blocks, Market Structure Breaks, Fair Value Gaps",
         maxRiskPerTrade: String = "0.5% - 1.0% per trade (Strict Stop Loss)",
         maxDailyLossPercent: Double = 3.0,
+        targetRiskRewardRatio: Double = 2.0,
         knownPsychologicalLeaks: String = "Moving Stop Loss, Premature Profit Taking, FOMO re-entry after taking a loss",
-        customMemoryNotes: String = "Focus on risk-to-reward ratio >= 2:1. Protect capital during consolidation. Never revenge trade."
+        customMemoryNotes: "Focus on risk-to-reward ratio >= 2:1. Protect capital during consolidation. Never revenge trade."
     ) {
         self.tradingStyle = tradingStyle
         self.accountObjective = accountObjective
         self.primaryPlaybooks = primaryPlaybooks
         self.maxRiskPerTrade = maxRiskPerTrade
         self.maxDailyLossPercent = maxDailyLossPercent
+        self.targetRiskRewardRatio = targetRiskRewardRatio
         self.knownPsychologicalLeaks = knownPsychologicalLeaks
         self.customMemoryNotes = customMemoryNotes
     }
@@ -173,6 +177,7 @@ public struct TraderProfileConfig: Codable, Equatable, Sendable {
         case primaryPlaybooks
         case maxRiskPerTrade
         case maxDailyLossPercent
+        case targetRiskRewardRatio
         case knownPsychologicalLeaks
         case customMemoryNotes
     }
@@ -184,8 +189,31 @@ public struct TraderProfileConfig: Codable, Equatable, Sendable {
         primaryPlaybooks = try container.decodeIfPresent(String.self, forKey: .primaryPlaybooks) ?? "Liquidity Sweeps, Order Blocks, Market Structure Breaks, Fair Value Gaps"
         maxRiskPerTrade = try container.decodeIfPresent(String.self, forKey: .maxRiskPerTrade) ?? "0.5% - 1.0% per trade (Strict Stop Loss)"
         maxDailyLossPercent = try container.decodeIfPresent(Double.self, forKey: .maxDailyLossPercent) ?? 3.0
+        
+        let customNotes = try container.decodeIfPresent(String.self, forKey: .customMemoryNotes) ?? "Focus on risk-to-reward ratio >= 2:1. Protect capital during consolidation. Never revenge trade."
+        let obj = try container.decodeIfPresent(String.self, forKey: .accountObjective) ?? ""
+        let play = try container.decodeIfPresent(String.self, forKey: .primaryPlaybooks) ?? ""
+        
+        if let explicitRR = try container.decodeIfPresent(Double.self, forKey: .targetRiskRewardRatio), explicitRR > 0 {
+            targetRiskRewardRatio = explicitRR
+        } else {
+            // Backward-compatibility: Parse from textual notes if previously set
+            let combined = "\(customNotes) \(obj) \(play)".lowercased()
+            if let match = combined.range(of: #"1\s*:\s*([0-9]+(\.[0-9]+)?)"#, options: .regularExpression) {
+                let matchedStr = String(combined[match])
+                let parts = matchedStr.components(separatedBy: ":")
+                if parts.count == 2, let r = Double(parts[1].trimmingCharacters(in: .whitespaces)), r > 0 {
+                    targetRiskRewardRatio = r
+                } else {
+                    targetRiskRewardRatio = 2.0
+                }
+            } else {
+                targetRiskRewardRatio = 2.0
+            }
+        }
+        
         knownPsychologicalLeaks = try container.decodeIfPresent(String.self, forKey: .knownPsychologicalLeaks) ?? "Moving Stop Loss, Premature Profit Taking, FOMO re-entry after taking a loss"
-        customMemoryNotes = try container.decodeIfPresent(String.self, forKey: .customMemoryNotes) ?? "Focus on risk-to-reward ratio >= 2:1. Protect capital during consolidation. Never revenge trade."
+        customMemoryNotes = customNotes
     }
     
     /// Authoritative numeric risk percentage (e.g. 5.0 for 5%) dynamically parsed from user setting.
@@ -203,19 +231,6 @@ public struct TraderProfileConfig: Codable, Equatable, Sendable {
     /// Authoritative numeric daily loss limit percentage (e.g. 3.0 for 3%)
     public var numericMaxDailyLossPercent: Decimal {
         Decimal(maxDailyLossPercent > 0 ? maxDailyLossPercent : 3.0)
-    }
-    
-    /// Authoritative numeric target R:R ratio (e.g. 3.0 for 1:3) dynamically parsed from user profile.
-    public var targetRiskRewardRatio: Double {
-        let combined = "\(customMemoryNotes) \(accountObjective) \(primaryPlaybooks)".lowercased()
-        if let match = combined.range(of: #"1\s*:\s*([0-9]+(\.[0-9]+)?)"#, options: .regularExpression) {
-            let matchedStr = String(combined[match])
-            let parts = matchedStr.components(separatedBy: ":")
-            if parts.count == 2, let r = Double(parts[1].trimmingCharacters(in: .whitespaces)), r > 0 {
-                return r
-            }
-        }
-        return 3.0 // Institutional default: R:R >= 1:3
     }
 }
 
