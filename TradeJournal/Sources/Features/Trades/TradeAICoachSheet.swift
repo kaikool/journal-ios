@@ -217,7 +217,10 @@ public struct TradeAICoachSheet: View {
         let curPriceStr = Formatters.price(curPrice, symbol: currentTrade.symbol)
         let slStr = currentTrade.stopLoss.map { Formatters.price($0, symbol: currentTrade.symbol) } ?? (isVi ? "Chưa cài SL" : "Not Set")
         let tpStr = currentTrade.profitTarget.map { Formatters.price($0, symbol: currentTrade.symbol) } ?? (isVi ? "Chưa cài TP" : "Not Set")
-        let volStr = Formatters.formatDecimal(currentTrade.quantity, maxDecimals: 2)
+        let activeVol: Decimal = (isOpen && currentTrade.openQuantity > 0) ? currentTrade.openQuantity : currentTrade.quantity
+        let volStr = (currentTrade.isPartiallyClosed && isOpen)
+            ? "\(Formatters.formatDecimal(currentTrade.openQuantity, maxDecimals: 2)) / \(Formatters.formatDecimal(currentTrade.quantity, maxDecimals: 2))"
+            : Formatters.formatDecimal(currentTrade.quantity, maxDecimals: 2)
         
         // P&L and Points
         let priceDelta = isShort ? (currentTrade.avgEntry - curPrice) : (curPrice - currentTrade.avgEntry)
@@ -230,15 +233,19 @@ public struct TradeAICoachSheet: View {
         // Unrealized P&L
         let unpnl: Decimal = {
             if isOpen {
-                return AssetContractEngine.calculateGrossPnl(
+                let floatingGross = AssetContractEngine.calculateGrossPnl(
                     symbol: currentTrade.symbol,
                     direction: currentTrade.direction,
-                    quantity: currentTrade.quantity,
+                    quantity: activeVol,
                     entryPrice: currentTrade.avgEntry,
                     exitPrice: curPrice,
                     customMultiplier: AssetContractEngine.customMultiplier(for: currentTrade.symbol, multipliers: dataStore.multipliers),
                     conversionRates: dataStore.currencyConversion.rates
                 )
+                if currentTrade.isPartiallyClosed {
+                    return currentTrade.netPnl + floatingGross
+                }
+                return floatingGross
             } else {
                 return currentTrade.netPnl
             }
@@ -323,10 +330,17 @@ public struct TradeAICoachSheet: View {
             }
         }()
         
+        let partialInfoVi = (currentTrade.isPartiallyClosed && isOpen)
+            ? "\n• Chốt lời một phần (Partial TP): Đã bỏ túi (Banked): \(Formatters.formatPnL(currentTrade.netPnl, currency: "USD")) | Khối lượng còn lại: \(Formatters.formatDecimal(currentTrade.openQuantity, maxDecimals: 2)) lots"
+            : ""
+        let partialInfoEn = (currentTrade.isPartiallyClosed && isOpen)
+            ? "\n• Partial Close: Banked profit: \(Formatters.formatPnL(currentTrade.netPnl, currency: "USD")) | Active runner volume: \(Formatters.formatDecimal(currentTrade.openQuantity, maxDecimals: 2)) lots"
+            : ""
+        
         if isVi {
             return """
             [TRẠNG THÁI VỊ THẾ THỜI GIAN THỰC (CẬP NHẬT TẠI \(nowStr))]:
-            • Cặp tiền: \(currentTrade.symbol) | Vị thế: \(isShort ? "SELL / SHORT" : "BUY / LONG") | Khối lượng: \(volStr) lots
+            • Cặp tiền: \(currentTrade.symbol) | Vị thế: \(isShort ? "SELL / SHORT" : "BUY / LONG") | Khối lượng: \(volStr) lots\(partialInfoVi)
             • Thời gian mở: \(openedStr) (Thời gian đã giữ lệnh: \(durationStr))
             • Giá vào (Entry): \(entryPriceStr)
             • Thị giá hiện tại: \(curPriceStr) (Biên độ lãi/lỗ hiện tại: \(pipsDeltaStr))
@@ -337,7 +351,7 @@ public struct TradeAICoachSheet: View {
         } else {
             return """
             [EXACT REAL-TIME POSITION STATE AT THIS MOMENT (TIMESTAMP: \(nowStr))]:
-            • Symbol: \(currentTrade.symbol) | Direction: \(isShort ? "SELL / SHORT" : "BUY / LONG") | Volume: \(volStr) lots
+            • Symbol: \(currentTrade.symbol) | Direction: \(isShort ? "SELL / SHORT" : "BUY / LONG") | Volume: \(volStr) lots\(partialInfoEn)
             • Opened At: \(openedStr) (Time elapsed: \(durationStr))
             • Entry Price: \(entryPriceStr)
             • Current Market Price: \(curPriceStr) (Delta: \(pipsDeltaStr))

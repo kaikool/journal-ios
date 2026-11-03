@@ -26,7 +26,7 @@ public struct TradeDetailMetricsCard: View {
         TradeFormCardContainer {
             VStack(alignment: .leading, spacing: 12) {
                 // Header
-                AppSectionHeader("Execution & financials", icon: "dollarsign.circle")
+                AppSectionHeader("Execution & financials")
                 
                 // 2x3 Grid of Clean Text Metrics
                 LazyVGrid(columns: [GridItem(.flexible(), spacing: 14), GridItem(.flexible(), spacing: 14)], spacing: 12) {

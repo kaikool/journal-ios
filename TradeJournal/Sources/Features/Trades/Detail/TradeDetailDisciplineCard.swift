@@ -47,7 +47,7 @@ public struct TradeDetailDisciplineCard: View {
         TradeFormCardContainer {
             VStack(alignment: .leading, spacing: 14) {
                 // Header
-                AppSectionHeader("Discipline & playbook", icon: "book.pages")
+                AppSectionHeader("Discipline & playbook")
                 
                 // Execution Rating
                 HStack {

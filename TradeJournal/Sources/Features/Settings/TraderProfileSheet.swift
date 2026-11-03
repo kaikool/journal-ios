@@ -98,7 +98,7 @@ public struct TraderProfileSheet: View {
     private var styleAndPlaybooksCard: some View {
         AppCard {
             VStack(alignment: .leading, spacing: 14) {
-                AppSectionHeader("Methodology & playbooks", icon: "chart.line.uptrend.xyaxis")
+                AppSectionHeader("Methodology & playbooks")
                 
                 // Trading Style
                 VStack(alignment: .leading, spacing: 6) {
@@ -136,7 +136,7 @@ public struct TraderProfileSheet: View {
     private var riskAndObjectivesCard: some View {
         AppCard {
             VStack(alignment: .leading, spacing: 14) {
-                AppSectionHeader("Risk budget & account targets", icon: "shield")
+                AppSectionHeader("Risk budget & account targets")
                 
                 // Max Risk per Trade
                 VStack(alignment: .leading, spacing: 6) {
@@ -188,7 +188,7 @@ public struct TraderProfileSheet: View {
     private var psychologyAndRulesCard: some View {
         AppCard {
             VStack(alignment: .leading, spacing: 14) {
-                AppSectionHeader("Psychological leaks & non-negotiables", icon: "exclamationmark.triangle")
+                AppSectionHeader("Psychological leaks & non-negotiables")
                 
                 // Known Psychological Leaks
                 VStack(alignment: .leading, spacing: 6) {

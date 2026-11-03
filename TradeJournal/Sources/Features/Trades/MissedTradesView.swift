@@ -380,7 +380,7 @@ public struct AddMissedTradeSheet: View {
     private var playbookCard: some View {
         TradeFormCardContainer {
             VStack(alignment: .leading, spacing: 10) {
-                AppSectionHeader("Playbook", icon: "book.pages")
+                AppSectionHeader("Playbook")
                 
                 let playbookOptions = [""] + dataStore.playbooks.map { $0.id }
                 AppDropdownField(
@@ -400,7 +400,7 @@ public struct AddMissedTradeSheet: View {
     private var notesCard: some View {
         TradeFormCardContainer {
             VStack(alignment: .leading, spacing: 10) {
-                AppSectionHeader("Post-mortem & notes", icon: "note.text")
+                AppSectionHeader("Post-mortem & notes")
                 
                 Text("Why did you miss this setup? Describe your thesis, entry trigger, hesitation, or psychological factor.")
                     .font(AppTypography.caption)

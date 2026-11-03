@@ -69,13 +69,17 @@ public struct EditTargetsSheet: View {
         return abs(tp - entryPrice)
     }
     
+    private var activeVolume: Decimal {
+        (trade.status == .open && trade.openQuantity > 0) ? trade.openQuantity : trade.quantity
+    }
+    
     private var riskAmount: Decimal? {
-        guard let sl = stopLoss, entryPrice > 0, trade.quantity > 0 else { return nil }
+        guard let sl = stopLoss, entryPrice > 0, activeVolume > 0 else { return nil }
         if isStopLossInProfit || isStopLossAtBreakeven { return 0 }
         let gross = AssetContractEngine.calculateGrossPnl(
             symbol: trade.symbol,
             direction: trade.direction,
-            quantity: trade.quantity,
+            quantity: activeVolume,
             entryPrice: entryPrice,
             exitPrice: sl,
             customMultiplier: AssetContractEngine.customMultiplier(for: trade.symbol, multipliers: dataStore.multipliers),
@@ -86,11 +90,11 @@ public struct EditTargetsSheet: View {
     }
     
     private var lockedProfitAmount: Decimal? {
-        guard isStopLossInProfit, let sl = stopLoss, entryPrice > 0, trade.quantity > 0 else { return nil }
+        guard isStopLossInProfit, let sl = stopLoss, entryPrice > 0, activeVolume > 0 else { return nil }
         let gross = AssetContractEngine.calculateGrossPnl(
             symbol: trade.symbol,
             direction: trade.direction,
-            quantity: trade.quantity,
+            quantity: activeVolume,
             entryPrice: entryPrice,
             exitPrice: sl,
             customMultiplier: AssetContractEngine.customMultiplier(for: trade.symbol, multipliers: dataStore.multipliers),
@@ -101,11 +105,11 @@ public struct EditTargetsSheet: View {
     }
     
     private var targetAmount: Decimal? {
-        guard let tp = profitTarget, entryPrice > 0, trade.quantity > 0 else { return nil }
+        guard let tp = profitTarget, entryPrice > 0, activeVolume > 0 else { return nil }
         let gross = AssetContractEngine.calculateGrossPnl(
             symbol: trade.symbol,
             direction: trade.direction,
-            quantity: trade.quantity,
+            quantity: activeVolume,
             entryPrice: entryPrice,
             exitPrice: tp,
             customMultiplier: AssetContractEngine.customMultiplier(for: trade.symbol, multipliers: dataStore.multipliers),
@@ -203,12 +207,25 @@ public struct EditTargetsSheet: View {
                     Spacer()
                     
                     VStack(alignment: .trailing, spacing: 2) {
-                        Text("Volume")
+                        Text(trade.isPartiallyClosed ? "Active Volume" : "Volume")
                             .font(AppTypography.statLabel)
                             .foregroundColor(AppColors.secondaryText)
-                        Text("\(Formatters.formatDecimal(trade.quantity, maxDecimals: 3)) lots")
+                        Text("\(Formatters.formatDecimal(activeVolume, maxDecimals: 3)) lots")
                             .font(AppTypography.statValue)
                             .foregroundColor(AppColors.primaryText)
+                    }
+                }
+                
+                if trade.isPartiallyClosed {
+                    Divider().background(AppColors.border.opacity(0.4))
+                    HStack {
+                        Text("Banked Realized Profit")
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.secondaryText)
+                        Spacer()
+                        Text(Formatters.formatPnL(trade.netPnl, currency: env.currentCurrency))
+                            .font(AppTypography.captionBold)
+                            .foregroundColor(Formatters.pnlColor(trade.netPnl))
                     }
                 }
             }
@@ -305,28 +322,80 @@ public struct EditTargetsSheet: View {
                             .foregroundColor(AppColors.brand)
                     }
                 } else if let rAmt = riskAmount, let rDist = riskDistance {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Risk Distance")
-                                .font(AppTypography.statLabel)
-                                .foregroundColor(AppColors.secondaryText)
-                            Text("\(Formatters.formatDecimal(rDist, maxDecimals: symbolSpec.defaultDecimals)) pts")
-                                .font(AppTypography.statValueMedium)
-                                .foregroundColor(AppColors.primaryText)
+                    if trade.isPartiallyClosed && trade.status == .open {
+                        if trade.netPnl >= rAmt {
+                            let netOutcome = trade.netPnl - rAmt
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Capital at Risk")
+                                        .font(AppTypography.statLabel)
+                                        .foregroundColor(AppColors.secondaryText)
+                                    Text("$0.00 (Risk-Free)")
+                                        .font(AppTypography.statValue)
+                                        .foregroundColor(AppColors.profit)
+                                }
+                                
+                                Spacer()
+                                
+                                VStack(alignment: .trailing, spacing: 2) {
+                                    Text("Net Outcome on SL")
+                                        .font(AppTypography.statLabel)
+                                        .foregroundColor(AppColors.secondaryText)
+                                    Text("+\(Formatters.formatCurrency(netOutcome, currency: env.currentCurrency))")
+                                        .font(AppTypography.statValueMedium)
+                                        .foregroundColor(AppColors.profit)
+                                }
+                            }
+                            .appSubCardStyle(cornerRadius: 8, padding: 10)
+                        } else {
+                            let netRisk = rAmt - trade.netPnl
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Net Risk at Stake")
+                                        .font(AppTypography.statLabel)
+                                        .foregroundColor(AppColors.secondaryText)
+                                    Text("-\(Formatters.formatCurrency(netRisk, currency: env.currentCurrency))")
+                                        .font(AppTypography.statValue)
+                                        .foregroundColor(AppColors.loss)
+                                }
+                                
+                                Spacer()
+                                
+                                VStack(alignment: .trailing, spacing: 2) {
+                                    Text("Active SL Loss")
+                                        .font(AppTypography.statLabel)
+                                        .foregroundColor(AppColors.secondaryText)
+                                    Text("-\(Formatters.formatCurrency(rAmt, currency: env.currentCurrency))")
+                                        .font(AppTypography.statValueMedium)
+                                        .foregroundColor(AppColors.loss)
+                                }
+                            }
+                            .appSubCardStyle(cornerRadius: 8, padding: 10)
                         }
-                        
-                        Spacer()
-                        
-                        VStack(alignment: .trailing, spacing: 2) {
-                            Text("Risk at Stake (1R)")
-                                .font(AppTypography.statLabel)
-                                .foregroundColor(AppColors.secondaryText)
-                            Text("-\(Formatters.formatCurrency(rAmt, currency: env.currentCurrency))")
-                                .font(AppTypography.statValue)
-                                .foregroundColor(AppColors.loss)
+                    } else {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Risk Distance")
+                                    .font(AppTypography.statLabel)
+                                    .foregroundColor(AppColors.secondaryText)
+                                Text("\(Formatters.formatDecimal(rDist, maxDecimals: symbolSpec.defaultDecimals)) pts")
+                                    .font(AppTypography.statValueMedium)
+                                    .foregroundColor(AppColors.primaryText)
+                            }
+                            
+                            Spacer()
+                            
+                            VStack(alignment: .trailing, spacing: 2) {
+                                Text("Risk at Stake (1R)")
+                                    .font(AppTypography.statLabel)
+                                    .foregroundColor(AppColors.secondaryText)
+                                Text("-\(Formatters.formatCurrency(rAmt, currency: env.currentCurrency))")
+                                    .font(AppTypography.statValue)
+                                    .foregroundColor(AppColors.loss)
+                            }
                         }
+                        .appSubCardStyle(cornerRadius: 8, padding: 10)
                     }
-                    .appSubCardStyle(cornerRadius: 8, padding: 10)
                 }
             }
         }
@@ -371,10 +440,11 @@ public struct EditTargetsSheet: View {
                         Spacer()
                         
                         VStack(alignment: .trailing, spacing: 2) {
-                            Text("Planned Reward")
+                            Text(trade.isPartiallyClosed ? "Total Potential" : "Planned Reward")
                                 .font(AppTypography.statLabel)
                                 .foregroundColor(AppColors.secondaryText)
-                            Text("+\(Formatters.formatCurrency(tAmt, currency: env.currentCurrency))")
+                            let totalTarget = trade.isPartiallyClosed ? (trade.netPnl + tAmt) : tAmt
+                            Text("+\(Formatters.formatCurrency(totalTarget, currency: env.currentCurrency))")
                                 .font(AppTypography.statValue)
                                 .foregroundColor(AppColors.profit)
                         }

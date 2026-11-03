@@ -38,7 +38,6 @@ public struct TradeDetailRiskCard: View {
                 AppSectionHeader(
                     "Risk & return (R:R)",
                     actionTitle: "Edit Targets",
-                    actionIcon: "shield.lefthalf.filled",
                     onAction: onEditTargets
                 )
                 
@@ -103,7 +102,8 @@ public struct TradeDetailRiskCard: View {
     
     private var riskProtectionTile: some View {
         if trade.isStopLossInProfit {
-            let sub = lockedProfit.map { "Locked +\(Formatters.formatCurrency($0, currency: reportingCurrency))" }
+            let totalLocked = (lockedProfit ?? 0) + (trade.isPartiallyClosed ? trade.netPnl : 0)
+            let sub = "Locked +\(Formatters.formatCurrency(totalLocked, currency: reportingCurrency))"
             return textMetric(
                 title: "Capital at Risk",
                 value: "$0.00 (Risk-Free)",
@@ -111,12 +111,41 @@ public struct TradeDetailRiskCard: View {
                 color: AppColors.profit
             )
         } else if trade.isStopLossAtBreakeven {
+            let sub = trade.isPartiallyClosed
+                ? "Banked: +\(Formatters.formatCurrency(trade.netPnl, currency: reportingCurrency))"
+                : "Protected at Breakeven"
             return textMetric(
                 title: "Capital at Risk",
                 value: "$0.00 (Risk-Free)",
-                subtitle: "Protected at Breakeven",
+                subtitle: sub,
                 color: AppColors.profit
             )
+        } else if trade.isPartiallyClosed && trade.status == .open {
+            if let risk = riskAmount {
+                if trade.netPnl >= risk {
+                    let netOutcome = trade.netPnl - risk
+                    return textMetric(
+                        title: "Capital at Risk",
+                        value: "$0.00 (Risk-Free)",
+                        subtitle: "Net on SL: +\(Formatters.formatCurrency(netOutcome, currency: reportingCurrency))",
+                        color: AppColors.profit
+                    )
+                } else {
+                    let netRisk = risk - trade.netPnl
+                    return textMetric(
+                        title: "Net Risk at Stake",
+                        value: "-\(Formatters.formatCurrency(netRisk, currency: reportingCurrency))",
+                        subtitle: "Active: -\(Formatters.formatCurrency(risk, currency: reportingCurrency)) | Banked: +\(Formatters.formatCurrency(trade.netPnl, currency: reportingCurrency))",
+                        color: AppColors.loss
+                    )
+                }
+            } else {
+                return textMetric(
+                    title: "Capital at Risk",
+                    value: "–",
+                    color: AppColors.secondaryText
+                )
+            }
         } else {
             return textMetric(
                 title: "Risk at Stake (1R)",
@@ -131,8 +160,8 @@ public struct TradeDetailRiskCard: View {
             let isClosed = trade.status.isClosed
             let val = isClosed
                 ? (realizedR.map { Formatters.formatRMultiple(($0 as NSDecimalNumber).doubleValue) } ?? Formatters.formatPnL(trade.netPnl, currency: reportingCurrency))
-                : (targetAmount.map { "+\(Formatters.formatCurrency($0, currency: reportingCurrency))" } ?? "Risk-Free Runner")
-            let sub: String? = isClosed ? nil : (lockedProfit.map { "Guaranteed +\(Formatters.formatCurrency($0, currency: reportingCurrency))" })
+                : (targetAmount.map { "+\(Formatters.formatCurrency($0 + (trade.isPartiallyClosed ? trade.netPnl : 0), currency: reportingCurrency))" } ?? "Risk-Free Runner")
+            let sub: String? = isClosed ? nil : (lockedProfit.map { "Guaranteed +\(Formatters.formatCurrency($0 + (trade.isPartiallyClosed ? trade.netPnl : 0), currency: reportingCurrency))" })
             return textMetric(
                 title: isClosed ? "Realized Return" : "Runner Status",
                 value: val,
@@ -141,14 +170,32 @@ public struct TradeDetailRiskCard: View {
             )
         } else if trade.isStopLossAtBreakeven {
             let isClosed = trade.status.isClosed
+            let totalReturn = (targetAmount ?? 0) + (trade.isPartiallyClosed ? trade.netPnl : 0)
             let val = isClosed
                 ? Formatters.formatPnL(trade.netPnl, currency: reportingCurrency)
-                : (targetAmount.map { "+\(Formatters.formatCurrency($0, currency: reportingCurrency))" } ?? "Risk-Free BE")
+                : (targetAmount != nil ? "+\(Formatters.formatCurrency(totalReturn, currency: reportingCurrency))" : "Risk-Free BE")
             return textMetric(
                 title: isClosed ? "Realized Return" : "Runner Status",
                 value: val,
                 color: isClosed ? Formatters.pnlColor(trade.netPnl) : AppColors.profit
             )
+        } else if trade.isPartiallyClosed && trade.status == .open {
+            if let tAmt = targetAmount {
+                let totalTarget = trade.netPnl + tAmt
+                let sub = "Active: +\(Formatters.formatCurrency(tAmt, currency: reportingCurrency)) | Banked: +\(Formatters.formatCurrency(trade.netPnl, currency: reportingCurrency))"
+                return textMetric(
+                    title: "Total Potential",
+                    value: "+\(Formatters.formatCurrency(totalTarget, currency: reportingCurrency))",
+                    subtitle: sub,
+                    color: AppColors.profit
+                )
+            } else {
+                return textMetric(
+                    title: "Banked Return",
+                    value: Formatters.formatPnL(trade.netPnl, currency: reportingCurrency),
+                    color: Formatters.pnlColor(trade.netPnl)
+                )
+            }
         } else {
             let isClosed = trade.status.isClosed
             let val = realizedR.map { Formatters.formatRMultiple(($0 as NSDecimalNumber).doubleValue) } ??
@@ -173,6 +220,23 @@ public struct TradeDetailRiskCard: View {
                         .foregroundColor(AppColors.secondaryText)
                     Spacer()
                     Text(trade.isStopLossInProfit ? "Locked Profit Runner" : "Breakeven Protected")
+                        .font(AppTypography.captionBold)
+                        .foregroundColor(AppColors.profit)
+                }
+                
+                Capsule()
+                    .fill(AppColors.profit.opacity(0.85))
+                    .frame(height: 4)
+            }
+            .padding(.top, 4)
+        } else if trade.isPartiallyClosed && trade.status == .open && (trade.netPnl >= (riskAmount ?? 0)) {
+            VStack(spacing: 4) {
+                HStack {
+                    Text("Downside Risk: $0.00 (Banked profit covers SL)")
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.secondaryText)
+                    Spacer()
+                    Text("Risk-Free (Partial TP)")
                         .font(AppTypography.captionBold)
                         .foregroundColor(AppColors.profit)
                 }

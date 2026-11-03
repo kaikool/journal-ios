@@ -199,18 +199,7 @@ public enum TradeReplayEngine {
             ? (currentPrice - trade.avgEntry)
             : (trade.avgEntry - currentPrice)
         
-        // Method 1: If closed trade has an exit price, compute empirical dollar value per price unit
-        if let exit = trade.avgExit {
-            let totalExitDelta = (trade.direction == .long) ? (exit - trade.avgEntry) : (trade.avgEntry - exit)
-            if abs(totalExitDelta) > 0.00001 && abs(trade.grossPnl) > 0 {
-                let dollarPerPoint = trade.grossPnl / totalExitDelta
-                let grossAtBar = priceDelta * dollarPerPoint
-                let feeShare = isLastBar ? trade.fees : (trade.fees * 0.5)
-                return grossAtBar - feeShare
-            }
-        }
-        
-        // Method 2: Contract multiplier fallback with accurate commodity, index, and forex specifications
+        // Multiplier fallback with accurate commodity, index, and forex specifications
         let multiplier: Decimal = {
             if let cm = trade.contractMultiplier, cm > 0 {
                 return cm
@@ -218,8 +207,29 @@ public enum TradeReplayEngine {
             return AssetContractEngine.contractMultiplier(for: trade.symbol)
         }()
         
-        let grossAtBar = priceDelta * trade.quantity * multiplier
         let feeShare = isLastBar ? trade.fees : (trade.fees * 0.5)
+        
+        // If the trade is currently open and has been partially closed:
+        if trade.status == .open && trade.isPartiallyClosed {
+            let activeVolume = trade.openQuantity > 0 ? trade.openQuantity : trade.quantity
+            let floatingGross = priceDelta * activeVolume * multiplier
+            let bankedProfit = trade.netPnl
+            return bankedProfit + floatingGross - feeShare
+        }
+        
+        // Method 1: If closed trade has an exit price and was not partially closed, compute empirical dollar value per price unit
+        if let exit = trade.avgExit, trade.status.isClosed, trade.exits.count <= 1 {
+            let totalExitDelta = (trade.direction == .long) ? (exit - trade.avgEntry) : (trade.avgEntry - exit)
+            if abs(totalExitDelta) > 0.00001 && abs(trade.grossPnl) > 0 {
+                let dollarPerPoint = trade.grossPnl / totalExitDelta
+                let grossAtBar = priceDelta * dollarPerPoint
+                return grossAtBar - feeShare
+            }
+        }
+        
+        // Method 2: Standard volume calculation
+        let activeVolume = (trade.status == .open && trade.openQuantity > 0) ? trade.openQuantity : trade.quantity
+        let grossAtBar = priceDelta * activeVolume * multiplier
         return grossAtBar - feeShare
     }
     
@@ -275,9 +285,25 @@ public enum TradeReplayEngine {
         let maePoints = isLong ? (minPrice - trade.avgEntry) : (trade.avgEntry - maxPrice)
         let mfePoints = isLong ? (maxPrice - trade.avgEntry) : (trade.avgEntry - minPrice)
         
+        let multiplier: Decimal = {
+            if let cm = trade.contractMultiplier, cm > 0 {
+                return cm
+            }
+            return AssetContractEngine.contractMultiplier(for: trade.symbol)
+        }()
+        
         // Mark-to-market dollar conversion using asset contract specifications & empirical dollarPerPoint
         var maeDollar = computeUnrealizedPnl(trade: trade, currentPrice: maePrice, isLastBar: false)
         var mfeDollar = computeUnrealizedPnl(trade: trade, currentPrice: mfePrice, isLastBar: false)
+        
+        // For partially closed trades, also evaluate the initial excursion before partial close took place:
+        if trade.isPartiallyClosed {
+            let initialDip = min(0, maePoints * trade.quantity * multiplier)
+            maeDollar = min(maeDollar, initialDip)
+            
+            let initialPeak = max(0, mfePoints * trade.quantity * multiplier)
+            mfeDollar = max(mfeDollar, initialPeak)
+        }
         
         // MAE is maximum adverse excursion (drawdown), so it must be <= 0
         if maeDollar > 0 { maeDollar = 0 }

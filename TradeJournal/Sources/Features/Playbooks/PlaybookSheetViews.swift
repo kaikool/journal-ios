@@ -51,7 +51,7 @@ public struct NewPlaybookSheet: View {
     private var detailsCard: some View {
         AppleCard {
             VStack(alignment: .leading, spacing: 14) {
-                AppSectionHeader("Strategy identity", icon: "pencil.and.outline")
+                AppSectionHeader("Strategy identity")
                 
                 AppFormField(
                     "Playbook Name",
@@ -83,7 +83,6 @@ public struct NewPlaybookSheet: View {
             VStack(alignment: .leading, spacing: 14) {
                 AppSectionHeader(
                     "Checklist rules",
-                    icon: "checklist",
                     badge: "\(validRulesCount)",
                     trailingBadge: "Dynamic Entry",
                     trailingBadgeColor: AppColors.brand
@@ -234,7 +233,7 @@ public struct EditPlaybookSheet: View {
     private var detailsCard: some View {
         AppleCard {
             VStack(alignment: .leading, spacing: 14) {
-                AppSectionHeader("Strategy identity", icon: "pencil.and.outline")
+                AppSectionHeader("Strategy identity")
                 
                 AppFormField(
                     "Playbook Name",
@@ -258,7 +257,6 @@ public struct EditPlaybookSheet: View {
             VStack(alignment: .leading, spacing: 14) {
                 AppSectionHeader(
                     "Checklist rules",
-                    icon: "checklist",
                     badge: "\(validRulesCount)",
                     trailingBadge: "Dynamic Entry",
                     trailingBadgeColor: AppColors.brand

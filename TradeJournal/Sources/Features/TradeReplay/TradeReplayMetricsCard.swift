@@ -75,9 +75,9 @@ public struct TradeReplayHeaderCard: View {
                         Text("•")
                             .foregroundColor(AppColors.secondaryText.opacity(0.4))
                         
-                        Text("Qty:")
+                        Text(trade.isPartiallyClosed && trade.status == .open ? "Active Qty:" : "Qty:")
                             .foregroundColor(AppColors.secondaryText)
-                        Text(Formatters.formatNumber(trade.quantity))
+                        Text(trade.isPartiallyClosed && trade.status == .open ? "\(Formatters.formatNumber(trade.openQuantity)) / \(Formatters.formatNumber(trade.quantity))" : Formatters.formatNumber(trade.quantity))
                             .foregroundColor(AppColors.primaryText)
                     }
                     .font(AppTypography.caption)

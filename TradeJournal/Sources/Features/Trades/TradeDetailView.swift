@@ -61,16 +61,20 @@ public struct TradeDetailView: View {
             .sorted { $0.executedAt < $1.executedAt }
     }
     
+    private var activeVolume: Decimal {
+        (trade.status == .open && trade.openQuantity > 0) ? trade.openQuantity : trade.quantity
+    }
+    
     // Risk calculations
     private var riskAmount: Decimal? {
-        guard let sl = trade.stopLoss, trade.avgEntry > 0, trade.quantity > 0 else { return nil }
+        guard let sl = trade.stopLoss, trade.avgEntry > 0, activeVolume > 0 else { return nil }
         if trade.isStopLossInProfit || trade.isStopLossAtBreakeven {
             return 0
         }
         let gross = AssetContractEngine.calculateGrossPnl(
             symbol: trade.symbol,
             direction: trade.direction,
-            quantity: trade.quantity,
+            quantity: activeVolume,
             entryPrice: trade.avgEntry,
             exitPrice: sl,
             customMultiplier: AssetContractEngine.customMultiplier(for: trade.symbol, multipliers: dataStore.multipliers),
@@ -81,11 +85,11 @@ public struct TradeDetailView: View {
     }
     
     private var lockedProfitAmount: Decimal? {
-        guard trade.isStopLossInProfit, let sl = trade.stopLoss, trade.avgEntry > 0, trade.quantity > 0 else { return nil }
+        guard trade.isStopLossInProfit, let sl = trade.stopLoss, trade.avgEntry > 0, activeVolume > 0 else { return nil }
         let gross = AssetContractEngine.calculateGrossPnl(
             symbol: trade.symbol,
             direction: trade.direction,
-            quantity: trade.quantity,
+            quantity: activeVolume,
             entryPrice: trade.avgEntry,
             exitPrice: sl,
             customMultiplier: AssetContractEngine.customMultiplier(for: trade.symbol, multipliers: dataStore.multipliers),
@@ -96,11 +100,11 @@ public struct TradeDetailView: View {
     }
     
     private var targetAmount: Decimal? {
-        guard let tp = trade.profitTarget, trade.avgEntry > 0, trade.quantity > 0 else { return nil }
+        guard let tp = trade.profitTarget, trade.avgEntry > 0, activeVolume > 0 else { return nil }
         let gross = AssetContractEngine.calculateGrossPnl(
             symbol: trade.symbol,
             direction: trade.direction,
-            quantity: trade.quantity,
+            quantity: activeVolume,
             entryPrice: trade.avgEntry,
             exitPrice: tp,
             customMultiplier: AssetContractEngine.customMultiplier(for: trade.symbol, multipliers: dataStore.multipliers),
@@ -292,7 +296,7 @@ public struct TradeDetailView: View {
     private var partialExitsCard: some View {
         TradeFormCardContainer {
             VStack(alignment: .leading, spacing: 10) {
-                AppSectionHeader("Partial exits & executions", icon: "arrow.triangle.pull")
+                AppSectionHeader("Partial exits & executions")
                 
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
@@ -353,12 +357,6 @@ public struct TradeDetailView: View {
                         .foregroundColor(AppColors.secondaryText)
                         .tracking(0.5)
                     Spacer()
-                    Image(systemName: "photo.stack")
-                        .font(AppTypography.cardHeaderUppercase)
-                        .foregroundColor(AppColors.secondaryText.opacity(0.7))
-                        .frame(width: 24, height: 24)
-                        .background(AppColors.secondaryBackground.opacity(0.5))
-                        .clipShape(Circle())
                 }
                 
                 AttachmentsSectionView(
