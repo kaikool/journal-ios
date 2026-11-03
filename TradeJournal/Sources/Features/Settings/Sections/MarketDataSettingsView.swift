@@ -12,12 +12,20 @@ public struct MarketDataSettingsView: View {
     @State private var isTestingOanda: Bool = false
     @State private var isCheckingAlerts: Bool = false
     @State private var alertCheckStatus: String = ""
+    @State private var isWatchlistExpanded: Bool = false
     
     public init() {}
     
     private var isOandaConfigured: Bool {
         let key = KeychainManager.get(forKey: "oanda_api_key") ?? AppSecretsLoader.loadSecret(named: "OANDA_API_KEY") ?? dataStore.marketConnections.oandaApiKey
         return !key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+    
+    private var customTradeHistorySymbols: [String] {
+        let preset = Set(["XAUUSD", "XAGUSD", "USOIL", "EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD", "USDCHF", "US30", "NAS100", "SPX500", "BTCUSD", "ETHUSD", "SOLUSD"])
+        let traded = dataStore.trades.map { $0.symbol.uppercased() }
+        let unique = Array(Set(traded)).filter { !preset.contains($0) && !$0.isEmpty }
+        return unique.sorted()
     }
     
     public var body: some View {
@@ -116,30 +124,80 @@ public struct MarketDataSettingsView: View {
                     Divider()
                         .background(AppColors.border.opacity(0.4))
                     
+                    // Collapsible Monitored Symbols Section
                     HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Monitored Symbols")
-                                .font(AppTypography.captionBold)
-                                .foregroundColor(AppColors.secondaryText)
+                        VStack(alignment: .leading, spacing: 3) {
+                            HStack(spacing: 6) {
+                                Text("Monitored Symbols")
+                                    .font(AppTypography.captionBold)
+                                    .foregroundColor(AppColors.secondaryText)
+                                
+                                Text("(\(alertEngine.monitoredSymbols.count))")
+                                    .font(AppTypography.captionMicro)
+                                    .foregroundColor(AppColors.brand)
+                            }
+                            
                             Text(alertEngine.monitoredSymbols.joined(separator: ", "))
                                 .font(AppTypography.rowPrimary)
                                 .foregroundColor(AppColors.primaryText)
+                                .lineLimit(1)
                         }
+                        
                         Spacer()
+                        
+                        Image(systemName: isWatchlistExpanded ? "chevron.up" : "chevron.down")
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.secondaryText)
+                            .frame(width: 44, height: 44)
+                    }
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        NativeHaptics.lightImpact()
+                        withAnimation(AppAnimations.springQuick) {
+                            isWatchlistExpanded.toggle()
+                        }
+                    }
+                    
+                    if isWatchlistExpanded {
+                        VStack(alignment: .leading, spacing: 10) {
+                            symbolCategoryRow(title: "Metals & Energy", symbols: ["XAUUSD", "XAGUSD", "USOIL"])
+                            symbolCategoryRow(title: "Major Forex", symbols: ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD", "USDCHF"])
+                            symbolCategoryRow(title: "Indices", symbols: ["US30", "NAS100", "SPX500"])
+                            symbolCategoryRow(title: "Crypto", symbols: ["BTCUSD", "ETHUSD", "SOLUSD"])
+                            
+                            let historySymbols = customTradeHistorySymbols
+                            if !historySymbols.isEmpty {
+                                symbolCategoryRow(title: "From Your Trades", symbols: historySymbols)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
                     }
                     
                     Divider()
                         .background(AppColors.border.opacity(0.4))
                     
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
+                    // Timeframes Row with Check Now Button
+                    HStack(alignment: .center) {
+                        VStack(alignment: .leading, spacing: 4) {
                             Text("Timeframes")
                                 .font(AppTypography.captionBold)
                                 .foregroundColor(AppColors.secondaryText)
-                            Text(alertEngine.monitoredTimeframes.map { $0.uppercased() }.joined(separator: ", "))
-                                .font(AppTypography.rowPrimary)
-                                .foregroundColor(AppColors.primaryText)
+                            
+                            HStack(spacing: 6) {
+                                ForEach(["15m", "1h", "4h"], id: \.self) { tf in
+                                    AppFilterChip(
+                                        tf.uppercased(),
+                                        isSelected: alertEngine.isTimeframeMonitored(tf),
+                                        height: 28,
+                                        activeColor: AppColors.brand
+                                    ) {
+                                        alertEngine.toggleTimeframe(tf)
+                                    }
+                                }
+                            }
                         }
+                        
                         Spacer()
                         
                         AppButton("Check Now", icon: "bell.badge", style: .secondary, size: .compact, isLoading: isCheckingAlerts) {
@@ -169,6 +227,29 @@ public struct MarketDataSettingsView: View {
         }
         .onAppear {
             binanceEnabled = dataStore.marketConnections.binanceEnabled
+        }
+    }
+    
+    private func symbolCategoryRow(title: String, symbols: [String]) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(AppTypography.captionMicro)
+                .foregroundColor(AppColors.secondaryText)
+            
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    ForEach(symbols, id: \.self) { sym in
+                        AppFilterChip(
+                            sym,
+                            isSelected: alertEngine.isSymbolMonitored(sym),
+                            height: 28,
+                            activeColor: AppColors.brand
+                        ) {
+                            alertEngine.toggleSymbol(sym)
+                        }
+                    }
+                }
+            }
         }
     }
     

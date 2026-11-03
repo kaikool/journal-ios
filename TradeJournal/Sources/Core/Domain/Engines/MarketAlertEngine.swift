@@ -106,6 +106,40 @@ public final class MarketAlertEngine: ObservableObject, @unchecked Sendable {
     
     @Published public var enabledEMAPeriods: [Int] = [21, 50]
     
+    public func toggleSymbol(_ symbol: String) {
+        let clean = symbol.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        guard !clean.isEmpty else { return }
+        if let idx = monitoredSymbols.firstIndex(of: clean) {
+            if monitoredSymbols.count > 1 {
+                monitoredSymbols.remove(at: idx)
+            }
+        } else {
+            monitoredSymbols.append(clean)
+        }
+    }
+    
+    public func isSymbolMonitored(_ symbol: String) -> Bool {
+        let clean = symbol.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        return monitoredSymbols.contains(clean)
+    }
+    
+    public func toggleTimeframe(_ tf: String) {
+        let clean = tf.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !clean.isEmpty else { return }
+        if let idx = monitoredTimeframes.firstIndex(of: clean) {
+            if monitoredTimeframes.count > 1 {
+                monitoredTimeframes.remove(at: idx)
+            }
+        } else {
+            monitoredTimeframes.append(clean)
+        }
+    }
+    
+    public func isTimeframeMonitored(_ tf: String) -> Bool {
+        let clean = tf.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return monitoredTimeframes.contains(clean)
+    }
+    
     private init() {
         self.isEnabled = UserDefaults.standard.bool(forKey: "market_alert_enabled")
         

@@ -875,5 +875,18 @@ final class FeatureVerificationTests: XCTestCase {
         // Deduplication test: Re-evaluating the exact same bar must yield 0 new alerts
         let duplicateAlerts = engine.evaluateCandles(symbol: sym, timeframe: tf, bars: bars, referenceDate: refDate)
         XCTAssertTrue(duplicateAlerts.isEmpty, "Duplicate alerts on the same closed bar timestamp must be suppressed")
+        
+        // Symbol & Timeframe toggling test
+        engine.monitoredSymbols = ["XAUUSD", "EURUSD"]
+        engine.toggleSymbol("BTCUSD")
+        XCTAssertTrue(engine.isSymbolMonitored("BTCUSD"))
+        engine.toggleSymbol("BTCUSD")
+        XCTAssertFalse(engine.isSymbolMonitored("BTCUSD"))
+        
+        engine.monitoredTimeframes = ["15m"]
+        engine.toggleTimeframe("1h")
+        XCTAssertTrue(engine.isTimeframeMonitored("1h"))
+        engine.toggleTimeframe("1h")
+        XCTAssertFalse(engine.isTimeframeMonitored("1h"))
     }
 }
