@@ -64,6 +64,9 @@ public struct TradeDetailView: View {
     // Risk calculations
     private var riskAmount: Decimal? {
         guard let sl = trade.stopLoss, trade.avgEntry > 0, trade.quantity > 0 else { return nil }
+        if trade.isStopLossInProfit || trade.isStopLossAtBreakeven {
+            return 0
+        }
         let gross = AssetContractEngine.calculateGrossPnl(
             symbol: trade.symbol,
             direction: trade.direction,
@@ -77,8 +80,41 @@ public struct TradeDetailView: View {
         return abs(gross)
     }
     
+    private var lockedProfitAmount: Decimal? {
+        guard trade.isStopLossInProfit, let sl = trade.stopLoss, trade.avgEntry > 0, trade.quantity > 0 else { return nil }
+        let gross = AssetContractEngine.calculateGrossPnl(
+            symbol: trade.symbol,
+            direction: trade.direction,
+            quantity: trade.quantity,
+            entryPrice: trade.avgEntry,
+            exitPrice: sl,
+            customMultiplier: AssetContractEngine.customMultiplier(for: trade.symbol, multipliers: dataStore.multipliers),
+            conversionRates: dataStore.currencyConversion.rates,
+            reportingCurrency: env.currentCurrency
+        )
+        return max(0, gross)
+    }
+    
+    private var targetAmount: Decimal? {
+        guard let tp = trade.profitTarget, trade.avgEntry > 0, trade.quantity > 0 else { return nil }
+        let gross = AssetContractEngine.calculateGrossPnl(
+            symbol: trade.symbol,
+            direction: trade.direction,
+            quantity: trade.quantity,
+            entryPrice: trade.avgEntry,
+            exitPrice: tp,
+            customMultiplier: AssetContractEngine.customMultiplier(for: trade.symbol, multipliers: dataStore.multipliers),
+            conversionRates: dataStore.currencyConversion.rates,
+            reportingCurrency: env.currentCurrency
+        )
+        return max(0, gross)
+    }
+    
     private var realizedR: Decimal? {
         guard let sl = trade.stopLoss, let exit = trade.avgExit, trade.avgEntry > 0 else { return nil }
+        if trade.isStopLossInProfit || trade.isStopLossAtBreakeven {
+            return nil
+        }
         let riskPerUnit = abs(trade.avgEntry - sl)
         guard riskPerUnit > 0 else { return nil }
         let gainPerUnit = (trade.direction == .long) ? (exit - trade.avgEntry) : (trade.avgEntry - exit)
@@ -87,6 +123,9 @@ public struct TradeDetailView: View {
     
     private var plannedR: Decimal? {
         guard let sl = trade.stopLoss, let tp = trade.profitTarget, trade.avgEntry > 0 else { return nil }
+        if trade.isStopLossInProfit || trade.isStopLossAtBreakeven {
+            return nil
+        }
         let riskPerUnit = abs(trade.avgEntry - sl)
         guard riskPerUnit > 0 else { return nil }
         let targetPerUnit = abs(tp - trade.avgEntry)
@@ -112,10 +151,17 @@ public struct TradeDetailView: View {
                     timeZone: env.currentTimeZone
                 )
                 
+                // 2b. Partial Exits Breakdown (if partial closes occurred)
+                if !trade.exits.isEmpty || trade.isPartiallyClosed {
+                    partialExitsCard
+                }
+                
                 // 3. Risk Management & Targets (2x2 Balanced Tiles + Visual Bar)
                 TradeDetailRiskCard(
                     trade: trade,
                     riskAmount: riskAmount,
+                    lockedProfit: lockedProfitAmount,
+                    targetAmount: targetAmount,
                     realizedR: realizedR,
                     plannedR: plannedR,
                     reportingCurrency: env.currentCurrency,
@@ -238,6 +284,61 @@ public struct TradeDetailView: View {
         .onChange(of: dataStore.trades) { newTrades in
             if let fresh = newTrades.first(where: { $0.key == trade.key }) {
                 self.trade = fresh
+            }
+        }
+    }
+    
+    // MARK: - 2b. Partial Exits Card
+    private var partialExitsCard: some View {
+        TradeFormCardContainer {
+            VStack(alignment: .leading, spacing: 10) {
+                AppSectionHeader("Partial exits & executions", icon: "arrow.triangle.pull")
+                
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Active Open Volume")
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.secondaryText)
+                        Text("\(Formatters.formatDecimal(trade.openQuantity, maxDecimals: 3)) lots")
+                            .font(AppTypography.statValueMedium)
+                            .foregroundColor(trade.openQuantity > 0 ? AppColors.brand : AppColors.secondaryText)
+                    }
+                    
+                    Spacer()
+                    
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text("Closed Volume")
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.secondaryText)
+                        Text("\(Formatters.formatDecimal(trade.closedQuantity, maxDecimals: 3)) lots")
+                            .font(AppTypography.statValueMedium)
+                            .foregroundColor(AppColors.primaryText)
+                    }
+                }
+                .padding(.vertical, 2)
+                
+                if !trade.exits.isEmpty {
+                    Divider().background(AppColors.border.opacity(0.4))
+                    
+                    VStack(spacing: 8) {
+                        ForEach(Array(trade.exits.enumerated()), id: \.offset) { idx, exit in
+                            HStack {
+                                HStack(spacing: 6) {
+                                    AppBadge("#\(idx + 1)", variant: .secondary)
+                                    Text("\(Formatters.formatDecimal(exit.quantity, maxDecimals: 2)) lots")
+                                        .font(AppTypography.bodyMedium)
+                                        .foregroundColor(AppColors.primaryText)
+                                }
+                                
+                                Spacer()
+                                
+                                Text(Formatters.formatPnL(exit.grossPnl, currency: env.currentCurrency))
+                                    .font(AppTypography.bodyBold)
+                                    .foregroundColor(Formatters.pnlColor(exit.grossPnl))
+                            }
+                        }
+                    }
+                }
             }
         }
     }

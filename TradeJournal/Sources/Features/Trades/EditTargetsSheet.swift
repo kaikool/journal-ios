@@ -2,6 +2,7 @@ import SwiftUI
 
 /// Dedicated, high-precision sheet for editing Stop Loss and Profit Target (Take Profit)
 /// Provides real-time Risk / Reward (R:R) analytics, risk amount calculation, and 1-tap R presets.
+/// Correctly distinguishes between initial downside stop loss, breakeven protection, and trailing profit lock.
 /// Invariant: Directly updates trade annotations without mutating executions or account state.
 public struct EditTargetsSheet: View {
     @Environment(\.dismiss) private var dismiss
@@ -43,8 +44,23 @@ public struct EditTargetsSheet: View {
         trade.avgEntry
     }
     
+    private var isStopLossInProfit: Bool {
+        guard let sl = stopLoss, entryPrice > 0 else { return false }
+        if trade.direction == .long {
+            return sl > entryPrice
+        } else {
+            return sl < entryPrice
+        }
+    }
+    
+    private var isStopLossAtBreakeven: Bool {
+        guard let sl = stopLoss, entryPrice > 0 else { return false }
+        return abs(sl - entryPrice) <= Decimal(0.00001)
+    }
+    
     private var riskDistance: Decimal? {
         guard let sl = stopLoss, entryPrice > 0 else { return nil }
+        if isStopLossInProfit || isStopLossAtBreakeven { return 0 }
         return abs(entryPrice - sl)
     }
     
@@ -55,6 +71,7 @@ public struct EditTargetsSheet: View {
     
     private var riskAmount: Decimal? {
         guard let sl = stopLoss, entryPrice > 0, trade.quantity > 0 else { return nil }
+        if isStopLossInProfit || isStopLossAtBreakeven { return 0 }
         let gross = AssetContractEngine.calculateGrossPnl(
             symbol: trade.symbol,
             direction: trade.direction,
@@ -66,6 +83,21 @@ public struct EditTargetsSheet: View {
             reportingCurrency: dataStore.currencyConversion.reportingCurrency
         )
         return abs(gross)
+    }
+    
+    private var lockedProfitAmount: Decimal? {
+        guard isStopLossInProfit, let sl = stopLoss, entryPrice > 0, trade.quantity > 0 else { return nil }
+        let gross = AssetContractEngine.calculateGrossPnl(
+            symbol: trade.symbol,
+            direction: trade.direction,
+            quantity: trade.quantity,
+            entryPrice: entryPrice,
+            exitPrice: sl,
+            customMultiplier: AssetContractEngine.customMultiplier(for: trade.symbol, multipliers: dataStore.multipliers),
+            conversionRates: dataStore.currencyConversion.rates,
+            reportingCurrency: dataStore.currencyConversion.reportingCurrency
+        )
+        return max(0, gross)
     }
     
     private var targetAmount: Decimal? {
@@ -84,17 +116,9 @@ public struct EditTargetsSheet: View {
     }
     
     private var plannedR: Decimal? {
+        if isStopLossInProfit || isStopLossAtBreakeven { return nil }
         guard let rDist = riskDistance, let tDist = targetDistance, rDist > 0 else { return nil }
         return tDist / rDist
-    }
-    
-    private var isStopLossValidDirection: Bool {
-        guard let sl = stopLoss else { return true }
-        if trade.direction == .long {
-            return sl < entryPrice
-        } else {
-            return sl > entryPrice
-        }
     }
     
     private var isProfitTargetValidDirection: Bool {
@@ -171,7 +195,7 @@ public struct EditTargetsSheet: View {
                         Text("Entry Price")
                             .font(AppTypography.statLabel)
                             .foregroundColor(AppColors.secondaryText)
-                        Text(Formatters.price(entryPrice))
+                        Text(Formatters.price(entryPrice, symbol: trade.symbol))
                             .font(AppTypography.statValue)
                             .foregroundColor(AppColors.primaryText)
                     }
@@ -196,10 +220,10 @@ public struct EditTargetsSheet: View {
         TradeFormCardContainer {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
-                    Image(systemName: "shield.slash.fill")
+                    Image(systemName: isStopLossInProfit ? "shield.lefthalf.filled.badge.checkmark" : (isStopLossAtBreakeven ? "shield.checkmark.fill" : "shield.slash.fill"))
                         .font(AppTypography.cardHeaderUppercase)
-                        .foregroundColor(AppColors.loss)
-                    Text("STOP LOSS (RISK)")
+                        .foregroundColor(isStopLossInProfit ? AppColors.profit : (isStopLossAtBreakeven ? AppColors.brand : AppColors.loss))
+                    Text(isStopLossInProfit ? "STOP LOSS (TRAILING PROFIT LOCK)" : (isStopLossAtBreakeven ? "STOP LOSS (BREAKEVEN)" : "STOP LOSS (RISK)"))
                         .font(AppTypography.cardHeaderUppercase)
                         .foregroundColor(AppColors.secondaryText)
                         .tracking(0.5)
@@ -216,7 +240,71 @@ public struct EditTargetsSheet: View {
                     placeholder: "e.g. \(Formatters.formatDecimal(entryPrice * 0.99, maxDecimals: symbolSpec.defaultDecimals))"
                 )
                 
-                if let rAmt = riskAmount, let rDist = riskDistance {
+                if isStopLossInProfit {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Locked Profit")
+                                .font(AppTypography.statLabel)
+                                .foregroundColor(AppColors.secondaryText)
+                            Text(lockedProfitAmount.map { "+\(Formatters.formatCurrency($0, currency: env.currentCurrency))" } ?? "–")
+                                .font(AppTypography.statValueMedium)
+                                .foregroundColor(AppColors.profit)
+                        }
+                        
+                        Spacer()
+                        
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text("Capital at Risk")
+                                .font(AppTypography.statLabel)
+                                .foregroundColor(AppColors.secondaryText)
+                            Text("$0.00 (Risk-Free)")
+                                .font(AppTypography.statValue)
+                                .foregroundColor(AppColors.profit)
+                        }
+                    }
+                    .appSubCardStyle(cornerRadius: 8, padding: 10)
+                    
+                    HStack(spacing: 6) {
+                        Image(systemName: "checkmark.seal.fill")
+                            .font(AppTypography.footnote)
+                            .foregroundColor(AppColors.profit)
+                        Text("Trailing Stop: Stop Loss is above entry (Buy) / below entry (Sell). Guaranteed profit locked in!")
+                            .font(AppTypography.footnote)
+                            .foregroundColor(AppColors.profit)
+                    }
+                } else if isStopLossAtBreakeven {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Stop Mode")
+                                .font(AppTypography.statLabel)
+                                .foregroundColor(AppColors.secondaryText)
+                            Text("Breakeven")
+                                .font(AppTypography.statValueMedium)
+                                .foregroundColor(AppColors.brand)
+                        }
+                        
+                        Spacer()
+                        
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text("Capital at Risk")
+                                .font(AppTypography.statLabel)
+                                .foregroundColor(AppColors.secondaryText)
+                            Text("$0.00 (Risk-Free)")
+                                .font(AppTypography.statValue)
+                                .foregroundColor(AppColors.profit)
+                        }
+                    }
+                    .appSubCardStyle(cornerRadius: 8, padding: 10)
+                    
+                    HStack(spacing: 6) {
+                        Image(systemName: "shield.checkmark.fill")
+                            .font(AppTypography.footnote)
+                            .foregroundColor(AppColors.brand)
+                        Text("Breakeven Stop: Position is 100% protected against capital downside.")
+                            .font(AppTypography.footnote)
+                            .foregroundColor(AppColors.brand)
+                    }
+                } else if let rAmt = riskAmount, let rDist = riskDistance {
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Risk Distance")
@@ -239,17 +327,6 @@ public struct EditTargetsSheet: View {
                         }
                     }
                     .appSubCardStyle(cornerRadius: 8, padding: 10)
-                }
-                
-                if !isStopLossValidDirection {
-                    HStack(spacing: 6) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .font(AppTypography.footnote)
-                            .foregroundColor(AppColors.warning)
-                        Text(trade.direction == .long ? "Stop loss should be below entry price for Buy trades." : "Stop loss should be above entry price for Sell trades.")
-                            .font(AppTypography.footnote)
-                            .foregroundColor(AppColors.warning)
-                    }
                 }
             }
         }
@@ -316,8 +393,8 @@ public struct EditTargetsSheet: View {
                     }
                 }
                 
-                // Quick R Presets (Based on Stop Loss distance)
-                if let rDist = riskDistance, rDist > 0 {
+                // Quick R Presets (Only applicable when Stop Loss defines a downside risk distance)
+                if !isStopLossInProfit && !isStopLossAtBreakeven, let rDist = riskDistance, rDist > 0 {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("QUICK TARGET PRESETS")
                             .font(AppTypography.cardHeaderUppercase)
@@ -361,7 +438,15 @@ public struct EditTargetsSheet: View {
                         .foregroundColor(AppColors.secondaryText)
                         .tracking(0.5)
                     Spacer()
-                    if let pR = plannedR {
+                    if isStopLossInProfit {
+                        Text("Risk-Free (Locked Profit)")
+                            .font(AppTypography.statValueMedium)
+                            .foregroundColor(AppColors.profit)
+                    } else if isStopLossAtBreakeven {
+                        Text("Risk-Free (Breakeven)")
+                            .font(AppTypography.statValueMedium)
+                            .foregroundColor(AppColors.brand)
+                    } else if let pR = plannedR {
                         let plannedVal = (pR as NSDecimalNumber).doubleValue
                         Text(String(format: "1 : %.2f R", plannedVal))
                             .font(AppTypography.displayMedium)
@@ -373,7 +458,29 @@ public struct EditTargetsSheet: View {
                     }
                 }
                 
-                if let pR = plannedR {
+                if isStopLossInProfit || isStopLossAtBreakeven {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Capsule()
+                            .fill(AppColors.profit.opacity(0.85))
+                            .frame(height: 6)
+                        
+                        HStack {
+                            Text("Capital Risk: $0.00 (Risk-Free)")
+                                .font(AppTypography.badgeStandard)
+                                .foregroundColor(AppColors.profit)
+                            Spacer()
+                            if let tAmt = targetAmount {
+                                Text("Potential: +\(Formatters.formatCurrency(tAmt, currency: env.currentCurrency))")
+                                    .font(AppTypography.badgeStandard)
+                                    .foregroundColor(AppColors.profit)
+                            } else {
+                                Text(isStopLossInProfit ? "Locked Profit Runner" : "Breakeven Protected")
+                                    .font(AppTypography.badgeStandard)
+                                    .foregroundColor(AppColors.profit)
+                            }
+                        }
+                    }
+                } else if let pR = plannedR {
                     let plannedVal = max(0.1, (pR as NSDecimalNumber).doubleValue)
                     VStack(spacing: 6) {
                         GeometryReader { geo in

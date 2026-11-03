@@ -491,17 +491,34 @@ extension TradeDataStore {
             }
             
             if localTrades[i].status == .open {
-                // An active open trade MUST stay open: closedAt is nil, openQuantity is quantity, realized PnL is 0
+                // An active open trade MUST stay open: closedAt is nil
                 if localTrades[i].closedAt != nil {
                     localTrades[i].closedAt = nil
                     modified = true
                 }
-                if localTrades[i].netPnl != 0 || localTrades[i].grossPnl != 0 || localTrades[i].fees != 0 || localTrades[i].openQuantity != localTrades[i].quantity {
-                    localTrades[i].netPnl = 0
-                    localTrades[i].grossPnl = 0
-                    localTrades[i].fees = 0
-                    localTrades[i].openQuantity = localTrades[i].quantity
-                    modified = true
+                
+                let isPartial = !localTrades[i].exits.isEmpty || (localTrades[i].openQuantity > 0 && localTrades[i].openQuantity < localTrades[i].quantity)
+                if isPartial {
+                    // Respect partial close: preserve openQuantity (remaining lots) and netPnl (realized profit of closed portion)
+                    if localTrades[i].openQuantity > localTrades[i].quantity {
+                        localTrades[i].openQuantity = localTrades[i].quantity
+                        modified = true
+                    } else if localTrades[i].openQuantity <= 0 {
+                        localTrades[i].openQuantity = localTrades[i].quantity
+                        modified = true
+                    }
+                } else {
+                    // Fully open position with no exits: enforce openQuantity = quantity and zero realized P&L
+                    if localTrades[i].openQuantity != localTrades[i].quantity {
+                        localTrades[i].openQuantity = localTrades[i].quantity
+                        modified = true
+                    }
+                    if localTrades[i].netPnl != 0 || localTrades[i].grossPnl != 0 || localTrades[i].fees != 0 {
+                        localTrades[i].netPnl = 0
+                        localTrades[i].grossPnl = 0
+                        localTrades[i].fees = 0
+                        modified = true
+                    }
                 }
             } else {
                 // A completed closed trade (.win, .loss, .breakeven) must have openQuantity = 0 and closedAt populated

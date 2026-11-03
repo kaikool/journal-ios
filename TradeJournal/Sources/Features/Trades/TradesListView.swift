@@ -392,6 +392,10 @@ private struct TradeTerminalRow: View {
                     trade.status.rawValue.uppercased(),
                     color: Formatters.statusColor(trade.status)
                 )
+                
+                if trade.isPartiallyClosed {
+                    AppBadge("PARTIAL", variant: .warning)
+                }
             }
             
             Spacer(minLength: 4)
@@ -407,7 +411,11 @@ private struct TradeTerminalRow: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.85)
                 
-                if let r = rMultiple {
+                if trade.status == .open && trade.isPartiallyClosed {
+                    Text("Realized")
+                        .font(AppTypography.captionMicro)
+                        .foregroundColor(AppColors.secondaryText)
+                } else if let r = rMultiple {
                     Text("\(r >= 0 ? "+" : "")\(Formatters.formatNumber(r))R")
                         .font(AppTypography.statValueMedium)
                         .foregroundColor(r >= 0 ? AppColors.profit : AppColors.loss)
@@ -446,9 +454,15 @@ private struct TradeTerminalRow: View {
             
             // Volume and Duration
             HStack(spacing: 6) {
-                Text("\(Formatters.formatNumber(trade.quantity)) lots")
-                    .font(AppTypography.statLabel)
-                    .foregroundColor(AppColors.secondaryText)
+                if trade.isPartiallyClosed && trade.status == .open {
+                    Text("\(Formatters.formatNumber(trade.openQuantity)) / \(Formatters.formatNumber(trade.quantity)) lots")
+                        .font(AppTypography.statLabel)
+                        .foregroundColor(AppColors.secondaryText)
+                } else {
+                    Text("\(Formatters.formatNumber(trade.quantity)) lots")
+                        .font(AppTypography.statLabel)
+                        .foregroundColor(AppColors.secondaryText)
+                }
                 
                 if let dur = durationText {
                     Text("·")

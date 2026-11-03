@@ -25,9 +25,23 @@ public struct TradeDetailHeroCard: View {
                             variant: trade.direction == .long ? .brand : .warning
                         )
                         
-                        Text("\(Formatters.formatNumber(trade.quantity)) Lots")
-                            .font(AppTypography.statLabel)
-                            .foregroundColor(AppColors.secondaryText)
+                        if trade.isPartiallyClosed {
+                            AppBadge("PARTIAL", variant: .warning)
+                            
+                            if trade.status == .open {
+                                Text("\(Formatters.formatNumber(trade.openQuantity)) / \(Formatters.formatNumber(trade.quantity)) Lots")
+                                    .font(AppTypography.statLabel)
+                                    .foregroundColor(AppColors.secondaryText)
+                            } else {
+                                Text("\(Formatters.formatNumber(trade.quantity)) Lots")
+                                    .font(AppTypography.statLabel)
+                                    .foregroundColor(AppColors.secondaryText)
+                            }
+                        } else {
+                            Text("\(Formatters.formatNumber(trade.quantity)) Lots")
+                                .font(AppTypography.statLabel)
+                                .foregroundColor(AppColors.secondaryText)
+                        }
                     }
                     
                     Spacer()
@@ -38,12 +52,20 @@ public struct TradeDetailHeroCard: View {
                     )
                 }
                 
-                AppMonetaryText(
-                    Formatters.formatPnL(trade.netPnl, currency: env.currentCurrency),
-                    isPrivate: env.isPrivacyModeEnabled,
-                    font: AppTypography.displayHeroLarge,
-                    color: Formatters.pnlColor(trade.netPnl)
-                )
+                VStack(alignment: .leading, spacing: 2) {
+                    AppMonetaryText(
+                        Formatters.formatPnL(trade.netPnl, currency: env.currentCurrency),
+                        isPrivate: env.isPrivacyModeEnabled,
+                        font: AppTypography.displayHeroLarge,
+                        color: Formatters.pnlColor(trade.netPnl)
+                    )
+                    
+                    if trade.status == .open && trade.isPartiallyClosed {
+                        Text("Realized P&L (Partial Close)")
+                            .font(AppTypography.captionMicro)
+                            .foregroundColor(trade.netPnl >= 0 ? AppColors.profit : AppColors.loss)
+                    }
+                }
                 
                 HStack(spacing: 12) {
                     HStack(spacing: 4) {

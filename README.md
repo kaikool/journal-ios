@@ -47,7 +47,7 @@
 - **Playbook & Discipline Tracking (`Features/Playbooks`):** Setup checklists (`TradeRuleCheck`), mistake categorization (`TradeFailureTaxonomy`), and Missed Trade logging (`MissedTradesView`).
 
 ### 3. AI Execution Coach, Pre-Trade Desk & Memory (`Features/AIReflection`, `Core/Networking/AI`)
-- **Multi-Timeframe Pre-Trade Scanner (`MultiTimeframeTriVisionCanvas`):** Simultaneous `D1 • H4 • M15` candlestick inspection with algorithmic liquidity sweeps, order blocks, momentum, and moving average snapshots (`LiquidityEngine`, `MarketStateSnapshotBuilder`).
+- **Multi-Timeframe Market Structure Scanner:** Multi-timeframe (`D1 • H4 • H1 • M15`) interactive candlestick inspection with order blocks, momentum, EMA 21/50, and 3-line Wilder RSI system (`CandleChartView`, `MarketCandleChartView`, `MarketStateSnapshotBuilder`).
 - **Trade Audit & Interactive Follow-Up (`TradeAICoachSheet`):** Context-aware AI evaluation of live and closed trades with multi-turn Q&A (`AICoachSessionStore`) and lesson extraction (`SupabaseTradeLessonSync`).
 - **Persistent AI Memory & Research Workspace (`AIAdvisorMemoryEngine`, `AIResearchWorkspaceEngine`):** Tracks verified trader habits, recurring psychological leaks, and structured market hypotheses across sessions.
 - **Multi-Provider AI Routing (`AIFallbackProvider`):** Supports Google Gemini, Groq Cloud, OpenRouter, and Supabase Edge Functions (`supabase/functions/ai-reflection`).

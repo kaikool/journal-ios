@@ -72,13 +72,32 @@ public struct TradeDetailMetricsCard: View {
                         subtitle: Formatters.formatDateTime(trade.openedAt, timeZone: timeZone)
                     )
                     
-                    textMetric(
-                        title: "Avg Exit Price",
-                        value: trade.avgExit.map { Formatters.price($0, symbol: trade.symbol) } ?? "Open",
-                        subtitle: trade.closedAt.map { Formatters.formatDateTime($0, timeZone: timeZone) }
-                    )
+                    exitPriceMetric
                 }
             }
+        }
+    }
+    
+    private var exitPriceMetric: some View {
+        let title = "Avg Exit Price"
+        if trade.status.isClosed {
+            return textMetric(
+                title: title,
+                value: trade.avgExit.map { Formatters.price($0, symbol: trade.symbol) } ?? "–",
+                subtitle: trade.closedAt.map { Formatters.formatDateTime($0, timeZone: timeZone) }
+            )
+        } else if trade.isPartiallyClosed {
+            return textMetric(
+                title: title,
+                value: trade.avgExit.map { Formatters.price($0, symbol: trade.symbol) } ?? "Partial",
+                subtitle: "\(Formatters.formatNumber(trade.closedQuantity)) lots closed"
+            )
+        } else {
+            return textMetric(
+                title: title,
+                value: "Open",
+                subtitle: "Active position"
+            )
         }
     }
     

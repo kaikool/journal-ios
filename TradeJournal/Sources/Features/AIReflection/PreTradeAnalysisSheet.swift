@@ -76,7 +76,7 @@ public struct PreTradeAnalysisSheet: View {
                         m15Bars: m15Bars,
                         activeProvider: activeProvider,
                         onEnlarge: {
-                            if let snapshot = (userAttachedImage ?? renderActiveSnapshot()) {
+                            if let snapshot = userAttachedImage {
                                 self.activeChartSnapshot = snapshot
                                 self.showFullScreenChart = true
                             }
@@ -178,7 +178,7 @@ public struct PreTradeAnalysisSheet: View {
                 }
             }
             .fullScreenCover(isPresented: $showFullScreenChart) {
-                if let img = activeChartSnapshot ?? renderActiveSnapshot() ?? userAttachedImage {
+                if let img = activeChartSnapshot ?? userAttachedImage {
                     FullScreenChartLightboxView(image: img)
                 }
             }
@@ -502,11 +502,6 @@ public struct PreTradeAnalysisSheet: View {
             return
         }
         
-        let activeSnap = renderActiveSnapshot()
-        await MainActor.run {
-            self.activeChartSnapshot = activeSnap
-        }
-        
         // Only encode image if user explicitly attached a photo
         let singleChartBase64 = userAttachedImage?.jpegData(compressionQuality: 0.85)?.base64EncodedString()
         // Always run a fresh clean-slate analysis on latest market bars without anchoring to stale cached text
@@ -556,82 +551,6 @@ public struct PreTradeAnalysisSheet: View {
                 self.isAnalyzing = false
             }
         }
-    }
-    
-    // MARK: - Individual Timeframe Chart Snapshot Renderers (100% Off-Screen)
-    @MainActor
-    private func renderChartSnapshot(bars: [MarketBar], timeframe: String) -> UIImage? {
-        guard !bars.isEmpty else { return nil }
-        let chart = MarketCandleChartView(
-            bars: Array(bars.suffix(36)),
-            symbol: selectedSymbol,
-            timeframe: timeframe
-        )
-        .frame(width: 440, height: 260)
-        .background(AppColors.cardBackground)
-        
-        let renderer = ImageRenderer(content: chart)
-        renderer.scale = 2.0
-        return renderer.uiImage
-    }
-    
-    @MainActor
-    private func renderAllThreeTimeframeSnapshots() -> [String] {
-        var base64List: [String] = []
-        if !d1Bars.isEmpty, let img = renderChartSnapshot(bars: d1Bars, timeframe: "D1"), let b64 = img.jpegData(compressionQuality: 0.85)?.base64EncodedString() {
-            base64List.append(b64)
-        }
-        if !h4Bars.isEmpty, let img = renderChartSnapshot(bars: h4Bars, timeframe: "H4"), let b64 = img.jpegData(compressionQuality: 0.85)?.base64EncodedString() {
-            base64List.append(b64)
-        }
-        if !h1Bars.isEmpty, let img = renderChartSnapshot(bars: h1Bars, timeframe: "H1"), let b64 = img.jpegData(compressionQuality: 0.85)?.base64EncodedString() {
-            base64List.append(b64)
-        }
-        if !m15Bars.isEmpty, let img = renderChartSnapshot(bars: m15Bars, timeframe: "M15"), let b64 = img.jpegData(compressionQuality: 0.85)?.base64EncodedString() {
-            base64List.append(b64)
-        }
-        return base64List
-    }
-    
-    // MARK: - Multi-Timeframe Tri-Panel Fallback Snapshot Renderer (100% Off-Screen)
-    @MainActor
-    private func renderMultiTimeframeSnapshot() -> UIImage? {
-        guard !d1Bars.isEmpty || !h4Bars.isEmpty || !m15Bars.isEmpty else { return nil }
-        let canvas = MultiTimeframeTriVisionCanvas(
-            symbol: selectedSymbol,
-            d1Bars: d1Bars,
-            h4Bars: h4Bars,
-            h1Bars: h1Bars,
-            m15Bars: m15Bars
-        )
-        let renderer = ImageRenderer(content: canvas)
-        renderer.scale = 2.0
-        return renderer.uiImage
-    }
-    
-    // MARK: - Single Tab Snapshot Renderer
-    @MainActor
-    private func renderActiveSnapshot() -> UIImage? {
-        guard !activeBars.isEmpty else { return nil }
-        let tfTitle: String = {
-            switch selectedTimeframe {
-            case "1d": return "D1"
-            case "4h": return "H4"
-            case "1h": return "H1"
-            default: return "M15"
-            }
-        }()
-        let chart = MarketCandleChartView(
-            bars: activeBars,
-            symbol: selectedSymbol,
-            timeframe: tfTitle
-        )
-        .frame(width: 420, height: 260)
-        .background(AppColors.cardBackground)
-        
-        let renderer = ImageRenderer(content: chart)
-        renderer.scale = 2.0
-        return renderer.uiImage
     }
     
     // MARK: - Document Content Builder

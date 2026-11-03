@@ -235,6 +235,46 @@ public struct Trade: Identifiable, Codable, Equatable, Hashable {
     
     /// Total trading costs deducted from gross P&L (commission plus swap cost).
     public var totalCosts: Decimal { fees + max(0, -swapAmount) }
+    
+    /// Whether the trade is currently open with a portion already realized/closed, or had multiple partial exits.
+    public var isPartiallyClosed: Bool {
+        if status == .open {
+            return (openQuantity > 0 && openQuantity < quantity) || !exits.isEmpty
+        } else {
+            return exits.count > 1
+        }
+    }
+    
+    /// The volume closed so far
+    public var closedQuantity: Decimal {
+        if status == .open {
+            return max(0, quantity - openQuantity)
+        } else {
+            return quantity
+        }
+    }
+    
+    /// Whether Stop Loss has been trailed into profit (Buy: SL > Entry, Sell: SL < Entry).
+    public var isStopLossInProfit: Bool {
+        guard let sl = stopLoss, avgEntry > 0 else { return false }
+        if direction == .long {
+            return sl > avgEntry
+        } else {
+            return sl < avgEntry
+        }
+    }
+    
+    /// Whether Stop Loss is set exactly at or very close to Breakeven (within 0.00001).
+    public var isStopLossAtBreakeven: Bool {
+        guard let sl = stopLoss, avgEntry > 0 else { return false }
+        return abs(sl - avgEntry) <= Decimal(0.00001)
+    }
+    
+    /// Locked profit points if Stop Loss is trailed into profit.
+    public var lockedProfitPoints: Decimal? {
+        guard isStopLossInProfit, let sl = stopLoss else { return nil }
+        return direction == .long ? (sl - avgEntry) : (avgEntry - sl)
+    }
 }
 
 public struct TradeAnnotations: Codable, Equatable, Sendable {
