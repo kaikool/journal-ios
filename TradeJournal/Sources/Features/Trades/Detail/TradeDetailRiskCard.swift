@@ -153,7 +153,7 @@ public struct TradeDetailRiskCard: View {
             let isClosed = trade.status.isClosed
             let val = realizedR.map { Formatters.formatRMultiple(($0 as NSDecimalNumber).doubleValue) } ??
                    (plannedR.map { "Planned \(Formatters.formatRMultiple(($0 as NSDecimalNumber).doubleValue))" } ?? "–")
-            let sub: String? = (realizedR != nil && plannedR != nil) ? "Planned \(Formatters.formatRMultiple(($plannedR! as NSDecimalNumber).doubleValue))" : nil
+            let sub: String? = (realizedR != nil && plannedR != nil) ? plannedR.map { "Planned \(Formatters.formatRMultiple(($0 as NSDecimalNumber).doubleValue))" } : nil
             return textMetric(
                 title: isClosed ? "Realized Return" : "Planned Return",
                 value: val,
