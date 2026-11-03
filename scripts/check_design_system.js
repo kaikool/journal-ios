@@ -2,12 +2,12 @@
 
 /**
  * ========================================================================
- * TRADEJOURNAL IOS - 24 ARCHITECTURAL STANDARDS CI GATEKEEPER
+ * TRADEJOURNAL IOS - 25 ARCHITECTURAL STANDARDS CI GATEKEEPER
  * ========================================================================
  * 
  * Strict Single Source of Truth & Zero Inline Code Governance.
- * Audits all Swift source files against the 24 Architectural Standards.
- * Ordered sequentially from Standard 01 to Standard 24:
+ * Audits all Swift source files against the 25 Architectural Standards.
+ * Ordered sequentially from Standard 01 to Standard 25:
  * 
  * --- PART 1: CONTENT & CONTROLS (Standards 01 - 11) ---
  * Standard 01: Buttons & Actions (AppButton, AppPrimaryButton, ModalToolbarButtons)
@@ -30,7 +30,7 @@
  * Standard 16: Native Haptics Feedback (NativeHaptics - Zero raw UIKit)
  * Standard 17: Animation Presets (AppAnimations - Zero hardcoded .spring)
  * 
- * --- PART 3: FINTECH POLISH & PRODUCTION RESILIENCE (Standards 18 - 24) ---
+ * --- PART 3: FINTECH POLISH & PRODUCTION RESILIENCE (Standards 18 - 25) ---
  * Standard 18: Financial Formatters (Formatters - Zero raw currency concat)
  * Standard 19: Semantic Color Hierarchy (AppColors - Zero ad-hoc Color(hex:))
  * Standard 20: Timezone & Date Alignment (env.currentTimeZone, JournalIds)
@@ -38,6 +38,7 @@
  * Standard 22: Safe Keyboard Handling (ScrollView embed for form safety)
  * Standard 23: Offline-First & Network Resilience (TradeDataStore cache-first)
  * Standard 24: Zero Unsafe Force-Unwrapping & Safe Math (Safe math & optionals)
+ * Standard 25: Push Notifications & Alert Dispatching (AppNotificationManager - Zero raw UNNotification in views)
  */
 
 const fs = require('fs');
@@ -71,7 +72,8 @@ const WHITELIST_PRIMITIVES = [
   'AppMetricTile.swift',
   'Formatters.swift',
   'SplashScreenView.swift',
-  'TradeJournalProLoader.swift'
+  'TradeJournalProLoader.swift',
+  'AppNotificationManager.swift'
 ];
 
 function walk(dir) {
@@ -559,11 +561,24 @@ files.forEach(f => {
         fix: 'Use safe optional binding (if let, guard let, or nil-coalescing ??)'
       });
     }
+
+    // --- STANDARD 25: PUSH NOTIFICATIONS & ALERT DISPATCHING ---
+    // Prohibits raw UNUserNotificationCenter calls in Feature views. All alerts must route via AppNotificationManager.
+    if (isFeature && (trimmed.includes('UNUserNotificationCenter.current()') || trimmed.includes('UNMutableNotificationContent('))) {
+      violations.push({
+        std: 'Standard 25: Push Notifications & Alerts',
+        rule: 'PROHIBIT_RAW_USER_NOTIFICATIONS_IN_VIEWS',
+        file: rel,
+        line: lineNum,
+        code: trimmed,
+        fix: 'Use AppNotificationManager.shared for dispatching notifications and managing permissions'
+      });
+    }
   });
 });
 
 console.log('========================================================================');
-console.log('        TRADEJOURNAL IOS - 24 ARCHITECTURAL STANDARDS CI GATE           ');
+console.log('        TRADEJOURNAL IOS - 25 ARCHITECTURAL STANDARDS CI GATE           ');
 console.log('========================================================================');
 console.log(`Audited ${files.length} Swift files across ${SOURCES_DIR}\n`);
 
@@ -591,7 +606,8 @@ const standardRegistry = [
   { code: '21', title: 'Minimum Touch Targets (44x44pt Apple HIG Bounds)' },
   { code: '22', title: 'Safe Keyboard Handling (ScrollView Form Safety)' },
   { code: '23', title: 'Offline & Network Resilience (TradeDataStore Cache-First)' },
-  { code: '24', title: 'Zero Unsafe Force-Unwrapping (Defensive Optionals & Safe Math)' }
+  { code: '24', title: 'Zero Unsafe Force-Unwrapping (Defensive Optionals & Safe Math)' },
+  { code: '25', title: 'Push Notifications & Alerts (AppNotificationManager)' }
 ];
 
 standardRegistry.forEach(std => {
@@ -611,9 +627,9 @@ if (violations.length > 0) {
     console.error(`    Code:   ${v.code}`);
     console.error(`    Fix:    ${v.fix}\n`);
   });
-  console.error('⛔ Commit rejected: All code must adhere to the 24 Architectural Standards.');
+  console.error('⛔ Commit rejected: All code must adhere to the 25 Architectural Standards.');
   process.exit(1);
 } else {
-  console.log('✅ PASS: 100% compliance across all 24 Architectural Standards!');
+  console.log('✅ PASS: 100% compliance across all 25 Architectural Standards!');
   process.exit(0);
 }

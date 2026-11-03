@@ -349,7 +349,7 @@ public struct NoteAIInquirySheet: View {
     
     private func startInitialAssessment() async {
         isLoading = true
-        let trade = linkedTrade ?? dummyTradeForNote()
+        let trade = linkedTrade ?? fallbackContextTradeForNote()
         let bars = await fetchBarsForAudit(trade: trade)
         
         let prompt = AIPromptBuilder.buildTradeNoteInquiryPrompt(
@@ -398,7 +398,7 @@ public struct NoteAIInquirySheet: View {
         inputText = ""
         isLoading = true
         
-        let trade = linkedTrade ?? dummyTradeForNote()
+        let trade = linkedTrade ?? fallbackContextTradeForNote()
         
         Task {
             let isFollowUp = messages.count > 1
@@ -527,7 +527,7 @@ public struct NoteAIInquirySheet: View {
         }
     }
     
-    private func dummyTradeForNote() -> Trade {
+    private func fallbackContextTradeForNote() -> Trade {
         Trade(
             key: tradeKey ?? "note-trade",
             accountId: "default",

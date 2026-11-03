@@ -373,39 +373,22 @@ public final class MarketAlertEngine: ObservableObject, @unchecked Sendable {
     // MARK: - 5. System Notification Dispatcher
     
     public func dispatchNotification(for record: MarketAlertRecord) {
-        #if canImport(UserNotifications)
-        let content = UNMutableNotificationContent()
-        content.title = "[Trade Alert] \(record.symbol) (\(record.timeframe.uppercased()))"
-        content.subtitle = "Price \(record.eventType.label) EMA \(record.emaPeriod)"
-        content.body = record.message
-        content.sound = .default
-        
-        let request = UNNotificationRequest(
-            identifier: "market_alert_\(record.id)",
-            content: content,
-            trigger: nil
+        AppNotificationManager.shared.dispatchNotification(
+            id: "market_alert_\(record.id)",
+            title: "[Trade Alert] \(record.symbol) (\(record.timeframe.uppercased()))",
+            subtitle: "Price \(record.eventType.label) EMA \(record.emaPeriod)",
+            body: record.message,
+            categoryIdentifier: "MARKET_ALERT",
+            userInfo: [
+                "symbol": record.symbol,
+                "timeframe": record.timeframe,
+                "alertId": record.id
+            ]
         )
-        
-        UNUserNotificationCenter.current().add(request) { error in
-            if let err = error {
-                AppLogger.warning("Failed to dispatch alert notification: \(err.localizedDescription)")
-            }
-        }
-        #endif
     }
     
     public func requestNotificationPermission() async -> Bool {
-        #if canImport(UserNotifications)
-        do {
-            let center = UNUserNotificationCenter.current()
-            let granted = try await center.requestAuthorization(options: [.alert, .sound, .badge])
-            return granted
-        } catch {
-            return false
-        }
-        #else
-        return false
-        #endif
+        await AppNotificationManager.shared.requestAuthorization()
     }
     
     public func clearActiveAlerts() {

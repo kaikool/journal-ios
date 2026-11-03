@@ -7,7 +7,9 @@ public struct TradeJournalApp: App {
     @StateObject private var dataStore = TradeDataStore.shared
     @State private var isAppReady: Bool = false
     
-    public init() {}
+    public init() {
+        AppNotificationManager.shared.configure()
+    }
     
     public var body: some Scene {
         WindowGroup {
