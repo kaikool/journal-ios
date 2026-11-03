@@ -93,37 +93,47 @@ public enum MovingAverageEngine: Sendable {
     ///            EMA[i] = Close[i] * alpha + EMA[i-1] * (1 - alpha)
     /// Every point i depends solely on past data [0...i] and is strictly invariant to future bars.
     public static func calculateEMA(period: Int, bars: [MarketBar]) -> [Decimal] {
-        guard period > 0, let firstBar = bars.first else { return [] }
-        var result: [Decimal] = []
-        result.reserveCapacity(bars.count)
-        
-        let alpha = Decimal(2) / Decimal(period + 1)
-        let oneMinusAlpha = Decimal(1) - alpha
-        
-        var currentEMA: Decimal = firstBar.close
-        result.append(currentEMA)
-        
-        for i in 1..<bars.count {
-            currentEMA = (bars[i].close * alpha) + (currentEMA * oneMinusAlpha)
-            result.append(currentEMA)
-        }
-        
-        return result
+        guard period > 0, !bars.isEmpty else { return [] }
+        return calculateEMA(period: period, closes: bars.map(\.close))
     }
     
     /// Pure causal EMA calculation for raw Decimal price series.
+    /// Uses standard TA-Lib / TradingView seed (SMA of the first `period` bars)
+    /// to guarantee mathematical alignment with broker and charting platforms.
     public static func calculateEMA(period: Int, closes: [Decimal]) -> [Decimal] {
-        guard period > 0, let firstClose = closes.first else { return [] }
+        guard period > 0, !closes.isEmpty else { return [] }
         var result: [Decimal] = []
         result.reserveCapacity(closes.count)
         
         let alpha = Decimal(2) / Decimal(period + 1)
         let oneMinusAlpha = Decimal(1) - alpha
         
-        var currentEMA: Decimal = firstClose
+        if closes.count < period {
+            // When fewer than period bars exist, causal fallback running exponential average
+            var cur = closes[0]
+            result.append(cur)
+            for i in 1..<closes.count {
+                cur = (closes[i] * alpha) + (cur * oneMinusAlpha)
+                result.append(cur)
+            }
+            return result
+        }
+        
+        // Standard TA seed: first (period - 1) indices maintain 1:1 bar alignment via cumulative average
+        var runningSum: Decimal = 0
+        for i in 0..<period - 1 {
+            runningSum += closes[i]
+            let avg = runningSum / Decimal(i + 1)
+            result.append(avg)
+        }
+        
+        // Index (period - 1) is the exact SMA of the first `period` bars
+        runningSum += closes[period - 1]
+        var currentEMA = runningSum / Decimal(period)
         result.append(currentEMA)
         
-        for i in 1..<closes.count {
+        // Subsequent bars apply standard exponential weighting
+        for i in period..<closes.count {
             currentEMA = (closes[i] * alpha) + (currentEMA * oneMinusAlpha)
             result.append(currentEMA)
         }

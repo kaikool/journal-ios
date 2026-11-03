@@ -61,9 +61,9 @@ public struct MultiTimeframeTriVisionCanvas: View {
             }
             .padding(.horizontal, 10)
             
-            // Panel 2: H4 4-Hour Swing Structure & Liquidity Bounds
+            // Panel 2: H4 4-Hour Swing Structure & Key Levels
             VStack(alignment: .leading, spacing: 3) {
-                panelBadge(title: "2. H4 4-HOUR SWING STRUCTURE & ORDER BLOCKS", color: AppColors.profit)
+                panelBadge(title: "2. H4 4-HOUR SWING STRUCTURE & KEY LEVELS", color: AppColors.profit)
                 if !h4Bars.isEmpty {
                     MarketCandleChartView(
                         bars: Array(h4Bars.suffix(36)),
@@ -95,7 +95,7 @@ public struct MultiTimeframeTriVisionCanvas: View {
             
             // Panel 3: M15 15-Minute Execution & Micro Structure
             VStack(alignment: .leading, spacing: 3) {
-                panelBadge(title: "\(h1Bars.isEmpty ? "3" : "4"). M15 15-MINUTE EXECUTION & LIQUIDITY SWEEPS", color: .orange)
+                panelBadge(title: "\(h1Bars.isEmpty ? "3" : "4"). M15 15-MINUTE EXECUTION & MOMENTUM", color: .orange)
                 if !m15Bars.isEmpty {
                     MarketCandleChartView(
                         bars: Array(m15Bars.suffix(48)),

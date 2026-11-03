@@ -181,29 +181,134 @@ extension AIPromptBuilder {
             }
         }()
         
-        let risk1RStr: String = {
-            guard let sl = trade.stopLoss else { return isVi ? "Chưa rõ (Không cài SL)" : "Undefined (No SL)" }
-            let dist = abs(trade.avgEntry - sl)
-            let mult = trade.contractMultiplier ?? Decimal(1)
-            let riskUsd = dist * trade.quantity * mult
-            let riskUsdVal = NSDecimalNumber(decimal: riskUsd).doubleValue
-            if riskUsdVal > 0 {
-                return "$\(String(format: "%.2f", riskUsdVal))"
-            }
-            return isVi ? "Không đáng kể" : "Negligible"
-        }()
+        let mult = trade.contractMultiplier ?? Decimal(1)
+        let entry = trade.avgEntry
+        let isShort = trade.direction == .short
+        let directionStrVi = isShort ? "SELL / SHORT (BÁN KHỐNG - Kỳ vọng giá GIẢM)" : "BUY / LONG (MUA - Kỳ vọng giá TĂNG)"
+        let directionStrEn = isShort ? "SELL / SHORT (Short position - Expects price to FALL)" : "BUY / LONG (Long position - Expects price to RISE)"
         
-        let realizedRStr: String = {
-            guard let sl = trade.stopLoss else { return "N/A" }
-            let dist = abs(trade.avgEntry - sl)
-            let mult = trade.contractMultiplier ?? Decimal(1)
-            let riskUsd = dist * trade.quantity * mult
-            if riskUsd > 0 {
-                let r = trade.netPnl / riskUsd
-                let rVal = NSDecimalNumber(decimal: r).doubleValue
-                return String(format: "%@%.2fR", rVal >= 0 ? "+" : "", rVal)
+        // Dynamic Stop Loss & Risk Protection Analysis (Accounts for Initial Risk, Breakeven, and Trailing/Positive Stop Loss)
+        struct ProtectionStatus {
+            let labelVi: String
+            let labelEn: String
+            let risk1RStr: String
+            let realizedRStr: String
+            let isRiskFree: Bool
+            let isPositiveLock: Bool
+        }
+        
+        let protection: ProtectionStatus = {
+            guard let sl = trade.stopLoss, sl > 0 else {
+                return ProtectionStatus(
+                    labelVi: "Không cài Stop Loss (Vị thế chưa được khống chế rủi ro)",
+                    labelEn: "No Stop Loss set (Position is unprotected with undefined risk)",
+                    risk1RStr: isVi ? "Chưa rõ (Không cài SL)" : "Undefined (No SL)",
+                    realizedRStr: "N/A",
+                    isRiskFree: false,
+                    isPositiveLock: false
+                )
             }
-            return "N/A"
+            
+            let slPriceStr = formatPrice(sl)
+            let entryPriceStr = formatPrice(entry)
+            
+            if isShort {
+                // SELL / SHORT Position:
+                if sl < entry {
+                    // SL is BELOW entry -> Trailing Stop / Positive Lock!
+                    let lockedPts = entry - sl
+                    let lockedUsd = lockedPts * trade.quantity * mult
+                    let lockedUsdVal = (lockedUsd as NSDecimalNumber).doubleValue
+                    let lockedStr = String(format: "$%.2f", lockedUsdVal)
+                    return ProtectionStatus(
+                        labelVi: "SL tại \(slPriceStr) DƯỚI giá vào \(entryPriceStr) -> ĐÃ DỜI SL BẢO TOÀN VỊ THẾ VÀ KHÓA LÃI DƯƠNG (Trailing Stop). Rủi ro bằng 0 (Risk-Free), khóa chắc lợi nhuận tối thiểu ít nhất +\(lockedStr). Đây là hành động quản trị rủi ro chuyên nghiệp nhằm bảo vệ thành quả vị thế, hoàn toàn đúng đắn.",
+                        labelEn: "SL at \(slPriceStr) BELOW entry \(entryPriceStr) -> TRAILING STOP / POSITIVE LOCK. Zero capital risk (Risk-Free position), minimum guaranteed profit locked at +\(lockedStr). Professional risk-defense execution.",
+                        risk1RStr: isVi ? "0.00 USD (Đã khóa lãi an toàn)" : "$0.00 (Risk-Free / Positive Lock)",
+                        realizedRStr: "Risk-Free",
+                        isRiskFree: true,
+                        isPositiveLock: true
+                    )
+                } else if sl == entry {
+                    // Breakeven
+                    return ProtectionStatus(
+                        labelVi: "SL tại \(slPriceStr) BẰNG giá vào -> ĐÃ DỜI SL HÒA VỐN (Breakeven). Vị thế an toàn tuyệt đối, rủi ro vốn bằng 0 (Risk-Free).",
+                        labelEn: "SL at \(slPriceStr) EQUALS entry -> BREAKEVEN. Zero capital risk (Risk-Free position).",
+                        risk1RStr: isVi ? "0.00 USD (Hòa vốn)" : "$0.00 (Breakeven)",
+                        realizedRStr: "Risk-Free (BE)",
+                        isRiskFree: true,
+                        isPositiveLock: false
+                    )
+                } else {
+                    // Initial risk above entry
+                    let riskPts = sl - entry
+                    let riskUsd = riskPts * trade.quantity * mult
+                    let riskUsdVal = (riskUsd as NSDecimalNumber).doubleValue
+                    let riskStr = String(format: "$%.2f", riskUsdVal)
+                    let rStr: String = {
+                        if riskUsdVal > 0 {
+                            let r = (trade.netPnl / riskUsd as NSDecimalNumber).doubleValue
+                            return String(format: "%@%.2fR", r >= 0 ? "+" : "", r)
+                        }
+                        return "N/A"
+                    }()
+                    return ProtectionStatus(
+                        labelVi: "SL tại \(slPriceStr) TRÊN giá vào \(entryPriceStr) -> VỊ THẾ ĐANG RỦI RO VỐN (Khoảng cách SL = \(formatPrice(riskPts)), Rủi ro tối đa 1R = \(riskStr)).",
+                        labelEn: "SL at \(slPriceStr) ABOVE entry \(entryPriceStr) -> ACTIVE CAPITAL RISK (SL distance = \(formatPrice(riskPts)), Max 1R Risk = \(riskStr)).",
+                        risk1RStr: riskStr,
+                        realizedRStr: rStr,
+                        isRiskFree: false,
+                        isPositiveLock: false
+                    )
+                }
+            } else {
+                // BUY / LONG Position:
+                if sl > entry {
+                    // SL is ABOVE entry -> Trailing Stop / Positive Lock!
+                    let lockedPts = sl - entry
+                    let lockedUsd = lockedPts * trade.quantity * mult
+                    let lockedUsdVal = (lockedUsd as NSDecimalNumber).doubleValue
+                    let lockedStr = String(format: "$%.2f", lockedUsdVal)
+                    return ProtectionStatus(
+                        labelVi: "SL tại \(slPriceStr) TRÊN giá vào \(entryPriceStr) -> ĐÃ DỜI SL BẢO TOÀN VỊ THẾ VÀ KHÓA LÃI DƯƠNG (Trailing Stop). Rủi ro bằng 0 (Risk-Free), khóa chắc lợi nhuận tối thiểu ít nhất +\(lockedStr). Đây là hành động quản trị rủi ro chuyên nghiệp nhằm bảo vệ thành quả vị thế, hoàn toàn đúng đắn.",
+                        labelEn: "SL at \(slPriceStr) ABOVE entry \(entryPriceStr) -> TRAILING STOP / POSITIVE LOCK. Zero capital risk (Risk-Free position), minimum guaranteed profit locked at +\(lockedStr). Professional risk-defense execution.",
+                        risk1RStr: isVi ? "0.00 USD (Đã khóa lãi an toàn)" : "$0.00 (Risk-Free / Positive Lock)",
+                        realizedRStr: "Risk-Free",
+                        isRiskFree: true,
+                        isPositiveLock: true
+                    )
+                } else if sl == entry {
+                    // Breakeven
+                    return ProtectionStatus(
+                        labelVi: "SL tại \(slPriceStr) BẰNG giá vào -> ĐÃ DỜI SL HÒA VỐN (Breakeven). Vị thế an toàn tuyệt đối, rủi ro vốn bằng 0 (Risk-Free).",
+                        labelEn: "SL at \(slPriceStr) EQUALS entry -> BREAKEVEN. Zero capital risk (Risk-Free position).",
+                        risk1RStr: isVi ? "0.00 USD (Hòa vốn)" : "$0.00 (Breakeven)",
+                        realizedRStr: "Risk-Free (BE)",
+                        isRiskFree: true,
+                        isPositiveLock: false
+                    )
+                } else {
+                    // Initial risk below entry
+                    let riskPts = entry - sl
+                    let riskUsd = riskPts * trade.quantity * mult
+                    let riskUsdVal = (riskUsd as NSDecimalNumber).doubleValue
+                    let riskStr = String(format: "$%.2f", riskUsdVal)
+                    let rStr: String = {
+                        if riskUsdVal > 0 {
+                            let r = (trade.netPnl / riskUsd as NSDecimalNumber).doubleValue
+                            return String(format: "%@%.2fR", r >= 0 ? "+" : "", r)
+                        }
+                        return "N/A"
+                    }()
+                    return ProtectionStatus(
+                        labelVi: "SL tại \(slPriceStr) DƯỚI giá vào \(entryPriceStr) -> VỊ THẾ ĐANG RỦI RO VỐN (Khoảng cách SL = \(formatPrice(riskPts)), Rủi ro tối đa 1R = \(riskStr)).",
+                        labelEn: "SL at \(slPriceStr) BELOW entry \(entryPriceStr) -> ACTIVE CAPITAL RISK (SL distance = \(formatPrice(riskPts)), Max 1R Risk = \(riskStr)).",
+                        risk1RStr: riskStr,
+                        realizedRStr: rStr,
+                        isRiskFree: false,
+                        isPositiveLock: false
+                    )
+                }
+            }
         }()
         
         let feesVal = NSDecimalNumber(decimal: trade.fees).doubleValue
@@ -211,17 +316,13 @@ extension AIPromptBuilder {
         let feesStr = "$\(String(format: "%.2f", feesVal))"
         let swapStr = "$\(String(format: "%.2f", swapVal))"
         
-        let isShort = trade.direction == .short
-        let directionStrVi = isShort ? "SELL / SHORT (BÁN KHỐNG - Kỳ vọng giá GIẢM)" : "BUY / LONG (MUA - Kỳ vọng giá TĂNG)"
-        let directionStrEn = isShort ? "SELL / SHORT (Short position - Expects price to FALL)" : "BUY / LONG (Long position - Expects price to RISE)"
+        let directionInfoVi = isShort
+            ? "ĐỊNH HƯỚNG VỊ THẾ: Lệnh BÁN KHỐNG (SELL / SHORT). Lợi nhuận sinh ra khi giá giảm (Giá hiện tại hoặc Giá ra < Giá vào = CÓ LÃI). Mục tiêu Take Profit nằm phía dưới giá vào."
+            : "ĐỊNH HƯỚNG VỊ THẾ: Lệnh MUA (BUY / LONG). Lợi nhuận sinh ra khi giá tăng (Giá hiện tại hoặc Giá ra > Giá vào = CÓ LÃI). Mục tiêu Take Profit nằm phía trên giá vào."
         
-        let directionWarningVi = isShort
-            ? "⚠️ CẢNH BÁO QUAN TRỌNG VỀ CHIỀU LỆNH: Đây là lệnh BÁN (SELL / SHORT). Lợi nhuận sinh ra khi giá GIẢM (Giá hiện tại hoặc Giá ra < Giá vào = CÓ LÃI). Take Profit (TP) phải nằm DƯỚI giá vào, Stop Loss (SL) phải nằm TRÊN giá vào. Tuyệt đối KHÔNG ĐƯỢC phân tích nhầm thành lệnh MUA (BUY)."
-            : "⚠️ CẢNH BÁO QUAN TRỌNG VỀ CHIỀU LỆNH: Đây là lệnh MUA (BUY / LONG). Lợi nhuận sinh ra khi giá TĂNG (Giá hiện tại hoặc Giá ra > Giá vào = CÓ LÃI). Take Profit (TP) nằm TRÊN giá vào, Stop Loss (SL) nằm DƯỚI giá vào."
-        
-        let directionWarningEn = isShort
-            ? "CRITICAL DIRECTION DIRECTIVE: THIS IS A SHORT / SELL TRADE. Profit occurs strictly when the price DROPS (Current/Exit price < Entry price = Profit). Take Profit (TP) is BELOW Entry; Stop Loss (SL) is ABOVE Entry. NEVER evaluate this as a BUY trade."
-            : "CRITICAL DIRECTION DIRECTIVE: THIS IS A LONG / BUY TRADE. Profit occurs strictly when the price RISES. Take Profit (TP) is ABOVE Entry; Stop Loss (SL) is BELOW Entry."
+        let directionInfoEn = isShort
+            ? "POSITION ORIENTATION: Short position (SELL). Profit occurs when price declines (Current/Exit price < Entry price = In Profit). Take Profit target is below entry."
+            : "POSITION ORIENTATION: Long position (BUY). Profit occurs when price rises (Current/Exit price > Entry price = In Profit). Take Profit target is above entry."
         
         let candleInfo = recentCandlesSummary ?? (isVi ? "Không có chuỗi nến số hóa (Dựa vào thông số lệnh và ảnh biểu đồ đính kèm nếu có)." : "No numeric candle feed (Rely on trade metrics and attached chart image if present).")
         
@@ -238,7 +339,7 @@ extension AIPromptBuilder {
         let streak = sessionSummary?.currentStreakToday ?? 0
         let streakStr: String = {
             if streak > 0 { return isVi ? "Thắng \(streak) lệnh liên tiếp (+)" : "\(streak) wins in a row (+)" }
-            if streak < 0 { return isVi ? "⚠️ Đang thua \(abs(streak)) lệnh liên tiếp (-)" : "⚠️ In a \(abs(streak))-loss losing streak (-)" }
+            if streak < 0 { return isVi ? "Đang thua \(abs(streak)) lệnh liên tiếp (-)" : "In a \(abs(streak))-loss losing streak (-)" }
             return isVi ? "Chưa có chuỗi lệnh hôm nay" : "No active streak today"
         }()
         
@@ -275,11 +376,12 @@ extension AIPromptBuilder {
             • Giá vào (Entry): \(entryStr) | Thị giá hiện tại: \(exitStr)\(liveDeltaInfo)
             • Lợi nhuận tạm tính: \(pnlStr)\(excursionBlock)
             • Mức Cắt lỗ (SL): \(slStr) | Mức Chốt lời (TP): \(tpStr)
-            • Mức rủi ro 1R tính toán: \(risk1RStr)
+            • Trạng thái quản trị rủi ro & SL: \(protection.labelVi)
+            • Rủi ro 1R vị thế: \(protection.risk1RStr)
             • Chi phí sàn: \(feesStr) | Phí Swap: \(swapStr)
             • Ghi chú của trader: \(notes)\(preTradeBlock)\(lessonsBlock)\(complianceBlock)
 
-            \(directionWarningVi)
+            \(directionInfoVi)
 
             [DIỄN BIẾN CHUỖI 15 NẾN H1 GẦN NHẤT (OHLC + EMA 21/50 + WILDER RSI 14)]:
             \(h1SeriesStr)
@@ -294,7 +396,7 @@ extension AIPromptBuilder {
             - Kết luận dứt khoát: [VỊ THẾ HỢP LÝ / CẦN PHÒNG THỦ CAO / SAI LẦM KỸ THUẬT].
 
             ### 2. Cấu trúc thị trường & Bối cảnh đa khung
-            - Cấu trúc xu hướng khung lớn có tiếp tục ủng hộ lệnh này không hay giá đang tiệm cận vùng kháng cự/hỗ trợ mạnh hoặc vùng thanh khoản (BSL/SSL)?
+            - Cấu trúc xu hướng khung lớn có tiếp tục ủng hộ lệnh này không hay giá đang tiệm cận vùng kháng cự/hỗ trợ mạnh?
             - Các vùng cản then chốt tiếp theo mà vị thế cần vượt qua hoặc có nguy cơ bị phản ứng đảo chiều?
 
             ### 3. Điểm vô hiệu hóa cấu trúc & Kế hoạch bảo vệ vốn
@@ -330,11 +432,12 @@ extension AIPromptBuilder {
             • Entry Price: \(entryStr) | Current Price: \(exitStr)\(liveDeltaInfo)
             • Unrealized P&L: \(pnlStr)\(excursionBlock)
             • Stop Loss: \(slStr) | Take Profit: \(tpStr)
-            • Calculated 1R Risk: \(risk1RStr)
+            • Protection State: \(protection.labelEn)
+            • Position 1R Risk: \(protection.risk1RStr)
             • Fees: \(feesStr) | Swap: \(swapStr)
             • Trader Notes: \(notes)\(preTradeBlock)\(lessonsBlock)\(complianceBlock)
 
-            \(directionWarningEn)
+            \(directionInfoEn)
 
             [RECENT 15-CANDLE H1 EXECUTION SERIES (OHLC + EMA 21/50 + WILDER RSI 14)]:
             \(h1SeriesStr)
@@ -349,7 +452,7 @@ extension AIPromptBuilder {
             - Decisive Verdict: [RATIONAL POSITION / DEFENSIVE STANCE REQUIRED / FLAWED SETUP].
 
             ### 2. Market Structure & Key Barriers
-            - Does higher timeframe structure support holding, or is price running into major liquidity pools (BSL/SSL) or strong resistance?
+            - Does higher timeframe structure support holding, or is price running into major structural resistance or support?
             - Key upcoming barriers where price may react or reverse?
 
             ### 3. Structural Invalidation & Capital Defense
@@ -380,8 +483,9 @@ extension AIPromptBuilder {
             - Thời gian: Mở \(openedAtStr) -> Đóng \(closedAtStr)
             - Giá vào (Entry): \(entryStr) -> Giá ra (Exit): \(exitStr)
             - Lợi nhuận thực tế: \(pnlStr)\(excursionBlock)
-            - Mức SL dự kiến: \(slStr) | Mức TP dự kiến: \(tpStr)
-            - Tỷ lệ R thực hiện: \(realizedRStr) (1R = \(risk1RStr)) | Thời gian giữ lệnh: \(durationStr)
+            - Mức SL ghi nhận: \(slStr) | Mức TP dự kiến: \(tpStr)
+            - Quản trị SL của lệnh: \(protection.labelVi)
+            - Tỷ lệ R thực hiện: \(protection.realizedRStr) (1R = \(protection.risk1RStr)) | Thời gian giữ lệnh: \(durationStr)
             - Chi phí sàn: \(feesStr) | Phí Swap: \(swapStr)
             - Sai lầm trader tự ghi: \(mistakes)
             - Ghi chú trader: \(notes)
@@ -389,7 +493,7 @@ extension AIPromptBuilder {
             \(trajectoryBlock)
             \(candlesTableBlock)\(momentumBlock)
             
-            \(directionWarningVi)
+            \(directionInfoVi)
             
             NHIỆM VỤ CỦA RISK AI (BẢN ĐÚC KẾT BÀI HỌC KỶ LUẬT):
             Nhận xét chuyên nghiệp, sắc bén theo 4 mục:
@@ -404,14 +508,14 @@ extension AIPromptBuilder {
             
             ### 2. Đánh giá quản trị lệnh & Điểm thoát
             - Điểm thoát ở \(exitStr) là tuân thủ kế hoạch (chạm TP/SL chuẩn) hay do tâm lý (chốt non, gồng lỗ)?
-            - Có hành vi dời SL, gỡ SL, hay nhồi lệnh vô kỷ luật không?
+            - Trader có thực hiện dời SL bảo vệ vị thế (Breakeven/Trailing Stop) đúng kỹ thuật không?
             
             ### 3. Cấu trúc thị trường & Bối cảnh đa khung
-            - Thị trường đã đi đúng hay ngược phân tích? Điểm săn thanh khoản (Liquidity Sweep) nào đã tác động đến lệnh?
+            - Thị trường đã đi đúng hay ngược phân tích? Phản ứng giá quanh các ngưỡng cản then chốt đã tác động thế nào đến lệnh?
             
             ### 4. Phân loại sai lệch & Bài học kỷ luật
             - Nếu lệnh này thua lỗ hoặc thoát lệnh sai nguyên tắc, BẮT BUỘC PHÂN LOẠI theo 1 trong 4 nhóm:
-              1. [Lỗi thực thi (Bad Execution)]: Vào lệnh sai điểm, trễ, đuổi giá (FOMO), chốt non, dời SL sai quy tắc.
+              1. [Lỗi thực thi (Bad Execution)]: Vào lệnh sai điểm, trễ, đuổi giá (FOMO), chốt non, nới rộng SL sai quy tắc.
               2. [Kế hoạch sai lệch (Flawed Plan)]: Giả định phân tích sai, đọc sai cấu trúc, bỏ qua cản HTF lớn.
               3. [Thị trường đổi pha (Regime Shift)]: Tin tức bất ngờ, bứt phá bất thường, biến động ngoài dự liệu.
               4. [Thua lỗ ngẫu nhiên (Random Loss)]: Thực hiện đúng 100% kế hoạch nhưng xác suất thống kê dừng lỗ.
@@ -423,8 +527,9 @@ extension AIPromptBuilder {
             - Timeline: Opened at \(openedAtStr) -> Closed at \(closedAtStr)
             - Entry Price: \(entryStr) -> Exit Price: \(exitStr)
             - Realized P&L: \(pnlStr)\(excursionBlock)
-            - Planned SL: \(slStr) | Planned TP: \(tpStr)
-            - Realized R: \(realizedRStr) (1R = \(risk1RStr)) | Duration: \(durationStr)
+            - Recorded SL: \(slStr) | Planned TP: \(tpStr)
+            - SL Protection: \(protection.labelEn)
+            - Realized R: \(protection.realizedRStr) (1R = \(protection.risk1RStr)) | Duration: \(durationStr)
             - Fees: \(feesStr) | Swap: \(swapStr)
             - Self-Logged Mistakes: \(mistakes)
             - Trader Notes: \(notes)
@@ -432,7 +537,7 @@ extension AIPromptBuilder {
             \(trajectoryBlock)
             \(candlesTableBlock)\(momentumBlock)
             
-            \(directionWarningEn)
+            \(directionInfoEn)
             
             TASK: POST-TRADE FORENSIC DISCIPLINE AUDIT:
             
@@ -446,15 +551,16 @@ extension AIPromptBuilder {
             
             ### 2. Execution & Exit Quality
             - Was the exit at \(exitStr) planned (hit TP/SL) or emotional (panicked early exit, widened SL)?
+            - Did the trader execute defensive trailing stop management properly?
             
             ### 3. Market Structure & Multi-Timeframe Context
-            - What structural event or liquidity sweep dictated the outcome?
+            - What structural barrier or candle reaction dictated the outcome?
             
             ### 4. Failure Classification & Discipline Takeaway
             - If this trade was a loss or suboptimal, CLASSIFY the primary cause into one of the four canonical modes:
               1. [Bad Execution]: Missed entry level, chasing price (FOMO), premature exit, or improper SL modification.
               2. [Flawed Plan]: Invalidation of initial thesis, structural misread, or ignoring major HTF barriers.
-              3. [Regime Shift]: Unexpected news catalyst, volatility breakout, or liquidity drain.
+              3. [Regime Shift]: Unexpected news catalyst, volatility breakout, or volatility exhaustion.
               4. [Random Statistical Loss]: Flawless adherence to plan, but standard statistical distribution stop loss.
             - Audit against [LESSON COMPLIANCE & HISTORICAL ERROR AUDIT]: Did the trader repeat a previously flagged pitfall?
             - Synthesize the single most actionable lesson to persist into system memory.
@@ -513,7 +619,7 @@ extension AIPromptBuilder {
               - Thực tế thị trường: Nến M15 ĐÃ TỪNG \(zoneActionStrVi)!
               - Sau khi chạm mốc \(extremePriceStr), giá đảo chiều đóng nến tại \(entryStr) -> Trader vào lệnh theo đúng TÍN HIỆU XÁC NHẬN (CONFIRMATION ENTRY / MSS)!
             
-            ⚠️ NGUYÊN TẮC: Giá đã chạm/quét \(setupTypeVi) (\(extremePriceStr)) rồi mới xác nhận ở \(entryStr). Đây là lệnh xác nhận kỷ luật, TUYỆT ĐỐI KHÔNG phê phán là vào sớm hay \(setupActionVi).
+            [NGUYÊN TẮC THỰC THI]: Giá đã kiểm tra \(setupTypeVi) (\(extremePriceStr)) rồi mới xác nhận ở \(entryStr). Đây là lệnh xác nhận kỷ luật, không phê phán là vào sớm hay \(setupActionVi).
             """
         } else {
             return """
@@ -526,7 +632,104 @@ extension AIPromptBuilder {
               - Reality: Price DID \(zoneActionStrEn)!
               - Execution: After testing \(extremePriceStr), price rejected and closed at \(entryStr) -> Trader executed on disciplined CONFIRMATION ENTRY.
             
-            ⚠️ PRINCIPLE: Price tested \(extremePriceStr) before confirmation at \(entryStr). This is a disciplined confirmation entry, NEVER accuse the trader of entering prematurely or "\(setupActionEn)".
+            [EXECUTION PRINCIPLE]: Price tested \(extremePriceStr) before confirmation at \(entryStr). This is a disciplined confirmation entry, do not evaluate as premature entry or "\(setupActionEn)".
+            """
+        }
+    }
+
+    // MARK: - Multi-Model Ensemble Distillation & Synthesis for Trade Coaching (RISK AI)
+    public static func buildCoachingEnsembleSynthesisPrompt(
+        trade: Trade,
+        analyses: [String],
+        isVi: Bool = true
+    ) -> String {
+        var analysesBlock = ""
+        for (idx, a) in analyses.enumerated() {
+            let num = idx + 1
+            analysesBlock += """
+            ==================================================
+            [GÓC NHÌN PHÂN TÍCH ĐỘC LẬP \(num)]:
+            \(AIPromptBuilder.distillAnalysis(a))
+            
+            """
+        }
+        
+        let isShort = trade.direction == .short
+        let dirStr = isShort ? "SELL" : "BUY"
+        let entryStr = Formatters.price(trade.avgEntry, symbol: trade.symbol)
+        let slStr = trade.stopLoss.map { Formatters.price($0, symbol: trade.symbol) } ?? "None"
+        let pnlStr = Formatters.currency(trade.netPnl)
+        let isOpen = trade.closedAt == nil
+        
+        if isVi {
+            return """
+            BẠN LÀ RISK AI - GIÁM ĐỐC QUẢN TRỊ RỦI RO & HUẤN LUYỆN VIÊN TRƯỞNG (CHIEF RISK OFFICER).
+            
+            [THÔNG SỐ VỊ THẾ GIAO DỊCH]:
+            • Cặp tiền: \(trade.symbol) | Vị thế: [\(dirStr)] | Khối lượng: \(trade.quantity) lots
+            • Giá vào (Entry): \(entryStr) | Mức SL hiện tại: \(slStr) | Trạng thái: [\(isOpen ? "ĐANG MỞ (LIVE)" : "ĐÃ ĐÓNG (CLOSED)")]
+            • PnL: \(pnlStr)
+            
+            Dưới đây là \(analyses.count) góc nhìn phân tích độc lập từ các mô hình kỹ thuật đối với vị thế trên:
+            
+            \(analysesBlock)==================================================
+            
+            [NGUYÊN TẮC TỔNG HỢP VÀ ĐIỀU PHỐI ĐỘC LẬP]:
+            Tổng hợp và đúc kết thành MỘT BẢN ĐÁNH GIÁ CHUYÊN NGHIỆP DUY NHẤT dưới tư cách RISK AI.
+            Tuyệt đối KHÔNG nhắc đến "Góc nhìn 1/2/3", "các mô hình AI", hay "hội đồng". Bạn phát ngôn với một tiếng nói duy nhất là RISK AI.
+            
+            NGUYÊN TẮC BẢO VỆ RỦI RO VÀ TƯ DUY GIAO DỊCH CHUYÊN NGHIỆP:
+            1. BẢO TOÀN VỊ THẾ & TRAILING STOP:
+               - Khi lệnh \(dirStr) có SL đã được dời vượt qua giá vào theo chiều có lợi (đối với SELL: SL nằm dưới giá vào; đối với BUY: SL nằm trên giá vào): ĐÂY LÀ HÀNH ĐỘNG DỜI SL DƯƠNG / TRAILING STOP ĐỂ BẢO VỆ VỐN VÀ KHÓA LÃI (RISK-FREE). BẮT BUỘC công nhận đây là kỹ năng quản trị rủi ro an toàn tuyệt đối, TUYỆT ĐỐI KHÔNG ĐƯỢC coi là lỗi kỹ thuật hay sai chiều.
+               - Nếu có góc nhìn độc lập nào hiểu nhầm việc kéo SL bảo vệ thành lỗi kỹ thuật: BẮT BUỘC BÁC BỎ sự hiểu nhầm đó và khẳng định vị thế đã an toàn.
+            2. CĂN CỨ VÀO ĐỘNG LƯỢNG VÀ CẤU TRÚC ĐA KHUNG:
+               - Kết hợp diễn biến giá so với EMA 21/50 và RSI 14 để đưa ra chỉ đạo hành động cụ thể.
+            
+            ĐỊNH DẠNG ĐẦU RA CHUẨN:
+            \(isOpen ? """
+            ### 1. Thẩm định tính hợp lý của vị thế & Động lượng nến
+            ### 2. Cấu trúc thị trường & Mức cản then chốt
+            ### 3. Điểm vô hiệu hóa cấu trúc & Kế hoạch bảo vệ vốn
+            ### 4. Đối chiếu Hồ sơ Trader & Phòng chống lỗi tâm lý
+            
+            [LIVE POSITION DIRECTIVE]
+            - Action: [HOLD hoặc PARTIAL TP hoặc MOVE SL TO BE hoặc CLOSE NOW]
+            - Current Price: [Thị giá hiện tại]
+            - Adjusted SL: [Mức SL khuyến nghị]
+            - Partial Close Volume: [Khối lượng chốt nếu có, nếu không ghi Không]
+            - Next Target: [Vùng giá mục tiêu tiếp theo]
+            """ : """
+            ### 1. Đánh giá chất lượng điểm vào & Động lượng nến
+            ### 2. Đánh giá quản trị lệnh & Điểm thoát
+            ### 3. Cấu trúc thị trường & Bài học thực chiến
+            ### 4. Kỷ luật vốn & Phòng chống tái phạm
+            """)
+            
+            > [Đúng 1 câu quy tắc kỷ luật hành động không khoan nhượng của nhà giao dịch chuyên nghiệp]
+            """
+        } else {
+            return """
+            YOU ARE RISK AI - CHIEF RISK OFFICER & MASTER TRADING COACH.
+            
+            [TRADE CONTEXT]:
+            • Symbol: \(trade.symbol) | Direction: [\(dirStr)] | Volume: \(trade.quantity) lots
+            • Entry: \(entryStr) | Stop Loss: \(slStr) | Status: [\(isOpen ? "LIVE OPEN" : "CLOSED")]
+            • PnL: \(pnlStr)
+            
+            Below are \(analyses.count) independent technical reviews of this position:
+            
+            \(analysesBlock)==================================================
+            
+            [SYNTHESIS & RESOLUTION DIRECTIVE]:
+            Synthesize the independent reviews into ONE SINGLE AUTHORITATIVE COACHING PLAN as RISK AI.
+            Never mention "Perspective 1/2/3" or "AI models". You speak with one single voice as RISK AI.
+            
+            PROFESSIONAL CAPITAL PRESERVATION DIRECTIVES:
+            1. POSITIVE SL & TRAILING STOP PRESERVATION:
+               - When a \(dirStr) trade has its Stop Loss moved past entry into profit (for SELL: SL below entry; for BUY: SL above entry): THIS IS A TRAILING STOP / POSITIVE LOCK TO SECURE PROFIT (RISK-FREE). Mandate recognition of this as professional capital preservation, NOT an execution error.
+               - Overrule any dissenting view that misinterprets trailing stop loss protection.
+            
+            CONCLUDE WITH STANDARD SECTIONS AND FINAL DIRECTIVE BLOCK.
             """
         }
     }

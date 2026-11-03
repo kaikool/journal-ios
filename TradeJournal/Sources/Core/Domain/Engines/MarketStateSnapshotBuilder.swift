@@ -28,12 +28,8 @@ public enum MarketStateSnapshotBuilder {
         let m15StateDesc = m15Ema?.summary
         let triggerLvl = m15Ema?.ema21
         
-        let m15Analysis = LiquidityEngine.analyzeLiquidity(symbol: cleanSymbol, barsM15: barsM15, barsH4: barsH4)
-        let lastSweep = m15Analysis.latestSweep
-        let sweepDesc: String? = lastSweep.map { s in
-            "\(s.sweepType.rawValue.uppercased()) at \(Formatters.price(s.sweptPrice, symbol: cleanSymbol))"
-        }
-        let nearestUnswept = m15Analysis.nearestBSL?.price ?? m15Analysis.nearestSSL?.price
+        let sweepDesc: String? = nil
+        let nearestUnswept: Decimal? = nil
         
         // 3. Technical Momentum (M15 Wilder RSI 14 / EMA 9 / WMA 45)
         var rsiVal: Double? = nil
@@ -132,7 +128,6 @@ public enum MarketStateSnapshotBuilder {
             • Cặp tiền: \(snapshot.symbol) | Thị giá hiện tại: \(curPriceStr)
             • Khung lớn H4 (Order Flow & Cản): Xu hướng: [\(snapshot.h4OrderFlow)] | Đỉnh Swing High: [\(h4HighStr)] | Đáy Swing Low: [\(h4LowStr)]
             • Khung nhỏ M15 (Execution): Xu hướng: [\(snapshot.m15OrderFlow)] | Trạng thái cấu trúc: [\(snapshot.m15MssState ?? "Tiếp diễn")] | Mốc kích hoạt: [\(m15TriggerStr)]
-            • Thanh khoản M15: Quét thanh khoản gần nhất: [\(m15SweepStr)] | Vùng giá chưa quét: [\(m15UnsweptStr)]
             • Động lượng M15: RSI(14) = [\(rsiStr)] | EMA(9) = [\(emaStr)] | WMA(45) = [\(wmaStr)]
             • Tin tức kinh tế (Catalyst): \(newsBlock)
             """
@@ -143,7 +138,6 @@ public enum MarketStateSnapshotBuilder {
             • Symbol: \(snapshot.symbol) | Current Price: \(curPriceStr)
             • HTF H4 (Order Flow & Key Barriers): Trend: [\(snapshot.h4OrderFlow)] | Swing High: [\(h4HighStr)] | Swing Low: [\(h4LowStr)]
             • LTF M15 (Execution): Trend: [\(snapshot.m15OrderFlow)] | Structural State: [\(snapshot.m15MssState ?? "Continuation")] | Trigger Level: [\(m15TriggerStr)]
-            • M15 Liquidity: Recent Sweep: [\(m15SweepStr)] | Nearest Unswept Pool: [\(m15UnsweptStr)]
             • M15 Momentum: RSI(14) = [\(rsiStr)] | EMA(9) = [\(emaStr)] | WMA(45) = [\(wmaStr)]
             • Macro News Catalyst: \(newsBlock)
             """

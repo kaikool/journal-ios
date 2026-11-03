@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Dedicated Fullscreen Landscape Chart View for Trade Replay.
-/// Maximizes horizontal chart real estate for deep market structure, institutional liquidity, and RSI inspection.
+/// Maximizes horizontal chart real estate for deep market structure, EMA trend, and RSI inspection.
 public struct TradeReplayLandscapeChartView: View {
     let trade: Trade
     let executions: [Execution]
@@ -9,7 +9,6 @@ public struct TradeReplayLandscapeChartView: View {
     @Binding var replaySpeed: Double
     @Binding var selectedResolution: MarketResolution
     @Binding var showMarketStructure: Bool
-    @Binding var showLiquidity: Bool
     @Binding var showRSI: Bool
     let bars: [MarketBar]
     let frame: ReplayFrame
@@ -33,7 +32,6 @@ public struct TradeReplayLandscapeChartView: View {
         replaySpeed: Binding<Double>,
         selectedResolution: Binding<MarketResolution>,
         showMarketStructure: Binding<Bool>,
-        showLiquidity: Binding<Bool>,
         showRSI: Binding<Bool>,
         bars: [MarketBar],
         frame: ReplayFrame,
@@ -54,7 +52,6 @@ public struct TradeReplayLandscapeChartView: View {
         self._replaySpeed = replaySpeed
         self._selectedResolution = selectedResolution
         self._showMarketStructure = showMarketStructure
-        self._showLiquidity = showLiquidity
         self._showRSI = showRSI
         self.bars = bars
         self.frame = frame
@@ -232,7 +229,6 @@ public struct TradeReplayLandscapeChartView: View {
                     currency: reportingCurrency,
                     resolution: selectedResolution,
                     showMarketStructure: true,
-                    showLiquidity: true,
                     showRSI: true,
                     isLandscape: true
                 )

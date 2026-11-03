@@ -566,6 +566,88 @@ public actor AIReflectionService {
             linkedPreTradePlan: linkedPreTradePlan
         )
         
+        // Multi-Model Parallel Ensemble for Trade Coaching (GPT-120B, Qwen-27B, Gemini-3.5-Flash-Lite)
+        let groqKey = config.groqKey.trimmingCharacters(in: .whitespaces).isEmpty ? AiSettingsConfig.defaultGroqKey : config.groqKey.trimmingCharacters(in: .whitespaces)
+        let groqBackupKey = config.groqBackupKey.trimmingCharacters(in: .whitespaces).isEmpty ? AiSettingsConfig.defaultGroqBackupKey : config.groqBackupKey.trimmingCharacters(in: .whitespaces)
+        let geminiKey = config.geminiKey.trimmingCharacters(in: .whitespaces).isEmpty ? AiSettingsConfig.defaultGeminiKey : config.geminiKey.trimmingCharacters(in: .whitespaces)
+        let effectiveGroqKey = !groqKey.isEmpty ? groqKey : groqBackupKey
+        
+        if !effectiveGroqKey.isEmpty {
+            async let worker1 = self.callModelSafe(
+                endpoint: Self.groqEndpoint,
+                apiKey: effectiveGroqKey,
+                model: "openai/gpt-oss-120b",
+                action: .critique,
+                prompt: prompt,
+                metrics: metrics,
+                language: activeLang,
+                traderProfile: nil,
+                sessionSummary: sessionSummary,
+                conversationHistory: nil
+            )
+            async let worker2 = self.callModelSafe(
+                endpoint: Self.groqEndpoint,
+                apiKey: effectiveGroqKey,
+                model: "qwen/qwen3.8-27b",
+                action: .critique,
+                prompt: prompt,
+                metrics: metrics,
+                language: activeLang,
+                traderProfile: nil,
+                sessionSummary: sessionSummary,
+                conversationHistory: nil
+            )
+            async let worker3 = self.callModelSafe(
+                endpoint: Self.geminiEndpoint,
+                apiKey: geminiKey,
+                model: "gemini-3.5-flash-lite",
+                action: .critique,
+                prompt: prompt,
+                metrics: metrics,
+                language: activeLang,
+                traderProfile: nil,
+                sessionSummary: sessionSummary,
+                conversationHistory: nil
+            )
+            
+            let (res1, res2, res3) = await (worker1, worker2, worker3)
+            let validAnalyses = [res1, res2, res3].compactMap { $0 }.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            
+            if validAnalyses.count >= 2 {
+                let synthesisPrompt = AIPromptBuilder.buildCoachingEnsembleSynthesisPrompt(
+                    trade: trade,
+                    analyses: validAnalyses,
+                    isVi: isVi
+                )
+                
+                // Synthesis via Chief Risk Officer Lead Model
+                do {
+                    return try await callOpenAiCompatible(
+                        endpoint: Self.groqEndpoint,
+                        apiKey: effectiveGroqKey,
+                        model: "qwen/qwen3.8-27b",
+                        action: .critique,
+                        prompt: synthesisPrompt,
+                        metrics: metrics,
+                        edgeScore: nil,
+                        language: activeLang,
+                        traderProfile: nil,
+                        chartImageBase64: nil,
+                        chartImagesBase64: nil,
+                        sessionSummary: sessionSummary,
+                        conversationHistory: nil
+                    )
+                } catch {
+                    AppLogger.warning("Trade Coaching synthesis failed: \(error.localizedDescription). Falling back to longest valid analysis...")
+                    if let best = validAnalyses.max(by: { $0.count < $1.count }) {
+                        return best
+                    }
+                }
+            } else if let single = validAnalyses.first {
+                return single
+            }
+        }
+        
         return try await requestReflection(
             action: .critique,
             prompt: prompt,

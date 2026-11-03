@@ -723,6 +723,17 @@ public final class AIAdvisorMemoryEngine: @unchecked Sendable {
     
     // MARK: - 4. Parsing & Extraction Helpers
     
+    /// Extracts the first decimal number from a string, immune to trailing text annotations like "2740 (D1 PDH)" or "2730 (EMA 21)".
+    public static func extractFirstPrice(from text: String) -> Decimal? {
+        let sanitized = text.replacingOccurrences(of: ",", with: "")
+        guard let regex = try? NSRegularExpression(pattern: #"[0-9]+(?:\.[0-9]+)?"#) else { return nil }
+        let ns = sanitized as NSString
+        guard let match = regex.firstMatch(in: sanitized, options: [], range: NSRange(location: 0, length: ns.length)) else {
+            return nil
+        }
+        return Decimal(string: ns.substring(with: match.range))
+    }
+    
     /// Parses an AI analysis output string into a structured AdvisorCommitmentRecord with discrete setup fields.
     public func extractCommitment(
         from analysisText: String,
@@ -730,7 +741,8 @@ public final class AIAdvisorMemoryEngine: @unchecked Sendable {
         fallbackBalance: String? = nil,
         fallbackVolume: String? = nil,
         accountBalance: Decimal? = nil,
-        riskPercentage: Decimal? = nil
+        riskPercentage: Decimal? = nil,
+        targetRiskRewardRatio: Double? = nil
     ) -> AdvisorCommitmentRecord {
         var bias = "FLAT"
         var entry: String? = nil
@@ -860,13 +872,12 @@ public final class AIAdvisorMemoryEngine: @unchecked Sendable {
         
         // 3. Mathematical Verification of Volume and R:R via AssetContractEngine
         if let entryStr = entry, let slStr = sl {
-            let cleanEntry = entryStr.replacingOccurrences(of: "[^0-9.]", with: "", options: .regularExpression)
-            let cleanSL = slStr.replacingOccurrences(of: "[^0-9.]", with: "", options: .regularExpression)
-            if let eNum = Decimal(string: cleanEntry), let sNum = Decimal(string: cleanSL), eNum > 0, sNum > 0, eNum != sNum {
+            if let eNum = Self.extractFirstPrice(from: entryStr),
+               let sNum = Self.extractFirstPrice(from: slStr),
+               eNum > 0, sNum > 0, eNum != sNum {
                 var balNum = accountBalance
                 if balNum == nil, let bStr = balance ?? fallbackBalance {
-                    let clean = bStr.replacingOccurrences(of: "[^0-9.]", with: "", options: .regularExpression)
-                    balNum = Decimal(string: clean)
+                    balNum = Self.extractFirstPrice(from: bStr)
                 }
                 let activeRiskPct = riskPercentage ?? Decimal(1)
                 if let b = balNum, b > 0 {
@@ -881,16 +892,15 @@ public final class AIAdvisorMemoryEngine: @unchecked Sendable {
                     }
                 }
                 
-                if let tpStr = tp1 {
-                    let cleanTP = tpStr.replacingOccurrences(of: "[^0-9.]", with: "", options: .regularExpression)
-                    if let tNum = Decimal(string: cleanTP), tNum > 0 {
-                        let riskDist = abs(eNum - sNum)
-                        let rewardDist = abs(tNum - eNum)
-                        if riskDist > 0 {
-                            let rr = (rewardDist / riskDist as NSDecimalNumber).doubleValue
-                            rrRatio = String(format: "1:%.2f", rr)
-                        }
+                let riskDist = abs(eNum - sNum)
+                if let tpStr = tp1, let tNum = Self.extractFirstPrice(from: tpStr), tNum > 0 {
+                    let rewardDist = abs(tNum - eNum)
+                    if riskDist > 0 {
+                        let calculatedRR = (rewardDist / riskDist as NSDecimalNumber).doubleValue
+                        rrRatio = String(format: "1:%.1f", calculatedRR)
                     }
+                } else if let targetRR = targetRiskRewardRatio, targetRR > 0 {
+                    rrRatio = String(format: "1:%.1f", targetRR)
                 }
             }
         }

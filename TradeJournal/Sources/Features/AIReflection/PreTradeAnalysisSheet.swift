@@ -253,12 +253,14 @@ public struct PreTradeAnalysisSheet: View {
         let session = AIAccountContextProvider.captureContext(dataStore: self.dataStore)
         let balStr = session.balance.map { Formatters.formatCurrency($0, currency: session.accountCurrency) }
         let riskPct = self.dataStore.aiSettings.traderProfile.numericRiskPercent
+        let targetRR = self.dataStore.aiSettings.traderProfile.targetRiskRewardRatio
         return AIAdvisorMemoryEngine.shared.extractCommitment(
             from: text,
             symbol: symbol,
             fallbackBalance: balStr,
             accountBalance: session.balance,
-            riskPercentage: riskPct
+            riskPercentage: riskPct,
+            targetRiskRewardRatio: targetRR
         )
     }
     
@@ -457,10 +459,10 @@ public struct PreTradeAnalysisSheet: View {
         let config = dataStore.marketConnections
         
         do {
-            async let d1Task = MarketDataService.shared.fetchBarsForSymbol(symbol: sym, config: config, resolution: "1d", count: 30, forceRefresh: forceRefresh)
-            async let h4Task = MarketDataService.shared.fetchBarsForSymbol(symbol: sym, config: config, resolution: "4h", count: 36, forceRefresh: forceRefresh)
-            async let h1Task = MarketDataService.shared.fetchBarsForSymbol(symbol: sym, config: config, resolution: "1h", count: 48, forceRefresh: forceRefresh)
-            async let m15Task = MarketDataService.shared.fetchBarsForSymbol(symbol: sym, config: config, resolution: "15m", count: 100, forceRefresh: forceRefresh)
+            async let d1Task = MarketDataService.shared.fetchBarsForSymbol(symbol: sym, config: config, resolution: "1d", count: 100, forceRefresh: forceRefresh)
+            async let h4Task = MarketDataService.shared.fetchBarsForSymbol(symbol: sym, config: config, resolution: "4h", count: 150, forceRefresh: forceRefresh)
+            async let h1Task = MarketDataService.shared.fetchBarsForSymbol(symbol: sym, config: config, resolution: "1h", count: 150, forceRefresh: forceRefresh)
+            async let m15Task = MarketDataService.shared.fetchBarsForSymbol(symbol: sym, config: config, resolution: "15m", count: 150, forceRefresh: forceRefresh)
             
             let (d1Res, h4Res, h1Res, m15Res) = try await (d1Task, h4Task, h1Task, m15Task)
             
@@ -533,13 +535,16 @@ public struct PreTradeAnalysisSheet: View {
                 let balStr = session.balance.map { Formatters.formatCurrency($0, currency: session.accountCurrency) }
                 let riskPct = self.dataStore.aiSettings.traderProfile.numericRiskPercent
                 
+                let targetRR = self.dataStore.aiSettings.traderProfile.targetRiskRewardRatio
+                
                 // Persist structured advisor commitment so Trade Coach can automatically link and honor it
                 let commitment = AIAdvisorMemoryEngine.shared.extractCommitment(
                     from: response,
                     symbol: self.selectedSymbol,
                     fallbackBalance: balStr,
                     accountBalance: session.balance,
-                    riskPercentage: riskPct
+                    riskPercentage: riskPct,
+                    targetRiskRewardRatio: targetRR
                 )
                 self.currentCommitment = commitment
                 AIAdvisorMemoryEngine.shared.saveCommitment(commitment)

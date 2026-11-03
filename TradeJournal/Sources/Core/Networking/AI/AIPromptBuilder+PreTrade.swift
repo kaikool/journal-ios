@@ -401,7 +401,7 @@ extension AIPromptBuilder {
               - Cắt lỗ (Stop Loss): Mức giá SL cụ thể bảo vệ cấu trúc dưới/trên EMA.
               - Chốt lời (Take Profit): TP 1 tại [Mức giá] | TP 2 tại [Mức giá]
               - Khối lượng (Volume): Tính chính xác số lot theo mức rủi ro \(numericRisk)% và số tiền rủi ro \(targetRiskDollarsStr).
-              - Tỷ lệ R:R thực tế đạt được: Tối ưu để hướng tới 1:\(String(format: "%.1f", targetRR)).
+              - Tỷ lệ R:R thực tế đạt được: Bắt buộc tính toán chính xác theo công thức (|TP1 - Entry| / |Entry - SL|), mục tiêu tối thiểu đạt 1:\(String(format: "%.1f", targetRR)) theo hồ sơ Trader Profile.
 
             BẮT BUỘC KẾT THÚC BẰNG BẢNG THÔNG SỐ SETUP ĐÚNG ĐỊNH DẠNG SAU:
             [PRE-TRADE SETUP SPECIFICATION]
@@ -411,7 +411,7 @@ extension AIPromptBuilder {
             - Stop loss: [Mức giá SL cụ thể]
             - Take profit 1: [Mức giá TP 1]
             - Take profit 2: [Mức giá TP 2 nếu có, nếu không ghi None]
-            - R:R Ratio: [Tỷ lệ R:R, ví dụ 1:3.2]
+            - R:R Ratio: 1:\(String(format: "%.1f", targetRR))
             - Volume: [Khối lượng lot khuyến nghị tính theo số tiền rủi ro \(targetRiskDollarsStr), ví dụ 1.00 lot]
             - Date time: [Thời gian hiện tại]
 
@@ -422,7 +422,7 @@ extension AIPromptBuilder {
               "stopLoss": [mức giá sl dạng số hoặc null],
               "takeProfit1": [mức giá tp1 dạng số hoặc null],
               "takeProfit2": [mức giá tp2 dạng số hoặc null],
-              "riskRewardRatio": "[ví dụ 1:3.2]",
+              "riskRewardRatio": "1:\(String(format: "%.1f", targetRR))",
               "volume": "[ví dụ 1.00 lot]"
             }
             ```
@@ -508,7 +508,7 @@ extension AIPromptBuilder {
             - Stop loss: [Specific SL price]
             - Take profit 1: [Specific TP1 price]
             - Take profit 2: [Specific TP2 price if any, otherwise None]
-            - R:R Ratio: [Expected R:R ratio, e.g. 1:3.2]
+            - R:R Ratio: 1:\(String(format: "%.1f", targetRR))
             - Volume: [Recommended lots based on \(targetRiskDollarsStr) risk]
             - Date time: [Current date and time]
 
@@ -519,7 +519,7 @@ extension AIPromptBuilder {
               "stopLoss": [numeric SL price or null],
               "takeProfit1": [numeric TP1 price or null],
               "takeProfit2": [numeric TP2 price or null],
-              "riskRewardRatio": "[e.g. 1:3.2]",
+              "riskRewardRatio": "1:\(String(format: "%.1f", targetRR))",
               "volume": "[e.g. 1.00 lot]"
             }
             ```
@@ -779,7 +779,7 @@ extension AIPromptBuilder {
               + Dừng lỗ bảo vệ cấu trúc (Stop Loss): [Mức SL an toàn nhất]
               + Chốt lời (Take Profit): TP 1 tại [Mức giá] | TP 2 tại [Mức giá nếu có]
               + Khối lượng khuyến nghị (Volume): [Số lot chính xác tính theo ngân sách rủi ro \(riskDollars)]
-              + Tỷ lệ R:R thực tế: [Ví dụ 1:2.4]
+              + Tỷ lệ R:R thực tế: Bắt buộc tối thiểu 1:\(targetRRStr) (Theo cấu hình Trader Profile)
             - Mức độ đồng thuận & Khuyến nghị quản trị: [Chỉ rõ các góc nhìn đồng thuận ở đâu, lưu ý kiểm soát rủi ro].
             - Lưu ý thực thi: [Khuyến nghị kỷ luật thực chiến và quản lý lệnh].
 
@@ -791,8 +791,8 @@ extension AIPromptBuilder {
             - Stop loss: [Mức giá hoặc null]
             - Take profit 1: [Mức giá hoặc null]
             - Take profit 2: [Mức giá hoặc None]
-            - R:R Ratio: [Ví dụ 1:2.5]
-            - Volume: [Ví dụ 0.50 lot]
+            - R:R Ratio: 1:\(targetRRStr)
+            - Volume: [Khối lượng lot khuyến nghị tính theo số tiền rủi ro \(riskDollars), ví dụ 0.50 lot]
             - Date time: [Thời gian hiện tại]
 
             ```json
@@ -802,7 +802,7 @@ extension AIPromptBuilder {
               "stopLoss": [mức giá dạng số hoặc null],
               "takeProfit1": [mức giá dạng số hoặc null],
               "takeProfit2": [mức giá dạng số hoặc null],
-              "riskRewardRatio": "[ví dụ 1:2.5]",
+              "riskRewardRatio": "1:\(targetRRStr)",
               "volume": "[ví dụ 0.50 lot]"
             }
             ```

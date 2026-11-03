@@ -16,7 +16,6 @@ public struct CandleChartView: View {
     let resolution: MarketResolution
     public var onResolutionChange: ((MarketResolution) -> Void)? = nil
     let showMarketStructure: Bool
-    let showLiquidity: Bool
     let showRSI: Bool
     let isLandscape: Bool
     @State private var activeRSIMAType: MomentumEngine.RSIMAType
@@ -56,7 +55,6 @@ public struct CandleChartView: View {
         self.currency = currency
         self.resolution = resolution
         self.showMarketStructure = showMarketStructure
-        self.showLiquidity = showLiquidity
         self.showRSI = showRSI
         self.isLandscape = isLandscape
         self.onResolutionChange = onResolutionChange
@@ -346,11 +344,6 @@ public struct CandleChartView: View {
             // Dynamic EMA 21 & EMA 50 Overlay
             if showMarketStructure {
                 emaOverlay(plotWidth: plotWidth, plotHeight: plotHeight, stepX: stepX, minP: minP, span: priceSpan, panOffset: clampedPan)
-            }
-            
-            // Liquidity Overlay (EQH / EQL Pools, Sweeps / SFPs)
-            if showLiquidity {
-                liquidityOverlay(plotWidth: plotWidth, plotHeight: plotHeight, stepX: stepX, minP: minP, span: priceSpan, panOffset: clampedPan)
             }
             
             // Unified trade overlay (entry/exit lines, arrows, connecting line)
@@ -658,120 +651,6 @@ public struct CandleChartView: View {
                         }
                     }
                     .stroke(Color.cyan.opacity(0.9), lineWidth: 1.4)
-                }
-            }
-        }
-    }
-    
-    // MARK: - 7. Institutional Liquidity Overlay (Resting Pools & SFP Sweeps)
-    
-    @ViewBuilder
-    private func liquidityOverlay(
-        plotWidth: CGFloat,
-        plotHeight: CGFloat,
-        stepX: CGFloat,
-        minP: Double,
-        span: Double,
-        panOffset: CGFloat = 0
-    ) -> some View {
-        if visibleBars.count >= 5 {
-            let curPrice = visibleBars.last?.close ?? 0
-            let pivots = LiquidityEngine.identifyPivots(bars: visibleBars, window: 2, timeframe: resolution.label)
-            let simResult = LiquidityEngine.simulate(
-                bars: visibleBars,
-                pivots: pivots,
-                sessionBarsCount: visibleBars.count
-            )
-            
-            // Priority filtering: active pools, limit to top 2 closest BSL and top 2 closest SSL
-            let topBSL = Array(simResult.restingBuySide.filter { $0.price > curPrice }.prefix(2))
-            let topSSL = Array(simResult.restingSellSide.filter { $0.price < curPrice }.prefix(2))
-            let displayPools = topBSL + topSSL
-            
-            ZStack {
-                // 1. Resting Liquidity Pools (Bounded Levels & Clustered Zones)
-                ForEach(displayPools) { pool in
-                    let pD = (pool.price as NSDecimalNumber).doubleValue
-                    let rawY = plotHeight - CGFloat((pD - minP) / span) * plotHeight
-                    let clampedY = max(8, min(plotHeight - 8, rawY))
-                    
-                    let isBuySide = pool.type == .buySide
-                    let poolColor = isBuySide ? Color(red: 1.0, green: 0.62, blue: 0.2) : Color(red: 0.2, green: 0.82, blue: 0.95)
-                    let poolLabel = isBuySide ? "BSL-H" : "SSL-L"
-                    
-                    // Zone rectangle if rangeMin != rangeMax (e.g. EQH/EQL clusters)
-                    if pool.rangeMin != pool.rangeMax {
-                        let topD = (pool.topPrice as NSDecimalNumber).doubleValue
-                        let botD = (pool.bottomPrice as NSDecimalNumber).doubleValue
-                        let topY = plotHeight - CGFloat((topD - minP) / span) * plotHeight
-                        let botY = plotHeight - CGFloat((botD - minP) / span) * plotHeight
-                        let zoneH = max(2, abs(botY - topY))
-                        let zoneMinY = min(topY, botY)
-                        
-                        Rectangle()
-                            .fill(poolColor.opacity(0.10))
-                            .frame(width: plotWidth, height: zoneH)
-                            .position(x: plotWidth / 2.0, y: zoneMinY + zoneH / 2.0)
-                    }
-                    
-                    // Horizontal dashed pool line
-                    Path { path in
-                        path.move(to: CGPoint(x: 0, y: clampedY))
-                        path.addLine(to: CGPoint(x: plotWidth, y: clampedY))
-                    }
-                    .stroke(poolColor.opacity(0.85), style: StrokeStyle(lineWidth: 1.0, dash: [4, 4]))
-                    
-                    // Pool tag badge
-                    Text(poolLabel)
-                        .font(AppTypography.badgeMarker)
-                        .padding(.horizontal, 4)
-                        .padding(.vertical, 1.5)
-                        .background(poolColor.opacity(0.18))
-                        .foregroundColor(poolColor)
-                        .cornerRadius(3)
-                        .position(x: min(plotWidth - 50, max(50, plotWidth - 55)), y: max(10, clampedY - 8))
-                }
-                
-                // 2. Liquidity Sweeps (Discrete SFP Markers)
-                ForEach(Array(simResult.sweeps.prefix(6))) { sweep in
-                    if sweep.barIndex < visibleBars.count {
-                        let x = CGFloat(sweep.barIndex) * stepX + (stepX / 2.0) + panOffset
-                        if x >= 0 && x <= plotWidth {
-                            let isHighSweep = sweep.sweepType == .buySideSwept
-                            let wickD = (sweep.wickExtreme as NSDecimalNumber).doubleValue
-                            let rawY = plotHeight - CGFloat((wickD - minP) / span) * plotHeight
-                            let clampedY = max(8, min(plotHeight - 8, rawY))
-                            
-                            let sweepColor = isHighSweep ? Color(red: 1.0, green: 0.55, blue: 0.2) : Color(red: 0.2, green: 0.85, blue: 0.6)
-                            
-                            VStack(spacing: 1) {
-                                if isHighSweep {
-                                    Text("SW")
-                                        .font(AppTypography.badgeMarkerSmall)
-                                        .padding(.horizontal, 3)
-                                        .padding(.vertical, 1)
-                                        .background(sweepColor)
-                                        .foregroundColor(.white)
-                                        .cornerRadius(2)
-                                    Image(systemName: "arrowtriangle.down.fill")
-                                        .font(AppTypography.badgeMarkerSmall)
-                                        .foregroundColor(sweepColor)
-                                } else {
-                                    Image(systemName: "arrowtriangle.up.fill")
-                                        .font(AppTypography.badgeMarkerSmall)
-                                        .foregroundColor(sweepColor)
-                                    Text("SW")
-                                        .font(AppTypography.badgeMarkerSmall)
-                                        .padding(.horizontal, 3)
-                                        .padding(.vertical, 1)
-                                        .background(sweepColor)
-                                        .foregroundColor(.white)
-                                        .cornerRadius(2)
-                                }
-                            }
-                            .position(x: x, y: isHighSweep ? max(10, clampedY - 12) : min(plotHeight - 10, clampedY + 12))
-                        }
-                    }
                 }
             }
         }

@@ -23,7 +23,6 @@ public struct TradeReplayView: View {
     @State private var replaySpeed: Double = 2.0
     @State private var excursionEstimate: ExcursionEstimate? = nil
     @State private var showMarketStructure: Bool = true
-    @State private var showLiquidity: Bool = true
     @State private var showRSI: Bool = true
     @State private var showLandscapeChart: Bool = false
     
@@ -149,7 +148,6 @@ public struct TradeReplayView: View {
                 replaySpeed: $replaySpeed,
                 selectedResolution: $selectedResolution,
                 showMarketStructure: $showMarketStructure,
-                showLiquidity: $showLiquidity,
                 showRSI: $showRSI,
                 bars: bars,
                 frame: frame,
@@ -208,7 +206,6 @@ public struct TradeReplayView: View {
                         currency: env.currentCurrency,
                         resolution: selectedResolution,
                         showMarketStructure: true,
-                        showLiquidity: true,
                         showRSI: true,
                         onResolutionChange: { newRes in
                             self.selectedResolution = newRes
@@ -275,7 +272,7 @@ public struct TradeReplayView: View {
             
             if !fetchedBars.isEmpty {
                 // Auto-align broker server timezone offset and trim to replay window
-                // (80 bars before open for SMC swings, liquidity pools & RSI-14 warmup, 15 bars after close)
+                // (80 bars before open for market swings, EMA & RSI-14 warmup, 15 bars after close)
                 let alignedBars = TradeReplayEngine.alignAndTrimBars(
                     bars: fetchedBars,
                     trade: trade,

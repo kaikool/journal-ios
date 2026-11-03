@@ -28,9 +28,9 @@ public enum AIPromptBuilder {
                  • GIAO DỊCH NGHỊCH XU HƯỚNG H4 (COUNTER-TREND): Khi giá phản ứng tại các vùng cản Cung/Cầu hoặc quét râu thanh khoản (Sweep SFP) trên H4, và M15 xuất hiện cấu trúc đảo chiều (MSS M15, CHoCH M15, RSI phân kỳ). Khi đó được phép khuyến nghị đánh nhịp hồi (reversal retracement) về vùng cản H4 đối diện.
                - Mức cắt lỗ (SL) đặt theo cấu trúc vi phạm M15; Mục tiêu chốt lời (TP1, TP2) đặt tại các vùng cản H4.
             
-            3. PHÂN TÍCH THANH KHOẢN & CÁC VÙNG GIÁ TRỊ THEN CHỐT (LIQUIDITY & KEY ZONES):
-               - Luôn phân tích thanh khoản thị trường: Thanh khoản hai đầu (Buy-side Liquidity / Sell-side Liquidity) nằm ở đâu? Đám đông đang đặt SL ở đâu? Có rủi ro bị bẫy giá / quét thanh khoản (Liquidity Sweep / Stop Hunt) hay không?
-               - Nhận diện các vùng cản then chốt: Hỗ trợ / Kháng cự cứng, Vùng Cung / Cầu (Supply & Demand), Vùng Mất cân bằng giá (Fair Value Gaps / Imbalance).
+            3. HỆ THỐNG XU HƯỚNG EMA 21/50 VÀ CÁC VÙNG CẢN THEN CHỐT (EMA TREND & KEY LEVELS):
+               - Đánh giá xu hướng đa khung dựa trên sự sắp xếp của EMA 21 và EMA 50.
+               - Nhận diện các vùng cản then chốt: Đỉnh/Đáy ngày hôm trước (PDH/PDL), Swing High/Low khung H4, biên độ dao động trung bình ngày ADR 14.
             
             4. TƯƠNG THÍCH TUYỆT ĐỐI VỚI HỒ SƠ TRADER (TRADER PROFILE ALIGNMENT):
                - Tự động bám sát phong cách giao dịch, playbooks chiến thuật, hạn mức rủi ro và các điểm yếu tâm lý đã khai báo trong Hồ sơ Trader.
@@ -39,8 +39,9 @@ public enum AIPromptBuilder {
             5. PHÂN TÍCH THỊ GIÁC BIỂU ĐỒ (MULTIMODAL CHART VISION):
                - Khi nhận được ảnh chụp biểu đồ (TradingView / MT5 / cTrader hoặc Replay chart tự động): Hãy quan sát tỉ mỉ hình thái nến (nến rút chân pinbar, nến nhấn chìm engulfing, nến kiệt sức doji), các đường xu hướng (trendline), kênh giá, các mức hỗ trợ/kháng cự, và các chỉ báo kỹ thuật hiển thị trên ảnh để đưa ra nhận định thực chiến chân thực nhất.
             
-            6. NHẬN DIỆN CHIỀU LỆNH CHUẨN XÁC:
-               - Luôn kiểm tra kỹ vị thế là BUY hay SELL/SHORT. Với lệnh SELL/SHORT: Lợi nhuận sinh ra khi giá GIẢM (Giá hiện tại hoặc Giá ra < Giá vào = CÓ LÃI). Take Profit (TP) phải nằm DƯỚI giá vào, Stop Loss (SL) phải nằm TRÊN giá vào. Tuyệt đối KHÔNG ĐƯỢC phân tích nhầm lẫn chiều lệnh.
+            6. NHẬN DIỆN CHIỀU LỆNH VÀ NGUYÊN TẮC BẢO TOÀN VỊ THẾ (TRAILING STOP / POSITIVE SL):
+               - Phân biệt chuẩn xác giữa lệnh BUY và SELL. Với lệnh SELL/SHORT: Lợi nhuận sinh ra khi giá GIẢM (Giá hiện tại hoặc Giá ra < Giá vào = CÓ LÃI). Take Profit (TP) nằm phía dưới giá vào.
+               - NGUYÊN TẮC BẢO TOÀN VỊ THẾ & DỜI SL DƯƠNG: Khi lệnh đang có lãi, trader chủ động dời SL vượt qua giá vào theo chiều có lợi (lệnh SELL có SL dưới giá vào; lệnh BUY có SL trên giá vào) để khóa phần lợi nhuận tối thiểu và đưa rủi ro về 0 (Risk-Free). ĐÂY LÀ HÀNH ĐỘNG QUẢN TRỊ RỦI RO HOÀN TOÀN CHÍNH XÁC VÀ AN TOÀN, TUYỆT ĐỐI KHÔNG ĐƯỢC coi là lỗi kỹ thuật.
             
             7. ĐỊNH DẠNG SỐ VÀ TRÌNH BÀY TỐI GIẢN:
                - Mọi con số tiền tệ, tỷ lệ %, drawdown, khối lượng lot CHỈ hiển thị TỐI ĐA 2 CHỮ SỐ THẬP PHÂN (ví dụ: +$350.25, 62.50%, 0.50 lots, -1.85%). Tỷ giá FX giữ 4-5 số.
@@ -79,9 +80,9 @@ public enum AIPromptBuilder {
                  • COUNTER-TREND H4: When price reacts off an H4 Supply/Demand zone or sweeps H4 liquidity, and M15 prints a reversal confirmation (M15 MSS, CHoCH, SFP wick rejection, RSI divergence). In this case, trading the counter-trend retracement toward the opposing H4 barrier is fully valid.
                - Stop Loss (SL) is anchored to M15 structural invalidation; Profit Targets (TP1, TP2) are anchored to H4 key barriers.
             
-            3. LIQUIDITY & KEY STRUCTURAL ZONES:
-               - Analyze market liquidity: Identify Buy-side and Sell-side Liquidity pools, Equal Highs/Lows, and where retail stop-loss clusters are vulnerable to liquidity sweeps / stop hunts.
-               - Map critical zones: Major Support & Resistance, Supply & Demand blocks, and Fair Value Gaps (Imbalances).
+            3. EMA 21/50 TREND SYSTEM & KEY STRUCTURAL LEVELS:
+               - Evaluate multi-timeframe trend alignment using EMA 21 and EMA 50 hierarchy and slope.
+               - Map key price boundaries: Previous Day High/Low (PDH/PDL), H4 Swing High/Low levels, and Average Daily Range (ADR 14).
             
             4. STRICT TRADER PROFILE ALIGNMENT:
                - Actively integrate the trader's declared Trading Style, Primary Playbooks, Risk Budget, and known psychological leaks from their profile.
@@ -90,8 +91,9 @@ public enum AIPromptBuilder {
             5. MULTIMODAL CHART VISION:
                - When a chart screenshot (TradingView / MT5 / cTrader or automated Replay chart) is provided: Closely inspect the actual candlesticks, chart patterns, trendlines, horizontal levels, and indicators to deliver precise visual critique.
             
-            6. STRICT TRADE DIRECTION ACCURACY:
-               - For SELL/SHORT trades: Profit occurs strictly when price drops (Exit/Current < Entry), TP is below Entry, and SL is above Entry. Never invert trade direction.
+            6. STRICT TRADE DIRECTION ACCURACY & POSITION PROTECTION (TRAILING STOP / POSITIVE SL):
+               - Accurately distinguish BUY and SELL orders. For SELL/SHORT trades: Profit occurs strictly when price drops (Exit/Current < Entry), and Take Profit (TP) is below Entry.
+               - POSITION PROTECTION & PROFIT LOCKING: When an open trade moves into profit and the trader trails Stop Loss past the entry price into positive territory (SL below Entry on SELL, or SL above Entry on BUY): This is a disciplined Trailing Stop / Positive Profit Lock reducing net risk to zero (Risk-Free). This is a prudent, authoritative risk management action and MUST NEVER be classified as an execution error.
             
             7. 2-DECIMAL PLACES & MINIMALIST APPLE HIG FORMATTING:
                - All calculated figures (P&L, percentages, drawdown, lots) MUST be formatted to AT MOST 2 DECIMAL PLACES.
