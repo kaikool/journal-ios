@@ -158,7 +158,7 @@ public struct MarketDataSettingsView: View {
                     
                     if let lastEval = alertEngine.lastEvaluatedAt {
                         HStack {
-                            Text("Last evaluated: \(JournalIds.formatTime(lastEval))")
+                            Text("Last evaluated: \(Formatters.formatTime(lastEval))")
                                 .font(AppTypography.captionMicro)
                                 .foregroundColor(AppColors.secondaryText)
                             Spacer()

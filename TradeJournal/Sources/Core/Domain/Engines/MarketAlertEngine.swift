@@ -295,7 +295,7 @@ public final class MarketAlertEngine: ObservableObject, @unchecked Sendable {
     public func evaluateAllMonitoredSymbols() async -> [MarketAlertRecord] {
         let symbols = monitoredSymbols
         let timeframes = monitoredTimeframes
-        let config = TradeDataStore.shared.marketConnections
+        let config = await MainActor.run { TradeDataStore.shared.marketConnections }
         
         var allFired: [MarketAlertRecord] = []
         
