@@ -183,6 +183,9 @@ extension AIPromptBuilder {
         
         let mult = trade.contractMultiplier ?? Decimal(1)
         let entry = trade.avgEntry
+        func formatPrice(_ p: Decimal) -> String {
+            Formatters.price(p, symbol: trade.symbol)
+        }
         let isShort = trade.direction == .short
         let directionStrVi = isShort ? "SELL / SHORT (BÁN KHỐNG - Kỳ vọng giá GIẢM)" : "BUY / LONG (MUA - Kỳ vọng giá TĂNG)"
         let directionStrEn = isShort ? "SELL / SHORT (Short position - Expects price to FALL)" : "BUY / LONG (Long position - Expects price to RISE)"
