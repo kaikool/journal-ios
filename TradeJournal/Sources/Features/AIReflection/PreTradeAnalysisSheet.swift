@@ -509,7 +509,8 @@ public struct PreTradeAnalysisSheet: View {
         
         // Only encode image if user explicitly attached a photo
         let singleChartBase64 = userAttachedImage?.jpegData(compressionQuality: 0.85)?.base64EncodedString()
-        let prevAnalysis = analysisResult.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : analysisResult
+        // Always run a fresh clean-slate analysis on latest market bars without anchoring to stale cached text
+        let prevAnalysis: String? = nil
         
         do {
             let response = try await AIReflectionService.shared.requestPreTradeMarketAnalysis(

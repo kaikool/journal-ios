@@ -387,8 +387,8 @@ extension AIPromptBuilder {
             \(directionInfoVi)
 
             [DIỄN BIẾN CHUỖI 15 NẾN H1 GẦN NHẤT (OHLC + EMA 21/50 + WILDER RSI 14)]:
-            \(h1SeriesStr)
-            • Hướng dẫn phân tích: Dựa vào diễn biến chuỗi nến H1 ở trên để phân tích Price Action (rút râu, từ chối giá, cấu trúc nến, phân kỳ động lượng).
+            \(h1SeriesStr)\(momentumBlock)
+            • Hướng dẫn phân tích: Dựa vào diễn biến chuỗi nến H1 và bảng động lượng 3 đường RSI (14, EMA 9, WMA 45) ở trên để phân tích Price Action (rút râu, từ chối giá, cấu trúc nến, phân kỳ động lượng).
 
             NHIỆM VỤ CỦA RISK AI (CỐ VẤN QUẢN TRỊ RỦI RO ĐỘC LẬP):
             Phân tích sắc bén, khách quan, trực diện theo đúng 4 mục (không lặp lại thông tin hồ sơ tài khoản) và kết thúc bằng bảng chỉ đạo hành động [LIVE POSITION DIRECTIVE]:
@@ -443,8 +443,8 @@ extension AIPromptBuilder {
             \(directionInfoEn)
 
             [RECENT 15-CANDLE H1 EXECUTION SERIES (OHLC + EMA 21/50 + WILDER RSI 14)]:
-            \(h1SeriesStr)
-            • Analysis Directive: Analyze Price Action based on the 15-candle H1 series above (wicks, rejections, candle structure, momentum divergence).
+            \(h1SeriesStr)\(momentumBlock)
+            • Analysis Directive: Analyze Price Action and the 3-line RSI momentum system (14, EMA 9, WMA 45) above (wicks, rejections, candle structure, momentum divergence).
 
             TASK: INDEPENDENT RISK ADVISORY AUDIT:
             Provide a razor-sharp, objective, institutional critique across the 4 sections below, concluding with the [LIVE POSITION DIRECTIVE] block:

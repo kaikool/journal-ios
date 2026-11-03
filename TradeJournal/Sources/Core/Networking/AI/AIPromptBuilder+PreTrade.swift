@@ -103,6 +103,7 @@ extension AIPromptBuilder {
         let d1EMAStr = formatEMALevels(emaAnalysis.d1, tfName: "D1")
         let h4EMAStr = formatEMALevels(emaAnalysis.h4, tfName: "H4")
         let h1EMAStr = formatEMALevels(emaAnalysis.h1, tfName: "H1")
+        let m15EMAStr = formatEMALevels(emaAnalysis.m15, tfName: "M15")
         
         // Key H4 Swing High & Swing Low Levels (Direct Structural Scanning)
         let h4SwingHighStr: String = {
@@ -130,39 +131,17 @@ extension AIPromptBuilder {
         // 3d. Live Unclosed Candle Dynamics (Current Price Action Pulse)
         let liveCandlePulse = buildLiveUnclosedCandlePulse(bar: execBars.last ?? m15Bars.last, isVi: isVi)
         
-        // 4. H1 Momentum & RSI Metrics
-        let momentumWindow = MomentumEngine.computeWindow(bars: execBars, windowSize: 10)
+        // 4. H1 Momentum & 3-Line RSI System (Wilder RSI 14 / EMA 9 / WMA 45)
+        let momentumWindow = MomentumEngine.computeWindow(bars: execBars, windowSize: 15)
         let rsiVal = momentumWindow.currentRSI.map { ($0 as NSDecimalNumber).doubleValue }
-        let rsiStr: String = {
-            guard let val = rsiVal else { return "N/A" }
-            let zone: String
-            if isVi {
-                if val >= 70 { zone = "Quá Mua (>70)" }
-                else if val <= 30 { zone = "Quá Bán (<30)" }
-                else if val >= 50 { zone = "Thiên Tăng / Phe Mua kiểm soát (50-70)" }
-                else { zone = "Thiên Giảm / Phe Bán kiểm soát (30-50)" }
-            } else {
-                if val >= 70 { zone = "Overbought (>70)" }
-                else if val <= 30 { zone = "Oversold (<30)" }
-                else if val >= 50 { zone = "Bullish Control (50-70)" }
-                else { zone = "Bearish Control (30-50)" }
-            }
-            return String(format: "%.1f (%@)", val, zone)
-        }()
+        let emaVal = momentumWindow.currentEMA9.map { ($0 as NSDecimalNumber).doubleValue }
+        let wmaVal = momentumWindow.currentWMA45.map { ($0 as NSDecimalNumber).doubleValue }
         
-        let rsiSignalStr: String = {
-            guard let rsi = rsiVal, let ema = momentumWindow.currentEMA9.map({ ($0 as NSDecimalNumber).doubleValue }) else {
-                return "N/A"
-            }
-            let status: String
-            if isVi {
-                status = rsi >= ema ? "RSI trên Signal (Động lượng Mua)" : "RSI dưới Signal (Động lượng Bán)"
-            } else {
-                status = rsi >= ema ? "RSI above Signal (Bullish)" : "RSI below Signal (Bearish)"
-            }
-            return String(format: "%.1f [%@]", ema, status)
-        }()
-        
+        let rValStr = rsiVal.map { String(format: "%.1f", $0) } ?? "N/A"
+        let eValStr = emaVal.map { String(format: "%.1f", $0) } ?? "N/A"
+        let wValStr = wmaVal.map { String(format: "%.1f", $0) } ?? "N/A"
+        let alignmentDesc = isVi ? momentumWindow.alignmentVi : momentumWindow.alignmentEn
+        let emaVsWmaDesc = isVi ? momentumWindow.emaVsWmaVi : momentumWindow.emaVsWmaEn
         let divStr = isVi ? (momentumWindow.divergenceVi ?? "Không có phân kỳ") : (momentumWindow.divergenceEn ?? "None")
         
         // 5. Macro News Catalyst
@@ -350,8 +329,15 @@ extension AIPromptBuilder {
 
             - Khung H1 (Thực thi và Động lượng): Xu hướng [\(emaAnalysis.h1?.trend.label ?? "N/A")]
               EMA H1: \(h1EMAStr)
-              RSI(14) Wilder: Mức hiện tại: \(rsiStr) | Signal: \(rsiSignalStr) | Phân kỳ: [\(divStr)]
+              Hệ thống 3 đường Động lượng RSI (Wilder RSI 14 / EMA 9 / WMA 45):
+                • Giá trị: RSI(14) = \(rValStr) | EMA(9) = \(eValStr) | WMA(45) = \(wValStr)
+                • Cấu trúc sắp xếp: \(alignmentDesc)
+                • Nền trung hạn (EMA 9 vs WMA 45): \(emaVsWmaDesc)
+                • Tín hiệu phân kỳ: [\(divStr)]
               Mốc tham chiếu then chốt: Đỉnh Swing H4: \(h4SwingHighStr) | Đáy Swing H4: \(h4SwingLowStr) | PDH: \(d1PDH) | PDL: \(d1PDL)
+
+            - Khung M15 (Vi mô kích hoạt): Xu hướng [\(emaAnalysis.m15?.trend.label ?? "N/A")]
+              EMA M15: \(m15EMAStr)
 
             - HÀNH ĐỘNG GIÁ SỐNG (LIVE CANDLE PULSE):
             \(liveCandlePulse)
@@ -373,7 +359,14 @@ extension AIPromptBuilder {
             2. ĐỊNH HƯỚNG THEO HỆ THỐNG XU HƯỚNG EMA 21 & EMA 50:
                - KỊCH BẢN BUY: Khi D1/H4 xu hướng TĂNG (EMA 21 >= EMA 50, giá trên EMA) và H1/M15 hồi về kiểm tra EMA 21/50 hoặc nến từ chối giảm: Chủ động lập kế hoạch BUY với Entry tại vùng EMA, SL dưới đáy gần nhất / dưới EMA, TP tại Swing High (\(h4SwingHighStr)) hoặc PDH (\(d1PDH)).
                - KỊCH BẢN SELL: Khi D1/H4 xu hướng GIẢM (EMA 21 <= EMA 50, giá dưới EMA) và H1/M15 hồi lên kiểm tra EMA 21/50 hoặc nến từ chối tăng: Chủ động lập kế hoạch SELL với Entry tại vùng EMA, SL trên đỉnh gần nhất / trên EMA, TP tại Swing Low (\(h4SwingLowStr)) hoặc PDL (\(d1PDL)).
-            3. QUY ĐỊNH VỀ KẾT LUẬN FLAT (ĐỨNG NGOÀI):
+            3. NGUYÊN TẮC HỆ THỐNG 3 ĐƯỜNG ĐỘNG LƯỢNG RSI (RSI 14 / EMA 9 / WMA 45):
+               - TĂNG ÁP ĐẢO (BULLISH ALIGNMENT): Khi RSI > EMA 9 > WMA 45 -> Động lượng phe mua thống trị. Canh BUY khi giá hồi về EMA 21/50 hoặc RSI retest EMA 9 / WMA 45 bật tăng.
+               - GIẢM ÁP ĐẢO (BEARISH ALIGNMENT): Khi RSI < EMA 9 < WMA 45 -> Động lượng phe bán áp đảo. Canh SELL khi giá hồi lên EMA 21/50 hoặc RSI retest EMA 9 / WMA 45 quay đầu giảm.
+               - SÓNG HỒI KỸ THUẬT (COUNTER-TREND):
+                 • Nếu RSI > EMA 9 nhưng DƯỚI WMA 45: Nhịp hồi tăng ngắn hạn trong xu hướng giảm lớn (WMA 45 là cản động lượng). Không mua đuổi, canh SELL tại cản EMA đường giá.
+                 • Nếu RSI < EMA 9 nhưng TRÊN WMA 45: Nhịp điều chỉnh giảm lành mạnh trong xu hướng tăng lớn (WMA 45 là hỗ trợ động lượng). Canh BUY khi RSI cắt ngược lên EMA 9.
+               - CO THẮT NÉN ĐỘNG LƯỢNG (SQUEEZE): Khi EMA 9 và WMA 45 hội tụ sát nhau (chênh lệch < 1.0 điểm) -> Động lượng nén chặt chuẩn bị bùng nổ sóng mới.
+            4. QUY ĐỊNH VỀ KẾT LUẬN FLAT (ĐỨNG NGOÀI):
                - CHỈ ĐƯỢC KẾT LUẬN FLAT trong trường hợp duy nhất: Thị trường hoàn toàn không có biên độ biến động (thị trường ngày lễ hoặc biên độ cả ngày nhỏ hơn 15% ADR) hoặc sắp công bố tin tức cực kỳ nguy hiểm trong vòng 15 phút.
                - Trong mọi điều kiện thị trường có sóng bình thường: BẮT BUỘC ĐƯA RA HƯỚNG LỆNH CỤ THỂ (BUY hoặc SELL), kể cả lệnh chờ đón Limit tại vùng EMA!
 
@@ -390,18 +383,20 @@ extension AIPromptBuilder {
 
             ### 3. Tín hiệu vào lệnh H1/M15
             - Hành động giá nến H1/M15: Nến từ chối tại EMA 21/50, nến nhấn chìm, hoặc lực đẩy phá vỡ.
-            - Trạng thái RSI(14): Động lượng mua/bán, phân kỳ và tín hiệu cắt Signal.
+            - Động lượng 3 đường RSI (14, EMA 9, WMA 45): Đang ở trạng thái Tăng áp đảo, Giảm áp đảo, Sóng hồi kỹ thuật, hay Squeeze co thắt; có phân kỳ đảo chiều không.
             - Xác định thời điểm và vùng kích hoạt lệnh tối ưu.
 
-            ### 4. Kế hoạch giao dịch & Quản lý vốn
-            - KẾT LUẬN: [BUY (LONG) hoặc SELL (SHORT)] (Chỉ chọn FLAT nếu thị trường chết thanh khoản < 15% ADR).
-            - THIẾT LẬP LỆNH CHI TIẾT:
-              - Hướng lệnh: [BUY hoặc SELL]
-              - Điểm vào tối ưu (Entry): Mức giá cụ thể (vào ngay hoặc Limit tại vùng kiểm tra EMA 21/50).
-              - Cắt lỗ (Stop Loss): Mức giá SL cụ thể bảo vệ cấu trúc dưới/trên EMA.
-              - Chốt lời (Take Profit): TP 1 tại [Mức giá] | TP 2 tại [Mức giá]
-              - Khối lượng (Volume): Tính chính xác số lot theo mức rủi ro \(numericRisk)% và số tiền rủi ro \(targetRiskDollarsStr).
-              - Tỷ lệ R:R thực tế đạt được: Bắt buộc tính toán chính xác theo công thức (|TP1 - Entry| / |Entry - SL|), mục tiêu tối thiểu đạt 1:\(String(format: "%.1f", targetRR)) theo hồ sơ Trader Profile.
+            ### 4. Kế hoạch giao dịch & Quản trị rủi ro
+            - Hướng lệnh: [BUY hoặc SELL] (Chỉ chọn FLAT nếu thị trường chết thanh khoản < 15% ADR)
+            - Điểm vào tối ưu (Entry): [Mức giá cụ thể]
+            - Dừng lỗ (Stop Loss): [Mức giá cụ thể]
+            - Chốt lời (Take Profit): TP 1 tại [Mức giá] | TP 2 tại [Mức giá nếu có]
+            - Khối lượng (Volume): [Khối lượng lot cụ thể, ví dụ: 0.50 lot]
+            - Tỷ lệ R:R: [1:\(String(format: "%.1f", targetRR))]
+            - Quản lý lệnh: [1-2 câu ngắn gọn về dời SL bảo vệ vị thế khi nến xác nhận]
+
+            QUY TẮC BẮT BUỘC KHI TRÌNH BÀY PHẦN 4 (NGHIÊM NGẶT):
+            Chỉ xuất các mốc giá và thông số rõ ràng, dứt khoát, chuẩn phong cách quỹ tài chính. TUYỆT ĐỐI KHÔNG viết kèm các câu giải thích rườm rà trong ngoặc đơn như "(tính toán chính xác dựa trên...)", "(bảo vệ phía trên...)", "(theo công thức...)". Mọi phân tích giải thích đã có ở mục 1, 2, 3; phần 4 là bảng lệnh thực thi trực tiếp, đơn giản và sạch sẽ.
 
             BẮT BUỘC KẾT THÚC BẰNG BẢNG THÔNG SỐ SETUP ĐÚNG ĐỊNH DẠNG SAU:
             [PRE-TRADE SETUP SPECIFICATION]
@@ -453,8 +448,15 @@ extension AIPromptBuilder {
 
             - H1 Execution & Momentum: Trend [\(emaAnalysis.h1?.trend.label ?? "N/A")]
               EMA H1: \(h1EMAStr)
-              Wilder RSI(14): Current: \(rsiStr) | Signal: \(rsiSignalStr) | Divergence: [\(divStr)]
+              3-Line RSI Momentum System (Wilder RSI 14 / EMA 9 / WMA 45):
+                • Values: RSI(14) = \(rValStr) | EMA(9) = \(eValStr) | WMA(45) = \(wValStr)
+                • Alignment: \(alignmentDesc)
+                • Baseline (EMA 9 vs WMA 45): \(emaVsWmaDesc)
+                • Divergence: [\(divStr)]
               Key Reference Levels: H4 Swing High: \(h4SwingHighStr) | H4 Swing Low: \(h4SwingLowStr) | PDH: \(d1PDH) | PDL: \(d1PDL)
+
+            - M15 Micro Execution & Trigger: Trend [\(emaAnalysis.m15?.trend.label ?? "N/A")]
+              EMA M15: \(m15EMAStr)
 
             - LIVE CANDLE PULSE:
             \(liveCandlePulse)
@@ -476,7 +478,12 @@ extension AIPromptBuilder {
             2. MULTI-TIMEFRAME EMA TREND ALIGNMENT:
                - BUY BIAS: When D1/H4 trend is BULLISH (EMA 21 >= EMA 50, price above EMAs) and H1/M15 pulls back to test EMA 21/50 or prints bullish rejection: Formulate an actionable BUY setup with Entry at EMA, SL below recent structural support, and TP at Swing High (\(h4SwingHighStr)) or PDH (\(d1PDH)).
                - SELL BIAS: When D1/H4 trend is BEARISH (EMA 21 <= EMA 50, price below EMAs) and H1/M15 rallies to test EMA 21/50 or prints bearish rejection: Formulate an actionable SELL setup with Entry at EMA, SL above recent structural resistance, and TP at Swing Low (\(h4SwingLowStr)) or PDL (\(d1PDL)).
-            3. STRICT RULES ON "FLAT":
+            3. 3-LINE RSI MOMENTUM SYSTEM (WILDER RSI 14 / EMA 9 / WMA 45):
+               - STRONG BULLISH: RSI > EMA 9 > WMA 45 -> Buyers dominate. Buy on pullbacks to EMA 21/50 or when RSI bounces off EMA 9 / WMA 45.
+               - STRONG BEARISH: RSI < EMA 9 < WMA 45 -> Sellers dominate. Sell on rallies to EMA 21/50 or when RSI retests EMA 9 / WMA 45 down.
+               - COUNTER-TREND REBOUND: RSI above EMA 9 but below WMA 45 -> Short-term counter-trend retracement in macro downtrend. Do not chase; sell near EMA value.
+               - SQUEEZE: EMA 9 & WMA 45 converging (gap < 1.0 pt) -> Momentum compression preceding major expansion.
+            4. STRICT RULES ON "FLAT":
                - FLAT is ONLY permitted if the market is completely dead (< 15% of ADR) or major high-impact news is due within 15 minutes. In all normal trending/oscillating conditions, an actionable BUY or SELL plan (including Limit orders at EMA value) is MANDATORY.
 
             TASK: INSTITUTIONAL PRE-TRADE PLAN (4 SECTIONS):
@@ -489,17 +496,19 @@ extension AIPromptBuilder {
             - Identify pullback value zones around EMA 21 and 50 and key trend targets.
 
             ### 3. H1/M15 Confirmation & Trigger
-            - Read live candle pulse, rejection wicks at EMA 21/50, and RSI momentum.
+            - Read live candle pulse, rejection wicks at EMA 21/50, and 3-line RSI momentum state (RSI 14 / EMA 9 / WMA 45).
 
             ### 4. Trade Plan & Risk Management
-            - Decisive Verdict: [BUY or SELL] (Only FLAT if dead volatility < 15% ADR).
-            - Target R:R Ratio: Benchmark goal configured in trader profile is 1:\(String(format: "%.1f", targetRR)).
-            - ACTIONABLE TRADE SPECIFICATION:
-              - Precise Entry price (market or pending limit at EMA).
-              - Structural Invalidation SL.
-              - Take Profit Targets (TP1 & TP2).
-              - Calculated lot volume based on \(numericRisk)% risk (\(targetRiskDollarsStr)).
-              - Expected R:R ratio.
+            - Verdict: [BUY or SELL] (Only FLAT if dead volatility < 15% ADR)
+            - Entry: [Precise price]
+            - Stop Loss: [Precise SL price]
+            - Take Profit: TP 1 at [Price] | TP 2 at [Price if any]
+            - Volume: [Lot size, e.g. 0.50 lot]
+            - R:R Ratio: [1:\(String(format: "%.1f", targetRR))]
+            - Trade Management: [1-2 concise sentences on trailing SL]
+
+            STRICT FORMATTING RULE FOR SECTION 4:
+            State clear, exact numbers and directives. STRICTLY PROHIBIT verbose parenthetical justifications like "(calculated based on...)", "(protecting above...)", or "(according to profile...)". Keep it clean, direct, and institutional.
 
             [PRE-TRADE SETUP SPECIFICATION]
             - Direction: [BUY or SELL or FLAT]
@@ -662,6 +671,9 @@ extension AIPromptBuilder {
     ) -> String {
         guard !bars.isEmpty else { return isVi ? "Không có dữ liệu nến M15" : "No M15 candle data" }
         
+        let ema21 = MovingAverageEngine.calculateEMA(period: 21, bars: bars)
+        let ema50 = MovingAverageEngine.calculateEMA(period: 50, bars: bars)
+        
         let n = bars.count
         let takeCount = min(count, n)
         let startIndex = n - takeCount
@@ -679,9 +691,11 @@ extension AIPromptBuilder {
             let bar = bars[i]
             let offset = n - 1 - i
             let timeLabel = offset == 0 ? (isVi ? "[Nến sống]" : "[Live]") : "[-t-\(offset * 15)m]"
+            let e21Str = i < ema21.count ? fmt(ema21[i]) : "N/A"
+            let e50Str = i < ema50.count ? fmt(ema50[i]) : "N/A"
             let num = lines.count + 1
             let numStr = num < 10 ? "0\(num)" : "\(num)"
-            let line = "  - #\(numStr) \(timeLabel): O: \(fmt(bar.open)) | H: \(fmt(bar.high)) | L: \(fmt(bar.low)) | C: \(fmt(bar.close))"
+            let line = "  - #\(numStr) \(timeLabel): O: \(fmt(bar.open)) | H: \(fmt(bar.high)) | L: \(fmt(bar.low)) | C: \(fmt(bar.close)) | EMA21: \(e21Str) | EMA50: \(e50Str)"
             lines.append(line)
         }
         return lines.joined(separator: "\n")
@@ -690,10 +704,10 @@ extension AIPromptBuilder {
     // MARK: - Multi-Model Ensemble Distillation & Synthesis Prompt (RISK AI)
     public static func distillAnalysis(_ raw: String) -> String {
         let clean = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        if clean.count <= 1800 {
+        if clean.count <= 6000 {
             return clean
         }
-        return String(clean.prefix(1800)) + "\n[...cắt ngắn để tối ưu ngữ cảnh...]"
+        return String(clean.prefix(6000)) + "\n[...cắt ngắn để tối ưu ngữ cảnh...]"
     }
     
     public static func buildEnsembleSynthesisPrompt(
@@ -704,7 +718,8 @@ extension AIPromptBuilder {
         riskPercent: Decimal,
         targetRR: Double,
         analyses: [String],
-        isVi: Bool = true
+        isVi: Bool = true,
+        technicalGroundTruth: String? = nil
     ) -> String {
         var analysesBlock = ""
         for (idx, a) in analyses.enumerated() {
@@ -718,6 +733,19 @@ extension AIPromptBuilder {
         }
         
         let targetRRStr = String(format: "%.1f", targetRR)
+        let groundTruthSection = technicalGroundTruth.map { gt in
+            isVi ? """
+            [BẢNG THAM CHIẾU KỸ THUẬT CHUẨN XÁC TỪ SÀN (GROUND TRUTH)]:
+            \(gt)
+            QUY TẮC BẮT BUỘC VỀ DỮ LIỆU KỸ THUẬT:
+            Mọi mốc giá Entry, Stop Loss, Take Profit và đặc biệt là mốc EMA 21, EMA 50, và trạng thái 3 đường RSI (RSI 14 / EMA 9 / WMA 45) BẮT BUỘC PHẢI KHỚP CHÍNH XÁC với BẢNG THAM CHIẾU KỸ THUẬT ở trên. TUYỆT ĐỐI KHÔNG tự bịa ra hoặc làm tròn sai lệch mốc EMA 21/50.
+            """ : """
+            [AUTHORITATIVE TECHNICAL GROUND TRUTH (BROKER FEED)]:
+            \(gt)
+            MANDATORY TECHNICAL DATA ACCURACY:
+            All price levels for Entry, Stop Loss, Take Profit, and specifically EMA 21, EMA 50, and 3-line RSI (RSI 14 / EMA 9 / WMA 45) MUST EXACTLY MATCH THE GROUND TRUTH TABLE ABOVE. Never hallucinate or alter moving average values.
+            """
+        } ?? ""
         
         if isVi {
             return """
@@ -727,7 +755,7 @@ extension AIPromptBuilder {
             - Cặp tiền: \(symbol) | Thị giá hiện tại: \(currentPrice)
             - Số dư tài khoản: \(balance) | Ngân sách rủi ro tối đa: \(riskDollars) (\(riskPercent)% vốn)
             - Mục tiêu tỷ lệ Risk/Reward tham chiếu: 1:\(targetRRStr)
-
+            \(groundTruthSection)
             Dưới đây là \(analyses.count) bản phân tích kỹ thuật độc lập được lập từ cùng một tập dữ liệu nến (D1, H4, H1, M15), tin tức kinh tế và quy tắc tài khoản cho cặp \(symbol):
 
             \(analysesBlock)==================================================
@@ -747,9 +775,10 @@ extension AIPromptBuilder {
             - VÙNG GIÁ QUAN TÂM: Là các mốc giá kiểm tra EMA 21/50 hoặc Swing High/Low có sự đồng thuận cao nhất để thiết lập điểm vào (Entry).
             - CẢN QUAN TRỌNG: Mốc đỉnh/đáy đối diện dùng làm mục tiêu Chốt Lời (TP 1 / TP 2) để bảo vệ lợi nhuận.
 
-            3. PHÂN XỬ TÍN HIỆU H1/M15 & ĐỘNG LƯỢNG:
-            - Nếu tín hiệu H1/M15 đã có nến xác nhận hoặc chạm vùng EMA: Cho phép vào lệnh Market.
-            - Nếu giá đang lưng chừng hoặc có ý kiến cho rằng cần điểm vào đẹp hơn: Thiết lập lệnh CHỜ (Limit Order) tại vùng kiểm tra EMA 21/50 thay vì đứng ngoài!
+            3. PHÂN XỬ TÍN HIỆU H1/M15 & HỆ THỐNG 3 ĐƯỜNG RSI:
+            - Kết hợp hành động giá nến với hệ thống 3 đường RSI (RSI 14 / EMA 9 / WMA 45).
+            - Nếu tín hiệu H1/M15 đã có nến xác nhận hoặc chạm vùng EMA và RSI ủng hộ: Cho phép vào lệnh Market.
+            - Nếu giá đang lưng chừng hoặc cần điểm vào đẹp hơn: Thiết lập lệnh CHỜ (Limit Order) tại vùng kiểm tra EMA 21/50 thay vì đứng ngoài!
 
             4. PHÂN XỬ KẾ HOẠCH GIAO DỊCH & QUẢN TRỊ RỦI RO (QUYẾT ĐOÁN):
             - Điểm Dừng Lỗ (Stop Loss): BẮT BUỘC CHỌN MỐC SL AN TOÀN VÀ KỶ LUẬT NHẤT.
@@ -770,18 +799,19 @@ extension AIPromptBuilder {
             - Mốc chốt chặn rủi ro: [Chỉ rõ mốc giá vi phạm cấu trúc để đặt Stop Loss]
 
             ### 3. Tín hiệu vào lệnh H1/M15
-            (Đánh giá hành động giá nến H1/M15, phản ứng tại EMA, và động lượng RSI 14).
+            (Đánh giá hành động giá nến H1/M15, phản ứng tại EMA, và hệ thống 3 đường RSI 14 / EMA 9 / WMA 45).
 
             ### 4. Kế hoạch giao dịch & Quản trị rủi ro
-            - KẾT LUẬN: [BUY hoặc SELL] (Chỉ chọn FLAT nếu thị trường chết thanh khoản)
-            - Kế hoạch cụ thể:
-              + Điểm vào tối ưu (Entry): [Mức giá cụ thể vào ngay hoặc Limit tại vùng EMA]
-              + Dừng lỗ bảo vệ cấu trúc (Stop Loss): [Mức SL an toàn nhất]
-              + Chốt lời (Take Profit): TP 1 tại [Mức giá] | TP 2 tại [Mức giá nếu có]
-              + Khối lượng khuyến nghị (Volume): [Số lot chính xác tính theo ngân sách rủi ro \(riskDollars)]
-              + Tỷ lệ R:R thực tế: Bắt buộc tối thiểu 1:\(targetRRStr) (Theo cấu hình Trader Profile)
-            - Mức độ đồng thuận & Khuyến nghị quản trị: [Chỉ rõ các góc nhìn đồng thuận ở đâu, lưu ý kiểm soát rủi ro].
-            - Lưu ý thực thi: [Khuyến nghị kỷ luật thực chiến và quản lý lệnh].
+            - Hướng lệnh: [BUY hoặc SELL] (Chỉ chọn FLAT nếu thị trường chết thanh khoản)
+            - Điểm vào tối ưu (Entry): [Mức giá cụ thể]
+            - Dừng lỗ (Stop Loss): [Mức giá cụ thể]
+            - Chốt lời (Take Profit): TP 1 tại [Mức giá] | TP 2 tại [Mức giá nếu có]
+            - Khối lượng (Volume): [Khối lượng lot cụ thể, ví dụ: 0.50 lot]
+            - Tỷ lệ R:R: [1:\(targetRRStr)]
+            - Quản lý lệnh: [1-2 câu ngắn gọn về dời SL bảo vệ vị thế khi nến xác nhận]
+
+            QUY TẮC BẮT BUỘC CHO PHẦN 4:
+            Chỉ xuất thông số rõ ràng, dứt khoát, chuẩn phong cách quỹ tài chính. TUYỆT ĐỐI KHÔNG viết kèm các giải thích rườm rà trong ngoặc đơn như "(tính toán chính xác dựa trên...)", "(bảo vệ phía trên...)", "(theo hồ sơ...)".
 
             BẮT BUỘC KẾT THÚC BẰNG BẢNG THÔNG SỐ VÀ KHỐI JSON:
             [PRE-TRADE SETUP SPECIFICATION]
@@ -817,7 +847,7 @@ extension AIPromptBuilder {
             - Symbol: \(symbol) | Current Price: \(currentPrice)
             - Account Balance: \(balance) | Max Risk Budget: \(riskDollars) (\(riskPercent)%)
             - Target Risk/Reward Ratio Benchmark: 1:\(targetRRStr)
-
+            \(groundTruthSection)
             Below are \(analyses.count) independent technical evaluations generated from identical multi-timeframe candles (D1, H4, H1, M15), economic news, and account risk guardrails for \(symbol):
 
             \(analysesBlock)==================================================
@@ -836,12 +866,13 @@ extension AIPromptBuilder {
             - KEY AREAS OF INTEREST: Highest-consensus EMA 21/50 test levels and structural swing points.
             - OPPOSING BARRIERS: Treat opposing swing highs/lows as Take Profit targets.
 
-            3. H1/M15 CONFIRMATION RESOLUTION:
+            3. H1/M15 CONFIRMATION & 3-LINE RSI RESOLUTION:
+            - Evaluate live candle price action against 3-line RSI momentum state (RSI 14 / EMA 9 / WMA 45).
             - If price has reached the EMA value zone with rejection: Permit Market entry.
             - If price is extended: Mandate condition-based pending Limit orders at the EMA pullback level rather than standing aside!
 
             4. TRADE PLAN & STOP LOSS RESOLUTION (MANDATE DECISIVE ACTION):
-            - STOP LOSS PLACEMENT: Select the safest, most discipline structural stop loss.
+            - STOP LOSS PLACEMENT: Select the safest, most disciplined structural stop loss.
             - MANDATE ACTIONABLE SETUP (BUY OR SELL):
               + NEVER default to FLAT merely because price is between Swing High and Swing Low.
               + If dissenting views express risk caution: Still maintain directional bias with reduced volume (50%) and pending limit entry at EMA support/resistance.
@@ -854,10 +885,18 @@ extension AIPromptBuilder {
             - Key Areas of Interest: [Specific price levels]
             - Structural Invalidation Level: [Specific price level]
             ### 3. H1/M15 Entry Confirmations
+            (Read live candle pulse, reaction at EMA, and 3-line RSI momentum).
             ### 4. Trade Plan & Risk Management
-            - VERDICT: [BUY or SELL] (Only FLAT if dead volatility)
-            - Entry, Stop Loss, Take Profit 1 & 2, Recommended Volume, R:R
-            - Execution Guidelines & Discipline
+            - Verdict: [BUY or SELL] (Only FLAT if dead volatility < 15% ADR)
+            - Entry: [Precise price]
+            - Stop Loss: [Precise SL price]
+            - Take Profit: TP 1 at [Price] | TP 2 at [Price if any]
+            - Volume: [Lot size, e.g. 0.50 lot]
+            - R:R Ratio: [1:\(targetRRStr)]
+            - Trade Management: [1-2 concise sentences on trailing SL]
+
+            STRICT FORMATTING RULE FOR SECTION 4:
+            State clear, exact numbers and directives. STRICTLY PROHIBIT verbose parenthetical justifications like "(calculated based on...)", "(protecting above...)", or "(according to profile...)". Keep it clean, direct, and institutional.
 
             CONCLUDE WITH [PRE-TRADE SETUP SPECIFICATION] AND JSON BLOCK.
             """

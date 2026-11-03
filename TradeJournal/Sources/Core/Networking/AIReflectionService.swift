@@ -809,6 +809,48 @@ public actor AIReflectionService {
                 }()
                 let targetRiskDollarsStr = String(format: "$%.2f", (targetRiskDollars as NSDecimalNumber).doubleValue)
                 
+                let emaMulti = MovingAverageEngine.analyzeMultiTimeframe(
+                    barsD1: d1Bars,
+                    barsH4: h4Bars,
+                    barsH1: h1Bars,
+                    barsM15: m15Bars,
+                    symbol: symbol
+                )
+                
+                func fmtP(_ p: Decimal?) -> String {
+                    guard let p = p else { return "N/A" }
+                    return Formatters.price(p, symbol: symbol)
+                }
+                
+                let execBars = !h1Bars.isEmpty ? h1Bars : m15Bars
+                let momWin = MomentumEngine.computeWindow(bars: execBars, windowSize: 15)
+                let rVal = momWin.currentRSI.map { String(format: "%.1f", ($0 as NSDecimalNumber).doubleValue) } ?? "N/A"
+                let eVal = momWin.currentEMA9.map { String(format: "%.1f", ($0 as NSDecimalNumber).doubleValue) } ?? "N/A"
+                let wVal = momWin.currentWMA45.map { String(format: "%.1f", ($0 as NSDecimalNumber).doubleValue) } ?? "N/A"
+                let alignStr = isVi ? momWin.alignmentVi : momWin.alignmentEn
+                let emaWmaStr = isVi ? momWin.emaVsWmaVi : momWin.emaVsWmaEn
+                let divStr = isVi ? (momWin.divergenceVi ?? "Không có phân kỳ") : (momWin.divergenceEn ?? "None")
+                
+                let technicalGroundTruth = isVi ? """
+                • D1:  EMA 21 = \(fmtP(emaMulti.d1?.ema21)) | EMA 50 = \(fmtP(emaMulti.d1?.ema50)) | Xu hướng: \(emaMulti.d1?.trend.label ?? "N/A")
+                • H4:  EMA 21 = \(fmtP(emaMulti.h4?.ema21)) | EMA 50 = \(fmtP(emaMulti.h4?.ema50)) | Xu hướng: \(emaMulti.h4?.trend.label ?? "N/A")
+                • H1:  EMA 21 = \(fmtP(emaMulti.h1?.ema21)) | EMA 50 = \(fmtP(emaMulti.h1?.ema50)) | Xu hướng: \(emaMulti.h1?.trend.label ?? "N/A")
+                • M15: EMA 21 = \(fmtP(emaMulti.m15?.ema21)) | EMA 50 = \(fmtP(emaMulti.m15?.ema50)) | Xu hướng: \(emaMulti.m15?.trend.label ?? "N/A")
+                • Động lượng 3 đường RSI H1: RSI(14) = \(rVal) | EMA(9) = \(eVal) | WMA(45) = \(wVal)
+                • Trạng thái 3 đường RSI: \(alignStr)
+                • Nền động lượng (EMA 9 vs WMA 45): \(emaWmaStr)
+                • Phân kỳ RSI: \(divStr)
+                """ : """
+                • D1:  EMA 21 = \(fmtP(emaMulti.d1?.ema21)) | EMA 50 = \(fmtP(emaMulti.d1?.ema50)) | Trend: \(emaMulti.d1?.trend.label ?? "N/A")
+                • H4:  EMA 21 = \(fmtP(emaMulti.h4?.ema21)) | EMA 50 = \(fmtP(emaMulti.h4?.ema50)) | Trend: \(emaMulti.h4?.trend.label ?? "N/A")
+                • H1:  EMA 21 = \(fmtP(emaMulti.h1?.ema21)) | EMA 50 = \(fmtP(emaMulti.h1?.ema50)) | Trend: \(emaMulti.h1?.trend.label ?? "N/A")
+                • M15: EMA 21 = \(fmtP(emaMulti.m15?.ema21)) | EMA 50 = \(fmtP(emaMulti.m15?.ema50)) | Trend: \(emaMulti.m15?.trend.label ?? "N/A")
+                • H1 3-Line RSI Momentum: RSI(14) = \(rVal) | EMA(9) = \(eVal) | WMA(45) = \(wVal)
+                • 3-Line RSI Alignment: \(alignStr)
+                • Momentum Baseline (EMA 9 vs WMA 45): \(emaWmaStr)
+                • RSI Divergence: \(divStr)
+                """
+                
                 let synthesisPrompt = AIPromptBuilder.buildEnsembleSynthesisPrompt(
                     symbol: symbol,
                     currentPrice: currentPriceStr,
@@ -817,7 +859,8 @@ public actor AIReflectionService {
                     riskPercent: riskNum,
                     targetRR: traderProfile.targetRiskRewardRatio,
                     analyses: validAnalyses,
-                    isVi: isVi
+                    isVi: isVi,
+                    technicalGroundTruth: technicalGroundTruth
                 )
                 
                 // VÒNG 2: Chief Risk Officer Synthesizer (Qwen-27B on Groq, fallback to GPT-120B then Gemini)

@@ -667,6 +667,15 @@ public struct CandleChartView: View {
         Array(rsiSeries.prefix(visibleBars.count))
     }
     
+    // EMA 9 of RSI 14
+    private var rsiEma9Series: [Double?] {
+        MomentumEngine.computeEMA(series: rsiSeries, period: 9)
+    }
+    
+    private var visibleRsiEma9: [Double?] {
+        Array(rsiEma9Series.prefix(visibleBars.count))
+    }
+    
     // WMA 45 of RSI 14
     private var rsiWma45Series: [Double?] {
         MomentumEngine.computeWMA(series: rsiSeries, period: 45)
@@ -760,7 +769,26 @@ public struct CandleChartView: View {
             .stroke(Color(red: 0.65, green: 0.45, blue: 0.95), style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
             .clipped()
             
-            // 2. WMA 45 Curve of RSI 14 (Gold / Amber)
+            // 2. EMA 9 Curve of RSI 14 (Sky Blue / Cyan)
+            Path { path in
+                var isFirst = true
+                for (i, emaOpt) in visibleRsiEma9.enumerated() {
+                    guard let ema = emaOpt else { continue }
+                    let x = CGFloat(i) * stX + (stX / 2.0) + panOffset
+                    let y = plotHeight - CGFloat(ema / 100.0) * plotHeight
+                    let clampedY = max(2, min(plotHeight - 2, y))
+                    if isFirst {
+                        path.move(to: CGPoint(x: x, y: clampedY))
+                        isFirst = false
+                    } else {
+                        path.addLine(to: CGPoint(x: x, y: clampedY))
+                    }
+                }
+            }
+            .stroke(Color(red: 0.22, green: 0.74, blue: 0.97), style: StrokeStyle(lineWidth: 1.2, lineCap: .round, lineJoin: .round))
+            .clipped()
+            
+            // 3. WMA 45 Curve of RSI 14 (Gold / Amber)
             Path { path in
                 var isFirst = true
                 for (i, maOpt) in visibleRsiWma45.enumerated() {
@@ -779,7 +807,7 @@ public struct CandleChartView: View {
             .stroke(Color(red: 1.0, green: 0.82, blue: 0.2), style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
             .clipped()
             
-            // 3. Active / Hovered dot and cursor line
+            // 4. Active / Hovered dot and cursor line
             if let hIdx = hoveredBarIndex, hIdx < visibleBars.count {
                 let hX = CGFloat(hIdx) * stX + (stX / 2.0) + panOffset
                 if hX >= 0 && hX <= plotWidth {
@@ -794,6 +822,16 @@ public struct CandleChartView: View {
                         let clampedY = max(2, min(plotHeight - 2, rsiY))
                         Circle()
                             .fill(Color(red: 0.65, green: 0.45, blue: 0.95))
+                            .frame(width: 5, height: 5)
+                            .position(x: hX, y: clampedY)
+                    }
+                    
+                    // EMA 9 dot
+                    if hIdx < visibleRsiEma9.count, let ema = visibleRsiEma9[hIdx] {
+                        let emaY = plotHeight - CGFloat(ema / 100.0) * plotHeight
+                        let clampedY = max(2, min(plotHeight - 2, emaY))
+                        Circle()
+                            .fill(Color(red: 0.22, green: 0.74, blue: 0.97))
                             .frame(width: 5, height: 5)
                             .position(x: hX, y: clampedY)
                     }
