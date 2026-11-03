@@ -3,12 +3,15 @@ import SwiftUI
 // MARK: - Market Data Settings View (Apple HIG Inset-Grouped Standard)
 public struct MarketDataSettingsView: View {
     @ObservedObject private var dataStore = TradeDataStore.shared
+    @ObservedObject private var alertEngine = MarketAlertEngine.shared
     
     @State private var binanceEnabled: Bool = true
     @State private var binanceStatus: String = ""
     @State private var oandaStatus: String = ""
     @State private var isTestingBinance: Bool = false
     @State private var isTestingOanda: Bool = false
+    @State private var isCheckingAlerts: Bool = false
+    @State private var alertCheckStatus: String = ""
     
     public init() {}
     
@@ -91,9 +94,97 @@ public struct MarketDataSettingsView: View {
                     }
                 }
             }
+            
+            // Unified Candle Hub & EMA Alerts Card
+            SettingsCard(
+                title: "EMA Candle Close Alerts",
+                footer: "Evaluates closed bars (:01s boundary) for EMA 21 & EMA 50 touches via Unified Candle Hub. Eliminates redundant streaming."
+            ) {
+                VStack(spacing: 12) {
+                    AppToggleRow(
+                        "Enable EMA 21/50 Alerts",
+                        subtitle: "Alerts when candle touches or rejects EMA 21 or 50",
+                        isOn: $alertEngine.isEnabled
+                    ) { enabled in
+                        if enabled {
+                            Task {
+                                _ = await alertEngine.requestNotificationPermission()
+                            }
+                        }
+                    }
+                    
+                    Divider()
+                        .background(AppColors.border.opacity(0.4))
+                    
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Monitored Symbols")
+                                .font(AppTypography.captionBold)
+                                .foregroundColor(AppColors.secondaryText)
+                            Text(alertEngine.monitoredSymbols.joined(separator: ", "))
+                                .font(AppTypography.rowPrimary)
+                                .foregroundColor(AppColors.primaryText)
+                        }
+                        Spacer()
+                    }
+                    
+                    Divider()
+                        .background(AppColors.border.opacity(0.4))
+                    
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Timeframes")
+                                .font(AppTypography.captionBold)
+                                .foregroundColor(AppColors.secondaryText)
+                            Text(alertEngine.monitoredTimeframes.map { $0.uppercased() }.joined(separator: ", "))
+                                .font(AppTypography.rowPrimary)
+                                .foregroundColor(AppColors.primaryText)
+                        }
+                        Spacer()
+                        
+                        AppButton("Check Now", icon: "bell.badge", style: .secondary, size: .compact, isLoading: isCheckingAlerts) {
+                            checkAlertsNow()
+                        }
+                    }
+                    
+                    if !alertCheckStatus.isEmpty {
+                        HStack {
+                            Text(alertCheckStatus)
+                                .font(AppTypography.caption)
+                                .foregroundColor(AppColors.brand)
+                            Spacer()
+                        }
+                    }
+                    
+                    if let lastEval = alertEngine.lastEvaluatedAt {
+                        HStack {
+                            Text("Last evaluated: \(JournalIds.formatTime(lastEval))")
+                                .font(AppTypography.captionMicro)
+                                .foregroundColor(AppColors.secondaryText)
+                            Spacer()
+                        }
+                    }
+                }
+            }
         }
         .onAppear {
             binanceEnabled = dataStore.marketConnections.binanceEnabled
+        }
+    }
+    
+    private func checkAlertsNow() {
+        isCheckingAlerts = true
+        alertCheckStatus = "Evaluating EMA touches..."
+        Task {
+            let fired = await alertEngine.evaluateAllMonitoredSymbols()
+            await MainActor.run {
+                self.isCheckingAlerts = false
+                if fired.isEmpty {
+                    self.alertCheckStatus = "Checked: No EMA 21/50 touches on last closed bars."
+                } else {
+                    self.alertCheckStatus = "Detected \(fired.count) EMA alerts! Notifications dispatched."
+                }
+            }
         }
     }
     

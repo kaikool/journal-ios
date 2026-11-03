@@ -656,7 +656,7 @@ public final class MarketDataService: Sendable {
         return validateBars(bars)
     }
     
-    // MARK: - 6. Symbol Candlesticks Fetcher (Pre-Trade Forward Analysis with Adaptive TTL Caching)
+    // MARK: - 6. Symbol Candlesticks Fetcher (Unified Candle Hub with Sub-slice Reuse & Coalescing)
     public func fetchBarsForSymbol(
         symbol: String,
         config: MarketConnectionConfig,
@@ -675,7 +675,10 @@ public final class MarketDataService: Sendable {
             return (providerTag, cached)
         }
         
-        let coalescingKey = "sym_\(cleanSymbol)_\(resolution)_\(count)"
+        // Canonical request count: always request at least 100 bars for standard timeframes
+        // so that replay, bias, ai coach, and alerts share the exact same buffer!
+        let canonicalFetchCount = max(count, 100)
+        let coalescingKey = "sym_\(cleanSymbol)_\(resolution)"
         
         do {
             let fetchedBars = try await MarketDataCacheStore.shared.runCoalesced(key: coalescingKey) { [self] in
@@ -688,13 +691,13 @@ public final class MarketDataService: Sendable {
                 
                 if provider == "binance" {
                     let normalized = normalizeMarketSymbol(symbol: cleanSymbol, provider: "binance")
-                    var bars = (try? await fetchBinanceBars(symbol: normalized, interval: resolution, limit: count)) ?? []
+                    var bars = (try? await fetchBinanceBars(symbol: normalized, interval: resolution, limit: canonicalFetchCount)) ?? []
                     if bars.isEmpty {
-                        bars = (try? await fetchBinanceBars(symbol: cleanSymbol, interval: resolution, limit: count)) ?? []
+                        bars = (try? await fetchBinanceBars(symbol: cleanSymbol, interval: resolution, limit: canonicalFetchCount)) ?? []
                     }
                     if !bars.isEmpty {
                         let valid = validateBars(bars)
-                        MarketDataCacheStore.shared.saveSymbolBars(valid, symbol: cleanSymbol, resolution: resolution, count: count)
+                        MarketDataCacheStore.shared.saveSymbolBars(valid, symbol: cleanSymbol, resolution: resolution, count: canonicalFetchCount)
                         return valid
                     }
                     throw NSError(
@@ -711,21 +714,21 @@ public final class MarketDataService: Sendable {
                         accountId: effectiveAcc,
                         environment: config.oandaEnvironment,
                         resolution: resolution,
-                        count: count
+                        count: canonicalFetchCount
                     )
                     let valid = validateBars(bars)
-                    MarketDataCacheStore.shared.saveSymbolBars(valid, symbol: cleanSymbol, resolution: resolution, count: count)
+                    MarketDataCacheStore.shared.saveSymbolBars(valid, symbol: cleanSymbol, resolution: resolution, count: canonicalFetchCount)
                     return valid
                 } else {
                     // Binance USDT Fallback
                     let binanceBars = try? await fetchBinanceBars(
                         symbol: "\(cleanSymbol)USDT",
                         interval: resolution,
-                        limit: count
+                        limit: canonicalFetchCount
                     )
                     if let bb = binanceBars, !bb.isEmpty {
                         let valid = validateBars(bb)
-                        MarketDataCacheStore.shared.saveSymbolBars(valid, symbol: cleanSymbol, resolution: resolution, count: count)
+                        MarketDataCacheStore.shared.saveSymbolBars(valid, symbol: cleanSymbol, resolution: resolution, count: canonicalFetchCount)
                         return valid
                     }
                     
@@ -737,7 +740,8 @@ public final class MarketDataService: Sendable {
                 }
             }
             
-            return (forceRefresh ? "\(providerTag) Live" : providerTag, fetchedBars)
+            let sliced = fetchedBars.count >= count ? Array(fetchedBars.suffix(count)) : fetchedBars
+            return (forceRefresh ? "\(providerTag) Live" : providerTag, sliced)
         } catch {
             // Stale / Offline Cache Fallback
             if let stale = MarketDataCacheStore.shared.getStaleSymbolBars(symbol: cleanSymbol, resolution: resolution, count: count), !stale.isEmpty {

@@ -59,28 +59,48 @@ public final class MarketDataCacheStore: @unchecked Sendable {
         try? fileManager.createDirectory(at: cacheDirectoryUrl, withIntermediateDirectories: true)
     }
     
-    // MARK: - 1. Adaptive TTL Resolution Helper
+    // MARK: - 1. Candle-Boundary Dynamic TTL Resolution Helper
     
-    public static func defaultTTL(for resolution: String) -> Double {
+    /// Computes the remaining seconds until the next candle boundary for the specified resolution.
+    /// Aligns cache freshness strictly with candle close boundaries (:00, :15, :30, :45 for M15, :00 for H1, etc.)
+    /// so that closed bars are cached and reused across features until the next candle actually completes.
+    public static func candleBoundaryTTL(for resolution: String, referenceDate: Date = Date()) -> Double {
         let clean = resolution.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let granSec: Double
         switch clean {
-        case "1d", "d", "daily", "d1":
-            return 900 // 15 minutes
-        case "4h", "h4":
-            return 300 // 5 minutes
-        case "1h", "h1":
-            return 120 // 2 minutes
-        case "30m", "m30":
-            return 90  // 1.5 minutes
-        case "15m", "m15":
-            return 60  // 60 seconds
-        case "5m", "m5":
-            return 20  // 20 seconds
         case "1m", "m1":
-            return 10  // 10 seconds
+            granSec = 60
+        case "5m", "m5":
+            granSec = 300
+        case "15m", "m15":
+            granSec = 900
+        case "30m", "m30":
+            granSec = 1800
+        case "1h", "h1":
+            granSec = 3600
+        case "4h", "h4":
+            granSec = 14400
+        case "1d", "d", "daily", "d1":
+            granSec = 86400
         default:
-            return 60
+            granSec = 900
         }
+        
+        let epochSec = referenceDate.timeIntervalSince1970
+        let elapsed = epochSec.truncatingRemainder(dividingBy: granSec)
+        let remaining = granSec - elapsed
+        
+        if granSec >= 86400 {
+            return min(max(15.0, remaining), 900.0) // Daily: max 15m
+        } else if granSec >= 14400 {
+            return min(max(15.0, remaining), 600.0) // H4: max 10m
+        } else {
+            return max(15.0, remaining)
+        }
+    }
+    
+    public static func defaultTTL(for resolution: String, referenceDate: Date = Date()) -> Double {
+        return candleBoundaryTTL(for: resolution, referenceDate: referenceDate)
     }
     
     // MARK: - 2. Trade Bars Caching (Historical / Replay / AI Coach)
@@ -131,26 +151,102 @@ public final class MarketDataCacheStore: @unchecked Sendable {
         lock.unlock()
     }
     
-    // MARK: - 3. Symbol Bars Caching (Pre-Trade Forward Analysis & Market Bias)
+    // MARK: - 3. Symbol Bars Caching (Unified Candle Hub with Sub-slice Reuse)
     
+    /// Retrieves cached bars for symbol and resolution.
+    /// If an exact key match is found and valid, returns it.
+    /// If a canonical or larger slice (M >= count) exists and is unexpired,
+    /// returns the sub-slice suffix(count) without requiring an OANDA or Binance API round-trip.
     public func getSymbolBars(symbol: String, resolution: String, count: Int) -> [MarketBar]? {
         let cleanSym = symbol.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
-        let key = "sym_\(cleanSym)_\(resolution)_\(count)"
-        return getBars(forKey: key, bypassExpiry: false)
+        let exactKey = "sym_\(cleanSym)_\(resolution)_\(count)"
+        
+        // 1. Direct exact key match
+        if let direct = getBars(forKey: exactKey, bypassExpiry: false), direct.count >= count {
+            return direct
+        }
+        
+        // 2. Canonical pool check (M >= count)
+        let canonicalKey = "sym_\(cleanSym)_\(resolution)_canonical"
+        if let canonical = getBars(forKey: canonicalKey, bypassExpiry: false), canonical.count >= count {
+            return Array(canonical.suffix(count))
+        }
+        
+        // 3. Scan memory cache for any unexpired slice with >= count
+        lock.lock()
+        let prefix = "sym_\(cleanSym)_\(resolution)_"
+        for (cachedKey, entry) in memoryCache where cachedKey.hasPrefix(prefix) && !cachedKey.hasSuffix("_canonical") {
+            if !entry.isExpired && entry.bars.count >= count {
+                let result = Array(entry.bars.suffix(count))
+                lock.unlock()
+                return result
+            }
+        }
+        lock.unlock()
+        
+        return nil
     }
     
     public func getStaleSymbolBars(symbol: String, resolution: String, count: Int) -> [MarketBar]? {
         let cleanSym = symbol.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
-        let key = "sym_\(cleanSym)_\(resolution)_\(count)"
-        return getBars(forKey: key, bypassExpiry: true)
+        let exactKey = "sym_\(cleanSym)_\(resolution)_\(count)"
+        
+        if let direct = getBars(forKey: exactKey, bypassExpiry: true), direct.count >= count {
+            return direct
+        }
+        
+        let canonicalKey = "sym_\(cleanSym)_\(resolution)_canonical"
+        if let canonical = getBars(forKey: canonicalKey, bypassExpiry: true) {
+            if canonical.count >= count {
+                return Array(canonical.suffix(count))
+            } else if !canonical.isEmpty {
+                return canonical
+            }
+        }
+        
+        lock.lock()
+        let prefix = "sym_\(cleanSym)_\(resolution)_"
+        for (cachedKey, entry) in memoryCache where cachedKey.hasPrefix(prefix) {
+            if entry.bars.count >= count {
+                let result = Array(entry.bars.suffix(count))
+                lock.unlock()
+                return result
+            }
+        }
+        lock.unlock()
+        
+        return nil
     }
     
     public func saveSymbolBars(_ bars: [MarketBar], symbol: String, resolution: String, count: Int) {
         guard !bars.isEmpty else { return }
         let cleanSym = symbol.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
-        let key = "sym_\(cleanSym)_\(resolution)_\(count)"
-        let ttl = Self.defaultTTL(for: resolution)
+        let exactKey = "sym_\(cleanSym)_\(resolution)_\(count)"
+        let ttl = Self.candleBoundaryTTL(for: resolution)
         let entry = CacheEntry(bars: bars, ttlSeconds: ttl, isPermanent: false)
+        saveEntry(entry, forKey: exactKey)
+        
+        // Update canonical pool to serve subsequent sub-slice queries across all features
+        let canonicalKey = "sym_\(cleanSym)_\(resolution)_canonical"
+        updateCanonicalPool(forKey: canonicalKey, newBars: bars, ttlSeconds: ttl)
+    }
+    
+    private func updateCanonicalPool(forKey key: String, newBars: [MarketBar], ttlSeconds: Double) {
+        var combined: [MarketBar] = []
+        if let existing = getBars(forKey: key, bypassExpiry: true) {
+            combined = existing + newBars
+        } else {
+            combined = newBars
+        }
+        
+        var dict: [Int64: MarketBar] = [:]
+        for bar in combined {
+            dict[bar.timestamp] = bar
+        }
+        let sortedBars = dict.values.sorted { $0.timestamp < $1.timestamp }
+        let trimmed = Array(sortedBars.suffix(300))
+        
+        let entry = CacheEntry(bars: trimmed, ttlSeconds: ttlSeconds, isPermanent: false)
         saveEntry(entry, forKey: key)
     }
     

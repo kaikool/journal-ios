@@ -768,4 +768,112 @@ final class FeatureVerificationTests: XCTestCase {
         XCTAssertEqual(totalRealizedPnl, Decimal(450))
         XCTAssertEqual(remainingOpenVolume, Decimal(0))
     }
+    
+    // MARK: - Unified Candle Hub & EMA Alert Service Tests
+    
+    func testUnifiedCandleHubSubSliceAndBoundaryTTL() {
+        let cache = MarketDataCacheStore.shared
+        let sym = "XAUUSD"
+        let res = "15m"
+        
+        // 1. Verify Candle-Boundary Dynamic TTL
+        // Reference time: exactly at 14:00:00 UTC (1719237600)
+        let exactBoundaryDate = Date(timeIntervalSince1970: 1719237600)
+        let ttlAtBoundary = MarketDataCacheStore.candleBoundaryTTL(for: "15m", referenceDate: exactBoundaryDate)
+        XCTAssertEqual(ttlAtBoundary, 900.0, accuracy: 0.1, "At exact 15m boundary, remaining TTL must be 900s")
+        
+        // Halfway through 15m candle: 14:07:30 UTC (+450s)
+        let midCandleDate = Date(timeIntervalSince1970: 1719237600 + 450)
+        let ttlMid = MarketDataCacheStore.candleBoundaryTTL(for: "15m", referenceDate: midCandleDate)
+        XCTAssertEqual(ttlMid, 450.0, accuracy: 0.1, "Halfway through candle, remaining TTL must be 450s")
+        
+        // 5 seconds before close: 14:14:55 UTC (+895s)
+        let nearCloseDate = Date(timeIntervalSince1970: 1719237600 + 895)
+        let ttlNearClose = MarketDataCacheStore.candleBoundaryTTL(for: "15m", referenceDate: nearCloseDate)
+        XCTAssertGreaterThanOrEqual(ttlNearClose, 15.0, "Near close, minimum safety buffer must be at least 15s")
+        
+        // 2. Sub-slice Cache Lookup Verification (100 bars stored -> query 50 bars)
+        var sampleBars: [MarketBar] = []
+        let baseTime: Int64 = 1719237600000
+        for i in 0..<100 {
+            let t = baseTime + Int64(i * 900_000)
+            let p = Decimal(2300 + i)
+            sampleBars.append(MarketBar(
+                timestamp: t,
+                open: p,
+                high: p + 2,
+                low: p - 2,
+                close: p + 1,
+                volume: 50
+            ))
+        }
+        
+        cache.saveSymbolBars(sampleBars, symbol: sym, resolution: res, count: 100)
+        
+        // Exact count lookup
+        let exactMatch = cache.getSymbolBars(symbol: sym, resolution: res, count: 100)
+        XCTAssertNotNil(exactMatch)
+        XCTAssertEqual(exactMatch?.count, 100)
+        
+        // Sub-slice lookup (count = 40): Must return last 40 bars without re-querying network!
+        let subSlice40 = cache.getSymbolBars(symbol: sym, resolution: res, count: 40)
+        XCTAssertNotNil(subSlice40)
+        XCTAssertEqual(subSlice40?.count, 40)
+        XCTAssertEqual(subSlice40?.first?.timestamp, sampleBars[60].timestamp)
+        XCTAssertEqual(subSlice40?.last?.timestamp, sampleBars[99].timestamp)
+        
+        // Sub-slice lookup (count = 60)
+        let subSlice60 = cache.getSymbolBars(symbol: sym, resolution: res, count: 60)
+        XCTAssertNotNil(subSlice60)
+        XCTAssertEqual(subSlice60?.count, 60)
+        XCTAssertEqual(subSlice60?.first?.timestamp, sampleBars[40].timestamp)
+        XCTAssertEqual(subSlice60?.last?.timestamp, sampleBars[99].timestamp)
+    }
+    
+    func testMarketAlertEngineEMATouchAndDeduplication() {
+        let engine = MarketAlertEngine.shared
+        engine.clearActiveAlerts()
+        
+        let sym = "XAUUSD"
+        let tf = "15m"
+        let baseTime: Int64 = 1719237600000
+        
+        // Build 65 bars with flat/slight drift so EMA 21 and 50 stabilize around 2400
+        var bars: [MarketBar] = []
+        for i in 0..<64 {
+            let t = baseTime + Int64(i * 900_000)
+            bars.append(MarketBar(
+                timestamp: t,
+                open: 2400,
+                high: 2405,
+                low: 2395,
+                close: 2400,
+                volume: 100
+            ))
+        }
+        
+        // Bar 64 (last closed bar): Price swings low to 2390 and high to 2410, crossing EMA 21 (~2400)
+        let lastClosedTime = baseTime + Int64(64 * 900_000)
+        bars.append(MarketBar(
+            timestamp: lastClosedTime,
+            open: 2392,
+            high: 2408,
+            low: 2395,
+            close: 2404,
+            volume: 200
+        ))
+        
+        // Reference time set to 1 second after bar 64 close
+        let refDate = Date(timeIntervalSince1970: Double(lastClosedTime + 900_000) / 1000.0 + 1.0)
+        
+        let alerts = engine.evaluateCandles(symbol: sym, timeframe: tf, bars: bars, referenceDate: refDate)
+        XCTAssertFalse(alerts.isEmpty, "Alert engine must detect candle touching EMA 21/50")
+        
+        let hasEMA21 = alerts.contains { $0.emaPeriod == 21 }
+        XCTAssertTrue(hasEMA21, "Must generate an alert record for EMA 21")
+        
+        // Deduplication test: Re-evaluating the exact same bar must yield 0 new alerts
+        let duplicateAlerts = engine.evaluateCandles(symbol: sym, timeframe: tf, bars: bars, referenceDate: refDate)
+        XCTAssertTrue(duplicateAlerts.isEmpty, "Duplicate alerts on the same closed bar timestamp must be suppressed")
+    }
 }
