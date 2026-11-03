@@ -719,8 +719,42 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
         // 2. Fetch live snapshot positions and orders
         let snapshotResult = await fetchEndpointData(path: "/v1/trading/accounts/\(cleanId)/snapshot", host: clusterHost)
         var snapshotPositions: [[String: Any]] = []
-        if let sJson = snapshotResult.json, let posArr = sJson["positions"] as? [[String: Any]] {
-            snapshotPositions = posArr
+        var allOrders: [[String: Any]] = []
+        var seenOrderIds = Set<String>()
+        
+        if let sJson = snapshotResult.json {
+            if let posArr = sJson["positions"] as? [[String: Any]] {
+                snapshotPositions = posArr
+            }
+            if let ordArr = (sJson["orders"] as? [[String: Any]]) ?? (sJson["items"] as? [[String: Any]]) {
+                for it in ordArr {
+                    let order = (it["order"] as? [String: Any]) ?? it
+                    if let oId = order["order_id"] as? String, !seenOrderIds.contains(oId) {
+                        seenOrderIds.insert(oId)
+                        allOrders.append(order)
+                    }
+                }
+            }
+        }
+        
+        // Fallback: dedicated active positions endpoint if snapshot returned empty positions
+        if snapshotPositions.isEmpty {
+            let posResult = await fetchEndpointData(path: "/v1/trading/accounts/\(cleanId)/positions", host: clusterHost)
+            if let pJson = posResult.json, let posArr = (pJson["positions"] as? [[String: Any]]) ?? (pJson["items"] as? [[String: Any]]) {
+                snapshotPositions = posArr
+            }
+        }
+        
+        // Also query active trading orders endpoint (contains active SL/TP orders on open positions)
+        let activeOrdersResult = await fetchEndpointData(path: "/v1/trading/accounts/\(cleanId)/orders", host: clusterHost)
+        if let aoJson = activeOrdersResult.json, let ordArr = (aoJson["orders"] as? [[String: Any]]) ?? (aoJson["items"] as? [[String: Any]]) {
+            for it in ordArr {
+                let order = (it["order"] as? [String: Any]) ?? it
+                if let oId = order["order_id"] as? String, !seenOrderIds.contains(oId) {
+                    seenOrderIds.insert(oId)
+                    allOrders.append(order)
+                }
+            }
         }
         
         // 3. Query Deals and Orders History in safe 14-day chunks (Exness limit: max 30 days per request)
@@ -737,9 +771,7 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
         }
         
         var allDeals: [[String: Any]] = []
-        var allOrders: [[String: Any]] = []
         var seenDealIds = Set<String>()
-        var seenOrderIds = Set<String>()
         
         for w in chunkWindows {
             let fromStr = isoFormatter.string(from: w.from)
@@ -774,17 +806,64 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
             }
         }
         
-        // 4. Map Orders to SL / TP by position_id
+        // 4. Map Orders and Positions to SL / TP by position_id and order_id
+        func extractSltp(from dict: [String: Any]) -> (sl: Decimal?, tp: Decimal?) {
+            let sl = parseDecimal(dict["stop_loss_price"]) ??
+                     parseDecimal(dict["stop_loss"]) ??
+                     parseDecimal(dict["sl"]) ??
+                     parseDecimal(dict["sl_price"])
+            let tp = parseDecimal(dict["take_profit_price"]) ??
+                     parseDecimal(dict["take_profit"]) ??
+                     parseDecimal(dict["tp"]) ??
+                     parseDecimal(dict["tp_price"])
+            let validSl = (sl != nil && (sl ?? 0) > 0) ? sl : nil
+            let validTp = (tp != nil && (tp ?? 0) > 0) ? tp : nil
+            return (validSl, validTp)
+        }
+        
         var positionSltpMap: [String: (sl: Decimal?, tp: Decimal?)] = [:]
+        
+        // 4.1 Harvest from all Orders (historical + active snapshot)
         for o in allOrders {
-            guard let posId = o["position_id"] as? String, !posId.isEmpty else { continue }
-            let sl = parseDecimal(o["stop_loss_price"])
-            let tp = parseDecimal(o["take_profit_price"])
-            let existing = positionSltpMap[posId] ?? (nil, nil)
-            positionSltpMap[posId] = (
-                sl != nil && (sl ?? 0) > 0 ? sl : existing.sl,
-                tp != nil && (tp ?? 0) > 0 ? tp : existing.tp
-            )
+            let (sl, tp) = extractSltp(from: o)
+            guard sl != nil || tp != nil else { continue }
+            if let posId = o["position_id"] as? String, !posId.isEmpty {
+                let existing = positionSltpMap[posId] ?? (nil, nil)
+                positionSltpMap[posId] = (sl ?? existing.sl, tp ?? existing.tp)
+            }
+            if let ordId = o["order_id"] as? String, !ordId.isEmpty {
+                let existing = positionSltpMap[ordId] ?? (nil, nil)
+                positionSltpMap[ordId] = (sl ?? existing.sl, tp ?? existing.tp)
+            }
+        }
+        
+        // 4.2 Harvest from Snapshot Positions
+        for p in snapshotPositions {
+            let (sl, tp) = extractSltp(from: p)
+            guard sl != nil || tp != nil else { continue }
+            if let posId = p["position_id"] as? String, !posId.isEmpty {
+                let existing = positionSltpMap[posId] ?? (nil, nil)
+                positionSltpMap[posId] = (sl ?? existing.sl, tp ?? existing.tp)
+            }
+        }
+        
+        // 4.3 Harvest from Deal close reasons or comments (e.g. "[sl]", "[tp 2715.00]", "stop_loss")
+        for d in allDeals {
+            guard let posId = d["position_id"] as? String, !posId.isEmpty else { continue }
+            let comment = (d["comment"] as? String ?? "").lowercased()
+            let reason = (d["reason"] as? String ?? d["close_reason"] as? String ?? "").lowercased()
+            let p = parseDecimal(d["price"])
+            
+            let isSl = comment.contains("[sl") || comment.contains("sl]") || reason.contains("stop_loss") || reason == "sl"
+            let isTp = comment.contains("[tp") || comment.contains("tp]") || reason.contains("take_profit") || reason == "tp"
+            
+            if (isSl || isTp), let price = p, price > 0 {
+                let existing = positionSltpMap[posId] ?? (nil, nil)
+                positionSltpMap[posId] = (
+                    isSl ? (existing.sl ?? price) : existing.sl,
+                    isTp ? (existing.tp ?? price) : existing.tp
+                )
+            }
         }
         
         // 5. Group deals by position_id
@@ -815,7 +894,7 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
             }
         }
         
-        // 6. Build atomic Executions and authoritative Trades
+        // 6. Build atomic Executions and authoritative Trades (with multi-deal and partial close support)
         var directTrades: [Trade] = []
         var newExecutions: [Execution] = []
         let defaultPlaybookId = await MainActor.run { TradeDataStore.shared.defaultPlaybook?.id }
@@ -824,135 +903,169 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
             let sym = g.symbol
             let assetClass = assetClassForSymbol(sym)
             let sltp = positionSltpMap[posId]
-            
-            // A. Open Deal & Entry
-            let openDeal = g.openDeals.first
-            let openDir = (openDeal?["direction"] as? String ?? "buy").lowercased()
-            let tradeDir: TradeDirection = (openDir == "sell") ? .short : .long
-            let entryPrice = parseDecimal(openDeal?["price"]) ?? 0
-            let openDate = parseDate(openDeal?["create_time"]) ?? Date()
-            let volume = parseDecimal(openDeal?["volume"]) ?? 0.01
-            
             var execIds: [String] = []
             
-            // Record Open Execution Fill
-            if let od = openDeal, let dId = od["deal_id"] as? String {
-                let execId = "exness_deal_\(dId)"
-                execIds.append(execId)
-                let fillHash = "\(journalAccId)|\(sym)|\(openDir)|\(volume)|\(entryPrice)|\(Int64(openDate.timeIntervalSince1970 * 1000))"
-                let openFill = Execution(
-                    id: execId,
-                    accountId: journalAccId,
-                    symbol: sym,
-                    side: tradeDir == .short ? .sell : .buy,
-                    quantity: volume,
-                    price: entryPrice,
-                    fee: 0,
-                    swap: nil,
-                    executedAt: openDate,
-                    assetClass: assetClass,
-                    source: "exness",
-                    contentHash: fillHash
-                )
-                newExecutions.append(openFill)
-            }
+            // A. Open Deals & Entry (Support multiple open fills/scale-in)
+            var totalOpenVolume: Decimal = 0
+            var openWeightedSum: Decimal = 0
+            var earliestOpenDate: Date = Date()
+            var tradeDir: TradeDirection = .long
             
-            // B. Close Deal & Exit
-            let closeDeal = g.closeDeals.first
-            if let cd = closeDeal, let cdId = cd["deal_id"] as? String {
-                let exitPrice = parseDecimal(cd["price"]) ?? entryPrice
-                let closeDate = parseDate(cd["create_time"]) ?? openDate
-                let exitDir = (cd["direction"] as? String ?? "sell").lowercased()
+            for (idx, od) in g.openDeals.enumerated() {
+                let v = parseDecimal(od["volume"]) ?? 0
+                let p = parseDecimal(od["price"]) ?? 0
+                let d = parseDate(od["create_time"]) ?? Date()
+                let dirStr = (od["direction"] as? String ?? "buy").lowercased()
+                let currentDir: TradeDirection = (dirStr == "sell") ? .short : .long
                 
-                // Profit amount reported by Exness broker
-                var pnl: Decimal = 0
-                if let pObj = cd["profit"] as? [String: Any] {
-                    pnl = parseDecimal(pObj["amount"]) ?? 0
+                if idx == 0 {
+                    tradeDir = currentDir
+                    earliestOpenDate = d
+                } else if d < earliestOpenDate {
+                    earliestOpenDate = d
                 }
                 
-                let exitExecId = "exness_deal_\(cdId)"
-                execIds.append(exitExecId)
-                let exitHash = "\(journalAccId)|\(sym)|\(exitDir)|\(volume)|\(exitPrice)|\(Int64(closeDate.timeIntervalSince1970 * 1000))"
-                let exitFill = Execution(
-                    id: exitExecId,
-                    accountId: journalAccId,
-                    symbol: sym,
-                    side: tradeDir == .short ? .buy : .sell,
-                    quantity: volume,
-                    price: exitPrice,
-                    fee: 0,
-                    swap: nil,
-                    executedAt: closeDate,
-                    assetClass: assetClass,
-                    source: "exness",
-                    contentHash: exitHash
-                )
-                newExecutions.append(exitFill)
+                totalOpenVolume += v
+                openWeightedSum += (p * v)
                 
-                let status: TradeStatus = pnl > 0 ? .win : (pnl < 0 ? .loss : .breakeven)
-                let durMs = Int64(max(0, closeDate.timeIntervalSince(openDate) * 1000))
-                
-                let trade = Trade(
-                    key: "exness_\(posId)",
-                    accountId: journalAccId,
-                    symbol: sym,
-                    assetClass: assetClass,
-                    direction: tradeDir,
-                    status: status,
-                    openedAt: openDate,
-                    closedAt: closeDate,
-                    quantity: volume,
-                    openQuantity: 0,
-                    avgEntry: entryPrice,
-                    avgExit: exitPrice,
-                    grossPnl: pnl,
-                    fees: 0,
-                    swap: nil,
-                    netPnl: pnl,
-                    executionCount: execIds.count,
-                    executionIds: execIds,
-                    durationMs: durMs,
-                    playbookId: defaultPlaybookId,
-                    stopLoss: sltp?.sl,
-                    profitTarget: sltp?.tp
-                )
-                directTrades.append(trade)
-            } else {
-                // Open position from historical deals without a close deal yet
-                let trade = Trade(
-                    key: "exness_\(posId)",
-                    accountId: journalAccId,
-                    symbol: sym,
-                    assetClass: assetClass,
-                    direction: tradeDir,
-                    status: .open,
-                    openedAt: openDate,
-                    closedAt: nil,
-                    quantity: volume,
-                    openQuantity: volume,
-                    avgEntry: entryPrice,
-                    avgExit: nil,
-                    grossPnl: 0,
-                    fees: 0,
-                    swap: nil,
-                    netPnl: 0,
-                    executionCount: execIds.count,
-                    executionIds: execIds,
-                    durationMs: nil,
-                    playbookId: defaultPlaybookId,
-                    stopLoss: sltp?.sl,
-                    profitTarget: sltp?.tp
-                )
-                directTrades.append(trade)
+                if let dId = od["deal_id"] as? String {
+                    let execId = "exness_deal_\(dId)"
+                    execIds.append(execId)
+                    let fillHash = "\(journalAccId)|\(sym)|\(dirStr)|\(v)|\(p)|\(Int64(d.timeIntervalSince1970 * 1000))"
+                    let openFill = Execution(
+                        id: execId,
+                        accountId: journalAccId,
+                        symbol: sym,
+                        side: currentDir == .short ? .sell : .buy,
+                        quantity: v,
+                        price: p,
+                        fee: 0,
+                        swap: nil,
+                        executedAt: d,
+                        assetClass: assetClass,
+                        source: "exness",
+                        contentHash: fillHash
+                    )
+                    newExecutions.append(openFill)
+                }
             }
+            
+            let entryPrice = totalOpenVolume > 0 ? (openWeightedSum / totalOpenVolume) : (parseDecimal(g.openDeals.first?["price"]) ?? 0)
+            let volume = totalOpenVolume > 0 ? totalOpenVolume : (parseDecimal(g.openDeals.first?["volume"]) ?? 0.01)
+            
+            // B. Close Deals & Exits (Support Partial Closes)
+            var totalClosedVolume: Decimal = 0
+            var closeWeightedSum: Decimal = 0
+            var totalRealizedPnl: Decimal = 0
+            var latestCloseDate: Date = earliestOpenDate
+            var exits: [ExitAttribution] = []
+            
+            for cd in g.closeDeals {
+                let v = parseDecimal(cd["volume"]) ?? 0
+                let p = parseDecimal(cd["price"]) ?? entryPrice
+                let d = parseDate(cd["create_time"]) ?? earliestOpenDate
+                let exitDir = (cd["direction"] as? String ?? "sell").lowercased()
+                
+                var dealPnl: Decimal = 0
+                if let pObj = cd["profit"] as? [String: Any] {
+                    dealPnl = parseDecimal(pObj["amount"]) ?? 0
+                }
+                
+                totalClosedVolume += v
+                closeWeightedSum += (p * v)
+                totalRealizedPnl += dealPnl
+                if d > latestCloseDate {
+                    latestCloseDate = d
+                }
+                
+                if let cdId = cd["deal_id"] as? String {
+                    let exitExecId = "exness_deal_\(cdId)"
+                    execIds.append(exitExecId)
+                    let exitHash = "\(journalAccId)|\(sym)|\(exitDir)|\(v)|\(p)|\(Int64(d.timeIntervalSince1970 * 1000))"
+                    let exitFill = Execution(
+                        id: exitExecId,
+                        accountId: journalAccId,
+                        symbol: sym,
+                        side: tradeDir == .short ? .buy : .sell,
+                        quantity: v,
+                        price: p,
+                        fee: 0,
+                        swap: nil,
+                        executedAt: d,
+                        assetClass: assetClass,
+                        source: "exness",
+                        contentHash: exitHash
+                    )
+                    newExecutions.append(exitFill)
+                    
+                    exits.append(ExitAttribution(
+                        executionId: exitExecId,
+                        grossPnl: dealPnl,
+                        quantity: v
+                    ))
+                }
+            }
+            
+            let remainingOpenVolume = max(Decimal(0), volume - totalClosedVolume)
+            let isFullyClosed = remainingOpenVolume <= Decimal(0.000001) && totalClosedVolume > 0
+            let avgExit = totalClosedVolume > 0 ? (closeWeightedSum / totalClosedVolume) : nil
+            let status: TradeStatus = isFullyClosed
+                ? (totalRealizedPnl > 0 ? .win : (totalRealizedPnl < 0 ? .loss : .breakeven))
+                : .open
+            let durMs = isFullyClosed ? Int64(max(0, latestCloseDate.timeIntervalSince(earliestOpenDate) * 1000)) : nil
+            let finalClosedAt = isFullyClosed ? latestCloseDate : nil
+            
+            let trade = Trade(
+                key: "exness_\(posId)",
+                accountId: journalAccId,
+                symbol: sym,
+                assetClass: assetClass,
+                direction: tradeDir,
+                status: status,
+                openedAt: earliestOpenDate,
+                closedAt: finalClosedAt,
+                quantity: volume,
+                openQuantity: isFullyClosed ? 0 : remainingOpenVolume,
+                avgEntry: entryPrice,
+                avgExit: avgExit,
+                grossPnl: totalRealizedPnl,
+                fees: 0,
+                swap: nil,
+                netPnl: totalRealizedPnl,
+                executionCount: execIds.count,
+                executionIds: execIds,
+                exits: exits,
+                durationMs: durMs,
+                playbookId: defaultPlaybookId,
+                stopLoss: sltp?.sl,
+                profitTarget: sltp?.tp
+            )
+            directTrades.append(trade)
         }
         
         // 7. Parse active Snapshot positions (if not already covered in deals)
         for p in snapshotPositions {
             guard let posId = p["position_id"] as? String, !posId.isEmpty else { continue }
-            if directTrades.contains(where: { $0.key == "exness_\(posId)" }) {
+            let (slFromPos, tpFromPos) = extractSltp(from: p)
+            let sltp = positionSltpMap[posId]
+            let resolvedSl = slFromPos ?? sltp?.sl
+            let resolvedTp = tpFromPos ?? sltp?.tp
+            
+            if let existingIdx = directTrades.firstIndex(where: { $0.key == "exness_\(posId)" }) {
+                if let liveVol = parseDecimal(p["volume"]), liveVol > 0 {
+                    directTrades[existingIdx].openQuantity = liveVol
+                    directTrades[existingIdx].status = .open
+                    directTrades[existingIdx].closedAt = nil
+                }
+                if let sl = resolvedSl, directTrades[existingIdx].stopLoss == nil {
+                    directTrades[existingIdx].stopLoss = sl
+                }
+                if let tp = resolvedTp, directTrades[existingIdx].profitTarget == nil {
+                    directTrades[existingIdx].profitTarget = tp
+                }
                 continue
             }
+            
             let sym = (p["instrument"] as? String) ?? "UNKNOWN"
             let assetClass = assetClassForSymbol(sym)
             let dirStr = (p["direction"] as? String ?? "buy").lowercased()
@@ -960,7 +1073,6 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
             let price = parseDecimal(p["open_price"]) ?? 0
             let volume = parseDecimal(p["volume"]) ?? 0.01
             let openDate = parseDate(p["create_time"]) ?? Date()
-            let sltp = positionSltpMap[posId]
             
             let execId = "exness_pos_\(posId)"
             let fillHash = "\(journalAccId)|\(sym)|\(dirStr)|\(volume)|\(price)|\(Int64(openDate.timeIntervalSince1970 * 1000))"
@@ -999,10 +1111,11 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
                 netPnl: 0,
                 executionCount: 1,
                 executionIds: [execId],
+                exits: [],
                 durationMs: nil,
                 playbookId: defaultPlaybookId,
-                stopLoss: sltp?.sl,
-                profitTarget: sltp?.tp
+                stopLoss: resolvedSl,
+                profitTarget: resolvedTp
             )
             directTrades.append(openTrade)
         }
@@ -1018,17 +1131,42 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
                 for t in directTrades {
                     var tradeToMerge = t
                     if let idx = currentTrades.firstIndex(where: { $0.key == tradeToMerge.key || $0.id == tradeToMerge.id }) {
-                        if let existingPbId = currentTrades[idx].playbookId, !existingPbId.isEmpty {
+                        let existing = currentTrades[idx]
+                        
+                        // 1. Playbook
+                        if let existingPbId = existing.playbookId, !existingPbId.isEmpty {
                             tradeToMerge.playbookId = existingPbId
                         } else if tradeToMerge.playbookId == nil {
                             tradeToMerge.playbookId = defaultPbId
                         }
-                        if let existingNotes = currentTrades[idx].notes, !existingNotes.isEmpty {
+                        
+                        // 2. User Annotations (Notes, Tags, Mistakes, Rating, ReviewedAt)
+                        if let existingNotes = existing.notes, !existingNotes.isEmpty {
                             tradeToMerge.notes = existingNotes
                         }
-                        if !currentTrades[idx].tags.isEmpty {
-                            tradeToMerge.tags = Array(Set(currentTrades[idx].tags + tradeToMerge.tags))
+                        if !existing.tags.isEmpty {
+                            tradeToMerge.tags = Array(Set(existing.tags + tradeToMerge.tags))
                         }
+                        if !existing.mistakes.isEmpty {
+                            tradeToMerge.mistakes = existing.mistakes
+                        }
+                        if let r = existing.rating {
+                            tradeToMerge.rating = r
+                        }
+                        if let rev = existing.reviewedAt {
+                            tradeToMerge.reviewedAt = rev
+                        }
+                        
+                        // 3. SL / TP Priority:
+                        // Priority 1: Broker-reported SL/TP (tradeToMerge.stopLoss / profitTarget from Exness)
+                        // Priority 2: User manually entered SL/TP (existing.stopLoss / existing.profitTarget)
+                        if tradeToMerge.stopLoss == nil || (tradeToMerge.stopLoss ?? 0) <= 0 {
+                            tradeToMerge.stopLoss = existing.stopLoss
+                        }
+                        if tradeToMerge.profitTarget == nil || (tradeToMerge.profitTarget ?? 0) <= 0 {
+                            tradeToMerge.profitTarget = existing.profitTarget
+                        }
+                        
                         currentTrades[idx] = tradeToMerge
                     } else {
                         if tradeToMerge.playbookId == nil {

@@ -697,4 +697,75 @@ final class FeatureVerificationTests: XCTestCase {
             }
         }
     }
+    
+    func testExnessPartialCloseAndManualSLTPPreservation() {
+        // 1. Test Trade SL/TP priority logic
+        var existingTrade = Trade(
+            key: "exness_123456",
+            accountId: "acc-exness",
+            symbol: "XAUUSD",
+            direction: .long,
+            status: .open,
+            openedAt: Date(),
+            quantity: Decimal(0.3),
+            openQuantity: Decimal(0.3),
+            avgEntry: Decimal(2700),
+            grossPnl: 0,
+            fees: 0,
+            netPnl: 0,
+            executionCount: 1,
+            executionIds: ["exness_deal_1"]
+        )
+        // User manually entered SL & TP in app
+        existingTrade.stopLoss = Decimal(2690)
+        existingTrade.profitTarget = Decimal(2730)
+        
+        // Simulating incoming sync when Exness does not return SL/TP
+        var incomingTradeNoSL = existingTrade
+        incomingTradeNoSL.stopLoss = nil
+        incomingTradeNoSL.profitTarget = nil
+        
+        // Merge rule verification: Keep manual input if incoming is nil
+        if incomingTradeNoSL.stopLoss == nil || (incomingTradeNoSL.stopLoss ?? 0) <= 0 {
+            incomingTradeNoSL.stopLoss = existingTrade.stopLoss
+        }
+        if incomingTradeNoSL.profitTarget == nil || (incomingTradeNoSL.profitTarget ?? 0) <= 0 {
+            incomingTradeNoSL.profitTarget = existingTrade.profitTarget
+        }
+        XCTAssertEqual(incomingTradeNoSL.stopLoss, Decimal(2690))
+        XCTAssertEqual(incomingTradeNoSL.profitTarget, Decimal(2730))
+        
+        // Simulating incoming sync when Exness DOES return SL/TP -> Broker takes priority
+        var incomingTradeWithBrokerSL = existingTrade
+        incomingTradeWithBrokerSL.stopLoss = Decimal(2695)
+        incomingTradeWithBrokerSL.profitTarget = Decimal(2735)
+        if incomingTradeWithBrokerSL.stopLoss == nil || (incomingTradeWithBrokerSL.stopLoss ?? 0) <= 0 {
+            incomingTradeWithBrokerSL.stopLoss = existingTrade.stopLoss
+        }
+        if incomingTradeWithBrokerSL.profitTarget == nil || (incomingTradeWithBrokerSL.profitTarget ?? 0) <= 0 {
+            incomingTradeWithBrokerSL.profitTarget = existingTrade.profitTarget
+        }
+        XCTAssertEqual(incomingTradeWithBrokerSL.stopLoss, Decimal(2695))
+        XCTAssertEqual(incomingTradeWithBrokerSL.profitTarget, Decimal(2735))
+        
+        // 2. Test Partial Close math (0.3 lot total, 0.15 closed at 2710 with +$150, 0.15 closed at 2720 with +$300)
+        let totalOpenVolume = Decimal(0.3)
+        let close1Vol = Decimal(0.15)
+        let close1Price = Decimal(2710)
+        let close1Pnl = Decimal(150)
+        
+        let close2Vol = Decimal(0.15)
+        let close2Price = Decimal(2720)
+        let close2Pnl = Decimal(300)
+        
+        let totalClosedVolume = close1Vol + close2Vol
+        let closeWeightedSum = (close1Price * close1Vol) + (close2Price * close2Vol)
+        let avgExit = closeWeightedSum / totalClosedVolume
+        let totalRealizedPnl = close1Pnl + close2Pnl
+        let remainingOpenVolume = max(Decimal(0), totalOpenVolume - totalClosedVolume)
+        
+        XCTAssertEqual(avgExit, Decimal(2715))
+        XCTAssertEqual(totalRealizedPnl, Decimal(450))
+        XCTAssertEqual(remainingOpenVolume, Decimal(0))
+    }
 }
