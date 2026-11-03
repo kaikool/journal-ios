@@ -16,6 +16,7 @@ public struct TraderProfileSheet: View {
     @State private var targetRiskRewardRatioText: String = ""
     @State private var knownPsychologicalLeaks: String = ""
     @State private var customMemoryNotes: String = ""
+    @State private var minedBehaviorResult: TraderBehaviorMiningEngine.BehaviorMiningResult? = nil
     
     @State private var showSavedToast: Bool = false
     @State private var showBehaviorLeaksSheet: Bool = false
@@ -190,19 +191,45 @@ public struct TraderProfileSheet: View {
             VStack(alignment: .leading, spacing: 14) {
                 AppSectionHeader("Psychological leaks & non-negotiables")
                 
-                // Known Psychological Leaks
-                VStack(alignment: .leading, spacing: 6) {
-                    AppFormField(
-                        "Known Behavioral Leaks & Biases",
-                        text: $knownPsychologicalLeaks,
-                        placeholder: "e.g. Widening Stop Loss, Premature Profit Taking, FOMO re-entry",
-                        height: 42
-                    )
-                    
-                    HStack {
+                // Known Psychological Leaks (Auto-Mined from Entire Trade History)
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(alignment: .center) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Identified Behavioral Leaks")
+                                .font(AppTypography.captionBold)
+                                .foregroundColor(AppColors.primaryText)
+                            let count = minedBehaviorResult?.totalTradesAnalyzed ?? dataStore.trades.count
+                            Text("Auto-mined across all trade history (\(count) trades)")
+                                .font(AppTypography.captionMicro)
+                                .foregroundColor(AppColors.secondaryText)
+                        }
+                        
                         Spacer()
-                        AppActionPill("Mine Historical Leaks", icon: "sparkles") {
+                        
+                        AppActionPill("View Details", icon: "arrow.up.right") {
                             showBehaviorLeaksSheet = true
+                        }
+                    }
+                    
+                    let names = minedBehaviorResult?.detectedBehaviorNames ?? []
+                    if names.isEmpty {
+                        HStack(spacing: 6) {
+                            Image(systemName: "checkmark.seal.fill")
+                                .font(AppTypography.caption)
+                                .foregroundColor(AppColors.profit)
+                            Text((minedBehaviorResult?.totalTradesAnalyzed ?? 0) < 5 ? "Mining trade history (requires at least 5 closed trades)..." : "No critical behavioral leaks detected • Disciplined execution")
+                                .font(AppTypography.caption)
+                                .foregroundColor((minedBehaviorResult?.totalTradesAnalyzed ?? 0) < 5 ? AppColors.secondaryText : AppColors.profit)
+                        }
+                        .padding(.vertical, 4)
+                    } else {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 6) {
+                                ForEach(names, id: \.self) { name in
+                                    AppBadge(name, variant: .loss)
+                                }
+                            }
+                            .padding(.vertical, 2)
                         }
                     }
                 }
@@ -257,8 +284,12 @@ public struct TraderProfileSheet: View {
         maxRiskPerTrade = prof.maxRiskPerTrade
         maxDailyLossPercentText = String(format: "%.1f", prof.maxDailyLossPercent)
         targetRiskRewardRatioText = String(format: "%.1f", prof.targetRiskRewardRatio)
-        knownPsychologicalLeaks = prof.knownPsychologicalLeaks
         customMemoryNotes = prof.customMemoryNotes
+        
+        // Automatically mine behavioral leaks across all accounts in the background:
+        let res = TraderBehaviorMiningEngine.mineAndSyncToProfile(dataStore: dataStore)
+        self.minedBehaviorResult = res
+        self.knownPsychologicalLeaks = res.detectedBehaviorSummary
     }
     
     private func saveProfile() {
@@ -269,6 +300,7 @@ public struct TraderProfileSheet: View {
         let cleanRR = targetRiskRewardRatioText.replacingOccurrences(of: "1:", with: "").trimmingCharacters(in: .whitespaces)
         let parsedRR = Double(cleanRR) ?? 2.0
         
+        let leaksToSave = minedBehaviorResult?.detectedBehaviorSummary ?? dataStore.aiSettings.traderProfile.knownPsychologicalLeaks
         conf.traderProfile = TraderProfileConfig(
             tradingStyle: tradingStyle.trimmingCharacters(in: .whitespaces),
             accountObjective: accountObjective.trimmingCharacters(in: .whitespaces),
@@ -276,7 +308,7 @@ public struct TraderProfileSheet: View {
             maxRiskPerTrade: maxRiskPerTrade.trimmingCharacters(in: .whitespaces),
             maxDailyLossPercent: parsedDailyLoss,
             targetRiskRewardRatio: parsedRR,
-            knownPsychologicalLeaks: knownPsychologicalLeaks.trimmingCharacters(in: .whitespaces),
+            knownPsychologicalLeaks: leaksToSave,
             customMemoryNotes: customMemoryNotes.trimmingCharacters(in: .whitespaces)
         )
         dataStore.aiSettings = conf

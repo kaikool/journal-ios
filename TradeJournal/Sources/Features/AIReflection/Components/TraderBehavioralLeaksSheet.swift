@@ -10,7 +10,7 @@ public struct TraderBehavioralLeaksSheet: View {
     public init() {}
     
     private var trades: [Trade] {
-        dataStore.filteredTrades
+        dataStore.trades
     }
     
     private var miningResult: TraderBehaviorMiningEngine.BehaviorMiningResult {
@@ -19,10 +19,7 @@ public struct TraderBehavioralLeaksSheet: View {
     }
     
     private var hasAnyLeak: Bool {
-        miningResult.worstTimeWindowEn != nil ||
-        miningResult.revengeTradingLeakEn != nil ||
-        miningResult.rrAsymmetryLeakEn != nil ||
-        miningResult.toxicSymbolLeakEn != nil
+        !miningResult.detectedBehaviorNames.isEmpty
     }
     
     public var body: some View {
@@ -32,13 +29,13 @@ public struct TraderBehavioralLeaksSheet: View {
                     // Header Guidance Card
                     headerOverviewCard
                     
-                    if miningResult.totalTradesAnalyzed < 10 {
+                    if miningResult.totalTradesAnalyzed < 5 {
                         // Empty State: Not enough trade data
                         AppCard {
                             AppEmptyState(
                                 icon: "shield.checkerboard",
                                 title: "Insufficient Trade History",
-                                message: "TraderBehaviorMiningEngine requires at least 10 closed trades to accurately detect behavioral vulnerabilities. Currently analyzed: \(miningResult.totalTradesAnalyzed) trades."
+                                message: "TraderBehaviorMiningEngine requires at least 5 closed trades to accurately detect behavioral vulnerabilities. Currently analyzed: \(miningResult.totalTradesAnalyzed) trades across all accounts."
                             )
                         }
                     } else if !hasAnyLeak {
@@ -53,7 +50,7 @@ public struct TraderBehavioralLeaksSheet: View {
                                     .font(AppTypography.cardHeader)
                                     .foregroundColor(AppColors.primaryText)
                                 
-                                Text("Across \(miningResult.totalTradesAnalyzed) analyzed trades, no statistically significant revenge trading, toxic hours, or asymmetric risk habits were detected.")
+                                Text("Across \(miningResult.totalTradesAnalyzed) analyzed trades across all accounts, no statistically significant revenge trading, toxic hours, or asymmetric risk habits were detected.")
                                     .font(AppTypography.caption)
                                     .foregroundColor(AppColors.secondaryText)
                                     .multilineTextAlignment(.center)
@@ -104,6 +101,72 @@ public struct TraderBehavioralLeaksSheet: View {
                                 badgeVariant: .loss,
                                 description: toxic,
                                 recommendation: "Consider blacklisting or reducing position size by 50% until edge is re-validated in backtesting."
+                            )
+                        }
+                        
+                        if let ot = miningResult.overtradingLeakEn {
+                            leakCard(
+                                title: "Overtrading & Session Fatigue",
+                                icon: "arrow.triangle.swap",
+                                badgeText: "High Frequency",
+                                badgeVariant: .loss,
+                                description: ot,
+                                recommendation: "Cap daily executions at 3 trades. Cease trading when intraday target or loss threshold is reached."
+                            )
+                        }
+                        
+                        if let sl = miningResult.movingOrNoStopLossLeakEn {
+                            leakCard(
+                                title: "Stop Loss Discipline Breach",
+                                icon: "shield.slash.fill",
+                                badgeText: "Undefined Risk",
+                                badgeVariant: .loss,
+                                description: sl,
+                                recommendation: "Always set Stop Loss at order placement. Never widen or remove Stop Loss while holding drawdown."
+                            )
+                        }
+                        
+                        if let st = miningResult.streakTiltLeakEn {
+                            leakCard(
+                                title: "Losing Streak Tilt",
+                                icon: "exclamationmark.octagon.fill",
+                                badgeText: "Tilt Vulnerability",
+                                badgeVariant: .loss,
+                                description: st,
+                                recommendation: "Mandatory walk-away protocol: Halt all trading for the day after 2-3 consecutive losses."
+                            )
+                        }
+                        
+                        if let sz = miningResult.positionSizingLeakEn {
+                            leakCard(
+                                title: "Impulse Sizing & Martingale",
+                                icon: "scalemass.fill",
+                                badgeText: "Sizing Spike",
+                                badgeVariant: .loss,
+                                description: sz,
+                                recommendation: "Strictly adhere to fixed % risk per trade. Never increase lot size to revenge-recover past losses."
+                            )
+                        }
+                        
+                        if let wk = miningResult.weekendHoldingLeakEn {
+                            leakCard(
+                                title: "Weekend Holding Risk",
+                                icon: "calendar.badge.exclamationmark",
+                                badgeText: "Gap Exposure",
+                                badgeVariant: .loss,
+                                description: wk,
+                                recommendation: "Close all day trades before Friday market close to prevent adverse opening price gaps."
+                            )
+                        }
+                        
+                        if let fm = miningResult.fomoChasingLeakEn {
+                            leakCard(
+                                title: "FOMO & Chased Entries",
+                                icon: "bolt.fill",
+                                badgeText: "Late Entry",
+                                badgeVariant: .loss,
+                                description: fm,
+                                recommendation: "Wait for market structure pullbacks to key levels. Never buy green expansion candles or chase missed moves."
                             )
                         }
                     }

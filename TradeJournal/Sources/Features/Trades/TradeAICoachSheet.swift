@@ -171,13 +171,13 @@ public struct TradeAICoachSheet: View {
             }
         }
         .task {
-            if let cached = AICoachSessionStore.shared.get(key: trade.key) {
+            // For OPEN trades, NEVER use stale cached result because market price and position evolve continuously in real-time!
+            if !self.isOpen, let cached = AICoachSessionStore.shared.get(key: trade.key) {
                 self.coachingResult = cached.result
                 self.followUpMessages = cached.followUps
                 self.isLoading = false
-                // Always fetch fresh market bars in background so activeBars and real-time live price are up to date
                 Task {
-                    await refreshActiveBars(force: self.isOpen)
+                    await refreshActiveBars(force: false)
                 }
                 return
             }
@@ -204,7 +204,17 @@ public struct TradeAICoachSheet: View {
     private func buildLivePositionSnapshot(isVi: Bool) -> String {
         let currentTrade = dataStore.trades.first(where: { $0.key == trade.key }) ?? trade
         let latestBar = activeBars?.last
-        let curPrice = latestBar?.close ?? currentTrade.avgExit ?? currentTrade.avgEntry
+        let curPrice: Decimal = {
+            if let barClose = latestBar?.close {
+                return barClose
+            }
+            if isOpen {
+                // NEVER use avgExit for an open trade because avgExit is the partial close price!
+                return currentTrade.avgEntry
+            } else {
+                return currentTrade.avgExit ?? currentTrade.avgEntry
+            }
+        }()
         let isShort = currentTrade.direction == .short
         
         let df = DateFormatter()

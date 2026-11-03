@@ -273,6 +273,9 @@ extension TradeDataStore {
         if selectedAccountId == "default-acc" || selectedAccountId == "all" || selectedAccountId.isEmpty || !accounts.contains(where: { $0.id == selectedAccountId || TradeDataStore.isSameAccountId($0.id, selectedAccountId) }) {
             selectedAccountId = mostRecentActiveAccount?.id ?? visibleAccounts.first?.id ?? accounts.first?.id ?? "default-acc"
         }
+        // Automatically mine behavioral leaks across all trade history in the backend and sync into TraderProfile
+        TraderBehaviorMiningEngine.mineAndSyncToProfile(dataStore: self)
+        
         invalidatePerformanceCaches()
         if SupabaseService.shared.isConfigured {
             Task { [weak self] in

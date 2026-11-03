@@ -17,12 +17,37 @@ extension AIPromptBuilder {
         let isOpen = trade.status == .open || trade.closedAt == nil
         let pnlVal = NSDecimalNumber(decimal: trade.netPnl).doubleValue
         let pnlStr = (trade.netPnl >= 0 ? "+$" : "-$") + String(format: "%.2f", abs(pnlVal))
-        let volumeStr = String(format: "%.2f", NSDecimalNumber(decimal: trade.quantity).doubleValue)
+        let activeVolume: Decimal = (isOpen && trade.openQuantity > 0) ? trade.openQuantity : trade.quantity
+        let volumeStr: String = {
+            if isOpen && trade.isPartiallyClosed {
+                return "\(Formatters.formatDecimal(trade.openQuantity, maxDecimals: 2)) / \(Formatters.formatDecimal(trade.quantity, maxDecimals: 2))"
+            }
+            return String(format: "%.2f", NSDecimalNumber(decimal: trade.quantity).doubleValue)
+        }()
         let entryStr = Formatters.price(trade.avgEntry, symbol: trade.symbol)
         let latestBar = bars?.last
         let curLivePrice = latestBar?.close
-        let curLivePriceStr = curLivePrice.map { Formatters.price($0, symbol: trade.symbol) }
-        let exitStr = trade.avgExit.map { Formatters.price($0, symbol: trade.symbol) } ?? (isOpen ? (curLivePriceStr ?? "Live / Market") : "N/A")
+        let curLivePriceStr: String = {
+            if let cp = curLivePrice {
+                return Formatters.price(cp, symbol: trade.symbol)
+            }
+            return isVi ? "Thị trường" : "Live / Market"
+        }()
+        let exitStr = !isOpen ? (trade.avgExit.map { Formatters.price($0, symbol: trade.symbol) } ?? "N/A") : curLivePriceStr
+        let partialCloseLineVi: String = {
+            guard isOpen && trade.isPartiallyClosed, let pe = trade.avgExit else { return "" }
+            let closedQty = trade.closedQuantity
+            let exitPriceStr = Formatters.price(pe, symbol: trade.symbol)
+            let bankedStr = Formatters.formatPnL(trade.netPnl, currency: "USD")
+            return "\n• Đã chốt lời một phần (Partial TP): Giá chốt \(exitPriceStr) | Lãi đã bỏ túi: \(bankedStr) (Đã chốt \(Formatters.formatDecimal(closedQty, maxDecimals: 2)) lots, Còn chạy \(Formatters.formatDecimal(trade.openQuantity, maxDecimals: 2)) lots)"
+        }()
+        let partialCloseLineEn: String = {
+            guard isOpen && trade.isPartiallyClosed, let pe = trade.avgExit else { return "" }
+            let closedQty = trade.closedQuantity
+            let exitPriceStr = Formatters.price(pe, symbol: trade.symbol)
+            let bankedStr = Formatters.formatPnL(trade.netPnl, currency: "USD")
+            return "\n• Partial Take Profit: Exited at \(exitPriceStr) | Banked Profit Secured: \(bankedStr) (Closed \(Formatters.formatDecimal(closedQty, maxDecimals: 2)) lots, Runner \(Formatters.formatDecimal(trade.openQuantity, maxDecimals: 2)) lots)"
+        }()
         let slStr = trade.stopLoss.map { Formatters.price($0, symbol: trade.symbol) } ?? (isVi ? "Chưa cài SL" : "Not Set")
         let tpStr = trade.profitTarget.map { Formatters.price($0, symbol: trade.symbol) } ?? (isVi ? "Chưa cài TP" : "Not Set")
         let mistakes = trade.mistakes.isEmpty ? (isVi ? "Không ghi nhận" : "None") : trade.mistakes.joined(separator: ", ")
@@ -220,7 +245,7 @@ extension AIPromptBuilder {
                 if sl < entry {
                     // SL is BELOW entry -> Trailing Stop / Positive Lock!
                     let lockedPts = entry - sl
-                    let lockedUsd = lockedPts * trade.quantity * mult
+                    let lockedUsd = lockedPts * activeVolume * mult
                     let lockedUsdVal = (lockedUsd as NSDecimalNumber).doubleValue
                     let lockedStr = String(format: "$%.2f", lockedUsdVal)
                     return ProtectionStatus(
@@ -244,9 +269,24 @@ extension AIPromptBuilder {
                 } else {
                     // Initial risk above entry
                     let riskPts = sl - entry
-                    let riskUsd = riskPts * trade.quantity * mult
+                    let riskUsd = riskPts * activeVolume * mult
                     let riskUsdVal = (riskUsd as NSDecimalNumber).doubleValue
                     let riskStr = String(format: "$%.2f", riskUsdVal)
+                    
+                    if isOpen && trade.isPartiallyClosed && trade.netPnl >= riskUsd {
+                        let netOutcome = trade.netPnl - riskUsd
+                        let netOutcomeVal = (netOutcome as NSDecimalNumber).doubleValue
+                        let netStr = String(format: "$%.2f", netOutcomeVal)
+                        return ProtectionStatus(
+                            labelVi: "SL tại \(slPriceStr) TRÊN giá vào nhưng vị thế ĐÃ CHỐT LÃI MỘT PHẦN (+$\(String(format: "%.2f", (trade.netPnl as NSDecimalNumber).doubleValue))). Dù chạm SL vẫn DƯƠNG RÒNG tối thiểu +\(netStr) (Risk-Free: Khoản lãi đã bỏ túi lớn hơn rủi ro SL phần runner).",
+                            labelEn: "SL at \(slPriceStr) ABOVE entry, but position has BANKED PARTIAL PROFITS (+$\(String(format: "%.2f", (trade.netPnl as NSDecimalNumber).doubleValue))). Even if SL hits, net outcome is POSITIVE +\(netStr) (Risk-Free: banked profit covers SL downside on runner).",
+                            risk1RStr: isVi ? "0.00 USD (Risk-Free nhờ chốt lời)" : "$0.00 (Risk-Free via banked profit)",
+                            realizedRStr: "Risk-Free",
+                            isRiskFree: true,
+                            isPositiveLock: true
+                        )
+                    }
+                    
                     let rStr: String = {
                         if riskUsdVal > 0 {
                             let r = (trade.netPnl / riskUsd as NSDecimalNumber).doubleValue
@@ -268,7 +308,7 @@ extension AIPromptBuilder {
                 if sl > entry {
                     // SL is ABOVE entry -> Trailing Stop / Positive Lock!
                     let lockedPts = sl - entry
-                    let lockedUsd = lockedPts * trade.quantity * mult
+                    let lockedUsd = lockedPts * activeVolume * mult
                     let lockedUsdVal = (lockedUsd as NSDecimalNumber).doubleValue
                     let lockedStr = String(format: "$%.2f", lockedUsdVal)
                     return ProtectionStatus(
@@ -292,9 +332,24 @@ extension AIPromptBuilder {
                 } else {
                     // Initial risk below entry
                     let riskPts = entry - sl
-                    let riskUsd = riskPts * trade.quantity * mult
+                    let riskUsd = riskPts * activeVolume * mult
                     let riskUsdVal = (riskUsd as NSDecimalNumber).doubleValue
                     let riskStr = String(format: "$%.2f", riskUsdVal)
+                    
+                    if isOpen && trade.isPartiallyClosed && trade.netPnl >= riskUsd {
+                        let netOutcome = trade.netPnl - riskUsd
+                        let netOutcomeVal = (netOutcome as NSDecimalNumber).doubleValue
+                        let netStr = String(format: "$%.2f", netOutcomeVal)
+                        return ProtectionStatus(
+                            labelVi: "SL tại \(slPriceStr) DƯỚI giá vào nhưng vị thế ĐÃ CHỐT LÃI MỘT PHẦN (+$\(String(format: "%.2f", (trade.netPnl as NSDecimalNumber).doubleValue))). Dù chạm SL vẫn DƯƠNG RÒNG tối thiểu +\(netStr) (Risk-Free: Khoản lãi đã bỏ túi lớn hơn rủi ro SL phần runner).",
+                            labelEn: "SL at \(slPriceStr) BELOW entry, but position has BANKED PARTIAL PROFITS (+$\(String(format: "%.2f", (trade.netPnl as NSDecimalNumber).doubleValue))). Even if SL hits, net outcome is POSITIVE +\(netStr) (Risk-Free: banked profit covers SL downside on runner).",
+                            risk1RStr: isVi ? "0.00 USD (Risk-Free nhờ chốt lời)" : "$0.00 (Risk-Free via banked profit)",
+                            realizedRStr: "Risk-Free",
+                            isRiskFree: true,
+                            isPositiveLock: true
+                        )
+                    }
+                    
                     let rStr: String = {
                         if riskUsdVal > 0 {
                             let r = (trade.netPnl / riskUsd as NSDecimalNumber).doubleValue
@@ -376,7 +431,7 @@ extension AIPromptBuilder {
             [THÔNG SỐ VỊ THẾ ĐANG MỞ (LIVE OPEN POSITION)]:
             • Cặp tiền: \(trade.symbol) | Chiều vị thế: \(directionStrVi) | Khối lượng: \(volumeStr) lots
             • Thời gian mở lệnh: \(openedAtStr) | Thời gian giữ lệnh: \(durationStr)
-            • Giá vào (Entry): \(entryStr) | Thị giá hiện tại: \(exitStr)\(liveDeltaInfo)
+            • Giá vào (Entry): \(entryStr) | Thị giá hiện tại: \(curLivePriceStr)\(liveDeltaInfo)\(partialCloseLineVi)
             • Lợi nhuận tạm tính: \(pnlStr)\(excursionBlock)
             • Mức Cắt lỗ (SL): \(slStr) | Mức Chốt lời (TP): \(tpStr)
             • Trạng thái quản trị rủi ro & SL: \(protection.labelVi)
@@ -432,7 +487,7 @@ extension AIPromptBuilder {
             [LIVE OPEN POSITION AUDIT]:
             • Symbol: \(trade.symbol) | Direction: \(directionStrEn) | Volume: \(volumeStr) lots
             • Opened At: \(openedAtStr) | Duration: \(durationStr)
-            • Entry Price: \(entryStr) | Current Price: \(exitStr)\(liveDeltaInfo)
+            • Entry Price: \(entryStr) | Current Price: \(curLivePriceStr)\(liveDeltaInfo)\(partialCloseLineEn)
             • Unrealized P&L: \(pnlStr)\(excursionBlock)
             • Stop Loss: \(slStr) | Take Profit: \(tpStr)
             • Protection State: \(protection.labelEn)
