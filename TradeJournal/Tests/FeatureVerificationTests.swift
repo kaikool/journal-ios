@@ -556,7 +556,7 @@ final class FeatureVerificationTests: XCTestCase {
         XCTAssertFalse(preTradePrompt.contains("(GMT+7)"))
         XCTAssertFalse(preTradePrompt.contains("(UTC)"))
         XCTAssertFalse(preTradePrompt.contains("GMT+7"))
-        XCTAssertTrue(preTradePrompt.contains("Cấu trúc thực thi H1 qua Chuỗi 15 nến"))
+        XCTAssertTrue(preTradePrompt.contains("Chuỗi 24 nến H1 gần nhất"))
         XCTAssertTrue(preTradePrompt.contains("PRE-TRADE SETUP SPECIFICATION"))
         
         // 3. Candlestick Tape Markdown Table Header

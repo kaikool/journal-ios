@@ -1,8 +1,8 @@
 import SwiftUI
 
-// MARK: - Pre-Trade Quantitative Context Card (EMA 21/50 Trend & Institutional Liquidity)
-// Replaces complex lagging market structure machines with clean, robust EMA 21 & 50 multi-timeframe
-// trend evaluation alongside calendar-verified D1 PDH/PDL and institutional liquidity sweeps.
+// MARK: - Pre-Trade Quantitative Context Card (EMA 21/50 Multi-Timeframe Trend & Key Levels)
+// Provides clean, robust EMA 21 & 50 multi-timeframe trend evaluation alongside
+// daily PDH/PDL, ADR 14, H4 Swing High/Low, and Wilder RSI-14 momentum.
 public struct PreTradeContextMetricsCard: View {
     public let d1Bars: [MarketBar]
     public let h4Bars: [MarketBar]
@@ -34,18 +34,34 @@ public struct PreTradeContextMetricsCard: View {
         )
     }
     
-    private var liquidityResult: LiquidityAnalysisResult {
-        LiquidityEngine.analyzeLiquidity(
-            symbol: symbol,
-            barsM15: m15Bars,
-            barsH1: h1Bars,
-            barsH4: h4Bars,
-            barsD1: d1Bars
-        )
+    private var livePrice: Decimal? {
+        m15Bars.last?.close ?? h1Bars.last?.close ?? h4Bars.last?.close ?? d1Bars.last?.close
     }
     
-    private var livePrice: Decimal? {
-        m15Bars.last?.close ?? h4Bars.last?.close ?? d1Bars.last?.close
+    private var d1KeyLevels: (pdh: Decimal?, pdl: Decimal?, adr: Decimal?) {
+        guard d1Bars.count >= 2 else { return (nil, nil, nil) }
+        let prev = d1Bars[d1Bars.count - 2]
+        let lookback = min(14, d1Bars.count - 1)
+        let ranges = d1Bars.suffix(lookback).map { $0.high - $0.low }
+        let avgRange = ranges.reduce(Decimal.zero, +) / Decimal(lookback)
+        return (prev.high, prev.low, avgRange)
+    }
+    
+    private var h4Swing: (high: Decimal?, low: Decimal?) {
+        guard !h4Bars.isEmpty else { return (nil, nil) }
+        let h = h4Bars.suffix(24).map(\.high).max()
+        let l = h4Bars.suffix(24).map(\.low).min()
+        return (h, l)
+    }
+    
+    private var momentumSnapshot: (rsi: Double, signal: Double, isBullish: Bool)? {
+        let targetBars = !h1Bars.isEmpty ? h1Bars : m15Bars
+        guard targetBars.count >= 14 else { return nil }
+        let window = MomentumEngine.computeWindow(bars: targetBars, windowSize: 1)
+        guard let pt = window.points.last else { return nil }
+        let r = NSDecimalNumber(decimal: pt.rsi14).doubleValue
+        let s = NSDecimalNumber(decimal: pt.ema9).doubleValue
+        return (r, s, r >= s)
     }
     
     public var body: some View {
@@ -58,7 +74,7 @@ public struct PreTradeContextMetricsCard: View {
                             .font(AppTypography.cardHeaderUppercase)
                             .foregroundColor(AppColors.brand)
                         
-                        Text("TREND & LIQUIDITY CONTEXT")
+                        Text("TREND & STRUCTURAL CONTEXT")
                             .font(AppTypography.cardHeaderUppercase)
                             .foregroundColor(AppColors.secondaryText)
                             .tracking(0.5)
@@ -100,16 +116,16 @@ public struct PreTradeContextMetricsCard: View {
                 
                 Divider().background(AppColors.border.opacity(0.3))
                 
-                // Section 2: Institutional Liquidity Reference Levels
+                // Section 2: Key Price Levels (PDH / PDL, ADR 14, H4 Swing High / Low)
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("INSTITUTIONAL LIQUIDITY LEVELS")
+                    Text("KEY STRUCTURAL LEVELS")
                         .font(AppTypography.cardHeaderUppercase)
                         .foregroundColor(AppColors.secondaryText)
                         .tracking(0.3)
                     
                     HStack(spacing: 12) {
                         // D1 PDH / PDL
-                        if let h = liquidityResult.pdh, let l = liquidityResult.pdl {
+                        if let h = d1KeyLevels.pdh, let l = d1KeyLevels.pdl {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("D1 PDH / PDL")
                                     .font(AppTypography.statLabel)
@@ -120,52 +136,53 @@ public struct PreTradeContextMetricsCard: View {
                             }
                         }
                         
-                        Spacer()
-                        
-                        // Nearest BSL / SSL Targets
-                        if let bsl = liquidityResult.nearestBSL {
+                        // ADR 14
+                        if let adr = d1KeyLevels.adr {
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("Nearest BSL")
+                                Text("14-Day ADR")
                                     .font(AppTypography.statLabel)
                                     .foregroundColor(AppColors.secondaryText)
-                                Text(Formatters.price(bsl.price, symbol: symbol))
+                                Text(Formatters.price(adr, symbol: symbol))
                                     .font(AppTypography.number(11, weight: .semibold))
-                                    .foregroundColor(AppColors.loss)
+                                    .foregroundColor(AppColors.secondaryText)
                             }
                         }
                         
-                        if let ssl = liquidityResult.nearestSSL {
+                        Spacer()
+                        
+                        // H4 Swing High & Low
+                        if let sh = h4Swing.high, let sl = h4Swing.low {
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("Nearest SSL")
+                                Text("H4 High / Low")
                                     .font(AppTypography.statLabel)
                                     .foregroundColor(AppColors.secondaryText)
-                                Text(Formatters.price(ssl.price, symbol: symbol))
+                                Text("\(Formatters.price(sh, symbol: symbol)) / \(Formatters.price(sl, symbol: symbol))")
                                     .font(AppTypography.number(11, weight: .semibold))
-                                    .foregroundColor(AppColors.profit)
+                                    .foregroundColor(AppColors.brand)
                             }
                         }
                     }
                 }
                 
-                // Section 3: Recent SFP Sweeps (if any)
-                if let sweep = liquidityResult.latestSweep {
-                    HStack(spacing: 6) {
-                        let isBuySweep = sweep.sweepType == .buySideSwept
-                        Image(systemName: isBuySweep ? "arrow.down.right.circle.fill" : "arrow.up.right.circle.fill")
-                            .foregroundColor(isBuySweep ? AppColors.loss : AppColors.profit)
-                            .font(AppTypography.caption)
-                        
-                        Text("\(sweep.levelName) Swept (\(sweep.sweepType == .buySideSwept ? "Bearish SFP" : "Bullish SFP"))")
+                // Section 3: Momentum & RSI 14
+                if let mom = momentumSnapshot {
+                    Divider().background(AppColors.border.opacity(0.3))
+                    
+                    HStack(spacing: 8) {
+                        Text("RSI(14): \(String(format: "%.1f", mom.rsi))")
                             .font(AppTypography.captionBold)
-                            .foregroundColor(isBuySweep ? AppColors.loss : AppColors.profit)
+                            .foregroundColor(AppColors.primaryText)
+                        
+                        Text("Signal: \(String(format: "%.1f", mom.signal))")
+                            .font(AppTypography.captionMicro)
+                            .foregroundColor(AppColors.secondaryText)
                         
                         Spacer()
                         
-                        Text("\(sweep.barsAgo) bars ago")
+                        Text(mom.isBullish ? "Bullish Momentum" : "Bearish Momentum")
                             .font(AppTypography.captionMicro)
-                            .foregroundColor(AppColors.secondaryText)
+                            .foregroundColor(mom.isBullish ? AppColors.profit : AppColors.loss)
                     }
-                    .appSubCardStyle(cornerRadius: 6, padding: 6)
                 }
             }
         }

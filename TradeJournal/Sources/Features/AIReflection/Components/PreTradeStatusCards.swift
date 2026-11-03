@@ -14,11 +14,11 @@ public struct PreTradeLoadingCard: View {
                 TradeJournalProLoader(size: 28)
                 
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(isLoadingData ? "Streaming Multi-Timeframe Bars..." : "Auditing Liquidity & Formulating Bias...")
+                    Text(isLoadingData ? "Streaming Multi-Timeframe Bars..." : "Evaluating EMA Trend & Formulating Setups...")
                         .font(AppTypography.rowTitle)
                         .foregroundColor(AppColors.primaryText)
                     
-                    Text("Risk AI is cross-referencing D1 macro regime, H4 order blocks, and M15 liquidity triggers.")
+                    Text("Risk AI is cross-referencing D1/H4 EMA trends, key price levels, and M15 execution triggers.")
                         .font(AppTypography.caption)
                         .foregroundColor(AppColors.secondaryText)
                         .lineLimit(2)

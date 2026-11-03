@@ -104,72 +104,31 @@ extension AIPromptBuilder {
         let h4EMAStr = formatEMALevels(emaAnalysis.h4, tfName: "H4")
         let h1EMAStr = formatEMALevels(emaAnalysis.h1, tfName: "H1")
         
-        // Accurate H4 Swing High & Swing Low Detection
-        let h4Pivots = LiquidityEngine.identifyPivots(bars: h4Bars, window: 2, timeframe: "H4")
+        // Key H4 Swing High & Swing Low Levels (Direct Structural Scanning)
         let h4SwingHighStr: String = {
-            if let high = h4Pivots.filter({ $0.type == .buySide }).last?.price {
-                return formatPrice(high)
-            }
-            if let maxBar = h4Bars.suffix(20).max(by: { $0.high < $1.high }) {
+            if let maxBar = h4Bars.suffix(24).max(by: { $0.high < $1.high }) {
                 return formatPrice(maxBar.high)
             }
             return "N/A"
         }()
         let h4SwingLowStr: String = {
-            if let low = h4Pivots.filter({ $0.type == .sellSide }).last?.price {
-                return formatPrice(low)
-            }
-            if let minBar = h4Bars.suffix(20).min(by: { $0.low < $1.low }) {
+            if let minBar = h4Bars.suffix(24).min(by: { $0.low < $1.low }) {
                 return formatPrice(minBar.low)
             }
             return "N/A"
         }()
         
-        // 3. Institutional Liquidity & SFP Sweeps
-        let liquidity = LiquidityEngine.analyzeLiquidity(
-            symbol: symbol,
-            barsM15: execBars,
-            barsH4: h4Bars,
-            barsD1: d1Bars
-        )
-        
-        // 3b. Recent H4 Candles (Last 3 bars OHLC)
+        // 3a. Recent H4 Candles (Last 3 bars OHLC)
         let h4CandlesSummary = buildH4CandleSummary(bars: h4Bars, count: 3, isVi: isVi)
         
-        // 3c. 24-Candle H1 Execution Series (OHLC + EMA 21/50 + Wilder RSI 14)
+        // 3b. 24-Candle H1 Execution Series (OHLC + EMA 21/50 + Wilder RSI 14)
         let h1CandlesSummary = buildH1CandleSeriesSummary(bars: execBars, count: 24, symbol: symbol, isVi: isVi)
         
-        // 3d. 16-Candle M15 Micro-Execution Series
+        // 3c. 16-Candle M15 Micro-Execution Series
         let m15CandlesSummary = buildM15CandleSeriesSummary(bars: m15Bars, count: 16, symbol: symbol, isVi: isVi)
         
-        // 3e. Live Unclosed Candle Dynamics (Current Price Action Pulse)
+        // 3d. Live Unclosed Candle Dynamics (Current Price Action Pulse)
         let liveCandlePulse = buildLiveUnclosedCandlePulse(bar: execBars.last ?? m15Bars.last, isVi: isVi)
-        
-        let nearestBSLStr: String = {
-            if let bsl = liquidity.nearestBSL {
-                let dist = liquidity.distanceToBSLPips.map { " (khoảng cách \(formatPrice($0)))" } ?? ""
-                return "\(bsl.label) tại \(formatPrice(bsl.price))\(dist)"
-            }
-            return isVi ? "Không có mốc BSL gần" : "No nearby BSL pool"
-        }()
-        
-        let nearestSSLStr: String = {
-            if let ssl = liquidity.nearestSSL {
-                let dist = liquidity.distanceToSSLPips.map { " (khoảng cách \(formatPrice($0)))" } ?? ""
-                return "\(ssl.label) tại \(formatPrice(ssl.price))\(dist)"
-            }
-            return isVi ? "Không có mốc SSL gần" : "No nearby SSL pool"
-        }()
-        
-        let sweepsStr: String = {
-            if liquidity.recentSweeps.isEmpty {
-                return isVi ? "Không có nhịp quét gần đây" : "No recent sweeps"
-            }
-            return liquidity.recentSweeps.prefix(2).map { sw in
-                let typeStr = sw.sweepType == .buySideSwept ? "Quét đỉnh (Bearish SFP)" : "Quét đáy (Bullish SFP)"
-                return "\(sw.levelName) [\(typeStr)] tại \(formatPrice(sw.sweptPrice)), râu \(formatPrice(sw.wickExtreme))"
-            }.joined(separator: "; ")
-        }()
         
         // 4. H1 Momentum & RSI Metrics
         let momentumWindow = MomentumEngine.computeWindow(bars: execBars, windowSize: 10)
@@ -376,7 +335,7 @@ extension AIPromptBuilder {
             - \(dailyBufferStr)\(riskGuardrailWarning)
             \(contractSizingBlockVi)
             \(behavioralLeaksBlock)
-            [CẤU TRÚC THỊ TRƯỜNG VÀ CHỈ BÁO KỸ THUẬT (EMA 21/50 & RSI 14)]:
+            [CẤU TRÚC THỊ TRƯỜNG & HỆ THỐNG CHỈ BÁO KỸ THUẬT (EMA 21/50 & RSI 14)]:
             - Cặp tiền: \(symbol) | Thị giá hiện tại: \(currentPrice)
 
             - Khung D1 (Macro Bias): Xu hướng [\(emaAnalysis.d1?.trend.label ?? "N/A")]
@@ -392,8 +351,7 @@ extension AIPromptBuilder {
             - Khung H1 (Thực thi và Động lượng): Xu hướng [\(emaAnalysis.h1?.trend.label ?? "N/A")]
               EMA H1: \(h1EMAStr)
               RSI(14) Wilder: Mức hiện tại: \(rsiStr) | Signal: \(rsiSignalStr) | Phân kỳ: [\(divStr)]
-              Vùng thanh khoản: BSL gần nhất: \(nearestBSLStr) | SSL gần nhất: \(nearestSSLStr)
-              Quét thanh khoản SFP: \(sweepsStr)
+              Mốc tham chiếu then chốt: Đỉnh Swing H4: \(h4SwingHighStr) | Đáy Swing H4: \(h4SwingLowStr) | PDH: \(d1PDH) | PDL: \(d1PDL)
 
             - HÀNH ĐỘNG GIÁ SỐNG (LIVE CANDLE PULSE):
             \(liveCandlePulse)
@@ -408,35 +366,42 @@ extension AIPromptBuilder {
             \(liveUpdateBlock)\(thesisContinuityBlock)
             VAI TRÒ VÀ NGUYÊN TẮC CỦA NHÀ GIAO DỊCH CHUYÊN NGHIỆP:
             Bạn là một Senior Institutional Portfolio Manager & Master Trader (Chuyên gia Phân tích & Quản lý Quỹ).
-            Triết lý giao dịch:
-            1. Giao dịch là bài toán bảo vệ vốn và tìm kiếm lợi thế xác suất cao. Nếu thị trường có cơ hội rõ ràng thì chủ động lên kế hoạch giao dịch cụ thể; nếu thị trường tranh chấp hoặc chưa có lợi thế thì phân tích rõ lý do và khuyến nghị kiên nhẫn quan sát.
-            2. Luôn nhìn thị trường bằng con mắt khách quan, bóc tách cấu trúc giá và các vùng thanh khoản của phe tổ chức.
-            3. Phản biện toàn diện: Từ cấu trúc xu hướng, bẫy thanh khoản, đến tín hiệu kích hoạt nến và tỷ lệ R:R.
+            TRIẾT LÝ GIAO DỊCH VÀ NGUYÊN TẮC HÀNH ĐỘNG QUYẾT ĐOÁN:
+            1. ƯU TIÊN ĐƯA RA KẾ HOẠCH GIAO DỊCH CỤ THỂ (BUY HOẶC SELL):
+               - Thị trường luôn dao động giữa Đỉnh và Đáy ngày/tuần. Việc giá nằm giữa Swing High và Swing Low là diễn biến hoàn toàn bình thường, TUYỆT ĐỐI KHÔNG ĐƯỢC coi đó là "kẹt thanh khoản" hay "bẫy thanh khoản" để bao biện cho việc kết luận FLAT (Đứng ngoài).
+               - Nhà giao dịch chuyên nghiệp tìm kiếm điểm vào lệnh tối ưu tại các nhịp hồi về vùng giá trị EMA 21 / EMA 50 hoặc giao dịch theo đà bứt phá cấu trúc.
+            2. ĐỊNH HƯỚNG THEO HỆ THỐNG XU HƯỚNG EMA 21 & EMA 50:
+               - KỊCH BẢN BUY: Khi D1/H4 xu hướng TĂNG (EMA 21 >= EMA 50, giá trên EMA) và H1/M15 hồi về kiểm tra EMA 21/50 hoặc nến từ chối giảm: Chủ động lập kế hoạch BUY với Entry tại vùng EMA, SL dưới đáy gần nhất / dưới EMA, TP tại Swing High (\(h4SwingHighStr)) hoặc PDH (\(d1PDH)).
+               - KỊCH BẢN SELL: Khi D1/H4 xu hướng GIẢM (EMA 21 <= EMA 50, giá dưới EMA) và H1/M15 hồi lên kiểm tra EMA 21/50 hoặc nến từ chối tăng: Chủ động lập kế hoạch SELL với Entry tại vùng EMA, SL trên đỉnh gần nhất / trên EMA, TP tại Swing Low (\(h4SwingLowStr)) hoặc PDL (\(d1PDL)).
+            3. QUY ĐỊNH VỀ KẾT LUẬN FLAT (ĐỨNG NGOÀI):
+               - CHỈ ĐƯỢC KẾT LUẬN FLAT trong trường hợp duy nhất: Thị trường hoàn toàn không có biên độ biến động (thị trường ngày lễ hoặc biên độ cả ngày nhỏ hơn 15% ADR) hoặc sắp công bố tin tức cực kỳ nguy hiểm trong vòng 15 phút.
+               - Trong mọi điều kiện thị trường có sóng bình thường: BẮT BUỘC ĐƯA RA HƯỚNG LỆNH CỤ THỂ (BUY hoặc SELL), kể cả lệnh chờ đón Limit tại vùng EMA!
 
             NHIỆM VỤ PHÂN TÍCH VÀ LẬP KẾ HOẠCH GIAO DỊCH (4 PHẦN):
 
             ### 1. Cấu trúc D1
-            - Xu hướng D1: Vị trí sóng, khoảng cách so với EMA(21) D1 và các mốc thanh khoản PDH (\(d1PDH)) / PDL (\(d1PDL)).
-            - Đánh giá xung đột đa khung: D1 tăng nhưng H4 suy kiệt hoặc đang tiếp cận cản lớn thì lưu ý không đu đỉnh.
+            - Xu hướng D1: Vị trí thị giá so với EMA 21 và EMA 50 D1, biên độ dao động PDH (\(d1PDH)) / PDL (\(d1PDL)) và mức ADR (\(d1ADR)).
+            - Xác định phe chủ đạo đang kiểm soát thị trường.
 
-            ### 2. Cấu trúc H4 & Vùng Cung Cầu
-            - Cấu trúc sóng H4: Đỉnh/đáy Swing, các vùng Cung/Cầu tổ chức then chốt (Order Block, Fair Value Gap) và bẫy thanh khoản phe nhỏ lẻ (Equal Highs/Lows).
-            - Nếu giá đang ở vùng tranh chấp không có lợi thế cấu trúc: Phân tích rõ các ranh giới cần theo dõi.
+            ### 2. Cấu trúc H4 & Mức Cản Then Chốt
+            - Cấu trúc sóng H4: Đỉnh Swing High (\(h4SwingHighStr)) và Đáy Swing Low (\(h4SwingLowStr)).
+            - Vị trí giá so với EMA 21 / EMA 50 H4: Giá đang bám trend tăng, đang trong nhịp hồi điều chỉnh (pullback), hay đang test cản.
+            - Xác định các vùng cản chốt lời tiềm năng theo xu hướng.
 
             ### 3. Tín hiệu vào lệnh H1/M15
-            - Hành động giá nến H1/M15 thời gian thực: Thân nến, râu nến từ chối giá, tín hiệu quét thanh khoản (SFP) hoặc xác nhận cấu trúc (MSS/CHoCH).
-            - Nếu nến chưa chạm vùng giá trị: Có thể lên kịch bản đón đầu có điều kiện (Pending/Limit Setup) tại các vùng cản then chốt.
+            - Hành động giá nến H1/M15: Nến từ chối tại EMA 21/50, nến nhấn chìm, hoặc lực đẩy phá vỡ.
+            - Trạng thái RSI(14): Động lượng mua/bán, phân kỳ và tín hiệu cắt Signal.
+            - Xác định thời điểm và vùng kích hoạt lệnh tối ưu.
 
             ### 4. Kế hoạch giao dịch & Quản lý vốn
-            - KẾT LUẬN: [BUY (LONG) / SELL (SHORT) / FLAT (ĐỨNG NGOÀI)].
-            - TỶ LỆ R:R THAM CHIẾU: Mục tiêu theo hồ sơ trader là 1:\(String(format: "%.1f", targetRR)). Khi đưa ra setup, ưu tiên tối ưu hóa điểm vào và cắt lỗ để hướng tới tỷ lệ R:R này.
-            - NẾU THẤY CÓ SETUP KHẢ THI (BUY/SELL hoặc Limit/Stop Order):
-              - Điểm vào tối ưu (Entry).
-              - Cắt lỗ bảo vệ cấu trúc (Structural Invalidation SL): Mức giá SL cụ thể.
-              - Chốt lời (Targets): TP 1 và TP 2 tại cản H4.
+            - KẾT LUẬN: [BUY (LONG) hoặc SELL (SHORT)] (Chỉ chọn FLAT nếu thị trường chết thanh khoản < 15% ADR).
+            - THIẾT LẬP LỆNH CHI TIẾT:
+              - Hướng lệnh: [BUY hoặc SELL]
+              - Điểm vào tối ưu (Entry): Mức giá cụ thể (vào ngay hoặc Limit tại vùng kiểm tra EMA 21/50).
+              - Cắt lỗ (Stop Loss): Mức giá SL cụ thể bảo vệ cấu trúc dưới/trên EMA.
+              - Chốt lời (Take Profit): TP 1 tại [Mức giá] | TP 2 tại [Mức giá]
               - Khối lượng (Volume): Tính chính xác số lot theo mức rủi ro \(numericRisk)% và số tiền rủi ro \(targetRiskDollarsStr).
-              - Tỷ lệ R:R thực tế đạt được: [Ghi rõ số R:R, ví dụ 1:\(String(format: "%.1f", targetRR))].
-            - NẾU ĐÁNH GIÁ THỊ TRƯỜNG CHƯA ĐỦ ĐIỀU KIỆN / KHÔNG CÓ LỢI THẾ: Kết luận FLAT (Đứng ngoài) và phân tích rõ lý do kỹ thuật vì sao chưa nên vào lệnh lúc này.
+              - Tỷ lệ R:R thực tế đạt được: Tối ưu để hướng tới 1:\(String(format: "%.1f", targetRR)).
 
             BẮT BUỘC KẾT THÚC BẰNG BẢNG THÔNG SỐ SETUP ĐÚNG ĐỊNH DẠNG SAU:
             [PRE-TRADE SETUP SPECIFICATION]
@@ -489,7 +454,7 @@ extension AIPromptBuilder {
             - H1 Execution & Momentum: Trend [\(emaAnalysis.h1?.trend.label ?? "N/A")]
               EMA H1: \(h1EMAStr)
               Wilder RSI(14): Current: \(rsiStr) | Signal: \(rsiSignalStr) | Divergence: [\(divStr)]
-              Liquidity: BSL: \(nearestBSLStr) | SSL: \(nearestSSLStr) | Sweeps: \(sweepsStr)
+              Key Reference Levels: H4 Swing High: \(h4SwingHighStr) | H4 Swing Low: \(h4SwingLowStr) | PDH: \(d1PDH) | PDL: \(d1PDL)
 
             - LIVE CANDLE PULSE:
             \(liveCandlePulse)
@@ -504,34 +469,37 @@ extension AIPromptBuilder {
             \(liveUpdateBlock)\(thesisContinuityBlock)
             ROLE & INSTITUTIONAL MINDSET:
             You are a SENIOR INSTITUTIONAL PORTFOLIO MANAGER & MASTER TRADER.
-            Core philosophy:
-            1. Capital preservation and probabilistic edge come first. Actively identify quality setups when market structure offers clear asymmetrical advantage; when structure is ambiguous, explain why and recommend observation.
-            2. Maintain an objective institutional mindset, mapping liquidity pools and structural order flow.
-            3. Full-spectrum critique: multi-timeframe alignment, key barriers, and dynamic R:R.
+            DECISIVE ACTION PHILOSOPHY:
+            1. MANDATORY DECISIVE BIAS (BUY OR SELL):
+               - Markets naturally oscillate between daily and weekly highs and lows. The fact that price is between Swing High and Swing Low is entirely normal—NEVER treat this as "trapped liquidity" or an excuse to default to FLAT (stand aside).
+               - Elite traders hunt for optimal entries on pullbacks to value zones (EMA 21 / EMA 50) or trend breakouts.
+            2. MULTI-TIMEFRAME EMA TREND ALIGNMENT:
+               - BUY BIAS: When D1/H4 trend is BULLISH (EMA 21 >= EMA 50, price above EMAs) and H1/M15 pulls back to test EMA 21/50 or prints bullish rejection: Formulate an actionable BUY setup with Entry at EMA, SL below recent structural support, and TP at Swing High (\(h4SwingHighStr)) or PDH (\(d1PDH)).
+               - SELL BIAS: When D1/H4 trend is BEARISH (EMA 21 <= EMA 50, price below EMAs) and H1/M15 rallies to test EMA 21/50 or prints bearish rejection: Formulate an actionable SELL setup with Entry at EMA, SL above recent structural resistance, and TP at Swing Low (\(h4SwingLowStr)) or PDL (\(d1PDL)).
+            3. STRICT RULES ON "FLAT":
+               - FLAT is ONLY permitted if the market is completely dead (< 15% of ADR) or major high-impact news is due within 15 minutes. In all normal trending/oscillating conditions, an actionable BUY or SELL plan (including Limit orders at EMA value) is MANDATORY.
 
             TASK: INSTITUTIONAL PRE-TRADE PLAN (4 SECTIONS):
 
             ### 1. D1 Structure
-            - Evaluate current trend stage, extension relative to EMA(21), and key PDH (\(d1PDH)) / PDL (\(d1PDL)) liquidity targets.
-            - Identify multi-timeframe conflicts: Never buy into HTF resistance.
+            - Evaluate macro trend, extension relative to EMA 21 and 50, and key PDH (\(d1PDH)) / PDL (\(d1PDL)) boundaries.
 
-            ### 2. H4 Structure & Key Zones
-            - Map H4 swing high/low structure, institutional Supply/Demand zones (Order Blocks, Fair Value Gaps), and retail liquidity traps.
-            - Confirm key structural invalidation levels for Stop Loss placement.
+            ### 2. H4 Structure & Key Barriers
+            - Map H4 swing high (\(h4SwingHighStr)) and swing low (\(h4SwingLowStr)).
+            - Identify pullback value zones around EMA 21 and 50 and key trend targets.
 
             ### 3. H1/M15 Confirmation & Trigger
-            - Read live candle pulse and rejection wicks. If market hasn't reached key zones yet, condition-based pending setups (Limit/Stop orders) are permitted.
+            - Read live candle pulse, rejection wicks at EMA 21/50, and RSI momentum.
 
             ### 4. Trade Plan & Risk Management
-            - Decisive Verdict: [BUY / SELL / FLAT].
-            - Target R:R Ratio: Benchmark goal configured in trader profile is 1:\(String(format: "%.1f", targetRR)). Optimize entry and invalidation SL to target this ratio.
-            - IF A VALID SETUP EXISTS (BUY/SELL or Pending Order):
-              - Precise Entry price.
+            - Decisive Verdict: [BUY or SELL] (Only FLAT if dead volatility < 15% ADR).
+            - Target R:R Ratio: Benchmark goal configured in trader profile is 1:\(String(format: "%.1f", targetRR)).
+            - ACTIONABLE TRADE SPECIFICATION:
+              - Precise Entry price (market or pending limit at EMA).
               - Structural Invalidation SL.
               - Take Profit Targets (TP1 & TP2).
               - Calculated lot volume based on \(numericRisk)% risk (\(targetRiskDollarsStr)).
               - Expected R:R ratio.
-            - IF MARKET OFFERS NO EDGE / UNFAVORABLE: Conclude FLAT (stand aside) with specific technical reasons explaining why risk is unfavorable now.
 
             [PRE-TRADE SETUP SPECIFICATION]
             - Direction: [BUY or SELL or FLAT]
@@ -768,50 +736,52 @@ extension AIPromptBuilder {
             Nhiệm vụ của bạn là đối chiếu các góc nhìn trên để đúc kết thành MỘT BẢN PHÂN TÍCH DUY NHẤT VÀ CHẶT CHẼ NHẤT mang tên RISK AI.
             Tuyệt đối không nhắc đến "góc nhìn 1/2/3", "mô hình AI", hay bất kỳ từ ngữ "hội đồng" nào. Bạn chính là thực thể RISK AI duy nhất phát ngôn trực tiếp với trader.
 
-            BẮT BUỘC ÁP DỤNG BỘ QUY TẮC 4 TẦNG KHI CÓ Ý KIẾN BẤT ĐỒNG / KHÁC BIỆT:
+            BẮT BUỘC ÁP DỤNG BỘ QUY TẮC 4 TẦNG HÀNH ĐỘNG QUYẾT ĐOÁN:
 
-            1. PHÂN XỬ CẤU TRÚC XU HƯỚNG D1:
-            - Lấy xu hướng theo phe đa số.
-            - NẾU CÓ Ý KIẾN BẤT ĐỒNG (cảnh báo D1 đang chạm cản mạnh hoặc suy kiệt động lượng): Bắt buộc dùng mốc cản của ý kiến này làm "VÙNG BIÊN GIỚI HẠN", cảnh báo trader không mua đuổi khi giá chạm biên này và hạ kỳ vọng Chốt Lời (TP) về trước cản này.
+            1. PHÂN XỬ CẤU TRÚC XU HƯỚNG D1 & H4:
+            - Xác định xu hướng chủ đạo qua liên kết EMA 21 & EMA 50.
+            - Nếu EMA D1/H4 thiên TĂNG: Định hướng chủ đạo là BUY (Long) khi giá hồi về các vùng hỗ trợ EMA.
+            - Nếu EMA D1/H4 thiên GIẢM: Định hướng chủ đạo là SELL (Short) khi giá hồi lên các vùng kháng cự EMA.
 
-            2. PHÂN XỬ CẤU TRÚC H4 & BÓC TÁCH VÙNG GIÁ:
-            - VÙNG GIÁ CẦN QUAN TÂM: Là các mốc giá/vùng Order Block, FVG có sự trùng khớp hoặc bổ trợ giữa các góc nhìn, nơi có xác suất phản ứng giá cao nhất.
-            - VÙNG TIỀM ẨN BẪY (TRAPS / INDUCEMENT): Là các mốc giá bị cảnh báo là bẫy thanh khoản của phe tổ chức, cản yếu hoặc vùng dễ bị thò râu quét Stop Loss. Bắt buộc cảnh báo trader không đặt lệnh đón sớm tại đây.
-            - Nếu có ý kiến phát hiện vùng cản đối diện: Lấy mốc đó làm mục tiêu Chốt Lời 1 (TP 1) để bảo vệ vốn.
+            2. PHÂN XỬ CẤU TRÚC H4 & CÁC VÙNG CẢN QUAN TRỌNG:
+            - VÙNG GIÁ QUAN TÂM: Là các mốc giá kiểm tra EMA 21/50 hoặc Swing High/Low có sự đồng thuận cao nhất để thiết lập điểm vào (Entry).
+            - CẢN QUAN TRỌNG: Mốc đỉnh/đáy đối diện dùng làm mục tiêu Chốt Lời (TP 1 / TP 2) để bảo vệ lợi nhuận.
 
-            3. PHÂN XỬ TÍN HIỆU H1/M15:
-            - ÁP DỤNG NGUYÊN TẮC CẨN TRỌNG TỐI ĐA: Nếu có bên bảo "đã đủ điều kiện vào ngay" nhưng có bên cảnh báo "tín hiệu chưa dứt khoát / dễ là phá vỡ giả (False Break)": Bắt buộc đứng về phía ý kiến cẩn trọng. Đánh giá trạng thái là "CẦN ĐIỀU KIỆN XÁC NHẬN BỔ SUNG" và chỉ rõ điều kiện nến đóng cửa vượt mốc giá cụ thể trước khi kích hoạt lệnh.
+            3. PHÂN XỬ TÍN HIỆU H1/M15 & ĐỘNG LƯỢNG:
+            - Nếu tín hiệu H1/M15 đã có nến xác nhận hoặc chạm vùng EMA: Cho phép vào lệnh Market.
+            - Nếu giá đang lưng chừng hoặc có ý kiến cho rằng cần điểm vào đẹp hơn: Thiết lập lệnh CHỜ (Limit Order) tại vùng kiểm tra EMA 21/50 thay vì đứng ngoài!
 
-            4. PHÂN XỬ KẾ HOẠCH GIAO DỊCH & QUẢN TRỊ RỦI RO:
-            - Điểm Dừng Lỗ (Stop Loss): BẮT BUỘC CHỌN MỐC SL AN TOÀN VÀ KỶ LUẬT NHẤT (không bao giờ chọn SL ngắn thiếu an toàn).
-            - Hướng lệnh:
-              + Nếu đa số chọn BUY/SELL nhưng có bên cảnh báo ngược chiều hoặc đứng ngoài: Vẫn cho phép bám theo xu hướng đa số nhưng BẮT BUỘC KHUYẾN NGHỊ GIẢM 50% KHỐI LƯỢNG (Volume) và dời Entry về lệnh chờ Limit tại Vùng Cần Quan Tâm.
-              + Nếu đa số chọn FLAT hoặc chia rẽ hoàn toàn (1 Buy, 1 Sell, 1 Flat): BẮT BUỘC KẾT LUẬN FLAT (ĐỨNG NGOÀI) để bảo vệ an toàn vốn.
+            4. PHÂN XỬ KẾ HOẠCH GIAO DỊCH & QUẢN TRỊ RỦI RO (QUYẾT ĐOÁN):
+            - Điểm Dừng Lỗ (Stop Loss): BẮT BUỘC CHỌN MỐC SL AN TOÀN VÀ KỶ LUẬT NHẤT.
+            - BẮT BUỘC ĐƯA RA HƯỚNG LỆNH CỤ THỂ (BUY hoặc SELL) bám sát xu hướng chủ đạo của EMA:
+              + Tuyệt đối KHÔNG được kết luận FLAT chỉ vì giá đang nằm giữa Swing High và Swing Low.
+              + Nếu có bất đồng ý kiến về rủi ro: VẪN ĐƯA RA LỆNH BUY hoặc SELL nhưng khuyến nghị vào lệnh bằng lệnh chờ Limit tại vùng EMA và giảm 50% khối lượng (Volume).
+              + Chỉ kết luận FLAT khi thị trường hoàn toàn bất động / biên độ sideway cực hẹp không có sóng giao dịch.
             - Tỷ lệ R:R: Tối ưu điểm Entry và SL để hướng tới mục tiêu R:R tối thiểu 1:\(targetRRStr) theo hồ sơ trader.
 
             --------------------------------------------------
             ĐỊNH DẠNG ĐẦU RA BẮT BUỘC (ĐÚNG CHUẨN 4 PHẦN CHUYÊN NGHIỆP):
 
             ### 1. Cấu trúc D1
-            (Phân tích xu hướng chủ đạo D1, mốc Swing High/Low then chốt và giới hạn biên độ).
+            (Phân tích xu hướng chủ đạo D1, vị trí so với EMA 21/50 và biên độ PDH/PDL).
 
-            ### 2. Cấu trúc H4 & Vùng Cung Cầu
-            - Vùng giá nên quan sát: [Chỉ rõ các mốc giá cụ thể của Order Block / FVG xác suất cao, kèm điều kiện nến chờ phản ứng]
-            - Vùng tiềm ẩn bẫy: [Chỉ rõ mốc giá thanh khoản có nguy cơ quét râu hoặc bẫy dụ phe nhỏ lẻ, ví dụ quét BSL/SSL]
+            ### 2. Cấu trúc H4 & Các Vùng Giá Trị
+            - Vùng giá nên quan sát: [Chỉ rõ các mốc giá cụ thể của vùng hỗ trợ/kháng cự EMA 21/50 và Swing High/Low]
+            - Mốc chốt chặn rủi ro: [Chỉ rõ mốc giá vi phạm cấu trúc để đặt Stop Loss]
 
             ### 3. Tín hiệu vào lệnh H1/M15
-            (Đánh giá hành động giá nến H1/M15, tín hiệu quét râu SFP, và điều kiện nến đóng cửa xác nhận dứt khoát).
+            (Đánh giá hành động giá nến H1/M15, phản ứng tại EMA, và động lượng RSI 14).
 
             ### 4. Kế hoạch giao dịch & Quản trị rủi ro
-            - KẾT LUẬN: [BUY / SELL / FLAT]
+            - KẾT LUẬN: [BUY hoặc SELL] (Chỉ chọn FLAT nếu thị trường chết thanh khoản)
             - Kế hoạch cụ thể:
-              + Điểm vào tối ưu (Entry): [Mức giá cụ thể neo tại Vùng nên quan sát]
+              + Điểm vào tối ưu (Entry): [Mức giá cụ thể vào ngay hoặc Limit tại vùng EMA]
               + Dừng lỗ bảo vệ cấu trúc (Stop Loss): [Mức SL an toàn nhất]
               + Chốt lời (Take Profit): TP 1 tại [Mức giá] | TP 2 tại [Mức giá nếu có]
               + Khối lượng khuyến nghị (Volume): [Số lot chính xác tính theo ngân sách rủi ro \(riskDollars)]
               + Tỷ lệ R:R thực tế: [Ví dụ 1:2.4]
-            - Mức độ đồng thuận & Cảnh báo bất đồng: [Chỉ rõ các góc nhìn đồng thuận ở đâu, có góc nhìn nào cảnh báo rủi ro khác biệt không].
-            - Lưu ý thực thi & Xử lý bẫy: [Khuyến nghị kỷ luật thực chiến và giải pháp né bẫy thanh khoản].
+            - Mức độ đồng thuận & Khuyến nghị quản trị: [Chỉ rõ các góc nhìn đồng thuận ở đâu, lưu ý kiểm soát rủi ro].
+            - Lưu ý thực thi: [Khuyến nghị kỷ luật thực chiến và quản lý lệnh].
 
             BẮT BUỘC KẾT THÚC BẰNG BẢNG THÔNG SỐ VÀ KHỐI JSON:
             [PRE-TRADE SETUP SPECIFICATION]
@@ -856,36 +826,38 @@ extension AIPromptBuilder {
             Synthesize the independent perspectives above into ONE SINGLE AUTHORITATIVE PRE-TRADE PLAN as RISK AI.
             Never mention "Perspective 1/2/3", "AI models", or "council". You speak with one single voice as RISK AI.
 
-            APPLY THE 4-TIER CONFLICT RESOLUTION PROTOCOL:
-            1. D1 TREND RESOLUTION:
-            - Adopt the majority directional bias.
-            - IF A DISSENTING VIEW WARNS OF HTF RESISTANCE OR EXHAUSTION: Use its level as a strict BOUNDARY LIMIT (Ceiling/Floor). Warn against chasing and cap Take Profit before this boundary.
+            APPLY THE 4-TIER DECISIVE CONFLICT RESOLUTION PROTOCOL:
+            1. D1 & H4 TREND RESOLUTION:
+            - Determine macro trend based on multi-timeframe EMA 21 and EMA 50 alignment.
+            - If D1/H4 is BULLISH: Primary directive is BUY on pullbacks to EMA support.
+            - If D1/H4 is BEARISH: Primary directive is SELL on rallies to EMA resistance.
 
-            2. H4 STRUCTURE & PRICE LEVEL CLUSTERING:
-            - KEY AREAS OF INTEREST: High-probability overlapping Order Blocks and FVGs where multiple views converge.
-            - POTENTIAL TRAP ZONES: Levels flagged as institutional inducement, retail liquidity pools, or stop-hunt wicks. Warn against placing early limit orders here.
-            - OPPOSING BARRIERS: Treat newly flagged counter-trend supply/demand as Take Profit 1.
+            2. H4 STRUCTURE & KEY PRICE BARRIERS:
+            - KEY AREAS OF INTEREST: Highest-consensus EMA 21/50 test levels and structural swing points.
+            - OPPOSING BARRIERS: Treat opposing swing highs/lows as Take Profit targets.
 
             3. H1/M15 CONFIRMATION RESOLUTION:
-            - STRICT CONSERVATIVE BIAS: If one view warns of an unconfirmed or false breakout, mandate an explicit candle closure condition beyond that level before opening a position.
+            - If price has reached the EMA value zone with rejection: Permit Market entry.
+            - If price is extended: Mandate condition-based pending Limit orders at the EMA pullback level rather than standing aside!
 
-            4. TRADE PLAN & STOP LOSS RESOLUTION:
-            - STOP LOSS PLACEMENT: MANDATORY TO SELECT THE SAFEST, MOST CONSERVATIVE STRUCTURAL STOP LOSS.
-            - DIRECTIONAL SPLIT:
-              + If majority signals BUY/SELL but one view dissents with a risk warning: Permit the trade but MANDATE 50% VOLUME REDUCTION and shift entry deeper into the Key Area of Interest.
-              + If majority selects FLAT or there is a 3-way split: MANDATE FLAT (STAND ASIDE) to preserve capital.
+            4. TRADE PLAN & STOP LOSS RESOLUTION (MANDATE DECISIVE ACTION):
+            - STOP LOSS PLACEMENT: Select the safest, most discipline structural stop loss.
+            - MANDATE ACTIONABLE SETUP (BUY OR SELL):
+              + NEVER default to FLAT merely because price is between Swing High and Swing Low.
+              + If dissenting views express risk caution: Still maintain directional bias with reduced volume (50%) and pending limit entry at EMA support/resistance.
+              + Only conclude FLAT if market volatility is genuinely dead (< 15% of ADR).
             - RISK/REWARD: Align entry and SL to achieve target 1:\(targetRRStr) R:R.
 
             OUTPUT FORMAT (STANDARD 4 SECTIONS):
             ### 1. D1 Structure
             ### 2. H4 Structure & Key Zones
             - Key Areas of Interest: [Specific price levels]
-            - Potential Trap Zones: [Specific price levels]
+            - Structural Invalidation Level: [Specific price level]
             ### 3. H1/M15 Entry Confirmations
             ### 4. Trade Plan & Risk Management
-            - VERDICT: [BUY / SELL / FLAT]
+            - VERDICT: [BUY or SELL] (Only FLAT if dead volatility)
             - Entry, Stop Loss, Take Profit 1 & 2, Recommended Volume, R:R
-            - Execution Guidelines & Trap Avoidance
+            - Execution Guidelines & Discipline
 
             CONCLUDE WITH [PRE-TRADE SETUP SPECIFICATION] AND JSON BLOCK.
             """

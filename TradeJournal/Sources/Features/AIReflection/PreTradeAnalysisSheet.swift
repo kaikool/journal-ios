@@ -84,7 +84,7 @@ public struct PreTradeAnalysisSheet: View {
                         onAttachPhoto: { showPhotoPicker = true }
                     )
                     
-                    // 3. Quantitative Dynamic EMA Trend & Liquidity Summary
+                    // 3. Quantitative Dynamic EMA Trend & Key Levels Summary
                     if !d1Bars.isEmpty || !h4Bars.isEmpty || !h1Bars.isEmpty || !m15Bars.isEmpty {
                         PreTradeContextMetricsCard(
                             d1Bars: d1Bars,
