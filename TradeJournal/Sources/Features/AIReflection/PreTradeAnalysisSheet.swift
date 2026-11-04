@@ -29,11 +29,22 @@ public struct PreTradeAnalysisSheet: View {
     @State private var isSubmittingFollowUp: Bool = false
     
     @State private var activeChartSnapshot: UIImage? = nil
-    @State private var showFullScreenChart: Bool = false
-    @State private var showLandscapeChart: Bool = false
+    @State private var activeFullScreenModal: PreTradeFullScreenModal? = nil
     @State private var showPhotoPicker: Bool = false
     @State private var userAttachedImage: UIImage? = nil
     
+    private enum PreTradeFullScreenModal: Identifiable {
+        case lightbox(UIImage)
+        case landscapeChart
+
+        var id: String {
+            switch self {
+            case .lightbox: return "lightbox"
+            case .landscapeChart: return "landscapeChart"
+            }
+        }
+    }
+
     @State private var isSavedToNotebook: Bool = false
     @State private var showCopiedAlert: Bool = false
     @State private var showLinkTicketSheet: Bool = false
@@ -77,11 +88,11 @@ public struct PreTradeAnalysisSheet: View {
                         m15Bars: m15Bars,
                         activeProvider: activeProvider,
                         onEnlarge: {
-                            if let snapshot = userAttachedImage {
+                            if let snapshot = userAttachedImage ?? activeChartSnapshot {
                                 self.activeChartSnapshot = snapshot
-                                self.showFullScreenChart = true
+                                self.activeFullScreenModal = .lightbox(snapshot)
                             } else {
-                                self.showLandscapeChart = true
+                                self.activeFullScreenModal = .landscapeChart
                             }
                         },
                         onAttachPhoto: { showPhotoPicker = true }
@@ -180,28 +191,28 @@ public struct PreTradeAnalysisSheet: View {
                     ModalPrimaryButton("Done") { dismiss() }
                 }
             }
-            .fullScreenCover(isPresented: $showFullScreenChart) {
-                if let img = activeChartSnapshot ?? userAttachedImage {
+            .fullScreenCover(item: $activeFullScreenModal) { modal in
+                switch modal {
+                case .lightbox(let img):
                     FullScreenChartLightboxView(image: img)
+                case .landscapeChart:
+                    MarketCandleLandscapeSheet(
+                        bars: activeBars,
+                        symbol: selectedSymbol,
+                        selectedTimeframe: $selectedTimeframe,
+                        timeframeOptions: ["15m", "1h", "4h", "1d"],
+                        timeframeTitle: { id in
+                            switch id {
+                            case "15m": return "M15"
+                            case "1h": return "H1"
+                            case "4h": return "H4"
+                            case "1d": return "D1"
+                            default: return id.uppercased()
+                            }
+                        },
+                        onDismiss: { activeFullScreenModal = nil }
+                    )
                 }
-            }
-            .fullScreenCover(isPresented: $showLandscapeChart) {
-                MarketCandleLandscapeSheet(
-                    bars: activeBars,
-                    symbol: selectedSymbol,
-                    selectedTimeframe: $selectedTimeframe,
-                    timeframeOptions: ["15m", "1h", "4h", "1d"],
-                    timeframeTitle: { id in
-                        switch id {
-                        case "15m": return "M15"
-                        case "1h": return "H1"
-                        case "4h": return "H4"
-                        case "1d": return "D1"
-                        default: return id.uppercased()
-                        }
-                    },
-                    onDismiss: { showLandscapeChart = false }
-                )
             }
             .sheet(isPresented: $showPhotoPicker) {
                 UIKitImagePicker(isPresented: $showPhotoPicker) { data, _ in

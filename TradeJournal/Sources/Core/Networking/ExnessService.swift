@@ -806,6 +806,17 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
             }
         }
 
+        // Helper: Robust ID parser (handles Int, Int64, String, NSNumber in JSON)
+        func parseId(_ val: Any?) -> String? {
+            if let s = val as? String, !s.trimmingCharacters(in: .whitespaces).isEmpty {
+                return s.trimmingCharacters(in: .whitespaces)
+            }
+            if let i = val as? Int { return String(i) }
+            if let i64 = val as? Int64 { return String(i64) }
+            if let num = val as? NSNumber { return num.stringValue }
+            return nil
+        }
+
         // 4. Map Orders and Positions to SL / TP by position_id and order_id
         func extractSltp(from dict: [String: Any]) -> (sl: Decimal?, tp: Decimal?) {
             let sl = parseDecimal(dict["stop_loss_price"]) ??
@@ -827,11 +838,11 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
         for o in allOrders {
             let (sl, tp) = extractSltp(from: o)
             guard sl != nil || tp != nil else { continue }
-            if let posId = o["position_id"] as? String, !posId.isEmpty {
+            if let posId = parseId(o["position_id"]) ?? parseId(o["positionId"]) {
                 let existing = positionSltpMap[posId] ?? (nil, nil)
                 positionSltpMap[posId] = (sl ?? existing.sl, tp ?? existing.tp)
             }
-            if let ordId = o["order_id"] as? String, !ordId.isEmpty {
+            if let ordId = parseId(o["order_id"]) ?? parseId(o["orderId"]) {
                 let existing = positionSltpMap[ordId] ?? (nil, nil)
                 positionSltpMap[ordId] = (sl ?? existing.sl, tp ?? existing.tp)
             }
@@ -841,7 +852,7 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
         for p in snapshotPositions {
             let (sl, tp) = extractSltp(from: p)
             guard sl != nil || tp != nil else { continue }
-            if let posId = p["position_id"] as? String, !posId.isEmpty {
+            if let posId = parseId(p["position_id"]) ?? parseId(p["positionId"]) {
                 let existing = positionSltpMap[posId] ?? (nil, nil)
                 positionSltpMap[posId] = (sl ?? existing.sl, tp ?? existing.tp)
             }
@@ -849,7 +860,7 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
 
         // 4.3 Harvest from Deal close reasons or comments (e.g. "[sl]", "[tp 2715.00]", "stop_loss")
         for d in allDeals {
-            guard let posId = d["position_id"] as? String, !posId.isEmpty else { continue }
+            guard let posId = parseId(d["position_id"]) ?? parseId(d["positionId"]) else { continue }
             let comment = (d["comment"] as? String ?? "").lowercased()
             let reason = (d["reason"] as? String ?? d["close_reason"] as? String ?? "").lowercased()
             let p = parseDecimal(d["price"])
@@ -881,8 +892,8 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
                 // Deposit or withdrawal transaction
                 continue
             }
-            guard let posId = d["position_id"] as? String, !posId.isEmpty else { continue }
-            let sym = (d["instrument"] as? String) ?? "UNKNOWN"
+            guard let posId = parseId(d["position_id"]) ?? parseId(d["positionId"]) ?? parseId(d["id"]), !posId.isEmpty else { continue }
+            let sym = (d["instrument"] as? String) ?? (d["symbol"] as? String) ?? "UNKNOWN"
 
             if groups[posId] == nil {
                 groups[posId] = DealGroup(positionId: posId, symbol: sym, openDeals: [], closeDeals: [])
@@ -949,7 +960,7 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
                 totalOpenVolume += v
                 openWeightedSum += (p * v)
 
-                if let dId = od["deal_id"] as? String {
+                if let dId = parseId(od["deal_id"]) ?? parseId(od["id"]) {
                     let execId = "exness_deal_\(dId)"
                     execIds.append(execId)
                     let fillHash = "\(journalAccId)|\(sym)|\(dirStr)|\(v)|\(p)|\(Int64(d.timeIntervalSince1970 * 1000))"
@@ -984,12 +995,16 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
             for cd in g.closeDeals {
                 let v = parseDecimal(cd["volume"]) ?? 0
                 let p = parseDecimal(cd["price"]) ?? entryPrice
-                let d = parseDate(cd["create_time"]) ?? earliestOpenDate
+                let d = parseDate(cd["create_time"]) ?? parseDate(cd["time"]) ?? earliestOpenDate
                 let exitDir = (cd["direction"] as? String ?? "sell").lowercased()
 
                 var dealPnl: Decimal = 0
                 if let pObj = cd["profit"] as? [String: Any] {
-                    dealPnl = parseDecimal(pObj["amount"]) ?? 0
+                    dealPnl = parseDecimal(pObj["amount"]) ?? parseDecimal(pObj["value"]) ?? 0
+                } else if let directP = parseDecimal(cd["profit"]) {
+                    dealPnl = directP
+                } else if let pVal = parseDecimal(cd["realized_pnl"]) ?? parseDecimal(cd["net_profit"]) ?? parseDecimal(cd["pnl"]) {
+                    dealPnl = pVal
                 }
 
                 totalClosedVolume += v
@@ -999,7 +1014,7 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
                     latestCloseDate = d
                 }
 
-                if let cdId = cd["deal_id"] as? String {
+                if let cdId = parseId(cd["deal_id"]) ?? parseId(cd["id"]) {
                     let exitExecId = "exness_deal_\(cdId)"
                     execIds.append(exitExecId)
                     let exitHash = "\(journalAccId)|\(sym)|\(exitDir)|\(v)|\(p)|\(Int64(d.timeIntervalSince1970 * 1000))"
@@ -1030,6 +1045,21 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
             let remainingOpenVolume = max(Decimal(0), volume - totalClosedVolume)
             let isFullyClosed = remainingOpenVolume <= Decimal(0.000001) && totalClosedVolume > 0
             let avgExit = totalClosedVolume > 0 ? (closeWeightedSum / totalClosedVolume) : nil
+
+            // Authoritative contract P&L fallback: if broker reported deal profit 0 but price moved, calculate gross P&L
+            if totalRealizedPnl == 0, let exitP = avgExit, exitP > 0, entryPrice > 0 {
+                let calcPnl = AssetContractEngine.calculateGrossPnl(
+                    symbol: sym,
+                    direction: tradeDir,
+                    quantity: totalClosedVolume,
+                    entryPrice: entryPrice,
+                    exitPrice: exitP
+                )
+                if calcPnl != 0 {
+                    totalRealizedPnl = calcPnl
+                }
+            }
+
             let status: TradeStatus = isFullyClosed
                 ? (totalRealizedPnl > 0 ? .win : (totalRealizedPnl < 0 ? .loss : .breakeven))
                 : .open
@@ -1066,7 +1096,7 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
 
         // 7. Parse active Snapshot positions (if not already covered in deals)
         for p in snapshotPositions {
-            guard let posId = p["position_id"] as? String, !posId.isEmpty else { continue }
+            guard let posId = parseId(p["position_id"]) ?? parseId(p["id"]), !posId.isEmpty else { continue }
             let (slFromPos, tpFromPos) = extractSltp(from: p)
             let sltp = positionSltpMap[posId]
             let resolvedSl = slFromPos ?? sltp?.sl
@@ -1181,7 +1211,7 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
 
             // Check for any previously open Exness positions that are NO LONGER in active broker snapshot
             if snapshotResult.statusCode == 200 {
-                let activePositionIds = Set(snapshotPositions.compactMap { $0["position_id"] as? String })
+                let activePositionIds = Set(snapshotPositions.compactMap { parseId($0["position_id"]) ?? parseId($0["id"]) })
                 for idx in 0..<currentTrades.count {
                     if currentTrades[idx].accountId == journalAccId &&
                        currentTrades[idx].key.hasPrefix("exness_") &&
@@ -1189,7 +1219,19 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
                         let posId = String(currentTrades[idx].key.dropFirst("exness_".count))
                         if !activePositionIds.contains(posId) && !directTrades.contains(where: { $0.key == currentTrades[idx].key }) {
                             // Broker no longer holds this open position -> position has been closed!
-                            currentTrades[idx].status = currentTrades[idx].netPnl > 0 ? .win : (currentTrades[idx].netPnl < 0 ? .loss : .breakeven)
+                            var pnl = currentTrades[idx].netPnl
+                            if pnl == 0, let exitP = currentTrades[idx].avgExit, exitP > 0, currentTrades[idx].avgEntry > 0 {
+                                pnl = AssetContractEngine.calculateGrossPnl(
+                                    symbol: currentTrades[idx].symbol,
+                                    direction: currentTrades[idx].direction,
+                                    quantity: currentTrades[idx].quantity,
+                                    entryPrice: currentTrades[idx].avgEntry,
+                                    exitPrice: exitP
+                                )
+                                currentTrades[idx].grossPnl = pnl
+                                currentTrades[idx].netPnl = pnl
+                            }
+                            currentTrades[idx].status = pnl > 0 ? .win : (pnl < 0 ? .loss : .breakeven)
                             currentTrades[idx].openQuantity = Decimal.zero
                             if currentTrades[idx].closedAt == nil {
                                 currentTrades[idx].closedAt = Date()

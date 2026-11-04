@@ -93,13 +93,35 @@ public struct CandleChartView: View {
                 if isLandscape {
                     GeometryReader { geo in
                         candlestickPlotView(size: geo.size)
+                            .onAppear {
+                                let plotW = max(10, geo.size.width - 55)
+                                currentPlotWidth = plotW
+                                let baseCount = max(visibleBars.count, min(totalBarsCount, 50))
+                                let stepX = plotW / CGFloat(max(1, baseCount))
+                                let totalW = CGFloat(visibleBars.count) * stepX
+                                if totalW > plotW && panOffset == 0 {
+                                    panOffset = plotW - totalW
+                                }
+                            }
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .clipped()
                 } else {
                     GeometryReader { geo in
                         candlestickPlotView(size: geo.size)
+                            .onAppear {
+                                let plotW = max(10, geo.size.width - 55)
+                                currentPlotWidth = plotW
+                                let baseCount = max(visibleBars.count, min(totalBarsCount, 50))
+                                let stepX = plotW / CGFloat(max(1, baseCount))
+                                let totalW = CGFloat(visibleBars.count) * stepX
+                                if totalW > plotW && panOffset == 0 {
+                                    panOffset = plotW - totalW
+                                }
+                            }
                     }
                     .frame(height: showRSI ? 220 : 260)
+                    .clipped()
                 }
 
                 // 2. RSI Sub-Window (Underneath)
@@ -121,6 +143,7 @@ public struct CandleChartView: View {
                         rsiPlotView(size: geo.size, stepX: stepX, panOffset: clampedPan)
                     }
                     .frame(height: isLandscape ? 85 : 110)
+                    .clipped()
                 }
             }
             .contentShape(Rectangle())
@@ -129,7 +152,27 @@ public struct CandleChartView: View {
                     .onChanged { value in
                         let delta = value / lastMagnification
                         lastMagnification = value
-                        zoomScale = max(0.5, min(4.0, zoomScale * delta))
+                        let oldZoom = zoomScale
+                        let newZoom = max(0.5, min(4.0, oldZoom * delta))
+                        zoomScale = newZoom
+
+                        // Maintain viewport anchor during pinch zoom
+                        let plotW = max(10, currentPlotWidth)
+                        let baseCount = max(visibleBars.count, min(totalBarsCount, 50))
+                        let oldSlotCount = max(8, Double(baseCount) / Double(oldZoom))
+                        let oldStepX = plotW / CGFloat(max(1, oldSlotCount))
+                        let oldTotalW = CGFloat(visibleBars.count) * oldStepX
+                        let oldMinOffset = min(0, plotW - oldTotalW)
+
+                        let newSlotCount = max(8, Double(baseCount) / Double(newZoom))
+                        let newStepX = plotW / CGFloat(max(1, newSlotCount))
+                        let newTotalW = CGFloat(visibleBars.count) * newStepX
+                        let newMinOffset = min(0, plotW - newTotalW)
+
+                        if oldMinOffset < 0 && newMinOffset < 0 {
+                            let progress = panOffset / oldMinOffset
+                            panOffset = min(0, max(newMinOffset, progress * newMinOffset))
+                        }
                     }
                     .onEnded { _ in
                         lastMagnification = 1.0
@@ -145,46 +188,47 @@ public struct CandleChartView: View {
                         let stepX = plotW / CGFloat(max(1, slotCount))
                         let totalW = CGFloat(visibleBars.count) * stepX
 
-                        // Smooth panning when dragged horizontally and content exceeds visible viewport
-                        if abs(value.translation.width) > 6 && totalW > plotW {
-                            let delta = value.translation.width - lastDragX
-                            lastDragX = value.translation.width
+                        let delta = value.translation.width - lastDragX
+                        lastDragX = value.translation.width
+
+                        // Smooth zero-deadzone TradingView fluid panning
+                        if totalW > plotW {
                             let minOffset = plotW - totalW
                             panOffset = min(0, max(minOffset, panOffset + delta))
-                        } else {
-                            // Touch/Hover crosshair inspection with tactile haptic feedback
-                            updateHoveredBar(at: value.location.x, totalWidth: plotW, stepX: stepX, panOffset: panOffset)
                         }
                     }
                     .onEnded { _ in
                         lastDragX = 0
                         hoveredBarIndex = nil
-                        let plotW = max(10, currentPlotWidth)
-                        let baseCount = max(visibleBars.count, min(totalBarsCount, 50))
-                        let effectiveZoom = max(0.5, min(4.0, zoomScale))
-                        let slotCount = max(8, Double(baseCount) / Double(effectiveZoom))
-                        let stepX = plotW / CGFloat(max(1, slotCount))
-                        let totalW = CGFloat(visibleBars.count) * stepX
-                        if totalW > plotW {
-                            let minOffset = plotW - totalW
-                            panOffset = min(0, max(minOffset, panOffset))
-                        } else {
-                            panOffset = 0
+                    }
+            )
+            .simultaneousGesture(
+                LongPressGesture(minimumDuration: 0.2)
+                    .sequenced(before: DragGesture(minimumDistance: 0))
+                    .onChanged { value in
+                        switch value {
+                        case .second(true, let drag):
+                            if let loc = drag?.location {
+                                updateHoveredBar(at: loc.x, totalWidth: currentPlotWidth, panOffset: panOffset)
+                            }
+                        default:
+                            break
                         }
+                    }
+                    .onEnded { _ in
+                        hoveredBarIndex = nil
                     }
             )
             .onTapGesture(count: 2) {
                 withAnimation(AppAnimations.springStandard) {
                     zoomScale = 1.0
-                    panOffset = 0.0
+                    let plotW = max(10, currentPlotWidth)
+                    let baseCount = max(visibleBars.count, min(totalBarsCount, 50))
+                    let stepX = plotW / CGFloat(max(1, baseCount))
+                    let totalW = CGFloat(visibleBars.count) * stepX
+                    panOffset = min(0, plotW - totalW)
                 }
             }
-            .background(AppColors.cardBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(AppColors.border.opacity(0.6), lineWidth: 1)
-            )
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("Candlestick chart for \(trade.symbol), \(visibleBars.count) bars visible.")
         }
@@ -252,11 +296,6 @@ public struct CandleChartView: View {
         let plotWidth = max(10, size.width - rightAxisWidth)
         let plotHeight = max(10, size.height - bottomAxisHeight)
 
-        let bounds = calculatePriceBounds()
-        let minP = bounds.minPrice
-        let maxP = bounds.maxPrice
-        let priceSpan = max(0.00001, maxP - minP)
-
         // Base slot count scaled by pinch zoom:
         let baseCount = max(visibleBars.count, min(totalBarsCount, 50))
         let effectiveZoom = max(0.5, min(4.0, zoomScale))
@@ -267,6 +306,12 @@ public struct CandleChartView: View {
         let totalContentWidth = CGFloat(visibleBars.count) * stepX
         let minPan = min(0, plotWidth - totalContentWidth)
         let clampedPan = totalContentWidth > plotWidth ? min(0, max(minPan, panOffset)) : 0
+
+        // TradingView Dynamic Viewport Auto-Scaling (fits precisely to visible bars in viewport)
+        let bounds = calculateViewportPriceBounds(stepX: stepX, clampedPan: clampedPan, plotWidth: plotWidth)
+        let minP = bounds.minPrice
+        let maxP = bounds.maxPrice
+        let priceSpan = max(0.00001, maxP - minP)
 
         return ZStack(alignment: .topLeading) {
             // Grid lines and right price axis
@@ -290,15 +335,10 @@ public struct CandleChartView: View {
                     let openD = (bar.open as NSDecimalNumber).doubleValue
                     let closeD = (bar.close as NSDecimalNumber).doubleValue
 
-                    let rawYHigh = plotHeight - CGFloat((highD - minP) / priceSpan) * plotHeight
-                    let rawYLow = plotHeight - CGFloat((lowD - minP) / priceSpan) * plotHeight
-                    let rawYOpen = plotHeight - CGFloat((openD - minP) / priceSpan) * plotHeight
-                    let rawYClose = plotHeight - CGFloat((closeD - minP) / priceSpan) * plotHeight
-
-                    let yHigh = max(0, min(plotHeight, rawYHigh))
-                    let yLow = max(0, min(plotHeight, rawYLow))
-                    let yOpen = max(0, min(plotHeight, rawYOpen))
-                    let yClose = max(0, min(plotHeight, rawYClose))
+                    let yHigh = plotHeight - CGFloat((highD - minP) / priceSpan) * plotHeight
+                    let yLow = plotHeight - CGFloat((lowD - minP) / priceSpan) * plotHeight
+                    let yOpen = plotHeight - CGFloat((openD - minP) / priceSpan) * plotHeight
+                    let yClose = plotHeight - CGFloat((closeD - minP) / priceSpan) * plotHeight
 
                     // Highlight Price Action pattern by changing candle color directly (InsideBar and Doji excluded)
                     let matchedPattern = patterns.first(where: {
@@ -366,6 +406,8 @@ public struct CandleChartView: View {
                     .position(x: 32, y: 16)
             }
         }
+        .frame(width: size.width, height: size.height)
+        .clipped()
     }
 
     // MARK: - Footprint Key Levels Overlay (TradingView Footprint Alignment)
@@ -994,32 +1036,22 @@ public struct CandleChartView: View {
 
     // MARK: - Helpers
 
-    private func calculatePriceBounds() -> (minPrice: Double, maxPrice: Double) {
-        let referenceBars = allBars.isEmpty ? visibleBars : allBars
-        var lows = referenceBars.map { ($0.low as NSDecimalNumber).doubleValue }
-        var highs = referenceBars.map { ($0.high as NSDecimalNumber).doubleValue }
+    private func calculateViewportPriceBounds(stepX: CGFloat, clampedPan: CGFloat, plotWidth: CGFloat) -> (minPrice: Double, maxPrice: Double) {
+        guard !visibleBars.isEmpty, stepX > 0 else { return (1.0, 2.0) }
+        let leftX = -clampedPan
+        let rightX = leftX + plotWidth
+        let startIdx = max(0, min(visibleBars.count - 1, Int(floor(leftX / stepX))))
+        let endIdx = max(0, min(visibleBars.count - 1, Int(ceil(rightX / stepX))))
 
-        let entryD = (trade.avgEntry as NSDecimalNumber).doubleValue
-        if entryD > 0 {
-            lows.append(entryD)
-            highs.append(entryD)
-        }
-        if let exit = trade.avgExit {
-            let exitD = (exit as NSDecimalNumber).doubleValue
-            if exitD > 0 {
-                lows.append(exitD)
-                highs.append(exitD)
-            }
-        }
+        let slice = visibleBars[startIdx...endIdx]
+        let lows = slice.map { ($0.low as NSDecimalNumber).doubleValue }
+        let highs = slice.map { ($0.high as NSDecimalNumber).doubleValue }
 
         let minVal = lows.min() ?? 1.0
-        let maxVal = highs.max() ?? 1.0
-        let effectiveZoom = max(0.5, min(4.0, zoomScale))
-        let baseSpan = max(0.0001, (maxVal - minVal) * 1.16)
-        let verticalSpan = baseSpan / Double(effectiveZoom)
-        let centerVal = (maxVal + minVal) / 2.0
-
-        return (minPrice: centerVal - (verticalSpan / 2.0), maxPrice: centerVal + (verticalSpan / 2.0))
+        let maxVal = highs.max() ?? 2.0
+        let rawSpan = max(0.0001, maxVal - minVal)
+        let pad = rawSpan * 0.10
+        return (minPrice: minVal - pad, maxPrice: maxVal + pad)
     }
 
     private func updateHoveredBar(at x: CGFloat, totalWidth: CGFloat, stepX: CGFloat? = nil, panOffset: CGFloat = 0) {

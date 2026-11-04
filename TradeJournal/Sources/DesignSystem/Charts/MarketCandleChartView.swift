@@ -55,15 +55,42 @@ public struct MarketCandleChartView: View {
                 candlestickPlotView(size: geo.size)
                     .onAppear {
                         if currentPlotWidth != pw { currentPlotWidth = pw }
+                        let baseCount = max(bars.count, 40)
+                        let stepX = pw / CGFloat(max(1, baseCount))
+                        let totalW = CGFloat(bars.count) * stepX
+                        if totalW > pw && panOffset == 0 {
+                            panOffset = pw - totalW
+                        }
                     }
             }
             .contentShape(Rectangle())
+            .clipped()
             .gesture(
                 MagnificationGesture()
                     .onChanged { value in
                         let delta = value / lastMagnification
                         lastMagnification = value
-                        zoomScale = max(0.5, min(4.0, zoomScale * delta))
+                        let oldZoom = zoomScale
+                        let newZoom = max(0.5, min(4.0, oldZoom * delta))
+                        zoomScale = newZoom
+
+                        // Maintain relative viewport anchor during pinch zoom
+                        let plotW = max(10, currentPlotWidth)
+                        let baseCount = max(bars.count, 40)
+                        let oldSlotCount = max(8, Double(baseCount) / Double(oldZoom))
+                        let oldStepX = plotW / CGFloat(max(1, oldSlotCount))
+                        let oldTotalW = CGFloat(bars.count) * oldStepX
+                        let oldMinOffset = min(0, plotW - oldTotalW)
+
+                        let newSlotCount = max(8, Double(baseCount) / Double(newZoom))
+                        let newStepX = plotW / CGFloat(max(1, newSlotCount))
+                        let newTotalW = CGFloat(bars.count) * newStepX
+                        let newMinOffset = min(0, plotW - newTotalW)
+
+                        if oldMinOffset < 0 && newMinOffset < 0 {
+                            let progress = panOffset / oldMinOffset
+                            panOffset = min(0, max(newMinOffset, progress * newMinOffset))
+                        }
                     }
                     .onEnded { _ in
                         lastMagnification = 1.0
@@ -79,48 +106,45 @@ public struct MarketCandleChartView: View {
                         let stepX = plotW / CGFloat(max(1, slotCount))
                         let totalW = CGFloat(bars.count) * stepX
 
-                        let dx = value.translation.width - lastDragX
-                        let dy = value.translation.height - lastDragY
+                        let delta = value.translation.width - lastDragX
+                        lastDragX = value.translation.width
 
-                        if abs(value.translation.width) > 6 || abs(value.translation.height) > 6 {
-                            lastDragX = value.translation.width
-                            lastDragY = value.translation.height
-                            if totalW > plotW {
-                                let minOffset = plotW - totalW
-                                panOffset = min(0, max(minOffset, panOffset + dx))
-                            }
-                            if effectiveZoom > 1.05 {
-                                panOffsetY += dy
-                            }
-                        } else {
-                            updateHoveredBar(at: value.location.x, totalWidth: plotW, stepX: stepX, panOffset: panOffset)
+                        // Smooth zero-deadzone TradingView fluid panning
+                        if totalW > plotW {
+                            let minOffset = plotW - totalW
+                            panOffset = min(0, max(minOffset, panOffset + delta))
                         }
                     }
                     .onEnded { _ in
                         lastDragX = 0
-                        lastDragY = 0
                         hoveredBarIndex = nil
-                        let plotW = max(10, currentPlotWidth)
-                        let baseCount = max(bars.count, 40)
-                        let effectiveZoom = max(0.5, min(4.0, zoomScale))
-                        let slotCount = max(8, Double(baseCount) / Double(effectiveZoom))
-                        let stepX = plotW / CGFloat(max(1, slotCount))
-                        let totalW = CGFloat(bars.count) * stepX
-                        if totalW > plotW {
-                            let minOffset = plotW - totalW
-                            panOffset = min(0, max(minOffset, panOffset))
-                        } else {
-                            panOffset = 0
+                    }
+            )
+            .simultaneousGesture(
+                LongPressGesture(minimumDuration: 0.2)
+                    .sequenced(before: DragGesture(minimumDistance: 0))
+                    .onChanged { value in
+                        switch value {
+                        case .second(true, let drag):
+                            if let loc = drag?.location {
+                                updateHoveredBar(at: loc.x, totalWidth: currentPlotWidth, panOffset: panOffset)
+                            }
+                        default:
+                            break
                         }
-                        if effectiveZoom <= 1.05 {
-                            panOffsetY = 0
-                        }
+                    }
+                    .onEnded { _ in
+                        hoveredBarIndex = nil
                     }
             )
             .onTapGesture(count: 2) {
                 withAnimation(AppAnimations.springStandard) {
                     zoomScale = 1.0
-                    panOffset = 0.0
+                    let plotW = max(10, currentPlotWidth)
+                    let baseCount = max(bars.count, 40)
+                    let stepX = plotW / CGFloat(max(1, baseCount))
+                    let totalW = CGFloat(bars.count) * stepX
+                    panOffset = min(0, plotW - totalW)
                     panOffsetY = 0.0
                 }
             }
@@ -163,17 +187,22 @@ public struct MarketCandleChartView: View {
         let minPan = min(0, plotWidth - totalContentWidth)
         let clampedPan = totalContentWidth > plotWidth ? min(0, max(minPan, panOffset)) : 0
 
-        let allPrices = bars.flatMap { [($0.high as NSDecimalNumber).doubleValue, ($0.low as NSDecimalNumber).doubleValue] }
-        let rawMin = allPrices.min() ?? 1.0
-        let rawMax = allPrices.max() ?? 2.0
-        let centerP = (rawMin + rawMax) / 2.0
-        let baseSpan = max(0.0001, (rawMax - rawMin) * 1.16)
-        let verticalSpan = baseSpan / Double(effectiveZoom)
-        let yPriceShift = Double(panOffsetY / plotHeight) * verticalSpan
-        let shiftedCenter = centerP + yPriceShift
-        let minP = shiftedCenter - (verticalSpan / 2.0)
-        let maxP = shiftedCenter + (verticalSpan / 2.0)
-        let span = max(0.0001, maxP - minP)
+        // TradingView Viewport Auto-Fitting Price Scale
+        let leftX = -clampedPan
+        let rightX = leftX + plotWidth
+        let startIdx = max(0, min(bars.count - 1, Int(floor(leftX / stepX))))
+        let endIdx = max(0, min(bars.count - 1, Int(ceil(rightX / stepX))))
+
+        let slice = bars[startIdx...endIdx]
+        let lows = slice.map { ($0.low as NSDecimalNumber).doubleValue }
+        let highs = slice.map { ($0.high as NSDecimalNumber).doubleValue }
+        let minVal = lows.min() ?? 1.0
+        let maxVal = highs.max() ?? 2.0
+        let rawSpan = max(0.0001, maxVal - minVal)
+        let pad = rawSpan * 0.10
+        let minP = minVal - pad
+        let maxP = maxVal + pad
+        let span = maxP - minP
 
         return ZStack(alignment: .topLeading) {
             // Day / Session Vertical Dividers
@@ -186,7 +215,7 @@ public struct MarketCandleChartView: View {
             volumeHistogram(plotWidth: plotWidth, plotHeight: plotHeight, stepX: stepX, candleWidth: candleWidth, panOffset: clampedPan)
 
             // TradingView-aligned Footprint POC & Key Levels Overlay (Time-bounded segments + selective rays)
-            footprintOverlay(plotWidth: plotWidth, plotHeight: plotHeight, stepX: stepX, minP: minP, span: span)
+            footprintOverlay(plotWidth: plotWidth, plotHeight: plotHeight, stepX: stepX, minP: minP, span: span, clampedPan: clampedPan)
 
             // Candlesticks
             ForEach(0..<bars.count, id: \.self) { i in
@@ -254,6 +283,8 @@ public struct MarketCandleChartView: View {
                 crosshairOverlay(hIdx: hIdx, plotWidth: plotWidth, plotHeight: plotHeight, stepX: stepX, minP: minP, span: span, clampedPan: clampedPan)
             }
         }
+        .frame(width: size.width, height: size.height)
+        .clipped()
     }
 
     // MARK: - 3. Footprint Key Levels Overlay (TradingView Footprint Alignment)
@@ -263,7 +294,8 @@ public struct MarketCandleChartView: View {
         plotHeight: CGFloat,
         stepX: CGFloat,
         minP: Double,
-        span: Double
+        span: Double,
+        clampedPan: CGFloat
     ) -> some View {
         ZStack(alignment: .topLeading) {
             // 1. Time-bounded Historical Session Profiles (Tokyo, London, NY, Daily, Weekly)
@@ -275,7 +307,8 @@ public struct MarketCandleChartView: View {
                     plotHeight: plotHeight,
                     stepX: stepX,
                     minP: minP,
-                    span: span
+                    span: span,
+                    clampedPan: clampedPan
                 )
             }
 
@@ -287,7 +320,8 @@ public struct MarketCandleChartView: View {
                     plotHeight: plotHeight,
                     stepX: stepX,
                     minP: minP,
-                    span: span
+                    span: span,
+                    clampedPan: clampedPan
                 )
             }
 
@@ -297,7 +331,8 @@ public struct MarketCandleChartView: View {
                 plotHeight: plotHeight,
                 stepX: stepX,
                 minP: minP,
-                span: span
+                span: span,
+                clampedPan: clampedPan
             )
         }
     }
@@ -350,7 +385,8 @@ public struct MarketCandleChartView: View {
         plotHeight: CGFloat,
         stepX: CGFloat,
         minP: Double,
-        span: Double
+        span: Double,
+        clampedPan: CGFloat
     ) -> some View {
         let pocD = (snap.pocPrice as NSDecimalNumber).doubleValue
         if pocD >= (minP - span * 0.05) && pocD <= (minP + span * 1.05) {
@@ -362,8 +398,8 @@ public struct MarketCandleChartView: View {
 
             if let sI = startIdx ?? (bars.first.map { snap.endTime >= $0.date ? 0 : nil } ?? nil) {
                 let eI = endIdx ?? min(bars.count - 1, sI)
-                let x1 = CGFloat(sI) * stepX + (stepX / 2.0)
-                let x2 = CGFloat(eI) * stepX + (stepX / 2.0)
+                let x1 = CGFloat(sI) * stepX + (stepX / 2.0) + clampedPan
+                let x2 = CGFloat(eI) * stepX + (stepX / 2.0) + clampedPan
                 let segXEnd = max(x1 + stepX, x2)
                 let isD1orW1 = snap.sessionType == .daily || snap.sessionType == .weekly
                 let lineWidth: CGFloat = isD1orW1 ? 2.0 : 1.2
@@ -377,13 +413,14 @@ public struct MarketCandleChartView: View {
                         stepX: stepX,
                         minP: minP,
                         span: span,
-                        plotHeight: plotHeight
+                        plotHeight: plotHeight,
+                        panOffset: clampedPan
                     )
                     staircase.stroke(col, lineWidth: lineWidth)
                 } else if segXEnd >= 0 && x1 <= plotWidth {
                     Path { path in
-                        path.move(to: CGPoint(x: max(0, x1), y: y))
-                        path.addLine(to: CGPoint(x: min(plotWidth, segXEnd), y: y))
+                        path.move(to: CGPoint(x: x1, y: y))
+                        path.addLine(to: CGPoint(x: segXEnd, y: y))
                     }
                     .stroke(col, lineWidth: lineWidth)
                 }
@@ -391,12 +428,12 @@ public struct MarketCandleChartView: View {
                 // 2. Untested (Naked) POC Ray
                 if snap.isNaked {
                     let rayEndIdx = findRayEndIndex(after: eI, for: snap.pocPrice, in: bars)
-                    let rayXEnd = CGFloat(rayEndIdx) * stepX + (stepX / 2.0)
+                    let rayXEnd = CGFloat(rayEndIdx) * stepX + (stepX / 2.0) + clampedPan
 
-                    if rayXEnd > segXEnd && segXEnd <= plotWidth {
+                    if rayXEnd > segXEnd {
                         Path { path in
-                            path.move(to: CGPoint(x: max(0, segXEnd), y: y))
-                            path.addLine(to: CGPoint(x: min(plotWidth, rayXEnd), y: y))
+                            path.move(to: CGPoint(x: segXEnd, y: y))
+                            path.addLine(to: CGPoint(x: rayXEnd, y: y))
                         }
                         .stroke(col.opacity(0.65), style: StrokeStyle(lineWidth: 1.0, dash: [2, 3]))
 
@@ -419,7 +456,8 @@ public struct MarketCandleChartView: View {
         plotHeight: CGFloat,
         stepX: CGFloat,
         minP: Double,
-        span: Double
+        span: Double,
+        clampedPan: CGFloat
     ) -> some View {
         if let curPoc = dev.currentPoc {
             let pocD = (curPoc as NSDecimalNumber).doubleValue
@@ -428,8 +466,8 @@ public struct MarketCandleChartView: View {
                 let col = sessionColor(for: dev.sessionType)
 
                 let sIdx = bars.firstIndex(where: { $0.date >= dev.startTime }) ?? max(0, bars.count - 12)
-                let x1 = CGFloat(sIdx) * stepX + (stepX / 2.0)
-                let x2 = CGFloat(max(0, bars.count - 1)) * stepX + (stepX / 2.0)
+                let x1 = CGFloat(sIdx) * stepX + (stepX / 2.0) + clampedPan
+                let x2 = CGFloat(max(0, bars.count - 1)) * stepX + (stepX / 2.0) + clampedPan
                 let isD1orW1 = dev.sessionType == .daily || dev.sessionType == .weekly
                 let lineWidth: CGFloat = isD1orW1 ? 2.0 : 1.4
 
@@ -442,13 +480,14 @@ public struct MarketCandleChartView: View {
                             stepX: stepX,
                             minP: minP,
                             span: span,
-                            plotHeight: plotHeight
+                            plotHeight: plotHeight,
+                            panOffset: clampedPan
                         )
                         staircase.stroke(col, lineWidth: lineWidth)
                     } else {
                         Path { path in
-                            path.move(to: CGPoint(x: max(0, x1), y: y))
-                            path.addLine(to: CGPoint(x: min(plotWidth, x2), y: y))
+                            path.move(to: CGPoint(x: x1, y: y))
+                            path.addLine(to: CGPoint(x: x2, y: y))
                         }
                         .stroke(col, lineWidth: lineWidth)
                     }
@@ -478,13 +517,14 @@ public struct MarketCandleChartView: View {
         plotHeight: CGFloat,
         stepX: CGFloat,
         minP: Double,
-        span: Double
+        span: Double,
+        clampedPan: CGFloat
     ) -> some View {
         let intradayLevels = keyLevels.filter { $0.type == .pdh || $0.type == .pdl || $0.type == .pdc }
         if !intradayLevels.isEmpty && !bars.isEmpty {
             let todayStartIdx = findTodayStartIndex(in: bars)
-            let x1 = CGFloat(todayStartIdx) * stepX + (stepX / 2.0)
-            let x2 = CGFloat(bars.count - 1) * stepX + (stepX / 2.0)
+            let x1 = CGFloat(todayStartIdx) * stepX + (stepX / 2.0) + clampedPan
+            let x2 = CGFloat(bars.count - 1) * stepX + (stepX / 2.0) + clampedPan
 
             ForEach(intradayLevels) { lvl in
                 let priceD = (lvl.price as NSDecimalNumber).doubleValue
@@ -492,8 +532,8 @@ public struct MarketCandleChartView: View {
                     let y = plotHeight - CGFloat((priceD - minP) / span) * plotHeight
 
                     Path { path in
-                        path.move(to: CGPoint(x: max(0, x1), y: y))
-                        path.addLine(to: CGPoint(x: min(plotWidth, x2), y: y))
+                        path.move(to: CGPoint(x: x1, y: y))
+                        path.addLine(to: CGPoint(x: x2, y: y))
                     }
                     .stroke(AppColors.secondaryText.opacity(0.4), style: StrokeStyle(lineWidth: 0.8, dash: [4, 4]))
                 }
@@ -506,7 +546,8 @@ public struct MarketCandleChartView: View {
         stepX: CGFloat,
         minP: Double,
         span: Double,
-        plotHeight: CGFloat
+        plotHeight: CGFloat,
+        panOffset: CGFloat = 0.0
     ) -> Path {
         var path = Path()
         guard !steps.isEmpty else { return path }
@@ -521,7 +562,7 @@ public struct MarketCandleChartView: View {
 
         for step in steps {
             guard let bIdx = barIndexMap[step.timestamp] else { continue }
-            let xCenter = CGFloat(bIdx) * stepX + (stepX / 2.0)
+            let xCenter = CGFloat(bIdx) * stepX + (stepX / 2.0) + panOffset
             let xLeft = xCenter - (stepX / 2.0)
             let xRight = xCenter + (stepX / 2.0)
 

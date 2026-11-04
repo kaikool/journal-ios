@@ -124,9 +124,38 @@ extension TradeDataStore {
     
     /// Deduplicates trades by key, and by semantic signature (account, symbol, direction, open time, quantity)
     public func deduplicateTrades() {
-        let cleaned = TradeDeduplicator.deduplicate(trades)
-        if cleaned.count != trades.count {
-            AppLogger.info("Deduplicated trades from \(trades.count) down to \(cleaned.count)")
+        var cleaned = TradeDeduplicator.deduplicate(trades)
+        var mutated = false
+
+        // Heal any closed trade that has profit but was previously tagged as .breakeven
+        for i in 0..<cleaned.count {
+            if cleaned[i].status.isClosed {
+                if cleaned[i].netPnl == 0, let exitP = cleaned[i].avgExit, exitP > 0, cleaned[i].avgEntry > 0 {
+                    let calcPnl = AssetContractEngine.calculateGrossPnl(
+                        symbol: cleaned[i].symbol,
+                        direction: cleaned[i].direction,
+                        quantity: cleaned[i].quantity,
+                        entryPrice: cleaned[i].avgEntry,
+                        exitPrice: exitP
+                    )
+                    if calcPnl != 0 {
+                        cleaned[i].grossPnl = calcPnl
+                        cleaned[i].netPnl = calcPnl
+                        mutated = true
+                    }
+                }
+                if cleaned[i].netPnl > 0 && cleaned[i].status == .breakeven {
+                    cleaned[i].status = .win
+                    mutated = true
+                } else if cleaned[i].netPnl < 0 && cleaned[i].status == .breakeven {
+                    cleaned[i].status = .loss
+                    mutated = true
+                }
+            }
+        }
+
+        if cleaned.count != trades.count || mutated {
+            AppLogger.info("Deduplicated and sanitized trades from \(trades.count) down to \(cleaned.count)")
             self.trades = cleaned
             invalidatePerformanceCaches()
         }
