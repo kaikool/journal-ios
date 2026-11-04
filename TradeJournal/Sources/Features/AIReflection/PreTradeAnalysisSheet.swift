@@ -7,61 +7,10 @@ public struct PreTradeAnalysisSheet: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var env: AppEnvironment
     @ObservedObject private var dataStore = TradeDataStore.shared
-    
-    @State private var selectedSymbol: String = "XAUUSD"
-    @State private var customSymbolText: String = ""
-    @State private var selectedTimeframe: String = "15m" // "15m", "4h", "1d", "all"
-    
-    @State private var d1Bars: [MarketBar] = []
-    @State private var h4Bars: [MarketBar] = []
-    @State private var h1Bars: [MarketBar] = []
-    @State private var m15Bars: [MarketBar] = []
-    @State private var activeProvider: String = ""
-    
-    @State private var analysisResult: String = ""
-    @State private var currentCommitment: AdvisorCommitmentRecord? = nil
-    @State private var isLoadingData: Bool = false
-    @State private var isAnalyzing: Bool = false
-    @State private var errorMessage: String? = nil
-    
-    @State private var followUpMessages: [AICoachMessage] = []
-    @State private var followUpQuery: String = ""
-    @State private var isSubmittingFollowUp: Bool = false
-    
-    @State private var activeChartSnapshot: UIImage? = nil
-    @State private var activeFullScreenModal: PreTradeFullScreenModal? = nil
-    @State private var showPhotoPicker: Bool = false
-    @State private var userAttachedImage: UIImage? = nil
-    
-    private enum PreTradeFullScreenModal: Identifiable {
-        case lightbox(UIImage)
-        case landscapeChart
-
-        var id: String {
-            switch self {
-            case .lightbox: return "lightbox"
-            case .landscapeChart: return "landscapeChart"
-            }
-        }
-    }
-
-    @State private var isSavedToNotebook: Bool = false
-    @State private var showCopiedAlert: Bool = false
-    @State private var showLinkTicketSheet: Bool = false
-    @State private var createdNoteId: String? = nil
-    @State private var isChartInteracting: Bool = false
+    @StateObject private var viewModel: PreTradeAnalysisViewModel
     
     public init(initialSymbol: String = "XAUUSD") {
-        self._selectedSymbol = State(initialValue: initialSymbol)
-    }
-    
-    private var activeBars: [MarketBar] {
-        switch selectedTimeframe {
-        case "1d": return d1Bars
-        case "4h": return h4Bars
-        case "1h": return h1Bars
-        default: return m15Bars
-        }
+        self._viewModel = StateObject(wrappedValue: PreTradeAnalysisViewModel(initialSymbol: initialSymbol))
     }
     
     public var body: some View {
@@ -70,83 +19,89 @@ public struct PreTradeAnalysisSheet: View {
                 VStack(spacing: 12) {
                     // 1. Symbol Selection & Quick Switcher
                     PreTradeSymbolSelectorCard(
-                        selectedSymbol: $selectedSymbol,
-                        customSymbolText: $customSymbolText,
+                        selectedSymbol: $viewModel.selectedSymbol,
+                        customSymbolText: $viewModel.customSymbolText,
                         onSelectSymbol: { sym in
-                            onSymbolSelected(sym)
+                            viewModel.onSymbolSelected(sym, dataStore: dataStore)
                         },
-                        onSubmitCustom: submitCustomSymbol
+                        onSubmitCustom: {
+                            viewModel.submitCustomSymbol(dataStore: dataStore)
+                        }
                     )
                     
                     // 2. Multi-Timeframe Chart Vision Card
                     PreTradeChartCard(
-                        symbol: selectedSymbol,
-                        selectedTimeframe: $selectedTimeframe,
-                        activeBars: activeBars,
-                        d1Bars: d1Bars,
-                        h4Bars: h4Bars,
-                        h1Bars: h1Bars,
-                        m15Bars: m15Bars,
-                        activeProvider: activeProvider,
+                        symbol: viewModel.selectedSymbol,
+                        selectedTimeframe: $viewModel.selectedTimeframe,
+                        activeBars: viewModel.activeBars,
+                        d1Bars: viewModel.d1Bars,
+                        h4Bars: viewModel.h4Bars,
+                        h1Bars: viewModel.h1Bars,
+                        m15Bars: viewModel.m15Bars,
+                        activeProvider: viewModel.activeProvider,
                         onEnlarge: {
-                            if let snapshot = userAttachedImage ?? activeChartSnapshot {
-                                self.activeChartSnapshot = snapshot
-                                self.activeFullScreenModal = .lightbox(snapshot)
+                            if let snapshot = viewModel.userAttachedImage ?? viewModel.activeChartSnapshot {
+                                viewModel.activeChartSnapshot = snapshot
+                                viewModel.activeFullScreenModal = .lightbox(snapshot)
                             } else {
-                                self.activeFullScreenModal = .landscapeChart
+                                viewModel.activeFullScreenModal = .landscapeChart
                             }
                         },
-                        onAttachPhoto: { showPhotoPicker = true },
+                        onAttachPhoto: { viewModel.showPhotoPicker = true },
                         onInteractionChanged: { isInteracting in
-                            isChartInteracting = isInteracting
+                            viewModel.isChartInteracting = isInteracting
                         }
                     )
                     
                     // 3. Quantitative Dynamic EMA Trend & Key Levels Summary
-                    if !d1Bars.isEmpty || !h4Bars.isEmpty || !h1Bars.isEmpty || !m15Bars.isEmpty {
+                    if !viewModel.d1Bars.isEmpty || !viewModel.h4Bars.isEmpty || !viewModel.h1Bars.isEmpty || !viewModel.m15Bars.isEmpty {
                         PreTradeContextMetricsCard(
-                            d1Bars: d1Bars,
-                            h4Bars: h4Bars,
-                            h1Bars: h1Bars,
-                            m15Bars: m15Bars,
-                            symbol: selectedSymbol
+                            d1Bars: viewModel.d1Bars,
+                            h4Bars: viewModel.h4Bars,
+                            h1Bars: viewModel.h1Bars,
+                            m15Bars: viewModel.m15Bars,
+                            symbol: viewModel.selectedSymbol
                         )
                     }
                     
                     // 4. Loading, Error, AI Decision Document, or Action CTA Card
-                    if isAnalyzing || isLoadingData {
-                        PreTradeLoadingCard(isLoadingData: isLoadingData)
-                    } else if let error = errorMessage {
+                    if viewModel.isAnalyzing || viewModel.isLoadingData {
+                        PreTradeLoadingCard(isLoadingData: viewModel.isLoadingData)
+                    } else if let error = viewModel.errorMessage {
                         PreTradeErrorCard(message: error, onRetry: {
                             Task {
-                                await fetchAllTimeframeBars(for: selectedSymbol, forceRefresh: true)
-                                await runFullAnalysis()
+                                await viewModel.fetchAllTimeframeBars(for: viewModel.selectedSymbol, forceRefresh: true, dataStore: dataStore)
+                                await viewModel.runFullAnalysis(dataStore: dataStore)
                             }
                         })
-                    } else if !analysisResult.isEmpty {
+                    } else if !viewModel.analysisResult.isEmpty {
                         // 5. Pre-Trade Action Bar (Save Note, Link Trade, Copy, Regenerate) - Placed RIGHT ON TOP of AI Result
                         PreTradeActionBar(
-                            isSavedToNotebook: isSavedToNotebook,
-                            showCopiedAlert: showCopiedAlert,
-                            onSaveNotebook: saveToNotebook,
-                            onLinkTicket: {
-                                showLinkTicketSheet = true
+                            isSavedToNotebook: viewModel.isSavedToNotebook,
+                            showCopiedAlert: viewModel.showCopiedAlert,
+                            onSaveNotebook: {
+                                viewModel.saveToNotebook(dataStore: dataStore)
                             },
-                            onCopy: copyToClipboard,
+                            onLinkTicket: {
+                                viewModel.showLinkTicketSheet = true
+                            },
+                            onCopy: {
+                                viewModel.copyToClipboard()
+                            },
                             onRegenerate: {
-                                followUpMessages = []
+                                viewModel.followUpMessages = []
                                 Task {
-                                    await fetchAllTimeframeBars(for: selectedSymbol, forceRefresh: true)
-                                    await runFullAnalysis()
+                                    await viewModel.fetchAllTimeframeBars(for: viewModel.selectedSymbol, forceRefresh: true, dataStore: dataStore)
+                                    await viewModel.runFullAnalysis(dataStore: dataStore)
                                 }
                             }
                         )
                         
                         // 6. Structured Section Cards Reader
-                        AIDocumentReaderView(text: AIDocumentParser.stripTechnicalMetadata(from: analysisResult))
+                        AIDocumentReaderView(text: AIDocumentParser.stripTechnicalMetadata(from: viewModel.analysisResult))
                         
                         // 6.1 Dedicated Pre-Trade Setup Card (Placed below AI analysis, only when actionable setup exists)
-                        if let plan = currentCommitment, plan.hasActionableSetup {
+                        if let plan = viewModel.currentCommitment, plan.hasActionableSetup {
                             PreTradeSetupCard(
                                 plan: plan,
                                 timeZone: dataStore.generalSettings.displayTimeZone
@@ -155,8 +110,8 @@ public struct PreTradeAnalysisSheet: View {
                         
                         // 7. Follow-up conversation turns (message bubbles in scroll view)
                         PreTradeFollowUpSection(
-                            analysisResult: analysisResult,
-                            followUpMessages: followUpMessages
+                            analysisResult: viewModel.analysisResult,
+                            followUpMessages: viewModel.followUpMessages
                         )
                     } else {
                         // User-triggered analysis card (no unprompted AI executions)
@@ -167,20 +122,22 @@ public struct PreTradeAnalysisSheet: View {
                 .padding(.vertical, 12)
                 .padding(.bottom, 24)
             }
-            .scrollDisabled(isChartInteracting)
+            .scrollDisabled(viewModel.isChartInteracting)
             .safeAreaInset(edge: .bottom) {
-                if !analysisResult.isEmpty && !isAnalyzing && !isLoadingData {
+                if !viewModel.analysisResult.isEmpty && !viewModel.isAnalyzing && !viewModel.isLoadingData {
                     PreTradeBottomFloatingInput(
-                        followUpQuery: $followUpQuery,
-                        isSubmitting: isSubmittingFollowUp,
-                        hasHistory: !followUpMessages.isEmpty,
+                        followUpQuery: $viewModel.followUpQuery,
+                        isSubmitting: viewModel.isSubmittingFollowUp,
+                        hasHistory: !viewModel.followUpMessages.isEmpty,
                         onResetThread: {
-                            followUpMessages = []
-                            followUpQuery = ""
-                            let cacheKey = "pretrade_\(selectedSymbol)"
-                            AICoachSessionStore.shared.save(key: cacheKey, result: analysisResult, followUps: [])
+                            viewModel.followUpMessages = []
+                            viewModel.followUpQuery = ""
+                            let cacheKey = "pretrade_\(viewModel.selectedSymbol)"
+                            AICoachSessionStore.shared.save(key: cacheKey, result: viewModel.analysisResult, followUps: [])
                         },
-                        onSubmit: submitFollowUp
+                        onSubmit: {
+                            viewModel.submitFollowUp(dataStore: dataStore)
+                        }
                     )
                 }
             }
@@ -196,35 +153,35 @@ public struct PreTradeAnalysisSheet: View {
                     ModalPrimaryButton("Done") { dismiss() }
                 }
             }
-            .fullScreenCover(item: $activeFullScreenModal) { modal in
+            .fullScreenCover(item: $viewModel.activeFullScreenModal) { modal in
                 switch modal {
                 case .lightbox(let img):
                     FullScreenChartLightboxView(image: img)
                 case .landscapeChart:
                     MarketCandleLandscapeSheet(
-                        bars: activeBars,
-                        symbol: selectedSymbol,
-                        selectedTimeframe: $selectedTimeframe,
+                        bars: viewModel.activeBars,
+                        symbol: viewModel.selectedSymbol,
+                        selectedTimeframe: $viewModel.selectedTimeframe,
                         timeframeOptions: ["15m", "1h", "4h", "1d"],
                         timeframeTitle: { MarketResolution.label(for: $0) },
-                        onDismiss: { activeFullScreenModal = nil }
+                        onDismiss: { viewModel.activeFullScreenModal = nil }
                     )
                 }
             }
-            .sheet(isPresented: $showPhotoPicker) {
-                UIKitImagePicker(isPresented: $showPhotoPicker) { data, _ in
+            .sheet(isPresented: $viewModel.showPhotoPicker) {
+                UIKitImagePicker(isPresented: $viewModel.showPhotoPicker) { data, _ in
                     if let img = UIImage(data: data) {
-                        self.userAttachedImage = img
-                        self.activeChartSnapshot = img
-                        Task { await runFullAnalysis() }
+                        viewModel.userAttachedImage = img
+                        viewModel.activeChartSnapshot = img
+                        Task { await viewModel.runFullAnalysis(dataStore: dataStore) }
                     }
                 }
             }
-            .sheet(isPresented: $showLinkTicketSheet) {
-                if let noteId = createdNoteId {
+            .sheet(isPresented: $viewModel.showLinkTicketSheet) {
+                if let noteId = viewModel.createdNoteId {
                     LinkNoteToTradeSheet(
                         noteId: noteId,
-                        noteTitle: "[Pre-Trade Bias] \(selectedSymbol)",
+                        noteTitle: "[Pre-Trade Bias] \(viewModel.selectedSymbol)",
                         currentTradeKey: nil
                     )
                     .presentationDetents([.medium, .large])
@@ -233,7 +190,7 @@ public struct PreTradeAnalysisSheet: View {
             }
         }
         .task {
-            onSymbolSelected(selectedSymbol)
+            viewModel.onSymbolSelected(viewModel.selectedSymbol, dataStore: dataStore)
         }
     }
     
@@ -255,368 +212,10 @@ public struct PreTradeAnalysisSheet: View {
                 }
                 
                 AppPrimaryButton("Analyze Market Bias", icon: "sparkles") {
-                    Task { await runFullAnalysis() }
+                    Task { await viewModel.runFullAnalysis(dataStore: dataStore) }
                 }
             }
             .padding(.vertical, 4)
         }
-    }
-    
-    private func onSymbolSelected(_ sym: String) {
-        selectedSymbol = sym
-        let cacheKey = "pretrade_\(sym)"
-        if let cached = AICoachSessionStore.shared.get(key: cacheKey) {
-            self.analysisResult = cached.result
-            self.followUpMessages = cached.followUps
-            self.currentCommitment = extractCommitmentSafely(from: cached.result, symbol: sym)
-        } else {
-            self.analysisResult = ""
-            self.followUpMessages = []
-            self.currentCommitment = nil
-        }
-        Task { await fetchAllTimeframeBars(for: sym, forceRefresh: true) }
-    }
-    
-    private func extractCommitmentSafely(from text: String, symbol: String) -> AdvisorCommitmentRecord? {
-        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
-        let session = AIAccountContextProvider.captureContext(dataStore: self.dataStore)
-        let balStr = session.balance.map { Formatters.formatCurrency($0, currency: session.accountCurrency) }
-        let riskPct = self.dataStore.aiSettings.traderProfile.numericRiskPercent
-        let targetRR = self.dataStore.aiSettings.traderProfile.targetRiskRewardRatio
-        return AIAdvisorMemoryEngine.shared.extractCommitment(
-            from: text,
-            symbol: symbol,
-            fallbackBalance: balStr,
-            accountBalance: session.balance,
-            riskPercentage: riskPct,
-            targetRiskRewardRatio: targetRR
-        )
-    }
-    
-    private func submitCustomSymbol() {
-        let clean = customSymbolText.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
-        guard !clean.isEmpty else { return }
-        customSymbolText = ""
-        onSymbolSelected(clean)
-    }
-    
-    // MARK: - Follow-Up Actions
-    private func submitFollowUp() {
-        let q = followUpQuery.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !q.isEmpty, !isSubmittingFollowUp else { return }
-        
-        let userMsg = AICoachMessage(role: "user", content: q)
-        // Keep front-end messages clean (only user questions and AI replies)
-        self.followUpMessages.append(userMsg)
-        self.followUpQuery = ""
-        self.isSubmittingFollowUp = true
-        
-        let currentSymbol = self.selectedSymbol
-        
-        Task {
-            // 1. Fetch freshest H1 candles, or fallback to current h1Bars
-            var activeBars = self.h1Bars
-            if let freshH1 = try? await AppServices.current.marketData.fetchBarsForSymbol(
-                symbol: currentSymbol,
-                config: dataStore.marketConnections,
-                resolution: "1h",
-                count: 48,
-                forceRefresh: true
-            ), !freshH1.bars.isEmpty {
-                activeBars = freshH1.bars
-                await MainActor.run {
-                    self.h1Bars = freshH1.bars
-                }
-            }
-            
-            let isVi = (dataStore.aiSettings.language.isEmpty || dataStore.aiSettings.language == "vi")
-            
-            // 2. Capture Real Account, Today's Execution Stats & Prop Firm Buffer
-            let sessionSummary = await MainActor.run {
-                AIAccountContextProvider.captureContext(dataStore: self.dataStore)
-            }
-            
-            let accName = sessionSummary.accountName ?? "Exness"
-            let propFirm = sessionSummary.propFirmName
-            let isProp = propFirm?.isEmpty == false
-            let firmName = propFirm ?? ""
-            let accCategory = isProp
-                ? (isVi ? "Quỹ Cấp Vốn (\(firmName))" : "Prop Firm (\(firmName))")
-                : (isVi ? "Tài khoản Cá nhân (\(accName.contains("Exness") ? "Exness" : "Broker"))" : "Personal Brokerage (\(accName.contains("Exness") ? "Exness" : "Broker"))")
-            
-            let balVal = sessionSummary.balance.map { Formatters.formatCurrency($0, currency: sessionSummary.accountCurrency) } ?? "N/A"
-            let eqVal = sessionSummary.equity.map { Formatters.formatCurrency($0, currency: sessionSummary.accountCurrency) } ?? balVal
-            
-            let pnlTodayStr = Formatters.formatPnL(sessionSummary.netPnlToday, currency: sessionSummary.accountCurrency)
-            let streakToday = sessionSummary.currentStreakToday
-            let streakDesc: String = {
-                if streakToday > 0 { return isVi ? "Thắng \(streakToday) lệnh liên tiếp (+)" : "\(streakToday) wins in a row (+)" }
-                if streakToday < 0 { return isVi ? "Đang thua \(abs(streakToday)) lệnh liên tiếp (-)" : "In a \(abs(streakToday))-loss streak (-)" }
-                return isVi ? "Chưa có chuỗi lệnh hôm nay" : "No streak today"
-            }()
-            
-            let bufferStr: String = {
-                if let buf = sessionSummary.dailyLossBufferRemainingUsd {
-                    let limit = sessionSummary.dailyLossLimitUsd.map { Formatters.formatCurrency($0, currency: "USD") } ?? (isVi ? "Quy định" : "Rule")
-                    let formattedBuf = Formatters.formatCurrency(buf, currency: "USD")
-                    return isVi
-                        ? "Hạn mức lỗ ngày: \(limit) | Đệm lỗ còn lại hôm nay: \(formattedBuf)"
-                        : "Daily Limit: \(limit) | Remaining Buffer: \(formattedBuf)"
-                }
-                return isVi ? "Hạn mức rủi ro ngày: Tối đa 2-3 lệnh (2-3% vốn)" : "Daily Risk Budget: Max 2-3 trades (2-3% capital)"
-            }()
-            
-            let isRiskBreached = streakToday <= -2 || (sessionSummary.dailyLossBufferRemainingUsd.map { $0 <= 0 } ?? false)
-            let riskAlert = isRiskBreached
-                ? (isVi
-                    ? "\n[CẢNH BÁO RỦI RO]: Trader đang có chuỗi thua hoặc đệm lỗ ngày đã chạm ngưỡng. AI BẮT BUỘC KHUYẾN NGHỊ ĐỨNG NGOÀI (FLAT), KHÔNG MỞ LỆNH MỚI.\n"
-                    : "\n[CRITICAL RISK GUARDRAIL]: Trader is on a losing streak or daily buffer exhausted. AI MUST ADVISE FLAT (STAND ASIDE), NO NEW TRADES.\n")
-                : ""
-            
-            // 3. Multi-Timeframe Context: H4 Context & 15-Candle H1 Series
-            let h4High = self.h4Bars.suffix(24).map(\.high).max().map { Formatters.price($0, symbol: currentSymbol) } ?? "N/A"
-            let h4Low = self.h4Bars.suffix(24).map(\.low).min().map { Formatters.price($0, symbol: currentSymbol) } ?? "N/A"
-            let h4Candles = AIPromptBuilder.buildH4CandleSummary(bars: self.h4Bars, count: 3, isVi: isVi)
-            
-            let h1Series = AIPromptBuilder.buildH1CandleSeriesSummary(bars: activeBars, count: 15, symbol: currentSymbol, isVi: isVi)
-            
-            let latestClose = activeBars.last.map { Formatters.price($0.close, symbol: currentSymbol) } ?? "N/A"
-            
-            var liveContext = ""
-            if isVi {
-                liveContext = """
-                [TRẠNG THÁI TÀI KHOẢN & RỦI RO HÔM NAY]:
-                • Tài khoản: \(accName) | Phân loại: \(accCategory) | Nền tảng: cTrader / Terminal
-                • Số dư: \(balVal) | Vốn ròng: \(eqVal)
-                • Trạng thái lệnh hôm nay: \(sessionSummary.totalTradesToday) lệnh (\(sessionSummary.winsToday) Thắng | \(sessionSummary.lossesToday) Thua | \(sessionSummary.breakevensToday) Hòa) | Đang chạy: \(sessionSummary.openTradesToday)
-                • PnL ròng hôm nay: \(pnlTodayStr) | Chuỗi lệnh: \(streakDesc)
-                • \(bufferStr)\(riskAlert)
-                [CẤU TRÚC ĐA KHUNG VÀ HÀNH ĐỘNG GIÁ THỜI GIAN THỰC]:
-                • Cặp tiền: \(currentSymbol) | Thị giá hiện tại: \(latestClose)
-                • Khung H4: Biên độ 24 nến: Cao nhất = \(h4High) | Thấp nhất = \(h4Low)
-                • 3 nến H4 gần nhất:
-                \(h4Candles)
-
-                • Chuỗi 15 nến H1 gần nhất (OHLC + Wilder RSI 14):
-                \(h1Series)
-                """
-            } else {
-                liveContext = """
-                [ACCOUNT & TODAY'S RISK CONTEXT]:
-                • Account: \(accName) | Category: \(accCategory) | Platform: cTrader / Terminal
-                • Balance: \(balVal) | Equity: \(eqVal)
-                • Today's Execution: \(sessionSummary.totalTradesToday) trades (\(sessionSummary.winsToday) W | \(sessionSummary.lossesToday) L | \(sessionSummary.breakevensToday) BE) | Active Open: \(sessionSummary.openTradesToday)
-                • Net P&L Today: \(pnlTodayStr) | Current Streak: \(streakDesc)
-                • \(bufferStr)\(riskAlert)
-                [MULTI-TIMEFRAME & REAL-TIME PRICE ACTION]:
-                • Symbol: \(currentSymbol) | Current Price: \(latestClose)
-                • H4 Frame: 24-Bar Range: High = \(h4High) | Low = \(h4Low)
-                • Recent 3 H4 Bars:
-                \(h4Candles)
-
-                • Recent 15-Candle H1 Execution Series (OHLC + Wilder RSI 14):
-                \(h1Series)
-                """
-            }
-            
-            let attachedImageB64 = userAttachedImage?.jpegData(compressionQuality: 0.85)?.base64EncodedString()
-            
-            // Backend context: push condensed initial analysis and live market update invisibly to AI
-            var historyToSend: [AICoachMessage] = []
-            if !self.analysisResult.isEmpty {
-                let condensed = self.analysisResult.count > 1000
-                    ? String(self.analysisResult.prefix(1000)) + "\n[...trích lược kế hoạch ban đầu...]"
-                    : self.analysisResult
-                historyToSend.append(AICoachMessage(role: "assistant", content: condensed))
-            }
-            historyToSend.append(contentsOf: self.followUpMessages)
-            
-            var augmentedPrompt = q
-            if !liveContext.isEmpty {
-                augmentedPrompt = "\(q)\n\n\(liveContext)"
-            }
-            if isVi {
-                augmentedPrompt += """
-                
-                [YEU CAU]: Tra loi truc dien, ngan gon, dung thuat ngu tai chinh. Doi chieu bien dong gia hien tai voi moc Invalidation SL va diem kich hoat trong ke hoach ban dau de xac dinh ke hoach con hieu luc hay da bi thi truong bac bo.
-                """
-            } else {
-                augmentedPrompt += """
-                
-                [DIRECTIVE]: Answer directly and concisely. Cross-reference current price with the structural Invalidation SL and entry triggers from the original plan to state if the thesis remains valid or is invalidated.
-                """
-            }
-            
-            do {
-                let response = try await AIReflectionService.shared.requestReflection(
-                    action: .ask,
-                    prompt: augmentedPrompt,
-                    metrics: nil,
-                    edgeScore: nil,
-                    language: dataStore.aiSettings.language,
-                    chartImageBase64: attachedImageB64,
-                    chartImagesBase64: nil,
-                    sessionSummary: nil,
-                    conversationHistory: historyToSend
-                )
-                await MainActor.run {
-                    self.followUpMessages.append(AICoachMessage(role: "assistant", content: response))
-                    self.isSubmittingFollowUp = false
-                    self.isSavedToNotebook = false
-                    let cacheKey = "pretrade_\(self.selectedSymbol)"
-                    AICoachSessionStore.shared.save(key: cacheKey, result: self.analysisResult, followUps: self.followUpMessages)
-                }
-            } catch {
-                await MainActor.run {
-                    self.followUpMessages.append(AICoachMessage(role: "assistant", content: "Error: \(error.localizedDescription)"))
-                    self.isSubmittingFollowUp = false
-                }
-            }
-        }
-    }
-    
-    // MARK: - Market Fetching & Analysis Execution
-    private func fetchAllTimeframeBars(for sym: String, forceRefresh: Bool = false) async {
-        await MainActor.run {
-            self.isLoadingData = true
-            self.errorMessage = nil
-            self.isSavedToNotebook = false
-        }
-        
-        let config = dataStore.marketConnections
-        
-        do {
-            async let d1Task = AppServices.current.marketData.fetchBarsForSymbol(symbol: sym, config: config, resolution: "1d", count: 100, forceRefresh: forceRefresh)
-            async let h4Task = AppServices.current.marketData.fetchBarsForSymbol(symbol: sym, config: config, resolution: "4h", count: 150, forceRefresh: forceRefresh)
-            async let h1Task = AppServices.current.marketData.fetchBarsForSymbol(symbol: sym, config: config, resolution: "1h", count: 150, forceRefresh: forceRefresh)
-            async let m15Task = AppServices.current.marketData.fetchBarsForSymbol(symbol: sym, config: config, resolution: "15m", count: 150, forceRefresh: forceRefresh)
-            
-            let (d1Res, h4Res, h1Res, m15Res) = try await (d1Task, h4Task, h1Task, m15Task)
-            
-            await MainActor.run {
-                self.d1Bars = d1Res.bars
-                self.h4Bars = h4Res.bars
-                self.h1Bars = h1Res.bars
-                self.m15Bars = m15Res.bars
-                self.activeProvider = m15Res.provider
-                self.isLoadingData = false
-            }
-        } catch {
-            await MainActor.run {
-                self.errorMessage = error.localizedDescription
-                self.isLoadingData = false
-                self.isAnalyzing = false
-            }
-        }
-    }
-    
-    private func runFullAnalysis() async {
-        await MainActor.run {
-            self.isAnalyzing = true
-            self.errorMessage = nil
-        }
-        
-        // Always ensure we have the freshest bars before formulating bias
-        await fetchAllTimeframeBars(for: selectedSymbol, forceRefresh: true)
-        
-        guard !d1Bars.isEmpty || !h4Bars.isEmpty || !h1Bars.isEmpty || !m15Bars.isEmpty else {
-            await MainActor.run {
-                self.errorMessage = dataStore.aiSettings.language == "vi"
-                    ? "Không thể tải dữ liệu nến cho \(selectedSymbol). Vui lòng thử lại sau giây lát."
-                    : "Unable to stream candle data for \(selectedSymbol). Please retry in a moment."
-                self.isAnalyzing = false
-            }
-            return
-        }
-        
-        // Only encode image if user explicitly attached a photo
-        let singleChartBase64 = userAttachedImage?.jpegData(compressionQuality: 0.85)?.base64EncodedString()
-        // Always run a fresh clean-slate analysis on latest market bars without anchoring to stale cached text
-        let prevAnalysis: String? = nil
-        
-        do {
-            let response = try await AIReflectionService.shared.requestPreTradeMarketAnalysis(
-                symbol: selectedSymbol,
-                d1Bars: d1Bars,
-                h4Bars: h4Bars,
-                h1Bars: h1Bars,
-                m15Bars: m15Bars,
-                language: dataStore.aiSettings.language,
-                chartImageBase64: nil,
-                chartImagesBase64: nil,
-                conversationHistory: followUpMessages,
-                previousAnalysis: prevAnalysis
-            )
-            await MainActor.run {
-                self.analysisResult = response
-                self.isAnalyzing = false
-                let cacheKey = "pretrade_\(self.selectedSymbol)"
-                AICoachSessionStore.shared.save(key: cacheKey, result: response, followUps: self.followUpMessages)
-                
-                // Capture account balance for setup record
-                let session = AIAccountContextProvider.captureContext(dataStore: self.dataStore)
-                let balStr = session.balance.map { Formatters.formatCurrency($0, currency: session.accountCurrency) }
-                let riskPct = self.dataStore.aiSettings.traderProfile.numericRiskPercent
-                
-                let targetRR = self.dataStore.aiSettings.traderProfile.targetRiskRewardRatio
-                
-                // Persist structured advisor commitment so Trade Coach can automatically link and honor it
-                let commitment = AIAdvisorMemoryEngine.shared.extractCommitment(
-                    from: response,
-                    symbol: self.selectedSymbol,
-                    fallbackBalance: balStr,
-                    accountBalance: session.balance,
-                    riskPercentage: riskPct,
-                    targetRiskRewardRatio: targetRR
-                )
-                self.currentCommitment = commitment
-                AIAdvisorMemoryEngine.shared.saveCommitment(commitment)
-            }
-        } catch {
-            await MainActor.run {
-                self.errorMessage = error.localizedDescription
-                self.isAnalyzing = false
-            }
-        }
-    }
-    
-    // MARK: - Document Content Builder
-    private func fullAnalysisContent() -> String {
-        var fullText = AIDocumentParser.stripTechnicalMetadata(from: analysisResult)
-        let followUps = followUpMessages.filter { $0.content != analysisResult }
-        if !followUps.isEmpty {
-            fullText += "\n\n### Follow-Up Discussion\n"
-            for msg in followUps {
-                if msg.role == "user" {
-                    fullText += "\n• **Trader**: \(msg.content)\n"
-                } else {
-                    fullText += "\n• **Risk AI**: \(AIDocumentParser.stripTechnicalMetadata(from: msg.content))\n"
-                }
-            }
-        }
-        return fullText
-    }
-    
-    // MARK: - Actions
-    private func saveToNotebook() {
-        guard !analysisResult.isEmpty else { return }
-        let dateStr = JournalIds.todayDateString()
-        let title = "[Pre-Trade Bias] \(selectedSymbol) (\(dateStr))"
-        let tags = ["#pre-trade-bias", "#market-structure", "#\(selectedSymbol.lowercased())"]
-        if let note = dataStore.upsertNotebookNoteInFolder(
-            folderName: "Trade Insights",
-            existingNoteId: createdNoteId,
-            title: title,
-            content: fullAnalysisContent(),
-            tags: tags,
-            dayDate: dateStr
-        ) {
-            createdNoteId = note.id
-            isSavedToNotebook = true
-        }
-    }
-    
-    private func copyToClipboard() {
-        TradeDataStore.copyToClipboard(fullAnalysisContent()) { showCopiedAlert = $0 }
     }
 }

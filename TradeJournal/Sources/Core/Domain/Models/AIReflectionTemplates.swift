@@ -172,7 +172,7 @@ public struct AIReflectionTemplates {
         let dayFormatter = DateFormatter()
         dayFormatter.dateFormat = "yyyy-MM-dd"
         let todayDayStr = JournalIds.todayDateString()
-        let cal = Calendar.current
+        let cal = Calendar(identifier: .gregorian)
         let yesterdayDay = cal.date(byAdding: .day, value: -1, to: Date()) ?? Date()
         let yesterdayDayStr = dayFormatter.string(from: yesterdayDay)
         

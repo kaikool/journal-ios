@@ -41,9 +41,10 @@ public enum SyncDateRangeMode: String, Codable, CaseIterable, Identifiable {
         }
     }
     
-    public func dateInterval(customStart: Date? = nil, customEnd: Date? = nil) -> (start: Date?, end: Date?) {
+    public func dateInterval(customStart: Date? = nil, customEnd: Date? = nil, timeZone: TimeZone = .current) -> (start: Date?, end: Date?) {
         let now = Date()
-        let cal = Calendar.current
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = timeZone
         switch self {
         case .last7Days:
             let start = cal.date(byAdding: .day, value: -7, to: now)

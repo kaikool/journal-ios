@@ -75,7 +75,7 @@ public enum TraderBehaviorMiningEngine {
             )
         }
         
-        var calendar = Calendar.current
+        var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = timeZone
         var detectedNames: [String] = []
         

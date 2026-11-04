@@ -10,9 +10,11 @@ public enum AIAccountContextProvider {
         targetAccountId: String? = nil,
         dataStore: TradeDataStore = .shared
     ) -> AIAccountSessionSummary {
-        let todayStr = JournalIds.todayDateString()
+        let timeZone = TimeZone(identifier: dataStore.generalSettings.displayTimeZone) ?? .current
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd"
+        dateFormatter.timeZone = timeZone
+        let todayStr = dateFormatter.string(from: Date())
         
         let activeAccId: String = {
             if let t = targetAccountId, !t.isEmpty, t != "all", t != "default-acc" {
@@ -56,7 +58,8 @@ public enum AIAccountContextProvider {
         let symbolsToday = Array(Set(todayTrades.map { $0.symbol })).sorted()
         
         // Yesterday's Trades
-        let calendar = Calendar.current
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
         let now = Date()
         let yesterdayDate = calendar.date(byAdding: .day, value: -1, to: now) ?? now
         let yesterdayStr = dateFormatter.string(from: yesterdayDate)
