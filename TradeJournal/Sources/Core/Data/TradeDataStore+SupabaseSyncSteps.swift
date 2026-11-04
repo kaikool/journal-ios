@@ -1,0 +1,727 @@
+import Foundation
+import Combine
+
+// MARK: - Supabase Sync Pipeline Steps
+
+/// Mutable state threaded through the individual Supabase sync steps.
+struct SupabaseSyncContext {
+    var accountsCount = 0
+    var tradesCount = 0
+    var executionsCount = 0
+    var propCount = 0
+    var warnings: [String] = []
+}
+
+extension TradeDataStore {
+    /// Supabase sync step: Accounts. Returns alse when the sync was cancelled.
+    func syncSupabaseAccounts(_ ctx: inout SupabaseSyncContext) async -> Bool {
+        // 1. Synchronize Accounts
+        do {
+            let remoteAccounts = (try await SupabaseService.shared.fetchAccounts()).filter { !$0.name.hasPrefix("Account ") }
+            ctx.accountsCount = remoteAccounts.count
+            mergeRemoteAccounts(remoteAccounts)
+            
+            if !accounts.isEmpty {
+                do {
+                    try await SupabaseService.shared.upsertAccounts(accounts)
+                } catch {
+                    if Self.isCancellation(error) { return false }
+                    AppLogger.error("Supabase accounts upsert warning: \(error.localizedDescription)")
+                    ctx.warnings.append("Accounts upload: \(error.localizedDescription)")
+                }
+            }
+        } catch {
+            if Self.isCancellation(error) { return false }
+            AppLogger.error("Supabase accounts sync warning: \(error.localizedDescription)")
+            ctx.warnings.append("Accounts: \(error.localizedDescription)")
+        }
+        return true
+    }
+
+    /// Supabase sync step: Trades. Returns alse when the sync was cancelled.
+    func syncSupabaseTrades(_ ctx: inout SupabaseSyncContext) async -> Bool {
+        // 2. Synchronize Trades
+        do {
+            let remoteTrades = try await SupabaseService.shared.fetchTrades(accountId: nil)
+            ctx.tradesCount = remoteTrades.count
+            var localTrades = self.trades
+            var tradesModified = false
+            for rTrade in remoteTrades {
+                if let idx = localTrades.firstIndex(where: { $0.key == rTrade.key }) {
+                    var local = localTrades[idx]
+
+                    // Safeguard: Never overwrite a locally closed trade with an open status from cloud
+                    if local.status.isClosed && rTrade.status == .open {
+                        continue
+                    }
+
+                    let isBrokerSynced = local.key.hasPrefix("the5ers_") || local.key.hasPrefix("ctrader_") || local.key.hasPrefix("exness_")
+                    if isBrokerSynced {
+                        var mutated = false
+                        // If remote trade is closed with valid exit/P&L while local is still open or missing exit/P&L, adopt remote closed execution data
+                        if rTrade.status.isClosed && (local.status == .open || (local.netPnl == 0 && rTrade.netPnl != 0) || (local.avgExit == nil && rTrade.avgExit != nil)) {
+                            local.status = rTrade.status
+                            local.closedAt = rTrade.closedAt ?? local.closedAt
+                            local.openQuantity = rTrade.openQuantity
+                            local.avgExit = rTrade.avgExit ?? local.avgExit
+                            local.grossPnl = rTrade.grossPnl
+                            local.netPnl = rTrade.netPnl
+                            local.fees = rTrade.fees
+                            local.swap = rTrade.swap ?? local.swap
+                            if !rTrade.executionIds.isEmpty {
+                                local.executionIds = rTrade.executionIds
+                                local.executionCount = rTrade.executionCount
+                            }
+                            if !rTrade.exits.isEmpty {
+                                local.exits = rTrade.exits
+                            }
+                            if let dur = rTrade.durationMs {
+                                local.durationMs = dur
+                            }
+                            mutated = true
+                        }
+                        // Preserve authoritative local broker P&L, fees, swap, and status; merge user annotations from cloud if local is empty
+                        if (local.notes == nil || local.notes?.isEmpty == true), let rNotes = rTrade.notes, !rNotes.isEmpty {
+                            local.notes = rNotes
+                            mutated = true
+                        }
+                        if local.tags.isEmpty && !rTrade.tags.isEmpty {
+                            local.tags = rTrade.tags
+                            mutated = true
+                        }
+                        if local.mistakes.isEmpty && !rTrade.mistakes.isEmpty {
+                            local.mistakes = rTrade.mistakes
+                            mutated = true
+                        }
+                        if local.rating == nil && rTrade.rating != nil { local.rating = rTrade.rating; mutated = true }
+                        if local.stopLoss == nil && rTrade.stopLoss != nil { local.stopLoss = rTrade.stopLoss; mutated = true }
+                        if local.profitTarget == nil && rTrade.profitTarget != nil { local.profitTarget = rTrade.profitTarget; mutated = true }
+                        if (local.playbookId == nil || local.playbookId?.isEmpty == true) {
+                            if let rPb = rTrade.playbookId, !rPb.isEmpty {
+                                local.playbookId = rPb
+                                mutated = true
+                            } else if let defPb = defaultPlaybook?.id {
+                                local.playbookId = defPb
+                                mutated = true
+                            }
+                        }
+                        if local.reviewedAt == nil && rTrade.reviewedAt != nil { local.reviewedAt = rTrade.reviewedAt; mutated = true }
+                        if local.mae == nil && rTrade.mae != nil { local.mae = rTrade.mae; mutated = true }
+                        if local.mfe == nil && rTrade.mfe != nil { local.mfe = rTrade.mfe; mutated = true }
+                        if local.maePoints == nil && rTrade.maePoints != nil { local.maePoints = rTrade.maePoints; mutated = true }
+                        if local.mfePoints == nil && rTrade.mfePoints != nil { local.mfePoints = rTrade.mfePoints; mutated = true }
+                        if mutated {
+                            localTrades[idx] = local
+                            tradesModified = true
+                        }
+                    } else if (local.netPnl != 0 || local.grossPnl != 0) && (rTrade.netPnl == 0 && rTrade.grossPnl == 0) {
+                        // Keep local non-zero PnL if remote has zero PnL
+                    } else if local != rTrade {
+                        var updated = rTrade
+                        if updated.playbookId == nil || updated.playbookId?.isEmpty == true {
+                            updated.playbookId = local.playbookId ?? defaultPlaybook?.id
+                        }
+                        localTrades[idx] = updated
+                        tradesModified = true
+                    }
+                } else {
+                    var newTrade = rTrade
+                    if newTrade.playbookId == nil || newTrade.playbookId?.isEmpty == true {
+                        newTrade.playbookId = defaultPlaybook?.id
+                    }
+                    localTrades.append(newTrade)
+                    tradesModified = true
+                }
+                if !rTrade.accountId.isEmpty {
+                    if let matched = accounts.first(where: { $0.id.isEquivalentAccountId(to: rTrade.accountId) }) {
+                        if let lastIdx = localTrades.indices.last, localTrades[lastIdx].key == rTrade.key, localTrades[lastIdx].accountId != matched.id {
+                            localTrades[lastIdx].accountId = matched.id
+                            tradesModified = true
+                        }
+                    }
+                }
+            }
+            if tradesModified || (ctx.tradesCount > 0 && localTrades.count != self.trades.count) {
+                self.trades = localTrades
+                cleanupLegacyThe5ersCorruptions()
+                deduplicateTrades()
+            }
+            if selectedAccountId == "default-acc" || selectedAccountId == "all" || !accounts.contains(where: { $0.id == selectedAccountId || TradeDataStore.isSameAccountId($0.id, selectedAccountId) }) {
+                selectedAccountId = mostRecentActiveAccount?.id ?? visibleAccounts.first?.id ?? accounts.first?.id ?? "default-acc"
+            }
+            if !trades.isEmpty {
+                do {
+                    try await SupabaseService.shared.upsertTrades(trades)
+                } catch {
+                    if Self.isCancellation(error) { return false }
+                    AppLogger.error("Supabase trades upsert warning: \(error.localizedDescription)")
+                    ctx.warnings.append("Trades upload: \(error.localizedDescription)")
+                }
+            }
+        } catch {
+            if Self.isCancellation(error) { return false }
+            AppLogger.error("Supabase trades sync warning: \(error.localizedDescription)")
+            ctx.warnings.append("Trades: \(error.localizedDescription)")
+        }
+        return true
+    }
+
+    /// Supabase sync step: Executions. Returns alse when the sync was cancelled.
+    func syncSupabaseExecutions(_ ctx: inout SupabaseSyncContext) async -> Bool {
+        // 3. Synchronize Executions
+        do {
+            let remoteExecutions = try await SupabaseService.shared.fetchExecutions(accountId: nil)
+            ctx.executionsCount = remoteExecutions.count
+            if !remoteExecutions.isEmpty {
+                let uniqueNew = remoteExecutions.filter { !executionHashes.contains($0.contentHash) }
+                if !uniqueNew.isEmpty {
+                    var localExecutions = self.executions
+                    for fill in uniqueNew {
+                        executionHashes.insert(fill.contentHash)
+                        localExecutions.append(fill)
+                    }
+                    self.executions = localExecutions
+                }
+            }
+            if !executions.isEmpty {
+                do {
+                    try await SupabaseService.shared.upsertExecutions(executions)
+                } catch {
+                    if Self.isCancellation(error) { return false }
+                    AppLogger.error("Supabase executions upsert warning: \(error.localizedDescription)")
+                    ctx.warnings.append("Executions upload: \(error.localizedDescription)")
+                }
+            }
+        } catch {
+            if Self.isCancellation(error) { return false }
+            AppLogger.error("Supabase executions sync warning: \(error.localizedDescription)")
+            ctx.warnings.append("Executions: \(error.localizedDescription)")
+        }
+        return true
+    }
+
+    /// Supabase sync step: Playbooks. Returns alse when the sync was cancelled.
+    func syncSupabasePlaybooks(_ ctx: inout SupabaseSyncContext) async -> Bool {
+        // Supabase playbooks sync
+        do {
+            let remotePlaybooks = try await SupabaseService.shared.fetchPlaybooks()
+            var localPlaybooks = self.playbooks
+            var playbooksModified = false
+            var playbooksToUpload: [Playbook] = []
+            
+            // 1. Reconcile remote playbooks against local
+            for rPb in remotePlaybooks {
+                // If deleted locally, delete from Supabase and skip
+                if deletedPlaybookIds.contains(rPb.id) || (rPb.name.lowercased().contains("test playbook") && deletedPlaybookIds.contains(rPb.id)) {
+                    Task { try? await SupabaseService.shared.deletePlaybook(id: rPb.id) }
+                    continue
+                }
+                
+                if let idx = localPlaybooks.firstIndex(where: { $0.id == rPb.id }) {
+                    let local = localPlaybooks[idx]
+                    // Check if content differs
+                    if local.name != rPb.name || local.description != rPb.description || local.rules != rPb.rules {
+                        // Conflict resolution: if local was edited, keep local and upload to Supabase
+                        if local.updatedAt >= rPb.createdAt {
+                            playbooksToUpload.append(local)
+                        } else {
+                            // Remote is newer: adopt remote
+                            localPlaybooks[idx] = rPb
+                            playbooksModified = true
+                        }
+                    }
+                } else {
+                    // New remote playbook not yet in local
+                    localPlaybooks.append(rPb)
+                    playbooksModified = true
+                }
+            }
+            
+            // 2. Identify local playbooks not yet on remote or edited locally
+            for localPb in localPlaybooks {
+                if deletedPlaybookIds.contains(localPb.id) { continue }
+                if !remotePlaybooks.contains(where: { $0.id == localPb.id }) {
+                    playbooksToUpload.append(localPb)
+                }
+            }
+            
+            // 3. Purge any deleted playbooks from local collection
+            let countBeforePurge = localPlaybooks.count
+            localPlaybooks.removeAll { deletedPlaybookIds.contains($0.id) }
+            if localPlaybooks.count != countBeforePurge {
+                playbooksModified = true
+            }
+            
+            if playbooksModified {
+                self.playbooks = localPlaybooks
+                saveToDisk(immediate: true)
+            }
+            
+            // 4. Upsert pending playbooks to Supabase
+            if !playbooksToUpload.isEmpty {
+                do {
+                    try await SupabaseService.shared.upsertPlaybooks(playbooksToUpload)
+                } catch {
+                    if Self.isCancellation(error) { return false }
+                    AppLogger.warning("Supabase playbooks upsert warning: \(error.localizedDescription)")
+                }
+            }
+        } catch {
+            if Self.isCancellation(error) { return false }
+            AppLogger.warning("Supabase playbooks sync warning: \(error.localizedDescription)")
+        }
+        return true
+    }
+
+    /// Supabase sync step: JournalDays. Returns alse when the sync was cancelled.
+    func syncSupabaseJournalDays(_ ctx: inout SupabaseSyncContext) async -> Bool {
+        // Supabase journal_days (calendar notes) sync
+        do {
+            let remoteNotes = try await SupabaseService.shared.fetchJournalDays()
+            for rNote in remoteNotes {
+                if let local = calendarNotes[rNote.date] {
+                    if rNote.updatedAt >= local.updatedAt {
+                        calendarNotes[rNote.date] = rNote
+                        journalDays[rNote.date] = rNote.content
+                    }
+                } else {
+                    calendarNotes[rNote.date] = rNote
+                    journalDays[rNote.date] = rNote.content
+                }
+            }
+            let localNotesToUpload = calendarNotes.values.filter { local in
+                !remoteNotes.contains(where: { $0.date == local.date && $0.updatedAt >= local.updatedAt })
+            }
+            if !localNotesToUpload.isEmpty {
+                try? await SupabaseService.shared.upsertJournalDays(Array(localNotesToUpload))
+            }
+        } catch {
+            if Self.isCancellation(error) { return false }
+            AppLogger.warning("Supabase journal_days sync warning: \(error.localizedDescription)")
+        }
+        return true
+    }
+
+    /// Supabase sync step: PropAccounts. Returns alse when the sync was cancelled.
+    func syncSupabasePropAccounts(_ ctx: inout SupabaseSyncContext) async -> Bool {
+        // 4. Synchronize Prop Accounts
+        do {
+            let remotePropAccounts = try await SupabaseService.shared.fetchPropAccounts()
+            ctx.propCount = remotePropAccounts.count
+            for rAcc in remotePropAccounts {
+                if let idx = propAccounts.firstIndex(where: { $0.id.isEquivalentAccountId(to: rAcc.id) }) {
+                    let local = propAccounts[idx]
+                    if local.firm == "The5ers" {
+                        var merged = local
+                        merged.revision = max(local.revision, rAcc.revision)
+                        propAccounts[idx] = merged
+                    } else if rAcc.revision >= local.revision {
+                        propAccounts[idx] = rAcc
+                    }
+                } else {
+                    propAccounts.append(rAcc)
+                }
+            }
+            cleanupLegacyThe5ersCorruptions()
+            let validAccIds = Set(accounts.map { $0.id })
+            let validPropIds = Set(propAccounts.map { $0.id })
+            for idx in 0..<propAccounts.count {
+                if let jId = propAccounts[idx].journalAccountId, !jId.isEmpty {
+                    if !validAccIds.contains(jId) {
+                        if let matched = accounts.first(where: { $0.id.isEquivalentAccountId(to: jId) }) {
+                            propAccounts[idx].journalAccountId = matched.id
+                        } else {
+                            propAccounts[idx].journalAccountId = nil
+                        }
+                    }
+                }
+                if let pId = propAccounts[idx].parentId, !pId.isEmpty {
+                    if !validPropIds.contains(pId) {
+                        propAccounts[idx].parentId = nil
+                    }
+                }
+            }
+            
+            if !propAccounts.isEmpty {
+                do {
+                    try await SupabaseService.shared.upsertPropAccounts(propAccounts)
+                } catch {
+                    if Self.isCancellation(error) { return false }
+                    AppLogger.warning("Supabase prop accounts upsert warning: \(error.localizedDescription)")
+                    ctx.warnings.append("Prop accounts upload: \(error.localizedDescription)")
+                }
+            }
+        } catch {
+            if Self.isCancellation(error) { return false }
+            AppLogger.warning("Supabase prop accounts warning: \(error.localizedDescription)")
+        }
+        return true
+    }
+
+    /// Supabase sync step: PropEntries. Returns alse when the sync was cancelled.
+    func syncSupabasePropEntries(_ ctx: inout SupabaseSyncContext) async -> Bool {
+        do {
+            let remotePropEntries = try await SupabaseService.shared.fetchPropEntries()
+            for rEntry in remotePropEntries {
+                if let idx = propEntries.firstIndex(where: { $0.id == rEntry.id }) {
+                    if rEntry.revision >= propEntries[idx].revision {
+                        propEntries[idx] = rEntry
+                    }
+                } else {
+                    propEntries.append(rEntry)
+                }
+            }
+            cleanupLegacyThe5ersCorruptions()
+            deduplicatePropEntries()
+            
+            let currentPropIds = Set(propAccounts.map { $0.id })
+            let currentEntryIds = Set(propEntries.map { $0.id })
+            for idx in 0..<propEntries.count {
+                if propEntries[idx].firm == "The5ers" && propEntries[idx].kind == "expense" && propEntries[idx].id.hasPrefix("the5ers_purchase_") {
+                    propEntries[idx].accountId = nil
+                } else if let aId = propEntries[idx].accountId, !aId.isEmpty {
+                    if !currentPropIds.contains(aId) {
+                        if let matched = propAccounts.first(where: { $0.id.isEquivalentAccountId(to: aId) }) {
+                            propEntries[idx].accountId = matched.id
+                        } else {
+                            propEntries[idx].accountId = nil
+                        }
+                    }
+                }
+                if let pId = propEntries[idx].parentId, !pId.isEmpty {
+                    if !currentEntryIds.contains(pId) {
+                        propEntries[idx].parentId = nil
+                    }
+                }
+            }
+            
+            if !propEntries.isEmpty {
+                do {
+                    try await SupabaseService.shared.upsertPropEntries(propEntries)
+                } catch {
+                    if Self.isCancellation(error) { return false }
+                    AppLogger.warning("Supabase prop entries upsert warning: \(error.localizedDescription)")
+                    ctx.warnings.append("Prop entries upload: \(error.localizedDescription)")
+                }
+            }
+        } catch {
+            if Self.isCancellation(error) { return false }
+            AppLogger.warning("Supabase prop entries warning: \(error.localizedDescription)")
+        }
+        return true
+    }
+
+    /// Supabase sync step: PropReceipts. Returns alse when the sync was cancelled.
+    func syncSupabasePropReceipts(_ ctx: inout SupabaseSyncContext) async -> Bool {
+        do {
+            let remotePropReceipts = try await SupabaseService.shared.fetchPropReceipts()
+            for rRcpt in remotePropReceipts {
+                if let idx = propReceipts.firstIndex(where: { $0.id == rRcpt.id }) {
+                    propReceipts[idx] = rRcpt
+                } else {
+                    propReceipts.append(rRcpt)
+                }
+            }
+            deduplicatePropReceipts()
+            reconcileReceiptsToEntries()
+            
+            let validEntryIds = Set(propEntries.map { $0.id })
+            var validReceipts: [PropReceiptItem] = []
+            for var rcpt in propReceipts {
+                if validEntryIds.contains(rcpt.payoutId) {
+                    validReceipts.append(rcpt)
+                } else if let matched = propEntries.first(where: { $0.id.contains(rcpt.payoutId) || rcpt.payoutId.contains($0.id) }) {
+                    rcpt.payoutId = matched.id
+                    validReceipts.append(rcpt)
+                } else {
+                    AppLogger.warning("Supabase sync: Skipping receipt \(rcpt.id) because referenced payout entry \(rcpt.payoutId) does not exist.")
+                }
+            }
+            
+            if !validReceipts.isEmpty {
+                do {
+                    try await SupabaseService.shared.upsertPropReceipts(validReceipts)
+                } catch {
+                    if Self.isCancellation(error) { return false }
+                    AppLogger.warning("Supabase prop receipts upsert warning: \(error.localizedDescription)")
+                    ctx.warnings.append("Prop receipts upload: \(error.localizedDescription)")
+                }
+            }
+        } catch {
+            if Self.isCancellation(error) { return false }
+            AppLogger.warning("Supabase prop receipts warning: \(error.localizedDescription)")
+        }
+        return true
+    }
+
+    /// Supabase sync step: PropAudits. Returns alse when the sync was cancelled.
+    func syncSupabasePropAudits(_ ctx: inout SupabaseSyncContext) async -> Bool {
+        do {
+            let remotePropAudits = try await SupabaseService.shared.fetchPropAudits()
+            for rAudit in remotePropAudits {
+                if !propAudits.contains(where: { $0.id == rAudit.id }) {
+                    propAudits.append(rAudit)
+                }
+            }
+            if !propAudits.isEmpty {
+                do {
+                    try await SupabaseService.shared.upsertPropAudits(propAudits)
+                } catch {
+                    if Self.isCancellation(error) { return false }
+                    let msg = error.localizedDescription.lowercased()
+                    if msg.contains("row-level security") || msg.contains("rls") {
+                        AppLogger.warning("Supabase prop audits RLS: \(error.localizedDescription)")
+                    } else {
+                        AppLogger.warning("Supabase prop audits upsert warning: \(error.localizedDescription)")
+                        ctx.warnings.append("Prop audits upload: \(error.localizedDescription)")
+                    }
+                }
+            }
+        } catch {
+            if Self.isCancellation(error) { return false }
+            AppLogger.warning("Supabase prop audits warning: \(error.localizedDescription)")
+        }
+        return true
+    }
+
+    /// Supabase sync step: AttachmentsSettingsAndNotebook. Returns alse when the sync was cancelled.
+    func syncSupabaseAttachmentsSettingsAndNotebook(_ ctx: inout SupabaseSyncContext) async -> Bool {
+        // 5. Synchronize Attachments
+        do {
+            let remoteAttachments = try await SupabaseService.shared.fetchAttachments()
+            for rAtt in remoteAttachments {
+                if !attachments.contains(where: { $0.id == rAtt.id }) {
+                    attachments.append(rAtt)
+                }
+            }
+        } catch {
+            if Self.isCancellation(error) { return false }
+            AppLogger.warning("Supabase attachments warning: \(error.localizedDescription)")
+        }
+
+        // 6. Synchronize Settings (The5ers Token, AI Configuration)
+        do {
+            let remoteSettings = try await SupabaseService.shared.fetchSettings()
+            var localSettingsToUpload: [JournalSettingRecord] = []
+            
+            // Sync The5ers MCP Token across devices
+            if let remoteToken = remoteSettings.first(where: { $0.key == "the5ers_mcp_token" })?.value, !remoteToken.isEmpty {
+                let localToken = UserDefaults.standard.string(forKey: "the5ers_mcp_token") ?? ""
+                if localToken.isEmpty {
+                    UserDefaults.standard.set(remoteToken, forKey: "the5ers_mcp_token")
+                    The5ersService.shared.mcpToken = remoteToken
+                }
+            } else if let localToken = UserDefaults.standard.string(forKey: "the5ers_mcp_token"), !localToken.isEmpty {
+                localSettingsToUpload.append(JournalSettingRecord(key: "the5ers_mcp_token", value: localToken))
+            }
+            
+            // Sync AI Configuration across devices
+            if let remoteAi = remoteSettings.first(where: { $0.key == "ai_reflection" })?.value, !remoteAi.isEmpty {
+                if let data = remoteAi.data(using: .utf8), let decoded = try? JSONDecoder().decode(AiSettingsConfig.self, from: data) {
+                    if self.aiSettings == .default && decoded != .default {
+                        self.aiSettings = decoded
+                    }
+                }
+            } else if self.aiSettings != .default {
+                if let data = try? JSONEncoder().encode(self.aiSettings), let jsonStr = String(data: data, encoding: .utf8) {
+                    localSettingsToUpload.append(JournalSettingRecord(key: "ai_reflection", value: jsonStr))
+                }
+            }
+            
+            if !localSettingsToUpload.isEmpty {
+                try? await SupabaseService.shared.upsertSettings(localSettingsToUpload)
+            }
+        } catch {
+            AppLogger.warning("Supabase settings sync warning: \(error.localizedDescription)")
+        }
+
+        // 7. Synchronize Notebook Folders & Notes
+        do {
+            let remoteFolders = try await SupabaseService.shared.fetchFolders()
+            for rF in remoteFolders {
+                if let idx = folders.firstIndex(where: { $0.id == rF.id }) {
+                    if rF.deletedAt != nil && folders[idx].deletedAt == nil {
+                        folders[idx].deletedAt = rF.deletedAt
+                    } else if folders[idx].name != rF.name {
+                        folders[idx].name = rF.name
+                    }
+                } else {
+                    folders.append(rF)
+                }
+            }
+            let foldersToUpload = folders.filter { local in
+                !remoteFolders.contains(where: { $0.id == local.id })
+            }
+            if !foldersToUpload.isEmpty {
+                try? await SupabaseService.shared.upsertFolders(foldersToUpload)
+            }
+            
+            let remoteNotes = try await SupabaseService.shared.fetchNotes()
+            for rN in remoteNotes {
+                if let idx = notebookNotes.firstIndex(where: { $0.id == rN.id }) {
+                    if rN.updatedAt >= notebookNotes[idx].updatedAt {
+                        notebookNotes[idx] = rN
+                    }
+                } else {
+                    notebookNotes.append(rN)
+                }
+            }
+            let notesToUpload = notebookNotes.filter { local in
+                !remoteNotes.contains(where: { $0.id == local.id && $0.updatedAt >= local.updatedAt })
+            }
+            if !notesToUpload.isEmpty {
+                try? await SupabaseService.shared.upsertNotes(notesToUpload)
+            }
+        } catch {
+            if Self.isCancellation(error) { return false }
+            AppLogger.warning("Supabase notebook sync warning: \(error.localizedDescription)")
+        }
+        return true
+    }
+
+    /// Supabase sync step: ProgressRoutines. Returns alse when the sync was cancelled.
+    func syncSupabaseProgressRoutines(_ ctx: inout SupabaseSyncContext) async -> Bool {
+        // 8. Synchronize Progress Rules (Routines) & Checks
+        do {
+            let remoteRules = try await SupabaseService.shared.fetchProgressRules()
+            var localRules = self.progressRules
+            var rulesModified = false
+            var rulesToUpload: [ProgressRule] = []
+            
+            for rRule in remoteRules {
+                // If permanently deleted locally, enforce deletion on Supabase and skip
+                if deletedProgressRuleIds.contains(rRule.id) {
+                    Task { try? await SupabaseService.shared.deleteProgressRule(id: rRule.id) }
+                    continue
+                }
+                
+                if let idx = localRules.firstIndex(where: { $0.id == rRule.id }) {
+                    let local = localRules[idx]
+                    if local.title != rRule.title || local.stage != rRule.stage || local.weekdaysJson != rRule.weekdaysJson || local.archivedAt != rRule.archivedAt {
+                        if local.archivedAt != nil && rRule.archivedAt == nil {
+                            rulesToUpload.append(local)
+                        } else {
+                            localRules[idx] = rRule
+                            rulesModified = true
+                        }
+                    }
+                } else {
+                    localRules.append(rRule)
+                    rulesModified = true
+                }
+            }
+            
+            for localRule in localRules {
+                if deletedProgressRuleIds.contains(localRule.id) { continue }
+                if !remoteRules.contains(where: { $0.id == localRule.id }) {
+                    rulesToUpload.append(localRule)
+                }
+            }
+            
+            let countBefore = localRules.count
+            localRules.removeAll { deletedProgressRuleIds.contains($0.id) }
+            if localRules.count != countBefore {
+                rulesModified = true
+            }
+            
+            if rulesModified {
+                await MainActor.run {
+                    self.progressRules = localRules
+                    self.saveToDisk(immediate: true)
+                    self.objectWillChange.send()
+                }
+            }
+            
+            if !rulesToUpload.isEmpty {
+                do {
+                    try await SupabaseService.shared.upsertProgressRules(rulesToUpload)
+                    AppLogger.info("Supabase sync uploaded \(rulesToUpload.count) progress rules")
+                } catch {
+                    AppLogger.warning("Supabase upsertProgressRules failed: \(error.localizedDescription)")
+                }
+            }
+            
+            let remoteChecks = try await SupabaseService.shared.fetchProgressChecks()
+            var localChecks = self.progressChecks
+            var checksModified = false
+            var checksToUpload: [ProgressCheck] = []
+            
+            for rCheck in remoteChecks {
+                if deletedProgressRuleIds.contains(rCheck.ruleId) {
+                    Task { try? await SupabaseService.shared.deleteProgressCheck(id: rCheck.id) }
+                    continue
+                }
+                if let idx = localChecks.firstIndex(where: { ($0.ruleId == rCheck.ruleId && $0.date == rCheck.date) || $0.id == rCheck.id }) {
+                    if localChecks[idx].done != rCheck.done {
+                        localChecks[idx].done = rCheck.done
+                        checksModified = true
+                    }
+                } else {
+                    localChecks.append(rCheck)
+                    checksModified = true
+                }
+            }
+            
+            for localCheck in localChecks {
+                if deletedProgressRuleIds.contains(localCheck.ruleId) { continue }
+                if !remoteChecks.contains(where: { ($0.ruleId == localCheck.ruleId && $0.date == localCheck.date) || $0.id == localCheck.id }) {
+                    checksToUpload.append(localCheck)
+                }
+            }
+            
+            let checkCountBefore = localChecks.count
+            localChecks.removeAll { deletedProgressRuleIds.contains($0.ruleId) }
+            if localChecks.count != checkCountBefore {
+                checksModified = true
+            }
+            
+            if checksModified {
+                await MainActor.run {
+                    self.progressChecks = localChecks
+                    self.saveToDisk(immediate: true)
+                    self.objectWillChange.send()
+                }
+            }
+            
+            if !checksToUpload.isEmpty {
+                do {
+                    try await SupabaseService.shared.upsertProgressChecks(checksToUpload)
+                    AppLogger.info("Supabase sync uploaded \(checksToUpload.count) progress checks")
+                } catch {
+                    AppLogger.warning("Supabase upsertProgressChecks failed: \(error.localizedDescription)")
+                }
+            }
+        } catch {
+            if Self.isCancellation(error) { return false }
+            AppLogger.warning("Supabase progress rules/checks sync warning: \(error.localizedDescription)")
+        }
+        return true
+    }
+
+    /// Supabase sync step: MissedTrades. Returns alse when the sync was cancelled.
+    func syncSupabaseMissedTrades(_ ctx: inout SupabaseSyncContext) async -> Bool {
+        // 9. Synchronize Missed Trades
+        do {
+            let remoteMissed = try await SupabaseService.shared.fetchMissedTrades()
+            for rMissed in remoteMissed {
+                if let idx = missedTrades.firstIndex(where: { $0.id == rMissed.id }) {
+                    if missedTrades[idx].symbol != rMissed.symbol || missedTrades[idx].notes != rMissed.notes || missedTrades[idx].archivedAt != rMissed.archivedAt {
+                        missedTrades[idx] = rMissed
+                    }
+                } else {
+                    missedTrades.append(rMissed)
+                }
+            }
+            let missedToUpload = missedTrades.filter { local in
+                !remoteMissed.contains(where: { $0.id == local.id })
+            }
+            if !missedToUpload.isEmpty {
+                try? await SupabaseService.shared.upsertMissedTrades(missedToUpload)
+            }
+        } catch {
+            if Self.isCancellation(error) { return false }
+            AppLogger.warning("Supabase missed trades sync warning: \(error.localizedDescription)")
+        }
+        return true
+    }
+}
