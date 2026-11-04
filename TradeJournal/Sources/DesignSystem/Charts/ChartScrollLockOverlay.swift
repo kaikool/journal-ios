@@ -1,16 +1,19 @@
 import SwiftUI
 import UIKit
 
-// MARK: - Unified Native UIKit Chart Interaction & Scroll-Lock Controller
+// MARK: - TradingView-Grade Native UIKit Chart Interaction & Kinetic Engine
 // Handles all chart touch interactions in a single native UIKit layer:
 // 1. Instantaneous parent UIScrollView lock on touch-down (zero outer page scroll interference)
-// 2. Zone-isolated 1-finger Pan:
-//    - Right Price Axis strip (58pt): vertical price scale zoom
-//    - Bottom Time Axis strip (28pt): horizontal time scale zoom
-//    - Main Canvas: smooth 2D horizontal time & vertical price panning
-// 3. 2-finger Pinch Zoom anchored at the finger midpoint
-// 4. Long-press Crosshair scrubbing (pauses panning while scrubbing)
-// 5. Double-tap Reset to auto-fit latest candles
+// 2. 60/120fps CADisplayLink kinetic momentum (inertial scrolling on flick release, instant catch on touch)
+// 3. Zone-isolated 1-finger Pan:
+//    - Right Price Axis strip (58pt): vertical price scale zoom (switches Price Scale to Manual)
+//    - Bottom Time Axis strip (28pt): horizontal time scale zoom anchored to right viewport
+//    - Main Canvas: directional intent lock (pure horizontal pan in Auto mode, 2D free pan in Manual mode or vertical drag)
+// 4. 2-finger Pinch Zoom:
+//    - Horizontal/diagonal pinch: zooms Time Scale anchored at finger midpoint + tracks 2-finger pan
+//    - Vertical pinch: zooms Price Scale
+// 5. Long-press 2D Crosshair scrubbing (tracks both X bar index and Y exact price)
+// 6. Zone-aware Double-tap Reset (Price Axis resets Auto Price Scale; Canvas/Time Axis resets full viewport)
 public struct ChartScrollLockOverlay: UIViewRepresentable {
     public var rightAxisWidth: CGFloat = 58
     public var bottomAxisHeight: CGFloat = 28
@@ -21,6 +24,8 @@ public struct ChartScrollLockOverlay: UIViewRepresentable {
     public var onTimeAxisZoom: ((_ dx: CGFloat) -> Void)?
     public var onPinchZoom: ((_ scaleDelta: CGFloat, _ focalX: CGFloat) -> Void)?
     public var onCrosshairChanged: ((_ x: CGFloat?) -> Void)?
+    public var onCrosshairPointChanged: ((_ point: CGPoint?) -> Void)?
+    public var onPriceAxisDoubleTap: (() -> Void)?
     public var onDoubleTapReset: (() -> Void)?
 
     public init(
@@ -33,6 +38,8 @@ public struct ChartScrollLockOverlay: UIViewRepresentable {
         onTimeAxisZoom: ((_ dx: CGFloat) -> Void)? = nil,
         onPinchZoom: ((_ scaleDelta: CGFloat, _ focalX: CGFloat) -> Void)? = nil,
         onCrosshairChanged: ((_ x: CGFloat?) -> Void)? = nil,
+        onCrosshairPointChanged: ((_ point: CGPoint?) -> Void)? = nil,
+        onPriceAxisDoubleTap: (() -> Void)? = nil,
         onDoubleTapReset: (() -> Void)? = nil
     ) {
         self.rightAxisWidth = rightAxisWidth
@@ -44,6 +51,8 @@ public struct ChartScrollLockOverlay: UIViewRepresentable {
         self.onTimeAxisZoom = onTimeAxisZoom
         self.onPinchZoom = onPinchZoom
         self.onCrosshairChanged = onCrosshairChanged
+        self.onCrosshairPointChanged = onCrosshairPointChanged
+        self.onPriceAxisDoubleTap = onPriceAxisDoubleTap
         self.onDoubleTapReset = onDoubleTapReset
     }
 
@@ -67,6 +76,8 @@ public struct ChartScrollLockOverlay: UIViewRepresentable {
         view.onTimeAxisZoom = onTimeAxisZoom
         view.onPinchZoom = onPinchZoom
         view.onCrosshairChanged = onCrosshairChanged
+        view.onCrosshairPointChanged = onCrosshairPointChanged
+        view.onPriceAxisDoubleTap = onPriceAxisDoubleTap
         view.onDoubleTapReset = onDoubleTapReset
     }
 }
@@ -78,6 +89,12 @@ public final class ScrollLockContainerView: UIView, UIGestureRecognizerDelegate 
         case timeAxis
     }
 
+    private enum CanvasDragIntent {
+        case undecided
+        case horizontalOnly
+        case free2D
+    }
+
     public var rightAxisWidth: CGFloat = 58
     public var bottomAxisHeight: CGFloat = 28
     public var onTouchStateChanged: ((Bool) -> Void)?
@@ -87,6 +104,8 @@ public final class ScrollLockContainerView: UIView, UIGestureRecognizerDelegate 
     public var onTimeAxisZoom: ((_ dx: CGFloat) -> Void)?
     public var onPinchZoom: ((_ scaleDelta: CGFloat, _ focalX: CGFloat) -> Void)?
     public var onCrosshairChanged: ((_ x: CGFloat?) -> Void)?
+    public var onCrosshairPointChanged: ((_ point: CGPoint?) -> Void)?
+    public var onPriceAxisDoubleTap: (() -> Void)?
     public var onDoubleTapReset: (() -> Void)?
 
     private weak var cachedScrollView: UIScrollView?
@@ -95,10 +114,18 @@ public final class ScrollLockContainerView: UIView, UIGestureRecognizerDelegate 
     private var pinchGesture: UIPinchGestureRecognizer?
     private var longPressGesture: UILongPressGestureRecognizer?
     private var doubleTapGesture: UITapGestureRecognizer?
+    private var singleTapGesture: UITapGestureRecognizer?
 
     private var activeDragZone: DragZone = .canvas
+    private var canvasDragIntent: CanvasDragIntent = .undecided
     private var lastPanTranslation: CGPoint = .zero
+    private var lastPinchFocal: CGPoint = .zero
     private var isCrosshairActive: Bool = false
+
+    // Kinetic inertia state
+    private var displayLink: CADisplayLink?
+    private var inertiaVelocity: CGPoint = .zero
+    private var lastInertiaTimestamp: CFTimeInterval = 0
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -115,7 +142,7 @@ public final class ScrollLockContainerView: UIView, UIGestureRecognizerDelegate 
         addGestureRecognizer(lock)
         self.lockGesture = lock
 
-        // 2. 1-Finger Pan (Zone-Isolated: Canvas 2D Pan vs Right Price Axis vs Bottom Time Axis)
+        // 2. 1-Finger Pan (Zone-Isolated: Canvas vs Right Price Axis vs Bottom Time Axis)
         let pan = UIPanGestureRecognizer(target: self, action: #selector(handlePan(_:)))
         pan.minimumNumberOfTouches = 1
         pan.maximumNumberOfTouches = 1
@@ -125,7 +152,7 @@ public final class ScrollLockContainerView: UIView, UIGestureRecognizerDelegate 
         addGestureRecognizer(pan)
         self.panGesture = pan
 
-        // 3. 2-Finger Pinch Zoom
+        // 3. 2-Finger Pinch Zoom (Time Axis & Vertical Price Axis)
         let pinch = UIPinchGestureRecognizer(target: self, action: #selector(handlePinch(_:)))
         pinch.cancelsTouchesInView = false
         pinch.delaysTouchesBegan = false
@@ -133,17 +160,17 @@ public final class ScrollLockContainerView: UIView, UIGestureRecognizerDelegate 
         addGestureRecognizer(pinch)
         self.pinchGesture = pinch
 
-        // 4. Long-Press Crosshair Scrub
+        // 4. Long-Press 2D Crosshair Scrub
         let longPress = UILongPressGestureRecognizer(target: self, action: #selector(handleLongPress(_:)))
-        longPress.minimumPressDuration = 0.32
-        longPress.allowableMovement = 10
+        longPress.minimumPressDuration = 0.28
+        longPress.allowableMovement = 9
         longPress.cancelsTouchesInView = false
         longPress.delaysTouchesBegan = false
         longPress.delegate = self
         addGestureRecognizer(longPress)
         self.longPressGesture = longPress
 
-        // 5. Double-Tap Reset
+        // 5. Double-Tap Reset (Zone-Aware)
         let doubleTap = UITapGestureRecognizer(target: self, action: #selector(handleDoubleTap(_:)))
         doubleTap.numberOfTapsRequired = 2
         doubleTap.cancelsTouchesInView = false
@@ -151,6 +178,16 @@ public final class ScrollLockContainerView: UIView, UIGestureRecognizerDelegate 
         doubleTap.delegate = self
         addGestureRecognizer(doubleTap)
         self.doubleTapGesture = doubleTap
+
+        // 6. Single-Tap (Dismisses active crosshair or toggles bottom-right Auto Price Scale badge)
+        let singleTap = UITapGestureRecognizer(target: self, action: #selector(handleSingleTap(_:)))
+        singleTap.numberOfTapsRequired = 1
+        singleTap.cancelsTouchesInView = false
+        singleTap.delaysTouchesBegan = false
+        singleTap.require(toFail: doubleTap)
+        singleTap.delegate = self
+        addGestureRecognizer(singleTap)
+        self.singleTapGesture = singleTap
     }
 
     required init?(coder: NSCoder) {
@@ -161,7 +198,6 @@ public final class ScrollLockContainerView: UIView, UIGestureRecognizerDelegate 
         _ gestureRecognizer: UIGestureRecognizer,
         shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer
     ) -> Bool {
-        // Never allow outer UIScrollView pan gesture to compete with our chart gestures
         if let sv = cachedScrollView ?? findParentScrollView(),
            otherGestureRecognizer.view === sv {
             return false
@@ -172,6 +208,7 @@ public final class ScrollLockContainerView: UIView, UIGestureRecognizerDelegate 
     @objc private func handleLockGesture(_ recognizer: ChartScrollLockGestureRecognizer) {
         switch recognizer.state {
         case .began:
+            stopInertia()
             lockParentScroll(true)
         case .ended, .cancelled, .failed:
             lockParentScroll(false)
@@ -181,7 +218,6 @@ public final class ScrollLockContainerView: UIView, UIGestureRecognizerDelegate 
     }
 
     @objc private func handlePan(_ recognizer: UIPanGestureRecognizer) {
-        // Do not pan while pinching with 2 fingers or scrubbing crosshair
         if let pinch = pinchGesture, (pinch.state == .began || pinch.state == .changed), pinch.numberOfTouches >= 2 {
             return
         }
@@ -191,8 +227,11 @@ public final class ScrollLockContainerView: UIView, UIGestureRecognizerDelegate 
 
         switch recognizer.state {
         case .began:
+            stopInertia()
             let startLoc = recognizer.location(in: self)
             lastPanTranslation = .zero
+            canvasDragIntent = .undecided
+
             if startLoc.x >= bounds.width - rightAxisWidth {
                 activeDragZone = .priceAxis
             } else if startLoc.y >= bounds.height - bottomAxisHeight {
@@ -213,10 +252,36 @@ public final class ScrollLockContainerView: UIView, UIGestureRecognizerDelegate 
             case .timeAxis:
                 onTimeAxisZoom?(dx)
             case .canvas:
-                onCanvasPan?(dx, dy, t.x, t.y)
+                if canvasDragIntent == .undecided {
+                    let dist = hypot(t.x, t.y)
+                    if dist >= 6.0 {
+                        // TradingView directional lock: horizontal swipe stays pure horizontal unless clearly vertical
+                        if abs(t.y) > abs(t.x) * 1.35 {
+                            canvasDragIntent = .free2D
+                        } else {
+                            canvasDragIntent = .horizontalOnly
+                        }
+                    }
+                }
+                let effectiveTotalDy: CGFloat = (canvasDragIntent == .free2D) ? t.y : 0
+                onCanvasPan?(dx, dy, t.x, effectiveTotalDy)
             }
 
-        case .ended, .cancelled, .failed:
+        case .ended:
+            let velocity = recognizer.velocity(in: self)
+            lastPanTranslation = .zero
+            if activeDragZone == .canvas {
+                let speed = hypot(velocity.x, velocity.y)
+                if speed > 90 {
+                    startInertia(velocity: velocity)
+                } else {
+                    onPanEnded?()
+                }
+            } else {
+                onPanEnded?()
+            }
+
+        case .cancelled, .failed:
             lastPanTranslation = .zero
             onPanEnded?()
 
@@ -227,11 +292,40 @@ public final class ScrollLockContainerView: UIView, UIGestureRecognizerDelegate 
 
     @objc private func handlePinch(_ recognizer: UIPinchGestureRecognizer) {
         switch recognizer.state {
-        case .began, .changed:
+        case .began:
+            stopInertia()
+            lastPinchFocal = recognizer.location(in: self)
+            let scale = recognizer.scale
+            recognizer.scale = 1.0
+            onPinchZoom?(scale, lastPinchFocal.x)
+
+        case .changed:
             let scale = recognizer.scale
             recognizer.scale = 1.0
             let focal = recognizer.location(in: self)
+            let focalDx = focal.x - lastPinchFocal.x
+            let focalDy = focal.y - lastPinchFocal.y
+            lastPinchFocal = focal
+
+            // Check if 2 fingers are oriented vertically to scale price, or horizontally to scale time
+            if recognizer.numberOfTouches >= 2 {
+                let p0 = recognizer.location(ofTouch: 0, in: self)
+                let p1 = recognizer.location(ofTouch: 1, in: self)
+                let spanX = abs(p1.x - p0.x)
+                let spanY = abs(p1.y - p0.y)
+                if spanY > spanX * 2.0 {
+                    // Vertical 2-finger pinch zooms Price Scale
+                    let syntheticDy = (1.0 - scale) * 160.0
+                    onPriceAxisZoom?(syntheticDy)
+                    return
+                }
+            }
+
+            if abs(focalDx) > 0.2 || abs(focalDy) > 0.2 {
+                onCanvasPan?(focalDx, focalDy, focalDx, 0)
+            }
             onPinchZoom?(scale, focal.x)
+
         default:
             break
         }
@@ -240,25 +334,103 @@ public final class ScrollLockContainerView: UIView, UIGestureRecognizerDelegate 
     @objc private func handleLongPress(_ recognizer: UILongPressGestureRecognizer) {
         switch recognizer.state {
         case .began:
+            stopInertia()
             isCrosshairActive = true
             let loc = recognizer.location(in: self)
+            let pt = CGPoint(x: loc.x, y: max(0, loc.y - 24))
             onCrosshairChanged?(loc.x)
+            onCrosshairPointChanged?(pt)
+
         case .changed:
             let loc = recognizer.location(in: self)
+            let pt = CGPoint(x: loc.x, y: max(0, loc.y - 24))
             onCrosshairChanged?(loc.x)
+            onCrosshairPointChanged?(pt)
+
         case .ended, .cancelled, .failed:
             isCrosshairActive = false
             onCrosshairChanged?(nil)
+            onCrosshairPointChanged?(nil)
+
         default:
             break
         }
     }
 
     @objc private func handleDoubleTap(_ recognizer: UITapGestureRecognizer) {
-        if recognizer.state == .ended {
+        guard recognizer.state == .ended else { return }
+        stopInertia()
+        isCrosshairActive = false
+        onCrosshairChanged?(nil)
+        onCrosshairPointChanged?(nil)
+
+        let loc = recognizer.location(in: self)
+        if loc.x >= bounds.width - rightAxisWidth {
+            if let priceReset = onPriceAxisDoubleTap {
+                priceReset()
+            } else {
+                onDoubleTapReset?()
+            }
+        } else {
+            onDoubleTapReset?()
+        }
+    }
+
+    @objc private func handleSingleTap(_ recognizer: UITapGestureRecognizer) {
+        guard recognizer.state == .ended else { return }
+        stopInertia()
+        let loc = recognizer.location(in: self)
+        // Bottom-right corner "A" (Auto Price Scale) button hit area
+        if loc.x >= bounds.width - rightAxisWidth && loc.y >= bounds.height - (bottomAxisHeight + 24) {
+            onPriceAxisDoubleTap?()
+            return
+        }
+        if isCrosshairActive {
             isCrosshairActive = false
             onCrosshairChanged?(nil)
-            onDoubleTapReset?()
+            onCrosshairPointChanged?(nil)
+        }
+    }
+
+    // MARK: - 60/120fps CADisplayLink Kinetic Deceleration
+    private func startInertia(velocity: CGPoint) {
+        stopInertia()
+        // Cap initial velocity for controlled TradingView feel
+        let maxSpeed: CGFloat = 2400
+        let vx = max(-maxSpeed, min(maxSpeed, velocity.x))
+        let vy = (canvasDragIntent == .free2D) ? max(-maxSpeed, min(maxSpeed, velocity.y)) : 0
+        inertiaVelocity = CGPoint(x: vx, y: vy)
+        lastInertiaTimestamp = CACurrentMediaTime()
+
+        let link = CADisplayLink(target: self, selector: #selector(stepInertia(_:)))
+        link.add(to: .main, forMode: .common)
+        self.displayLink = link
+    }
+
+    private func stopInertia() {
+        displayLink?.invalidate()
+        displayLink = nil
+        inertiaVelocity = .zero
+    }
+
+    @objc private func stepInertia(_ link: CADisplayLink) {
+        let now = link.timestamp
+        let dt = CGFloat(max(0.001, min(0.05, now - lastInertiaTimestamp)))
+        lastInertiaTimestamp = now
+
+        let dx = inertiaVelocity.x * dt
+        let dy = inertiaVelocity.y * dt
+
+        onCanvasPan?(dx, dy, 0, 0)
+
+        // Exponential decay (0.915 per 60fps frame)
+        let decay = pow(0.915, dt * 60.0)
+        inertiaVelocity.x *= decay
+        inertiaVelocity.y *= decay
+
+        if hypot(inertiaVelocity.x, inertiaVelocity.y) < 18.0 {
+            stopInertia()
+            onPanEnded?()
         }
     }
 
@@ -289,12 +461,14 @@ public final class ScrollLockContainerView: UIView, UIGestureRecognizerDelegate 
     public override func willMove(toWindow newWindow: UIWindow?) {
         super.willMove(toWindow: newWindow)
         if newWindow == nil {
+            stopInertia()
             cachedScrollView?.isScrollEnabled = true
             onTouchStateChanged?(false)
         }
     }
 
     deinit {
+        displayLink?.invalidate()
         cachedScrollView?.isScrollEnabled = true
     }
 }

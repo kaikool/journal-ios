@@ -27,6 +27,7 @@ public struct CandleChartView: View {
     @State private var activeRSIMAType: MomentumEngine.RSIMAType
 
     @State private var hoveredBarIndex: Int? = nil
+    @State private var hoveredTouchY: CGFloat? = nil
     @State private var zoomScale: CGFloat = 1.0
     @State private var panOffset: CGFloat = 0.0
     @State private var isManualPriceScale: Bool = false
@@ -194,6 +195,21 @@ public struct CandleChartView: View {
                             updateHoveredBar(at: locX, totalWidth: currentPlotWidth, panOffset: panOffset)
                         } else {
                             hoveredBarIndex = nil
+                            hoveredTouchY = nil
+                        }
+                    },
+                    onCrosshairPointChanged: { pt in
+                        if let pt = pt {
+                            hoveredTouchY = max(0, min(currentPlotHeight, pt.y))
+                        } else {
+                            hoveredTouchY = nil
+                        }
+                    },
+                    onPriceAxisDoubleTap: {
+                        withAnimation(AppAnimations.springStandard) {
+                            isManualPriceScale = false
+                            manualCenterPrice = 0
+                            manualPriceSpan = 0
                         }
                     },
                     onDoubleTapReset: {
@@ -713,23 +729,47 @@ public struct CandleChartView: View {
 
     private func gridAndPriceAxis(width: CGFloat, height: CGFloat, minP: Double, maxP: Double, fullWidth: CGFloat) -> some View {
         let levels = 4
-        return ForEach(0...levels, id: \.self) { i in
-            let ratio = Double(i) / Double(levels)
-            let price = minP + ratio * (maxP - minP)
-            let y = height - CGFloat(ratio) * height
-            let clampedY = max(8, min(height - 8, y))
-
+        return ZStack(alignment: .topLeading) {
+            // Crisp TradingView Pane Separators (Right Price Axis border + Bottom Axis border)
             Path { path in
-                path.move(to: CGPoint(x: 0, y: y))
-                path.addLine(to: CGPoint(x: width, y: y))
+                path.move(to: CGPoint(x: width, y: 0))
+                path.addLine(to: CGPoint(x: width, y: height + 20))
+                path.move(to: CGPoint(x: 0, y: height))
+                path.addLine(to: CGPoint(x: fullWidth, y: height))
             }
-            .stroke(AppColors.border.opacity(0.18), style: StrokeStyle(lineWidth: 0.8, dash: [2, 4]))
+            .stroke(AppColors.border.opacity(0.32), lineWidth: 0.8)
 
-            Text(Formatters.price(Decimal(price), symbol: trade.symbol))
-                .font(AppTypography.captionMicro)
-                .foregroundColor(AppColors.secondaryText.opacity(0.8))
-                .frame(width: 50, alignment: .leading)
-                .position(x: width + 28, y: clampedY)
+            ForEach(0...levels, id: \.self) { i in
+                let ratio = Double(i) / Double(levels)
+                let price = minP + ratio * (maxP - minP)
+                let y = height - CGFloat(ratio) * height
+                let clampedY = max(8, min(height - 8, y))
+
+                Path { path in
+                    path.move(to: CGPoint(x: 0, y: y))
+                    path.addLine(to: CGPoint(x: width, y: y))
+                }
+                .stroke(AppColors.border.opacity(0.18), style: StrokeStyle(lineWidth: 0.8, dash: [2, 4]))
+
+                Text(Formatters.price(Decimal(price), symbol: trade.symbol))
+                    .font(AppTypography.captionMicro)
+                    .foregroundColor(AppColors.secondaryText.opacity(0.8))
+                    .frame(width: 50, alignment: .leading)
+                    .position(x: width + 28, y: clampedY)
+            }
+
+            // TradingView "A" (Auto Scale) Indicator Pill in bottom-right of Price Axis
+            Text("A")
+                .font(AppTypography.badgeMarkerSmall)
+                .foregroundColor(isManualPriceScale ? AppColors.secondaryText.opacity(0.65) : .white)
+                .frame(width: 16, height: 14)
+                .background(isManualPriceScale ? AppColors.cardBackground : AppColors.accent.opacity(0.85))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 3)
+                        .stroke(isManualPriceScale ? AppColors.border.opacity(0.6) : Color.clear, lineWidth: 0.8)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 3))
+                .position(x: width + 44, y: height - 10)
         }
     }
 
@@ -819,24 +859,32 @@ public struct CandleChartView: View {
             let hBar = visibleBars[hIdx]
             let hX = CGFloat(hIdx) * stepX + (stepX / 2.0) + clampedPan
             let closeD = (hBar.close as NSDecimalNumber).doubleValue
-            let y = plotHeight - CGFloat((closeD - minP) / span) * plotHeight
+            let yClose = plotHeight - CGFloat((closeD - minP) / span) * plotHeight
+            let yCross = hoveredTouchY ?? max(0, min(plotHeight, yClose))
+            let crossPrice = minP + Double((plotHeight - yCross) / max(1, plotHeight)) * span
 
             // 1. Vertical Hairline
             Path { path in
                 path.move(to: CGPoint(x: hX, y: 0))
                 path.addLine(to: CGPoint(x: hX, y: plotHeight))
             }
-            .stroke(AppColors.secondaryText.opacity(0.4), style: StrokeStyle(lineWidth: 1.0, dash: [2, 2]))
+            .stroke(AppColors.secondaryText.opacity(0.45), style: StrokeStyle(lineWidth: 1.0, dash: [3, 3]))
 
-            // 2. Horizontal Hairline
+            // 2. Horizontal Hairline (follows finger Y for exact price reading)
             Path { path in
-                path.move(to: CGPoint(x: 0, y: y))
-                path.addLine(to: CGPoint(x: plotWidth, y: y))
+                path.move(to: CGPoint(x: 0, y: yCross))
+                path.addLine(to: CGPoint(x: plotWidth, y: yCross))
             }
-            .stroke(AppColors.secondaryText.opacity(0.4), style: StrokeStyle(lineWidth: 1.0, dash: [2, 2]))
+            .stroke(AppColors.secondaryText.opacity(0.45), style: StrokeStyle(lineWidth: 1.0, dash: [3, 3]))
+
+            // Candle Close Anchor Dot
+            Circle()
+                .fill(hBar.isUp ? AppColors.candleUp : AppColors.candleDown)
+                .frame(width: 5, height: 5)
+                .position(x: hX, y: max(2, min(plotHeight - 2, yClose)))
 
             // 3. Right Axis Price Badge
-            Text(Formatters.price(hBar.close, symbol: trade.symbol))
+            Text(Formatters.price(Decimal(crossPrice), symbol: trade.symbol))
                 .font(AppTypography.captionMicro)
                 .foregroundColor(AppColors.primaryText)
                 .padding(.horizontal, 4)
@@ -847,7 +895,7 @@ public struct CandleChartView: View {
                         .stroke(AppColors.secondaryText.opacity(0.6), lineWidth: 1)
                 )
                 .clipShape(RoundedRectangle(cornerRadius: 3))
-                .position(x: plotWidth + 28, y: max(8, min(plotHeight - 8, y)))
+                .position(x: plotWidth + 28, y: max(8, min(plotHeight - 8, yCross)))
 
             // 4. Bottom Time Badge
             Text(formatBarTime(hBar.timestamp))
