@@ -197,4 +197,57 @@ final class SessionFootprintAndPatternTests: XCTestCase {
         XCTAssertFalse(detected.isEmpty)
         XCTAssertEqual(detected.first?.confluenceKeyLevel?.label, "Tokyo POC")
     }
+
+    // MARK: - 5. Test Prior Staircase Step Retention (Even If Mitigated)
+    func testPriorStaircaseStepEvenIfMitigated() {
+        let yesterday = Date(timeIntervalSince1970: 1730000000)
+        
+        // Yesterday's Daily POC = 239.0 (Already touched / mitigated by price)
+        let priorDailySnapshot = SessionProfileSnapshot(
+            symbol: "XAUUSD",
+            sessionType: .daily,
+            sessionDate: "2026-11-03",
+            startTime: yesterday,
+            endTime: yesterday.addingTimeInterval(86400),
+            pocPrice: 239.0,
+            vahPrice: 245.0,
+            valPrice: 235.0,
+            profileHigh: 250.0,
+            profileLow: 230.0,
+            totalVolume: 10000,
+            isNaked: false, // NOT naked
+            mitigatedAt: yesterday.addingTimeInterval(43200)
+        )
+        
+        // Today's developing POC = 213.0
+        let keyLevels = SessionFootprintEngine.extractKeyLevels(
+            snapshots: [priorDailySnapshot],
+            developingPoc: 213.0,
+            developingSession: .daily
+        )
+        
+        // Verify developing POC (213.0) exists
+        let liveLevel = keyLevels.first(where: { $0.price == 213.0 })
+        XCTAssertNotNil(liveLevel, "Expected Live D1 POC at 213.0")
+        
+        // Verify prior staircase step (239.0) is retained with explicit Prior D1 POC label
+        let priorLevel = keyLevels.first(where: { $0.price == 239.0 })
+        XCTAssertNotNil(priorLevel, "Expected Prior D1 POC at 239.0 even though it is mitigated")
+        XCTAssertEqual(priorLevel?.label, "Prior D1 POC")
+        XCTAssertFalse(priorLevel?.isNaked ?? true)
+        
+        // Test staircase comparison: 213 < 239 (LOWER STEP)
+        let staircase = SessionFootprintEngine.compareStaircaseSteps(
+            snapshots: [priorDailySnapshot],
+            developingPoc: 213.0,
+            developingSession: .daily
+        )
+        
+        let dailyStep = staircase[.daily]
+        XCTAssertNotNil(dailyStep)
+        XCTAssertEqual(dailyStep?.currentPoc, 213.0)
+        XCTAssertEqual(dailyStep?.priorPoc, 239.0)
+        XCTAssertTrue(dailyStep?.stepDirection.contains("LOWER STEP") ?? false)
+    }
 }
+

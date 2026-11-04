@@ -301,29 +301,87 @@ public enum SessionFootprintEngine {
             ))
         }
         
-        // 3. Completed Session Profiles (Recent POCs & Naked POCs)
+        // 3. Completed Session Profiles (Prior Steps & Naked POCs)
         var ageMap: [FootprintSessionType: Int] = [:]
         for snap in snapshots.sorted(by: { $0.endTime > $1.endTime }) {
             let age = ageMap[snap.sessionType, default: 0] + 1
             ageMap[snap.sessionType] = age
             
-            if snap.isNaked {
+            // Age 1 is the immediate prior staircase step (mốc bậc thang gần nhất)
+            if age == 1 {
+                let priorLabel = snap.isNaked 
+                    ? "Prior \(snap.sessionType.shortCode) POC [NPOC]"
+                    : "Prior \(snap.sessionType.shortCode) POC"
+                levels.append(KeyLevel(
+                    type: .sessionPoc(snap.sessionType),
+                    price: snap.pocPrice,
+                    label: priorLabel,
+                    isNaked: snap.isNaked
+                ))
+            } else if snap.isNaked {
+                // Older untested levels act as magnetic liquidity rays
                 levels.append(KeyLevel(
                     type: .nakedPoc(snap.sessionType, age: age),
                     price: snap.pocPrice,
                     label: "NPOC [\(snap.sessionType.shortCode)-\(age)]",
                     isNaked: true
                 ))
-            } else if age <= 2 {
-                // Include recent tested POCs for immediate retest awareness
+            } else if age <= 3 {
+                // Keep recent tested historical staircase steps
                 levels.append(KeyLevel(
                     type: .sessionPoc(snap.sessionType),
                     price: snap.pocPrice,
-                    label: "\(snap.sessionType.shortCode) POC"
+                    label: "\(snap.sessionType.shortCode)-\(age) POC"
                 ))
             }
         }
         
         return levels
+    }
+
+    // MARK: - 7. Staircase Step Comparison (Bậc thang POC)
+    public struct StaircaseStep: Sendable, Equatable {
+        public let sessionType: FootprintSessionType
+        public let currentPoc: Decimal?
+        public let priorPoc: Decimal?
+        public let stepDirection: String
+    }
+
+    public static func compareStaircaseSteps(
+        snapshots: [SessionProfileSnapshot],
+        developingPoc: Decimal? = nil,
+        developingSession: FootprintSessionType? = nil
+    ) -> [FootprintSessionType: StaircaseStep] {
+        var result: [FootprintSessionType: StaircaseStep] = [:]
+        
+        for sType in FootprintSessionType.allCases {
+            let sortedSnaps = snapshots.filter { $0.sessionType == sType }.sorted(by: { $0.endTime > $1.endTime })
+            let priorPoc = sortedSnaps.first?.pocPrice
+            let curPoc = (developingSession == sType) ? developingPoc : nil
+            
+            let dir: String
+            if let cur = curPoc, let prior = priorPoc {
+                if cur > prior {
+                    dir = "HIGHER STEP (\(cur) > \(prior))"
+                } else if cur < prior {
+                    dir = "LOWER STEP (\(cur) < \(prior))"
+                } else {
+                    dir = "FLAT STEP (\(cur) == \(prior))"
+                }
+            } else if let prior = priorPoc {
+                dir = "PRIOR LOCKED AT \(prior)"
+            } else {
+                dir = "NO_DATA"
+            }
+            
+            result[sType] = StaircaseStep(
+                sessionType: sType,
+                currentPoc: curPoc,
+                priorPoc: priorPoc,
+                stepDirection: dir
+            )
+        }
+        
+        return result
     }
 }

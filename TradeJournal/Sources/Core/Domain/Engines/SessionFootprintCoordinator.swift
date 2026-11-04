@@ -128,6 +128,21 @@ public final class SessionFootprintCoordinator: Sendable {
                 }
             }
             
+            // New York Profile
+            if let ny = SessionFootprintEngine.sessionInterval(for: .newYork, on: firstDate) {
+                let nyBars = dayBars.filter { $0.date >= ny.start && $0.date <= ny.end }
+                if !nyBars.isEmpty, let snap = SessionFootprintEngine.computeProfile(
+                    bars: nyBars,
+                    symbol: symbol,
+                    sessionType: .newYork,
+                    sessionDate: dateStr,
+                    startTime: ny.start,
+                    endTime: ny.end
+                ) {
+                    result.append(snap)
+                }
+            }
+            
             // Daily Profile
             if let d1 = SessionFootprintEngine.sessionInterval(for: .daily, on: firstDate) {
                 if let snap = SessionFootprintEngine.computeProfile(
@@ -140,6 +155,48 @@ public final class SessionFootprintCoordinator: Sendable {
                 ) {
                     result.append(snap)
                 }
+            }
+        }
+        
+        // Group bars by Weekly Profile in GMT+7
+        let weekGroups = Dictionary(grouping: bars) { bar -> String in
+            let c = cal.dateComponents([.yearForWeekOfYear, .weekOfYear], from: bar.date)
+            return "\(c.yearForWeekOfYear ?? 0)-W\(c.weekOfYear ?? 0)"
+        }
+        for (_, wBars) in weekGroups {
+            guard let firstDate = wBars.first?.date,
+                  let wInterval = SessionFootprintEngine.sessionInterval(for: .weekly, on: firstDate) else { continue }
+            let weekDateStr = SessionFootprintEngine.sessionDateString(for: wInterval.start)
+            if let snap = SessionFootprintEngine.computeProfile(
+                bars: wBars,
+                symbol: symbol,
+                sessionType: .weekly,
+                sessionDate: weekDateStr,
+                startTime: wInterval.start,
+                endTime: wInterval.end
+            ) {
+                result.append(snap)
+            }
+        }
+        
+        // Group bars by Monthly Profile in GMT+7
+        let monthGroups = Dictionary(grouping: bars) { bar -> String in
+            let c = cal.dateComponents([.year, .month], from: bar.date)
+            return "\(c.year ?? 0)-M\(c.month ?? 0)"
+        }
+        for (_, mBars) in monthGroups {
+            guard let firstDate = mBars.first?.date,
+                  let mInterval = SessionFootprintEngine.sessionInterval(for: .monthly, on: firstDate) else { continue }
+            let monthDateStr = SessionFootprintEngine.sessionDateString(for: mInterval.start)
+            if let snap = SessionFootprintEngine.computeProfile(
+                bars: mBars,
+                symbol: symbol,
+                sessionType: .monthly,
+                sessionDate: monthDateStr,
+                startTime: mInterval.start,
+                endTime: mInterval.end
+            ) {
+                result.append(snap)
             }
         }
         
