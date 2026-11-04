@@ -1,18 +1,23 @@
 import Foundation
 import Combine
-import Combine
 
 /// Central reactive data store managing accounts, trades, executions, notes, playbooks, and prop accounts.
-/// Methods are cleanly partitioned into domain extensions:
-/// - `TradeDataStore+Accounts.swift`
-/// - `TradeDataStore+Trades.swift`
-/// - `TradeDataStore+PropFirm.swift`
-/// - `TradeDataStore+Notebook.swift`
-/// - `TradeDataStore+Playbooks.swift`
-/// - `TradeDataStore+Sync.swift`
+/// Acts as a unified facade coordinating dedicated domain stores:
+/// - `TradesDomainStore` (trades, executions, trade metrics)
+/// - `AccountsDomainStore` (accounts, active account selection, caching)
+/// - `PropFirmDomainStore` (prop evaluations, funded accounts, receipts)
+/// - `NotebookDomainStore` (folders, notes, calendar days)
+/// - `PlaybooksDomainStore` (playbooks, rules, assessments)
 @MainActor
 public final class TradeDataStore: ObservableObject {
     public static let shared = TradeDataStore()
+    
+    // MARK: - Domain Sub-Stores
+    public let tradesStore = TradesDomainStore()
+    public let accountsStore = AccountsDomainStore()
+    public let propFirmStore = PropFirmDomainStore()
+    public let notebookStore = NotebookDomainStore()
+    public let playbooksStore = PlaybooksDomainStore()
     
     @Published public var accounts: [Account] = [] {
         didSet { invalidatePerformanceCaches() }
@@ -84,6 +89,27 @@ public final class TradeDataStore: ObservableObject {
         activePropAccountIdsCache = nil
         inactivePropAccountIdsCache = nil
         cacheVersion &+= 1
+        
+        // Synchronize domain stores
+        tradesStore.trades = trades
+        tradesStore.executions = executions
+        tradesStore.missedTrades = missedTrades
+        tradesStore.attachments = attachments
+        accountsStore.accounts = accounts
+        accountsStore.selectedAccountId = selectedAccountId
+        accountsStore.selectedTimeRange = selectedTimeRange
+        propFirmStore.propAccounts = propAccounts
+        propFirmStore.propEntries = propEntries
+        propFirmStore.propReceipts = propReceipts
+        propFirmStore.propAudits = propAudits
+        notebookStore.folders = folders
+        notebookStore.notebookNotes = notebookNotes
+        notebookStore.journalDays = journalDays
+        notebookStore.calendarNotes = calendarNotes
+        playbooksStore.playbooks = playbooks
+        playbooksStore.playbookAssessments = playbookAssessments
+        playbooksStore.progressRules = progressRules
+        playbooksStore.progressChecks = progressChecks
     }
     
     internal var persistenceUrl: URL {

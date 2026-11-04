@@ -307,7 +307,7 @@ extension The5ersService {
             accountType: &authoritativeAccountType
         )
         
-        let existingCachedProp = dataStore.propAccounts.first(where: { TradeDataStore.isSameAccountId($0.id, journalAccId) })
+        let existingCachedProp = await dataStore.propAccounts.first(where: { TradeDataStore.isSameAccountId($0.id, journalAccId) })
         let needsProgramDetails = isRawActive ||
                                   existingCachedProp == nil ||
                                   (existingCachedProp?.name.hasPrefix("The5ers ") ?? true) ||
@@ -435,7 +435,7 @@ extension The5ersService {
             }
             if bal > 0 {
                 let journalIdForPayout = stableId.hasPrefix("the5ers_") ? stableId : "the5ers_\(stableId)"
-                let settledAccountPayouts = dataStore.propEntries
+                let settledAccountPayouts = await dataStore.propEntries
                     .filter { entry in
                         guard entry.firm == "The5ers", entry.kind == "payout", entry.status == .completed, !entry.voided, let accId = entry.accountId else { return false }
                         return accId == journalIdForPayout || TradeDataStore.isSameAccountId(accId, journalIdForPayout)
@@ -475,7 +475,7 @@ extension The5ersService {
             currentStepName: authoritativeStepName
         )
         
-        let existingTradesForAccount = dataStore.trades.filter {
+        let existingTradesForAccount = await dataStore.trades.filter {
             $0.accountId == mcpAcc.id ||
             TradeDataStore.isSameAccountId($0.accountId, mcpAcc.id) ||
             TradeDataStore.isSameAccountId($0.accountId, "the5ers_\(mcpAcc.id)")

@@ -39,6 +39,70 @@ extension The5ersService {
             // Immediately identify all candidate funded / live / instant accounts across the entire raw inventory
             let allCandidatePayoutAccounts = extractCandidatePayoutAccounts(from: rawAccountsList)
             
+            let (accountsList, importedPositionsCount) = try await processAccountsInventory(
+                rawAccountsList: rawAccountsList,
+                allCandidatePayoutAccounts: allCandidatePayoutAccounts,
+                dataStore: dataStore
+            )
+            
+            if accountsList.isEmpty {
+                lastStatus = "The5ers MCP responded successfully but no trading accounts were found."
+                return 0
+            }
+            
+            if Task.isCancelled || isCancelledByUser { throw CancellationError() }
+            
+            // Sync purchases and payouts across all accounts (ensures attribution includes any newly enriched inactive accounts)
+            await syncPurchases(into: dataStore, targetAccounts: accountsList)
+            
+            if Task.isCancelled || isCancelledByUser { throw CancellationError() }
+            
+            let finalPayoutTargets = allCandidatePayoutAccounts.isEmpty ? accountsList : allCandidatePayoutAccounts
+            await syncPayouts(into: dataStore, targetAccounts: finalPayoutTargets)
+            
+            lastSyncTime = Date()
+            dataStore.rebuildAllAccounts()
+            
+            if dataStore.selectedAccountId == "default-acc" || dataStore.selectedAccountId == "all" || dataStore.selectedAccountId.isEmpty || !dataStore.accounts.contains(where: { $0.id == dataStore.selectedAccountId || TradeDataStore.isSameAccountId($0.id, dataStore.selectedAccountId) }) {
+                if let targetId = dataStore.mostRecentActiveAccount?.id ?? dataStore.visibleAccounts.first?.id ?? dataStore.accounts.first?.id {
+                    dataStore.selectAccount(id: targetId)
+                }
+            }
+            
+            dataStore.saveToDisk()
+            dataStore.objectWillChange.send()
+            let activeCount = accountsList.filter {
+                let s = $0.status.lowercased()
+                return (s == "active" || s == "available" || s == "open" || s == "trading") && $0.tradingBlocked != true
+            }.count
+            lastStatus = "Successfully synced \(accountsList.count) accounts (\(activeCount) active) and \(importedPositionsCount) positions from The5ers MCP."
+            
+            // Automatically push newly synchronized The5ers accounts, trades, and prop entries to Supabase cloud
+            if SupabaseService.shared.isConfigured {
+                Task {
+                    await dataStore.syncWithSupabase(isBackground: true)
+                }
+            }
+            
+            return accountsList.count
+        } catch {
+            if isCancelledByUser {
+                isCancelledByUser = false
+                lastStatus = "Synchronization cancelled by user."
+                throw CancellationError()
+            }
+            lastStatus = "The5ers MCP sync error: \(error.localizedDescription)"
+            throw error
+        }
+    }
+    
+
+    @MainActor
+    private func processAccountsInventory(
+        rawAccountsList: [[String: Any]],
+        allCandidatePayoutAccounts: [The5ersMcpAccount],
+        dataStore: TradeDataStore
+    ) async throws -> (accounts: [The5ersMcpAccount], positionsCount: Int) {
             var accountsList: [The5ersMcpAccount] = []
             var importedPositionsCount = 0
             var didRunInitialPurchasesAndPayouts = false
@@ -185,55 +249,7 @@ extension The5ersService {
                 dataStore.objectWillChange.send()
             }
             
-            if accountsList.isEmpty {
-                lastStatus = "The5ers MCP responded successfully but no trading accounts were found."
-                return 0
-            }
-            
-            if Task.isCancelled || isCancelledByUser { throw CancellationError() }
-            
-            // Sync purchases and payouts across all accounts (ensures attribution includes any newly enriched inactive accounts)
-            await syncPurchases(into: dataStore, targetAccounts: accountsList)
-            
-            if Task.isCancelled || isCancelledByUser { throw CancellationError() }
-            
-            let finalPayoutTargets = allCandidatePayoutAccounts.isEmpty ? accountsList : allCandidatePayoutAccounts
-            await syncPayouts(into: dataStore, targetAccounts: finalPayoutTargets)
-            
-            lastSyncTime = Date()
-            dataStore.rebuildAllAccounts()
-            
-            if dataStore.selectedAccountId == "default-acc" || dataStore.selectedAccountId == "all" || dataStore.selectedAccountId.isEmpty || !dataStore.accounts.contains(where: { $0.id == dataStore.selectedAccountId || TradeDataStore.isSameAccountId($0.id, dataStore.selectedAccountId) }) {
-                if let targetId = dataStore.mostRecentActiveAccount?.id ?? dataStore.visibleAccounts.first?.id ?? dataStore.accounts.first?.id {
-                    dataStore.selectAccount(id: targetId)
-                }
-            }
-            
-            dataStore.saveToDisk()
-            dataStore.objectWillChange.send()
-            let activeCount = accountsList.filter {
-                let s = $0.status.lowercased()
-                return (s == "active" || s == "available" || s == "open" || s == "trading") && $0.tradingBlocked != true
-            }.count
-            lastStatus = "Successfully synced \(accountsList.count) accounts (\(activeCount) active) and \(importedPositionsCount) positions from The5ers MCP."
-            
-            // Automatically push newly synchronized The5ers accounts, trades, and prop entries to Supabase cloud
-            if SupabaseService.shared.isConfigured {
-                Task {
-                    await dataStore.syncWithSupabase(isBackground: true)
-                }
-            }
-            
-            return accountsList.count
-        } catch {
-            if isCancelledByUser {
-                isCancelledByUser = false
-                lastStatus = "Synchronization cancelled by user."
-                throw CancellationError()
-            }
-            lastStatus = "The5ers MCP sync error: \(error.localizedDescription)"
-            throw error
-        }
+
+        return (accountsList, importedPositionsCount)
     }
-    
 }

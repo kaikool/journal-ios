@@ -293,42 +293,11 @@ extension The5ersService {
     internal func upsertAccountIntoStore(_ acc: The5ersMcpAccount, into dataStore: TradeDataStore) {
         let rawStatus = acc.status.trimmingCharacters(in: .whitespaces).lowercased()
         let isBlocked = (acc.tradingBlocked == true)
-        let mappedStatus: PropStatus = {
-            // 1. Terminated / Breached / Failed / Disqualified / Violated (Highest priority)
-            if rawStatus.contains("term") || rawStatus.contains("breach") || rawStatus.contains("fail") || rawStatus.contains("viola") || rawStatus.contains("disqual") {
-                return .breached
-            }
-            // 2. Passed / Qualified
-            if rawStatus.contains("pass") || rawStatus.contains("qualif") {
-                return .passed
-            }
-            // 3. Closed / Ended / Expired / Archived
-            if rawStatus.contains("close") || rawStatus.contains("ended") || rawStatus.contains("expir") || rawStatus.contains("arch") {
-                return .closed
-            }
-            // 4. Inactive / Disabled
-            if rawStatus.contains("inact") || rawStatus.contains("disab") {
-                return .inactive
-            }
-            // 5. If broker/Hub balance has tradingBlocked == true, account is terminated/halted
-            if isBlocked {
-                return .closed
-            }
-            // 6. Explicit Active only (exact tokens, never substring 'trad' that matched 'trading_blocked')
-            if rawStatus == "active" || rawStatus == "open" || rawStatus == "available" || rawStatus == "trading" {
-                return .active
-            }
-            return .closed
-        }()
+        let mappedStatus = mapPropStatus(rawStatus: rawStatus, isBlocked: isBlocked)
         
         let rawProg = acc.program.trimmingCharacters(in: .whitespaces).lowercased()
         let rawLabel = acc.label.trimmingCharacters(in: .whitespaces).lowercased()
-        let mappedProgram: PropProgram = {
-            if rawProg.contains("instant") || rawLabel.contains("instant") { return .instantFunded }
-            if rawProg.contains("step2") || rawProg.contains("step 2") || rawProg.contains("phase2") || rawProg.contains("phase 2") || rawProg.contains("verification") || rawLabel.contains("phase 2") || rawLabel.contains("step 2") || rawLabel.contains("high stakes - 2") { return .verification }
-            if rawProg.contains("fund") || rawProg.contains("live") || rawProg.contains("master") || rawProg.contains("step 3") || rawProg.contains("phase 3") || rawLabel.contains("funded") || rawLabel.contains("live") || rawLabel.contains("step 3") || rawLabel.contains("phase 3") { return .funded }
-            return .evaluation
-        }()
+        let mappedProgram = mapPropProgram(rawProg: rawProg, rawLabel: rawLabel)
         
         let startingMinor = NSDecimalNumber(decimal: (acc.startingBalance ?? acc.balance) * 100).int64Value
         let journalAccId = acc.id.hasPrefix("the5ers_") ? acc.id : "the5ers_\(acc.id)"
@@ -358,7 +327,6 @@ extension The5ersService {
             return nil
         }()
         
-        // Extract account login/number to link with existing cTrader trading account
         let accountNumber: String? = {
             let pattern = #"(?:…|\.{3}|[-_·\s#])?(\d{3,12})\s*$"#
             if let regex = try? NSRegularExpression(pattern: pattern),
@@ -376,6 +344,74 @@ extension The5ersService {
         })
         let linkedAccountId = existingLinkedAcc?.id ?? journalAccId
         
+        upsertPropAccountItem(
+            acc: acc,
+            journalAccId: journalAccId,
+            linkedAccountId: linkedAccountId,
+            mappedProgram: mappedProgram,
+            mappedStatus: mappedStatus,
+            startingMinor: startingMinor,
+            balMinor: balMinor,
+            eqMinor: eqMinor,
+            pnlMinor: pnlMinor,
+            feesMinor: feesMinor,
+            accountNumber: accountNumber,
+            into: dataStore
+        )
+        
+        upsertTradingAccount(
+            acc: acc,
+            journalAccId: journalAccId,
+            mappedProgram: mappedProgram,
+            isActive: isActive,
+            accountNumber: accountNumber,
+            into: dataStore
+        )
+    }
+
+    private func mapPropStatus(rawStatus: String, isBlocked: Bool) -> PropStatus {
+        if rawStatus.contains("term") || rawStatus.contains("breach") || rawStatus.contains("fail") || rawStatus.contains("viola") || rawStatus.contains("disqual") {
+            return .breached
+        }
+        if rawStatus.contains("pass") || rawStatus.contains("qualif") {
+            return .passed
+        }
+        if rawStatus.contains("close") || rawStatus.contains("ended") || rawStatus.contains("expir") || rawStatus.contains("arch") {
+            return .closed
+        }
+        if rawStatus.contains("inact") || rawStatus.contains("disab") {
+            return .inactive
+        }
+        if isBlocked {
+            return .closed
+        }
+        if rawStatus == "active" || rawStatus == "open" || rawStatus == "available" || rawStatus == "trading" {
+            return .active
+        }
+        return .closed
+    }
+
+    private func mapPropProgram(rawProg: String, rawLabel: String) -> PropProgram {
+        if rawProg.contains("instant") || rawLabel.contains("instant") { return .instantFunded }
+        if rawProg.contains("step2") || rawProg.contains("step 2") || rawProg.contains("phase2") || rawProg.contains("phase 2") || rawProg.contains("verification") || rawLabel.contains("phase 2") || rawLabel.contains("step 2") || rawLabel.contains("high stakes - 2") { return .verification }
+        if rawProg.contains("fund") || rawProg.contains("live") || rawProg.contains("master") || rawProg.contains("step 3") || rawProg.contains("phase 3") || rawLabel.contains("funded") || rawLabel.contains("live") || rawLabel.contains("step 3") || rawLabel.contains("phase 3") { return .funded }
+        return .evaluation
+    }
+
+    private func upsertPropAccountItem(
+        acc: The5ersMcpAccount,
+        journalAccId: String,
+        linkedAccountId: String,
+        mappedProgram: PropProgram,
+        mappedStatus: PropStatus,
+        startingMinor: Int64,
+        balMinor: Int64,
+        eqMinor: Int64?,
+        pnlMinor: Int64?,
+        feesMinor: Int64?,
+        accountNumber: String?,
+        into dataStore: TradeDataStore
+    ) {
         if let existingIndex = dataStore.propAccounts.firstIndex(where: { p in
             TradeDataStore.isSameAccountId(p.id, journalAccId) ||
             p.name == acc.label ||
@@ -446,7 +482,16 @@ extension The5ersService {
             )
             dataStore.propAccounts.append(newPropAccount)
         }
-        
+    }
+
+    private func upsertTradingAccount(
+        acc: The5ersMcpAccount,
+        journalAccId: String,
+        mappedProgram: PropProgram,
+        isActive: Bool,
+        accountNumber: String?,
+        into dataStore: TradeDataStore
+    ) {
         if let accIdx = dataStore.accounts.firstIndex(where: { a in
             TradeDataStore.isSameAccountId(a.id, journalAccId) ||
             a.name == acc.label ||

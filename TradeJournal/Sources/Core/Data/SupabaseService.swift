@@ -48,7 +48,7 @@ internal struct PostgrestErrorPayload: Decodable {
 /// Service connecting directly to Supabase PostgreSQL via PostgREST API.
 /// Supports Auth, Multi-tenancy RLS, and bi-directional synchronization.
 /// Acts as Facade coordinating TradeSync, PropFirmSync, JournalSync, StorageService, and MigrationHelper.
-public final class SupabaseService {
+public final class SupabaseService: @unchecked Sendable, SupabaseProviding {
     public static let shared = SupabaseService()
     
     // Dynamic Supabase configuration loaded securely from Keychain, Environment, or Info.plist

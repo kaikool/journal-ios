@@ -156,7 +156,7 @@ public struct ForexFactoryEvent: Identifiable, Codable, Equatable, Sendable {
 
 // MARK: - Forex Factory Service (USD Focused)
 @MainActor
-public final class ForexFactoryService: ObservableObject {
+public final class ForexFactoryService: ObservableObject, ForexFactoryProviding {
     public static let shared = ForexFactoryService()
     
     public static let endpointUrl = "https://nfs.faireconomy.media/ff_calendar_thisweek.json?version=ae6353e5365cb1dd2a94f2299433e6bb"

@@ -42,6 +42,14 @@ extension TradeDataStore {
         )
         accounts.append(demoAccount)
         
+        let fills = generateDemoExecutions(demoAccountId: demoAccountId)
+        importExecutions(accountId: demoAccountId, newExecutions: fills)
+        selectedAccountId = demoAccountId
+        saveToDisk(immediate: true)
+        AppLogger.info("Loaded demo data: \(fills.count) executions for demo account \(demoAccountId)")
+    }
+
+    private func generateDemoExecutions(demoAccountId: String) -> [Execution] {
         var fills: [Execution] = []
         var s: Double = 42
         let rnd: () -> Double = {
@@ -68,36 +76,29 @@ extension TradeDataStore {
         let now = Date()
         
         func atDate(day: Date, minute: Int) -> Date {
-            var comps = cal.dateComponents([.year, .month, .day], from: day)
-            comps.hour = 13
-            comps.minute = 30 + minute
-            comps.second = Int(rnd() * 60)
-            comps.timeZone = TimeZone(secondsFromGMT: 0)
-            return cal.date(from: comps) ?? day
+            var c = cal.dateComponents([.year, .month, .day], from: day)
+            c.hour = 9 + (minute + 30) / 60
+            c.minute = (minute + 30) % 60
+            c.second = 15
+            return cal.date(from: c) ?? day
         }
         
-        for back in stride(from: 90, through: 1, by: -1) {
-            guard let day = cal.date(byAdding: .day, value: -back, to: now) else { continue }
-            let dow = cal.component(.weekday, from: day)
-            if dow == 1 || dow == 7 { continue }
-            if rnd() < 0.28 { continue }
+        for dayOffset in 2...16 {
+            guard let day = cal.date(byAdding: .day, value: -dayOffset, to: now) else { continue }
+            let w = cal.component(.weekday, from: day)
+            if w == 1 || w == 7 { continue }
             
-            let tradesToday = 1 + Int(rnd() * 4)
-            var minute = 5 + Int(rnd() * 40)
-            
-            for _ in 0..<tradesToday {
-                let spec = symbols[Int(rnd() * Double(symbols.count)) % symbols.count]
-                let isLong = rnd() < 0.72
+            let numTrades = 1 + Int(rnd() * 3)
+            var minute = 15 + Int(rnd() * 20)
+            for _ in 0..<numTrades {
+                let spec = symbols[Int(rnd() * Double(symbols.count))]
+                let isBuy = rnd() < 0.7
+                let entrySide: TradeSide = isBuy ? .buy : .sell
+                let exitSide: TradeSide = isBuy ? .sell : .buy
                 let quantity = round(spec.qtyMin + rnd() * (spec.qtyMax - spec.qtyMin))
-                let entry = spec.price * (0.97 + rnd() * 0.06)
-                let isWin = rnd() < 0.56
-                let magnitude = isWin ? (0.004 + rnd() * 0.014) : (0.003 + rnd() * 0.008)
-                let exit = entry + (isWin ? 1.0 : -1.0) * (isLong ? 1.0 : -1.0) * magnitude * entry
-                let hold = 4 + Int(rnd() * 55)
-                let entrySide: ExecutionSide = isLong ? .buy : .sell
-                let exitSide: ExecutionSide = isLong ? .sell : .buy
+                let slippage = (rnd() - 0.5) * 0.4
+                let entry = spec.price + slippage
                 let entryTime = atDate(day: day, minute: minute)
-                let exitTime = atDate(day: day, minute: minute + hold)
                 
                 fills.append(Execution(
                     accountId: demoAccountId,
@@ -111,29 +112,36 @@ extension TradeDataStore {
                     source: "import"
                 ))
                 
-                if rnd() < 0.3 && quantity >= 60 {
-                    let half = round(quantity / 2.0)
-                    let mid = entry + (exit - entry) * (0.4 + rnd() * 0.3)
-                    let midTime = atDate(day: day, minute: minute + hold / 2)
+                let hold = 20 + Int(rnd() * 120)
+                let exitTime = atDate(day: day, minute: minute + hold)
+                let win = rnd() < 0.58
+                let movePct = win ? (0.006 + rnd() * 0.02) : -(0.005 + rnd() * 0.015)
+                let exit = isBuy ? (entry * (1 + movePct)) : (entry * (1 - movePct))
+                
+                if rnd() < 0.3 {
+                    let part1 = round(quantity * 0.5)
+                    let part2 = quantity - part1
                     fills.append(Execution(
                         accountId: demoAccountId,
                         symbol: spec.symbol,
                         side: exitSide,
-                        quantity: Decimal(half),
-                        price: Decimal(string: String(format: "%.2f", mid)) ?? Decimal(mid),
-                        fee: 1,
-                        executedAt: midTime,
-                        assetClass: "equity",
-                        source: "import"
-                    ))
-                    fills.append(Execution(
-                        accountId: demoAccountId,
-                        symbol: spec.symbol,
-                        side: exitSide,
-                        quantity: Decimal(quantity - half),
+                        quantity: Decimal(part1),
                         price: Decimal(string: String(format: "%.2f", exit)) ?? Decimal(exit),
                         fee: 1,
                         executedAt: exitTime,
+                        assetClass: "equity",
+                        source: "import"
+                    ))
+                    let exit2Time = atDate(day: day, minute: minute + hold + 15)
+                    let exit2 = exit * (1 + (rnd() - 0.5) * 0.004)
+                    fills.append(Execution(
+                        accountId: demoAccountId,
+                        symbol: spec.symbol,
+                        side: exitSide,
+                        quantity: Decimal(part2),
+                        price: Decimal(string: String(format: "%.2f", exit2)) ?? Decimal(exit2),
+                        fee: 1,
+                        executedAt: exit2Time,
                         assetClass: "equity",
                         source: "import"
                     ))
@@ -179,11 +187,7 @@ extension TradeDataStore {
                 source: "import"
             ))
         }
-        
-        importExecutions(accountId: demoAccountId, newExecutions: fills)
-        selectedAccountId = demoAccountId
-        saveToDisk(immediate: true)
-        AppLogger.info("Loaded demo data: \(fills.count) executions for demo account \(demoAccountId)")
+        return fills
     }
     
     // MARK: - CSV Export

@@ -2,7 +2,6 @@ import Foundation
 
 // MARK: - Account & Reference Clean Formatters
 extension Formatters {
-    // MARK: - Account & Reference Clean Formatters
     
     /// Cleans raw broker/prop labels into standardized, professional account titles:
     /// e.g. "HighStakes Phase 1 · $100K · #123456"
@@ -10,175 +9,37 @@ extension Formatters {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return "Trading Account" }
         
-        // 1. Split existing delimited strings (' - ', ' · ', ' • ', ' | ') and perform smart deduplication
-        let normalizedDelimiters: String = {
-            var s = trimmed
-            s = s.replacingOccurrences(of: " · ", with: " - ")
-            s = s.replacingOccurrences(of: " • ", with: " - ")
-            s = s.replacingOccurrences(of: " | ", with: " - ")
-            // Standardize any dash with or without surrounding spaces e.g. " -$50K", "-50K", " - 1"
-            let dashPattern = #"\s*-\s*"#
-            if let regex = try? NSRegularExpression(pattern: dashPattern) {
-                s = regex.stringByReplacingMatches(in: s, range: NSRange(s.startIndex..., in: s), withTemplate: " - ")
-            }
-            return s
-        }()
-        let rawParts = normalizedDelimiters.components(separatedBy: " - ")
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-        
-        var deduplicatedParts: [String] = []
-        for part in rawParts {
-            let pLower = part.lowercased()
-            // Skip raw platform placeholders if they appear as separate segments
-            if (pLower.hasPrefix("meta-trader") || pLower.hasPrefix("c-trader") || pLower.hasPrefix("account the5ers_")) && rawParts.count > 1 {
-                continue
-            }
-            let pNorm = pLower.replacingOccurrences(of: "$", with: "")
-                .replacingOccurrences(of: "#", with: "")
-                .replacingOccurrences(of: " ", with: "")
-                .replacingOccurrences(of: ",", with: "")
-            
-            let isDupe = deduplicatedParts.contains { existing in
-                let eNorm = existing.lowercased()
-                    .replacingOccurrences(of: "$", with: "")
-                    .replacingOccurrences(of: "#", with: "")
-                    .replacingOccurrences(of: " ", with: "")
-                    .replacingOccurrences(of: ",", with: "")
-                if eNorm == pNorm { return true }
-                // If one contains the other (e.g. "highstakes50k" contains "highstakes" or "50k")
-                if pNorm.count >= 3 && eNorm.contains(pNorm) { return true }
-                if eNorm.count >= 3 && pNorm.contains(eNorm) { return true }
-                return false
-            }
-            
-            if !isDupe {
-                deduplicatedParts.append(part)
-            } else {
-                // If the incoming part is more descriptive (e.g. "High Stakes 50K" vs "High Stakes"), upgrade it
-                if let idx = deduplicatedParts.firstIndex(where: { existing in
-                    let eNorm = existing.lowercased()
-                        .replacingOccurrences(of: "$", with: "")
-                        .replacingOccurrences(of: "#", with: "")
-                        .replacingOccurrences(of: " ", with: "")
-                    return pNorm.count > eNorm.count && pNorm.contains(eNorm)
-                }) {
-                    deduplicatedParts[idx] = part
-                }
-            }
-        }
-        
+        let deduplicatedParts = normalizeAndDeduplicateParts(trimmed)
         let candidate = deduplicatedParts.joined(separator: " · ")
         let lower = candidate.lowercased()
         
-        // Check if any word of 4+ characters repeats in the candidate (e.g. "highstakes" repeating)
         let words = lower.components(separatedBy: CharacterSet.alphanumerics.inverted).filter { $0.count >= 4 }
         let hasRepeatingWord = Set(words).count != words.count
         
-        // Only preserve if candidate is strictly in standard " · " format, has no hyphens or duplicate words
         let isAlreadyClean = trimmed.contains(" · ") && !trimmed.contains("-") && !hasRepeatingWord && !lower.contains("meta-trader") && !lower.contains("c-trader") && !lower.hasPrefix("the5ers_")
         if isAlreadyClean && deduplicatedParts.count >= 2 {
             return candidate
         }
         
-        let isRawIdOrPrefix = lower.hasPrefix("account the5ers_") ||
-                              lower.hasPrefix("account ") ||
-                              lower.hasPrefix("the5ers_")
-        
-        let isRawPlatform = lower.contains("meta-trader") ||
-                            lower.contains("meta-trade") ||
-                            lower.contains("metatrader") ||
-                            lower.contains("c-trader") ||
-                            lower.contains("ctrader") ||
-                            lower.contains("trader-evolution") ||
-                            lower.contains("traderevolution") ||
-                            isRawIdOrPrefix
+        let isRawIdOrPrefix = lower.hasPrefix("account the5ers_") || lower.hasPrefix("account ") || lower.hasPrefix("the5ers_")
+        let isRawPlatform = lower.contains("meta-trader") || lower.contains("meta-trade") || lower.contains("metatrader") ||
+                            lower.contains("c-trader") || lower.contains("ctrader") || lower.contains("trader-evolution") ||
+                            lower.contains("traderevolution") || isRawIdOrPrefix
         
         guard isRawPlatform || lower.contains("phase") || lower.contains("step") || lower.contains("stakes") || lower.contains("bootcamp") || lower.contains("growth") else {
             return candidate
         }
         
-        let platformTag: String
-        if lower.contains("meta-trader-5") || lower.contains("meta-trade-5") || lower.contains("mt5") {
-            platformTag = "MT5"
-        } else if lower.contains("meta-trader-4") || lower.contains("meta-trade-4") || lower.contains("mt4") {
-            platformTag = "MT4"
-        } else if lower.contains("c-trader") || lower.contains("ctrader") {
-            platformTag = "cTrader"
-        } else if lower.contains("trader-evolution") || lower.contains("traderevolution") {
-            platformTag = "TraderEvolution"
-        } else {
-            platformTag = "MT5"
-        }
-        
-        var suffix = ""
-        let pattern = #"(?:…|\.{3}|[-_·\s#])?(\d{3,12})\s*$"#
-        if let regex = try? NSRegularExpression(pattern: pattern),
-           let match = regex.firstMatch(in: trimmed, range: NSRange(trimmed.startIndex..., in: trimmed)),
-           let range = Range(match.range(at: 1), in: trimmed) {
-            suffix = String(trimmed[range])
-        }
-        
-        let pkg: String = {
-            if lower.contains("high stakes") || lower.contains("highstakes") || lower.contains("high-stakes") || lower.contains("high steaks") || lower.contains("highsteaks") {
-                return "High Stakes"
-            }
-            if lower.contains("hyper growth") || lower.contains("hypergrowth") || lower.contains("hyper-growth") {
-                return "Hyper Growth"
-            }
-            if lower.contains("bootcamp") || lower.contains("boot camp") {
-                return "Bootcamp"
-            }
-            if lower.contains("instant") {
-                return "Instant Funding"
-            }
-            if lower.hasPrefix("ftmo") {
-                return "FTMO \(platformTag)"
-            }
-            return "The5ers \(platformTag)"
-        }()
-        
-        let phase: String = {
-            if lower.contains("step 2") || lower.contains("step2") || lower.contains("phase 2") || lower.contains("phase2") || lower.contains("verification") ||
-               lower.contains("- 2 -") || lower.contains("- 2-") || lower.contains("-2-") || lower.contains(" - 2 ") || lower.hasSuffix("- 2") || lower.hasSuffix("-2") {
-                return "Phase 2"
-            }
-            if lower.contains("step 3") || lower.contains("step3") || lower.contains("phase 3") || lower.contains("phase3") ||
-               lower.contains("- 3 -") || lower.contains("- 3-") || lower.contains("-3-") || lower.contains(" - 3 ") || lower.hasSuffix("- 3") || lower.hasSuffix("-3") {
-                return "Phase 3"
-            }
-            if lower.contains("funded") || lower.contains("live") || lower.contains("master") || pkg == "Instant Funding" {
-                return "Funded"
-            }
-            if lower.contains("step 1") || lower.contains("step1") || lower.contains("phase 1") || lower.contains("phase1") || lower.contains("evaluation") ||
-               lower.contains("- 1 -") || lower.contains("- 1-") || lower.contains("-1-") || lower.contains(" - 1 ") || lower.hasSuffix("- 1") || lower.hasSuffix("-1") {
-                return "Phase 1"
-            }
-            return ""
-        }()
+        let pkg = resolvePackageName(from: lower)
+        let phase = resolvePhaseName(from: lower, pkg: pkg)
+        let suffix = extractAccountSuffix(from: trimmed)
         
         var components: [String] = [pkg]
         if !phase.isEmpty && phase != pkg {
             components.append(phase)
         }
         
-        // Extract size from balance or raw string e.g. "50K", "$100k"
-        let sizeCandidate: String? = {
-            if let b = balance, b > 0 {
-                let bInt = NSDecimalNumber(decimal: b).intValue
-                if bInt >= 1000 && bInt % 1000 == 0 {
-                    return "$\(bInt / 1000)K"
-                }
-                return "$\(bInt)"
-            }
-            if let regex = try? NSRegularExpression(pattern: #"(?i)\$?(\d{1,4})\s*k\b"#),
-               let match = regex.firstMatch(in: trimmed, range: NSRange(trimmed.startIndex..., in: trimmed)),
-               let range = Range(match.range(at: 1), in: trimmed) {
-                return "$\(trimmed[range].uppercased())K"
-            }
-            return nil
-        }()
-        if let sz = sizeCandidate {
+        if let sz = extractSizeTag(from: trimmed, balance: balance) {
             let sizeBare = sz.replacingOccurrences(of: "$", with: "").lowercased()
             let alreadyHasSize = components.contains { c in
                 c.replacingOccurrences(of: "$", with: "").lowercased().contains(sizeBare)
@@ -195,6 +56,135 @@ extension Formatters {
             }
         }
         
+        return filterAndMergeComponents(components)
+    }
+
+    private static func normalizeAndDeduplicateParts(_ trimmed: String) -> [String] {
+        var s = trimmed.replacingOccurrences(of: " · ", with: " - ")
+            .replacingOccurrences(of: " • ", with: " - ")
+            .replacingOccurrences(of: " | ", with: " - ")
+        let dashPattern = #"\s*-\s*"#
+        if let regex = try? NSRegularExpression(pattern: dashPattern) {
+            s = regex.stringByReplacingMatches(in: s, range: NSRange(s.startIndex..., in: s), withTemplate: " - ")
+        }
+        let rawParts = s.components(separatedBy: " - ")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        
+        var deduplicatedParts: [String] = []
+        for part in rawParts {
+            let pLower = part.lowercased()
+            if (pLower.hasPrefix("meta-trader") || pLower.hasPrefix("c-trader") || pLower.hasPrefix("account the5ers_")) && rawParts.count > 1 {
+                continue
+            }
+            let pNorm = pLower.replacingOccurrences(of: "$", with: "")
+                .replacingOccurrences(of: "#", with: "")
+                .replacingOccurrences(of: " ", with: "")
+                .replacingOccurrences(of: ",", with: "")
+            
+            let isDupe = deduplicatedParts.contains { existing in
+                let eNorm = existing.lowercased()
+                    .replacingOccurrences(of: "$", with: "")
+                    .replacingOccurrences(of: "#", with: "")
+                    .replacingOccurrences(of: " ", with: "")
+                    .replacingOccurrences(of: ",", with: "")
+                if eNorm == pNorm { return true }
+                if pNorm.count >= 3 && eNorm.contains(pNorm) { return true }
+                if eNorm.count >= 3 && pNorm.contains(eNorm) { return true }
+                return false
+            }
+            
+            if !isDupe {
+                deduplicatedParts.append(part)
+            } else if let idx = deduplicatedParts.firstIndex(where: { existing in
+                let eNorm = existing.lowercased().replacingOccurrences(of: "$", with: "").replacingOccurrences(of: "#", with: "").replacingOccurrences(of: " ", with: "")
+                return pNorm.count > eNorm.count && pNorm.contains(eNorm)
+            }) {
+                deduplicatedParts[idx] = part
+            }
+        }
+        return deduplicatedParts
+    }
+
+    private static func resolvePlatformTag(from lower: String) -> String {
+        if lower.contains("meta-trader-5") || lower.contains("meta-trade-5") || lower.contains("mt5") {
+            return "MT5"
+        } else if lower.contains("meta-trader-4") || lower.contains("meta-trade-4") || lower.contains("mt4") {
+            return "MT4"
+        } else if lower.contains("c-trader") || lower.contains("ctrader") {
+            return "cTrader"
+        } else if lower.contains("trader-evolution") || lower.contains("traderevolution") {
+            return "TraderEvolution"
+        }
+        return "MT5"
+    }
+
+    private static func resolvePackageName(from lower: String) -> String {
+        let platformTag = resolvePlatformTag(from: lower)
+        if lower.contains("high stakes") || lower.contains("highstakes") || lower.contains("high-stakes") || lower.contains("high steaks") || lower.contains("highsteaks") {
+            return "High Stakes"
+        }
+        if lower.contains("hyper growth") || lower.contains("hypergrowth") || lower.contains("hyper-growth") {
+            return "Hyper Growth"
+        }
+        if lower.contains("bootcamp") || lower.contains("boot camp") {
+            return "Bootcamp"
+        }
+        if lower.contains("instant") {
+            return "Instant Funding"
+        }
+        if lower.hasPrefix("ftmo") {
+            return "FTMO \(platformTag)"
+        }
+        return "The5ers \(platformTag)"
+    }
+
+    private static func resolvePhaseName(from lower: String, pkg: String) -> String {
+        if lower.contains("step 2") || lower.contains("step2") || lower.contains("phase 2") || lower.contains("phase2") || lower.contains("verification") ||
+           lower.contains("- 2 -") || lower.contains("- 2-") || lower.contains("-2-") || lower.contains(" - 2 ") || lower.hasSuffix("- 2") || lower.hasSuffix("-2") {
+            return "Phase 2"
+        }
+        if lower.contains("step 3") || lower.contains("step3") || lower.contains("phase 3") || lower.contains("phase3") ||
+           lower.contains("- 3 -") || lower.contains("- 3-") || lower.contains("-3-") || lower.contains(" - 3 ") || lower.hasSuffix("- 3") || lower.hasSuffix("-3") {
+            return "Phase 3"
+        }
+        if lower.contains("funded") || lower.contains("live") || lower.contains("master") || pkg == "Instant Funding" {
+            return "Funded"
+        }
+        if lower.contains("step 1") || lower.contains("step1") || lower.contains("phase 1") || lower.contains("phase1") || lower.contains("evaluation") ||
+           lower.contains("- 1 -") || lower.contains("- 1-") || lower.contains("-1-") || lower.contains(" - 1 ") || lower.hasSuffix("- 1") || lower.hasSuffix("-1") {
+            return "Phase 1"
+        }
+        return ""
+    }
+
+    private static func extractAccountSuffix(from trimmed: String) -> String {
+        let pattern = #"(?:…|\.{3}|[-_·\s#])?(\d{3,12})\s*$"#
+        if let regex = try? NSRegularExpression(pattern: pattern),
+           let match = regex.firstMatch(in: trimmed, range: NSRange(trimmed.startIndex..., in: trimmed)),
+           let range = Range(match.range(at: 1), in: trimmed) {
+            return String(trimmed[range])
+        }
+        return ""
+    }
+
+    private static func extractSizeTag(from trimmed: String, balance: Decimal?) -> String? {
+        if let b = balance, b > 0 {
+            let bInt = NSDecimalNumber(decimal: b).intValue
+            if bInt >= 1000 && bInt % 1000 == 0 {
+                return "$\(bInt / 1000)K"
+            }
+            return "$\(bInt)"
+        }
+        if let regex = try? NSRegularExpression(pattern: #"(?i)\$?(\d{1,4})\s*k\b"#),
+           let match = regex.firstMatch(in: trimmed, range: NSRange(trimmed.startIndex..., in: trimmed)),
+           let range = Range(match.range(at: 1), in: trimmed) {
+            return "$\(trimmed[range].uppercased())K"
+        }
+        return nil
+    }
+
+    private static func filterAndMergeComponents(_ components: [String]) -> String {
         var finalCleaned: [String] = []
         for c in components {
             let cNorm = c.lowercased()
@@ -214,7 +204,7 @@ extension Formatters {
         }
         return finalCleaned.joined(separator: " · ")
     }
-    
+
     /// Produces a concise account label tailored for tight navigation bars (e.g. "HighStakes P1 · $50K" or "cTrader #7657")
     public static func compactAccountName(_ raw: String) -> String {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)

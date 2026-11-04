@@ -97,7 +97,7 @@ public struct The5ersMcpAccount: Identifiable, Codable, Sendable {
 
 /// Official connector for The5ers via Model Context Protocol (MCP)
 /// Domain specification matching core web repository
-public final class The5ersService: ObservableObject {
+public final class The5ersService: ObservableObject, @unchecked Sendable, The5ersServiceProviding {
     public static let shared = The5ersService()
     
     public static let mcpUrl = "https://mcp.the5ers.com/mcp"

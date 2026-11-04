@@ -29,18 +29,3 @@ public protocol MarketDataProviding: Sendable {
 
 extension MarketDataService: MarketDataProviding {}
 
-/// Central service registry. Features resolve collaborators here instead of reaching
-/// for `.shared` singletons directly; tests may replace entries with fakes.
-public final class AppServices: @unchecked Sendable {
-    public static let current = AppServices()
-
-    private let lock = NSLock()
-    private var _marketData: any MarketDataProviding = MarketDataService.shared
-
-    public var marketData: any MarketDataProviding {
-        get { lock.lock(); defer { lock.unlock() }; return _marketData }
-        set { lock.lock(); defer { lock.unlock() }; _marketData = newValue }
-    }
-
-    private init() {}
-}

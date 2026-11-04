@@ -4,7 +4,7 @@ import Combine
 // MARK: - Remote Synchronization Extension
 extension TradeDataStore {
     
-    public static func isCancellation(_ error: Error) -> Bool {
+    nonisolated public static func isCancellation(_ error: Error) -> Bool {
         if error is CancellationError { return true }
         let ns = error as NSError
         if ns.domain == NSURLErrorDomain && ns.code == NSURLErrorCancelled { return true }
@@ -13,7 +13,7 @@ extension TradeDataStore {
         return false
     }
     
-    public static func isSameAccountId(_ a: String, _ b: String) -> Bool {
+    nonisolated public static func isSameAccountId(_ a: String, _ b: String) -> Bool {
         a.isEquivalentAccountId(to: b)
     }
     

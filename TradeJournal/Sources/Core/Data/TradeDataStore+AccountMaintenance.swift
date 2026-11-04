@@ -115,7 +115,14 @@ extension TradeDataStore {
     /// - Enforces zero Net P&L on all open / unclosed positions
     /// - Deduplicates and aligns all The5ers trades
     public func cleanupLegacyThe5ersCorruptions() {
-        // 1. Remove ONLY invalid test records with "opaque" IDs from old buggy builds
+        cleanupOpaqueThe5ersRecords()
+        cleanupOrphanedThe5ersReceipts()
+        normalizePositionQuantitiesAndPnl()
+        normalizeThe5ersExpenses()
+        reconcileThe5ersPropAccounts()
+    }
+
+    private func cleanupOpaqueThe5ersRecords() {
         if propEntries.contains(where: { $0.firm == "The5ers" && ($0.id.contains("opaque") || $0.reference.contains("opaque")) }) {
             propEntries.removeAll(where: { entry in
                 entry.firm == "The5ers" && (entry.id.contains("opaque") || entry.reference.contains("opaque"))
@@ -126,16 +133,18 @@ extension TradeDataStore {
                 rcpt.id.contains("opaque") || rcpt.payoutId.contains("opaque") || rcpt.reference.contains("opaque")
             })
         }
+    }
 
-        // 2. Remove orphaned receipts that don't match any active entry
+    private func cleanupOrphanedThe5ersReceipts() {
         let activeEntryIds = Set(propEntries.map { $0.id })
         if propReceipts.contains(where: { $0.id.hasPrefix("the5ers_") && !activeEntryIds.contains($0.payoutId) }) {
             propReceipts.removeAll(where: { rcpt in
                 rcpt.id.hasPrefix("the5ers_") && !activeEntryIds.contains(rcpt.payoutId)
             })
         }
+    }
 
-        // 3. Purge legacy synthetic "ACCOUNT" summary/midnight trades and enforce zero Net P&L on open positions
+    private func normalizePositionQuantitiesAndPnl() {
         var localTrades = trades
         var modified = false
         let countBeforePurge = localTrades.count
@@ -152,9 +161,7 @@ extension TradeDataStore {
             }
 
             if localTrades[i].status == .open {
-                // Check if all volume has been closed (openQuantity <= 0 with exits)
                 if localTrades[i].openQuantity <= 0 && (!localTrades[i].exits.isEmpty || localTrades[i].avgExit != nil) {
-                    // Fully closed! Transition to completed trade
                     localTrades[i].status = localTrades[i].netPnl > 0 ? .win : (localTrades[i].netPnl < 0 ? .loss : .breakeven)
                     localTrades[i].openQuantity = Decimal.zero
                     if localTrades[i].closedAt == nil {
@@ -162,7 +169,6 @@ extension TradeDataStore {
                     }
                     modified = true
                 } else {
-                    // An active open trade MUST stay open: closedAt is nil
                     if localTrades[i].closedAt != nil {
                         localTrades[i].closedAt = nil
                         modified = true
@@ -170,13 +176,11 @@ extension TradeDataStore {
 
                     let isPartial = !localTrades[i].exits.isEmpty || (localTrades[i].openQuantity > 0 && localTrades[i].openQuantity < localTrades[i].quantity)
                     if isPartial {
-                        // Respect partial close: preserve openQuantity (remaining lots) and netPnl (realized profit of closed portion)
                         if localTrades[i].openQuantity > localTrades[i].quantity {
                             localTrades[i].openQuantity = localTrades[i].quantity
                             modified = true
                         }
                     } else {
-                        // Fully open position with no exits: enforce openQuantity = quantity and zero realized P&L
                         if localTrades[i].openQuantity != localTrades[i].quantity {
                             localTrades[i].openQuantity = localTrades[i].quantity
                             modified = true
@@ -190,7 +194,6 @@ extension TradeDataStore {
                     }
                 }
             } else {
-                // A completed closed trade (.win, .loss, .breakeven) must have openQuantity = 0 and closedAt populated
                 if localTrades[i].closedAt == nil {
                     localTrades[i].closedAt = localTrades[i].openedAt.addingTimeInterval(120)
                     modified = true
@@ -204,8 +207,9 @@ extension TradeDataStore {
         if modified {
             trades = localTrades
         }
+    }
 
-        // 4. Clean and normalize The5ers purchase expenses
+    private func normalizeThe5ersExpenses() {
         var entriesModified = false
         var localEntries = propEntries
         for i in 0..<localEntries.count {
@@ -225,8 +229,9 @@ extension TradeDataStore {
         if entriesModified {
             propEntries = localEntries
         }
+    }
 
-        // 5. Ensure all The5ers PropAccountItems have complete program rules, realized Net P&L, & reconciled trade stats
+    private func reconcileThe5ersPropAccounts() {
         var propsModified = false
         var currentTrades = trades
         var localProps = propAccounts
@@ -239,12 +244,6 @@ extension TradeDataStore {
             var p = localProps[i]
             var changed = false
             let sizeMinor = p.sizeMinor ?? 0
-            let settledPayoutsMinor = propEntries
-                .filter { entry in
-                    guard entry.firm == "The5ers", entry.kind == "payout", entry.status == .completed, !entry.voided, let accId = entry.accountId else { return false }
-                    return accId == p.id || accId == p.journalAccountId || TradeDataStore.isSameAccountId(accId, p.id)
-                }
-                .reduce(Int64(0)) { $0 + $1.amountMinor }
             if sizeMinor > 0 {
                 let text = "\(p.name) \(p.currentStepName ?? "") \(p.program.rawValue)".lowercased()
                 let isStep2 = p.program == .verification || text.contains("- 2") || text.contains("step 2") || text.contains("phase 2")
@@ -329,7 +328,7 @@ extension TradeDataStore {
             propAccounts = localProps
         }
     }
-
+    
     /// Deduplicates propEntries by ID and semantic signature (firm, kind, currency, amount, date, account)
     public func deduplicatePropEntries() {
         var seenIds = Set<String>()

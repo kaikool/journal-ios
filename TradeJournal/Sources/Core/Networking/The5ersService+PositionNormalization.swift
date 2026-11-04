@@ -104,7 +104,46 @@ extension The5ersService {
             return nil
         }
         
-        // Robust closed status: boolean flag, status token, presence of close date, exit price, or realized P&L
+        let financials = resolveClosedStateAndFinancials(
+            row: row,
+            openedAtIso: openedAtIso,
+            openedAtDate: openedAtDate,
+            entry: entry
+        )
+        
+        let providerId = extractPositionProviderId(row: row)
+        
+        let feeVal = firstValue(in: row, keys: ["fee", "commission", "fees", "commissions", "totalfees", "brokerfee", "broker_fee", "orderfee", "order_fee", "cost", "costs", "comm"])
+        let fee = sourceNumber(feeVal)
+        let swapVal = firstValue(in: row, keys: ["swap", "swaps", "totalswap", "total_swap", "rollover", "financing", "interest", "overnight"])
+        let swap = sourceNumber(swapVal)
+        let isValid = sourceBoolean(row["isvalid"])
+        
+        return SourcePosition(
+            identityDiscriminator: nil,
+            providerId: providerId,
+            symbol: symbol,
+            direction: dir,
+            openedAtIso: openedAtIso,
+            openedAtDate: openedAtDate,
+            closedAtIso: financials.closedAtTuple?.iso,
+            closedAtDate: financials.closedAtTuple?.date,
+            quantity: quantity,
+            entry: entry,
+            exit: financials.exit,
+            netPnl: financials.netPnl,
+            fee: fee,
+            swap: swap,
+            isValid: isValid
+        )
+    }
+
+    private func resolveClosedStateAndFinancials(
+        row: [String: Any],
+        openedAtIso: String,
+        openedAtDate: Date,
+        entry: Decimal
+    ) -> (closedAtTuple: (iso: String, date: Date)?, exit: Decimal?, netPnl: Decimal) {
         let explicitClosedFlag = sourceBoolean(firstValue(in: row, keys: ["isclosed", "closed", "isclose"]))
         let st = String(describing: row["status"] ?? "").lowercased()
         let closeKeys = [
@@ -128,10 +167,6 @@ extension The5ersService {
         ]
         let rawPnlNum = sourceNumber(firstValue(in: row, keys: pnlKeys))
         
-        // Generic Ghost / Dangling Position Detection:
-        // A ghost position is NOT an open position.
-        // A live open position has NO close date (parsedCloseInstant == nil).
-        // A bridge-stuck ghost position was opened > 24 hours ago AND has a close timestamp recorded (e.g. scalp deal artifact).
         let isGhostDangling: Bool = {
             guard openedAtDate.timeIntervalSinceNow < -86400 else { return false }
             guard let cl = parsedCloseInstant else { return false }
@@ -139,105 +174,61 @@ extension The5ersService {
         }()
         
         let isClosed: Bool = {
-            // Rule 1: Explicitly closed flags from broker
             if explicitClosedFlag == true { return true }
             if st.contains("close") || st == "filled" || st == "done" || st.contains("exit") || st.contains("history") { return true }
-            
-            // Rule 2: Detected ghost position (has close timestamp from past)
             if isGhostDangling { return true }
-            
-            // Rule 3: If flagged open or status says open/active, it is genuinely an OPEN trade!
-            if explicitClosedFlag == false || st.contains("open") || st == "active" {
-                return false
-            }
-            
-            // Rule 4: Neutral record fallback requires both a close timestamp and exit price
-            if let cl = parsedCloseInstant, cl.date > openedAtDate, hasExitPrice {
-                return true
-            }
+            if explicitClosedFlag == false || st.contains("open") || st == "active" { return false }
+            if let cl = parsedCloseInstant, cl.date > openedAtDate, hasExitPrice { return true }
             return false
         }()
         
-        let closedAtTuple: (iso: String, date: Date)?
-        let exit: Decimal?
-        let netPnl: Decimal
-        
         if isClosed {
-            if let cl = parsedCloseInstant {
-                closedAtTuple = cl.date >= openedAtDate ? cl : (openedAtIso, openedAtDate)
-            } else {
-                closedAtTuple = (openedAtIso, openedAtDate.addingTimeInterval(120))
-            }
-            exit = rawExitNum ?? entry
-            netPnl = rawPnlNum ?? 0
+            let closedAtTuple: (iso: String, date: Date) = {
+                if let cl = parsedCloseInstant {
+                    return cl.date >= openedAtDate ? cl : (openedAtIso, openedAtDate)
+                } else {
+                    return (openedAtIso, openedAtDate.addingTimeInterval(120))
+                }
+            }()
+            return (closedAtTuple, rawExitNum ?? entry, rawPnlNum ?? 0)
         } else {
-            closedAtTuple = nil
-            exit = nil
-            netPnl = 0
+            return (nil, nil, 0)
         }
-        
-        // Never use ephemeral session-scoped 'ref' ('position-1', 'position-2') as providerId;
-        // 'ref' rotates every 10 minutes per session and changes order across pages.
+    }
+
+    private func extractPositionProviderId(row: [String: Any]) -> String? {
         let provKeys = ["positionid", "ticket", "id", "dealid", "orderid", "order_id"]
         let provVal = firstValue(in: row, keys: provKeys)
-        let providerId: String? = {
-            if let p = provVal {
-                let s = String(describing: p).trimmingCharacters(in: .whitespaces)
-                let sl = s.lowercased()
-                if !s.isEmpty && !sl.contains("opaque") && !sl.hasPrefix("position-") && !sl.hasPrefix("account-") {
-                    return s
-                }
+        if let p = provVal {
+            let s = String(describing: p).trimmingCharacters(in: .whitespaces)
+            let sl = s.lowercased()
+            if !s.isEmpty && !sl.contains("opaque") && !sl.hasPrefix("position-") && !sl.hasPrefix("account-") {
+                return s
             }
-            if let rawRef = row["ref"] as? String, rawRef.hasPrefix("pos_v1.") {
-                let parts = rawRef.components(separatedBy: ".")
-                if parts.count >= 2 {
-                    var base64 = parts[1]
-                        .replacingOccurrences(of: "-", with: "+")
-                        .replacingOccurrences(of: "_", with: "/")
-                    let remainder = base64.count % 4
-                    if remainder > 0 {
-                        base64.append(String(repeating: "=", count: 4 - remainder))
-                    }
-                    if let data = Data(base64Encoded: base64),
-                       let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                       let ticket = json["p"] {
-                        let tStr = String(describing: ticket).trimmingCharacters(in: .whitespaces)
-                        if !tStr.isEmpty && tStr != "0" {
-                            return tStr
-                        }
+        }
+        if let rawRef = row["ref"] as? String, rawRef.hasPrefix("pos_v1.") {
+            let parts = rawRef.components(separatedBy: ".")
+            if parts.count >= 2 {
+                var base64 = parts[1]
+                    .replacingOccurrences(of: "-", with: "+")
+                    .replacingOccurrences(of: "_", with: "/")
+                let remainder = base64.count % 4
+                if remainder > 0 {
+                    base64.append(String(repeating: "=", count: 4 - remainder))
+                }
+                if let data = Data(base64Encoded: base64),
+                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let ticket = json["p"] {
+                    let tStr = String(describing: ticket).trimmingCharacters(in: .whitespaces)
+                    if !tStr.isEmpty && tStr != "0" {
+                        return tStr
                     }
                 }
             }
-            return nil
-        }()
-        
-        let feeVal = firstValue(in: row, keys: ["fee", "commission", "fees", "commissions", "totalfees", "brokerfee", "broker_fee", "orderfee", "order_fee", "cost", "costs", "comm"])
-        var fee = sourceNumber(feeVal)
-        let swapVal = firstValue(in: row, keys: ["swap", "swaps", "totalswap", "total_swap", "rollover", "financing", "interest", "overnight"])
-        let swap = sourceNumber(swapVal)
-        let isValid = sourceBoolean(row["isvalid"])
-        
-        return SourcePosition(
-            identityDiscriminator: nil,
-            providerId: providerId,
-            symbol: symbol,
-            direction: dir,
-            openedAtIso: openedAtIso,
-            openedAtDate: openedAtDate,
-            closedAtIso: closedAtTuple?.iso,
-            closedAtDate: closedAtTuple?.date,
-            quantity: quantity,
-            entry: entry,
-            exit: exit,
-            netPnl: netPnl,
-            fee: fee,
-            swap: swap,
-            isValid: isValid
-        )
+        }
+        return nil
     }
     
-    /// Reconciles and merges remote positions from The5ers into local TradeDataStore
-    @MainActor
     internal func mergePositions(
         _ rawPositions: [[String: Any]],
         for acc: The5ersMcpAccount,

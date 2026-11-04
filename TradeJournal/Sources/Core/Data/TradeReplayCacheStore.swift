@@ -56,7 +56,7 @@ public final class TradeReplayCacheStore: @unchecked Sendable {
         
         // Save to disk asynchronously so we never block the UI thread
         let dir = self.cacheDirectoryUrl
-        DispatchQueue.global(qos: .utility).async {
+        Task.detached(priority: .utility) {
             let fileUrl = dir.appendingPathComponent("\(key).json")
             if let data = try? JSONEncoder().encode(bars) {
                 try? data.write(to: fileUrl, options: [.atomic])

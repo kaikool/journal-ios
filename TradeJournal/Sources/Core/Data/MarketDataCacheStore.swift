@@ -333,7 +333,7 @@ public final class MarketDataCacheStore: @unchecked Sendable {
         // Asynchronously persist to disk to avoid blocking caller thread
         let dir = self.cacheDirectoryUrl
         let sanitizedKey = key.replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: ":", with: "_")
-        DispatchQueue.global(qos: .utility).async {
+        Task.detached(priority: .utility) {
             let fileUrl = dir.appendingPathComponent("\(sanitizedKey).json")
             if let data = try? JSONEncoder().encode(entry) {
                 try? data.write(to: fileUrl, options: [.atomic])
@@ -371,7 +371,7 @@ public final class MarketDataCacheStore: @unchecked Sendable {
         lock.unlock()
         
         let dir = self.cacheDirectoryUrl
-        DispatchQueue.global(qos: .utility).async {
+        Task.detached(priority: .utility) {
             let fileUrl = dir.appendingPathComponent("session_profiles_\(clean).json")
             if let data = try? JSONEncoder().encode(profiles) {
                 try? data.write(to: fileUrl, options: [.atomic])

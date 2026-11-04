@@ -8,92 +8,27 @@ import SwiftUI
 /// - Custom Apple HIG direction selector (BUY / LONG & SELL / SHORT)
 /// - Modern inline date & time pickers with quick presets
 /// - Live estimated Net P&L calculation banner
+/// - MVVM ViewModel Architecture (AddTradeViewModel)
 public struct AddTradeSheet: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var env: AppEnvironment
     @ObservedObject private var dataStore = TradeDataStore.shared
-    
-    @State private var accountId: String = ""
-    @State private var symbol: String = ""
-    @State private var direction: TradeDirection = .long
-    @State private var isClosed: Bool = true
-    @State private var quantityText: String = "1"
-    @State private var entryPriceText: String = ""
-    @State private var exitPriceText: String = ""
-    @State private var openedAt: Date = Date()
-    @State private var closedAt: Date = Date()
-    @State private var feeText: String = "0"
-    @State private var stopLossText: String = ""
-    @State private var profitTargetText: String = ""
-    @State private var selectedPlaybookId: String = ""
-    @State private var ruleAssessments: [String: Bool] = [:]
-    @State private var rating: Int = 0
-    @State private var notes: String = ""
-    @State private var tags: [String] = []
-    @State private var mistakes: [String] = []
-    @State private var showCryptoSymbols: Bool = false
-    @State private var errorMessage: String? = nil
+    @StateObject private var viewModel: AddTradeViewModel
     
     public init(initialDate: Date = Date()) {
-        _openedAt = State(initialValue: initialDate)
-        _closedAt = State(initialValue: initialDate)
+        _viewModel = StateObject(wrappedValue: AddTradeViewModel(initialDate: initialDate))
     }
     
-    private var quantity: Decimal {
-        Decimal(string: quantityText.replacingOccurrences(of: ",", with: ".")) ?? 0
-    }
-    
-    private var entryPrice: Decimal {
-        Decimal(string: entryPriceText.replacingOccurrences(of: ",", with: ".")) ?? 0
-    }
-    
-    private var exitPrice: Decimal? {
-        guard isClosed, !exitPriceText.trimmingCharacters(in: .whitespaces).isEmpty else { return nil }
-        return Decimal(string: exitPriceText.replacingOccurrences(of: ",", with: "."))
-    }
-    
-    private var fee: Decimal {
-        Decimal(string: feeText.replacingOccurrences(of: ",", with: ".")) ?? 0
-    }
-    
-    private var stopLoss: Decimal? {
-        guard !stopLossText.trimmingCharacters(in: .whitespaces).isEmpty else { return nil }
-        return Decimal(string: stopLossText.replacingOccurrences(of: ",", with: "."))
-    }
-    
-    private var profitTarget: Decimal? {
-        guard !profitTargetText.trimmingCharacters(in: .whitespaces).isEmpty else { return nil }
-        return Decimal(string: profitTargetText.replacingOccurrences(of: ",", with: "."))
-    }
-    
-    private var symbolSpec: AssetContractEngine.SymbolSpec {
-        AssetContractEngine.spec(for: symbol)
-    }
-    
-    private var estimatedPnl: Decimal? {
-        guard let exit = exitPrice, entryPrice > 0, quantity > 0 else { return nil }
-        let gross = AssetContractEngine.calculateGrossPnl(
-            symbol: symbol,
-            direction: direction,
-            quantity: quantity,
-            entryPrice: entryPrice,
-            exitPrice: exit,
-            customMultiplier: AssetContractEngine.customMultiplier(for: symbol, multipliers: dataStore.multipliers),
-            conversionRates: dataStore.currencyConversion.rates,
-            reportingCurrency: dataStore.currencyConversion.reportingCurrency
-        )
-        return gross - fee
-    }
-    
-    private var estimatedDeltaText: String? {
-        guard let exit = exitPrice, entryPrice > 0 else { return nil }
-        return AssetContractEngine.formatDeltaText(
-            symbol: symbol,
-            entryPrice: entryPrice,
-            exitPrice: exit,
-            direction: direction
-        )
-    }
+    private var quantity: Decimal { viewModel.quantity }
+    private var entryPrice: Decimal { viewModel.entryPrice }
+    private var exitPrice: Decimal? { viewModel.exitPrice }
+    private var fee: Decimal { viewModel.fee }
+    private var stopLoss: Decimal? { viewModel.stopLoss }
+    private var profitTarget: Decimal? { viewModel.profitTarget }
+    private var symbolSpec: AssetContractEngine.SymbolSpec { viewModel.symbolSpec }
+    private var estimatedPnl: Decimal? { viewModel.estimatedPnl(dataStore: dataStore) }
+    private var estimatedDeltaText: String? { viewModel.estimatedDeltaText }
+    private var isValid: Bool { viewModel.isValid }
     
     public var body: some View {
         NavigationStack {
@@ -106,20 +41,24 @@ public struct AddTradeSheet: View {
                     positionAndPricingCard
                     
                     // Section 3: Execution Timestamps
-                    TradeTimestampsCard(openedAt: $openedAt, closedAt: $closedAt, isClosed: isClosed)
+                    TradeTimestampsCard(
+                        openedAt: $viewModel.openedAt,
+                        closedAt: $viewModel.closedAt,
+                        isClosed: viewModel.isClosed
+                    )
                     
                     // Section 4: Risk & Playbook Checklist
                     riskAndPlaybookCard
                     
                     // Section 5: Discipline & Journal Notes
                     TradeDisciplineAndNotesCard(
-                        rating: $rating,
-                        mistakes: $mistakes,
-                        tags: $tags,
-                        notes: $notes
+                        rating: $viewModel.rating,
+                        mistakes: $viewModel.mistakes,
+                        tags: $viewModel.tags,
+                        notes: $viewModel.notes
                     )
                     
-                    if let err = errorMessage {
+                    if let err = viewModel.errorMessage {
                         Text(err)
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.loss)
@@ -143,18 +82,20 @@ public struct AddTradeSheet: View {
                 
                 ToolbarItem(placement: .confirmationAction) {
                     ModalPrimaryButton("Save", isEnabled: isValid) {
-                        saveTrade()
+                        viewModel.saveTrade(dataStore: dataStore) {
+                            dismiss()
+                        }
                     }
                 }
             }
             .onAppear {
-                if accountId.isEmpty {
-                    accountId = dataStore.selectedAccountId == "all"
+                if viewModel.accountId.isEmpty {
+                    viewModel.accountId = dataStore.selectedAccountId == "all"
                         ? (dataStore.accounts.first?.id ?? "")
                         : dataStore.selectedAccountId
                 }
-                if selectedPlaybookId.isEmpty, let defId = dataStore.defaultPlaybook?.id {
-                    selectedPlaybookId = defId
+                if viewModel.selectedPlaybookId.isEmpty, let defId = dataStore.defaultPlaybook?.id {
+                    viewModel.selectedPlaybookId = defId
                 }
             }
         }
@@ -172,7 +113,7 @@ public struct AddTradeSheet: View {
                 let accountOptions = dataStore.accounts.map { $0.id }
                 AppDropdownField(
                     label: "Account",
-                    selection: $accountId,
+                    selection: $viewModel.accountId,
                     options: accountOptions,
                     titleFor: { id in
                         if let acc = dataStore.accounts.first(where: { $0.id == id }) {
@@ -183,7 +124,10 @@ public struct AddTradeSheet: View {
                     iconFor: { _ in "creditcard" }
                 )
                 
-                TradeSymbolSelector(symbol: $symbol, showCryptoSymbols: $showCryptoSymbols)
+                TradeSymbolSelector(
+                    symbol: $viewModel.symbol,
+                    showCryptoSymbols: $viewModel.showCryptoSymbols
+                )
             }
         }
     }
@@ -199,7 +143,7 @@ public struct AddTradeSheet: View {
                 
                 // Direction Selector
                 AppBinarySegmentedToggle(
-                    selection: $direction,
+                    selection: $viewModel.direction,
                     firstOption: .long,
                     firstTitle: "BUY / LONG",
                     firstIcon: "arrow.up.right",
@@ -213,8 +157,8 @@ public struct AddTradeSheet: View {
                 // Closed Position Toggle
                 AppToggleRow(
                     "Trade is Closed",
-                    subtitle: isClosed ? "Calculates realized net P&L and metrics" : "Tracked as an open position",
-                    isOn: $isClosed
+                    subtitle: viewModel.isClosed ? "Calculates realized net P&L and metrics" : "Tracked as an open position",
+                    isOn: $viewModel.isClosed
                 )
                 
                 Divider().background(AppColors.border.opacity(0.5))
@@ -224,27 +168,27 @@ public struct AddTradeSheet: View {
                     TradeNumericInputBlock(
                         title: "Quantity / Lots",
                         subtitle: symbolSpec.lotDescription,
-                        text: $quantityText,
+                        text: $viewModel.quantityText,
                         placeholder: "0.25"
                     )
                     TradeNumericInputBlock(
                         title: "Entry Price",
                         subtitle: "\(symbolSpec.defaultDecimals) decimals",
-                        text: $entryPriceText,
+                        text: $viewModel.entryPriceText,
                         placeholder: symbolSpec.pricePlaceholder
                     )
-                    if isClosed {
+                    if viewModel.isClosed {
                         TradeNumericInputBlock(
                             title: "Exit Price",
                             subtitle: "\(symbolSpec.defaultDecimals) decimals",
-                            text: $exitPriceText,
+                            text: $viewModel.exitPriceText,
                             placeholder: symbolSpec.pricePlaceholder
                         )
                     }
                     TradeNumericInputBlock(
                         title: "Fees & Commission",
                         subtitle: "Total fees",
-                        text: $feeText,
+                        text: $viewModel.feeText,
                         placeholder: "0.00"
                     )
                 }
@@ -274,62 +218,23 @@ public struct AddTradeSheet: View {
                     TradeNumericInputBlock(
                         title: "Stop Loss (Price)",
                         subtitle: "\(symbolSpec.defaultDecimals) decimals",
-                        text: $stopLossText,
+                        text: $viewModel.stopLossText,
                         placeholder: "Optional"
                     )
                     TradeNumericInputBlock(
                         title: "Profit Target (Price)",
                         subtitle: "\(symbolSpec.defaultDecimals) decimals",
-                        text: $profitTargetText,
+                        text: $viewModel.profitTargetText,
                         placeholder: "Optional"
                     )
                 }
                 
                 TradePlaybookRulesCard(
-                    selectedPlaybookId: $selectedPlaybookId,
-                    ruleAssessments: $ruleAssessments,
+                    selectedPlaybookId: $viewModel.selectedPlaybookId,
+                    ruleAssessments: $viewModel.ruleAssessments,
                     playbooks: dataStore.playbooks
                 )
             }
         }
-    }
-    
-    // MARK: - Validation & Save
-    private var isValid: Bool {
-        !symbol.trimmingCharacters(in: .whitespaces).isEmpty &&
-        quantity > 0 &&
-        entryPrice > 0 &&
-        (!isClosed || (exitPrice.map { $0 > 0 } ?? false))
-    }
-    
-    private func saveTrade() {
-        guard isValid else {
-            errorMessage = "Please enter valid symbol, quantity, and price."
-            return
-        }
-        
-        let targetAccId = accountId.isEmpty ? dataStore.selectedAccountId : accountId
-        
-        dataStore.addManualTrade(
-            accountId: targetAccId,
-            symbol: symbol,
-            direction: direction,
-            quantity: quantity,
-            entryPrice: entryPrice,
-            exitPrice: isClosed ? exitPrice : nil,
-            openedAt: openedAt,
-            closedAt: isClosed ? closedAt : nil,
-            fee: fee,
-            notes: notes.trimmingCharacters(in: .whitespaces).isEmpty ? nil : notes,
-            tags: tags,
-            mistakes: mistakes,
-            rating: rating > 0 ? rating : nil,
-            stopLoss: stopLoss,
-            profitTarget: profitTarget,
-            playbookId: selectedPlaybookId.isEmpty ? nil : selectedPlaybookId,
-            ruleAssessments: ruleAssessments
-        )
-        
-        dismiss()
     }
 }

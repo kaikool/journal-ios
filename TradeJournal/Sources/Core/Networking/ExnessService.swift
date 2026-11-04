@@ -6,7 +6,7 @@ import CryptoKit
 /// Implements automatic Access Point Discovery, Ed25519 cryptographic signing, server clock drift compensation,
 /// live balance/equity snapshots, and full deals/executions/orders history synchronization.
 /// Private keys and sensitive tokens are securely stored in the iOS Hardware Keychain (AES-256).
-public final class ExnessService: ObservableObject, @unchecked Sendable {
+public final class ExnessService: ObservableObject, @unchecked Sendable, ExnessServiceProviding {
     public static let shared = ExnessService()
 
     // MARK: - Published State
@@ -120,7 +120,7 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
         self.cachedAccessPoint = nil
         ud.removeObject(forKey: kExnessCachedAccessPoint)
 
-        DispatchQueue.main.async {
+        Task { @MainActor in
             self.apiHost = finalHost
             self.accountId = cleanAccountId
             self.apiKey = cleanApiKey
@@ -143,7 +143,7 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
         KeychainManager.delete(forKey: kExnessPrivateKey)
         self.cachedAccessPoint = nil
 
-        DispatchQueue.main.async {
+        Task { @MainActor in
             self.accountId = ""
             self.apiKey = ""
             self.isConfigured = false

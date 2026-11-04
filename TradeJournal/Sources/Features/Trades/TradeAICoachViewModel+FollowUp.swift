@@ -1,10 +1,10 @@
-import SwiftUI
+import Foundation
 import UIKit
 
 // MARK: - Live Position Snapshot & Follow-Up Chat Execution
-extension TradeAICoachSheet {
+extension TradeAICoachViewModel {
     
-    internal func buildLivePositionSnapshot(isVi: Bool) -> String {
+    public func buildLivePositionSnapshot(dataStore: TradeDataStore, isVi: Bool) -> String {
         let currentTrade = dataStore.trades.first(where: { $0.key == trade.key }) ?? trade
         let latestBar = activeBars?.last
         let curPrice: Decimal = {
@@ -58,100 +58,91 @@ extension TradeAICoachSheet {
                 return currentTrade.netPnl
             }
         }()
-        let pnlStr = Formatters.formatPnL(unpnl, currency: "USD")
+        let unpnlStr = Formatters.currency(unpnl, currency: currentTrade.accountCurrency)
         
-        // R-Multiple
-        let rStr: String = {
-            guard let sl = currentTrade.stopLoss else { return "N/A" }
-            let riskPerUnit = abs(currentTrade.avgEntry - sl)
-            guard riskPerUnit > 0 else { return "N/A" }
-            let r = priceDelta / riskPerUnit
-            let rDouble = (r as NSDecimalNumber).doubleValue
-            return Formatters.formatRMultiple(rDouble)
-        }()
-        
-        // Target Distances
-        let slDistStr: String = {
-            guard let sl = currentTrade.stopLoss else { return isVi ? "Chưa cài" : "Not set" }
-            let dist = abs(curPrice - sl)
-            let pips = dist / pipDivisor
-            return "\(Formatters.pips(pips)) (SL @ \(Formatters.price(sl, symbol: currentTrade.symbol)))"
-        }()
-        let tpDistStr: String = {
-            guard let tp = currentTrade.profitTarget else { return isVi ? "Chưa cài" : "Not set" }
-            let dist = abs(tp - curPrice)
-            let pips = dist / pipDivisor
-            return "\(Formatters.pips(pips)) (TP @ \(Formatters.price(tp, symbol: currentTrade.symbol)))"
-        }()
-        
-        // Extremes reached (MFE / MAE)
-        let extremesStr: String = {
-            guard let b = activeBars, !b.isEmpty else { return "" }
-            let highs = b.map { $0.high }
-            let lows = b.map { $0.low }
-            guard let maxH = highs.max(), let minL = lows.min() else { return "" }
-            let bestPrice = isShort ? minL : maxH
-            let worstPrice = isShort ? maxH : minL
-            let bestDelta = isShort ? (currentTrade.avgEntry - bestPrice) : (bestPrice - currentTrade.avgEntry)
-            let worstDelta = isShort ? (currentTrade.avgEntry - worstPrice) : (worstPrice - currentTrade.avgEntry)
-            let bestPips = (bestDelta / pipDivisor as NSDecimalNumber).doubleValue
-            let worstPips = (worstDelta / pipDivisor as NSDecimalNumber).doubleValue
-            let bestPriceStr = Formatters.price(bestPrice, symbol: currentTrade.symbol)
-            let worstPriceStr = Formatters.price(worstPrice, symbol: currentTrade.symbol)
-            let bestPipsStr = Formatters.pips(bestPips, signed: true)
-            let worstPipsStr = Formatters.pips(worstPips, signed: true)
-            
-            if isVi {
-                return "\n  • Đỉnh lợi nhuận từng đạt (MFE): \(bestPriceStr) (\(bestPipsStr))\n  • Mức sụt giảm tối đa từng chịu (MAE): \(worstPriceStr) (\(worstPipsStr))"
-            } else {
-                return "\n  • Max Favorable Excursion (MFE Peak): \(bestPriceStr) (\(bestPipsStr))\n  • Max Adverse Excursion (MAE Drawdown): \(worstPriceStr) (\(worstPipsStr))"
+        // R Multiple
+        let rMultStr: String = {
+            if let r = currentTrade.rMultiple {
+                return Formatters.rMultiple(r)
             }
+            if let sl = currentTrade.stopLoss, sl > 0 {
+                let riskDist = abs(currentTrade.avgEntry - sl)
+                if riskDist > 0 {
+                    let liveR = priceDelta / riskDist
+                    let liveRDouble = (liveR as NSDecimalNumber).doubleValue
+                    return Formatters.rMultiple(liveRDouble)
+                }
+            }
+            return "N/A"
+        }()
+        
+        // SL / TP Distances
+        let slInfo: String = {
+            guard let sl = currentTrade.stopLoss, sl > 0 else { return isVi ? "Chưa đặt (Rủi ro mở)" : "None (Uncapped risk)" }
+            let slPriceStr = Formatters.price(sl, symbol: currentTrade.symbol)
+            let slDelta = isShort ? (sl - curPrice) : (curPrice - sl)
+            let slPips = slDelta / pipDivisor
+            let slPipsDouble = (slPips as NSDecimalNumber).doubleValue
+            let status = slDelta < 0 ? (isVi ? "ĐANG VI PHẠM SL" : "SL BREACHED") : "\(Formatters.pips(slPipsDouble))"
+            return "\(slPriceStr) (\(status))"
+        }()
+        
+        let tpInfo: String = {
+            guard let tp = currentTrade.profitTarget, tp > 0 else { return isVi ? "Chưa đặt (Chạy theo trailing/cấu trúc)" : "None (Discretionary runner)" }
+            let tpPriceStr = Formatters.price(tp, symbol: currentTrade.symbol)
+            let tpDelta = isShort ? (curPrice - tp) : (tp - curPrice)
+            let tpPips = tpDelta / pipDivisor
+            let tpPipsDouble = (tpPips as NSDecimalNumber).doubleValue
+            let tpStatus = tpDelta <= 0 ? (isVi ? "ĐÃ ĐẠT TP" : "TP HIT") : "\(Formatters.pips(tpPipsDouble)) \(isVi ? "nữa" : "away")"
+            return "\(tpPriceStr) (\(tpStatus))"
         }()
         
         let durationStr: String = {
-            let diff = Date().timeIntervalSince(currentTrade.openedAt)
-            let mins = Int(max(1, diff / 60))
-            let hours = mins / 60
-            if hours > 0 {
-                return "\(hours)h \(mins % 60)m"
-            } else {
-                return "\(mins)m"
-            }
+            let endTime = currentTrade.closedAt ?? Date()
+            let diff = endTime.timeIntervalSince(currentTrade.openedAt)
+            if diff < 60 { return "\(Int(diff))s" }
+            if diff < 3600 { return "\(Int(diff / 60))m" }
+            let h = Int(diff / 3600)
+            let m = Int((diff.truncatingRemainder(dividingBy: 3600)) / 60)
+            return "\(h)h \(m)m"
         }()
         
-        let partialInfoVi = (currentTrade.isPartiallyClosed && isOpen)
-            ? "\n• Chốt lời một phần (Partial TP): Đã bỏ túi (Banked): \(Formatters.formatPnL(currentTrade.netPnl, currency: "USD")) | Khối lượng còn lại: \(Formatters.formatDecimal(currentTrade.openQuantity, maxDecimals: 2)) lots"
-            : ""
-        let partialInfoEn = (currentTrade.isPartiallyClosed && isOpen)
-            ? "\n• Partial Close: Banked profit: \(Formatters.formatPnL(currentTrade.netPnl, currency: "USD")) | Active runner volume: \(Formatters.formatDecimal(currentTrade.openQuantity, maxDecimals: 2)) lots"
-            : ""
+        let play = dataStore.playbooks.first(where: { $0.id == currentTrade.playbookId })?.title ?? "Discretionary"
         
         if isVi {
             return """
-            [TRẠNG THÁI VỊ THẾ THỜI GIAN THỰC (CẬP NHẬT TẠI \(nowStr))]:
-            • Cặp tiền: \(currentTrade.symbol) | Vị thế: \(isShort ? "SELL / SHORT" : "BUY / LONG") | Khối lượng: \(volStr) lots\(partialInfoVi)
-            • Thời gian mở: \(openedStr) (Thời gian đã giữ lệnh: \(durationStr))
-            • Giá vào (Entry): \(entryPriceStr)
-            • Thị giá hiện tại: \(curPriceStr) (Biên độ lãi/lỗ hiện tại: \(pipsDeltaStr))
-            • Lợi nhuận tạm tính hiện tại: \(pnlStr) (Tỷ lệ: \(rStr))
-            • Cắt lỗ (SL hiện tại): \(slDistStr)
-            • Chốt lời (TP hiện tại): \(tpDistStr)\(extremesStr)
+            [SNAPSHOT VỊ THẾ LIVE - DỮ LIỆU THỜI GIAN THỰC]:
+            • Mã tài sản: \(currentTrade.symbol) (\(currentTrade.direction == .short ? "SELL / SHORT" : "BUY / LONG"))
+            • Trạng thái lệnh: \(isOpen ? "ĐANG MỞ (LIVE)" : "ĐÃ ĐÓNG (REVIEW)")
+            • Khối lượng: \(volStr) Lots
+            • Giá vào lệnh (Entry): \(entryPriceStr) (Lúc \(openedStr))
+            • Giá hiện tại / Giá đóng: \(curPriceStr) (Snapshot lúc \(nowStr))
+            • Biến động pips hiện tại: \(pipsDeltaStr)
+            • Lợi nhuận tạm tính (P&L): \(unpnlStr) (R-Multiple: \(rMultStr))
+            • Cắt lỗ (SL): \(slInfo)
+            • Chốt lời (TP): \(tpInfo)
+            • Thời gian giữ lệnh: \(durationStr)
+            • Chiến lược Playbook: \(play)
             """
         } else {
             return """
-            [EXACT REAL-TIME POSITION STATE AT THIS MOMENT (TIMESTAMP: \(nowStr))]:
-            • Symbol: \(currentTrade.symbol) | Direction: \(isShort ? "SELL / SHORT" : "BUY / LONG") | Volume: \(volStr) lots\(partialInfoEn)
-            • Opened At: \(openedStr) (Time elapsed: \(durationStr))
-            • Entry Price: \(entryPriceStr)
-            • Current Market Price: \(curPriceStr) (Delta: \(pipsDeltaStr))
-            • Unrealized P&L Right Now: \(pnlStr) (Current R: \(rStr))
-            • Distance to Stop Loss (SL): \(slDistStr)
-            • Distance to Take Profit (TP): \(tpDistStr)\(extremesStr)
+            [REAL-TIME LIVE POSITION SNAPSHOT]:
+            • Asset: \(currentTrade.symbol) (\(currentTrade.direction == .short ? "SELL / SHORT" : "BUY / LONG"))
+            • Position State: \(isOpen ? "OPEN (LIVE)" : "CLOSED (POST-MORTEM)")
+            • Volume: \(volStr) Lots
+            • Avg Entry: \(entryPriceStr) (Opened: \(openedStr))
+            • Current/Exit Price: \(curPriceStr) (At: \(nowStr))
+            • Floating Pips: \(pipsDeltaStr)
+            • Unrealized/Net P&L: \(unpnlStr) (R-Multiple: \(rMultStr))
+            • Stop Loss (SL): \(slInfo)
+            • Take Profit (TP): \(tpInfo)
+            • Trade Duration: \(durationStr)
+            • Playbook Strategy: \(play)
             """
         }
     }
 
-    internal func submitFollowUpQuestion() {
+    public func submitFollowUpQuestion(dataStore: TradeDataStore) {
         let q = followUpQuery.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !q.isEmpty, !isSubmittingFollowUp else { return }
         
@@ -164,7 +155,7 @@ extension TradeAICoachSheet {
         
         Task {
             if self.isOpen || self.activeBars == nil {
-                await refreshActiveBars(force: true)
+                await refreshActiveBars(dataStore: dataStore, force: true)
             }
             
             var historyToSend: [AICoachMessage] = []
@@ -174,7 +165,7 @@ extension TradeAICoachSheet {
             historyToSend.append(contentsOf: self.followUpMessages)
             
             let isVi = (dataStore.aiSettings.language.isEmpty || dataStore.aiSettings.language == "vi")
-            let liveSnapshot = buildLivePositionSnapshot(isVi: isVi)
+            let liveSnapshot = buildLivePositionSnapshot(dataStore: dataStore, isVi: isVi)
             
             var promptComponents: [String] = []
             promptComponents.append(isVi ? "CÂU HỎI CỦA TRADER:\n\"\(q)\"" : "TRADER INQUIRY:\n\"\(q)\"")
@@ -244,18 +235,14 @@ extension TradeAICoachSheet {
                     sessionSummary: nil,
                     conversationHistory: historyToSend
                 )
-                await MainActor.run {
-                    self.followUpMessages.append(AICoachMessage(role: "assistant", content: response))
-                    self.isSubmittingFollowUp = false
-                    self.isSavedToNotes = false
-                    self.isSavedToNotebook = false
-                    AICoachSessionStore.shared.save(key: self.trade.key, result: self.coachingResult, followUps: self.followUpMessages)
-                }
+                self.followUpMessages.append(AICoachMessage(role: "assistant", content: response))
+                self.isSubmittingFollowUp = false
+                self.isSavedToNotes = false
+                self.isSavedToNotebook = false
+                AICoachSessionStore.shared.save(key: self.trade.key, result: self.coachingResult, followUps: self.followUpMessages)
             } catch {
-                await MainActor.run {
-                    self.followUpMessages.append(AICoachMessage(role: "assistant", content: "Error: \(error.localizedDescription)"))
-                    self.isSubmittingFollowUp = false
-                }
+                self.followUpMessages.append(AICoachMessage(role: "assistant", content: "Error: \(error.localizedDescription)"))
+                self.isSubmittingFollowUp = false
             }
         }
     }

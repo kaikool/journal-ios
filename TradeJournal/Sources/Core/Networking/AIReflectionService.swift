@@ -3,7 +3,7 @@ import Foundation
 /// Central coordinator for AI Trading Reflection, Risk Management Audits & Coaching
 /// Supports multi-provider inference (Groq, OpenAI, Gemini, OpenRouter, Anthropic, Custom)
 /// with automated multi-tier failover and offline heuristic fallback.
-public actor AIReflectionService {
+public actor AIReflectionService: AIReflectionProviding {
     public static let shared = AIReflectionService()
     
     // Official API endpoints
