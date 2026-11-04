@@ -435,6 +435,9 @@ public enum SessionFootprintEngine {
     }
 
     // MARK: - 8. Bar-by-Bar Developing Staircase POC Steps
+    private static let staircaseCacheLock = NSLock()
+    private static var staircaseCache: [String: [(timestamp: Int64, pocPrice: Decimal)]] = [:]
+
     /// Computes the progressive POC step line as volume accumulates throughout a session.
     public static func computeStaircaseSteps(
         bars: [MarketBar],
@@ -442,6 +445,14 @@ public enum SessionFootprintEngine {
         rowSize: Decimal? = nil
     ) -> [(timestamp: Int64, pocPrice: Decimal)] {
         guard !bars.isEmpty else { return [] }
+        let cacheKey = "\(symbol)_\(bars.count)_\(bars.first?.timestamp ?? 0)_\(bars.last?.timestamp ?? 0)_\(bars.last?.close ?? 0)"
+        staircaseCacheLock.lock()
+        if let cached = staircaseCache[cacheKey] {
+            staircaseCacheLock.unlock()
+            return cached
+        }
+        staircaseCacheLock.unlock()
+
         let step = rowSize ?? defaultRowSize(for: symbol, samplePrice: bars.first?.close)
         let stepDouble = NSDecimalNumber(decimal: step).doubleValue
         guard stepDouble > 0 else { return [] }
@@ -450,6 +461,7 @@ public enum SessionFootprintEngine {
         var maxV: Decimal = .zero
         var pocKey: Int = 0
         var results: [(timestamp: Int64, pocPrice: Decimal)] = []
+        results.reserveCapacity(bars.count)
 
         for bar in bars {
             let lowD = NSDecimalNumber(decimal: bar.low).doubleValue
@@ -472,6 +484,13 @@ public enum SessionFootprintEngine {
             let pocPrice = Decimal(pocKey) * step + (step / Decimal(2))
             results.append((timestamp: bar.timestamp, pocPrice: pocPrice))
         }
+
+        staircaseCacheLock.lock()
+        if staircaseCache.count > 128 {
+            staircaseCache.removeAll(keepingCapacity: true)
+        }
+        staircaseCache[cacheKey] = results
+        staircaseCacheLock.unlock()
 
         return results
     }

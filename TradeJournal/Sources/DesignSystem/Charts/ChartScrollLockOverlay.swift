@@ -402,7 +402,8 @@ public final class ScrollLockContainerView: UIView, UIGestureRecognizerDelegate 
         inertiaVelocity = CGPoint(x: vx, y: vy)
         lastInertiaTimestamp = CACurrentMediaTime()
 
-        let link = CADisplayLink(target: self, selector: #selector(stepInertia(_:)))
+        let proxy = WeakDisplayLinkProxy(target: self)
+        let link = CADisplayLink(target: proxy, selector: #selector(WeakDisplayLinkProxy.tick(_:)))
         link.add(to: .main, forMode: .common)
         self.displayLink = link
     }
@@ -413,7 +414,7 @@ public final class ScrollLockContainerView: UIView, UIGestureRecognizerDelegate 
         inertiaVelocity = .zero
     }
 
-    @objc private func stepInertia(_ link: CADisplayLink) {
+    fileprivate func stepInertia(_ link: CADisplayLink) {
         let now = link.timestamp
         let dt = CGFloat(max(0.001, min(0.05, now - lastInertiaTimestamp)))
         lastInertiaTimestamp = now
@@ -470,6 +471,22 @@ public final class ScrollLockContainerView: UIView, UIGestureRecognizerDelegate 
     deinit {
         displayLink?.invalidate()
         cachedScrollView?.isScrollEnabled = true
+    }
+}
+
+private final class WeakDisplayLinkProxy {
+    weak var target: ScrollLockContainerView?
+
+    init(target: ScrollLockContainerView) {
+        self.target = target
+    }
+
+    @objc func tick(_ link: CADisplayLink) {
+        guard let target = target else {
+            link.invalidate()
+            return
+        }
+        target.stepInertia(link)
     }
 }
 

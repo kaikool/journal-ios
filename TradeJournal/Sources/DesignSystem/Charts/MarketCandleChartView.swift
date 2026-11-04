@@ -191,60 +191,53 @@ public struct MarketCandleChartView: View {
             // TradingView-aligned Footprint POC & Key Levels Overlay (Time-bounded segments + selective rays)
             footprintOverlay(plotWidth: plotWidth, plotHeight: plotHeight, stepX: stepX, minP: minP, span: span, clampedPan: clampedPan)
 
-            // Candlesticks
-            ForEach(0..<bars.count, id: \.self) { i in
-                let bar = bars[i]
+            // Candlesticks (GPU-accelerated Canvas)
+            Canvas { context, _ in
+                for (i, bar) in bars.enumerated() {
+                    let xCenter = CGFloat(i) * stepX + (stepX / 2.0) + clampedPan
+                    guard xCenter >= -candleWidth && xCenter <= (plotWidth + candleWidth) else { continue }
 
-                // Highlight Price Action pattern by changing candle color directly (InsideBar and Doji excluded)
-                let matchedPattern = patterns.first(where: {
-                    $0.barTimestamp == bar.timestamp && $0.type != .insideBar && $0.type != .doji
-                })
-                let isPattern = matchedPattern != nil
-                let candleColor: Color = {
+                    let matchedPattern = patterns.first(where: {
+                        $0.barTimestamp == bar.timestamp && $0.type != .insideBar && $0.type != .doji
+                    })
+                    let isPattern = matchedPattern != nil
+                    let candleColor: Color
                     if let pat = matchedPattern {
-                        if pat.type.isBullish {
-                            return AppColors.patternBullish
-                        } else {
-                            return AppColors.patternBearish
-                        }
+                        candleColor = pat.type.isBullish ? AppColors.patternBullish : AppColors.patternBearish
+                    } else {
+                        candleColor = bar.isUp ? AppColors.candleUp : AppColors.candleDown
                     }
-                    return bar.isUp ? AppColors.candleUp : AppColors.candleDown
-                }()
 
-                let highD = (bar.high as NSDecimalNumber).doubleValue
-                let lowD = (bar.low as NSDecimalNumber).doubleValue
-                let openD = (bar.open as NSDecimalNumber).doubleValue
-                let closeD = (bar.close as NSDecimalNumber).doubleValue
+                    let highD = (bar.high as NSDecimalNumber).doubleValue
+                    let lowD = (bar.low as NSDecimalNumber).doubleValue
+                    let openD = (bar.open as NSDecimalNumber).doubleValue
+                    let closeD = (bar.close as NSDecimalNumber).doubleValue
 
-                let yHigh = plotHeight - CGFloat((highD - minP) / span) * plotHeight
-                let yLow = plotHeight - CGFloat((lowD - minP) / span) * plotHeight
-                let yOpen = plotHeight - CGFloat((openD - minP) / span) * plotHeight
-                let yClose = plotHeight - CGFloat((closeD - minP) / span) * plotHeight
+                    let yHigh = plotHeight - CGFloat((highD - minP) / span) * plotHeight
+                    let yLow = plotHeight - CGFloat((lowD - minP) / span) * plotHeight
+                    let yOpen = plotHeight - CGFloat((openD - minP) / span) * plotHeight
+                    let yClose = plotHeight - CGFloat((closeD - minP) / span) * plotHeight
 
-                let bodyTop = min(yOpen, yClose)
-                let bodyHeight = max(1.5, abs(yOpen - yClose))
-                let xCenter = CGFloat(i) * stepX + (stepX / 2.0) + clampedPan
+                    var wickPath = Path()
+                    wickPath.move(to: CGPoint(x: xCenter, y: yHigh))
+                    wickPath.addLine(to: CGPoint(x: xCenter, y: yLow))
+                    context.stroke(wickPath, with: .color(candleColor), lineWidth: isPattern ? 1.5 : 1.0)
 
-                if xCenter >= -candleWidth && xCenter <= (plotWidth + candleWidth) {
-                    ZStack {
-                        // Wick
-                        Rectangle()
-                            .fill(candleColor)
-                            .frame(width: isPattern ? 1.5 : 1.0, height: max(1, yLow - yHigh))
-                            .position(x: xCenter, y: (yHigh + yLow) / 2.0)
-
-                        // Real Body
-                        RoundedRectangle(cornerRadius: 1)
-                            .fill(candleColor)
-                            .frame(width: candleWidth, height: bodyHeight)
-                            .position(x: xCenter, y: bodyTop + bodyHeight / 2.0)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 1)
-                                    .stroke(candleColor.opacity(0.85), lineWidth: isPattern ? 1.0 : 0)
-                            )
+                    let bodyTop = min(yOpen, yClose)
+                    let bodyHeight = max(1.5, abs(yOpen - yClose))
+                    let bodyRect = CGRect(
+                        x: xCenter - (candleWidth / 2.0),
+                        y: bodyTop,
+                        width: candleWidth,
+                        height: bodyHeight
+                    )
+                    context.fill(Path(bodyRect), with: .color(candleColor))
+                    if isPattern {
+                        context.stroke(Path(bodyRect), with: .color(candleColor.opacity(0.9)), lineWidth: 1.0)
                     }
                 }
             }
+            .frame(width: plotWidth, height: plotHeight)
 
             // Time Axis
             timeAxis(width: plotWidth, height: plotHeight, stepX: stepX, panOffset: clampedPan)
@@ -787,17 +780,19 @@ public struct MarketCandleChartView: View {
             return c
         }()
 
-        ForEach(1..<bars.count, id: \.self) { i in
-            let curr = bars[i]
-            let prev = bars[i - 1]
-            if !cal.isDate(curr.date, inSameDayAs: prev.date) {
-                let x = CGFloat(i) * stepX + clampedPan
-                if x >= 0 && x <= plotWidth {
-                    Path { path in
-                        path.move(to: CGPoint(x: x, y: 0))
-                        path.addLine(to: CGPoint(x: x, y: plotHeight))
+        if bars.count >= 2 {
+            ForEach(1..<bars.count, id: \.self) { i in
+                let curr = bars[i]
+                let prev = bars[i - 1]
+                if !cal.isDate(curr.date, inSameDayAs: prev.date) {
+                    let x = CGFloat(i) * stepX + clampedPan
+                    if x >= 0 && x <= plotWidth {
+                        Path { path in
+                            path.move(to: CGPoint(x: x, y: 0))
+                            path.addLine(to: CGPoint(x: x, y: plotHeight))
+                        }
+                        .stroke(AppColors.secondaryText.opacity(0.12), style: StrokeStyle(lineWidth: 1.0, dash: [2, 4]))
                     }
-                    .stroke(AppColors.secondaryText.opacity(0.12), style: StrokeStyle(lineWidth: 1.0, dash: [2, 4]))
                 }
             }
         }

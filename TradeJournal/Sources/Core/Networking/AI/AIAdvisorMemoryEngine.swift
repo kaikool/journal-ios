@@ -757,7 +757,7 @@ public final class AIAdvisorMemoryEngine: @unchecked Sendable {
         // 1. Structured JSON Extraction (First priority)
         if let jsonStart = analysisText.range(of: "{"),
            let jsonEnd = analysisText.range(of: "}", options: .backwards),
-           jsonStart.lowerBound < jsonEnd.upperBound {
+           jsonStart.lowerBound < jsonEnd.lowerBound {
             let jsonString = String(analysisText[jsonStart.lowerBound...jsonEnd.lowerBound])
             if let data = jsonString.data(using: .utf8),
                let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {

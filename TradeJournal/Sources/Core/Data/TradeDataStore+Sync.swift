@@ -31,6 +31,13 @@ extension TradeDataStore {
                 self.lastSyncError = nil
             }
         }
+        defer {
+            if !isBackground {
+                Task { @MainActor in
+                    self.isSyncing = false
+                }
+            }
+        }
         
         var fetchedAccountsCount = 0
         var fetchedTradesCount = 0
@@ -161,6 +168,10 @@ extension TradeDataStore {
                             }
                         }
                         if local.reviewedAt == nil && rTrade.reviewedAt != nil { local.reviewedAt = rTrade.reviewedAt; mutated = true }
+                        if local.mae == nil && rTrade.mae != nil { local.mae = rTrade.mae; mutated = true }
+                        if local.mfe == nil && rTrade.mfe != nil { local.mfe = rTrade.mfe; mutated = true }
+                        if local.maePoints == nil && rTrade.maePoints != nil { local.maePoints = rTrade.maePoints; mutated = true }
+                        if local.mfePoints == nil && rTrade.mfePoints != nil { local.mfePoints = rTrade.mfePoints; mutated = true }
                         if mutated {
                             localTrades[idx] = local
                             tradesModified = true

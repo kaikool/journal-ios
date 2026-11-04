@@ -923,17 +923,19 @@ public struct CandleChartView: View {
             return c
         }()
 
-        ForEach(1..<visibleBars.count, id: \.self) { i in
-            let curr = visibleBars[i]
-            let prev = visibleBars[i - 1]
-            if !cal.isDate(curr.date, inSameDayAs: prev.date) {
-                let x = CGFloat(i) * stepX + clampedPan
-                if x >= 0 && x <= plotWidth {
-                    Path { path in
-                        path.move(to: CGPoint(x: x, y: 0))
-                        path.addLine(to: CGPoint(x: x, y: plotHeight))
+        if visibleBars.count >= 2 {
+            ForEach(1..<visibleBars.count, id: \.self) { i in
+                let curr = visibleBars[i]
+                let prev = visibleBars[i - 1]
+                if !cal.isDate(curr.date, inSameDayAs: prev.date) {
+                    let x = CGFloat(i) * stepX + clampedPan
+                    if x >= 0 && x <= plotWidth {
+                        Path { path in
+                            path.move(to: CGPoint(x: x, y: 0))
+                            path.addLine(to: CGPoint(x: x, y: plotHeight))
+                        }
+                        .stroke(AppColors.secondaryText.opacity(0.12), style: StrokeStyle(lineWidth: 1.0, dash: [2, 4]))
                     }
-                    .stroke(AppColors.secondaryText.opacity(0.12), style: StrokeStyle(lineWidth: 1.0, dash: [2, 4]))
                 }
             }
         }

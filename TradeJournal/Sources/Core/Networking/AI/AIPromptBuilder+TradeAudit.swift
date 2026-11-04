@@ -253,7 +253,10 @@ extension AIPromptBuilder {
             }
         }()
 
-        let mult = trade.contractMultiplier ?? Decimal(1)
+        let mult: Decimal = {
+            if let cm = trade.contractMultiplier, cm > 0 { return cm }
+            return AssetContractEngine.contractMultiplier(for: trade.symbol)
+        }()
         let entry = trade.avgEntry
         func formatPrice(_ p: Decimal) -> String {
             Formatters.price(p, symbol: trade.symbol)

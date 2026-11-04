@@ -261,7 +261,7 @@ public struct EquityCurveChart: View {
         if first == last {
             return first.addingTimeInterval(-86400)...last.addingTimeInterval(86400)
         }
-        return first...last
+        return min(first, last)...max(first, last)
     }
     
     private var visibleDateMarks: [Date] {
