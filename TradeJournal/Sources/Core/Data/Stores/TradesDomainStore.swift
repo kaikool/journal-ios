@@ -23,7 +23,7 @@ public final class TradesDomainStore: ObservableObject {
     }
 
     public func findTrade(byKey key: String) -> Trade? {
-        trades.first { $0.id == key || $0.tradeId == key }
+        trades.first { $0.id == key || $0.key == key }
     }
 
     public func filterTrades(for accountId: String, visibleAccountIds: Set<String>) -> [Trade] {

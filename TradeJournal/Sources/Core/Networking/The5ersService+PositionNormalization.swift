@@ -229,6 +229,7 @@ extension The5ersService {
         return nil
     }
     
+    @MainActor
     internal func mergePositions(
         _ rawPositions: [[String: Any]],
         for acc: The5ersMcpAccount,

@@ -93,8 +93,8 @@ extension TradeDataStore {
             for _ in 0..<numTrades {
                 let spec = symbols[Int(rnd() * Double(symbols.count))]
                 let isBuy = rnd() < 0.7
-                let entrySide: TradeSide = isBuy ? .buy : .sell
-                let exitSide: TradeSide = isBuy ? .sell : .buy
+                let entrySide: ExecutionSide = isBuy ? .buy : .sell
+                let exitSide: ExecutionSide = isBuy ? .sell : .buy
                 let quantity = round(spec.qtyMin + rnd() * (spec.qtyMax - spec.qtyMin))
                 let slippage = (rnd() - 0.5) * 0.4
                 let entry = spec.price + slippage

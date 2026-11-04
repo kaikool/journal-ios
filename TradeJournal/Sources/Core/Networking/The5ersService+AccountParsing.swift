@@ -398,6 +398,7 @@ extension The5ersService {
         return .evaluation
     }
 
+    @MainActor
     private func upsertPropAccountItem(
         acc: The5ersMcpAccount,
         journalAccId: String,
@@ -484,6 +485,7 @@ extension The5ersService {
         }
     }
 
+    @MainActor
     private func upsertTradingAccount(
         acc: The5ersMcpAccount,
         journalAccId: String,

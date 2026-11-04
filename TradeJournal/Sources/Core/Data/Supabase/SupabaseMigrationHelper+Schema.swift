@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - Supabase PostgreSQL DDL Schemas
 // Modular SQL partitions for database initialization and hotfix migration
-extension SupabaseMigrationHelper {
+extension SupabaseService {
     
     internal var coreSchemaSql: String {
         return """

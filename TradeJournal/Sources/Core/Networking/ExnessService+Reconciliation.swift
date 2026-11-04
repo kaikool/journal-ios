@@ -117,6 +117,7 @@ extension ExnessService {
         }
 
         // 3. Query Deals and Orders History in safe 14-day chunks
+        let nowServer = Date().addingTimeInterval(Double(serverTimeOffsetMs) / 1000.0)
         let allDeals = await fetchHistoryDealsAndOrders(
             cleanId: cleanId,
             clusterHost: clusterHost,

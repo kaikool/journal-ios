@@ -154,7 +154,7 @@ public extension The5ersServiceProviding {
 /// Protocol abstracting Exness broker trade reconciliation and API sync.
 public protocol ExnessServiceProviding: AnyObject, Sendable {
     func loadSettings()
-    func saveCredentials(login: String, server: String, token: String, isLive: Bool)
+    func saveCredentials(host: String, accountId: String, apiKey: String, privateKey: String)
     func getStoredPrivateKey() -> String
     func disconnect()
     func syncServerTimeIfNeeded() async

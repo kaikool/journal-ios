@@ -58,19 +58,16 @@ extension TradeAICoachViewModel {
                 return currentTrade.netPnl
             }
         }()
-        let unpnlStr = Formatters.currency(unpnl, currency: currentTrade.accountCurrency)
+        let unpnlStr = Formatters.formatPnL(unpnl, currency: "USD")
         
         // R Multiple
         let rMultStr: String = {
-            if let r = currentTrade.rMultiple {
-                return Formatters.rMultiple(r)
-            }
             if let sl = currentTrade.stopLoss, sl > 0 {
                 let riskDist = abs(currentTrade.avgEntry - sl)
                 if riskDist > 0 {
                     let liveR = priceDelta / riskDist
                     let liveRDouble = (liveR as NSDecimalNumber).doubleValue
-                    return Formatters.rMultiple(liveRDouble)
+                    return Formatters.formatRMultiple(liveRDouble)
                 }
             }
             return "N/A"

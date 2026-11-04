@@ -20,7 +20,7 @@ public final class AccountsDomainStore: ObservableObject {
     }
 
     public var visibleAccounts: [Account] {
-        accounts.filter { !$0.isHidden }
+        accounts.filter { $0.visibleInJournal ?? true }
     }
 
     public var visibleAccountIds: Set<String> {
@@ -28,7 +28,7 @@ public final class AccountsDomainStore: ObservableObject {
     }
 
     public var activeAccounts: [Account] {
-        accounts.filter { !$0.isArchived && !$0.isHidden }
+        accounts.filter { $0.archivedAt == nil && ($0.visibleInJournal ?? true) }
     }
 
     public func findAccount(byId id: String) -> Account? {
