@@ -30,6 +30,7 @@ public struct PreTradeAnalysisSheet: View {
     
     @State private var activeChartSnapshot: UIImage? = nil
     @State private var showFullScreenChart: Bool = false
+    @State private var showLandscapeChart: Bool = false
     @State private var showPhotoPicker: Bool = false
     @State private var userAttachedImage: UIImage? = nil
     
@@ -79,6 +80,8 @@ public struct PreTradeAnalysisSheet: View {
                             if let snapshot = userAttachedImage {
                                 self.activeChartSnapshot = snapshot
                                 self.showFullScreenChart = true
+                            } else {
+                                self.showLandscapeChart = true
                             }
                         },
                         onAttachPhoto: { showPhotoPicker = true }
@@ -181,6 +184,24 @@ public struct PreTradeAnalysisSheet: View {
                 if let img = activeChartSnapshot ?? userAttachedImage {
                     FullScreenChartLightboxView(image: img)
                 }
+            }
+            .fullScreenCover(isPresented: $showLandscapeChart) {
+                MarketCandleLandscapeSheet(
+                    bars: activeBars,
+                    symbol: selectedSymbol,
+                    selectedTimeframe: $selectedTimeframe,
+                    timeframeOptions: ["15m", "1h", "4h", "1d"],
+                    timeframeTitle: { id in
+                        switch id {
+                        case "15m": return "M15"
+                        case "1h": return "H1"
+                        case "4h": return "H4"
+                        case "1d": return "D1"
+                        default: return id.uppercased()
+                        }
+                    },
+                    onDismiss: { showLandscapeChart = false }
+                )
             }
             .sheet(isPresented: $showPhotoPicker) {
                 UIKitImagePicker(isPresented: $showPhotoPicker) { data, _ in

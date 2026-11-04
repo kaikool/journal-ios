@@ -213,25 +213,6 @@ public struct CandleChartView: View {
                 .font(AppTypography.actionButtonCompact)
                 .foregroundColor(AppColors.primaryText)
 
-            // 2. TradingView OHLC Inspector (Active when hovering / scrubbing)
-            if let hBar = activeHoveredBar, hoveredBarIndex != nil {
-                HStack(spacing: 5) {
-                    Text("O \(Formatters.price(hBar.open, symbol: trade.symbol))")
-                        .foregroundColor(AppColors.secondaryText)
-                    Text("H \(Formatters.price(hBar.high, symbol: trade.symbol))")
-                        .foregroundColor(AppColors.secondaryText)
-                    Text("L \(Formatters.price(hBar.low, symbol: trade.symbol))")
-                        .foregroundColor(AppColors.secondaryText)
-                    Text("C \(Formatters.price(hBar.close, symbol: trade.symbol))")
-                        .foregroundColor(hBar.isUp ? AppColors.candleUp : AppColors.candleDown)
-                }
-                .font(AppTypography.captionMicro)
-            } else if let lastBar = visibleBars.last {
-                Text(Formatters.price(lastBar.close, symbol: trade.symbol))
-                    .font(AppTypography.captionMicro)
-                    .foregroundColor(lastBar.isUp ? AppColors.candleUp : AppColors.candleDown)
-            }
-
             Spacer()
 
             // 3. Zoom Indicator (if user pinched)
@@ -1033,10 +1014,12 @@ public struct CandleChartView: View {
 
         let minVal = lows.min() ?? 1.0
         let maxVal = highs.max() ?? 1.0
-        let span = max(0.0001, maxVal - minVal)
-        let margin = span * 0.08
+        let effectiveZoom = max(0.5, min(4.0, zoomScale))
+        let baseSpan = max(0.0001, (maxVal - minVal) * 1.16)
+        let verticalSpan = baseSpan / Double(effectiveZoom)
+        let centerVal = (maxVal + minVal) / 2.0
 
-        return (minPrice: minVal - margin, maxPrice: maxVal + margin)
+        return (minPrice: centerVal - (verticalSpan / 2.0), maxPrice: centerVal + (verticalSpan / 2.0))
     }
 
     private func updateHoveredBar(at x: CGFloat, totalWidth: CGFloat, stepX: CGFloat? = nil, panOffset: CGFloat = 0) {

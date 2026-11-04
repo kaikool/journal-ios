@@ -240,22 +240,13 @@ public struct TradeReplayView: View {
                         }
                     )
 
-                    HStack(spacing: 8) {
-                        // Floating Updating Pill
-                        if isLoadingCandles {
+                    if isLoadingCandles {
+                        HStack(spacing: 8) {
                             AppBadge("Updating...", variant: .secondary)
+                            Spacer()
                         }
-
-                        // Fullscreen Landscape Trigger directly on chart
-                        ModalCircleButton(icon: "arrow.up.left.and.arrow.down.right") {
-                            NativeHaptics.lightImpact()
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                showLandscapeChart = true
-                            }
-                        }
-                        .accessibilityLabel("Fullscreen Landscape Chart")
+                        .padding(8)
                     }
-                    .padding(8)
                 }
             }
         }

@@ -104,7 +104,13 @@ extension TradeDataStore {
             for rTrade in remoteTrades {
                 if let idx = localTrades.firstIndex(where: { $0.key == rTrade.key }) {
                     var local = localTrades[idx]
-                    let isBrokerSynced = local.key.hasPrefix("the5ers_") || local.key.hasPrefix("ctrader_")
+
+                    // Safeguard: Never overwrite a locally closed trade with an open status from cloud
+                    if local.status.isClosed && rTrade.status == .open {
+                        continue
+                    }
+
+                    let isBrokerSynced = local.key.hasPrefix("the5ers_") || local.key.hasPrefix("ctrader_") || local.key.hasPrefix("exness_")
                     if isBrokerSynced {
                         var mutated = false
                         // Preserve authoritative local broker P&L, fees, swap, and status; only merge user annotations from cloud if local is empty

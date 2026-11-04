@@ -97,7 +97,6 @@ public struct PreTradeChartCard: View {
                             patterns: patterns
                         )
                         .frame(height: 260)
-                        .appSubCardStyle(cornerRadius: 8, padding: 0)
 
                         chartFooterActions
                     }

@@ -18,7 +18,9 @@ public struct MarketCandleChartView: View {
     @State private var zoomScale: CGFloat = 1.0
     @State private var lastMagnification: CGFloat = 1.0
     @State private var panOffset: CGFloat = 0.0
+    @State private var panOffsetY: CGFloat = 0.0
     @State private var lastDragX: CGFloat = 0.0
+    @State private var lastDragY: CGFloat = 0.0
     @State private var currentPlotWidth: CGFloat = 320
 
     public init(
@@ -77,17 +79,26 @@ public struct MarketCandleChartView: View {
                         let stepX = plotW / CGFloat(max(1, slotCount))
                         let totalW = CGFloat(bars.count) * stepX
 
-                        if abs(value.translation.width) > 6 && totalW > plotW {
-                            let delta = value.translation.width - lastDragX
+                        let dx = value.translation.width - lastDragX
+                        let dy = value.translation.height - lastDragY
+
+                        if abs(value.translation.width) > 6 || abs(value.translation.height) > 6 {
                             lastDragX = value.translation.width
-                            let minOffset = plotW - totalW
-                            panOffset = min(0, max(minOffset, panOffset + delta))
+                            lastDragY = value.translation.height
+                            if totalW > plotW {
+                                let minOffset = plotW - totalW
+                                panOffset = min(0, max(minOffset, panOffset + dx))
+                            }
+                            if effectiveZoom > 1.05 {
+                                panOffsetY += dy
+                            }
                         } else {
                             updateHoveredBar(at: value.location.x, totalWidth: plotW, stepX: stepX, panOffset: panOffset)
                         }
                     }
                     .onEnded { _ in
                         lastDragX = 0
+                        lastDragY = 0
                         hoveredBarIndex = nil
                         let plotW = max(10, currentPlotWidth)
                         let baseCount = max(bars.count, 40)
@@ -101,12 +112,16 @@ public struct MarketCandleChartView: View {
                         } else {
                             panOffset = 0
                         }
+                        if effectiveZoom <= 1.05 {
+                            panOffsetY = 0
+                        }
                     }
             )
             .onTapGesture(count: 2) {
                 withAnimation(AppAnimations.springStandard) {
                     zoomScale = 1.0
                     panOffset = 0.0
+                    panOffsetY = 0.0
                 }
             }
         }
@@ -121,26 +136,6 @@ public struct MarketCandleChartView: View {
                     .font(AppTypography.actionButtonCompact)
                     .foregroundColor(AppColors.primaryText)
                 AppBadge(timeframe, style: .neutral)
-            }
-
-            // TradingView OHLC Inspector
-            if let hIdx = hoveredBarIndex, hIdx < bars.count {
-                let hBar = bars[hIdx]
-                HStack(spacing: 5) {
-                    Text("O \(formatPrice(hBar.open))")
-                        .foregroundColor(AppColors.secondaryText)
-                    Text("H \(formatPrice(hBar.high))")
-                        .foregroundColor(AppColors.secondaryText)
-                    Text("L \(formatPrice(hBar.low))")
-                        .foregroundColor(AppColors.secondaryText)
-                    Text("C \(formatPrice(hBar.close))")
-                        .foregroundColor(hBar.isUp ? AppColors.candleUp : AppColors.candleDown)
-                }
-                .font(AppTypography.captionMicro)
-            } else if let lastBar = bars.last {
-                Text(formatPrice(lastBar.close))
-                    .font(AppTypography.captionMicro)
-                    .foregroundColor(lastBar.isUp ? AppColors.candleUp : AppColors.candleDown)
             }
 
             Spacer()
@@ -171,9 +166,13 @@ public struct MarketCandleChartView: View {
         let allPrices = bars.flatMap { [($0.high as NSDecimalNumber).doubleValue, ($0.low as NSDecimalNumber).doubleValue] }
         let rawMin = allPrices.min() ?? 1.0
         let rawMax = allPrices.max() ?? 2.0
-        let padding = max(0.0001, (rawMax - rawMin) * 0.08)
-        let minP = rawMin - padding
-        let maxP = rawMax + padding
+        let centerP = (rawMin + rawMax) / 2.0
+        let baseSpan = max(0.0001, (rawMax - rawMin) * 1.16)
+        let verticalSpan = baseSpan / Double(effectiveZoom)
+        let yPriceShift = Double(panOffsetY / plotHeight) * verticalSpan
+        let shiftedCenter = centerP + yPriceShift
+        let minP = shiftedCenter - (verticalSpan / 2.0)
+        let maxP = shiftedCenter + (verticalSpan / 2.0)
         let span = max(0.0001, maxP - minP)
 
         return ZStack(alignment: .topLeading) {
