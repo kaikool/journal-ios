@@ -126,9 +126,16 @@ public struct NotificationCenterSheet: View {
             case .dailyJournalReview:
                 env.selectedTab = .journal
                 env.requestOpenTodayJournal = true
-            case .disciplineTilt, .preSessionRoutine:
+            case .disciplineTilt:
                 env.selectedTab = .dashboard
                 env.requestAddTrade = true
+            case .preSessionRoutine:
+                if item.userInfo["type"] == "morning_routine" {
+                    env.selectedTab = .progress
+                } else {
+                    env.selectedTab = .dashboard
+                    env.requestAddTrade = true
+                }
             case .marketStructure:
                 env.selectedTab = .trades
             }

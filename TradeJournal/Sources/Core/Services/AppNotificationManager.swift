@@ -238,7 +238,15 @@ extension AppNotificationManager: UNUserNotificationCenterDelegate {
             case "DAILY_JOURNAL_REVIEW":
                 AppEnvironment.shared.selectedTab = .journal
                 AppEnvironment.shared.requestOpenTodayJournal = true
-            case "PRE_SESSION_ROUTINE", "DISCIPLINE_TILT":
+            case "PRE_SESSION_ROUTINE":
+                let type = response.notification.request.content.userInfo["type"] as? String
+                if type == "morning_routine" {
+                    AppEnvironment.shared.selectedTab = .progress
+                } else {
+                    AppEnvironment.shared.selectedTab = .dashboard
+                    AppEnvironment.shared.requestAddTrade = true
+                }
+            case "DISCIPLINE_TILT":
                 AppEnvironment.shared.selectedTab = .dashboard
                 AppEnvironment.shared.requestAddTrade = true
             case "MARKET_STRUCTURE", "MARKET_ALERT":

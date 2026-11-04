@@ -10,6 +10,7 @@ public struct NotificationSettingsView: View {
     @State private var notifyNews5m: Bool = AppSettingsStore.shared.notifyNews5m
     @State private var notifyNewsOnlyOpenTrades: Bool = AppSettingsStore.shared.notifyNewsOnlyOpenTrades
     @State private var notifyDisciplineTilt: Bool = AppSettingsStore.shared.notifyDisciplineTilt
+    @State private var notifyMorningRoutine: Bool = AppSettingsStore.shared.notifyMorningRoutine
     @State private var notifyPreSessionLondon: Bool = AppSettingsStore.shared.notifyPreSessionLondon
     @State private var notifyPreSessionNewYork: Bool = AppSettingsStore.shared.notifyPreSessionNewYork
     @State private var notifyDailyJournalReview: Bool = AppSettingsStore.shared.notifyDailyJournalReview
@@ -141,6 +142,17 @@ public struct NotificationSettingsView: View {
                         isOn: $notifyDisciplineTilt
                     ) { val in
                         AppSettingsStore.shared.notifyDisciplineTilt = val
+                    }
+                    
+                    Divider().background(AppColors.border.opacity(0.4))
+                    
+                    AppToggleRow(
+                        "Morning Routine Checklist (08:00)",
+                        subtitle: "Prompts you to review calendar and risk limits before market opens",
+                        icon: "sun.max",
+                        isOn: $notifyMorningRoutine
+                    ) { val in
+                        AppSettingsStore.shared.notifyMorningRoutine = val
                     }
                     
                     Divider().background(AppColors.border.opacity(0.4))

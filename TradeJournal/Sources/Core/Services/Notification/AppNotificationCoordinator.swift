@@ -174,11 +174,27 @@ public final class AppNotificationCoordinator: ObservableObject {
     
     // MARK: - 3. Pillar 4: Routines (Pre-Session & Daily Journal Review)
     
-    /// Schedules routine reminders before London and New York session opens.
+    /// Schedules routine reminders for morning preparation, London session, and New York session.
     public func schedulePreSessionRoutines(timeZone: TimeZone) {
         let now = Date()
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = timeZone
+        
+        // Morning Routine Checklist (08:00)
+        if AppSettingsStore.shared.notifyMorningRoutine {
+            scheduleDailyRoutine(
+                id: "morning_routine_check",
+                hour: 8,
+                minute: 0,
+                title: "[MORNING ROUTINE CHECKLIST]",
+                subtitle: "Daily Trading Preparation",
+                body: "Review daily economic calendar, account risk limits, and define key technical watchlist zones before session opening.",
+                category: .preSessionRoutine,
+                cal: cal,
+                now: now,
+                userInfo: ["type": "morning_routine"]
+            )
+        }
         
         // London Session Reminder (13:45 VN / 15m before 14:00)
         if AppSettingsStore.shared.notifyPreSessionLondon {
@@ -191,7 +207,8 @@ public final class AppNotificationCoordinator: ObservableObject {
                 body: "London session opens in 15 minutes. Review key footprint POC levels, macroeconomic calendar, and pre-trade rules before placing opening orders.",
                 category: .preSessionRoutine,
                 cal: cal,
-                now: now
+                now: now,
+                userInfo: ["type": "pre_session_london"]
             )
         }
         
@@ -206,7 +223,8 @@ public final class AppNotificationCoordinator: ObservableObject {
                 body: "New York session opens in 15 minutes. Review key footprint POC levels, macroeconomic calendar, and pre-trade rules before placing opening orders.",
                 category: .preSessionRoutine,
                 cal: cal,
-                now: now
+                now: now,
+                userInfo: ["type": "pre_session_newyork"]
             )
         }
     }
@@ -319,7 +337,8 @@ public final class AppNotificationCoordinator: ObservableObject {
         body: String,
         category: NotificationCategory,
         cal: Calendar,
-        now: Date
+        now: Date,
+        userInfo: [String: String] = [:]
     ) {
         var comps = cal.dateComponents([.year, .month, .day], from: now)
         comps.hour = hour
@@ -334,7 +353,7 @@ public final class AppNotificationCoordinator: ObservableObject {
             body: body,
             categoryIdentifier: category.rawValue,
             date: targetDate,
-            userInfo: ["type": id]
+            userInfo: userInfo
         )
     }
     

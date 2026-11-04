@@ -24,6 +24,7 @@ public final class AppSettingsStore: @unchecked Sendable {
         case notifyNews5m = "notify_news_5m"
         case notifyNewsOnlyOpenTrades = "notify_news_only_open_trades"
         case notifyDisciplineTilt = "notify_discipline_tilt"
+        case notifyMorningRoutine = "notify_morning_routine"
         case notifyPreSessionLondon = "notify_presession_london"
         case notifyPreSessionNewYork = "notify_presession_newyork"
         case notifyDailyJournalReview = "notify_daily_journal_review"
@@ -115,6 +116,11 @@ public final class AppSettingsStore: @unchecked Sendable {
     public var notifyDisciplineTilt: Bool {
         get { defaults.object(forKey: Key.notifyDisciplineTilt.rawValue) as? Bool ?? true }
         set { defaults.set(newValue, forKey: Key.notifyDisciplineTilt.rawValue) }
+    }
+
+    public var notifyMorningRoutine: Bool {
+        get { defaults.object(forKey: Key.notifyMorningRoutine.rawValue) as? Bool ?? true }
+        set { defaults.set(newValue, forKey: Key.notifyMorningRoutine.rawValue) }
     }
 
     public var notifyPreSessionLondon: Bool {
