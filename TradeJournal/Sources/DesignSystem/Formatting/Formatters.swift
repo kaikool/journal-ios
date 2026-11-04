@@ -472,8 +472,8 @@ public enum Formatters {
     }
     
     /// Formats a Date into an ISO8601 internet date-time string
-    public static func iso8601String(from date: Date) -> String {
-        isoBasicFormatter.string(from: date)
+    public static func iso8601String(from date: Date, fractionalSeconds: Bool = false) -> String {
+        fractionalSeconds ? isoFractionalFormatter.string(from: date) : isoBasicFormatter.string(from: date)
     }
     
     /// Parses an ISO8601 string (fractional or basic) into a Date
