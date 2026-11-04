@@ -32,8 +32,6 @@ public struct DashboardView: View {
     
     // MARK: - Arrangement & Presets
     
-    // MARK: - Arrangement & Presets
-    
     private var cardOrder: [String] {
         if cardOrderRaw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return DashboardCardRegistry.defaultOrder
@@ -103,34 +101,7 @@ public struct DashboardView: View {
     
     // MARK: - Memoized Single-Pass Snapshot
     
-    struct DashboardSnapshot {
-        let metrics: TradeMetrics
-        let curve: [EquityPoint]
-        let days: [DayStats]
-        let edgeResult: EdgeScore
-        let chartEquityPoints: [EquityPointItem]
-        let hourlyStats: [BucketStats]
-        let weekDelta: Decimal?
-        let bestDay: DayStats?
-        let worstDay: DayStats?
-        let daysWithTradesMap: [String: DayStats]
-        let currentMonthStats: (tradingDays: Int, winningDays: Int, monthPnl: Decimal)
-    }
-    
     private var cache: DashboardCache { DashboardCache.shared }
-    
-    @MainActor
-    private final class DashboardCache {
-        static let shared = DashboardCache()
-        var lastKey: String = ""
-        var lastSnapshot: DashboardSnapshot? = nil
-        var lastScopedKey: String = ""
-        var lastScopedTrades: [Trade] = []
-        var lastCurrencyGroupsKey: String = ""
-        var lastCurrencyGroups: [(currency: String, metrics: TradeMetrics, balance: Decimal)] = []
-        var lastCalendarWeeksKey: String = ""
-        var lastCalendarWeeks: [[Date?]] = []
-    }
     
     private static let monthPrefixFormatter: DateFormatter = {
         let f = DateFormatter()

@@ -206,15 +206,7 @@ public struct PreTradeAnalysisSheet: View {
                         symbol: selectedSymbol,
                         selectedTimeframe: $selectedTimeframe,
                         timeframeOptions: ["15m", "1h", "4h", "1d"],
-                        timeframeTitle: { id in
-                            switch id {
-                            case "15m": return "M15"
-                            case "1h": return "H1"
-                            case "4h": return "H4"
-                            case "1d": return "D1"
-                            default: return id.uppercased()
-                            }
-                        },
+                        timeframeTitle: { MarketResolution.label(for: $0) },
                         onDismiss: { activeFullScreenModal = nil }
                     )
                 }

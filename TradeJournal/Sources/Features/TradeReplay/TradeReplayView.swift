@@ -127,9 +127,9 @@ public struct TradeReplayView: View {
                         // Broker Data Notes
                         dataCoverageNote
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 10)
-                    .padding(.bottom, 32)
+                    .padding(.horizontal, AppSpacing.pageMargin)
+                    .padding(.top, AppSpacing.small)
+                    .padding(.bottom, AppSpacing.sectionGutter)
                 }
                 .scrollDisabled(isChartInteracting)
                 .scrollDismissesKeyboard(.interactively)
@@ -192,65 +192,65 @@ public struct TradeReplayView: View {
 
     // MARK: - Candlestick Chart Card
     private var chartCard: some View {
-        VStack(spacing: 8) {
-            if !candleErrorMessage.isEmpty {
-                HStack(spacing: 6) {
-                    Image(systemName: "info.circle.fill")
-                        .foregroundColor(AppColors.warning)
-                    Text(candleErrorMessage)
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.secondaryText)
-                    Spacer()
+        TradeFormCardContainer {
+            VStack(spacing: 8) {
+                if !candleErrorMessage.isEmpty {
+                    HStack(spacing: 6) {
+                        Image(systemName: "info.circle.fill")
+                            .foregroundColor(AppColors.warning)
+                        Text(candleErrorMessage)
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.secondaryText)
+                        Spacer()
+                    }
+                    .appSubCardStyle(cornerRadius: 6, padding: 8)
                 }
-                .appSubCardStyle(cornerRadius: 6, padding: 8)
-            }
 
-            if isLoadingCandles && bars.isEmpty {
-                LoadingView("Fetching candles for \(trade.symbol) (\(selectedResolution == .d1 ? "1D" : selectedResolution.rawValue))", size: 64)
-                    .frame(height: 270)
-                    .appCardStyle(cornerRadius: 16)
-            } else if bars.isEmpty {
-                AppEmptyState(
-                    icon: "chart.xyaxis.line",
-                    title: "No Candle Data Available",
-                    message: "Market data could not be retrieved for \(trade.symbol)"
-                )
-                .frame(height: 270)
-                .appCardStyle(cornerRadius: 16)
-            } else {
-                ZStack(alignment: .topTrailing) {
-                    CandleChartView(
-                        visibleBars: frame.visibleBars,
-                        allBars: bars,
-                        totalBarsCount: bars.count,
-                        trade: trade,
-                        executions: executions,
-                        throughTimestamp: frame.throughTimestamp,
-                        unrealizedPnl: frame.unrealizedPnl,
-                        timeZone: env.currentTimeZone,
-                        currency: env.currentCurrency,
-                        resolution: selectedResolution,
-                        showMarketStructure: true,
-                        showRSI: true,
-                        keyLevels: keyLevels,
-                        sessionProfiles: sessionProfiles,
-                        developingProfile: developingProfile,
-                        developingProfiles: developingProfiles,
-                        patterns: priceActionPatterns,
-                        onResolutionChange: { newRes in
-                            self.selectedResolution = newRes
-                        },
-                        onInteractionChanged: { isInteracting in
-                            isChartInteracting = isInteracting
-                        }
+                if isLoadingCandles && bars.isEmpty {
+                    LoadingView("Fetching candles for \(trade.symbol) (\(selectedResolution == .d1 ? "1D" : selectedResolution.rawValue))", size: 64)
+                        .frame(height: 270)
+                } else if bars.isEmpty {
+                    AppEmptyState(
+                        icon: "chart.xyaxis.line",
+                        title: "No Candle Data Available",
+                        message: "Market data could not be retrieved for \(trade.symbol)"
                     )
+                    .frame(height: 270)
+                } else {
+                    ZStack(alignment: .topTrailing) {
+                        CandleChartView(
+                            visibleBars: frame.visibleBars,
+                            allBars: bars,
+                            totalBarsCount: bars.count,
+                            trade: trade,
+                            executions: executions,
+                            throughTimestamp: frame.throughTimestamp,
+                            unrealizedPnl: frame.unrealizedPnl,
+                            timeZone: env.currentTimeZone,
+                            currency: env.currentCurrency,
+                            resolution: selectedResolution,
+                            showMarketStructure: true,
+                            showRSI: true,
+                            keyLevels: keyLevels,
+                            sessionProfiles: sessionProfiles,
+                            developingProfile: developingProfile,
+                            developingProfiles: developingProfiles,
+                            patterns: priceActionPatterns,
+                            onResolutionChange: { newRes in
+                                self.selectedResolution = newRes
+                            },
+                            onInteractionChanged: { isInteracting in
+                                isChartInteracting = isInteracting
+                            }
+                        )
 
-                    if isLoadingCandles {
-                        HStack(spacing: 8) {
-                            AppBadge("Updating...", variant: .secondary)
-                            Spacer()
+                        if isLoadingCandles {
+                            HStack(spacing: 8) {
+                                AppBadge("Updating...", variant: .secondary)
+                                Spacer()
+                            }
+                            .padding(8)
                         }
-                        .padding(8)
                     }
                 }
             }

@@ -49,12 +49,7 @@ public struct PreTradeChartCard: View {
     }
 
     private var activeTimeframeTitle: String {
-        switch selectedTimeframe {
-        case "1d": return "D1"
-        case "4h": return "H4"
-        case "1h": return "H1"
-        default: return "M15"
-        }
+        MarketResolution.label(for: selectedTimeframe)
     }
 
     public var body: some View {
@@ -73,15 +68,7 @@ public struct PreTradeChartCard: View {
                     AppSegmentedBar(
                         selection: $selectedTimeframe,
                         items: ["15m", "1h", "4h", "1d"],
-                        titleFor: { id in
-                            switch id {
-                            case "15m": return "M15"
-                            case "1h": return "H1"
-                            case "4h": return "H4"
-                            case "1d": return "D1"
-                            default: return id.uppercased()
-                            }
-                        },
+                        titleFor: { MarketResolution.label(for: $0) },
                         height: 28
                     )
                 }

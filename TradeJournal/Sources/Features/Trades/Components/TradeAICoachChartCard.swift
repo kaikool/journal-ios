@@ -53,13 +53,7 @@ public struct TradeAICoachChartCard: View {
     }
 
     private var activeTimeframeTitle: String {
-        switch selectedResolution {
-        case "5m": return "M5"
-        case "15m": return "M15"
-        case "1h": return "H1"
-        case "4h": return "H4"
-        default: return selectedResolution.uppercased()
-        }
+        MarketResolution.label(for: selectedResolution)
     }
 
     public var body: some View {
@@ -85,15 +79,7 @@ public struct TradeAICoachChartCard: View {
                             }
                         ),
                         items: ["5m", "15m", "1h", "4h"],
-                        titleFor: { id in
-                            switch id {
-                            case "5m": return "M5"
-                            case "15m": return "M15"
-                            case "1h": return "H1"
-                            case "4h": return "H4"
-                            default: return id.uppercased()
-                            }
-                        },
+                        titleFor: { MarketResolution.label(for: $0) },
                         height: 28
                     )
                 }

@@ -31,6 +31,10 @@ public enum MarketResolution: String, CaseIterable, Identifiable, Sendable {
         case .d1: return 86_400_000
         }
     }
+    
+    public static func label(for rawValue: String) -> String {
+        MarketResolution(rawValue: rawValue.lowercased())?.label ?? rawValue.uppercased()
+    }
 }
 
 public struct MarketBar: Identifiable, Codable, Equatable, Sendable {

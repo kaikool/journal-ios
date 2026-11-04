@@ -198,14 +198,7 @@ public struct CandleChartView: View {
                         set: { onResolutionChange?($0) }
                     ),
                     items: [MarketResolution.m15, .h1, .h4],
-                    titleFor: { res in
-                        switch res {
-                        case .m15: return "15m"
-                        case .h1: return "1h"
-                        case .h4: return "4h"
-                        default: return res.rawValue.uppercased()
-                        }
-                    },
+                    titleFor: { $0.label },
                     height: 28
                 )
             }

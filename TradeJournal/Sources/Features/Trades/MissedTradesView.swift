@@ -357,10 +357,10 @@ public struct AddMissedTradeSheet: View {
                     HStack(spacing: 6) {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .font(AppTypography.caption)
-                            .foregroundColor(.orange)
+                            .foregroundColor(AppColors.warning)
                         Text(direction == "long" ? "For BUY, Stop Loss must be below Entry and Take Profit above." : "For SELL, Stop Loss must be above Entry and Take Profit below.")
                             .font(AppTypography.caption)
-                            .foregroundColor(.orange)
+                            .foregroundColor(AppColors.warning)
                     }
                 }
             }
