@@ -1,5 +1,5 @@
 import Foundation
-import SwiftUI
+import Combine
 
 // MARK: - Prop Firm Management Extension
 extension TradeDataStore {

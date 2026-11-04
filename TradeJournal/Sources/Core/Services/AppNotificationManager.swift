@@ -1,5 +1,5 @@
 import Foundation
-import SwiftUI
+import Combine
 #if canImport(UserNotifications)
 import UserNotifications
 #endif

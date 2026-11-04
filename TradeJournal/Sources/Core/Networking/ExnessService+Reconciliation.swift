@@ -1,5 +1,5 @@
 import Foundation
-import SwiftUI
+import Combine
 
 extension ExnessService {
     // MARK: - Exness Data Ingestion & Parser

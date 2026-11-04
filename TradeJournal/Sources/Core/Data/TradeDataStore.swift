@@ -1,4 +1,5 @@
-import SwiftUI
+import Foundation
+import Combine
 import Combine
 
 /// Central reactive data store managing accounts, trades, executions, notes, playbooks, and prop accounts.

@@ -1,5 +1,5 @@
 import Foundation
-import SwiftUI
+import Combine
 import Combine
 
 // MARK: - Forex Factory News Impact

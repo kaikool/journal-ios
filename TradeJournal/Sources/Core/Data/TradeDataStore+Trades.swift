@@ -1,5 +1,5 @@
 import Foundation
-import SwiftUI
+import Combine
 
 // MARK: - Trades, Executions & Reconstruction Extension
 extension TradeDataStore {

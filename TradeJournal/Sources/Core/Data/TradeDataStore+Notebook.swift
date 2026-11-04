@@ -1,5 +1,5 @@
 import Foundation
-import SwiftUI
+import Combine
 
 // MARK: - Notebook, Calendar Notes & Attachments Extension
 extension TradeDataStore {

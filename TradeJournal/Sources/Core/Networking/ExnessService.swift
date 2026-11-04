@@ -1,5 +1,5 @@
 import Foundation
-import SwiftUI
+import Combine
 import CryptoKit
 
 /// Official Exness REST API Integration Service based on exness-api.com specification

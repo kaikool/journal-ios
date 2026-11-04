@@ -1,5 +1,5 @@
 import Foundation
-import SwiftUI
+import Combine
 
 // MARK: - Accounts & Multi-Account Management Extension
 extension TradeDataStore {

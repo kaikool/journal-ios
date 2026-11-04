@@ -1,5 +1,5 @@
 import Foundation
-import SwiftUI
+import Combine
 
 // MARK: - Remote Synchronization Extension
 extension TradeDataStore {
