@@ -299,7 +299,7 @@ public struct TradeReplayView: View {
         candleErrorMessage = ""
 
         do {
-            let (_, fetchedBars) = try await MarketDataService.shared.fetchBarsForTrade(
+            let (_, fetchedBars) = try await AppServices.current.marketData.fetchBarsForTrade(
                 trade: trade,
                 config: TradeDataStore.shared.marketConnections,
                 resolution: selectedResolution.rawValue,

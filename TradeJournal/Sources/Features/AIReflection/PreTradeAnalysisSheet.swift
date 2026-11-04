@@ -316,7 +316,7 @@ public struct PreTradeAnalysisSheet: View {
         Task {
             // 1. Fetch freshest H1 candles, or fallback to current h1Bars
             var activeBars = self.h1Bars
-            if let freshH1 = try? await MarketDataService.shared.fetchBarsForSymbol(
+            if let freshH1 = try? await AppServices.current.marketData.fetchBarsForSymbol(
                 symbol: currentSymbol,
                 config: dataStore.marketConnections,
                 resolution: "1h",
@@ -486,10 +486,10 @@ public struct PreTradeAnalysisSheet: View {
         let config = dataStore.marketConnections
         
         do {
-            async let d1Task = MarketDataService.shared.fetchBarsForSymbol(symbol: sym, config: config, resolution: "1d", count: 100, forceRefresh: forceRefresh)
-            async let h4Task = MarketDataService.shared.fetchBarsForSymbol(symbol: sym, config: config, resolution: "4h", count: 150, forceRefresh: forceRefresh)
-            async let h1Task = MarketDataService.shared.fetchBarsForSymbol(symbol: sym, config: config, resolution: "1h", count: 150, forceRefresh: forceRefresh)
-            async let m15Task = MarketDataService.shared.fetchBarsForSymbol(symbol: sym, config: config, resolution: "15m", count: 150, forceRefresh: forceRefresh)
+            async let d1Task = AppServices.current.marketData.fetchBarsForSymbol(symbol: sym, config: config, resolution: "1d", count: 100, forceRefresh: forceRefresh)
+            async let h4Task = AppServices.current.marketData.fetchBarsForSymbol(symbol: sym, config: config, resolution: "4h", count: 150, forceRefresh: forceRefresh)
+            async let h1Task = AppServices.current.marketData.fetchBarsForSymbol(symbol: sym, config: config, resolution: "1h", count: 150, forceRefresh: forceRefresh)
+            async let m15Task = AppServices.current.marketData.fetchBarsForSymbol(symbol: sym, config: config, resolution: "15m", count: 150, forceRefresh: forceRefresh)
             
             let (d1Res, h4Res, h1Res, m15Res) = try await (d1Task, h4Task, h1Task, m15Task)
             

@@ -273,7 +273,7 @@ public struct MarketDataSettingsView: View {
         isTestingBinance = true
         binanceStatus = "Pinging Binance API..."
         Task {
-            let res = await MarketDataService.shared.testBinanceConnection()
+            let res = await AppServices.current.marketData.testBinanceConnection()
             await MainActor.run {
                 self.isTestingBinance = false
                 self.binanceStatus = res.message
@@ -287,7 +287,7 @@ public struct MarketDataSettingsView: View {
         Task {
             let key = KeychainManager.get(forKey: "oanda_api_key") ?? AppSecretsLoader.loadSecret(named: "OANDA_API_KEY") ?? dataStore.marketConnections.oandaApiKey
             let acc = UserDefaults.standard.string(forKey: "oanda_account_id") ?? AppSecretsLoader.loadSecret(named: "OANDA_ACCOUNT_ID") ?? dataStore.marketConnections.oandaAccountId
-            let res = await MarketDataService.shared.testOandaConnection(
+            let res = await AppServices.current.marketData.testOandaConnection(
                 apiKey: key,
                 accountId: acc,
                 environment: dataStore.marketConnections.oandaEnvironment

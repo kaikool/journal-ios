@@ -235,7 +235,7 @@ public struct TradeAICoachSheet: View {
     // MARK: - Coaching Logic & Context Fetching
     internal func refreshActiveBars(force: Bool = false) async {
         do {
-            let res = try await MarketDataService.shared.fetchBarsForTrade(
+            let res = try await AppServices.current.marketData.fetchBarsForTrade(
                 trade: trade,
                 config: dataStore.marketConnections,
                 resolution: selectedResolution,
@@ -247,7 +247,7 @@ public struct TradeAICoachSheet: View {
                 self.activeCandleProvider = res.provider
             }
         } catch {
-            if let symRes = try? await MarketDataService.shared.fetchBarsForSymbol(
+            if let symRes = try? await AppServices.current.marketData.fetchBarsForSymbol(
                 symbol: trade.symbol,
                 config: dataStore.marketConnections,
                 resolution: selectedResolution,
@@ -274,7 +274,7 @@ public struct TradeAICoachSheet: View {
         var candleSummary: String? = nil
         var fetchedBars: [MarketBar]? = nil
         do {
-            let res = try await MarketDataService.shared.fetchBarsForTrade(
+            let res = try await AppServices.current.marketData.fetchBarsForTrade(
                 trade: trade,
                 config: dataStore.marketConnections,
                 resolution: selectedResolution,
@@ -300,11 +300,12 @@ public struct TradeAICoachSheet: View {
         }
         
         if fetchedBars == nil || (fetchedBars?.count ?? 0) < 30 {
-            if let symRes = try? await MarketDataService.shared.fetchBarsForSymbol(
+            if let symRes = try? await AppServices.current.marketData.fetchBarsForSymbol(
                 symbol: trade.symbol,
                 config: dataStore.marketConnections,
                 resolution: selectedResolution,
-                count: 100
+                count: 100,
+                forceRefresh: false
             ), !symRes.bars.isEmpty {
                 fetchedBars = symRes.bars
                 await MainActor.run {

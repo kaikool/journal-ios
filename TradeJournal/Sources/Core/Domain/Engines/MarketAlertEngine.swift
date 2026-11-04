@@ -336,7 +336,7 @@ public final class MarketAlertEngine: ObservableObject, @unchecked Sendable {
         for symbol in symbols {
             for tf in timeframes {
                 do {
-                    let (_, bars) = try await MarketDataService.shared.fetchBarsForSymbol(
+                    let (_, bars) = try await AppServices.current.marketData.fetchBarsForSymbol(
                         symbol: symbol,
                         config: config,
                         resolution: tf,

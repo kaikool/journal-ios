@@ -326,7 +326,7 @@ public struct NoteAIInquirySheet: View {
         let sym = detectedSymbol
         let isOpen = (trade.status == .open || trade.closedAt == nil)
         if trade.avgEntry > 0 && !trade.symbol.isEmpty && trade.symbol != "Asset" && trade.symbol != "Pre-Trade" {
-            if let res = try? await MarketDataService.shared.fetchBarsForTrade(
+            if let res = try? await AppServices.current.marketData.fetchBarsForTrade(
                 trade: trade,
                 config: dataStore.marketConnections,
                 resolution: "15m",
@@ -335,7 +335,7 @@ public struct NoteAIInquirySheet: View {
                 return res.bars
             }
         }
-        if let res = try? await MarketDataService.shared.fetchBarsForSymbol(
+        if let res = try? await AppServices.current.marketData.fetchBarsForSymbol(
             symbol: sym,
             config: dataStore.marketConnections,
             resolution: "15m",

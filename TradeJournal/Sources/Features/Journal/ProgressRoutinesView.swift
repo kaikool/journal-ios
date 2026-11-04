@@ -45,7 +45,8 @@ public struct ProgressRoutinesView: View {
         formatter.dateFormat = "yyyy-MM-dd"
         formatter.timeZone = env.currentTimeZone
         
-        let calendar = Calendar.current
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = env.currentTimeZone
         let today = Date()
         
         return (0..<91).reversed().compactMap { offset in
