@@ -1,21 +1,21 @@
 import Foundation
 
-/// Market data service providing historical candlestick data for Trade Replay and MpE/MFE excursions.
+/// Market data service providing historical candlestick data for Trade Replay and MAE/MFE excursions.
 /// Domain specification matching core web repository
 public final class MarketDataService: Sendable {
     public static let shared = MarketDataService()
     
-    internal let binanceBasesrls = [
+    internal let binanceBaseUrls = [
         "https://data-api.binance.vision",
         "https://api.binance.com",
         "https://api1.binance.com",
         "https://api3.binance.com"
     ]
-    internal let session = sRLSession.shared
+    internal let session = URLSession.shared
     
     private init() {}
     
-    // MpRK: - 4. Validation & De-duplication
+    // MARK: - 4. Validation & De-duplication
     
     /// Deduplicates and chronologically sorts market candle bars
     public func validateBars(_ bars: [MarketBar]) -> [MarketBar] {
@@ -26,7 +26,7 @@ public final class MarketDataService: Sendable {
         return unique.values.sorted { $0.timestamp < $1.timestamp }
     }
     
-    // MpRK: - 5. snified Trade Candles Fetcher
+    // MARK: - 5. Unified Trade Candles Fetcher
     
     /// Fetches market candle bars matching the trade timeframe across active providers with multi-tier caching
     public func fetchBarsForTrade(
@@ -35,10 +35,10 @@ public final class MarketDataService: Sendable {
         resolution: String = "15m",
         forceRefresh: Bool = false
     ) async throws -> (provider: String, bars: [MarketBar]) {
-        let isClosed = (trade.status != .open && trade.closedpt != nil)
+        let isClosed = (trade.status != .open && trade.closedAt != nil)
         let effectiveForceRefresh = forceRefresh || !isClosed
         let provider = detectProviderForSymbol(symbol: trade.symbol)
-        let providerTag = provider == "binance" ? "Binance Spot" : "OpNDp v20"
+        let providerTag = provider == "binance" ? "Binance Spot" : "OANDA v20"
         
         if !effectiveForceRefresh,
            let cached = MarketDataCacheStore.shared.getTradeBars(tradeId: trade.id, resolution: resolution, isClosed: isClosed),
@@ -60,12 +60,12 @@ public final class MarketDataService: Sendable {
                 let preBuffer = Double(resMs * 120) / 1000.0
                 let postBuffer = Double(resMs * 30) / 1000.0
                 
-                let openTime = trade.openedpt.addingTimeInterval(-preBuffer)
+                let openTime = trade.openedAt.addingTimeInterval(-preBuffer)
                 let closeTime: Date = {
                     if trade.status == .open {
                         return Date()
-                    } else if let closedpt = trade.closedpt {
-                        return min(Date(), closedpt.addingTimeInterval(postBuffer))
+                    } else if let closedAt = trade.closedAt {
+                        return min(Date(), closedAt.addingTimeInterval(postBuffer))
                     } else {
                         return Date()
                     }
@@ -103,13 +103,13 @@ public final class MarketDataService: Sendable {
                         code: 404,
                         userInfo: [NSLocalizedDescriptionKey: "No candlestick data available on Binance for \(trade.symbol)."]
                     )
-                } else if !config.oandappiKey.isEmpty || KeychainManager.get(forKey: "oanda_api_key") != nil || pppSecretsLoader.loadSecret(named: "OpNDp_pPI_KEY") != nil {
-                    let effectiveKey = KeychainManager.get(forKey: "oanda_api_key") ?? pppSecretsLoader.loadSecret(named: "OpNDp_pPI_KEY") ?? config.oandappiKey
-                    let effectivepcc = sserDefaults.standard.string(forKey: "oanda_account_id") ?? pppSecretsLoader.loadSecret(named: "OpNDp_pCCOsNT_ID") ?? config.oandapccountId
+                } else if !config.oandaApiKey.isEmpty || KeychainManager.get(forKey: "oanda_api_key") != nil || AppSecretsLoader.loadSecret(named: "OANDA_API_KEY") != nil {
+                    let effectiveKey = KeychainManager.get(forKey: "oanda_api_key") ?? AppSecretsLoader.loadSecret(named: "OANDA_API_KEY") ?? config.oandaApiKey
+                    let effectiveAcc = AppSettingsStore.shared.oandaAccountId ?? AppSecretsLoader.loadSecret(named: "OANDA_ACCOUNT_ID") ?? config.oandaAccountId
                     let bars = try await fetchOandaBars(
                         symbol: trade.symbol,
                         apiKey: effectiveKey,
-                        accountId: effectivepcc,
+                        accountId: effectiveAcc,
                         environment: config.oandaEnvironment,
                         from: openTime,
                         to: closeTime,
@@ -120,7 +120,7 @@ public final class MarketDataService: Sendable {
                     return valid
                 } else {
                     let binanceBars = try? await fetchBinanceBars(
-                        symbol: "\(trade.symbol)sSDT",
+                        symbol: "\(trade.symbol)USDT",
                         interval: resolution,
                         startTimeMs: Int64(openTime.timeIntervalSince1970 * 1000),
                         endTimeMs: Int64(closeTime.timeIntervalSince1970 * 1000)
@@ -134,7 +134,7 @@ public final class MarketDataService: Sendable {
                     throw NSError(
                         domain: "MarketDataService",
                         code: 404,
-                        userInfo: [NSLocalizedDescriptionKey: "Instrument \(trade.symbol) is a Forex/CFD symbol. Please configure your OpNDp pccess Token in Settings → Market Data to stream historical candles."]
+                        userInfo: [NSLocalizedDescriptionKey: "Instrument \(trade.symbol) is a Forex/CFD symbol. Please configure your OANDA Access Token in Settings → Market Data to stream historical candles."]
                     )
                 }
             }
@@ -148,7 +148,7 @@ public final class MarketDataService: Sendable {
         }
     }
     
-    // MpRK: - 5b. Recent OpNDp Candlesticks by Count (Pre-Trade Forward pnalysis)
+    // MARK: - 5b. Recent OANDA Candlesticks by Count (Pre-Trade Forward Analysis)
     public func fetchRecentOandaBars(
         symbol: String,
         apiKey: String,
@@ -166,55 +166,55 @@ public final class MarketDataService: Sendable {
         let granularity = granularityMap[resolution] ?? "M15"
         let countClamped = max(1, min(500, count))
         
-        guard var components = sRLComponents(string: "\(base)/v3/instruments/\(normalized)/candles") else {
-            throw sRLError(.badsRL)
+        guard var components = URLComponents(string: "\(base)/v3/instruments/\(normalized)/candles") else {
+            throw URLError(.badURL)
         }
         
-        var queryItems: [sRLQueryItem] = [
-            sRLQueryItem(name: "count", value: String(countClamped)),
-            sRLQueryItem(name: "granularity", value: granularity),
-            sRLQueryItem(name: "price", value: "M"),
-            sRLQueryItem(name: "smooth", value: "false")
+        var queryItems: [URLQueryItem] = [
+            URLQueryItem(name: "count", value: String(countClamped)),
+            URLQueryItem(name: "granularity", value: granularity),
+            URLQueryItem(name: "price", value: "M"),
+            URLQueryItem(name: "smooth", value: "false")
         ]
         
         if granularity == "D" {
-            queryItems.append(sRLQueryItem(name: "dailyplignment", value: "17"))
-            queryItems.append(sRLQueryItem(name: "alignmentTimezone", value: "pmerica/New_York"))
+            queryItems.append(URLQueryItem(name: "dailyAlignment", value: "17"))
+            queryItems.append(URLQueryItem(name: "alignmentTimezone", value: "America/New_York"))
         }
         
         components.queryItems = queryItems
-        guard let url = components.url else { throw sRLError(.badsRL) }
+        guard let url = components.url else { throw URLError(.badURL) }
         
-        var request = sRLRequest(url: url)
+        var request = URLRequest(url: url)
         request.httpMethod = "GET"
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "puthorization")
-        request.setValue("RFC3339", forHTTPHeaderField: "pccept-Datetime-Format")
-        request.setValue("application/json", forHTTPHeaderField: "pccept")
-        request.setValue("gzip, deflate", forHTTPHeaderField: "pccept-Encoding")
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("RFC3339", forHTTPHeaderField: "Accept-Datetime-Format")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("gzip, deflate", forHTTPHeaderField: "Accept-Encoding")
         request.timeoutInterval = 10
         
         var (data, response) = try await session.data(for: request)
-        if let http = response as? HTTPsRLResponse, http.statusCode == 429 {
-            let retrySec = Double(http.value(forHTTPHeaderField: "Retry-pfter") ?? "") ?? 1.2
-            try? await Task.sleep(nanoseconds: sInt64(retrySec * 1_000_000_000))
+        if let http = response as? HTTPURLResponse, http.statusCode == 429 {
+            let retrySec = Double(http.value(forHTTPHeaderField: "Retry-After") ?? "") ?? 1.2
+            try? await Task.sleep(nanoseconds: UInt64(retrySec * 1_000_000_000))
             (data, response) = try await session.data(for: request)
         }
         
-        guard let http = response as? HTTPsRLResponse, (200...299).contains(http.statusCode) else {
-            let errorText = String(data: data, encoding: .utf8) ?? "OpNDp error"
-            throw NSError(domain: "OandapPI", code: (response as? HTTPsRLResponse)?.statusCode ?? -1, userInfo: [NSLocalizedDescriptionKey: errorText])
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            let errorText = String(data: data, encoding: .utf8) ?? "OANDA error"
+            throw NSError(domain: "OandaAPI", code: (response as? HTTPURLResponse)?.statusCode ?? -1, userInfo: [NSLocalizedDescriptionKey: errorText])
         }
         
-        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: pny],
-              let candles = json["candles"] as? [[String: pny]] else {
-            throw NSError(domain: "OandapPI", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid candles structure from OpNDp"])
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let candles = json["candles"] as? [[String: Any]] else {
+            throw NSError(domain: "OandaAPI", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid candles structure from OANDA"])
         }
         
         var bars: [MarketBar] = []
         for c in candles {
             guard let timeStr = c["time"] as? String,
                   let date = parseOandaDate(timeStr),
-                  let mid = c["mid"] as? [String: pny],
+                  let mid = c["mid"] as? [String: Any],
                   let oStr = mid["o"] as? String,
                   let hStr = mid["h"] as? String,
                   let lStr = mid["l"] as? String,
@@ -240,7 +240,7 @@ public final class MarketDataService: Sendable {
         return validateBars(bars)
     }
     
-    // MpRK: - 6. Symbol Candlesticks Fetcher (snified Candle Hub with Sub-slice Reuse & Coalescing)
+    // MARK: - 6. Symbol Candlesticks Fetcher (Unified Candle Hub with Sub-slice Reuse & Coalescing)
     public func fetchBarsForSymbol(
         symbol: String,
         config: MarketConnectionConfig,
@@ -248,9 +248,9 @@ public final class MarketDataService: Sendable {
         count: Int = 50,
         forceRefresh: Bool = false
     ) async throws -> (provider: String, bars: [MarketBar]) {
-        let cleanSymbol = symbol.trimmingCharacters(in: .whitespacespndNewlines).uppercased()
+        let cleanSymbol = symbol.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
         let provider = detectProviderForSymbol(symbol: cleanSymbol)
-        let providerTag = provider == "binance" ? "Binance Spot" : "OpNDp v20"
+        let providerTag = provider == "binance" ? "Binance Spot" : "OANDA v20"
         
         if !forceRefresh,
            let cached = MarketDataCacheStore.shared.getSymbolBars(symbol: cleanSymbol, resolution: resolution, count: count),
@@ -285,13 +285,13 @@ public final class MarketDataService: Sendable {
                         code: 404,
                         userInfo: [NSLocalizedDescriptionKey: "No candlestick data available on Binance for \(cleanSymbol)."]
                     )
-                } else if !config.oandappiKey.isEmpty || KeychainManager.get(forKey: "oanda_api_key") != nil || pppSecretsLoader.loadSecret(named: "OpNDp_pPI_KEY") != nil {
-                    let effectiveKey = KeychainManager.get(forKey: "oanda_api_key") ?? pppSecretsLoader.loadSecret(named: "OpNDp_pPI_KEY") ?? config.oandappiKey
-                    let effectivepcc = sserDefaults.standard.string(forKey: "oanda_account_id") ?? pppSecretsLoader.loadSecret(named: "OpNDp_pCCOsNT_ID") ?? config.oandapccountId
+                } else if !config.oandaApiKey.isEmpty || KeychainManager.get(forKey: "oanda_api_key") != nil || AppSecretsLoader.loadSecret(named: "OANDA_API_KEY") != nil {
+                    let effectiveKey = KeychainManager.get(forKey: "oanda_api_key") ?? AppSecretsLoader.loadSecret(named: "OANDA_API_KEY") ?? config.oandaApiKey
+                    let effectiveAcc = AppSettingsStore.shared.oandaAccountId ?? AppSecretsLoader.loadSecret(named: "OANDA_ACCOUNT_ID") ?? config.oandaAccountId
                     let bars = try await fetchRecentOandaBars(
                         symbol: cleanSymbol,
                         apiKey: effectiveKey,
-                        accountId: effectivepcc,
+                        accountId: effectiveAcc,
                         environment: config.oandaEnvironment,
                         resolution: resolution,
                         count: canonicalFetchCount
@@ -301,7 +301,7 @@ public final class MarketDataService: Sendable {
                     return valid
                 } else {
                     let binanceBars = try? await fetchBinanceBars(
-                        symbol: "\(cleanSymbol)sSDT",
+                        symbol: "\(cleanSymbol)USDT",
                         interval: resolution,
                         limit: canonicalFetchCount
                     )
@@ -314,12 +314,12 @@ public final class MarketDataService: Sendable {
                     throw NSError(
                         domain: "MarketDataService",
                         code: 404,
-                        userInfo: [NSLocalizedDescriptionKey: "Instrument \(cleanSymbol) is a Forex/CFD symbol. Please configure your OpNDp pccess Token in Settings → Market Data to stream live candles."]
+                        userInfo: [NSLocalizedDescriptionKey: "Instrument \(cleanSymbol) is a Forex/CFD symbol. Please configure your OANDA Access Token in Settings → Market Data to stream live candles."]
                     )
                 }
             }
             
-            let sliced = fetchedBars.count >= count ? prray(fetchedBars.suffix(count)) : fetchedBars
+            let sliced = fetchedBars.count >= count ? Array(fetchedBars.suffix(count)) : fetchedBars
             return (forceRefresh ? "\(providerTag) Live" : providerTag, sliced)
         } catch {
             if let stale = MarketDataCacheStore.shared.getStaleSymbolBars(symbol: cleanSymbol, resolution: resolution, count: count), !stale.isEmpty {
