@@ -12,6 +12,7 @@ public struct ChartViewportMetrics {
     public let span: Double
 }
 
+@MainActor
 public struct ChartViewportState {
     public var hoveredBarIndex: Int? = nil
     public var hoveredTouchY: CGFloat? = nil
@@ -230,6 +231,7 @@ public struct ChartViewportState {
 }
 
 // MARK: - Unified Candlestick, Footprint, Grid & Crosshair Rendering Engine
+@MainActor
 public enum SharedChartCanvas {
 
     // MARK: 1. Candlesticks (GPU-accelerated Canvas)
