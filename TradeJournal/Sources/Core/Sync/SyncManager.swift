@@ -42,8 +42,8 @@ public final class SyncManager: ObservableObject {
     public private(set) var providers: [any SyncProvider] = []
     
     private init() {
-        // Load saved quick sync options from UserDefaults
-        if let data = UserDefaults.standard.data(forKey: "journal_quick_sync_options_v1"),
+        // Load saved quick sync options
+        if let data = AppSettingsStore.shared.quickSyncOptionsData,
            var decoded = try? JSONDecoder().decode(SyncOptions.self, from: data) {
             // Ensure Exness is enabled if configured
             if !decoded.enabledProviderIds.contains("exness") {
@@ -77,7 +77,7 @@ public final class SyncManager: ObservableObject {
     
     private func saveQuickSyncOptions() {
         if let encoded = try? JSONEncoder().encode(savedQuickSyncOptions) {
-            UserDefaults.standard.set(encoded, forKey: "journal_quick_sync_options_v1")
+            AppSettingsStore.shared.quickSyncOptionsData = encoded
         }
     }
     

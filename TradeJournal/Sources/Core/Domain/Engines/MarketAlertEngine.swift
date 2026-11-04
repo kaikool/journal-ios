@@ -84,7 +84,7 @@ public final class MarketAlertEngine: ObservableObject, @unchecked Sendable {
     
     @Published public var isEnabled: Bool {
         didSet {
-            UserDefaults.standard.set(isEnabled, forKey: "market_alert_enabled")
+            AppSettingsStore.shared.marketAlertEnabled = isEnabled
             if isEnabled {
                 startMonitoring()
             } else {
@@ -95,13 +95,13 @@ public final class MarketAlertEngine: ObservableObject, @unchecked Sendable {
     
     @Published public var monitoredSymbols: [String] {
         didSet {
-            UserDefaults.standard.set(monitoredSymbols, forKey: "market_alert_symbols")
+            AppSettingsStore.shared.marketAlertSymbols = monitoredSymbols
         }
     }
     
     @Published public var monitoredTimeframes: [String] {
         didSet {
-            UserDefaults.standard.set(monitoredTimeframes, forKey: "market_alert_timeframes")
+            AppSettingsStore.shared.marketAlertTimeframes = monitoredTimeframes
         }
     }
     
@@ -140,12 +140,12 @@ public final class MarketAlertEngine: ObservableObject, @unchecked Sendable {
     }
     
     private init() {
-        self.isEnabled = UserDefaults.standard.bool(forKey: "market_alert_enabled")
+        self.isEnabled = AppSettingsStore.shared.marketAlertEnabled
         
-        let savedSymbols = UserDefaults.standard.stringArray(forKey: "market_alert_symbols") ?? ["XAUUSD", "EURUSD", "BTCUSD"]
+        let savedSymbols = AppSettingsStore.shared.marketAlertSymbols ?? ["XAUUSD", "EURUSD", "BTCUSD"]
         self.monitoredSymbols = savedSymbols
         
-        let savedTfs = UserDefaults.standard.stringArray(forKey: "market_alert_timeframes") ?? ["15m", "1h"]
+        let savedTfs = AppSettingsStore.shared.marketAlertTimeframes ?? ["15m", "1h"]
         self.monitoredTimeframes = savedTfs
         
         if self.isEnabled {

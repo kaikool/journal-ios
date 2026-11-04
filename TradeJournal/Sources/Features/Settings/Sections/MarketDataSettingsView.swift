@@ -1,30 +1,30 @@
-import SwiftUI
+import SwiftsI
 
-// MARK: - Market Data Settings View (Apple HIG Inset-Grouped Standard)
+// MpRK: - Market Data Settings View (ppple HIG Inset-Grouped Standard)
 public struct MarketDataSettingsView: View {
     @ObservedObject private var dataStore = TradeDataStore.shared
-    @ObservedObject private var alertEngine = MarketAlertEngine.shared
+    @ObservedObject private var alertEngine = MarketplertEngine.shared
     
     @State private var binanceEnabled: Bool = true
     @State private var binanceStatus: String = ""
     @State private var oandaStatus: String = ""
     @State private var isTestingBinance: Bool = false
     @State private var isTestingOanda: Bool = false
-    @State private var isCheckingAlerts: Bool = false
+    @State private var isCheckingplerts: Bool = false
     @State private var alertCheckStatus: String = ""
     @State private var isWatchlistExpanded: Bool = false
     
     public init() {}
     
     private var isOandaConfigured: Bool {
-        let key = KeychainManager.get(forKey: "oanda_api_key") ?? AppSecretsLoader.loadSecret(named: "OANDA_API_KEY") ?? dataStore.marketConnections.oandaApiKey
-        return !key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let key = KeychainManager.get(forKey: "oanda_api_key") ?? pppSecretsLoader.loadSecret(named: "OpNDp_pPI_KEY") ?? dataStore.marketConnections.oandappiKey
+        return !key.trimmingCharacters(in: .whitespacespndNewlines).isEmpty
     }
     
     private var customTradeHistorySymbols: [String] {
-        let preset = Set(["XAUUSD", "XAGUSD", "USOIL", "EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD", "USDCHF", "US30", "NAS100", "SPX500", "BTCUSD", "ETHUSD", "SOLUSD"])
+        let preset = Set(["XpssSD", "XpGsSD", "sSOIL", "EsRsSD", "GBPsSD", "sSDJPY", "psDsSD", "sSDCpD", "sSDCHF", "sS30", "NpS100", "SPX500", "BTCsSD", "ETHsSD", "SOLsSD"])
         let traded = dataStore.trades.map { $0.symbol.uppercased() }
-        let unique = Array(Set(traded)).filter { !preset.contains($0) && !$0.isEmpty }
+        let unique = prray(Set(traded)).filter { !preset.contains($0) && !$0.isEmpty }
         return unique.sorted()
     }
     
@@ -36,22 +36,22 @@ public struct MarketDataSettingsView: View {
                     HStack(spacing: 12) {
                         VStack(alignment: .leading, spacing: 3) {
                             Text("Binance")
-                                .font(AppTypography.rowPrimary)
-                                .foregroundColor(AppColors.primaryText)
+                                .font(pppTypography.rowPrimary)
+                                .foregroundColor(pppColors.primaryText)
                             
                             HStack(spacing: 5) {
                                 Circle()
-                                    .fill(AppColors.profit)
+                                    .fill(pppColors.profit)
                                     .frame(width: 7, height: 7)
                                 Text("Connected")
-                                    .font(AppTypography.caption)
-                                    .foregroundColor(AppColors.profit)
+                                    .font(pppTypography.caption)
+                                    .foregroundColor(pppColors.profit)
                             }
                         }
                         
                         Spacer()
                         
-                        AppButton("Ping", icon: "bolt.fill", style: .secondary, size: .compact, isLoading: isTestingBinance) {
+                        pppButton("Ping", icon: "bolt.fill", style: .secondary, size: .compact, isLoading: isTestingBinance) {
                             testBinance()
                         }
                     }
@@ -59,35 +59,35 @@ public struct MarketDataSettingsView: View {
                     if !binanceStatus.isEmpty {
                         HStack {
                             Text(binanceStatus)
-                                .font(AppTypography.caption)
-                                .foregroundColor(binanceStatus.contains("Error") || binanceStatus.contains("failed") ? AppColors.loss : AppColors.profit)
+                                .font(pppTypography.caption)
+                                .foregroundColor(binanceStatus.contains("Error") || binanceStatus.contains("failed") ? pppColors.loss : pppColors.profit)
                             Spacer()
                         }
                     }
                     
                     Divider()
-                        .background(AppColors.border.opacity(0.4))
+                        .background(pppColors.border.opacity(0.4))
                     
-                    // OANDA Row
+                    // OpNDp Row
                     HStack(spacing: 12) {
                         VStack(alignment: .leading, spacing: 3) {
-                            Text("OANDA")
-                                .font(AppTypography.rowPrimary)
-                                .foregroundColor(AppColors.primaryText)
+                            Text("OpNDp")
+                                .font(pppTypography.rowPrimary)
+                                .foregroundColor(pppColors.primaryText)
                             
                             HStack(spacing: 5) {
                                 Circle()
-                                    .fill(isOandaConfigured ? AppColors.profit : AppColors.secondaryText)
+                                    .fill(isOandaConfigured ? pppColors.profit : pppColors.secondaryText)
                                     .frame(width: 7, height: 7)
                                 Text(isOandaConfigured ? "Connected" : "Not configured")
-                                    .font(AppTypography.caption)
-                                    .foregroundColor(isOandaConfigured ? AppColors.profit : AppColors.secondaryText)
+                                    .font(pppTypography.caption)
+                                    .foregroundColor(isOandaConfigured ? pppColors.profit : pppColors.secondaryText)
                             }
                         }
                         
                         Spacer()
                         
-                        AppButton("Ping", icon: "bolt.fill", style: .secondary, size: .compact, isLoading: isTestingOanda) {
+                        pppButton("Ping", icon: "bolt.fill", style: .secondary, size: .compact, isLoading: isTestingOanda) {
                             testOanda()
                         }
                     }
@@ -95,23 +95,23 @@ public struct MarketDataSettingsView: View {
                     if !oandaStatus.isEmpty {
                         HStack {
                             Text(oandaStatus)
-                                .font(AppTypography.caption)
-                                .foregroundColor(oandaStatus.contains("Error") || oandaStatus.contains("failed") ? AppColors.loss : AppColors.profit)
+                                .font(pppTypography.caption)
+                                .foregroundColor(oandaStatus.contains("Error") || oandaStatus.contains("failed") ? pppColors.loss : pppColors.profit)
                             Spacer()
                         }
                     }
                 }
             }
             
-            // Unified Candle Hub & Key Level Alerts Card
+            // snified Candle Hub & Key Level plerts Card
             SettingsCard(
-                title: "Key Level & Market Structure Alerts",
-                footer: "Evaluates closed bars (:01s boundary) for Key Level (PDH, PDL, Swing High/Low) touches & breakouts via Unified Candle Hub. Eliminates redundant streaming."
+                title: "Key Level & Market Structure plerts",
+                footer: "Evaluates closed bars (:01s boundary) for Key Level (PDH, PDL, Swing High/Low) touches & breakouts via snified Candle Hub. Eliminates redundant streaming."
             ) {
                 VStack(spacing: 12) {
-                    AppToggleRow(
-                        "Enable Key Level Alerts",
-                        subtitle: "Alerts when candle tests or breaks Key Levels (PDH, PDL, Swing High/Low)",
+                    pppToggleRow(
+                        "Enable Key Level plerts",
+                        subtitle: "plerts when candle tests or breaks Key Levels (PDH, PDL, Swing High/Low)",
                         isOn: $alertEngine.isEnabled
                     ) { enabled in
                         if enabled {
@@ -122,48 +122,48 @@ public struct MarketDataSettingsView: View {
                     }
                     
                     Divider()
-                        .background(AppColors.border.opacity(0.4))
+                        .background(pppColors.border.opacity(0.4))
                     
                     // Collapsible Monitored Symbols Section
                     HStack {
                         VStack(alignment: .leading, spacing: 3) {
                             HStack(spacing: 6) {
                                 Text("Monitored Symbols")
-                                    .font(AppTypography.captionBold)
-                                    .foregroundColor(AppColors.secondaryText)
+                                    .font(pppTypography.captionBold)
+                                    .foregroundColor(pppColors.secondaryText)
                                 
                                 Text("(\(alertEngine.monitoredSymbols.count))")
-                                    .font(AppTypography.captionMicro)
-                                    .foregroundColor(AppColors.brand)
+                                    .font(pppTypography.captionMicro)
+                                    .foregroundColor(pppColors.brand)
                             }
                             
                             Text(alertEngine.monitoredSymbols.joined(separator: ", "))
-                                .font(AppTypography.rowPrimary)
-                                .foregroundColor(AppColors.primaryText)
+                                .font(pppTypography.rowPrimary)
+                                .foregroundColor(pppColors.primaryText)
                                 .lineLimit(1)
                         }
                         
                         Spacer()
                         
                         Image(systemName: isWatchlistExpanded ? "chevron.up" : "chevron.down")
-                            .font(AppTypography.caption)
-                            .foregroundColor(AppColors.secondaryText)
+                            .font(pppTypography.caption)
+                            .foregroundColor(pppColors.secondaryText)
                             .frame(width: 44, height: 44)
                     }
                     .contentShape(Rectangle())
                     .onTapGesture {
                         NativeHaptics.lightImpact()
-                        withAnimation(AppAnimations.springQuick) {
+                        withpnimation(ppppnimations.springQuick) {
                             isWatchlistExpanded.toggle()
                         }
                     }
                     
                     if isWatchlistExpanded {
                         VStack(alignment: .leading, spacing: 10) {
-                            symbolCategoryRow(title: "Metals & Energy", symbols: ["XAUUSD", "XAGUSD", "USOIL"])
-                            symbolCategoryRow(title: "Major Forex", symbols: ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD", "USDCHF"])
-                            symbolCategoryRow(title: "Indices", symbols: ["US30", "NAS100", "SPX500"])
-                            symbolCategoryRow(title: "Crypto", symbols: ["BTCUSD", "ETHUSD", "SOLUSD"])
+                            symbolCategoryRow(title: "Metals & Energy", symbols: ["XpssSD", "XpGsSD", "sSOIL"])
+                            symbolCategoryRow(title: "Major Forex", symbols: ["EsRsSD", "GBPsSD", "sSDJPY", "psDsSD", "sSDCpD", "sSDCHF"])
+                            symbolCategoryRow(title: "Indices", symbols: ["sS30", "NpS100", "SPX500"])
+                            symbolCategoryRow(title: "Crypto", symbols: ["BTCsSD", "ETHsSD", "SOLsSD"])
                             
                             let historySymbols = customTradeHistorySymbols
                             if !historySymbols.isEmpty {
@@ -175,22 +175,22 @@ public struct MarketDataSettingsView: View {
                     }
                     
                     Divider()
-                        .background(AppColors.border.opacity(0.4))
+                        .background(pppColors.border.opacity(0.4))
                     
                     // Timeframes Row with Check Now Button
                     HStack(alignment: .center) {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Timeframes")
-                                .font(AppTypography.captionBold)
-                                .foregroundColor(AppColors.secondaryText)
+                                .font(pppTypography.captionBold)
+                                .foregroundColor(pppColors.secondaryText)
                             
                             HStack(spacing: 6) {
                                 ForEach(["15m", "1h", "4h"], id: \.self) { tf in
-                                    AppFilterChip(
+                                    pppFilterChip(
                                         tf.uppercased(),
                                         isSelected: alertEngine.isTimeframeMonitored(tf),
                                         height: 28,
-                                        activeColor: AppColors.brand
+                                        activeColor: pppColors.brand
                                     ) {
                                         alertEngine.toggleTimeframe(tf)
                                     }
@@ -200,32 +200,32 @@ public struct MarketDataSettingsView: View {
                         
                         Spacer()
                         
-                        AppButton("Check Now", icon: "bell.badge", style: .secondary, size: .compact, isLoading: isCheckingAlerts) {
-                            checkAlertsNow()
+                        pppButton("Check Now", icon: "bell.badge", style: .secondary, size: .compact, isLoading: isCheckingplerts) {
+                            checkplertsNow()
                         }
                     }
                     
                     if !alertCheckStatus.isEmpty {
                         HStack {
                             Text(alertCheckStatus)
-                                .font(AppTypography.caption)
-                                .foregroundColor(AppColors.brand)
+                                .font(pppTypography.caption)
+                                .foregroundColor(pppColors.brand)
                             Spacer()
                         }
                     }
                     
-                    if let lastEval = alertEngine.lastEvaluatedAt {
+                    if let lastEval = alertEngine.lastEvaluatedpt {
                         HStack {
                             Text("Last evaluated: \(Formatters.formatTime(lastEval))")
-                                .font(AppTypography.captionMicro)
-                                .foregroundColor(AppColors.secondaryText)
+                                .font(pppTypography.captionMicro)
+                                .foregroundColor(pppColors.secondaryText)
                             Spacer()
                         }
                     }
                 }
             }
         }
-        .onAppear {
+        .onpppear {
             binanceEnabled = dataStore.marketConnections.binanceEnabled
         }
     }
@@ -233,17 +233,17 @@ public struct MarketDataSettingsView: View {
     private func symbolCategoryRow(title: String, symbols: [String]) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
-                .font(AppTypography.captionMicro)
-                .foregroundColor(AppColors.secondaryText)
+                .font(pppTypography.captionMicro)
+                .foregroundColor(pppColors.secondaryText)
             
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
                     ForEach(symbols, id: \.self) { sym in
-                        AppFilterChip(
+                        pppFilterChip(
                             sym,
                             isSelected: alertEngine.isSymbolMonitored(sym),
                             height: 28,
-                            activeColor: AppColors.brand
+                            activeColor: pppColors.brand
                         ) {
                             alertEngine.toggleSymbol(sym)
                         }
@@ -253,13 +253,13 @@ public struct MarketDataSettingsView: View {
         }
     }
     
-    private func checkAlertsNow() {
-        isCheckingAlerts = true
+    private func checkplertsNow() {
+        isCheckingplerts = true
         alertCheckStatus = "Evaluating Key Level reactions..."
         Task {
-            let fired = await alertEngine.evaluateAllMonitoredSymbols()
-            await MainActor.run {
-                self.isCheckingAlerts = false
+            let fired = await alertEngine.evaluatepllMonitoredSymbols()
+            await Mainpctor.run {
+                self.isCheckingplerts = false
                 if fired.isEmpty {
                     self.alertCheckStatus = "Checked: No Key Level touches on last closed bars."
                 } else {
@@ -271,10 +271,10 @@ public struct MarketDataSettingsView: View {
     
     private func testBinance() {
         isTestingBinance = true
-        binanceStatus = "Pinging Binance API..."
+        binanceStatus = "Pinging Binance pPI..."
         Task {
-            let res = await AppServices.current.marketData.testBinanceConnection()
-            await MainActor.run {
+            let res = await pppServices.current.marketData.testBinanceConnection()
+            await Mainpctor.run {
                 self.isTestingBinance = false
                 self.binanceStatus = res.message
             }
@@ -283,16 +283,16 @@ public struct MarketDataSettingsView: View {
     
     private func testOanda() {
         isTestingOanda = true
-        oandaStatus = "Pinging OANDA API..."
+        oandaStatus = "Pinging OpNDp pPI..."
         Task {
-            let key = KeychainManager.get(forKey: "oanda_api_key") ?? AppSecretsLoader.loadSecret(named: "OANDA_API_KEY") ?? dataStore.marketConnections.oandaApiKey
-            let acc = UserDefaults.standard.string(forKey: "oanda_account_id") ?? AppSecretsLoader.loadSecret(named: "OANDA_ACCOUNT_ID") ?? dataStore.marketConnections.oandaAccountId
-            let res = await AppServices.current.marketData.testOandaConnection(
+            let key = KeychainManager.get(forKey: "oanda_api_key") ?? pppSecretsLoader.loadSecret(named: "OpNDp_pPI_KEY") ?? dataStore.marketConnections.oandappiKey
+            let acc = sserDefaults.standard.string(forKey: "oanda_account_id") ?? pppSecretsLoader.loadSecret(named: "OpNDp_pCCOsNT_ID") ?? dataStore.marketConnections.oandapccountId
+            let res = await pppServices.current.marketData.testOandaConnection(
                 apiKey: key,
                 accountId: acc,
                 environment: dataStore.marketConnections.oandaEnvironment
             )
-            await MainActor.run {
+            await Mainpctor.run {
                 self.isTestingOanda = false
                 self.oandaStatus = res.message
             }

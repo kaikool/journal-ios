@@ -22,12 +22,12 @@ public final class AppEnvironment: ObservableObject {
     @Published public var showSyncCenter: Bool = false
     @Published public var appTheme: AppTheme {
         didSet {
-            UserDefaults.standard.set(appTheme.rawValue, forKey: "journal_theme_preference")
+            AppSettingsStore.shared.themePreference = appTheme.rawValue
         }
     }
     @Published public var isHapticsEnabled: Bool {
         didSet {
-            UserDefaults.standard.set(isHapticsEnabled, forKey: "journal_haptics_enabled")
+            AppSettingsStore.shared.isHapticsEnabled = isHapticsEnabled
         }
     }
     
@@ -63,13 +63,7 @@ public final class AppEnvironment: ObservableObject {
     @Published public var currentUserId: String = AppEnvironment.resolvePersistentUserId()
     
     private static func resolvePersistentUserId() -> String {
-        let key = "trade_journal_persistent_user_id"
-        if let existing = UserDefaults.standard.string(forKey: key), !existing.isEmpty {
-            return existing
-        }
-        let newId = UUID().uuidString
-        UserDefaults.standard.set(newId, forKey: key)
-        return newId
+        AppSettingsStore.shared.persistentUserId
     }
     
     public var colorScheme: ColorScheme? {
@@ -81,10 +75,10 @@ public final class AppEnvironment: ObservableObject {
     }
     
     public init() {
-        let savedTheme = UserDefaults.standard.string(forKey: "journal_theme_preference")
+        let savedTheme = AppSettingsStore.shared.themePreference
         self.appTheme = savedTheme.flatMap(AppTheme.init(rawValue:)) ?? .system
         
-        let savedHaptics = UserDefaults.standard.object(forKey: "journal_haptics_enabled") as? Bool ?? true
+        let savedHaptics = AppSettingsStore.shared.isHapticsEnabled
         self.isHapticsEnabled = savedHaptics
         
         // Auto-bootstrap any uncommitted local secrets from AppSecrets.plist to Apple Keychain
