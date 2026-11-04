@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - Single Trade Audit Prompt Builder Extension
 extension AIPromptBuilder {
-    
+
     /// Generates objective forensic critique prompt for open and closed positions
     public static func buildTradeCoachingPrompt(
         trade: Trade,
@@ -12,7 +12,11 @@ extension AIPromptBuilder {
         sessionSummary: AIAccountSessionSummary? = nil,
         displayTimeZone: String = "UTC",
         linkedPreTradePlan: AdvisorCommitmentRecord? = nil,
-        excursion: TradeExcursion? = nil
+        excursion: TradeExcursion? = nil,
+        keyLevels: [KeyLevel]? = nil,
+        sessionProfiles: [SessionProfileSnapshot]? = nil,
+        developingProfiles: [DevelopingProfile]? = nil,
+        detectedPatterns: [DetectedCandlePattern]? = nil
     ) -> String {
         let isOpen = trade.status == .open || trade.closedAt == nil
         let pnlVal = NSDecimalNumber(decimal: trade.netPnl).doubleValue
@@ -52,7 +56,7 @@ extension AIPromptBuilder {
         let tpStr = trade.profitTarget.map { Formatters.price($0, symbol: trade.symbol) } ?? (isVi ? "Chưa cài TP" : "Not Set")
         let mistakes = trade.mistakes.isEmpty ? (isVi ? "Không ghi nhận" : "None") : trade.mistakes.joined(separator: ", ")
         let notes = trade.notes?.isEmpty == false ? (trade.notes ?? "") : (isVi ? "Không có ghi chú" : "None")
-        
+
         let liveDeltaInfo: String = {
             guard isOpen, let cp = curLivePrice else { return "" }
             let spec = AssetContractEngine.spec(for: trade.symbol)
@@ -60,7 +64,7 @@ extension AIPromptBuilder {
             let priceDelta = (trade.direction == .short) ? (trade.avgEntry - cp) : (cp - trade.avgEntry)
             let pips = (priceDelta / pipUnit as NSDecimalNumber).doubleValue
             let pipsStr = String(format: "%@%.1f pips", pips >= 0 ? "+" : "", pips)
-            
+
             var res = isVi ? " (Biên độ: \(pipsStr)" : " (Delta: \(pipsStr)"
             if let sl = trade.stopLoss {
                 let distSl = (abs(cp - sl) / pipUnit as NSDecimalNumber).doubleValue
@@ -73,21 +77,21 @@ extension AIPromptBuilder {
             res += ")"
             return res
         }()
-        
+
         let displayTz = TimeZone(identifier: displayTimeZone) ?? .current
         let df = DateFormatter()
         df.dateFormat = "yyyy-MM-dd HH:mm"
         df.timeZone = displayTz
         let openedAtStr = df.string(from: trade.openedAt)
         let closedAtStr = trade.closedAt.map { df.string(from: $0) } ?? (isVi ? "Đang mở" : "Open")
-        
+
         let preTrade = linkedPreTradePlan ?? AIAdvisorMemoryEngine.shared.getCommitmentForTrade(trade) ?? AIAdvisorMemoryEngine.shared.getLatestCommitment(for: trade.symbol, beforeOrNear: trade.openedAt)
         var preTradeBlock = ""
         if let pt = preTrade {
             let ptTimeStr = df.string(from: pt.timestamp)
             if isVi {
                 preTradeBlock = """
-                
+
                 [LỊCH SỬ KẾ HOẠCH PRE-TRADE ĐÃ TƯ VẤN (PRE-TRADE COMMITMENT)]:
                 • Thời điểm bạn tư vấn: \(ptTimeStr)
                 • Kế hoạch bạn đã khuyến nghị: \(pt.bias) tại vùng [\(pt.plannedEntry ?? "Thị trường")], Cắt lỗ SL: [\(pt.invalidationSL ?? "Theo cấu trúc")], TP: [\(pt.targetTP ?? "Vùng thanh khoản")]
@@ -95,7 +99,7 @@ extension AIPromptBuilder {
                 """
             } else {
                 preTradeBlock = """
-                
+
                 [YOUR PREVIOUS PRE-TRADE ADVISORY COMMITMENT]:
                 • Time of Analysis: \(ptTimeStr)
                 • Your Recommended Setup: \(pt.bias) at [\(pt.plannedEntry ?? "Market")], SL: [\(pt.invalidationSL ?? "Structural")], TP: [\(pt.targetTP ?? "Key Target")]
@@ -103,7 +107,7 @@ extension AIPromptBuilder {
                 """
             }
         }
-        
+
         // Pre-Entry Price Trajectory & Confirmation Entry Audit
         let trajectoryBlock = computePreEntryTrajectory(
             trade: trade,
@@ -112,7 +116,7 @@ extension AIPromptBuilder {
             displayTimeZone: displayTz,
             isVi: isVi
         )
-        
+
         // Candlestick Tape Markdown Table (Optimized to 5 key bars surrounding execution to honor strict 6k token budget)
         let candlesTableBlock: String = {
             guard let b = bars, !b.isEmpty else { return "" }
@@ -123,16 +127,16 @@ extension AIPromptBuilder {
                 displayTimeZone: displayTz
             )
             return isVi ? """
-            
+
             [BẢNG BĂNG GIÁ NẾN M15 QUANH ĐIỂM VÀO LỆNH (5 NẾN QUAN TRỌNG)]:
             \(table)
             """ : """
-            
+
             [M15 CANDLESTICK TAPE SURROUNDING ENTRY (LAST 5 BARS)]:
             \(table)
             """
         }()
-        
+
         // Technical Momentum Table (Wilder RSI 14 / EMA 9 / WMA 45 across 5-candle window)
         let momentumBlock: String = {
             guard let b = bars, !b.isEmpty else { return "" }
@@ -144,18 +148,61 @@ extension AIPromptBuilder {
             )
             return formatted.isEmpty ? "" : "\n\n" + formatted
         }()
-        
+
+        // Footprint Key Levels & Staircase Step POCs Block
+        let footprintBlock: String = {
+            let lvls = keyLevels ?? []
+            let profs = sessionProfiles ?? []
+            let devs = developingProfiles ?? []
+            let pats = detectedPatterns ?? []
+
+            // If empty but bars are provided, compute synchronously on the fly
+            if lvls.isEmpty && profs.isEmpty && devs.isEmpty, let b = bars, !b.isEmpty {
+                let bootstrapped = SessionFootprintCoordinator.bootstrapProfiles(from: b, symbol: trade.symbol)
+                let devRes = SessionFootprintCoordinator.computeCurrentDeveloping(from: b, symbol: trade.symbol)
+                let (pdh, pdl) = SessionFootprintCoordinator.extractPreviousDayLevels(from: b)
+                let extractedLevels = SessionFootprintEngine.extractKeyLevels(
+                    snapshots: bootstrapped,
+                    developingPoc: devRes.poc,
+                    developingSession: devRes.session,
+                    previousDayHigh: pdh,
+                    previousDayLow: pdl
+                )
+                let scannedPatterns = CandlePatternEngine.scanPatternsWithKeyLevelConfluence(bars: b, keyLevels: extractedLevels)
+                return buildFootprintAndPatternsBlock(
+                    symbol: trade.symbol,
+                    currentPrice: curLivePrice ?? trade.avgEntry,
+                    keyLevels: extractedLevels,
+                    sessionProfiles: bootstrapped,
+                    developingProfiles: devRes.list,
+                    patterns: scannedPatterns,
+                    isVi: isVi
+                )
+            }
+
+            guard !lvls.isEmpty || !profs.isEmpty || !devs.isEmpty else { return "" }
+            return buildFootprintAndPatternsBlock(
+                symbol: trade.symbol,
+                currentPrice: curLivePrice ?? trade.avgEntry,
+                keyLevels: lvls,
+                sessionProfiles: profs,
+                developingProfiles: devs,
+                patterns: pats,
+                isVi: isVi
+            )
+        }()
+
         let lessonsBlock = AIAdvisorMemoryEngine.shared.formatMemoriesForPrompt(
             symbol: trade.symbol,
             isVi: isVi,
             maxItems: 4
         )
-        
+
         let complianceBlock = AIAdvisorMemoryEngine.shared.formatComplianceBlock(
             symbol: trade.symbol,
             isVi: isVi
         )
-        
+
         // Maximum Adverse / Favorable Excursions (MAE / MFE)
         let excursionBlock: String = {
             let est: ExcursionEstimate? = {
@@ -166,7 +213,7 @@ extension AIPromptBuilder {
                 return nil
             }()
             guard let e = est, (e.mae != nil || e.mfe != nil) else { return "" }
-            
+
             let pnlFmt = { (val: Decimal?) -> String in
                 guard let v = val else { return "N/A" }
                 let num = NSDecimalNumber(decimal: v).doubleValue
@@ -176,14 +223,14 @@ extension AIPromptBuilder {
             let mfeStr = pnlFmt(e.mfe)
             let maePts = e.maePoints.map { Formatters.points($0) } ?? "N/A"
             let mfePts = e.mfePoints.map { Formatters.points($0) } ?? "N/A"
-            
+
             if isVi {
                 return "\n- Mức sụt giảm tối đa khi giữ lệnh (MAE Drawdown): \(maeStr) (\(maePts) pts)\n- Lợi nhuận cực đại tiềm năng khi giữ lệnh (MFE Runup): \(mfeStr) (\(mfePts) pts)"
             } else {
                 return "\n- Max Adverse Excursion (MAE Drawdown): \(maeStr) (\(maePts) pts)\n- Max Favorable Excursion (MFE Runup): \(mfeStr) (\(mfePts) pts)"
             }
         }()
-        
+
         let durationStr: String = {
             let diff: TimeInterval
             if let closed = trade.closedAt {
@@ -205,7 +252,7 @@ extension AIPromptBuilder {
                 return "\(max(1, mins))m"
             }
         }()
-        
+
         let mult = trade.contractMultiplier ?? Decimal(1)
         let entry = trade.avgEntry
         func formatPrice(_ p: Decimal) -> String {
@@ -214,7 +261,7 @@ extension AIPromptBuilder {
         let isShort = trade.direction == .short
         let directionStrVi = isShort ? "SELL / SHORT (BÁN KHỐNG - Kỳ vọng giá GIẢM)" : "BUY / LONG (MUA - Kỳ vọng giá TĂNG)"
         let directionStrEn = isShort ? "SELL / SHORT (Short position - Expects price to FALL)" : "BUY / LONG (Long position - Expects price to RISE)"
-        
+
         // Dynamic Stop Loss & Risk Protection Analysis (Accounts for Initial Risk, Breakeven, and Trailing/Positive Stop Loss)
         struct ProtectionStatus {
             let labelVi: String
@@ -224,7 +271,7 @@ extension AIPromptBuilder {
             let isRiskFree: Bool
             let isPositiveLock: Bool
         }
-        
+
         let protection: ProtectionStatus = {
             guard let sl = trade.stopLoss, sl > 0 else {
                 return ProtectionStatus(
@@ -236,10 +283,10 @@ extension AIPromptBuilder {
                     isPositiveLock: false
                 )
             }
-            
+
             let slPriceStr = formatPrice(sl)
             let entryPriceStr = formatPrice(entry)
-            
+
             if isShort {
                 // SELL / SHORT Position:
                 if sl < entry {
@@ -272,7 +319,7 @@ extension AIPromptBuilder {
                     let riskUsd = riskPts * activeVolume * mult
                     let riskUsdVal = (riskUsd as NSDecimalNumber).doubleValue
                     let riskStr = String(format: "$%.2f", riskUsdVal)
-                    
+
                     if isOpen && trade.isPartiallyClosed && trade.netPnl >= riskUsd {
                         let netOutcome = trade.netPnl - riskUsd
                         let netOutcomeVal = (netOutcome as NSDecimalNumber).doubleValue
@@ -286,7 +333,7 @@ extension AIPromptBuilder {
                             isPositiveLock: true
                         )
                     }
-                    
+
                     let rStr: String = {
                         if riskUsdVal > 0 {
                             let r = (trade.netPnl / riskUsd as NSDecimalNumber).doubleValue
@@ -335,7 +382,7 @@ extension AIPromptBuilder {
                     let riskUsd = riskPts * activeVolume * mult
                     let riskUsdVal = (riskUsd as NSDecimalNumber).doubleValue
                     let riskStr = String(format: "$%.2f", riskUsdVal)
-                    
+
                     if isOpen && trade.isPartiallyClosed && trade.netPnl >= riskUsd {
                         let netOutcome = trade.netPnl - riskUsd
                         let netOutcomeVal = (netOutcome as NSDecimalNumber).doubleValue
@@ -349,7 +396,7 @@ extension AIPromptBuilder {
                             isPositiveLock: true
                         )
                     }
-                    
+
                     let rStr: String = {
                         if riskUsdVal > 0 {
                             let r = (trade.netPnl / riskUsd as NSDecimalNumber).doubleValue
@@ -368,22 +415,22 @@ extension AIPromptBuilder {
                 }
             }
         }()
-        
+
         let feesVal = NSDecimalNumber(decimal: trade.fees).doubleValue
         let swapVal = NSDecimalNumber(decimal: trade.swap ?? Decimal.zero).doubleValue
         let feesStr = "$\(String(format: "%.2f", feesVal))"
         let swapStr = "$\(String(format: "%.2f", swapVal))"
-        
+
         let directionInfoVi = isShort
             ? "ĐỊNH HƯỚNG VỊ THẾ: Lệnh BÁN KHỐNG (SELL / SHORT). Lợi nhuận sinh ra khi giá giảm (Giá hiện tại hoặc Giá ra < Giá vào = CÓ LÃI). Mục tiêu Take Profit nằm phía dưới giá vào."
             : "ĐỊNH HƯỚNG VỊ THẾ: Lệnh MUA (BUY / LONG). Lợi nhuận sinh ra khi giá tăng (Giá hiện tại hoặc Giá ra > Giá vào = CÓ LÃI). Mục tiêu Take Profit nằm phía trên giá vào."
-        
+
         let directionInfoEn = isShort
             ? "POSITION ORIENTATION: Short position (SELL). Profit occurs when price declines (Current/Exit price < Entry price = In Profit). Take Profit target is below entry."
             : "POSITION ORIENTATION: Long position (BUY). Profit occurs when price rises (Current/Exit price > Entry price = In Profit). Take Profit target is above entry."
-        
+
         let candleInfo = recentCandlesSummary ?? (isVi ? "Không có chuỗi nến số hóa (Dựa vào thông số lệnh và ảnh biểu đồ đính kèm nếu có)." : "No numeric candle feed (Rely on trade metrics and attached chart image if present).")
-        
+
         let tradesToday = sessionSummary?.totalTradesToday ?? 0
         let winsToday = sessionSummary?.winsToday ?? 0
         let lossesToday = sessionSummary?.lossesToday ?? 0
@@ -400,7 +447,7 @@ extension AIPromptBuilder {
             if streak < 0 { return isVi ? "Đang thua \(abs(streak)) lệnh liên tiếp (-)" : "In a \(abs(streak))-loss losing streak (-)" }
             return isVi ? "Chưa có chuỗi lệnh hôm nay" : "No active streak today"
         }()
-        
+
         let realBalStr: String = {
             if let bal = sessionSummary?.balance {
                 let curr = sessionSummary?.accountCurrency ?? "USD"
@@ -415,7 +462,7 @@ extension AIPromptBuilder {
             }
             return ""
         }()
-        
+
         let h1SeriesStr: String = {
             guard let b = bars, !b.isEmpty else { return isVi ? "Không có dữ liệu nến H1" : "No H1 candle data" }
             return AIPromptBuilder.buildH1CandleSeriesSummary(bars: b, count: 15, symbol: trade.symbol, isVi: isVi)
@@ -442,8 +489,8 @@ extension AIPromptBuilder {
             \(directionInfoVi)
 
             [DIỄN BIẾN CHUỖI 15 NẾN H1 GẦN NHẤT (OHLC + EMA 21/50 + WILDER RSI 14)]:
-            \(h1SeriesStr)\(momentumBlock)
-            • Hướng dẫn phân tích: Dựa vào diễn biến chuỗi nến H1 và bảng động lượng 3 đường RSI (14, EMA 9, WMA 45) ở trên để phân tích Price Action (rút râu, từ chối giá, cấu trúc nến, phân kỳ động lượng).
+            \(h1SeriesStr)\(momentumBlock)\(footprintBlock)
+            • Hướng dẫn phân tích: Dựa vào diễn biến chuỗi nến H1, bảng động lượng 3 đường RSI (14, EMA 9, WMA 45), và các mốc Footprint POC bậc thang ở trên để phân tích Price Action (rút râu, từ chối giá, cấu trúc nến, phân kỳ động lượng).
 
             NHIỆM VỤ CỦA RISK AI (CỐ VẤN QUẢN TRỊ RỦI RO ĐỘC LẬP):
             Phân tích sắc bén, khách quan, trực diện theo đúng 4 mục (không lặp lại thông tin hồ sơ tài khoản) và kết thúc bằng bảng chỉ đạo hành động [LIVE POSITION DIRECTIVE]:
@@ -453,8 +500,9 @@ extension AIPromptBuilder {
             - Phân tích động lượng H1 từ chuỗi 15 nến: Quỹ đạo RSI(14) và vị trí giá so với EMA(21) và EMA(50). Có xuất hiện phân kỳ cảnh báo đảo chiều không, hay động lượng vẫn đang gia tốc ủng hộ giữ vị thế [\(isShort ? "SELL" : "BUY")]?
             - Kết luận dứt khoát: [VỊ THẾ HỢP LÝ / CẦN PHÒNG THỦ CAO / SAI LẦM KỸ THUẬT].
 
-            ### 2. Cấu trúc thị trường & Bối cảnh đa khung
-            - Cấu trúc xu hướng khung lớn có tiếp tục ủng hộ lệnh này không hay giá đang tiệm cận vùng kháng cự/hỗ trợ mạnh?
+            ### 2. Cấu trúc thị trường & Mốc cản Footprint POC
+            - Đối chiếu vị thế [\(isShort ? "SELL" : "BUY")] với Xu hướng Bậc thang Dòng tiền (Staircase Trend Bias): Lệnh có đang thuận hay nghịch chiều dịch chuyển giá trị của các phiên (Tokyo vs Daily vs Weekly)?
+            - Phản ứng nến Price Action quanh các mốc cản Footprint Key Levels (Tokyo POC, Daily POC, Weekly POC, Naked POC): Có tín hiệu từ chối rút râu hay nến xác nhận không?
             - Các vùng cản then chốt tiếp theo mà vị thế cần vượt qua hoặc có nguy cơ bị phản ứng đảo chiều?
 
             ### 3. Điểm vô hiệu hóa cấu trúc & Kế hoạch bảo vệ vốn
@@ -498,8 +546,8 @@ extension AIPromptBuilder {
             \(directionInfoEn)
 
             [RECENT 15-CANDLE H1 EXECUTION SERIES (OHLC + EMA 21/50 + WILDER RSI 14)]:
-            \(h1SeriesStr)\(momentumBlock)
-            • Analysis Directive: Analyze Price Action and the 3-line RSI momentum system (14, EMA 9, WMA 45) above (wicks, rejections, candle structure, momentum divergence).
+            \(h1SeriesStr)\(momentumBlock)\(footprintBlock)
+            • Analysis Directive: Analyze Price Action and the 3-line RSI momentum system (14, EMA 9, WMA 45) alongside Footprint Staircase POC levels above (wicks, rejections, candle structure, momentum divergence).
 
             TASK: INDEPENDENT RISK ADVISORY AUDIT:
             Provide a razor-sharp, objective, institutional critique across the 4 sections below, concluding with the [LIVE POSITION DIRECTIVE] block:
@@ -509,9 +557,10 @@ extension AIPromptBuilder {
             - H1 Momentum across the 15 bars: RSI(14) trajectory and price relation to EMA(21) and EMA(50). Any threatening divergences or is momentum accelerating?
             - Decisive Verdict: [RATIONAL POSITION / DEFENSIVE STANCE REQUIRED / FLAWED SETUP].
 
-            ### 2. Market Structure & Key Barriers
-            - Does higher timeframe structure support holding, or is price running into major structural resistance or support?
-            - Key upcoming barriers where price may react or reverse?
+            ### 2. Market Structure & Footprint POC Key Barriers
+            - Correlate position [\(isShort ? "SHORT" : "LONG")] with the Staircase Trend Bias (Tokyo POC vs Daily POC vs Weekly POC): Is the trade advancing with institutional value or fighting against migrating volume?
+            - Evaluate real-time price action reaction at Footprint Key Levels (Tokyo POC, Daily POC, Weekly POC, Naked POC): Are rejection wicks or confirmations appearing?
+            - Key upcoming structural targets or reversal barriers?
 
             ### 3. Structural Invalidation & Capital Defense
             - Exact price level representing structural invalidation where the setup must be aborted?
@@ -549,13 +598,13 @@ extension AIPromptBuilder {
             - Ghi chú trader: \(notes)
             - Tóm tắt nến quanh phiên: \(candleInfo)\(preTradeBlock)\(lessonsBlock)\(complianceBlock)
             \(trajectoryBlock)
-            \(candlesTableBlock)\(momentumBlock)
-            
+            \(candlesTableBlock)\(momentumBlock)\(footprintBlock)
+
             \(directionInfoVi)
-            
+
             NHIỆM VỤ CỦA RISK AI (BẢN ĐÚC KẾT BÀI HỌC KỶ LUẬT):
             Nhận xét chuyên nghiệp, sắc bén theo 4 mục:
-            
+
             ### 1. Đánh giá chất lượng điểm vào & Động lượng nến
             - Điểm vào có tuân thủ Playbook/kế hoạch không? Đối chiếu với hành động giá nến xác nhận quanh vùng cản.
             - Phân tích Động lượng RSI Core (BẮT BUỘC TRÍCH DẪN TỪ BẢNG ĐỘNG LƯỢNG):
@@ -563,14 +612,17 @@ extension AIPromptBuilder {
               • So sánh EMA(9) vs WMA(45): Nền trung hạn ủng hộ Mua hay Bán hay đang nén Squeeze?
               • Tương quan 3 đường: RSI nằm trên/dưới EMA9 và WMA45? Có giao cắt hay phân kỳ bất lợi không?
               • Kết luận: Vào lệnh thuận dòng động lượng hay ngược đà RSI?
-            
+
             ### 2. Đánh giá quản trị lệnh & Điểm thoát
             - Điểm thoát ở \(exitStr) là tuân thủ kế hoạch (chạm TP/SL chuẩn) hay do tâm lý (chốt non, gồng lỗ)?
             - Trader có thực hiện dời SL bảo vệ vị thế (Breakeven/Trailing Stop) đúng kỹ thuật không?
-            
-            ### 3. Cấu trúc thị trường & Bối cảnh đa khung
-            - Thị trường đã đi đúng hay ngược phân tích? Phản ứng giá quanh các ngưỡng cản then chốt đã tác động thế nào đến lệnh?
-            
+
+            ### 3. Cấu trúc thị trường & Mốc cản Footprint POC
+            - Đối chiếu điểm vào và điểm thoát với các mốc Footprint Key Levels (Weekly POC, Daily POC, Session POC, Naked POC):
+              • Lệnh vào có thuận theo Xu hướng Bậc thang Dòng tiền (Staircase Trend Bias: Tokyo vs Daily vs Weekly) không?
+              • Điểm vào có nến xác nhận Price Action (Pinbar rút râu, Engulfing) tại cản POC không hay vào theo cảm tính?
+              • Điểm chốt lời/cắt lỗ có đặt chuẩn theo các mốc Naked POC thanh khoản không?
+
             ### 4. Phân loại sai lệch & Bài học kỷ luật
             - Nếu lệnh này thua lỗ hoặc thoát lệnh sai nguyên tắc, BẮT BUỘC PHÂN LOẠI theo 1 trong 4 nhóm:
               1. [Lỗi thực thi (Bad Execution)]: Vào lệnh sai điểm, trễ, đuổi giá (FOMO), chốt non, nới rộng SL sai quy tắc.
@@ -593,12 +645,12 @@ extension AIPromptBuilder {
             - Trader Notes: \(notes)
             - Context: \(candleInfo)\(preTradeBlock)\(lessonsBlock)\(complianceBlock)
             \(trajectoryBlock)
-            \(candlesTableBlock)\(momentumBlock)
-            
+            \(candlesTableBlock)\(momentumBlock)\(footprintBlock)
+
             \(directionInfoEn)
-            
+
             TASK: POST-TRADE FORENSIC DISCIPLINE AUDIT:
-            
+
             ### 1. Entry Quality & Candlestick Momentum
             - Did this entry follow defined Playbook? Cross-examine with candle action and confirmed rejection at setup levels.
             - RSI Core Momentum (MANDATORY METRIC CITATION FROM TABLE):
@@ -606,14 +658,17 @@ extension AIPromptBuilder {
               • Compare EMA(9) vs WMA(45): Did intermediate baseline favor Bulls, Bears, or Squeeze?
               • 3-Line Alignment: Was RSI operating above/below EMA9 & WMA45? Any divergences?
               • Momentum Alignment Verdict: Was entry executed with or against prevailing momentum?
-            
+
             ### 2. Execution & Exit Quality
             - Was the exit at \(exitStr) planned (hit TP/SL) or emotional (panicked early exit, widened SL)?
             - Did the trader execute defensive trailing stop management properly?
-            
-            ### 3. Market Structure & Multi-Timeframe Context
-            - What structural barrier or candle reaction dictated the outcome?
-            
+
+            ### 3. Market Structure & Footprint POC Key Barriers
+            - Correlate entry and exit with Footprint Key Levels (Weekly POC, Daily POC, Session POC, Naked POC):
+              • Did the trade align with the Staircase Trend Bias (Tokyo POC vs Daily POC vs Weekly POC)?
+              • Did entry feature confirmed Price Action at key barriers (Pinbar rejection or engulfing)?
+              • Was exit or SL/TP placed rationally against Naked POC liquidity pools?
+
             ### 4. Failure Classification & Discipline Takeaway
             - If this trade was a loss or suboptimal, CLASSIFY the primary cause into one of the four canonical modes:
               1. [Bad Execution]: Missed entry level, chasing price (FOMO), premature exit, or improper SL modification.
@@ -625,7 +680,7 @@ extension AIPromptBuilder {
             """
         }
     }
-    
+
     // MARK: - Pre-Entry Candlestick Trajectory & Confirmation Entry Audit Computation
     public static func computePreEntryTrajectory(
         trade: Trade,
@@ -635,24 +690,24 @@ extension AIPromptBuilder {
         isVi: Bool
     ) -> String {
         guard let allBars = bars, !allBars.isEmpty else { return "" }
-        
+
         let entryDate = trade.openedAt
         let preBars = allBars.filter { $0.date <= entryDate }
         let relevantBars = preBars.isEmpty ? Array(allBars.suffix(12)) : Array(preBars.suffix(12))
         guard !relevantBars.isEmpty else { return "" }
-        
+
         let maxHigh = relevantBars.map(\.high).max() ?? trade.avgEntry
         let minLow = relevantBars.map(\.low).min() ?? trade.avgEntry
         let maxHighStr = Formatters.price(maxHigh)
         let minLowStr = Formatters.price(minLow)
         let entryStr = Formatters.price(trade.avgEntry)
         let plannedEntry = plannedZone?.isEmpty == false ? (plannedZone ?? "") : (isVi ? "Vùng kỹ thuật" : "Technical setup zone")
-        
+
         let df = DateFormatter()
         df.dateFormat = "HH:mm"
         df.timeZone = displayTimeZone
         let entryTime = df.string(from: trade.openedAt)
-        
+
         let isShort = trade.direction == .short
         let extremePriceStr = isShort ? maxHighStr : minLowStr
         let zoneActionStrVi = isShort
@@ -661,14 +716,14 @@ extension AIPromptBuilder {
         let zoneActionStrEn = isShort
             ? "rallied to peak at \(maxHighStr) (TESTED SUPPLY)"
             : "dropped to trough at \(minLowStr) (TESTED DEMAND)"
-        
+
         let setupTypeVi = isShort ? "vùng cung" : "vùng cầu"
         let setupActionVi = isShort ? "bán dưới vùng cung" : "mua trên vùng cầu"
         let setupActionEn = isShort ? "selling below supply" : "buying above demand"
-        
+
         if isVi {
             return """
-            
+
             [HÀNH TRÌNH GIÁ TRƯỚC KHI VÀO LỆNH (PRE-ENTRY PRICE TRAJECTORY & CONFIRMATION AUDIT)]:
             • Thời điểm vào lệnh: lúc \(entryTime) ở mức giá \(entryStr)
             • Diễn biến nến M15 trước lệnh: Cao nhất: \(maxHighStr) | Thấp nhất: \(minLowStr)
@@ -676,12 +731,12 @@ extension AIPromptBuilder {
               - Kế hoạch dự kiến: [\(plannedEntry)]
               - Thực tế thị trường: Nến M15 ĐÃ TỪNG \(zoneActionStrVi)!
               - Sau khi chạm mốc \(extremePriceStr), giá đảo chiều đóng nến tại \(entryStr) -> Trader vào lệnh theo đúng TÍN HIỆU XÁC NHẬN (CONFIRMATION ENTRY / MSS)!
-            
+
             [NGUYÊN TẮC THỰC THI]: Giá đã kiểm tra \(setupTypeVi) (\(extremePriceStr)) rồi mới xác nhận ở \(entryStr). Đây là lệnh xác nhận kỷ luật, không phê phán là vào sớm hay \(setupActionVi).
             """
         } else {
             return """
-            
+
             [PRE-ENTRY PRICE TRAJECTORY & CONFIRMATION AUDIT]:
             • Execution Time: \(entryTime) at \(entryStr)
             • Pre-Entry M15 Range: High: \(maxHighStr) | Low: \(minLowStr)
@@ -689,7 +744,7 @@ extension AIPromptBuilder {
               - Planned Zone: [\(plannedEntry)]
               - Reality: Price DID \(zoneActionStrEn)!
               - Execution: After testing \(extremePriceStr), price rejected and closed at \(entryStr) -> Trader executed on disciplined CONFIRMATION ENTRY.
-            
+
             [EXECUTION PRINCIPLE]: Price tested \(extremePriceStr) before confirmation at \(entryStr). This is a disciplined confirmation entry, do not evaluate as premature entry or "\(setupActionEn)".
             """
         }
@@ -708,48 +763,48 @@ extension AIPromptBuilder {
             ==================================================
             [GÓC NHÌN PHÂN TÍCH ĐỘC LẬP \(num)]:
             \(AIPromptBuilder.distillAnalysis(a))
-            
+
             """
         }
-        
+
         let isShort = trade.direction == .short
         let dirStr = isShort ? "SELL" : "BUY"
         let entryStr = Formatters.price(trade.avgEntry, symbol: trade.symbol)
         let slStr = trade.stopLoss.map { Formatters.price($0, symbol: trade.symbol) } ?? "None"
         let pnlStr = Formatters.currency(trade.netPnl)
         let isOpen = trade.closedAt == nil
-        
+
         if isVi {
             return """
             BẠN LÀ RISK AI - GIÁM ĐỐC QUẢN TRỊ RỦI RO & HUẤN LUYỆN VIÊN TRƯỞNG (CHIEF RISK OFFICER).
-            
+
             [THÔNG SỐ VỊ THẾ GIAO DỊCH]:
             • Cặp tiền: \(trade.symbol) | Vị thế: [\(dirStr)] | Khối lượng: \(trade.quantity) lots
             • Giá vào (Entry): \(entryStr) | Mức SL hiện tại: \(slStr) | Trạng thái: [\(isOpen ? "ĐANG MỞ (LIVE)" : "ĐÃ ĐÓNG (CLOSED)")]
             • PnL: \(pnlStr)
-            
+
             Dưới đây là \(analyses.count) góc nhìn phân tích độc lập từ các mô hình kỹ thuật đối với vị thế trên:
-            
+
             \(analysesBlock)==================================================
-            
+
             [NGUYÊN TẮC TỔNG HỢP VÀ ĐIỀU PHỐI ĐỘC LẬP]:
             Tổng hợp và đúc kết thành MỘT BẢN ĐÁNH GIÁ CHUYÊN NGHIỆP DUY NHẤT dưới tư cách RISK AI.
             Tuyệt đối KHÔNG nhắc đến "Góc nhìn 1/2/3", "các mô hình AI", hay "hội đồng". Bạn phát ngôn với một tiếng nói duy nhất là RISK AI.
-            
+
             NGUYÊN TẮC BẢO VỆ RỦI RO VÀ TƯ DUY GIAO DỊCH CHUYÊN NGHIỆP:
             1. BẢO TOÀN VỊ THẾ & TRAILING STOP:
                - Khi lệnh \(dirStr) có SL đã được dời vượt qua giá vào theo chiều có lợi (đối với SELL: SL nằm dưới giá vào; đối với BUY: SL nằm trên giá vào): ĐÂY LÀ HÀNH ĐỘNG DỜI SL DƯƠNG / TRAILING STOP ĐỂ BẢO VỆ VỐN VÀ KHÓA LÃI (RISK-FREE). BẮT BUỘC công nhận đây là kỹ năng quản trị rủi ro an toàn tuyệt đối, TUYỆT ĐỐI KHÔNG ĐƯỢC coi là lỗi kỹ thuật hay sai chiều.
                - Nếu có góc nhìn độc lập nào hiểu nhầm việc kéo SL bảo vệ thành lỗi kỹ thuật: BẮT BUỘC BÁC BỎ sự hiểu nhầm đó và khẳng định vị thế đã an toàn.
             2. CĂN CỨ VÀO ĐỘNG LƯỢNG VÀ CẤU TRÚC ĐA KHUNG:
                - Kết hợp hành động giá nến và hệ thống 3 đường Động lượng RSI để đưa ra chỉ đạo hành động cụ thể.
-            
+
             ĐỊNH DẠNG ĐẦU RA CHUẨN:
             \(isOpen ? """
             ### 1. Thẩm định tính hợp lý của vị thế & Động lượng nến
             ### 2. Cấu trúc thị trường & Mức cản then chốt
             ### 3. Điểm vô hiệu hóa cấu trúc & Kế hoạch bảo vệ vốn
             ### 4. Đối chiếu Hồ sơ Trader & Phòng chống lỗi tâm lý
-            
+
             [LIVE POSITION DIRECTIVE]
             - Action: [HOLD hoặc PARTIAL TP hoặc MOVE SL TO BE hoặc CLOSE NOW]
             - Current Price: [Thị giá hiện tại]
@@ -762,32 +817,116 @@ extension AIPromptBuilder {
             ### 3. Cấu trúc thị trường & Bài học thực chiến
             ### 4. Kỷ luật vốn & Phòng chống tái phạm
             """)
-            
+
             > [Đúng 1 câu quy tắc kỷ luật hành động không khoan nhượng của nhà giao dịch chuyên nghiệp]
             """
         } else {
             return """
             YOU ARE RISK AI - CHIEF RISK OFFICER & MASTER TRADING COACH.
-            
+
             [TRADE CONTEXT]:
             • Symbol: \(trade.symbol) | Direction: [\(dirStr)] | Volume: \(trade.quantity) lots
             • Entry: \(entryStr) | Stop Loss: \(slStr) | Status: [\(isOpen ? "LIVE OPEN" : "CLOSED")]
             • PnL: \(pnlStr)
-            
+
             Below are \(analyses.count) independent technical reviews of this position:
-            
+
             \(analysesBlock)==================================================
-            
+
             [SYNTHESIS & RESOLUTION DIRECTIVE]:
             Synthesize the independent reviews into ONE SINGLE AUTHORITATIVE COACHING PLAN as RISK AI.
             Never mention "Perspective 1/2/3" or "AI models". You speak with one single voice as RISK AI.
-            
+
             PROFESSIONAL CAPITAL PRESERVATION DIRECTIVES:
             1. POSITIVE SL & TRAILING STOP PRESERVATION:
                - When a \(dirStr) trade has its Stop Loss moved past entry into profit (for SELL: SL below entry; for BUY: SL above entry): THIS IS A TRAILING STOP / POSITIVE LOCK TO SECURE PROFIT (RISK-FREE). Mandate recognition of this as professional capital preservation, NOT an execution error.
                - Overrule any dissenting view that misinterprets trailing stop loss protection.
-            
+
             CONCLUDE WITH STANDARD SECTIONS AND FINAL DIRECTIVE BLOCK.
+            """
+        }
+    }
+
+    // MARK: - Footprint & Price Action Confluence Prompt Block
+    public static func buildFootprintAndPatternsBlock(
+        symbol: String,
+        currentPrice: Decimal,
+        keyLevels: [KeyLevel],
+        sessionProfiles: [SessionProfileSnapshot],
+        developingProfiles: [DevelopingProfile],
+        patterns: [DetectedCandlePattern],
+        isVi: Bool
+    ) -> String {
+        let weeklyPoc = sessionProfiles.first(where: { $0.sessionType == .weekly })?.pocPrice ?? developingProfiles.first(where: { $0.sessionType == .weekly })?.currentPoc
+        let dailyPoc = sessionProfiles.first(where: { $0.sessionType == .daily })?.pocPrice ?? developingProfiles.first(where: { $0.sessionType == .daily })?.currentPoc
+        let tokyoPoc = sessionProfiles.first(where: { $0.sessionType == .tokyo })?.pocPrice ?? developingProfiles.first(where: { $0.sessionType == .tokyo })?.currentPoc
+        let londonPoc = sessionProfiles.first(where: { $0.sessionType == .london })?.pocPrice ?? developingProfiles.first(where: { $0.sessionType == .london })?.currentPoc
+        let nyPoc = sessionProfiles.first(where: { $0.sessionType == .newYork })?.pocPrice ?? developingProfiles.first(where: { $0.sessionType == .newYork })?.currentPoc
+
+        guard weeklyPoc != nil || dailyPoc != nil || tokyoPoc != nil || !keyLevels.isEmpty else {
+            return ""
+        }
+
+        let staircaseBias: String = {
+            if let w = weeklyPoc, let d = dailyPoc {
+                if let t = tokyoPoc ?? londonPoc ?? nyPoc {
+                    if t > d && d > w {
+                        return isVi ? "BẬC THANG TĂNG GIÁ (Tokyo POC > Daily POC > Weekly POC) -> Dòng tiền liên tục nâng đáy giá trị lên cao hơn" : "BULLISH STAIRCASE (Tokyo POC > Daily POC > Weekly POC)"
+                    } else if t < d && d < w {
+                        return isVi ? "BẬC THANG GIẢM GIÁ (Tokyo POC < Daily POC < Weekly POC) -> Dòng tiền liên tục đè trần giá trị xuống thấp hơn" : "BEARISH STAIRCASE (Tokyo POC < Daily POC < Weekly POC)"
+                    }
+                }
+                if d > w {
+                    return isVi ? "DÒNG TIỀN NGÀY CAO HƠN TUẦN (Daily POC > Weekly POC) -> Thiên hướng Tăng" : "BULLISH BIAS (Daily POC > Weekly POC)"
+                } else if d < w {
+                    return isVi ? "DÒNG TIỀN NGÀY THẤP HƠN TUẦN (Daily POC < Weekly POC) -> Thiên hướng Giảm" : "BEARISH BIAS (Daily POC < Weekly POC)"
+                }
+            }
+            return isVi ? "CÂN BẰNG / TÍCH LŨY (Overlapping Value Areas)" : "BALANCED / OVERLAPPING"
+        }()
+
+        var pocList: [String] = []
+        if let w = weeklyPoc { pocList.append("Weekly POC: \(Formatters.price(w, symbol: symbol))") }
+        if let d = dailyPoc { pocList.append("Daily POC: \(Formatters.price(d, symbol: symbol))") }
+        if let t = tokyoPoc { pocList.append("Tokyo POC: \(Formatters.price(t, symbol: symbol))") }
+        if let l = londonPoc { pocList.append("London POC: \(Formatters.price(l, symbol: symbol))") }
+        if let n = nyPoc { pocList.append("New York POC: \(Formatters.price(n, symbol: symbol))") }
+
+        let nakedPocs = sessionProfiles.filter { $0.isNaked }.prefix(3)
+        let nakedStr = nakedPocs.map { "\($0.sessionType.shortCode) Naked POC: \(Formatters.price($0.pocPrice, symbol: symbol))" }.joined(separator: " | ")
+
+        let filteredPats = patterns.filter { $0.type != .insideBar && $0.type != .doji }.prefix(4)
+        let patternsStr: String = {
+            if filteredPats.isEmpty {
+                return isVi ? "Khong co mau nen dao chieu bat thuong tai can" : "No high-conviction candle patterns at key levels"
+            }
+            return filteredPats.map { pat in
+                let lvlTag = pat.confluenceKeyLevel.map { "@ \($0.label)" } ?? ""
+                return "\(pat.type.displayName) (\(pat.summary)) \(lvlTag)"
+            }.joined(separator: "\n  - ")
+        }()
+
+        if isVi {
+            return """
+
+
+            [DỮ LIỆU ĐO LƯỜNG FOOTPRINT POC BẬC THANG & PRICE ACTION]:
+            - Xu hướng Bậc thang Dòng tiền (Staircase Trend Bias): [\(staircaseBias)]
+            - Các mốc POC phiên then chốt: \(pocList.joined(separator: " | "))
+            - Mốc Naked POC chưa kiểm định (Nam châm thanh khoản): \(nakedStr.isEmpty ? "Không có" : nakedStr)
+            - Hành vi nến Price Action tại cản Footprint:
+              - \(patternsStr)
+            """
+        } else {
+            return """
+
+
+            [INSTITUTIONAL FOOTPRINT STAIRCASE POCS & PRICE ACTION CONFLUENCE]:
+            - Staircase Trend Bias: [\(staircaseBias)]
+            - Key Session POCs: \(pocList.joined(separator: " | "))
+            - Untested (Naked) POC Liquidity Targets: \(nakedStr.isEmpty ? "None" : nakedStr)
+            - Candlestick Price Action at Key Levels:
+              - \(patternsStr)
             """
         }
     }

@@ -81,9 +81,9 @@ public final class SessionFootprintCoordinator: Sendable {
         )
     }
 
-    // MARK: - Private Helpers
+    // MARK: - Synchronous Footprint Computation Helpers
 
-    private func bootstrapProfiles(from bars: [MarketBar], symbol: String) -> [SessionProfileSnapshot] {
+    public static func bootstrapProfiles(from bars: [MarketBar], symbol: String) -> [SessionProfileSnapshot] {
         guard bars.count >= 20 else { return [] }
         var result: [SessionProfileSnapshot] = []
 
@@ -203,7 +203,7 @@ public final class SessionFootprintCoordinator: Sendable {
         return result.sorted(by: { $0.endTime < $1.endTime })
     }
 
-    private func computeCurrentDeveloping(
+    public static func computeCurrentDeveloping(
         from bars: [MarketBar],
         symbol: String
     ) -> (profile: DevelopingProfile?, poc: Decimal?, session: FootprintSessionType?, list: [DevelopingProfile]) {
@@ -305,7 +305,7 @@ public final class SessionFootprintCoordinator: Sendable {
         return (primaryDev, primaryDev?.currentPoc, primaryDev?.sessionType, list)
     }
 
-    private func extractPreviousDayLevels(from bars: [MarketBar]) -> (pdh: Decimal?, pdl: Decimal?) {
+    public static func extractPreviousDayLevels(from bars: [MarketBar]) -> (pdh: Decimal?, pdl: Decimal?) {
         guard bars.count >= 24 else { return (nil, nil) }
 
         var cal = Calendar(identifier: .gregorian)

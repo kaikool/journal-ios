@@ -555,7 +555,14 @@ public actor AIReflectionService {
         }
         let activeLang = language ?? config.language
         let isVi = activeLang == "vi"
-        
+
+        let footprintData = await { () -> (levels: [KeyLevel], profiles: [SessionProfileSnapshot], devList: [DevelopingProfile], patterns: [DetectedCandlePattern]) in
+            guard let b = bars, !b.isEmpty else { return ([], [], [], []) }
+            let res = await SessionFootprintCoordinator.shared.loadKeyLevels(for: trade.symbol, recentBars: b)
+            let pats = SessionFootprintCoordinator.shared.scanConfluentPatterns(bars: b, keyLevels: res.levels)
+            return (res.levels, res.profiles, res.developingProfiles, pats)
+        }()
+
         let prompt = AIPromptBuilder.buildTradeCoachingPrompt(
             trade: trade,
             isVi: isVi,
@@ -563,7 +570,11 @@ public actor AIReflectionService {
             bars: bars,
             sessionSummary: sessionSummary,
             displayTimeZone: displayTimeZone,
-            linkedPreTradePlan: linkedPreTradePlan
+            linkedPreTradePlan: linkedPreTradePlan,
+            keyLevels: footprintData.levels,
+            sessionProfiles: footprintData.profiles,
+            developingProfiles: footprintData.devList,
+            detectedPatterns: footprintData.patterns
         )
         
         // Multi-Model Parallel Ensemble for Trade Coaching (GPT-120B, Qwen-27B, Gemini-3.5-Flash-Lite)
@@ -723,6 +734,25 @@ public actor AIReflectionService {
         let activeLang = language ?? config.language
         let isVi = activeLang == "vi"
         let hasImage = (chartImageBase64?.isEmpty == false) || (chartImagesBase64?.isEmpty == false)
+
+        let footprintData = await { () -> (levels: [KeyLevel], profiles: [SessionProfileSnapshot], patterns: [DetectedCandlePattern]) in
+            let refBars = !m15Bars.isEmpty ? m15Bars : (!h1Bars.isEmpty ? h1Bars : h4Bars)
+            guard !refBars.isEmpty else { return ([], [], []) }
+            let res = await SessionFootprintCoordinator.shared.loadKeyLevels(for: symbol, recentBars: refBars)
+            let pats = SessionFootprintCoordinator.shared.scanConfluentPatterns(bars: refBars, keyLevels: res.levels)
+            return (res.levels, res.profiles, pats)
+        }()
+
+        let preTradeSnapshot = MarketStateSnapshotBuilder.computeSnapshot(
+            symbol: symbol,
+            barsH4: h4Bars,
+            barsM15: m15Bars,
+            keyLevels: footprintData.levels,
+            patterns: footprintData.patterns,
+            events: events,
+            referenceDate: Date()
+        )
+
         let prompt = AIPromptBuilder.buildPreTradeAnalysisPrompt(
             symbol: symbol,
             d1Bars: d1Bars,
@@ -731,6 +761,7 @@ public actor AIReflectionService {
             m15Bars: m15Bars,
             events: events,
             language: activeLang,
+            marketSnapshot: preTradeSnapshot,
             sessionSummary: sessionSummary,
             traderProfile: traderProfile,
             displayTimeZone: displayTimeZone,

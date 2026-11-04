@@ -404,8 +404,23 @@ public struct TradeAICoachSheet: View {
             var promptComponents: [String] = []
             promptComponents.append(isVi ? "CÂU HỎI CỦA TRADER:\n\"\(q)\"" : "TRADER INQUIRY:\n\"\(q)\"")
             promptComponents.append(liveSnapshot)
-            
+
             if let b = activeBars, !b.isEmpty {
+                let footprintData = await SessionFootprintCoordinator.shared.loadKeyLevels(for: trade.symbol, recentBars: b)
+                let pats = SessionFootprintCoordinator.shared.scanConfluentPatterns(bars: b, keyLevels: footprintData.levels)
+                let footprintBlock = AIPromptBuilder.buildFootprintAndPatternsBlock(
+                    symbol: trade.symbol,
+                    currentPrice: b.last?.close ?? trade.avgEntry,
+                    keyLevels: footprintData.levels,
+                    sessionProfiles: footprintData.profiles,
+                    developingProfiles: footprintData.developingProfiles,
+                    patterns: pats,
+                    isVi: isVi
+                )
+                if !footprintBlock.isEmpty {
+                    promptComponents.append(footprintBlock)
+                }
+
                 let h1Series = AIPromptBuilder.buildH1CandleSeriesSummary(
                     bars: b,
                     count: 15,
@@ -421,7 +436,7 @@ public struct TradeAICoachSheet: View {
                 """
                 promptComponents.append(h1Block)
             }
-            
+
             var augmentedPrompt = promptComponents.joined(separator: "\n\n")
             if isVi {
                 augmentedPrompt += """
@@ -429,7 +444,7 @@ public struct TradeAICoachSheet: View {
 
                 CHỈ THỊ PHÂN TÍCH & TRẢ LỜI:
                 - BẮT BUỘC: Trả lời 100% bằng TIẾNG VIỆT, đi thẳng vào câu hỏi của trader.
-                - Dựa vào diễn biến chuỗi 15 nến H1 và trạng thái vị thế ở trên để phân tích Price Action (rút râu, từ chối giá, cấu trúc nến, phân kỳ RSI).
+                - ĐỐI CHIẾU với các mốc Footprint POC bậc thang (Weekly POC, Daily POC, Tokyo/London/NY POC, Naked POC) và phản ứng nến Price Action (rút râu, từ chối giá, engulfing).
                 - Đưa ra kết luận hành động dứt khoát: Giữ nguyên lệnh, Dời SL về hòa vốn (BE), hay Chốt một phần lợi nhuận (nêu rõ số lot chốt và mức SL mới).
                 """
             } else {
@@ -438,7 +453,7 @@ public struct TradeAICoachSheet: View {
 
                 ANALYSIS & RESPONSE DIRECTIVE:
                 - Respond directly and concisely in English to the trader's inquiry.
-                - Analyze Price Action from the 15-candle H1 sequence and real-time position state above (wicks, rejections, support/resistance, RSI divergence).
+                - Correlate directly with the Footprint Staircase POC levels (Weekly, Daily, Session, Naked POCs) and real-time Price Action reactions.
                 - Provide a decisive operational directive: Hold, Move SL to BE, Partial TP (state volume and new SL), or Close Now.
                 """
             }

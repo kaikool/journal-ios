@@ -19,7 +19,7 @@ public enum AIToolDispatcher {
         case .queryTradeExcursions:
             return await executeQueryTradeExcursions(call: call)
         case .queryMarketStructure:
-            return executeQueryMarketStructure(call: call)
+            return await executeQueryMarketStructure(call: call)
         }
     }
     
@@ -231,20 +231,32 @@ public enum AIToolDispatcher {
     }
     
     // MARK: - 6. Query Market Structure Tool
-    private static func executeQueryMarketStructure(call: AIToolCall) -> AIToolResult {
+    private static func executeQueryMarketStructure(call: AIToolCall) async -> AIToolResult {
         struct Args: Codable {
             let symbol: String
             let timeframe: String?
         }
         let args = (try? JSONDecoder().decode(Args.self, from: call.argumentsJson.data(using: .utf8) ?? Data()))
         let sym = args?.symbol.uppercased() ?? "XAUUSD"
-        
+
+        let (levels, profiles, dev, devList) = await SessionFootprintCoordinator.shared.loadKeyLevels(for: sym)
+        let md = AIPromptBuilder.buildFootprintAndPatternsBlock(
+            symbol: sym,
+            currentPrice: dev?.currentPoc ?? Decimal.zero,
+            keyLevels: levels,
+            sessionProfiles: profiles,
+            developingProfiles: devList,
+            patterns: [],
+            isVi: true
+        )
+        let jsonStr = "{\"symbol\":\"\(sym)\",\"keyLevelsCount\":\(levels.count),\"profilesCount\":\(profiles.count)}"
+
         return AIToolResult(
             callId: call.id,
             toolName: .queryMarketStructure,
             isSuccess: true,
-            outputJson: "{\"symbol\":\"\(sym)\",\"status\":\"active\"}",
-            formattedMarkdown: "Mức giá then chốt và động lượng nến cho \(sym) được phân tích tự động."
+            outputJson: jsonStr,
+            formattedMarkdown: md.isEmpty ? "Mức giá then chốt cho \(sym) đang được cập nhật." : md
         )
     }
 }
