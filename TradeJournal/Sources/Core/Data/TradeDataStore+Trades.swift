@@ -172,13 +172,11 @@ extension TradeDataStore {
         if mutated {
             AppLogger.info("Universal Auto-Healing repaired \(healedTradesToSync.count) trades.")
             invalidatePerformanceCaches()
-            persistStoreAsync()
+            saveToDisk()
 
             if !healedTradesToSync.isEmpty && SupabaseService.shared.isConfigured {
                 Task {
-                    for t in healedTradesToSync {
-                        try? await SupabaseService.shared.upsertTrade(t)
-                    }
+                    _ = try? await SupabaseService.shared.upsertTrades(healedTradesToSync)
                 }
             }
         }
