@@ -722,6 +722,25 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
         var allOrders: [[String: Any]] = []
         var seenOrderIds = Set<String>()
 
+
+        func parseId(_ val: Any?) -> String? {
+            if let s = val as? String, !s.trimmingCharacters(in: .whitespaces).isEmpty {
+                return s.trimmingCharacters(in: .whitespaces)
+            }
+            if let i = val as? Int { return String(i) }
+            if let i64 = val as? Int64 { return String(i64) }
+            if let num = val as? NSNumber { return num.stringValue }
+            return nil
+        }
+
+        func parseInt(_ val: Any?) -> Int? {
+            if let i = val as? Int { return i }
+            if let i64 = val as? Int64 { return Int(i64) }
+            if let num = val as? NSNumber { return num.intValue }
+            if let s = val as? String, let i = Int(s) { return i }
+            return nil
+        }
+
         if let sJson = snapshotResult.json {
             if let posArr = sJson["positions"] as? [[String: Any]] {
                 snapshotPositions = posArr
@@ -729,7 +748,7 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
             if let ordArr = (sJson["orders"] as? [[String: Any]]) ?? (sJson["items"] as? [[String: Any]]) {
                 for it in ordArr {
                     let order = (it["order"] as? [String: Any]) ?? it
-                    if let oId = order["order_id"] as? String, !seenOrderIds.contains(oId) {
+                    if let oId = parseId(order["order_id"]) ?? parseId(order["id"]), !seenOrderIds.contains(oId) {
                         seenOrderIds.insert(oId)
                         allOrders.append(order)
                     }
@@ -750,7 +769,7 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
         if let aoJson = activeOrdersResult.json, let ordArr = (aoJson["orders"] as? [[String: Any]]) ?? (aoJson["items"] as? [[String: Any]]) {
             for it in ordArr {
                 let order = (it["order"] as? [String: Any]) ?? it
-                if let oId = order["order_id"] as? String, !seenOrderIds.contains(oId) {
+                if let oId = parseId(order["order_id"]) ?? parseId(order["id"]), !seenOrderIds.contains(oId) {
                     seenOrderIds.insert(oId)
                     allOrders.append(order)
                 }
@@ -783,7 +802,7 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
             if let dJson = dRes.json, let items = (dJson["deals"] as? [[String: Any]]) ?? (dJson["items"] as? [[String: Any]]) {
                 for it in items {
                     let deal = (it["deal"] as? [String: Any]) ?? it
-                    if let dId = deal["deal_id"] as? String ?? deal["id"] as? String,
+                    if let dId = parseId(deal["deal_id"]) ?? parseId(deal["id"]),
                        !seenDealIds.contains(dId) {
                         seenDealIds.insert(dId)
                         allDeals.append(deal)
@@ -797,7 +816,7 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
             if let oJson = oRes.json, let items = (oJson["orders"] as? [[String: Any]]) ?? (oJson["items"] as? [[String: Any]]) {
                 for it in items {
                     let order = (it["order"] as? [String: Any]) ?? it
-                    if let oId = order["order_id"] as? String ?? order["id"] as? String,
+                    if let oId = parseId(order["order_id"]) ?? parseId(order["id"]),
                        !seenOrderIds.contains(oId) {
                         seenOrderIds.insert(oId)
                         allOrders.append(order)
@@ -806,16 +825,6 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
             }
         }
 
-        // Helper: Robust ID parser (handles Int, Int64, String, NSNumber in JSON)
-        func parseId(_ val: Any?) -> String? {
-            if let s = val as? String, !s.trimmingCharacters(in: .whitespaces).isEmpty {
-                return s.trimmingCharacters(in: .whitespaces)
-            }
-            if let i = val as? Int { return String(i) }
-            if let i64 = val as? Int64 { return String(i64) }
-            if let num = val as? NSNumber { return num.stringValue }
-            return nil
-        }
 
         // 4. Map Orders and Positions to SL / TP by position_id and order_id
         func extractSltp(from dict: [String: Any]) -> (sl: Decimal?, tp: Decimal?) {
@@ -901,7 +910,7 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
 
             // Robust classification of open (IN) vs close (OUT) deal
             let entryTypeStr = (d["entry_type"] as? String ?? d["entry"] as? String ?? "").lowercased()
-            let entryInt = d["entry"] as? Int
+            let entryInt = parseInt(d["entry"]) ?? parseInt(d["entry_type"])
             let typeStr = (d["type"] as? String ?? d["action"] as? String ?? "").lowercased()
             let reasonStr = (d["reason"] as? String ?? d["close_reason"] as? String ?? d["comment"] as? String ?? "").lowercased()
             let hasCloseReason = reasonStr.contains("sl") || reasonStr.contains("tp") || reasonStr.contains("close") || reasonStr.contains("stop_out") || reasonStr.contains("so")

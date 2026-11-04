@@ -276,6 +276,7 @@ extension TradeDataStore {
         // Automatically mine behavioral leaks across all trade history in the backend and sync into TraderProfile
         TraderBehaviorMiningEngine.mineAndSyncToProfile(dataStore: self)
         
+        healAndSanitizeAllTrades()
         invalidatePerformanceCaches()
         if SupabaseService.shared.isConfigured {
             Task { [weak self] in

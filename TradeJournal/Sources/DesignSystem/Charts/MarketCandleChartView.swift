@@ -21,6 +21,9 @@ public struct MarketCandleChartView: View {
     @State private var panOffsetY: CGFloat = 0.0
     @State private var lastDragX: CGFloat = 0.0
     @State private var lastDragY: CGFloat = 0.0
+    @State private var priceScaleMultiplier: CGFloat = 1.0
+    @State private var lastPriceDragY: CGFloat = 0.0
+    @State private var lastTimeDragX: CGFloat = 0.0
     @State private var currentPlotWidth: CGFloat = 320
 
     public init(
@@ -57,7 +60,8 @@ public struct MarketCandleChartView: View {
                         if currentPlotWidth != pw { currentPlotWidth = pw }
                         let baseCount = max(bars.count, 40)
                         let stepX = pw / CGFloat(max(1, baseCount))
-                        let totalW = CGFloat(bars.count) * stepX
+                        let rightMargin = stepX * 5.0
+                        let totalW = CGFloat(bars.count) * stepX + rightMargin
                         if totalW > pw && panOffset == 0 {
                             panOffset = pw - totalW
                         }
@@ -79,12 +83,14 @@ public struct MarketCandleChartView: View {
                         let baseCount = max(bars.count, 40)
                         let oldSlotCount = max(8, Double(baseCount) / Double(oldZoom))
                         let oldStepX = plotW / CGFloat(max(1, oldSlotCount))
-                        let oldTotalW = CGFloat(bars.count) * oldStepX
+                        let oldRightMargin = oldStepX * 5.0
+                        let oldTotalW = CGFloat(bars.count) * oldStepX + oldRightMargin
                         let oldMinOffset = min(0, plotW - oldTotalW)
 
                         let newSlotCount = max(8, Double(baseCount) / Double(newZoom))
                         let newStepX = plotW / CGFloat(max(1, newSlotCount))
-                        let newTotalW = CGFloat(bars.count) * newStepX
+                        let newRightMargin = newStepX * 5.0
+                        let newTotalW = CGFloat(bars.count) * newStepX + newRightMargin
                         let newMinOffset = min(0, plotW - newTotalW)
 
                         if oldMinOffset < 0 && newMinOffset < 0 {
@@ -104,19 +110,26 @@ public struct MarketCandleChartView: View {
                         let effectiveZoom = max(0.5, min(4.0, zoomScale))
                         let slotCount = max(8, Double(baseCount) / Double(effectiveZoom))
                         let stepX = plotW / CGFloat(max(1, slotCount))
-                        let totalW = CGFloat(bars.count) * stepX
+                        let rightMargin = stepX * 5.0
+                        let totalW = CGFloat(bars.count) * stepX + rightMargin
 
                         let delta = value.translation.width - lastDragX
+                        let dy = value.translation.height - lastDragY
                         lastDragX = value.translation.width
+                        lastDragY = value.translation.height
 
-                        // Smooth zero-deadzone TradingView fluid panning
+                        // Smooth zero-deadzone TradingView fluid horizontal panning
                         if totalW > plotW {
                             let minOffset = plotW - totalW
                             panOffset = min(0, max(minOffset, panOffset + delta))
                         }
+
+                        // Smooth 1-finger vertical price panning
+                        panOffsetY += dy
                     }
                     .onEnded { _ in
                         lastDragX = 0
+                        lastDragY = 0
                         hoveredBarIndex = nil
                     }
             )
@@ -140,12 +153,14 @@ public struct MarketCandleChartView: View {
             .onTapGesture(count: 2) {
                 withAnimation(AppAnimations.springStandard) {
                     zoomScale = 1.0
+                    priceScaleMultiplier = 1.0
+                    panOffsetY = 0.0
                     let plotW = max(10, currentPlotWidth)
                     let baseCount = max(bars.count, 40)
                     let stepX = plotW / CGFloat(max(1, baseCount))
-                    let totalW = CGFloat(bars.count) * stepX
+                    let rightMargin = stepX * 5.0
+                    let totalW = CGFloat(bars.count) * stepX + rightMargin
                     panOffset = min(0, plotW - totalW)
-                    panOffsetY = 0.0
                 }
             }
         }
@@ -163,10 +178,6 @@ public struct MarketCandleChartView: View {
             }
 
             Spacer()
-
-            if abs(zoomScale - 1.0) > 0.05 {
-                AppBadge(String(format: "%.1fx", zoomScale), style: .brand)
-            }
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
@@ -183,11 +194,13 @@ public struct MarketCandleChartView: View {
         let stepX = plotWidth / CGFloat(max(1, slotCount))
         let candleWidth = max(2.0, min(20.0, stepX * 0.72))
 
-        let totalContentWidth = CGFloat(bars.count) * stepX
+        let rightMarginBars: CGFloat = 5.0
+        let rightMarginWidth = stepX * rightMarginBars
+        let totalContentWidth = CGFloat(bars.count) * stepX + rightMarginWidth
         let minPan = min(0, plotWidth - totalContentWidth)
         let clampedPan = totalContentWidth > plotWidth ? min(0, max(minPan, panOffset)) : 0
 
-        // TradingView Viewport Auto-Fitting Price Scale
+        // TradingView Viewport Auto-Fitting Price Scale with 2D Pan and Price Scale Multiplier
         let leftX = -clampedPan
         let rightX = leftX + plotWidth
         let startIdx = max(0, min(bars.count - 1, Int(floor(leftX / stepX))))
@@ -198,11 +211,13 @@ public struct MarketCandleChartView: View {
         let highs = slice.map { ($0.high as NSDecimalNumber).doubleValue }
         let minVal = lows.min() ?? 1.0
         let maxVal = highs.max() ?? 2.0
-        let rawSpan = max(0.0001, maxVal - minVal)
-        let pad = rawSpan * 0.10
-        let minP = minVal - pad
-        let maxP = maxVal + pad
-        let span = maxP - minP
+        let rawSpan = max(0.0001, (maxVal - minVal) * Double(priceScaleMultiplier))
+        let centerPrice = (minVal + maxVal) / 2.0
+        let yPriceShift = (Double(panOffsetY) / Double(plotHeight)) * rawSpan
+        let shiftedCenter = centerPrice + yPriceShift
+        let minP = shiftedCenter - (rawSpan / 2.0)
+        let maxP = shiftedCenter + (rawSpan / 2.0)
+        let span = max(0.0001, maxP - minP)
 
         return ZStack(alignment: .topLeading) {
             // Day / Session Vertical Dividers
@@ -210,6 +225,20 @@ public struct MarketCandleChartView: View {
 
             // Price Grid & Right Axis
             gridAndPriceAxis(width: plotWidth, height: plotHeight, minP: minP, maxP: maxP)
+
+            // Dedicated right Price Axis touch target for vertical price scale zoom
+            Color.clear
+                .frame(width: 55, height: plotHeight)
+                .contentShape(Rectangle())
+                .position(x: plotWidth + 27.5, y: plotHeight / 2.0)
+                .gesture(priceAxisDragGesture(plotHeight: plotHeight))
+
+            // Dedicated bottom Time Axis touch target for horizontal zoom
+            Color.clear
+                .frame(width: plotWidth, height: 20)
+                .contentShape(Rectangle())
+                .position(x: plotWidth / 2.0, y: plotHeight + 10)
+                .gesture(timeAxisDragGesture(plotWidth: plotWidth))
 
             // Volume Histogram (Subtle background)
             volumeHistogram(plotWidth: plotWidth, plotHeight: plotHeight, stepX: stepX, candleWidth: candleWidth, panOffset: clampedPan)
@@ -852,5 +881,34 @@ public struct MarketCandleChartView: View {
             formatter.dateFormat = "HH:mm"
         }
         return formatter.string(from: date)
+    }
+
+    // MARK: - Price Axis & Time Axis Drag Gestures (TradingView Axis Zoom)
+    private func priceAxisDragGesture(plotHeight: CGFloat) -> some Gesture {
+        DragGesture(minimumDistance: 1)
+            .onChanged { value in
+                let dy = value.translation.height - lastPriceDragY
+                lastPriceDragY = value.translation.height
+                // Dragging down expands price range (zoom out/compress bars), dragging up compresses price range (zoom in/stretch bars)
+                let scaleChange = 1.0 + (dy / max(100, plotHeight)) * 1.5
+                priceScaleMultiplier = max(0.15, min(6.0, priceScaleMultiplier * scaleChange))
+            }
+            .onEnded { _ in
+                lastPriceDragY = 0
+            }
+    }
+
+    private func timeAxisDragGesture(plotWidth: CGFloat) -> some Gesture {
+        DragGesture(minimumDistance: 1)
+            .onChanged { value in
+                let dx = value.translation.width - lastTimeDragX
+                lastTimeDragX = value.translation.width
+                // Dragging right expands time zoom (wider candles), dragging left compresses time zoom (narrower candles)
+                let scaleChange = 1.0 + (dx / max(100, plotWidth)) * 1.8
+                zoomScale = max(0.5, min(4.0, zoomScale * scaleChange))
+            }
+            .onEnded { _ in
+                lastTimeDragX = 0
+            }
     }
 }

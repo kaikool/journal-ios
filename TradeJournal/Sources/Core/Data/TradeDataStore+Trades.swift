@@ -124,40 +124,63 @@ extension TradeDataStore {
     
     /// Deduplicates trades by key, and by semantic signature (account, symbol, direction, open time, quantity)
     public func deduplicateTrades() {
-        var cleaned = TradeDeduplicator.deduplicate(trades)
-        var mutated = false
+        let cleaned = TradeDeduplicator.deduplicate(trades)
 
-        // Heal any closed trade that has profit but was previously tagged as .breakeven
-        for i in 0..<cleaned.count {
-            if cleaned[i].status.isClosed {
-                if cleaned[i].netPnl == 0, let exitP = cleaned[i].avgExit, exitP > 0, cleaned[i].avgEntry > 0 {
+        if cleaned.count != trades.count {
+            AppLogger.info("Deduplicated trades from \(trades.count) down to \(cleaned.count)")
+            self.trades = cleaned
+            invalidatePerformanceCaches()
+        }
+        healAndSanitizeAllTrades()
+    }
+
+    /// Universal invariant auto-healing: Scans all trades in memory.
+    /// 1. If netPnl == 0 but entry and exit price are valid, recalculates contract P&L via AssetContractEngine.
+    /// 2. If netPnl > 0 and status != .win, restores status to .win.
+    /// 3. If netPnl < 0 and status != .loss, restores status to .loss.
+    /// 4. Synchronizes healed trades to persistent storage and Supabase in background without losing any user notes, tags, or playbooks.
+    public func healAndSanitizeAllTrades() {
+        var mutated = false
+        var healedTradesToSync: [Trade] = []
+
+        for i in 0..<trades.count {
+            if trades[i].status.isClosed {
+                if trades[i].netPnl == 0, let exitP = trades[i].avgExit, exitP > 0, trades[i].avgEntry > 0 {
                     let calcPnl = AssetContractEngine.calculateGrossPnl(
-                        symbol: cleaned[i].symbol,
-                        direction: cleaned[i].direction,
-                        quantity: cleaned[i].quantity,
-                        entryPrice: cleaned[i].avgEntry,
+                        symbol: trades[i].symbol,
+                        direction: trades[i].direction,
+                        quantity: trades[i].quantity,
+                        entryPrice: trades[i].avgEntry,
                         exitPrice: exitP
                     )
                     if calcPnl != 0 {
-                        cleaned[i].grossPnl = calcPnl
-                        cleaned[i].netPnl = calcPnl
+                        trades[i].grossPnl = calcPnl
+                        trades[i].netPnl = calcPnl
                         mutated = true
                     }
                 }
-                if cleaned[i].netPnl > 0 && cleaned[i].status == .breakeven {
-                    cleaned[i].status = .win
+
+                let correctStatus: TradeStatus = trades[i].netPnl > 0 ? .win : (trades[i].netPnl < 0 ? .loss : .breakeven)
+                if trades[i].status != correctStatus {
+                    trades[i].status = correctStatus
                     mutated = true
-                } else if cleaned[i].netPnl < 0 && cleaned[i].status == .breakeven {
-                    cleaned[i].status = .loss
-                    mutated = true
+                    healedTradesToSync.append(trades[i])
                 }
             }
         }
 
-        if cleaned.count != trades.count || mutated {
-            AppLogger.info("Deduplicated and sanitized trades from \(trades.count) down to \(cleaned.count)")
-            self.trades = cleaned
+        if mutated {
+            AppLogger.info("Universal Auto-Healing repaired \(healedTradesToSync.count) trades.")
             invalidatePerformanceCaches()
+            persistStoreAsync()
+
+            if !healedTradesToSync.isEmpty && SupabaseService.shared.isConfigured {
+                Task {
+                    for t in healedTradesToSync {
+                        try? await SupabaseService.shared.upsertTrade(t)
+                    }
+                }
+            }
         }
     }
     

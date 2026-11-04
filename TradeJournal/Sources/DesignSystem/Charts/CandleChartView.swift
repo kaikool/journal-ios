@@ -29,7 +29,12 @@ public struct CandleChartView: View {
     @State private var zoomScale: CGFloat = 1.0
     @State private var lastMagnification: CGFloat = 1.0
     @State private var panOffset: CGFloat = 0.0
+    @State private var panOffsetY: CGFloat = 0.0
     @State private var lastDragX: CGFloat = 0.0
+    @State private var lastDragY: CGFloat = 0.0
+    @State private var priceScaleMultiplier: CGFloat = 1.0
+    @State private var lastPriceDragY: CGFloat = 0.0
+    @State private var lastTimeDragX: CGFloat = 0.0
     @State private var currentPlotWidth: CGFloat = 320
 
     public init(
@@ -98,7 +103,8 @@ public struct CandleChartView: View {
                                 currentPlotWidth = plotW
                                 let baseCount = max(visibleBars.count, min(totalBarsCount, 50))
                                 let stepX = plotW / CGFloat(max(1, baseCount))
-                                let totalW = CGFloat(visibleBars.count) * stepX
+                                let rightMargin = stepX * 5.0
+                                let totalW = CGFloat(visibleBars.count) * stepX + rightMargin
                                 if totalW > plotW && panOffset == 0 {
                                     panOffset = plotW - totalW
                                 }
@@ -114,7 +120,8 @@ public struct CandleChartView: View {
                                 currentPlotWidth = plotW
                                 let baseCount = max(visibleBars.count, min(totalBarsCount, 50))
                                 let stepX = plotW / CGFloat(max(1, baseCount))
-                                let totalW = CGFloat(visibleBars.count) * stepX
+                                let rightMargin = stepX * 5.0
+                                let totalW = CGFloat(visibleBars.count) * stepX + rightMargin
                                 if totalW > plotW && panOffset == 0 {
                                     panOffset = plotW - totalW
                                 }
@@ -136,7 +143,8 @@ public struct CandleChartView: View {
                         let effectiveZoom = max(0.5, min(4.0, zoomScale))
                         let slotCount = max(8, Double(baseCount) / Double(effectiveZoom))
                         let stepX = plotWidth / CGFloat(max(1, slotCount))
-                        let totalW = CGFloat(visibleBars.count) * stepX
+                        let rightMargin = stepX * 5.0
+                        let totalW = CGFloat(visibleBars.count) * stepX + rightMargin
                         let minPan = min(0, plotWidth - totalW)
                         let clampedPan = totalW > plotWidth ? min(0, max(minPan, panOffset)) : 0
 
@@ -161,12 +169,14 @@ public struct CandleChartView: View {
                         let baseCount = max(visibleBars.count, min(totalBarsCount, 50))
                         let oldSlotCount = max(8, Double(baseCount) / Double(oldZoom))
                         let oldStepX = plotW / CGFloat(max(1, oldSlotCount))
-                        let oldTotalW = CGFloat(visibleBars.count) * oldStepX
+                        let oldRightMargin = oldStepX * 5.0
+                        let oldTotalW = CGFloat(visibleBars.count) * oldStepX + oldRightMargin
                         let oldMinOffset = min(0, plotW - oldTotalW)
 
                         let newSlotCount = max(8, Double(baseCount) / Double(newZoom))
                         let newStepX = plotW / CGFloat(max(1, newSlotCount))
-                        let newTotalW = CGFloat(visibleBars.count) * newStepX
+                        let newRightMargin = newStepX * 5.0
+                        let newTotalW = CGFloat(visibleBars.count) * newStepX + newRightMargin
                         let newMinOffset = min(0, plotW - newTotalW)
 
                         if oldMinOffset < 0 && newMinOffset < 0 {
@@ -186,19 +196,26 @@ public struct CandleChartView: View {
                         let effectiveZoom = max(0.5, min(4.0, zoomScale))
                         let slotCount = max(8, Double(baseCount) / Double(effectiveZoom))
                         let stepX = plotW / CGFloat(max(1, slotCount))
-                        let totalW = CGFloat(visibleBars.count) * stepX
+                        let rightMargin = stepX * 5.0
+                        let totalW = CGFloat(visibleBars.count) * stepX + rightMargin
 
-                        let delta = value.translation.width - lastDragX
+                        let dx = value.translation.width - lastDragX
+                        let dy = value.translation.height - lastDragY
                         lastDragX = value.translation.width
+                        lastDragY = value.translation.height
 
-                        // Smooth zero-deadzone TradingView fluid panning
+                        // Smooth zero-deadzone horizontal time panning
                         if totalW > plotW {
                             let minOffset = plotW - totalW
-                            panOffset = min(0, max(minOffset, panOffset + delta))
+                            panOffset = min(0, max(minOffset, panOffset + dx))
                         }
+
+                        // Smooth 1-finger vertical price panning
+                        panOffsetY += dy
                     }
                     .onEnded { _ in
                         lastDragX = 0
+                        lastDragY = 0
                         hoveredBarIndex = nil
                     }
             )
@@ -222,10 +239,13 @@ public struct CandleChartView: View {
             .onTapGesture(count: 2) {
                 withAnimation(AppAnimations.springStandard) {
                     zoomScale = 1.0
+                    panOffsetY = 0.0
+                    priceScaleMultiplier = 1.0
                     let plotW = max(10, currentPlotWidth)
                     let baseCount = max(visibleBars.count, min(totalBarsCount, 50))
                     let stepX = plotW / CGFloat(max(1, baseCount))
-                    let totalW = CGFloat(visibleBars.count) * stepX
+                    let rightMargin = stepX * 5.0
+                    let totalW = CGFloat(visibleBars.count) * stepX + rightMargin
                     panOffset = min(0, plotW - totalW)
                 }
             }
@@ -258,11 +278,6 @@ public struct CandleChartView: View {
                 .foregroundColor(AppColors.primaryText)
 
             Spacer()
-
-            // 3. Zoom Indicator (if user pinched)
-            if abs(zoomScale - 1.0) > 0.05 {
-                AppBadge(String(format: "%.1fx", zoomScale), style: .brand)
-            }
 
             // Timeframe Resolution Selector Tabs: 15m, 1h, 4h
             if onResolutionChange != nil {
@@ -303,23 +318,43 @@ public struct CandleChartView: View {
         let stepX = plotWidth / CGFloat(max(1, slotCount))
         let candleWidth = max(2.5, min(24.0, stepX * 0.7))
 
-        let totalContentWidth = CGFloat(visibleBars.count) * stepX
+        let rightMarginBars: CGFloat = 5.0
+        let rightMarginWidth = stepX * rightMarginBars
+        let totalContentWidth = CGFloat(visibleBars.count) * stepX + rightMarginWidth
         let minPan = min(0, plotWidth - totalContentWidth)
         let clampedPan = totalContentWidth > plotWidth ? min(0, max(minPan, panOffset)) : 0
 
-        // TradingView Dynamic Viewport Auto-Scaling (fits precisely to visible bars in viewport)
+        // TradingView Dynamic Viewport Auto-Scaling with 2D Pan and Price Scale Multiplier
         let bounds = calculateViewportPriceBounds(stepX: stepX, clampedPan: clampedPan, plotWidth: plotWidth)
-        let minP = bounds.minPrice
-        let maxP = bounds.maxPrice
+        let rawPriceSpan = max(0.00001, (bounds.maxPrice - bounds.minPrice) * Double(priceScaleMultiplier))
+        let centerPrice = (bounds.minPrice + bounds.maxPrice) / 2.0
+        let yPriceShift = (Double(panOffsetY) / Double(plotHeight)) * rawPriceSpan
+        let shiftedCenter = centerPrice + yPriceShift
+        let minP = shiftedCenter - (rawPriceSpan / 2.0)
+        let maxP = shiftedCenter + (rawPriceSpan / 2.0)
         let priceSpan = max(0.00001, maxP - minP)
 
         return ZStack(alignment: .topLeading) {
             // Grid lines and right price axis
             gridAndPriceAxis(width: plotWidth, height: plotHeight, minP: minP, maxP: maxP, fullWidth: size.width)
 
+            // Dedicated right Price Axis touch target for vertical price scale zoom
+            Color.clear
+                .frame(width: rightAxisWidth, height: plotHeight)
+                .contentShape(Rectangle())
+                .position(x: plotWidth + (rightAxisWidth / 2.0), y: plotHeight / 2.0)
+                .gesture(priceAxisDragGesture(plotHeight: plotHeight))
+
             // Time axis (bottom) - only shown on candlestick canvas if RSI sub-window is hidden
             if !showRSI {
                 timeAxis(width: plotWidth, height: plotHeight, stepX: stepX, fullHeight: size.height, panOffset: clampedPan)
+
+                // Dedicated bottom Time Axis touch target for horizontal zoom
+                Color.clear
+                    .frame(width: plotWidth, height: 20)
+                    .contentShape(Rectangle())
+                    .position(x: plotWidth / 2.0, y: plotHeight + 10)
+                    .gesture(timeAxisDragGesture(plotWidth: plotWidth))
             }
 
             volumeHistogram(plotWidth: plotWidth, plotHeight: plotHeight, stepX: stepX, candleWidth: candleWidth, panOffset: clampedPan)
@@ -392,18 +427,6 @@ public struct CandleChartView: View {
             // Full Dual-Axis Crosshair (Vertical + Horizontal + Time/Price Badges)
             if let hIdx = hoveredBarIndex, hIdx < visibleBars.count {
                 crosshairOverlay(hIdx: hIdx, plotWidth: plotWidth, plotHeight: plotHeight, stepX: stepX, minP: minP, span: priceSpan, clampedPan: clampedPan)
-            }
-
-            // Zoom scale pill indicator (shows dynamically during pinch zoom in landscape)
-            if isLandscape && abs(zoomScale - 1.0) > 0.05 {
-                Text(String(format: "%.1fx", zoomScale))
-                    .font(AppTypography.badgeMicro)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(AppColors.brand.opacity(0.2))
-                    .foregroundColor(AppColors.brand)
-                    .clipShape(Capsule())
-                    .position(x: 32, y: 16)
             }
         }
         .frame(width: size.width, height: size.height)
@@ -1282,7 +1305,43 @@ public struct CandleChartView: View {
 
             // Time Axis at bottom of RSI
             timeAxis(width: plotWidth, height: plotHeight, stepX: stX, fullHeight: size.height, panOffset: panOffset)
+
+            // Dedicated bottom Time Axis touch target for horizontal zoom
+            Color.clear
+                .frame(width: plotWidth, height: bottomAxisHeight)
+                .contentShape(Rectangle())
+                .position(x: plotWidth / 2.0, y: plotHeight + (bottomAxisHeight / 2.0))
+                .gesture(timeAxisDragGesture(plotWidth: plotWidth))
         }
+    }
+
+    // MARK: - Price Axis & Time Axis Drag Gestures (TradingView Axis Zoom)
+    private func priceAxisDragGesture(plotHeight: CGFloat) -> some Gesture {
+        DragGesture(minimumDistance: 1)
+            .onChanged { value in
+                let dy = value.translation.height - lastPriceDragY
+                lastPriceDragY = value.translation.height
+                // Dragging down compresses price (increases span multiplier), dragging up expands (decreases span multiplier)
+                let scaleChange = 1.0 + (dy / max(100, plotHeight)) * 1.5
+                priceScaleMultiplier = max(0.15, min(6.0, priceScaleMultiplier * scaleChange))
+            }
+            .onEnded { _ in
+                lastPriceDragY = 0
+            }
+    }
+
+    private func timeAxisDragGesture(plotWidth: CGFloat) -> some Gesture {
+        DragGesture(minimumDistance: 1)
+            .onChanged { value in
+                let dx = value.translation.width - lastTimeDragX
+                lastTimeDragX = value.translation.width
+                // Dragging right expands time zoom (wider candles), dragging left compresses time zoom (narrower candles)
+                let scaleChange = 1.0 + (dx / max(100, plotWidth)) * 1.8
+                zoomScale = max(0.5, min(4.0, zoomScale * scaleChange))
+            }
+            .onEnded { _ in
+                lastTimeDragX = 0
+            }
     }
 }
 
