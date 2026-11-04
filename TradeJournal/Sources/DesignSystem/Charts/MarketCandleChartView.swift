@@ -1,4 +1,4 @@
-﻿import SwiftUI
+import SwiftUI
 
 // MARK: - Pure Market Candlestick Chart (Multi-Timeframe Structure View)
 // Displays clean institutional candlestick price action with Footprint Key Levels (POC / VAH / VAL / Naked POC)
@@ -11,6 +11,7 @@ public struct MarketCandleChartView: View {
     public let keyLevels: [KeyLevel]
     public let sessionProfiles: [SessionProfileSnapshot]
     public let developingProfile: DevelopingProfile?
+    public let developingProfiles: [DevelopingProfile]
     public let patterns: [DetectedCandlePattern]
 
     @State private var hoveredBarIndex: Int? = nil
@@ -24,6 +25,7 @@ public struct MarketCandleChartView: View {
         keyLevels: [KeyLevel] = [],
         sessionProfiles: [SessionProfileSnapshot] = [],
         developingProfile: DevelopingProfile? = nil,
+        developingProfiles: [DevelopingProfile] = [],
         patterns: [DetectedCandlePattern] = []
     ) {
         self.bars = bars
@@ -33,6 +35,7 @@ public struct MarketCandleChartView: View {
         self.keyLevels = keyLevels
         self.sessionProfiles = sessionProfiles
         self.developingProfile = developingProfile
+        self.developingProfiles = !developingProfiles.isEmpty ? developingProfiles : (developingProfile.map { [$0] } ?? [])
         self.patterns = patterns
     }
 
@@ -57,41 +60,11 @@ public struct MarketCandleChartView: View {
 
     // MARK: - 1. HUD Header Bar
     private var hudHeaderView: some View {
-        let hoveredPattern: DetectedCandlePattern? = {
-            guard let idx = hoveredBarIndex, idx < bars.count else { return nil }
-            let bar = bars[idx]
-            return patterns.first(where: { $0.barTimestamp == bar.timestamp })
-        }()
-
-        return HStack(alignment: .center, spacing: 8) {
+        HStack(alignment: .center, spacing: 8) {
             // Symbol
             Text(symbol)
                 .font(AppTypography.cardHeaderUppercase)
                 .foregroundColor(AppColors.primaryText)
-
-            // Hovered Price Action Pattern Pill (Clean HUD presentation, zero chart canvas clutter)
-            if let pat = hoveredPattern {
-                AppBadge(
-                    pat.type.displayName,
-                    style: pat.type.isBullish ? .profit : (pat.type.isBearish ? .loss : .brand)
-                )
-                if let lvl = pat.confluenceKeyLevel {
-                    AppBadge("@ \(lvl.label)", variant: .secondary)
-                }
-            } else if !keyLevels.isEmpty {
-                // Key Levels Pill Summary (if any)
-                HStack(spacing: 4) {
-                    ForEach(keyLevels.prefix(3)) { lvl in
-                        Text("\(lvl.label): \(formatPrice(lvl.price))")
-                            .font(AppTypography.captionMicro)
-                            .foregroundColor(levelColor(for: lvl))
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 1)
-                            .background(AppColors.cardBackground)
-                            .cornerRadius(3)
-                    }
-                }
-            }
 
             Spacer()
         }
@@ -129,17 +102,17 @@ public struct MarketCandleChartView: View {
             ForEach(0..<bars.count, id: \.self) { i in
                 let bar = bars[i]
 
-                // Highlight Price Action pattern by changing candle color directly (Zero text clutter)
-                let matchedPattern = patterns.first(where: { $0.barTimestamp == bar.timestamp })
+                // Highlight Price Action pattern by changing candle color directly (InsideBar and Doji excluded)
+                let matchedPattern = patterns.first(where: {
+                    $0.barTimestamp == bar.timestamp && $0.type != .insideBar && $0.type != .doji
+                })
                 let isPattern = matchedPattern != nil
                 let candleColor: Color = {
                     if let pat = matchedPattern {
                         if pat.type.isBullish {
                             return AppColors.patternBullish
-                        } else if pat.type.isBearish {
-                            return AppColors.patternBearish
                         } else {
-                            return AppColors.patternNeutral
+                            return AppColors.patternBearish
                         }
                     }
                     return bar.isUp ? AppColors.profit : AppColors.loss
@@ -215,8 +188,8 @@ public struct MarketCandleChartView: View {
                 )
             }
 
-            // 2. Developing (Live) Ongoing Session Profile
-            if let dev = developingProfile {
+            // 2. Developing (Live) Ongoing Session & Multi-timeframe Profiles
+            ForEach(activeDevelopingProfiles, id: \.sessionType) { dev in
                 developingProfileSegment(
                     dev: dev,
                     plotWidth: plotWidth,
@@ -236,6 +209,10 @@ public struct MarketCandleChartView: View {
                 span: span
             )
         }
+    }
+
+    private var activeDevelopingProfiles: [DevelopingProfile] {
+        !developingProfiles.isEmpty ? developingProfiles : (developingProfile.map { [$0] } ?? [])
     }
 
     // MARK: - Filtered Profiles with TradingView Naming ([W-1], [D-1], [TY], etc.)
@@ -300,8 +277,19 @@ public struct MarketCandleChartView: View {
                 let isD1orW1 = snap.sessionType == .daily || snap.sessionType == .weekly
                 let lineWidth: CGFloat = isD1orW1 ? 2.0 : 1.2
 
-                // 1. Session Bounded Solid POC line (Only spans this session's candles, zero text over candles)
-                if segXEnd >= 0 && x1 <= plotWidth {
+                // 1. Session Bounded Staircase POC line (Preserves bar-by-bar progressive step line)
+                let sessionBars = bars.filter { $0.date >= snap.startTime && $0.date <= snap.endTime }
+                if sessionBars.count >= 2 {
+                    let steps = SessionFootprintEngine.computeStaircaseSteps(bars: sessionBars, symbol: symbol)
+                    let staircase = buildStaircasePath(
+                        steps: steps,
+                        stepX: stepX,
+                        minP: minP,
+                        span: span,
+                        plotHeight: plotHeight
+                    )
+                    staircase.stroke(col, lineWidth: lineWidth)
+                } else if segXEnd >= 0 && x1 <= plotWidth {
                     Path { path in
                         path.move(to: CGPoint(x: max(0, x1), y: y))
                         path.addLine(to: CGPoint(x: min(plotWidth, segXEnd), y: y))
@@ -351,14 +339,28 @@ public struct MarketCandleChartView: View {
                 let sIdx = bars.firstIndex(where: { $0.date >= dev.startTime }) ?? max(0, bars.count - 12)
                 let x1 = CGFloat(sIdx) * stepX + (stepX / 2.0)
                 let x2 = CGFloat(max(0, bars.count - 1)) * stepX + (stepX / 2.0)
+                let isD1orW1 = dev.sessionType == .daily || dev.sessionType == .weekly
+                let lineWidth: CGFloat = isD1orW1 ? 2.0 : 1.4
 
                 if x2 >= 0 && x1 <= plotWidth {
-                    // Solid line for current active session
-                    Path { path in
-                        path.move(to: CGPoint(x: max(0, x1), y: y))
-                        path.addLine(to: CGPoint(x: min(plotWidth, x2), y: y))
+                    let devBars = bars.filter { $0.date >= dev.startTime }
+                    if devBars.count >= 2 {
+                        let steps = SessionFootprintEngine.computeStaircaseSteps(bars: devBars, symbol: symbol)
+                        let staircase = buildStaircasePath(
+                            steps: steps,
+                            stepX: stepX,
+                            minP: minP,
+                            span: span,
+                            plotHeight: plotHeight
+                        )
+                        staircase.stroke(col, lineWidth: lineWidth)
+                    } else {
+                        Path { path in
+                            path.move(to: CGPoint(x: max(0, x1), y: y))
+                            path.addLine(to: CGPoint(x: min(plotWidth, x2), y: y))
+                        }
+                        .stroke(col, lineWidth: lineWidth)
                     }
-                    .stroke(col, lineWidth: 1.8)
 
                     // Faint dotted ray to the right edge
                     if x2 < plotWidth {
@@ -369,7 +371,7 @@ public struct MarketCandleChartView: View {
                         .stroke(col.opacity(0.65), style: StrokeStyle(lineWidth: 1.0, dash: [2, 3]))
                     }
 
-                    let devTag = dev.sessionType == .daily ? "[D]" : (dev.sessionType == .weekly ? "[W]" : "[TY]")
+                    let devTag = dev.sessionType == .daily ? "[D]" : (dev.sessionType == .weekly ? "[W]" : (dev.sessionType == .tokyo ? "[TKY]" : (dev.sessionType == .london ? "[LD]" : "[NY]")))
                     Text(devTag)
                         .font(AppTypography.captionMicro)
                         .foregroundColor(col)
@@ -402,19 +404,59 @@ public struct MarketCandleChartView: View {
                         path.move(to: CGPoint(x: max(0, x1), y: y))
                         path.addLine(to: CGPoint(x: min(plotWidth, x2), y: y))
                     }
-                    .stroke(AppColors.secondaryText.opacity(0.6), style: StrokeStyle(lineWidth: 1.0, dash: [4, 4]))
-
-                    Text(lvl.label)
-                        .font(AppTypography.captionMicro)
-                        .foregroundColor(AppColors.secondaryText)
-                        .padding(.horizontal, 3)
-                        .padding(.vertical, 1)
-                        .background(AppColors.cardBackground.opacity(0.9))
-                        .cornerRadius(2)
-                        .position(x: min(plotWidth - 24, max(24, x2 - 16)), y: max(8, min(plotHeight - 8, y - 7)))
+                    .stroke(AppColors.secondaryText.opacity(0.4), style: StrokeStyle(lineWidth: 0.8, dash: [4, 4]))
                 }
             }
         }
+    }
+
+    private func buildStaircasePath(
+        steps: [(timestamp: Int64, pocPrice: Decimal)],
+        stepX: CGFloat,
+        minP: Double,
+        span: Double,
+        plotHeight: CGFloat
+    ) -> Path {
+        var path = Path()
+        guard !steps.isEmpty else { return path }
+
+        var barIndexMap: [Int64: Int] = [:]
+        for (i, b) in bars.enumerated() {
+            barIndexMap[b.timestamp] = i
+        }
+
+        var lastY: CGFloat? = nil
+        var lastRightX: CGFloat? = nil
+
+        for step in steps {
+            guard let bIdx = barIndexMap[step.timestamp] else { continue }
+            let xCenter = CGFloat(bIdx) * stepX + (stepX / 2.0)
+            let xLeft = xCenter - (stepX / 2.0)
+            let xRight = xCenter + (stepX / 2.0)
+
+            let stepPocD = (step.pocPrice as NSDecimalNumber).doubleValue
+            let yStep = plotHeight - CGFloat((stepPocD - minP) / span) * plotHeight
+
+            if let prevY = lastY, let prevRight = lastRightX {
+                if abs(xLeft - prevRight) > 2.0 {
+                    path.move(to: CGPoint(x: xLeft, y: yStep))
+                    path.addLine(to: CGPoint(x: xRight, y: yStep))
+                } else {
+                    if abs(yStep - prevY) > 0.5 {
+                        path.addLine(to: CGPoint(x: prevRight, y: yStep))
+                    }
+                    path.addLine(to: CGPoint(x: xRight, y: yStep))
+                }
+            } else {
+                path.move(to: CGPoint(x: xLeft, y: yStep))
+                path.addLine(to: CGPoint(x: xRight, y: yStep))
+            }
+
+            lastY = yStep
+            lastRightX = xRight
+        }
+
+        return path
     }
 
     private func findRayEndIndex(after endIndex: Int, for pocPrice: Decimal, in barList: [MarketBar]) -> Int {

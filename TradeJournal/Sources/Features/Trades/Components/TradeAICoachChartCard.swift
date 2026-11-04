@@ -1,4 +1,4 @@
-﻿import SwiftUI
+import SwiftUI
 import UIKit
 
 // MARK: - Trade AI Coach Chart Preview Card
@@ -19,6 +19,7 @@ public struct TradeAICoachChartCard: View {
     @State private var keyLevels: [KeyLevel] = []
     @State private var sessionProfiles: [SessionProfileSnapshot] = []
     @State private var developingProfile: DevelopingProfile? = nil
+    @State private var developingProfiles: [DevelopingProfile] = []
     @State private var patterns: [DetectedCandlePattern] = []
 
     private let resolutions: [(String, String)] = [
@@ -118,6 +119,7 @@ public struct TradeAICoachChartCard: View {
                         keyLevels: keyLevels,
                         sessionProfiles: sessionProfiles,
                         developingProfile: developingProfile,
+                        developingProfiles: developingProfiles,
                         patterns: patterns
                     )
                     .frame(height: 250)
@@ -127,6 +129,7 @@ public struct TradeAICoachChartCard: View {
                         self.keyLevels = res.levels
                         self.sessionProfiles = res.profiles
                         self.developingProfile = res.developing
+                        self.developingProfiles = res.developingProfiles
                         self.patterns = SessionFootprintCoordinator.shared.scanConfluentPatterns(bars: validBars, keyLevels: res.levels)
                     }
                 } else {
@@ -147,7 +150,7 @@ public struct TradeAICoachChartCard: View {
                             .replacingOccurrences(of: "\\s*\\(.*?Cache.*?\\)", with: "", options: .regularExpression)
                             .replacingOccurrences(of: "\\s*\\(Cached\\)", with: "", options: .regularExpression)
                             .trimmingCharacters(in: .whitespaces)
-                        Text("\(activeBarsCount) bars â€¢ \(cleanProvider)")
+                        Text("\(activeBarsCount) bars - \(cleanProvider)")
                             .font(AppTypography.captionMicro)
                             .foregroundColor(AppColors.brand)
                     } else {

@@ -1,4 +1,4 @@
-﻿import SwiftUI
+import SwiftUI
 
 /// Trade Replay screen to review historical candlesticks and execution progression step-by-step.
 /// Ported 1:1 from `trade-market-data.tsx`, `trade-replay.ts`, and `excursions.ts`.
@@ -28,6 +28,7 @@ public struct TradeReplayView: View {
     @State private var keyLevels: [KeyLevel] = []
     @State private var sessionProfiles: [SessionProfileSnapshot] = []
     @State private var developingProfile: DevelopingProfile? = nil
+    @State private var developingProfiles: [DevelopingProfile] = []
     @State private var priceActionPatterns: [DetectedCandlePattern] = []
 
     public init(trade: Trade, executions: [Execution], isModal: Bool = false) {
@@ -76,66 +77,107 @@ public struct TradeReplayView: View {
     }
 
     public var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 12) {
-                    // Header: Trade info and dynamic replay P&L
-                    TradeReplayHeaderCard(
-                        trade: trade,
-                        frame: frame,
-                        bars: bars,
-                        currentStep: currentStep,
-                        isLoadingCandles: isLoadingCandles,
-                        reportingCurrency: env.currentCurrency
-                    )
+        ZStack {
+            NavigationStack {
+                ScrollView {
+                    VStack(spacing: 12) {
+                        // Header: Trade info and dynamic replay P&L
+                        TradeReplayHeaderCard(
+                            trade: trade,
+                            frame: frame,
+                            bars: bars,
+                            currentStep: currentStep,
+                            isLoadingCandles: isLoadingCandles,
+                            reportingCurrency: env.currentCurrency
+                        )
 
-                    // Professional Candlestick Chart (with integrated 15m/1h/4h timeframe selector and pure gesture pinch-zoom)
-                    chartCard
+                        // Professional Candlestick Chart (with integrated 15m/1h/4h timeframe selector and pure gesture pinch-zoom)
+                        chartCard
 
-                    // Replay Playback Controls (Play/Pause, Step, Speed, Fullscreen)
-                    TradeReplayControlsCard(
-                        currentStep: $currentStep,
-                        replaySpeed: $replaySpeed,
-                        isPlaying: isPlaying,
-                        barsCount: bars.count,
-                        currentBar: frame.currentBar,
-                        isLoadingCandles: isLoadingCandles,
-                        timeZone: env.currentTimeZone,
-                        onTogglePlay: togglePlay,
-                        onStep: { delta in step(by: delta) },
-                        onReset: resetReplay,
-                        onForwardToEnd: forwardToEnd,
-                        onSpeedChanged: restartTimerIfPlaying,
-                        onOpenLandscape: { showLandscapeChart = true }
-                    )
+                        // Replay Playback Controls (Play/Pause, Step, Speed, Fullscreen)
+                        TradeReplayControlsCard(
+                            currentStep: $currentStep,
+                            replaySpeed: $replaySpeed,
+                            isPlaying: isPlaying,
+                            barsCount: bars.count,
+                            currentBar: frame.currentBar,
+                            isLoadingCandles: isLoadingCandles,
+                            timeZone: env.currentTimeZone,
+                            onTogglePlay: togglePlay,
+                            onStep: { delta in step(by: delta) },
+                            onReset: resetReplay,
+                            onForwardToEnd: forwardToEnd,
+                            onSpeedChanged: restartTimerIfPlaying,
+                            onOpenLandscape: {
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    showLandscapeChart = true
+                                }
+                            }
+                        )
 
-                    // MAE & MFE Excursion Statistics
-                    TradeReplayExcursionCard(
-                        excursionEstimate: excursionEstimate,
-                        isLoadingCandles: isLoadingCandles,
-                        barsCount: bars.count,
-                        reportingCurrency: env.currentCurrency
-                    )
+                        // MAE & MFE Excursion Statistics
+                        TradeReplayExcursionCard(
+                            excursionEstimate: excursionEstimate,
+                            isLoadingCandles: isLoadingCandles,
+                            barsCount: bars.count,
+                            reportingCurrency: env.currentCurrency
+                        )
 
-                    // Broker Data Notes
-                    dataCoverageNote
+                        // Broker Data Notes
+                        dataCoverageNote
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 10)
+                    .padding(.bottom, 32)
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 10)
-                .padding(.bottom, 32)
+                .scrollDismissesKeyboard(.interactively)
+                .background(AppColors.background)
+                .navigationTitle("Replay - \(trade.symbol)")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        ModalDismissButton { dismiss() }
+                    }
+
+                    ToolbarItem(placement: .topBarTrailing) {
+                        ModalPrimaryButton("Done") { dismiss() }
+                    }
+                }
             }
-            .scrollDismissesKeyboard(.interactively)
-            .background(AppColors.background)
-            .navigationTitle("Replay Â· \(trade.symbol)")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    ModalDismissButton { dismiss() }
-                }
 
-                ToolbarItem(placement: .topBarTrailing) {
-                    ModalPrimaryButton("Done") { dismiss() }
-                }
+            if showLandscapeChart {
+                TradeReplayLandscapeChartView(
+                    trade: trade,
+                    executions: executions,
+                    currentStep: $currentStep,
+                    replaySpeed: $replaySpeed,
+                    selectedResolution: $selectedResolution,
+                    showMarketStructure: $showMarketStructure,
+                    showRSI: $showRSI,
+                    bars: bars,
+                    frame: frame,
+                    isPlaying: isPlaying,
+                    isLoadingCandles: isLoadingCandles,
+                    reportingCurrency: env.currentCurrency,
+                    timeZone: env.currentTimeZone,
+                    keyLevels: keyLevels,
+                    sessionProfiles: sessionProfiles,
+                    developingProfile: developingProfile,
+                    developingProfiles: developingProfiles,
+                    patterns: priceActionPatterns,
+                    onTogglePlay: togglePlay,
+                    onStep: { delta in step(by: delta) },
+                    onReset: resetReplay,
+                    onForwardToEnd: forwardToEnd,
+                    onSpeedChanged: restartTimerIfPlaying,
+                    onDismiss: {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            showLandscapeChart = false
+                        }
+                    }
+                )
+                .transition(.opacity)
+                .zIndex(999)
             }
         }
         .task(id: "\(trade.id)_\(selectedResolution.rawValue)") {
@@ -143,33 +185,6 @@ public struct TradeReplayView: View {
         }
         .onDisappear {
             stopTimer()
-        }
-        .fullScreenCover(isPresented: $showLandscapeChart) {
-            TradeReplayLandscapeChartView(
-                trade: trade,
-                executions: executions,
-                currentStep: $currentStep,
-                replaySpeed: $replaySpeed,
-                selectedResolution: $selectedResolution,
-                showMarketStructure: $showMarketStructure,
-                showRSI: $showRSI,
-                bars: bars,
-                frame: frame,
-                isPlaying: isPlaying,
-                isLoadingCandles: isLoadingCandles,
-                reportingCurrency: env.currentCurrency,
-                timeZone: env.currentTimeZone,
-                keyLevels: keyLevels,
-                sessionProfiles: sessionProfiles,
-                developingProfile: developingProfile,
-                patterns: priceActionPatterns,
-                onTogglePlay: togglePlay,
-                onStep: { delta in step(by: delta) },
-                onReset: resetReplay,
-                onForwardToEnd: forwardToEnd,
-                onSpeedChanged: restartTimerIfPlaying,
-                onDismiss: { showLandscapeChart = false }
-            )
         }
     }
 
@@ -218,17 +233,29 @@ public struct TradeReplayView: View {
                         keyLevels: keyLevels,
                         sessionProfiles: sessionProfiles,
                         developingProfile: developingProfile,
+                        developingProfiles: developingProfiles,
                         patterns: priceActionPatterns,
                         onResolutionChange: { newRes in
                             self.selectedResolution = newRes
                         }
                     )
 
-                    // Floating Updating Pill (Replaces the cramped loading indicator in Resolution bar)
-                    if isLoadingCandles {
-                        AppBadge("Updatingâ€¦", variant: .secondary)
-                            .padding(8)
+                    HStack(spacing: 8) {
+                        // Floating Updating Pill
+                        if isLoadingCandles {
+                            AppBadge("Updating...", variant: .secondary)
+                        }
+
+                        // Fullscreen Landscape Trigger directly on chart
+                        ModalCircleButton(icon: "arrow.up.left.and.arrow.down.right") {
+                            NativeHaptics.lightImpact()
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                showLandscapeChart = true
+                            }
+                        }
+                        .accessibilityLabel("Fullscreen Landscape Chart")
                     }
+                    .padding(8)
                 }
             }
         }
@@ -320,12 +347,13 @@ public struct TradeReplayView: View {
 
     private func updateFootprintAndPatterns(for activeBars: [MarketBar]) async {
         guard !activeBars.isEmpty else { return }
-        let (levels, profiles, dev) = await SessionFootprintCoordinator.shared.loadKeyLevels(for: trade.symbol, recentBars: activeBars)
+        let (levels, profiles, dev, devList) = await SessionFootprintCoordinator.shared.loadKeyLevels(for: trade.symbol, recentBars: activeBars)
         let pats = SessionFootprintCoordinator.shared.scanConfluentPatterns(bars: activeBars, keyLevels: levels)
         await MainActor.run {
             self.keyLevels = levels
             self.sessionProfiles = profiles
             self.developingProfile = dev
+            self.developingProfiles = devList
             self.priceActionPatterns = pats
         }
     }

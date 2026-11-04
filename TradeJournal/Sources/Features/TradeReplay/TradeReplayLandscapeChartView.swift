@@ -1,4 +1,4 @@
-﻿import SwiftUI
+import SwiftUI
 
 /// Dedicated Fullscreen Landscape Chart View for Trade Replay.
 /// Maximizes horizontal chart real estate for deep market structure and 3-line RSI momentum inspection.
@@ -19,6 +19,7 @@ public struct TradeReplayLandscapeChartView: View {
     let keyLevels: [KeyLevel]
     let sessionProfiles: [SessionProfileSnapshot]
     let developingProfile: DevelopingProfile?
+    let developingProfiles: [DevelopingProfile]
     let patterns: [DetectedCandlePattern]
     let onTogglePlay: () -> Void
     let onStep: (Int) -> Void
@@ -46,6 +47,7 @@ public struct TradeReplayLandscapeChartView: View {
         keyLevels: [KeyLevel] = [],
         sessionProfiles: [SessionProfileSnapshot] = [],
         developingProfile: DevelopingProfile? = nil,
+        developingProfiles: [DevelopingProfile] = [],
         patterns: [DetectedCandlePattern] = [],
         onTogglePlay: @escaping () -> Void,
         onStep: @escaping (Int) -> Void,
@@ -70,6 +72,7 @@ public struct TradeReplayLandscapeChartView: View {
         self.keyLevels = keyLevels
         self.sessionProfiles = sessionProfiles
         self.developingProfile = developingProfile
+        self.developingProfiles = !developingProfiles.isEmpty ? developingProfiles : (developingProfile.map { [$0] } ?? [])
         self.patterns = patterns
         self.onTogglePlay = onTogglePlay
         self.onStep = onStep
@@ -164,7 +167,7 @@ public struct TradeReplayLandscapeChartView: View {
                 }
             }
 
-            // Orientation flip button (toggles 90Â° rotation for devices with portrait orientation lock)
+            // Orientation flip button (toggles 90 deg rotation for devices with portrait orientation lock)
             ModalCircleButton(icon: "rotate.right", label: "Toggle Landscape Rotation") {
                 isForceLandscape90.toggle()
             }
@@ -203,7 +206,7 @@ public struct TradeReplayLandscapeChartView: View {
     private var chartContainer: some View {
         Group {
             if bars.isEmpty {
-                LoadingView("Loading Candlesâ€¦", size: 48)
+                LoadingView("Loading Candles...", size: 48)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .appCardStyle(cornerRadius: 12)
             } else {
@@ -224,6 +227,7 @@ public struct TradeReplayLandscapeChartView: View {
                     keyLevels: keyLevels,
                     sessionProfiles: sessionProfiles,
                     developingProfile: developingProfile,
+                    developingProfiles: developingProfiles,
                     patterns: patterns
                 )
             }
@@ -307,7 +311,7 @@ public struct TradeReplayLandscapeChartView: View {
                     set: { replaySpeed = $0; onSpeedChanged() }
                 ),
                 options: [1.0, 2.0, 4.0],
-                titleFor: { "\(Int($0))Ã—" },
+                titleFor: { "\(Int($0))x" },
                 height: 28
             )
         }

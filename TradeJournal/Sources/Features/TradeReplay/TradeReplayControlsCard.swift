@@ -114,7 +114,7 @@ public struct TradeReplayControlsCard: View {
                             set: { replaySpeed = $0; onSpeedChanged() }
                         ),
                         options: [1.0, 2.0, 4.0],
-                        titleFor: { "\(Int($0))×" },
+                        titleFor: { "\(Int($0))x" },
                         height: 34
                     )
                     

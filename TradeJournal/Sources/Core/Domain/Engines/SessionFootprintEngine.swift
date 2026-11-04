@@ -5,7 +5,7 @@ import Foundation
 /// Point of Control (POC), 70% Value Area (VAH / VAL), and Naked POC mitigation tracking.
 /// Configured strictly to GMT+7 (Bangkok/Hanoi/Jakarta) aligned with Asian, European, and US market sessions.
 public enum SessionFootprintEngine {
-    
+
     // Timezone GMT+7 for institutional session alignment
     public static let sessionTimeZone: TimeZone = TimeZone(identifier: "Asia/Bangkok") ?? TimeZone(secondsFromGMT: 7 * 3600) ?? .current
 
@@ -40,36 +40,36 @@ public enum SessionFootprintEngine {
     ) -> (start: Date, end: Date)? {
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = sessionTimeZone
-        
+
         let startOfDay = cal.startOfDay(for: date)
-        
+
         switch session {
         case .tokyo:
             guard let s = cal.date(byAdding: .hour, value: 7, to: startOfDay),
                   let e = cal.date(byAdding: .hour, value: 16, to: startOfDay) else { return nil }
             return (s, e)
-            
+
         case .london:
             guard let s = cal.date(byAdding: .hour, value: 14, to: startOfDay),
                   let e = cal.date(byAdding: .hour, value: 23, to: startOfDay) else { return nil }
             return (s, e)
-            
+
         case .newYork:
             guard let s = cal.date(byAdding: .hour, value: 19, to: startOfDay),
                   let nextDay = cal.date(byAdding: .day, value: 1, to: startOfDay),
                   let e = cal.date(byAdding: .hour, value: 4, to: nextDay) else { return nil }
             return (s, e)
-            
+
         case .daily:
             guard let e = cal.date(byAdding: .day, value: 1, to: startOfDay) else { return nil }
             return (startOfDay, e)
-            
+
         case .weekly:
             let comp = cal.dateComponents([.yearForWeekOfYear, .weekOfYear], from: date)
             guard let startOfWeek = cal.date(from: comp),
                   let endOfWeek = cal.date(byAdding: .day, value: 7, to: startOfWeek) else { return nil }
             return (startOfWeek, endOfWeek)
-            
+
         case .monthly:
             let comp = cal.dateComponents([.year, .month], from: date)
             guard let startOfMonth = cal.date(from: comp),
@@ -98,45 +98,45 @@ public enum SessionFootprintEngine {
         rowSize: Decimal? = nil
     ) -> SessionProfileSnapshot? {
         guard !bars.isEmpty else { return nil }
-        
+
         let step = rowSize ?? defaultRowSize(for: symbol)
         let stepDouble = NSDecimalNumber(decimal: step).doubleValue
         guard stepDouble > 0 else { return nil }
-        
+
         var binsMap: [Int: Decimal] = [:]
         var totalVolume: Decimal = .zero
         var minBarLow: Decimal = bars[0].low
         var maxBarHigh: Decimal = bars[0].high
-        
+
         for bar in bars {
             minBarLow = min(minBarLow, bar.low)
             maxBarHigh = max(maxBarHigh, bar.high)
             totalVolume += bar.volume
-            
+
             let lowD = NSDecimalNumber(decimal: bar.low).doubleValue
             let highD = NSDecimalNumber(decimal: bar.high).doubleValue
-            
+
             let startKey = Int(floor(lowD / stepDouble))
             let endKey = max(startKey, Int(floor(highD / stepDouble)))
             let spanCount = endKey - startKey + 1
-            
+
             let volPerBin = bar.volume / Decimal(max(1, spanCount))
             for k in startKey...endKey {
                 binsMap[k, default: .zero] += volPerBin
             }
         }
-        
+
         guard !binsMap.isEmpty, totalVolume > .zero else { return nil }
-        
+
         let sortedKeys = binsMap.keys.sorted()
         guard let minKey = sortedKeys.first, let maxKey = sortedKeys.last else { return nil }
         let profileMidKey = Double(minKey + maxKey) / 2.0
-        
+
         // Find Point of Control (POC) with maximum volume
         var maxV: Decimal = .zero
         var pocKey: Int = minKey
         var bestDist: Double = Double.greatestFiniteMagnitude
-        
+
         for k in sortedKeys {
             let v = binsMap[k] ?? .zero
             if v > maxV {
@@ -151,28 +151,28 @@ public enum SessionFootprintEngine {
                 }
             }
         }
-        
+
         // Value Area Expansion (70% Target)
         guard let pocIndex = sortedKeys.firstIndex(of: pocKey) else { return nil }
         let targetVolume = totalVolume * Decimal(0.70)
         var accumulatedVolume: Decimal = binsMap[pocKey] ?? .zero
-        
+
         var valKey = pocKey
         var vahKey = pocKey
         var belowIdx = pocIndex - 1
         var aboveIdx = pocIndex + 1
         let n = sortedKeys.count
-        
+
         while accumulatedVolume < targetVolume {
             let hasBelow = belowIdx >= 0
             let hasAbove = aboveIdx < n
             if !hasBelow && !hasAbove { break }
-            
+
             let belowKey = hasBelow ? sortedKeys[belowIdx] : nil
             let aboveKey = hasAbove ? sortedKeys[aboveIdx] : nil
             let belowV = belowKey != nil ? (binsMap[belowKey!] ?? .zero) : Decimal(-1)
             let aboveV = aboveKey != nil ? (binsMap[aboveKey!] ?? .zero) : Decimal(-1)
-            
+
             let chooseAbove: Bool
             if hasAbove && !hasBelow {
                 chooseAbove = true
@@ -187,12 +187,12 @@ public enum SessionFootprintEngine {
                 let belowDist = abs(pocKey - (belowKey ?? pocKey))
                 chooseAbove = aboveDist <= belowDist
             }
-            
+
             let chosenIdx = chooseAbove ? aboveIdx : belowIdx
             guard chosenIdx >= 0 && chosenIdx < n else { break }
             let chosenKey = sortedKeys[chosenIdx]
             let chosenV = binsMap[chosenKey] ?? .zero
-            
+
             accumulatedVolume += max(chosenV, .zero)
             if chooseAbove {
                 vahKey = chosenKey
@@ -202,13 +202,13 @@ public enum SessionFootprintEngine {
                 belowIdx -= 1
             }
         }
-        
+
         let pocPrice = Decimal(pocKey) * step + (step / Decimal(2))
         let valPrice = Decimal(valKey) * step
         let vahPrice = Decimal(vahKey) * step + step
         let profileHigh = Decimal(maxKey) * step + step
         let profileLow = Decimal(minKey) * step
-        
+
         return SessionProfileSnapshot(
             symbol: symbol,
             sessionType: sessionType,
@@ -234,12 +234,12 @@ public enum SessionFootprintEngine {
         subsequentBars: [MarketBar]
     ) {
         guard !snapshots.isEmpty && !subsequentBars.isEmpty else { return }
-        
+
         for i in snapshots.indices {
             guard snapshots[i].isNaked else { continue }
             let snapPoc = snapshots[i].pocPrice
             let snapEndTimeMs = Int64(snapshots[i].endTime.timeIntervalSince1970 * 1000.0)
-            
+
             for bar in subsequentBars where bar.timestamp >= snapEndTimeMs {
                 if bar.high >= snapPoc && bar.low <= snapPoc {
                     snapshots[i].isNaked = false
@@ -283,7 +283,7 @@ public enum SessionFootprintEngine {
         previousDayLow: Decimal? = nil
     ) -> [KeyLevel] {
         var levels: [KeyLevel] = []
-        
+
         // 1. Previous Day High & Low
         if let pdh = previousDayHigh, pdh > .zero {
             levels.append(KeyLevel(type: .pdh, price: pdh, label: "PDH"))
@@ -291,7 +291,7 @@ public enum SessionFootprintEngine {
         if let pdl = previousDayLow, pdl > .zero {
             levels.append(KeyLevel(type: .pdl, price: pdl, label: "PDL"))
         }
-        
+
         // 2. Developing Live POC
         if let devPoc = developingPoc, let devSess = developingSession {
             levels.append(KeyLevel(
@@ -300,16 +300,16 @@ public enum SessionFootprintEngine {
                 label: "Live \(devSess.shortCode) POC"
             ))
         }
-        
+
         // 3. Completed Session Profiles (Prior Steps & Naked POCs)
         var ageMap: [FootprintSessionType: Int] = [:]
         for snap in snapshots.sorted(by: { $0.endTime > $1.endTime }) {
             let age = ageMap[snap.sessionType, default: 0] + 1
             ageMap[snap.sessionType] = age
-            
+
             // Age 1 is the immediate prior staircase step (mốc bậc thang gần nhất)
             if age == 1 {
-                let priorLabel = snap.isNaked 
+                let priorLabel = snap.isNaked
                     ? "Prior \(snap.sessionType.shortCode) POC [NPOC]"
                     : "Prior \(snap.sessionType.shortCode) POC"
                 levels.append(KeyLevel(
@@ -335,7 +335,7 @@ public enum SessionFootprintEngine {
                 ))
             }
         }
-        
+
         return levels
     }
 
@@ -353,12 +353,12 @@ public enum SessionFootprintEngine {
         developingSession: FootprintSessionType? = nil
     ) -> [FootprintSessionType: StaircaseStep] {
         var result: [FootprintSessionType: StaircaseStep] = [:]
-        
+
         for sType in FootprintSessionType.allCases {
             let sortedSnaps = snapshots.filter { $0.sessionType == sType }.sorted(by: { $0.endTime > $1.endTime })
             let priorPoc = sortedSnaps.first?.pocPrice
             let curPoc = (developingSession == sType) ? developingPoc : nil
-            
+
             let dir: String
             if let cur = curPoc, let prior = priorPoc {
                 if cur > prior {
@@ -373,7 +373,7 @@ public enum SessionFootprintEngine {
             } else {
                 dir = "NO_DATA"
             }
-            
+
             result[sType] = StaircaseStep(
                 sessionType: sType,
                 currentPoc: curPoc,
@@ -381,7 +381,49 @@ public enum SessionFootprintEngine {
                 stepDirection: dir
             )
         }
-        
+
         return result
+    }
+
+    // MARK: - 8. Bar-by-Bar Developing Staircase POC Steps
+    /// Computes the progressive POC step line as volume accumulates throughout a session.
+    public static func computeStaircaseSteps(
+        bars: [MarketBar],
+        symbol: String,
+        rowSize: Decimal? = nil
+    ) -> [(timestamp: Int64, pocPrice: Decimal)] {
+        guard !bars.isEmpty else { return [] }
+        let step = rowSize ?? defaultRowSize(for: symbol)
+        let stepDouble = NSDecimalNumber(decimal: step).doubleValue
+        guard stepDouble > 0 else { return [] }
+
+        var binsMap: [Int: Decimal] = [:]
+        var maxV: Decimal = .zero
+        var pocKey: Int = 0
+        var results: [(timestamp: Int64, pocPrice: Decimal)] = []
+
+        for bar in bars {
+            let lowD = NSDecimalNumber(decimal: bar.low).doubleValue
+            let highD = NSDecimalNumber(decimal: bar.high).doubleValue
+            let startKey = Int(floor(lowD / stepDouble))
+            let endKey = max(startKey, Int(floor(highD / stepDouble)))
+            let spanCount = max(1, endKey - startKey + 1)
+            let effectiveVol = bar.volume > 0 ? bar.volume : Decimal(100)
+            let volPerBin = effectiveVol / Decimal(spanCount)
+
+            for k in startKey...endKey {
+                let newV = binsMap[k, default: .zero] + volPerBin
+                binsMap[k] = newV
+                if newV > maxV {
+                    maxV = newV
+                    pocKey = k
+                }
+            }
+
+            let pocPrice = Decimal(pocKey) * step + (step / Decimal(2))
+            results.append((timestamp: bar.timestamp, pocPrice: pocPrice))
+        }
+
+        return results
     }
 }

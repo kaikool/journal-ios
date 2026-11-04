@@ -1,4 +1,4 @@
-﻿import SwiftUI
+import SwiftUI
 import UIKit
 
 // MARK: - Pre-Trade Multi-Timeframe Chart Vision Card
@@ -18,6 +18,7 @@ public struct PreTradeChartCard: View {
     @State private var keyLevels: [KeyLevel] = []
     @State private var sessionProfiles: [SessionProfileSnapshot] = []
     @State private var developingProfile: DevelopingProfile? = nil
+    @State private var developingProfiles: [DevelopingProfile] = []
     @State private var patterns: [DetectedCandlePattern] = []
 
     public init(
@@ -92,6 +93,7 @@ public struct PreTradeChartCard: View {
                             keyLevels: keyLevels,
                             sessionProfiles: sessionProfiles,
                             developingProfile: developingProfile,
+                            developingProfiles: developingProfiles,
                             patterns: patterns
                         )
                         .frame(height: 210)
@@ -107,6 +109,7 @@ public struct PreTradeChartCard: View {
                         self.keyLevels = res.levels
                         self.sessionProfiles = res.profiles
                         self.developingProfile = res.developing
+                        self.developingProfiles = res.developingProfiles
                         self.patterns = SessionFootprintCoordinator.shared.scanConfluentPatterns(bars: activeBars, keyLevels: res.levels)
                     }
                 } else {
