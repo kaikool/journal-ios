@@ -793,34 +793,86 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
         var seenDealIds = Set<String>()
 
         for w in chunkWindows {
-            let fromStr = isoFormatter.string(from: w.from)
             let toStr = isoFormatter.string(from: w.to)
+            let encodedTo = toStr.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? toStr
 
-            // A. Fetch Deals
-            let dealsPath = "/v1/history/accounts/\(cleanId)/deals?from=\(fromStr.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? fromStr)&to=\(toStr.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? toStr)"
-            let dRes = await fetchEndpointData(path: dealsPath, host: clusterHost)
-            if let dJson = dRes.json, let items = (dJson["deals"] as? [[String: Any]]) ?? (dJson["items"] as? [[String: Any]]) {
+            // A. Fetch Deals with cursor pagination (Exness returns max 100 items per page sorted ascending by event_time)
+            var dealCursorDate = w.from
+            for _ in 0..<15 {
+                let fromStr = isoFormatter.string(from: dealCursorDate)
+                let encodedFrom = fromStr.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? fromStr
+                let dealsPath = "/v1/history/accounts/\(cleanId)/deals?from=\(encodedFrom)&to=\(encodedTo)"
+                let dRes = await fetchEndpointData(path: dealsPath, host: clusterHost)
+                guard let dJson = dRes.json,
+                      let items = (dJson["deals"] as? [[String: Any]]) ?? (dJson["items"] as? [[String: Any]]),
+                      !items.isEmpty else {
+                    break
+                }
+
+                var addedNewDeals = 0
                 for it in items {
                     let deal = (it["deal"] as? [String: Any]) ?? it
                     if let dId = parseId(deal["deal_id"]) ?? parseId(deal["id"]),
                        !seenDealIds.contains(dId) {
                         seenDealIds.insert(dId)
                         allDeals.append(deal)
+                        addedNewDeals += 1
                     }
+                }
+
+                if items.count < 100 || addedNewDeals == 0 {
+                    break
+                }
+                if let lastItem = items.last {
+                    let lastDeal = (lastItem["deal"] as? [String: Any]) ?? lastItem
+                    if let lastDate = parseDate(lastItem["event_time"]) ?? parseDate(lastDeal["create_time"]),
+                       lastDate > dealCursorDate {
+                        dealCursorDate = lastDate
+                    } else {
+                        break
+                    }
+                } else {
+                    break
                 }
             }
 
-            // B. Fetch Orders
-            let ordersPath = "/v1/history/accounts/\(cleanId)/orders?from=\(fromStr.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? fromStr)&to=\(toStr.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? toStr)"
-            let oRes = await fetchEndpointData(path: ordersPath, host: clusterHost)
-            if let oJson = oRes.json, let items = (oJson["orders"] as? [[String: Any]]) ?? (oJson["items"] as? [[String: Any]]) {
+            // B. Fetch Orders with cursor pagination (Exness returns max 100 items per page sorted ascending by event_time)
+            var orderCursorDate = w.from
+            for _ in 0..<15 {
+                let fromStr = isoFormatter.string(from: orderCursorDate)
+                let encodedFrom = fromStr.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? fromStr
+                let ordersPath = "/v1/history/accounts/\(cleanId)/orders?from=\(encodedFrom)&to=\(encodedTo)"
+                let oRes = await fetchEndpointData(path: ordersPath, host: clusterHost)
+                guard let oJson = oRes.json,
+                      let items = (oJson["orders"] as? [[String: Any]]) ?? (oJson["items"] as? [[String: Any]]),
+                      !items.isEmpty else {
+                    break
+                }
+
+                var addedNewOrders = 0
                 for it in items {
                     let order = (it["order"] as? [String: Any]) ?? it
                     if let oId = parseId(order["order_id"]) ?? parseId(order["id"]),
                        !seenOrderIds.contains(oId) {
                         seenOrderIds.insert(oId)
                         allOrders.append(order)
+                        addedNewOrders += 1
                     }
+                }
+
+                if items.count < 100 || addedNewOrders == 0 {
+                    break
+                }
+                if let lastItem = items.last {
+                    let lastOrder = (lastItem["order"] as? [String: Any]) ?? lastItem
+                    if let lastDate = parseDate(lastItem["event_time"]) ?? parseDate(lastOrder["update_time"]) ?? parseDate(lastOrder["create_time"]),
+                       lastDate > orderCursorDate {
+                        orderCursorDate = lastDate
+                    } else {
+                        break
+                    }
+                } else {
+                    break
                 }
             }
         }
@@ -897,11 +949,11 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
         var groups: [String: DealGroup] = [:]
         for d in allDeals {
             let type = (d["type"] as? String ?? "").lowercased()
-            if type == "balance" || type.contains("deposit") || type.contains("withdraw") {
-                // Deposit or withdrawal transaction
+            if type == "balance" || type.contains("deposit") || type.contains("withdraw") || type == "null_compensation" || type == "credit" || type == "bonus" {
+                // Deposit, withdrawal, or negative-balance compensation transaction
                 continue
             }
-            guard let posId = parseId(d["position_id"]) ?? parseId(d["positionId"]) ?? parseId(d["id"]), !posId.isEmpty else { continue }
+            guard let posId = parseId(d["position_id"]) ?? parseId(d["positionId"]), !posId.isEmpty else { continue }
             let sym = (d["instrument"] as? String) ?? (d["symbol"] as? String) ?? "UNKNOWN"
 
             if groups[posId] == nil {
@@ -1212,6 +1264,7 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
         }
 
         // 8. Ingest into TradeDataStore
+        var mergedAccountTradesForUpload: [Trade] = []
         await MainActor.run {
             let dataStore = TradeDataStore.shared
 
@@ -1227,7 +1280,7 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
                        currentTrades[idx].status == .open {
                         let posId = String(currentTrades[idx].key.dropFirst("exness_".count))
                         if !activePositionIds.contains(posId) && !directTrades.contains(where: { $0.key == currentTrades[idx].key }) {
-                            // Broker no longer holds this open position -> position has been closed!
+                            // Only finalize from snapshot disappearance if we actually have an exit price or non-zero P&L
                             var pnl = currentTrades[idx].netPnl
                             if pnl == 0, let exitP = currentTrades[idx].avgExit, exitP > 0, currentTrades[idx].avgEntry > 0 {
                                 pnl = AssetContractEngine.calculateGrossPnl(
@@ -1240,12 +1293,14 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
                                 currentTrades[idx].grossPnl = pnl
                                 currentTrades[idx].netPnl = pnl
                             }
-                            currentTrades[idx].status = pnl > 0 ? .win : (pnl < 0 ? .loss : .breakeven)
-                            currentTrades[idx].openQuantity = Decimal.zero
-                            if currentTrades[idx].closedAt == nil {
-                                currentTrades[idx].closedAt = Date()
+                            if pnl != 0 || currentTrades[idx].avgExit != nil {
+                                currentTrades[idx].status = pnl > 0 ? .win : (pnl < 0 ? .loss : .breakeven)
+                                currentTrades[idx].openQuantity = Decimal.zero
+                                if currentTrades[idx].closedAt == nil {
+                                    currentTrades[idx].closedAt = Date()
+                                }
+                                tradesMutated = true
                             }
-                            tradesMutated = true
                         }
                     }
                 }
@@ -1259,10 +1314,10 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
                     if let idx = currentTrades.firstIndex(where: { $0.key == tradeToMerge.key || $0.id == tradeToMerge.id }) {
                         let existing = currentTrades[idx]
 
-                        // Safeguard: If existing trade in journal was already closed (.win/.loss/.breakeven),
+                        // Safeguard: If existing trade in journal was genuinely closed (with valid exit or non-zero P&L),
                         // and incoming tradeToMerge is reported as .open (e.g. stale snapshot or delayed sync),
                         // PRESERVE the closed state! Never regress a closed trade back to open!
-                        if existing.status.isClosed && tradeToMerge.status == .open {
+                        if existing.status.isClosed && (existing.avgExit != nil || existing.netPnl != 0) && tradeToMerge.status == .open {
                             tradeToMerge.status = existing.status
                             tradeToMerge.closedAt = existing.closedAt ?? Date()
                             tradeToMerge.openQuantity = 0
@@ -1320,6 +1375,7 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
                 dataStore.trades = currentTrades
                 dataStore.deduplicateTrades()
             }
+            mergedAccountTradesForUpload = dataStore.trades.filter { $0.accountId == journalAccId }
 
             // B. Import execution fills
             if !newExecutions.isEmpty {
@@ -1357,10 +1413,11 @@ public final class ExnessService: ObservableObject, @unchecked Sendable {
         }
 
         // Asynchronously backup to Supabase Cloud in the background without blocking UI
+        let tradesToBackup = mergedAccountTradesForUpload
         if SupabaseService.shared.isConfigured {
             Task.detached(priority: .background) {
-                if !directTrades.isEmpty {
-                    _ = try? await SupabaseService.shared.upsertTrades(directTrades)
+                if !tradesToBackup.isEmpty {
+                    _ = try? await SupabaseService.shared.upsertTrades(tradesToBackup)
                 }
                 if !newExecutions.isEmpty {
                     _ = try? await SupabaseService.shared.upsertExecutions(newExecutions)

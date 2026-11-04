@@ -17,15 +17,17 @@ public struct MarketCandleChartView: View {
 
     @State private var hoveredBarIndex: Int? = nil
     @State private var zoomScale: CGFloat = 1.0
-    @State private var lastMagnification: CGFloat = 1.0
     @State private var panOffset: CGFloat = 0.0
-    @State private var panOffsetY: CGFloat = 0.0
-    @State private var lastDragX: CGFloat = 0.0
-    @State private var lastDragY: CGFloat = 0.0
-    @State private var priceScaleMultiplier: CGFloat = 1.0
-    @State private var lastPriceDragY: CGFloat = 0.0
-    @State private var lastTimeDragX: CGFloat = 0.0
+    @State private var isManualPriceScale: Bool = false
+    @State private var manualCenterPrice: Double = 0.0
+    @State private var manualPriceSpan: Double = 0.0
     @State private var currentPlotWidth: CGFloat = 320
+    @State private var currentPlotHeight: CGFloat = 220
+    @State private var didInitializeViewport: Bool = false
+
+    private var defaultVisibleBars: Int {
+        min(max(bars.count, 10), 42)
+    }
 
     public init(
         bars: [MarketBar],
@@ -58,115 +60,58 @@ public struct MarketCandleChartView: View {
 
             GeometryReader { geo in
                 let pw = max(10, geo.size.width - 55)
+                let ph = max(10, geo.size.height - 20)
                 candlestickPlotView(size: geo.size)
                     .onAppear {
-                        if currentPlotWidth != pw { currentPlotWidth = pw }
-                        let baseCount = max(bars.count, 40)
-                        let stepX = pw / CGFloat(max(1, baseCount))
-                        let rightMargin = stepX * 5.0
-                        let totalW = CGFloat(bars.count) * stepX + rightMargin
-                        if totalW > pw && panOffset == 0 {
-                            panOffset = pw - totalW
+                        currentPlotWidth = pw
+                        currentPlotHeight = ph
+                        if !didInitializeViewport && !bars.isEmpty {
+                            didInitializeViewport = true
+                            resetViewport(plotWidth: pw)
+                        }
+                    }
+                    .onChange(of: bars.count) { _ in
+                        if !bars.isEmpty {
+                            resetViewport(plotWidth: currentPlotWidth)
                         }
                     }
             }
             .contentShape(Rectangle())
             .clipped()
-            .overlay(ChartScrollLockOverlay(onTouchStateChanged: onInteractionChanged))
-            .gesture(
-                MagnificationGesture()
-                    .onChanged { value in
-                        let delta = value / lastMagnification
-                        lastMagnification = value
-                        let oldZoom = zoomScale
-                        let newZoom = max(0.5, min(4.0, oldZoom * delta))
-                        zoomScale = newZoom
-
-                        // Maintain relative viewport anchor during pinch zoom
-                        let plotW = max(10, currentPlotWidth)
-                        let baseCount = max(bars.count, 40)
-                        let oldSlotCount = max(8, Double(baseCount) / Double(oldZoom))
-                        let oldStepX = plotW / CGFloat(max(1, oldSlotCount))
-                        let oldRightMargin = oldStepX * 5.0
-                        let oldTotalW = CGFloat(bars.count) * oldStepX + oldRightMargin
-                        let oldMinOffset = min(0, plotW - oldTotalW)
-
-                        let newSlotCount = max(8, Double(baseCount) / Double(newZoom))
-                        let newStepX = plotW / CGFloat(max(1, newSlotCount))
-                        let newRightMargin = newStepX * 5.0
-                        let newTotalW = CGFloat(bars.count) * newStepX + newRightMargin
-                        let newMinOffset = min(0, plotW - newTotalW)
-
-                        if oldMinOffset < 0 && newMinOffset < 0 {
-                            let progress = panOffset / oldMinOffset
-                            panOffset = min(0, max(newMinOffset, progress * newMinOffset))
-                        }
-                    }
-                    .onEnded { _ in
-                        lastMagnification = 1.0
-                    }
-            )
-            .simultaneousGesture(
-                DragGesture(minimumDistance: 1)
-                    .onChanged { value in
-                        let plotW = max(10, currentPlotWidth)
-                        let baseCount = max(bars.count, 40)
-                        let effectiveZoom = max(0.5, min(4.0, zoomScale))
-                        let slotCount = max(8, Double(baseCount) / Double(effectiveZoom))
-                        let stepX = plotW / CGFloat(max(1, slotCount))
-                        let rightMargin = stepX * 5.0
-                        let totalW = CGFloat(bars.count) * stepX + rightMargin
-
-                        let delta = value.translation.width - lastDragX
-                        let dy = value.translation.height - lastDragY
-                        lastDragX = value.translation.width
-                        lastDragY = value.translation.height
-
-                        // Smooth zero-deadzone TradingView fluid horizontal panning
-                        if totalW > plotW {
-                            let minOffset = plotW - totalW
-                            panOffset = min(0, max(minOffset, panOffset + delta))
-                        }
-
-                        // Smooth 1-finger vertical price panning
-                        panOffsetY += dy
-                    }
-                    .onEnded { _ in
-                        lastDragX = 0
-                        lastDragY = 0
+            .overlay(
+                ChartScrollLockOverlay(
+                    rightAxisWidth: 58,
+                    bottomAxisHeight: 28,
+                    onTouchStateChanged: onInteractionChanged,
+                    onCanvasPan: { dx, dy, totalDx, totalDy in
+                        handleCanvasPan(dx: dx, dy: dy, totalDx: totalDx, totalDy: totalDy)
+                    },
+                    onPanEnded: {
                         hoveredBarIndex = nil
-                    }
-            )
-            .simultaneousGesture(
-                LongPressGesture(minimumDuration: 0.2)
-                    .sequenced(before: DragGesture(minimumDistance: 0))
-                    .onChanged { value in
-                        switch value {
-                        case .second(true, let drag):
-                            if let loc = drag?.location {
-                                updateHoveredBar(at: loc.x, totalWidth: currentPlotWidth, panOffset: panOffset)
-                            }
-                        default:
-                            break
+                    },
+                    onPriceAxisZoom: { dy in
+                        handlePriceAxisZoom(dy: dy)
+                    },
+                    onTimeAxisZoom: { dx in
+                        handleTimeAxisZoom(dx: dx)
+                    },
+                    onPinchZoom: { scaleDelta, focalX in
+                        handlePinchZoom(scaleDelta: scaleDelta, focalX: focalX)
+                    },
+                    onCrosshairChanged: { x in
+                        if let locX = x {
+                            updateHoveredBar(at: locX, totalWidth: currentPlotWidth, panOffset: panOffset)
+                        } else {
+                            hoveredBarIndex = nil
+                        }
+                    },
+                    onDoubleTapReset: {
+                        withAnimation(AppAnimations.springStandard) {
+                            resetViewport(plotWidth: currentPlotWidth)
                         }
                     }
-                    .onEnded { _ in
-                        hoveredBarIndex = nil
-                    }
+                )
             )
-            .onTapGesture(count: 2) {
-                withAnimation(AppAnimations.springStandard) {
-                    zoomScale = 1.0
-                    priceScaleMultiplier = 1.0
-                    panOffsetY = 0.0
-                    let plotW = max(10, currentPlotWidth)
-                    let baseCount = max(bars.count, 40)
-                    let stepX = plotW / CGFloat(max(1, baseCount))
-                    let rightMargin = stepX * 5.0
-                    let totalW = CGFloat(bars.count) * stepX + rightMargin
-                    panOffset = min(0, plotW - totalW)
-                }
-            }
         }
     }
 
@@ -192,35 +137,29 @@ public struct MarketCandleChartView: View {
         let plotWidth = max(10, size.width - 55)
         let plotHeight = max(10, size.height - 20)
 
-        let baseCount = max(bars.count, 40)
-        let effectiveZoom = max(0.5, min(4.0, zoomScale))
-        let slotCount = max(8, Double(baseCount) / Double(effectiveZoom))
-        let stepX = plotWidth / CGFloat(max(1, slotCount))
-        let candleWidth = max(2.0, min(20.0, stepX * 0.72))
+        let baseCount = defaultVisibleBars
+        let effectiveZoom = max(0.25, min(6.0, zoomScale))
+        let slotCount = max(6.0, Double(baseCount) / Double(effectiveZoom))
+        let stepX = plotWidth / CGFloat(max(1.0, slotCount))
+        let candleWidth = max(2.0, min(22.0, stepX * 0.72))
 
-        let rightMarginBars: CGFloat = 5.0
-        let rightMarginWidth = stepX * rightMarginBars
-        let totalContentWidth = CGFloat(bars.count) * stepX + rightMarginWidth
+        let maxRightSpace = max(stepX * 6.0, plotWidth * 0.45)
+        let totalContentWidth = CGFloat(bars.count) * stepX + maxRightSpace
         let minPan = min(0, plotWidth - totalContentWidth)
-        let clampedPan = totalContentWidth > plotWidth ? min(0, max(minPan, panOffset)) : 0
+        let maxPan = stepX * 2.0
+        let clampedPan = min(maxPan, max(minPan, panOffset))
 
-        // TradingView Viewport Auto-Fitting Price Scale with 2D Pan and Price Scale Multiplier
-        let leftX = -clampedPan
-        let rightX = leftX + plotWidth
-        let startIdx = max(0, min(bars.count - 1, Int(floor(leftX / stepX))))
-        let endIdx = max(0, min(bars.count - 1, Int(ceil(rightX / stepX))))
-
-        let slice = bars[startIdx...endIdx]
-        let lows = slice.map { ($0.low as NSDecimalNumber).doubleValue }
-        let highs = slice.map { ($0.high as NSDecimalNumber).doubleValue }
-        let minVal = lows.min() ?? 1.0
-        let maxVal = highs.max() ?? 2.0
-        let rawSpan = max(0.0001, (maxVal - minVal) * Double(priceScaleMultiplier))
-        let centerPrice = (minVal + maxVal) / 2.0
-        let yPriceShift = (Double(panOffsetY) / Double(plotHeight)) * rawSpan
-        let shiftedCenter = centerPrice + yPriceShift
-        let minP = shiftedCenter - (rawSpan / 2.0)
-        let maxP = shiftedCenter + (rawSpan / 2.0)
+        // TradingView Auto-Fitting vs Manual Locked Price Scale
+        let autoBounds = computeAutoPriceBounds(stepX: stepX, clampedPan: clampedPan, plotWidth: plotWidth)
+        let minP: Double
+        let maxP: Double
+        if isManualPriceScale && manualPriceSpan > 0 {
+            minP = manualCenterPrice - (manualPriceSpan / 2.0)
+            maxP = manualCenterPrice + (manualPriceSpan / 2.0)
+        } else {
+            minP = autoBounds.minP
+            maxP = autoBounds.maxP
+        }
         let span = max(0.0001, maxP - minP)
 
         return ZStack(alignment: .topLeading) {
@@ -229,20 +168,6 @@ public struct MarketCandleChartView: View {
 
             // Price Grid & Right Axis
             gridAndPriceAxis(width: plotWidth, height: plotHeight, minP: minP, maxP: maxP)
-
-            // Dedicated right Price Axis touch target for vertical price scale zoom
-            Color.clear
-                .frame(width: 55, height: plotHeight)
-                .contentShape(Rectangle())
-                .position(x: plotWidth + 27.5, y: plotHeight / 2.0)
-                .gesture(priceAxisDragGesture(plotHeight: plotHeight))
-
-            // Dedicated bottom Time Axis touch target for horizontal zoom
-            Color.clear
-                .frame(width: plotWidth, height: 20)
-                .contentShape(Rectangle())
-                .position(x: plotWidth / 2.0, y: plotHeight + 10)
-                .gesture(timeAxisDragGesture(plotWidth: plotWidth))
 
             // Volume Histogram (Subtle background)
             volumeHistogram(plotWidth: plotWidth, plotHeight: plotHeight, stepX: stepX, candleWidth: candleWidth, panOffset: clampedPan)
@@ -856,14 +781,14 @@ public struct MarketCandleChartView: View {
         guard !bars.isEmpty, totalWidth > 0 else { return }
         let stX: CGFloat = {
             if let s = stepX, s > 0 { return s }
-            let baseCount = max(bars.count, 40)
-            let effectiveZoom = max(0.5, min(4.0, zoomScale))
-            let slotCount = max(8, Double(baseCount) / Double(effectiveZoom))
-            return totalWidth / CGFloat(max(1, slotCount))
+            let baseCount = defaultVisibleBars
+            let effectiveZoom = max(0.25, min(6.0, zoomScale))
+            let slotCount = max(6.0, Double(baseCount) / Double(effectiveZoom))
+            return totalWidth / CGFloat(max(1.0, slotCount))
         }()
         let adjustedX = x - panOffset
-        let idx = Int(adjustedX / stX)
-        if idx >= 0 && idx < bars.count && self.hoveredBarIndex != idx {
+        let idx = max(0, min(bars.count - 1, Int(adjustedX / stX)))
+        if self.hoveredBarIndex != idx {
             self.hoveredBarIndex = idx
             NativeHaptics.selection()
         }
@@ -887,32 +812,129 @@ public struct MarketCandleChartView: View {
         return formatter.string(from: date)
     }
 
-    // MARK: - Price Axis & Time Axis Drag Gestures (TradingView Axis Zoom)
-    private func priceAxisDragGesture(plotHeight: CGFloat) -> some Gesture {
-        DragGesture(minimumDistance: 1)
-            .onChanged { value in
-                let dy = value.translation.height - lastPriceDragY
-                lastPriceDragY = value.translation.height
-                // Dragging down expands price range (zoom out/compress bars), dragging up compresses price range (zoom in/stretch bars)
-                let scaleChange = 1.0 + (dy / max(100, plotHeight)) * 1.5
-                priceScaleMultiplier = max(0.15, min(6.0, priceScaleMultiplier * scaleChange))
-            }
-            .onEnded { _ in
-                lastPriceDragY = 0
-            }
+    // MARK: - Unified TradingView Viewport & Gesture Handlers
+    private func resetViewport(plotWidth: CGFloat) {
+        let pw = max(10, plotWidth)
+        zoomScale = 1.0
+        isManualPriceScale = false
+        manualCenterPrice = 0
+        manualPriceSpan = 0
+        hoveredBarIndex = nil
+        let baseCount = defaultVisibleBars
+        let stepX = pw / CGFloat(max(1, baseCount))
+        let defaultRightMargin = stepX * 5.0
+        let totalW = CGFloat(bars.count) * stepX + defaultRightMargin
+        panOffset = min(0, pw - totalW)
     }
 
-    private func timeAxisDragGesture(plotWidth: CGFloat) -> some Gesture {
-        DragGesture(minimumDistance: 1)
-            .onChanged { value in
-                let dx = value.translation.width - lastTimeDragX
-                lastTimeDragX = value.translation.width
-                // Dragging right expands time zoom (wider candles), dragging left compresses time zoom (narrower candles)
-                let scaleChange = 1.0 + (dx / max(100, plotWidth)) * 1.8
-                zoomScale = max(0.5, min(4.0, zoomScale * scaleChange))
-            }
-            .onEnded { _ in
-                lastTimeDragX = 0
-            }
+    private func computeAutoPriceBounds(stepX: CGFloat, clampedPan: CGFloat, plotWidth: CGFloat) -> (minP: Double, maxP: Double) {
+        guard !bars.isEmpty, stepX > 0 else { return (1.0, 2.0) }
+        let leftX = -clampedPan
+        let rightX = leftX + plotWidth
+        let startIdx = max(0, min(bars.count - 1, Int(floor(leftX / stepX))))
+        let endIdx = max(startIdx, min(bars.count - 1, Int(ceil(rightX / stepX))))
+
+        let slice = bars[startIdx...endIdx]
+        let lows = slice.map { ($0.low as NSDecimalNumber).doubleValue }
+        let highs = slice.map { ($0.high as NSDecimalNumber).doubleValue }
+        let minVal = lows.min() ?? 1.0
+        let maxVal = highs.max() ?? 2.0
+        let rawSpan = max(0.0001, maxVal - minVal)
+        let pad = rawSpan * 0.08
+        return (minP: minVal - pad, maxP: maxVal + pad)
+    }
+
+    private func ensureManualPriceScaleInitialized(stepX: CGFloat, plotWidth: CGFloat) {
+        guard !isManualPriceScale || manualPriceSpan <= 0 else { return }
+        let maxRightSpace = max(stepX * 6.0, plotWidth * 0.45)
+        let totalContentWidth = CGFloat(bars.count) * stepX + maxRightSpace
+        let minPan = min(0, plotWidth - totalContentWidth)
+        let maxPan = stepX * 2.0
+        let clampedPan = min(maxPan, max(minPan, panOffset))
+        let auto = computeAutoPriceBounds(stepX: stepX, clampedPan: clampedPan, plotWidth: plotWidth)
+        manualCenterPrice = (auto.minP + auto.maxP) / 2.0
+        manualPriceSpan = max(0.0001, auto.maxP - auto.minP)
+        isManualPriceScale = true
+    }
+
+    private func handleCanvasPan(dx: CGFloat, dy: CGFloat, totalDx: CGFloat, totalDy: CGFloat) {
+        guard !bars.isEmpty else { return }
+        let plotW = max(10, currentPlotWidth)
+        let plotH = max(10, currentPlotHeight)
+        let baseCount = defaultVisibleBars
+        let effectiveZoom = max(0.25, min(6.0, zoomScale))
+        let slotCount = max(6.0, Double(baseCount) / Double(effectiveZoom))
+        let stepX = plotW / CGFloat(max(1.0, slotCount))
+
+        let maxRightSpace = max(stepX * 6.0, plotW * 0.45)
+        let totalW = CGFloat(bars.count) * stepX + maxRightSpace
+        let minOffset = min(0, plotW - totalW)
+        let maxOffset = stepX * 2.0
+        panOffset = min(maxOffset, max(minOffset, panOffset + dx))
+
+        // Engage 2D vertical panning when already in manual price scale mode or when the user drags vertically
+        if !isManualPriceScale && abs(totalDy) > 10 && abs(totalDy) > abs(totalDx) * 1.1 {
+            ensureManualPriceScaleInitialized(stepX: stepX, plotWidth: plotW)
+        }
+        if isManualPriceScale && manualPriceSpan > 0 {
+            let priceShift = (Double(dy) / Double(plotH)) * manualPriceSpan
+            manualCenterPrice += priceShift
+        }
+    }
+
+    private func handlePriceAxisZoom(dy: CGFloat) {
+        guard !bars.isEmpty else { return }
+        let plotW = max(10, currentPlotWidth)
+        let plotH = max(10, currentPlotHeight)
+        let baseCount = defaultVisibleBars
+        let effectiveZoom = max(0.25, min(6.0, zoomScale))
+        let slotCount = max(6.0, Double(baseCount) / Double(effectiveZoom))
+        let stepX = plotW / CGFloat(max(1.0, slotCount))
+
+        ensureManualPriceScaleInitialized(stepX: stepX, plotWidth: plotW)
+        let scaleChange = max(0.85, min(1.18, 1.0 + Double(dy / max(80, plotH)) * 1.8))
+        manualPriceSpan = max(0.0001, manualPriceSpan * scaleChange)
+    }
+
+    private func handleTimeAxisZoom(dx: CGFloat) {
+        guard !bars.isEmpty else { return }
+        let plotW = max(10, currentPlotWidth)
+        let scaleDelta = max(0.85, min(1.18, 1.0 + (dx / max(90, plotW)) * 1.8))
+        let baseCount = defaultVisibleBars
+        let oldSlotCount = max(6.0, Double(baseCount) / Double(zoomScale))
+        let oldStepX = plotW / CGFloat(max(1.0, oldSlotCount))
+        let anchorX = max(plotW * 0.5, min(plotW, plotW - oldStepX * 5.0))
+        applyHorizontalZoom(scaleDelta: scaleDelta, anchorX: anchorX)
+    }
+
+    private func handlePinchZoom(scaleDelta: CGFloat, focalX: CGFloat) {
+        guard !bars.isEmpty else { return }
+        let plotW = max(10, currentPlotWidth)
+        let anchorX = max(0, min(plotW, focalX))
+        applyHorizontalZoom(scaleDelta: scaleDelta, anchorX: anchorX)
+    }
+
+    private func applyHorizontalZoom(scaleDelta: CGFloat, anchorX: CGFloat) {
+        let plotW = max(10, currentPlotWidth)
+        let baseCount = defaultVisibleBars
+        let oldZoom = zoomScale
+        let newZoom = max(0.25, min(6.0, oldZoom * scaleDelta))
+        guard abs(newZoom - oldZoom) > 0.0001 else { return }
+
+        let oldSlotCount = max(6.0, Double(baseCount) / Double(oldZoom))
+        let oldStepX = plotW / CGFloat(max(1.0, oldSlotCount))
+        let barPosAtAnchor = (anchorX - panOffset) / oldStepX
+
+        zoomScale = newZoom
+
+        let newSlotCount = max(6.0, Double(baseCount) / Double(newZoom))
+        let newStepX = plotW / CGFloat(max(1.0, newSlotCount))
+        let maxRightSpace = max(newStepX * 6.0, plotW * 0.45)
+        let newTotalW = CGFloat(bars.count) * newStepX + maxRightSpace
+        let newMinOffset = min(0, plotW - newTotalW)
+        let newMaxOffset = newStepX * 2.0
+
+        let rawNewPan = anchorX - (barPosAtAnchor * newStepX)
+        panOffset = min(newMaxOffset, max(newMinOffset, rawNewPan))
     }
 }

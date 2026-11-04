@@ -113,7 +113,29 @@ extension TradeDataStore {
                     let isBrokerSynced = local.key.hasPrefix("the5ers_") || local.key.hasPrefix("ctrader_") || local.key.hasPrefix("exness_")
                     if isBrokerSynced {
                         var mutated = false
-                        // Preserve authoritative local broker P&L, fees, swap, and status; only merge user annotations from cloud if local is empty
+                        // If remote trade is closed with valid exit/P&L while local is still open or missing exit/P&L, adopt remote closed execution data
+                        if rTrade.status.isClosed && (local.status == .open || (local.netPnl == 0 && rTrade.netPnl != 0) || (local.avgExit == nil && rTrade.avgExit != nil)) {
+                            local.status = rTrade.status
+                            local.closedAt = rTrade.closedAt ?? local.closedAt
+                            local.openQuantity = rTrade.openQuantity
+                            local.avgExit = rTrade.avgExit ?? local.avgExit
+                            local.grossPnl = rTrade.grossPnl
+                            local.netPnl = rTrade.netPnl
+                            local.fees = rTrade.fees
+                            local.swap = rTrade.swap ?? local.swap
+                            if !rTrade.executionIds.isEmpty {
+                                local.executionIds = rTrade.executionIds
+                                local.executionCount = rTrade.executionCount
+                            }
+                            if !rTrade.exits.isEmpty {
+                                local.exits = rTrade.exits
+                            }
+                            if let dur = rTrade.durationMs {
+                                local.durationMs = dur
+                            }
+                            mutated = true
+                        }
+                        // Preserve authoritative local broker P&L, fees, swap, and status; merge user annotations from cloud if local is empty
                         if (local.notes == nil || local.notes?.isEmpty == true), let rNotes = rTrade.notes, !rNotes.isEmpty {
                             local.notes = rNotes
                             mutated = true
