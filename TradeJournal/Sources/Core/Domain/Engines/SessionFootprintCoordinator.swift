@@ -33,7 +33,7 @@ public final class SessionFootprintCoordinator: Sendable {
 
         // Step 3: If still empty and recent bars are available, bootstrap profiles from bars
         if cachedProfiles.isEmpty && !recentBars.isEmpty {
-            let bootstrapped = bootstrapProfiles(from: recentBars, symbol: clean)
+            let bootstrapped = Self.bootstrapProfiles(from: recentBars, symbol: clean)
             if !bootstrapped.isEmpty {
                 cachedProfiles = bootstrapped
                 MarketDataCacheStore.shared.saveSessionProfiles(bootstrapped, symbol: clean)
@@ -51,10 +51,10 @@ public final class SessionFootprintCoordinator: Sendable {
         }
 
         // Step 5: Compute Developing (Live) Profile from current ongoing session
-        let (devProfile, devPoc, devType, devList) = computeCurrentDeveloping(from: recentBars, symbol: clean)
+        let (devProfile, devPoc, devType, devList) = Self.computeCurrentDeveloping(from: recentBars, symbol: clean)
 
         // Step 6: Extract previous day High / Low for pure price action reference
-        let (pdh, pdl) = extractPreviousDayLevels(from: recentBars)
+        let (pdh, pdl) = Self.extractPreviousDayLevels(from: recentBars)
 
         let levels = SessionFootprintEngine.extractKeyLevels(
             snapshots: cachedProfiles,

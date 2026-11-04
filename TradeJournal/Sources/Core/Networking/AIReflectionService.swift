@@ -622,7 +622,7 @@ public actor AIReflectionService {
             )
             
             let (res1, res2, res3) = await (worker1, worker2, worker3)
-            let validAnalyses = [res1, res2, res3].compactMap { $0 }.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            let validAnalyses = [res1, res2, res3].compactMap { $0 }.filter { !$0.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines).isEmpty }
             
             if validAnalyses.count >= 2 {
                 let synthesisPrompt = AIPromptBuilder.buildCoachingEnsembleSynthesisPrompt(
@@ -759,9 +759,9 @@ public actor AIReflectionService {
             h4Bars: h4Bars,
             h1Bars: h1Bars,
             m15Bars: m15Bars,
+            marketSnapshot: preTradeSnapshot,
             events: events,
             language: activeLang,
-            marketSnapshot: preTradeSnapshot,
             sessionSummary: sessionSummary,
             traderProfile: traderProfile,
             displayTimeZone: displayTimeZone,
@@ -816,7 +816,7 @@ public actor AIReflectionService {
             )
             
             let (res1, res2, res3) = await (worker1, worker2, worker3)
-            let validAnalyses = [res1, res2, res3].compactMap { $0 }.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            let validAnalyses = [res1, res2, res3].compactMap { $0 }.filter { !$0.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines).isEmpty }
             
             if validAnalyses.count >= 2 {
                 let currentPriceStr: String = {
