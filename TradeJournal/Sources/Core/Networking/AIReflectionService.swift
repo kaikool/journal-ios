@@ -535,6 +535,42 @@ public actor AIReflectionService {
         }
     }
     
+    // MARK: - Safe Model Execution for Multi-Model Ensemble
+    func callModelSafe(
+        endpoint: String,
+        apiKey: String,
+        model: String,
+        action: AIReflectionAction,
+        prompt: String,
+        metrics: TradeMetrics?,
+        language: String,
+        traderProfile: TraderProfileConfig?,
+        sessionSummary: AIAccountSessionSummary?,
+        conversationHistory: [AICoachMessage]?
+    ) async -> String? {
+        guard !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        do {
+            return try await callOpenAiCompatible(
+                endpoint: endpoint,
+                apiKey: apiKey,
+                model: model,
+                action: action,
+                prompt: prompt,
+                metrics: metrics,
+                edgeScore: nil,
+                language: language,
+                traderProfile: traderProfile,
+                chartImageBase64: nil,
+                chartImagesBase64: nil,
+                sessionSummary: sessionSummary,
+                conversationHistory: conversationHistory
+            )
+        } catch {
+            AppLogger.warning("Ensemble worker '\(model)' encountered error: \(error.localizedDescription)")
+            return nil
+        }
+    }
+
     // MARK: - Dedicated Single Trade AI Coaching
     public func requestTradeCoaching(
         trade: Trade,

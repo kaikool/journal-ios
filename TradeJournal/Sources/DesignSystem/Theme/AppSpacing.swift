@@ -6,6 +6,7 @@ public enum AppSpacing {
     /// 2pt: Micro hairline spacing
     public static let xxxSmall: CGFloat = 2
     /// 4pt: Tight element separation (icon to label in badge)
+    public static let micro: CGFloat = 4
     public static let xxSmall: CGFloat = 4
     /// 6pt: Standard icon to text horizontal gap
     public static let xSmall: CGFloat = 6
@@ -18,6 +19,7 @@ public enum AppSpacing {
     /// 14pt: Card internal vertical gutter
     public static let cardPadding: CGFloat = 14
     /// 16pt: Standard screen margin and major card padding
+    public static let pageMargin: CGFloat = 16
     public static let large: CGFloat = 16
     /// 20pt: Spacing between independent card sections
     public static let xLarge: CGFloat = 20
