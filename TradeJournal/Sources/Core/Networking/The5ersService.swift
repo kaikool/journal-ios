@@ -314,15 +314,26 @@ public final class The5ersService: ObservableObject {
         }
         
         if let refreshToken = json["refresh_token"] as? String {
-            UserDefaults.standard.set(refreshToken, forKey: "the5ers_mcp_refresh_token")
+            KeychainManager.set(refreshToken, forKey: Self.refreshTokenKey)
         }
         
         return accessToken
     }
     
+    private static let refreshTokenKey = "the5ers_mcp_refresh_token"
+
+    /// Loads the OAuth refresh token from the Keychain, migrating any legacy plain-text UserDefaults copy.
+    private static func loadRefreshToken() -> String? {
+        if let stored = KeychainManager.get(forKey: refreshTokenKey), !stored.isEmpty { return stored }
+        guard let legacy = UserDefaults.standard.string(forKey: refreshTokenKey), !legacy.isEmpty else { return nil }
+        KeychainManager.set(legacy, forKey: refreshTokenKey)
+        UserDefaults.standard.removeObject(forKey: refreshTokenKey)
+        return legacy
+    }
+
     /// Refreshes the OAuth access token using saved refresh token
     public func refreshAccessTokenIfNeeded() async throws -> String? {
-        guard let refreshToken = UserDefaults.standard.string(forKey: "the5ers_mcp_refresh_token"), !refreshToken.isEmpty else {
+        guard let refreshToken = Self.loadRefreshToken(), !refreshToken.isEmpty else {
             return nil
         }
         guard let url = URL(string: "\(Self.authHost)/oauth2/v1/apps/agentic/\(Self.tenantPath)/token") else { return nil }
@@ -352,7 +363,7 @@ public final class The5ersService: ObservableObject {
         if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
            let newAccessToken = json["access_token"] as? String {
             if let newRefresh = json["refresh_token"] as? String {
-                UserDefaults.standard.set(newRefresh, forKey: "the5ers_mcp_refresh_token")
+                KeychainManager.set(newRefresh, forKey: Self.refreshTokenKey)
             }
             await MainActor.run {
                 self.configure(token: newAccessToken)
@@ -394,7 +405,7 @@ public final class The5ersService: ObservableObject {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json, text/event-stream", forHTTPHeaderField: "Accept")
         let effectiveToken = mcpToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            ? (UserDefaults.standard.string(forKey: "the5ers_mcp_token") ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            ? (KeychainManager.get(forKey: "the5ers_mcp_token") ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             : mcpToken
         request.setValue("Bearer \(effectiveToken)", forHTTPHeaderField: "Authorization")
         request.setValue(Self.protocolVersion, forHTTPHeaderField: "MCP-Protocol-Version")
@@ -422,7 +433,7 @@ public final class The5ersService: ObservableObject {
         let effectiveToken: String = {
             let direct = mcpToken.trimmingCharacters(in: .whitespacesAndNewlines)
             if !direct.isEmpty { return direct }
-            return (UserDefaults.standard.string(forKey: "the5ers_mcp_token") ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            return (KeychainManager.get(forKey: "the5ers_mcp_token") ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         }()
         
         guard !effectiveToken.isEmpty else {

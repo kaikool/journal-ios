@@ -504,17 +504,20 @@ extension TradeDataStore {
             let remoteSettings = try await SupabaseService.shared.fetchSettings()
             var localSettingsToUpload: [JournalSettingRecord] = []
             
-            // Sync The5ers MCP Token across devices
+            // Sync The5ers MCP Token across devices (token lives in the Keychain, never in UserDefaults)
+            let localToken: String = {
+                let live = The5ersService.shared.mcpToken
+                return live.isEmpty ? (KeychainManager.get(forKey: "the5ers_mcp_token") ?? "") : live
+            }()
             if let remoteToken = remoteSettings.first(where: { $0.key == "the5ers_mcp_token" })?.value, !remoteToken.isEmpty {
-                let localToken = UserDefaults.standard.string(forKey: "the5ers_mcp_token") ?? ""
                 if localToken.isEmpty {
-                    UserDefaults.standard.set(remoteToken, forKey: "the5ers_mcp_token")
-                    The5ersService.shared.mcpToken = remoteToken
+                    The5ersService.shared.configure(token: remoteToken)
                 }
-            } else if let localToken = UserDefaults.standard.string(forKey: "the5ers_mcp_token"), !localToken.isEmpty {
+            } else if !localToken.isEmpty {
                 localSettingsToUpload.append(JournalSettingRecord(key: "the5ers_mcp_token", value: localToken))
             }
             
+
             // Sync AI Configuration across devices
             if let remoteAi = remoteSettings.first(where: { $0.key == "ai_reflection" })?.value, !remoteAi.isEmpty {
                 if let data = remoteAi.data(using: .utf8), let decoded = try? JSONDecoder().decode(AiSettingsConfig.self, from: data) {
