@@ -311,16 +311,7 @@ public struct MarketCandleChartView: View {
 
                 // 2. Untested (Naked) POC Ray
                 if snap.isNaked {
-                    var rayEndIdx = bars.count - 1
-                    if eI + 1 < bars.count {
-                        for k in (eI + 1)..<bars.count {
-                            let b = bars[k]
-                            if b.low <= snap.pocPrice && b.high >= snap.pocPrice {
-                                rayEndIdx = k
-                                break
-                            }
-                        }
-                    }
+                    let rayEndIdx = findRayEndIndex(after: eI, for: snap.pocPrice, in: bars)
                     let rayXEnd = CGFloat(rayEndIdx) * stepX + (stepX / 2.0)
 
                     if rayXEnd > segXEnd && segXEnd <= plotWidth {
@@ -364,37 +355,39 @@ public struct MarketCandleChartView: View {
         minP: Double,
         span: Double
     ) -> some View {
-        let pocD = (dev.currentPoc as NSDecimalNumber).doubleValue
-        if pocD >= (minP - span * 0.05) && pocD <= (minP + span * 1.05) {
-            let y = plotHeight - CGFloat((pocD - minP) / span) * plotHeight
-            let col = sessionColor(for: dev.sessionType)
+        if let curPoc = dev.currentPoc {
+            let pocD = (curPoc as NSDecimalNumber).doubleValue
+            if pocD >= (minP - span * 0.05) && pocD <= (minP + span * 1.05) {
+                let y = plotHeight - CGFloat((pocD - minP) / span) * plotHeight
+                let col = sessionColor(for: dev.sessionType)
 
-            let sIdx = bars.firstIndex(where: { $0.date >= dev.startTime }) ?? max(0, bars.count - 12)
-            let x1 = CGFloat(sIdx) * stepX + (stepX / 2.0)
-            let x2 = CGFloat(max(0, bars.count - 1)) * stepX + (stepX / 2.0)
+                let sIdx = bars.firstIndex(where: { $0.date >= dev.startTime }) ?? max(0, bars.count - 12)
+                let x1 = CGFloat(sIdx) * stepX + (stepX / 2.0)
+                let x2 = CGFloat(max(0, bars.count - 1)) * stepX + (stepX / 2.0)
 
-            if x2 >= 0 && x1 <= plotWidth {
-                // Solid line for current active session
-                Path { path in
-                    path.move(to: CGPoint(x: max(0, x1), y: y))
-                    path.addLine(to: CGPoint(x: min(plotWidth, x2), y: y))
-                }
-                .stroke(col, lineWidth: 1.8)
-
-                // Faint dotted ray to the right edge
-                if x2 < plotWidth {
+                if x2 >= 0 && x1 <= plotWidth {
+                    // Solid line for current active session
                     Path { path in
-                        path.move(to: CGPoint(x: x2, y: y))
-                        path.addLine(to: CGPoint(x: plotWidth, y: y))
+                        path.move(to: CGPoint(x: max(0, x1), y: y))
+                        path.addLine(to: CGPoint(x: min(plotWidth, x2), y: y))
                     }
-                    .stroke(col.opacity(0.65), style: StrokeStyle(lineWidth: 1.0, dash: [2, 3]))
-                }
+                    .stroke(col, lineWidth: 1.8)
 
-                let devTag = dev.sessionType == .daily ? "[D]" : (dev.sessionType == .weekly ? "[W]" : "[TY]")
-                Text(devTag)
-                    .font(AppTypography.captionMicro)
-                    .foregroundColor(col)
-                    .position(x: plotWidth - 14, y: max(6, min(plotHeight - 6, y - 6)))
+                    // Faint dotted ray to the right edge
+                    if x2 < plotWidth {
+                        Path { path in
+                            path.move(to: CGPoint(x: x2, y: y))
+                            path.addLine(to: CGPoint(x: plotWidth, y: y))
+                        }
+                        .stroke(col.opacity(0.65), style: StrokeStyle(lineWidth: 1.0, dash: [2, 3]))
+                    }
+
+                    let devTag = dev.sessionType == .daily ? "[D]" : (dev.sessionType == .weekly ? "[W]" : "[TY]")
+                    Text(devTag)
+                        .font(AppTypography.captionMicro)
+                        .foregroundColor(col)
+                        .position(x: plotWidth - 14, y: max(6, min(plotHeight - 6, y - 6)))
+                }
             }
         }
     }
@@ -409,9 +402,7 @@ public struct MarketCandleChartView: View {
     ) -> some View {
         let intradayLevels = keyLevels.filter { $0.type == .pdh || $0.type == .pdl || $0.type == .pdc }
         if !intradayLevels.isEmpty && !bars.isEmpty {
-            var cal = Calendar(identifier: .gregorian)
-            cal.timeZone = SessionFootprintEngine.sessionTimeZone
-            let todayStartIdx = bars.firstIndex(where: { cal.isDateInToday($0.date) }) ?? max(0, bars.count - 24)
+            let todayStartIdx = findTodayStartIndex(in: bars)
             let x1 = CGFloat(todayStartIdx) * stepX + (stepX / 2.0)
             let x2 = CGFloat(bars.count - 1) * stepX + (stepX / 2.0)
 
@@ -437,6 +428,23 @@ public struct MarketCandleChartView: View {
                 }
             }
         }
+    }
+
+    private func findRayEndIndex(after endIndex: Int, for pocPrice: Decimal, in barList: [MarketBar]) -> Int {
+        guard endIndex + 1 < barList.count else { return max(0, barList.count - 1) }
+        for k in (endIndex + 1)..<barList.count {
+            let b = barList[k]
+            if b.low <= pocPrice && b.high >= pocPrice {
+                return k
+            }
+        }
+        return max(0, barList.count - 1)
+    }
+
+    private func findTodayStartIndex(in barList: [MarketBar]) -> Int {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = SessionFootprintEngine.sessionTimeZone
+        return barList.firstIndex(where: { cal.isDateInToday($0.date) }) ?? max(0, barList.count - 24)
     }
 
     private func sessionColor(for type: FootprintSessionType) -> Color {

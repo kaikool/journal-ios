@@ -1,4 +1,4 @@
-import Foundation
+﻿import Foundation
 
 // MARK: - Footprint Session Types
 public enum FootprintSessionType: String, Codable, Sendable, CaseIterable {
@@ -8,7 +8,7 @@ public enum FootprintSessionType: String, Codable, Sendable, CaseIterable {
     case daily = "daily"
     case weekly = "weekly"
     case monthly = "monthly"
-    
+
     public var title: String {
         switch self {
         case .tokyo: return "Tokyo Session"
@@ -19,7 +19,7 @@ public enum FootprintSessionType: String, Codable, Sendable, CaseIterable {
         case .monthly: return "Monthly Profile"
         }
     }
-    
+
     public var shortCode: String {
         switch self {
         case .tokyo: return "TYO"
@@ -38,7 +38,7 @@ public struct FootprintBin: Identifiable, Codable, Sendable, Equatable {
     public let key: Int
     public let price: Decimal
     public var volume: Decimal
-    
+
     public init(key: Int, price: Decimal, volume: Decimal) {
         self.key = key
         self.price = price
@@ -65,7 +65,7 @@ public struct SessionProfileSnapshot: Identifiable, Codable, Sendable, Equatable
     public var isNaked: Bool
     public var mitigatedAt: Date?
     public let createdAt: Date
-    
+
     public init(
         id: String = JournalIds.newId(),
         symbol: String,
@@ -112,7 +112,7 @@ public struct DevelopingProfile: Sendable, Equatable {
     public var profileLow: Decimal?
     public var totalVolume: Decimal
     public var bins: [FootprintBin]
-    
+
     public init(
         sessionType: FootprintSessionType,
         startTime: Date,
@@ -153,7 +153,7 @@ public struct KeyLevel: Identifiable, Sendable, Equatable {
     public let price: Decimal
     public let label: String
     public let isNaked: Bool
-    
+
     public init(type: KeyLevelType, price: Decimal, label: String, isNaked: Bool = false) {
         self.type = type
         self.price = price
@@ -178,7 +178,7 @@ public enum CandlePatternType: String, Codable, Sendable, CaseIterable {
     case tweezerTop = "Tweezer Top"
     case threeWhiteSoldiers = "Three White Soldiers"
     case threeBlackCrows = "Three Black Crows"
-    
+
     public var isBullish: Bool {
         switch self {
         case .bullishPinbar, .bullishEngulfing, .marubozuBullish, .morningStar, .tweezerBottom, .threeWhiteSoldiers:
@@ -187,7 +187,7 @@ public enum CandlePatternType: String, Codable, Sendable, CaseIterable {
             return false
         }
     }
-    
+
     public var isBearish: Bool {
         switch self {
         case .bearishPinbar, .bearishEngulfing, .marubozuBearish, .eveningStar, .tweezerTop, .threeBlackCrows:
@@ -195,6 +195,10 @@ public enum CandlePatternType: String, Codable, Sendable, CaseIterable {
         default:
             return false
         }
+    }
+
+    public var displayName: String {
+        rawValue
     }
 }
 
@@ -206,7 +210,7 @@ public struct DetectedCandlePattern: Identifiable, Sendable, Equatable {
     public let price: Decimal
     public let confluenceKeyLevel: KeyLevel?
     public let summary: String
-    
+
     public init(
         id: String = JournalIds.newId(),
         type: CandlePatternType,
