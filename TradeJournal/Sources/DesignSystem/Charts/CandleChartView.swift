@@ -1,4 +1,4 @@
-import SwiftUI
+﻿import SwiftUI
 
 /// Professional candlestick chart and execution path view for Trade Replay.
 /// Ported 1:1 from `@luxalgo/vela` and `trade-market-data.tsx` / `trade-chart.tsx`.
@@ -19,15 +19,17 @@ public struct CandleChartView: View {
     let showRSI: Bool
     let isLandscape: Bool
     public let keyLevels: [KeyLevel]
+    public let sessionProfiles: [SessionProfileSnapshot]
+    public let developingProfile: DevelopingProfile?
     public let patterns: [DetectedCandlePattern]
     @State private var activeRSIMAType: MomentumEngine.RSIMAType
-    
+
     @State private var hoveredBarIndex: Int? = nil
     @State private var zoomScale: CGFloat = 1.0
     @State private var lastMagnification: CGFloat = 1.0
     @State private var panOffset: CGFloat = 0.0
     @State private var lastDragX: CGFloat = 0.0
-    
+
     public init(
         visibleBars: [MarketBar],
         allBars: [MarketBar] = [],
@@ -44,6 +46,8 @@ public struct CandleChartView: View {
         rsiMAType: MomentumEngine.RSIMAType = .ema,
         isLandscape: Bool = false,
         keyLevels: [KeyLevel] = [],
+        sessionProfiles: [SessionProfileSnapshot] = [],
+        developingProfile: DevelopingProfile? = nil,
         patterns: [DetectedCandlePattern] = [],
         onResolutionChange: ((MarketResolution) -> Void)? = nil
     ) {
@@ -61,22 +65,24 @@ public struct CandleChartView: View {
         self.showRSI = showRSI
         self.isLandscape = isLandscape
         self.keyLevels = keyLevels
+        self.sessionProfiles = sessionProfiles
+        self.developingProfile = developingProfile
         self.patterns = patterns
         self.onResolutionChange = onResolutionChange
         self._activeRSIMAType = State(initialValue: rsiMAType)
     }
-    
+
     private var activeFills: [Execution] {
         executions.filter { Int64($0.executedAt.timeIntervalSince1970 * 1000) <= throughTimestamp }
     }
-    
+
     public var body: some View {
         VStack(spacing: 4) {
             // HUD Information Bar: Sleek, Minimalist (No OHLC, No numeric EMA values, Minimal Legends)
             if !isLandscape {
                 hudHeaderView
             }
-            
+
             // Unified Canvas Card: Candlesticks + optional RSI Sub-Window
             VStack(spacing: 0) {
                 // 1. Candlestick Canvas drawing
@@ -91,12 +97,12 @@ public struct CandleChartView: View {
                     }
                     .frame(height: showRSI ? 220 : 260)
                 }
-                
+
                 // 2. RSI Sub-Window (Underneath)
                 if showRSI {
                     Divider()
                         .background(AppColors.border.opacity(0.4))
-                    
+
                     GeometryReader { geo in
                         let rightAxisWidth: CGFloat = 55
                         let plotWidth = max(10, geo.size.width - rightAxisWidth)
@@ -107,7 +113,7 @@ public struct CandleChartView: View {
                         let totalW = CGFloat(visibleBars.count) * stepX
                         let minPan = min(0, plotWidth - totalW)
                         let clampedPan = totalW > plotWidth ? min(0, max(minPan, panOffset)) : 0
-                        
+
                         rsiPlotView(size: geo.size, stepX: stepX, panOffset: clampedPan)
                     }
                     .frame(height: isLandscape ? 85 : 110)
@@ -134,7 +140,7 @@ public struct CandleChartView: View {
                         let approxPlotWidth: CGFloat = isLandscape ? 600 : 300
                         let stepX = approxPlotWidth / CGFloat(max(1, slotCount))
                         let totalW = CGFloat(visibleBars.count) * stepX
-                        
+
                         if zoomScale > 1.05 && abs(value.translation.width) > 4 && totalW > approxPlotWidth {
                             let delta = value.translation.width - lastDragX
                             lastDragX = value.translation.width
@@ -176,46 +182,61 @@ public struct CandleChartView: View {
             .accessibilityLabel("Candlestick chart for \(trade.symbol), \(visibleBars.count) bars visible.")
         }
     }
-    
+
     // MARK: - 1. HUD Header Bar (Sleek, Minimalist, Pre-Trade Aligned)
-    
+
     private var activeHoveredBar: MarketBar? {
         guard let idx = hoveredBarIndex, idx >= 0, idx < visibleBars.count else {
             return visibleBars.last
         }
         return visibleBars[idx]
     }
-    
+
     private var activeHoveredIndex: Int? {
         if let idx = hoveredBarIndex, idx >= 0, idx < visibleBars.count {
             return idx
         }
         return visibleBars.isEmpty ? nil : (visibleBars.count - 1)
     }
-    
+
     private var hudHeaderView: some View {
         let hoveredTimeStr: String? = hoveredBarIndex != nil ? activeHoveredBar.map { formatBarTime($0.timestamp) } : nil
-        
+        let hoveredPattern: DetectedCandlePattern? = {
+            guard let bar = activeHoveredBar else { return nil }
+            return patterns.first(where: { $0.barTimestamp == bar.timestamp })
+        }()
+
         return HStack(alignment: .center, spacing: 8) {
             // 1. Symbol
             Text(trade.symbol)
                 .font(AppTypography.actionButtonCompact)
                 .foregroundColor(AppColors.primaryText)
-            
+
             // 2. Hovered Time (if touching/scrubbing candle)
             if let timeStr = hoveredTimeStr {
                 Text(timeStr)
                     .font(AppTypography.monoCaption)
                     .foregroundColor(AppColors.secondaryText)
             }
-            
+
+            // 3. Price Action Pattern Confluence Pill (Only in HUD, keeping chart canvas 100% clean)
+            if let pat = hoveredPattern {
+                AppBadge(
+                    pat.type.displayName,
+                    style: pat.type.isBullish ? .profit : (pat.type.isBearish ? .loss : .brand)
+                )
+                if let lvl = pat.confluenceKeyLevel {
+                    AppBadge("@ \(lvl.label)", variant: .secondary)
+                }
+            }
+
             Spacer()
-            
+
             // 4. Zoom Indicator (if user pinched)
             if abs(zoomScale - 1.0) > 0.05 {
                 AppBadge(String(format: "%.1fx", zoomScale), style: .brand)
             }
-            
+
             // Timeframe Resolution Selector Tabs: 15m, 1h, 4h
             if onResolutionChange != nil {
                 AppSegmentedBar(
@@ -239,70 +260,84 @@ public struct CandleChartView: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
     }
-    
+
     // MARK: - 2. Candlestick Main Plot
-    
+
     private func candlestickPlotView(size: CGSize) -> some View {
         let rightAxisWidth: CGFloat = 55
         let bottomAxisHeight: CGFloat = showRSI ? 0 : 20
         let plotWidth = max(10, size.width - rightAxisWidth)
         let plotHeight = max(10, size.height - bottomAxisHeight)
-        
+
         let bounds = calculatePriceBounds()
         let minP = bounds.minPrice
         let maxP = bounds.maxPrice
         let priceSpan = max(0.00001, maxP - minP)
-        
+
         // Base slot count scaled by pinch zoom:
         let baseCount = max(visibleBars.count, min(totalBarsCount, 50))
         let effectiveZoom = max(0.5, min(4.0, zoomScale))
         let slotCount = max(8, Double(baseCount) / Double(effectiveZoom))
         let stepX = plotWidth / CGFloat(max(1, slotCount))
         let candleWidth = max(2.5, min(24.0, stepX * 0.7))
-        
+
         let totalContentWidth = CGFloat(visibleBars.count) * stepX
         let minPan = min(0, plotWidth - totalContentWidth)
         let clampedPan = totalContentWidth > plotWidth ? min(0, max(minPan, panOffset)) : 0
-        
+
         return ZStack(alignment: .topLeading) {
             // Grid lines and right price axis
             gridAndPriceAxis(width: plotWidth, height: plotHeight, minP: minP, maxP: maxP, fullWidth: size.width)
-            
+
             // Time axis (bottom) - only shown on candlestick canvas if RSI sub-window is hidden
             if !showRSI {
                 timeAxis(width: plotWidth, height: plotHeight, stepX: stepX, fullHeight: size.height, panOffset: clampedPan)
             }
-            
+
             volumeHistogram(plotWidth: plotWidth, plotHeight: plotHeight, stepX: stepX, candleWidth: candleWidth, panOffset: clampedPan)
-            
+
             // Render candlesticks (Wick + Body)
             Canvas { context, _ in
                 for (i, bar) in visibleBars.enumerated() {
                     let centerX = CGFloat(i) * stepX + (stepX / 2.0) + clampedPan
                     guard centerX >= -candleWidth && centerX <= (plotWidth + candleWidth) else { continue }
-                    
+
                     let highD = (bar.high as NSDecimalNumber).doubleValue
                     let lowD = (bar.low as NSDecimalNumber).doubleValue
                     let openD = (bar.open as NSDecimalNumber).doubleValue
                     let closeD = (bar.close as NSDecimalNumber).doubleValue
-                    
+
                     let rawYHigh = plotHeight - CGFloat((highD - minP) / priceSpan) * plotHeight
                     let rawYLow = plotHeight - CGFloat((lowD - minP) / priceSpan) * plotHeight
                     let rawYOpen = plotHeight - CGFloat((openD - minP) / priceSpan) * plotHeight
                     let rawYClose = plotHeight - CGFloat((closeD - minP) / priceSpan) * plotHeight
-                    
+
                     let yHigh = max(0, min(plotHeight, rawYHigh))
                     let yLow = max(0, min(plotHeight, rawYLow))
                     let yOpen = max(0, min(plotHeight, rawYOpen))
                     let yClose = max(0, min(plotHeight, rawYClose))
-                    
-                    let color = bar.isUp ? AppColors.profit : AppColors.loss
-                    
+
+                    // Highlight Price Action pattern by changing candle color directly (Zero text clutter)
+                    let matchedPattern = patterns.first(where: { $0.barTimestamp == bar.timestamp })
+                    let candleColor: Color
+                    let isPattern = matchedPattern != nil
+                    if let pat = matchedPattern {
+                        if pat.type.isBullish {
+                            candleColor = AppColors.patternBullish
+                        } else if pat.type.isBearish {
+                            candleColor = AppColors.patternBearish
+                        } else {
+                            candleColor = AppColors.patternNeutral
+                        }
+                    } else {
+                        candleColor = bar.isUp ? AppColors.profit : AppColors.loss
+                    }
+
                     var wickPath = Path()
                     wickPath.move(to: CGPoint(x: centerX, y: yHigh))
                     wickPath.addLine(to: CGPoint(x: centerX, y: yLow))
-                    context.stroke(wickPath, with: .color(color), lineWidth: 1.5)
-                    
+                    context.stroke(wickPath, with: .color(candleColor), lineWidth: isPattern ? 2.0 : 1.5)
+
                     let bodyTop = min(yOpen, yClose)
                     let bodyHeight = max(2.5, abs(yClose - yOpen))
                     let bodyRect = CGRect(
@@ -311,18 +346,20 @@ public struct CandleChartView: View {
                         width: candleWidth,
                         height: bodyHeight
                     )
-                    context.fill(Path(bodyRect), with: .color(color))
+                    context.fill(Path(bodyRect), with: .color(candleColor))
+                    if isPattern {
+                        context.stroke(Path(bodyRect), with: .color(candleColor.opacity(0.9)), lineWidth: 1.0)
+                    }
                 }
             }
             .frame(width: plotWidth, height: plotHeight)
-            
-            // Footprint Key Levels & Candlestick Patterns Overlays
-            keyLevelsOverlay(width: plotWidth, height: plotHeight, minP: minP, span: priceSpan, panOffset: clampedPan)
-            patternsOverlay(plotWidth: plotWidth, plotHeight: plotHeight, stepX: stepX, minP: minP, span: priceSpan, panOffset: clampedPan)
-            
+
+            // TradingView-aligned Footprint POC & Key Levels Overlay (Time-bounded segments + selective rays)
+            footprintOverlay(plotWidth: plotWidth, plotHeight: plotHeight, stepX: stepX, minP: minP, span: priceSpan, panOffset: clampedPan)
+
             // Unified trade overlay (entry/exit lines, arrows, connecting line)
             tradeOverlay(plotWidth: plotWidth, plotHeight: plotHeight, stepX: stepX, minP: minP, span: priceSpan, panOffset: clampedPan)
-            
+
             if let hIdx = hoveredBarIndex, hIdx < visibleBars.count {
                 let hX = CGFloat(hIdx) * stepX + (stepX / 2.0) + clampedPan
                 if hX >= 0 && hX <= plotWidth {
@@ -332,7 +369,7 @@ public struct CandleChartView: View {
                         .position(x: hX, y: plotHeight / 2.0)
                 }
             }
-            
+
             // Zoom scale pill indicator (shows dynamically during pinch zoom in landscape)
             if isLandscape && abs(zoomScale - 1.0) > 0.05 {
                 Text(String(format: "%.1fx", zoomScale))
@@ -346,86 +383,276 @@ public struct CandleChartView: View {
             }
         }
     }
-    
-    // MARK: - Footprint Key Levels Overlay
-    private func keyLevelsOverlay(width: CGFloat, height: CGFloat, minP: Double, span: Double, panOffset: CGFloat) -> some View {
-        ForEach(keyLevels) { level in
-            let priceD = (level.price as NSDecimalNumber).doubleValue
-            if priceD >= minP && priceD <= (minP + span) {
-                let y = height - CGFloat((priceD - minP) / span) * height
-                let color = levelColor(for: level)
-                let isDotted = level.isNaked
-                
-                ZStack(alignment: .trailing) {
-                    Path { path in
-                        path.move(to: CGPoint(x: 0, y: y))
-                        path.addLine(to: CGPoint(x: width, y: y))
-                    }
-                    .stroke(color, style: StrokeStyle(lineWidth: isDotted ? 1.0 : 1.2, dash: isDotted ? [4, 4] : []))
-                    
-                    Text(level.label)
-                        .font(AppTypography.captionMicro)
-                        .foregroundColor(color)
-                        .padding(.horizontal, 4)
-                        .padding(.vertical, 1)
-                        .background(AppColors.cardBackground.opacity(0.9))
-                        .cornerRadius(2)
-                        .position(x: width - 36, y: max(8, min(height - 8, y - 8)))
-                }
+
+    // MARK: - Footprint Key Levels Overlay (TradingView Footprint Alignment)
+    @ViewBuilder
+    private func footprintOverlay(
+        plotWidth: CGFloat,
+        plotHeight: CGFloat,
+        stepX: CGFloat,
+        minP: Double,
+        span: Double,
+        panOffset: CGFloat
+    ) -> some View {
+        ZStack(alignment: .topLeading) {
+            // 1. Time-bounded Historical Session Profiles (Tokyo, London, NY, Daily, Weekly)
+            ForEach(filteredTradingViewProfiles, id: \.snap.id) { item in
+                sessionProfileSegment(
+                    snap: item.snap,
+                    tag: item.tag,
+                    plotWidth: plotWidth,
+                    plotHeight: plotHeight,
+                    stepX: stepX,
+                    minP: minP,
+                    span: span,
+                    panOffset: panOffset
+                )
             }
+
+            // 2. Developing (Live) Ongoing Session Profile
+            if let dev = developingProfile {
+                developingProfileSegment(
+                    dev: dev,
+                    plotWidth: plotWidth,
+                    plotHeight: plotHeight,
+                    stepX: stepX,
+                    minP: minP,
+                    span: span,
+                    panOffset: panOffset
+                )
+            }
+
+            // 3. Standalone Intraday Levels (PDH / PDL for current trading day)
+            intradayKeyLevels(
+                plotWidth: plotWidth,
+                plotHeight: plotHeight,
+                stepX: stepX,
+                minP: minP,
+                span: span,
+                panOffset: panOffset
+            )
         }
     }
-    
-    private func patternsOverlay(plotWidth: CGFloat, plotHeight: CGFloat, stepX: CGFloat, minP: Double, span: Double, panOffset: CGFloat) -> some View {
-        ForEach(patterns) { pat in
-            if let idx = visibleBars.firstIndex(where: { $0.timestamp == pat.barTimestamp }) {
-                let bar = visibleBars[idx]
-                let xCenter = CGFloat(idx) * stepX + (stepX / 2.0) + panOffset
-                if xCenter >= 0 && xCenter <= plotWidth {
-                    let highD = (bar.high as NSDecimalNumber).doubleValue
-                    let lowD = (bar.low as NSDecimalNumber).doubleValue
-                    let yHigh = plotHeight - CGFloat((highD - minP) / span) * plotHeight
-                    let yLow = plotHeight - CGFloat((lowD - minP) / span) * plotHeight
-                    
-                    let yPos = pat.type.isBullish ? min(plotHeight - 6, yLow + 12) : max(6, yHigh - 12)
-                    let col = pat.type.isBullish ? AppColors.profit : AppColors.loss
-                    
-                    Text(pat.type.rawValue)
-                        .font(AppTypography.captionMicro)
-                        .foregroundColor(col)
-                        .padding(.horizontal, 3)
-                        .padding(.vertical, 1)
-                        .background(AppColors.cardBackground.opacity(0.9))
-                        .cornerRadius(2)
-                        .position(x: xCenter, y: yPos)
+
+    // MARK: - Filtered Profiles with TradingView Naming ([W-1], [D-1], [TY], etc.)
+    private var filteredTradingViewProfiles: [(snap: SessionProfileSnapshot, tag: String)] {
+        let daily = sessionProfiles.filter { $0.sessionType == .daily }.sorted { $0.startTime > $1.startTime }
+        let weekly = sessionProfiles.filter { $0.sessionType == .weekly }.sorted { $0.startTime > $1.startTime }
+        let tokyo = sessionProfiles.filter { $0.sessionType == .tokyo }.sorted { $0.startTime > $1.startTime }
+        let london = sessionProfiles.filter { $0.sessionType == .london }.sorted { $0.startTime > $1.startTime }
+        let ny = sessionProfiles.filter { $0.sessionType == .newYork }.sorted { $0.startTime > $1.startTime }
+
+        var list: [(SessionProfileSnapshot, String)] = []
+
+        // Up to 3 most recent Daily profiles
+        for (idx, snap) in daily.prefix(3).enumerated() {
+            let tag = idx == 0 ? "[D]" : "[D-\(idx)]"
+            list.append((snap, tag))
+        }
+        // Up to 2 most recent Weekly profiles
+        for (idx, snap) in weekly.prefix(2).enumerated() {
+            let tag = idx == 0 ? "[W]" : "[W-\(idx)]"
+            list.append((snap, tag))
+        }
+        // Most recent Tokyo session
+        if let t = tokyo.first {
+            list.append((t, "[TY]"))
+        }
+        // Most recent London session
+        if let l = london.first {
+            list.append((l, "[LD]"))
+        }
+        // Most recent New York session
+        if let n = ny.first {
+            list.append((n, "[NY]"))
+        }
+
+        return list
+    }
+
+    @ViewBuilder
+    private func sessionProfileSegment(
+        snap: SessionProfileSnapshot,
+        tag: String,
+        plotWidth: CGFloat,
+        plotHeight: CGFloat,
+        stepX: CGFloat,
+        minP: Double,
+        span: Double,
+        panOffset: CGFloat
+    ) -> some View {
+        let pocD = (snap.pocPrice as NSDecimalNumber).doubleValue
+        if pocD >= (minP - span * 0.05) && pocD <= (minP + span * 1.05) {
+            let y = plotHeight - CGFloat((pocD - minP) / span) * plotHeight
+            let col = sessionColor(for: snap.sessionType)
+
+            // Find bar indices that correspond to this session
+            let startIdx = visibleBars.firstIndex(where: { $0.date >= snap.startTime })
+            let endIdx = visibleBars.lastIndex(where: { $0.date <= snap.endTime })
+
+            if let sI = startIdx ?? (visibleBars.first.map { snap.endTime >= $0.date ? 0 : nil } ?? nil) {
+                let eI = endIdx ?? min(visibleBars.count - 1, sI)
+                let x1 = CGFloat(sI) * stepX + (stepX / 2.0) + panOffset
+                let x2 = CGFloat(eI) * stepX + (stepX / 2.0) + panOffset
+                let segXEnd = max(x1 + stepX, x2)
+                let isD1orW1 = snap.sessionType == .daily || snap.sessionType == .weekly
+                let lineWidth: CGFloat = isD1orW1 ? 2.0 : 1.2
+
+                // 1. Session Bounded Solid POC line (Only spans this session's candles, zero text over candles)
+                if segXEnd >= 0 && x1 <= plotWidth {
+                    Path { path in
+                        path.move(to: CGPoint(x: max(0, x1), y: y))
+                        path.addLine(to: CGPoint(x: min(plotWidth, segXEnd), y: y))
+                    }
+                    .stroke(col, lineWidth: lineWidth)
+                }
+
+                // 2. Untested (Naked) POC Ray: Faint dotted line extending to the right with TradingView tag
+                if snap.isNaked {
+                    var rayEndIdx = visibleBars.count - 1
+                    if eI + 1 < visibleBars.count {
+                        for k in (eI + 1)..<visibleBars.count {
+                            let b = visibleBars[k]
+                            if b.low <= snap.pocPrice && b.high >= snap.pocPrice {
+                                rayEndIdx = k
+                                break
+                            }
+                        }
+                    }
+                    let rayXEnd = CGFloat(rayEndIdx) * stepX + (stepX / 2.0) + panOffset
+
+                    if rayXEnd > segXEnd && segXEnd <= plotWidth {
+                        Path { path in
+                            path.move(to: CGPoint(x: max(0, segXEnd), y: y))
+                            path.addLine(to: CGPoint(x: min(plotWidth, rayXEnd), y: y))
+                        }
+                        .stroke(col.opacity(0.65), style: StrokeStyle(lineWidth: 1.0, dash: [2, 3]))
+
+                        // Sleek bracket tag at right edge matching TradingView ([W-1], [D-1], [TY], etc.)
+                        if rayXEnd >= (plotWidth - 20) {
+                            Text(tag)
+                                .font(AppTypography.captionMicro)
+                                .foregroundColor(col)
+                                .position(x: plotWidth - 14, y: max(6, min(plotHeight - 6, y - 6)))
+                        }
+                    }
+                }
+
+                // 3. Immediate Prior Staircase Step (for Daily & Weekly POCs)
+                if let priorPoc = snap.priorStepPocPrice, isD1orW1 {
+                    let priorD = (priorPoc as NSDecimalNumber).doubleValue
+                    if priorD >= (minP - span * 0.05) && priorD <= (minP + span * 1.05) {
+                        let priorY = plotHeight - CGFloat((priorD - minP) / span) * plotHeight
+                        Path { path in
+                            path.move(to: CGPoint(x: max(0, x1), y: priorY))
+                            path.addLine(to: CGPoint(x: min(plotWidth, segXEnd), y: priorY))
+                        }
+                        .stroke(col.opacity(0.4), style: StrokeStyle(lineWidth: 1.0, dash: [3, 3]))
+                    }
                 }
             }
         }
     }
 
-    private func levelColor(for level: KeyLevel) -> Color {
-        switch level.type {
-        case .sessionPoc(.tokyo):
-            return Color(red: 0.0, green: 0.72, blue: 0.83) // Cyan
-        case .sessionPoc(.london):
-            return Color(red: 1.0, green: 0.70, blue: 0.0) // Amber
-        case .sessionPoc(.newYork):
-            return Color(red: 0.67, green: 0.0, blue: 1.0) // Purple
-        case .sessionPoc(.daily):
-            return AppColors.profit // Green
-        case .sessionPoc(.weekly):
-            return AppColors.accent // Blue
-        case .nakedPoc:
-            return AppColors.loss.opacity(0.85) // Reddish dotted ray
-        case .pdh, .pdl, .pdc:
-            return AppColors.primaryText.opacity(0.6)
-        default:
-            return AppColors.secondaryText
+    @ViewBuilder
+    private func developingProfileSegment(
+        dev: DevelopingProfile,
+        plotWidth: CGFloat,
+        plotHeight: CGFloat,
+        stepX: CGFloat,
+        minP: Double,
+        span: Double,
+        panOffset: CGFloat
+    ) -> some View {
+        let pocD = (dev.currentPoc as NSDecimalNumber).doubleValue
+        if pocD >= (minP - span * 0.05) && pocD <= (minP + span * 1.05) {
+            let y = plotHeight - CGFloat((pocD - minP) / span) * plotHeight
+            let col = sessionColor(for: dev.sessionType)
+
+            let sIdx = visibleBars.firstIndex(where: { $0.date >= dev.startTime }) ?? max(0, visibleBars.count - 12)
+            let x1 = CGFloat(sIdx) * stepX + (stepX / 2.0) + panOffset
+            let x2 = CGFloat(max(0, visibleBars.count - 1)) * stepX + (stepX / 2.0) + panOffset
+
+            if x2 >= 0 && x1 <= plotWidth {
+                // Solid line for current active session
+                Path { path in
+                    path.move(to: CGPoint(x: max(0, x1), y: y))
+                    path.addLine(to: CGPoint(x: min(plotWidth, x2), y: y))
+                }
+                .stroke(col, lineWidth: 1.8)
+
+                // Faint dotted ray to the right edge
+                if x2 < plotWidth {
+                    Path { path in
+                        path.move(to: CGPoint(x: x2, y: y))
+                        path.addLine(to: CGPoint(x: plotWidth, y: y))
+                    }
+                    .stroke(col.opacity(0.65), style: StrokeStyle(lineWidth: 1.0, dash: [2, 3]))
+                }
+
+                let devTag = dev.sessionType == .daily ? "[D]" : (dev.sessionType == .weekly ? "[W]" : "[TY]")
+                Text(devTag)
+                    .font(AppTypography.captionMicro)
+                    .foregroundColor(col)
+                    .position(x: plotWidth - 14, y: max(6, min(plotHeight - 6, y - 6)))
+            }
         }
     }
-    
+
+    @ViewBuilder
+    private func intradayKeyLevels(
+        plotWidth: CGFloat,
+        plotHeight: CGFloat,
+        stepX: CGFloat,
+        minP: Double,
+        span: Double,
+        panOffset: CGFloat
+    ) -> some View {
+        let intradayLevels = keyLevels.filter { $0.type == .pdh || $0.type == .pdl || $0.type == .pdc }
+        if !intradayLevels.isEmpty && !visibleBars.isEmpty {
+            var cal = Calendar(identifier: .gregorian)
+            cal.timeZone = SessionFootprintEngine.sessionTimeZone
+            let todayStartIdx = visibleBars.firstIndex(where: { cal.isDateInToday($0.date) }) ?? max(0, visibleBars.count - 24)
+            let x1 = CGFloat(todayStartIdx) * stepX + (stepX / 2.0) + panOffset
+            let x2 = CGFloat(visibleBars.count - 1) * stepX + (stepX / 2.0) + panOffset
+
+            ForEach(intradayLevels) { lvl in
+                let priceD = (lvl.price as NSDecimalNumber).doubleValue
+                if priceD >= minP && priceD <= (minP + span) {
+                    let y = plotHeight - CGFloat((priceD - minP) / span) * plotHeight
+
+                    Path { path in
+                        path.move(to: CGPoint(x: max(0, x1), y: y))
+                        path.addLine(to: CGPoint(x: min(plotWidth, x2), y: y))
+                    }
+                    .stroke(AppColors.secondaryText.opacity(0.6), style: StrokeStyle(lineWidth: 1.0, dash: [4, 4]))
+
+                    Text(lvl.label)
+                        .font(AppTypography.captionMicro)
+                        .foregroundColor(AppColors.secondaryText)
+                        .padding(.horizontal, 3)
+                        .padding(.vertical, 1)
+                        .background(AppColors.cardBackground.opacity(0.9))
+                        .cornerRadius(2)
+                        .position(x: min(plotWidth - 24, max(24, x2 - 16)), y: max(8, min(plotHeight - 8, y - 7)))
+                }
+            }
+        }
+    }
+
+    private func sessionColor(for type: FootprintSessionType) -> Color {
+        switch type {
+        case .tokyo: return AppColors.sessionTokyo
+        case .london: return AppColors.sessionLondon
+        case .newYork: return AppColors.sessionNewYork
+        case .daily: return AppColors.sessionDaily
+        case .weekly: return AppColors.sessionWeekly
+        case .monthly: return AppColors.sessionMonthly
+        }
+    }
+
     // MARK: - 3. Grid & Axes
-    
+
     private func gridAndPriceAxis(width: CGFloat, height: CGFloat, minP: Double, maxP: Double, fullWidth: CGFloat) -> some View {
         let levels = 4
         return ForEach(0...levels, id: \.self) { i in
@@ -433,13 +660,13 @@ public struct CandleChartView: View {
             let price = minP + ratio * (maxP - minP)
             let y = height - CGFloat(ratio) * height
             let clampedY = max(8, min(height - 8, y))
-            
+
             Path { path in
                 path.move(to: CGPoint(x: 0, y: y))
                 path.addLine(to: CGPoint(x: width, y: y))
             }
             .stroke(AppColors.border.opacity(0.6), style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
-            
+
             Text(Formatters.price(Decimal(price)))
                 .font(AppTypography.number(9, weight: .medium))
                 .foregroundColor(AppColors.secondaryText)
@@ -447,11 +674,11 @@ public struct CandleChartView: View {
                 .position(x: width + 28, y: clampedY)
         }
     }
-    
+
     private func timeAxis(width: CGFloat, height: CGFloat, stepX: CGFloat, fullHeight: CGFloat, panOffset: CGFloat = 0) -> some View {
         let count = visibleBars.count
         let markInterval = max(1, count / 4)
-        
+
         return ForEach(0..<count, id: \.self) { i in
             if i % markInterval == 0 || i == count - 1 {
                 let x = CGFloat(i) * stepX + (stepX / 2.0) + panOffset
@@ -465,14 +692,14 @@ public struct CandleChartView: View {
             }
         }
     }
-    
+
     // MARK: - 4. Volume Histogram
-    
+
     private func volumeHistogram(plotWidth: CGFloat, plotHeight: CGFloat, stepX: CGFloat, candleWidth: CGFloat, panOffset: CGFloat = 0) -> some View {
         let maxVol = visibleBars.map { ($0.volume as NSDecimalNumber).doubleValue }.max() ?? 1.0
         let safeMaxVol = max(1.0, maxVol)
         let volAreaHeight = plotHeight * 0.18
-        
+
         return ForEach(0..<visibleBars.count, id: \.self) { i in
             let bar = visibleBars[i]
             let v = (bar.volume as NSDecimalNumber).doubleValue
@@ -487,9 +714,9 @@ public struct CandleChartView: View {
             }
         }
     }
-    
+
     // MARK: - 5. Unified Trade Overlay (Entry/Exit Lines, Fill Markers, Connecting Line)
-    
+
     private func findBarIndex(for timestampMs: Int64) -> Int? {
         guard !visibleBars.isEmpty else { return nil }
         let dur = resolution.durationMs
@@ -502,16 +729,16 @@ public struct CandleChartView: View {
         }
         return nil
     }
-    
+
     private func tradeOverlay(plotWidth: CGFloat, plotHeight: CGFloat, stepX: CGFloat, minP: Double, span: Double, panOffset: CGFloat = 0) -> some View {
         let entryD = (trade.avgEntry as NSDecimalNumber).doubleValue
         let yEntry = plotHeight - CGFloat((entryD - minP) / span) * plotHeight
         let openMs = Int64(trade.openedAt.timeIntervalSince1970 * 1000)
         let closeMs = Int64((trade.closedAt ?? Date()).timeIntervalSince1970 * 1000)
-        
+
         let entryBarIdx = findBarIndex(for: openMs)
         let exitBarIdx = findBarIndex(for: closeMs)
-        
+
         return ZStack {
             // 1. Entry horizontal dashed reference line (always visible)
             Path { path in
@@ -519,11 +746,11 @@ public struct CandleChartView: View {
                 path.addLine(to: CGPoint(x: plotWidth, y: yEntry))
             }
             .stroke(AppColors.accent.opacity(0.85), style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
-            
-            // 2. Entry marker & label: "EN" xanh không cần giá
+
+            // 2. Entry marker & label: "EN" xanh khÃ´ng cáº§n giÃ¡
             if let entryIdx = entryBarIdx {
                 let entryX = CGFloat(entryIdx) * stepX + (stepX / 2.0) + panOffset
-                
+
                 Text("EN")
                     .font(AppTypography.badgeMarker)
                     .padding(.horizontal, 4)
@@ -532,27 +759,27 @@ public struct CandleChartView: View {
                     .foregroundColor(.white)
                     .cornerRadius(3)
                     .position(x: min(plotWidth - 20, max(20, entryX)), y: max(8, yEntry - 10))
-                
+
                 Image(systemName: trade.direction == .long ? "arrowtriangle.up.fill" : "arrowtriangle.down.fill")
                     .font(AppTypography.badgeMarker)
                     .foregroundColor(AppColors.profit)
                     .position(x: entryX, y: trade.direction == .long ? yEntry + 8 : yEntry - 8)
             }
-            
-            // 3. Exit line + label: "EX" đỏ không cần giá + connecting line
+
+            // 3. Exit line + label: "EX" Ä‘á» khÃ´ng cáº§n giÃ¡ + connecting line
             if let exitIdx = exitBarIdx, trade.status != .open {
                 let exitD = ((trade.avgExit ?? trade.avgEntry) as NSDecimalNumber).doubleValue
                 let yExit = plotHeight - CGFloat((exitD - minP) / span) * plotHeight
                 let exitX = CGFloat(exitIdx) * stepX + (stepX / 2.0) + panOffset
                 let exitColor = AppColors.loss
-                
+
                 // Exit horizontal dashed line
                 Path { path in
                     path.move(to: CGPoint(x: 0, y: yExit))
                     path.addLine(to: CGPoint(x: plotWidth, y: yExit))
                 }
                 .stroke(exitColor.opacity(0.85), style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
-                
+
                 // Connecting line from Entry to Exit
                 if let entryIdx = entryBarIdx {
                     let entryX = CGFloat(entryIdx) * stepX + (stepX / 2.0) + panOffset
@@ -562,8 +789,8 @@ public struct CandleChartView: View {
                     }
                     .stroke(exitColor.opacity(0.6), style: StrokeStyle(lineWidth: 1.5, dash: [5, 3]))
                 }
-                
-                // Exit badge: "EX" đỏ
+
+                // Exit badge: "EX" Ä‘á»
                 Text("EX")
                     .font(AppTypography.badgeMarker)
                     .padding(.horizontal, 4)
@@ -572,7 +799,7 @@ public struct CandleChartView: View {
                     .foregroundColor(.white)
                     .cornerRadius(3)
                     .position(x: min(plotWidth - 20, max(20, exitX)), y: max(8, yExit - 10))
-                
+
                 // Exit arrow marker
                 Image(systemName: trade.direction == .long ? "arrowtriangle.down.fill" : "arrowtriangle.up.fill")
                     .font(AppTypography.badgeMarker)
@@ -586,7 +813,7 @@ public struct CandleChartView: View {
                 let curX = CGFloat(visibleBars.count - 1) * stepX + (stepX / 2.0) + panOffset
                 let curPnl = TradeReplayEngine.computeUnrealizedPnl(trade: trade, currentPrice: curBar.close, isLastBar: false)
                 let curColor = Formatters.pnlColor(curPnl)
-                
+
                 Path { path in
                     path.move(to: CGPoint(x: entryX, y: yEntry))
                     path.addLine(to: CGPoint(x: curX, y: yCur))
@@ -595,14 +822,14 @@ public struct CandleChartView: View {
             }
         }
     }
-    
+
     // MARK: - Helpers
-    
+
     private func calculatePriceBounds() -> (minPrice: Double, maxPrice: Double) {
         let referenceBars = allBars.isEmpty ? visibleBars : allBars
         var lows = referenceBars.map { ($0.low as NSDecimalNumber).doubleValue }
         var highs = referenceBars.map { ($0.high as NSDecimalNumber).doubleValue }
-        
+
         let entryD = (trade.avgEntry as NSDecimalNumber).doubleValue
         if entryD > 0 {
             lows.append(entryD)
@@ -615,15 +842,15 @@ public struct CandleChartView: View {
                 highs.append(exitD)
             }
         }
-        
+
         let minVal = lows.min() ?? 1.0
         let maxVal = highs.max() ?? 1.0
         let span = max(0.0001, maxVal - minVal)
         let margin = span * 0.08
-        
+
         return (minPrice: minVal - margin, maxPrice: maxVal + margin)
     }
-    
+
     private func updateHoveredBar(at x: CGFloat, totalWidth: CGFloat, stepX: CGFloat? = nil, panOffset: CGFloat = 0) {
         guard !visibleBars.isEmpty, totalWidth > 0 else { return }
         let stX: CGFloat = {
@@ -640,7 +867,7 @@ public struct CandleChartView: View {
             NativeHaptics.selection()
         }
     }
-    
+
     private func formatBarTime(_ timestamp: Int64) -> String {
         let date = Date(timeIntervalSince1970: Double(timestamp) / 1000.0)
         let spanMs = (visibleBars.last?.timestamp ?? timestamp) - (visibleBars.first?.timestamp ?? timestamp)
@@ -657,42 +884,42 @@ public struct CandleChartView: View {
         }
         return f.string(from: date)
     }
-    
+
     // MARK: - 8. RSI Sub-Window View & Plot
-    
+
     private var rsiSeries: [Double?] {
         let reference = allBars.isEmpty ? visibleBars : allBars
         return MomentumEngine.computeRSISeries(bars: reference, period: 14)
     }
-    
+
     private var visibleRsi: [Double?] {
         Array(rsiSeries.prefix(visibleBars.count))
     }
-    
+
     // EMA 9 of RSI 14
     private var rsiEma9Series: [Double?] {
         MomentumEngine.computeEMA(series: rsiSeries, period: 9)
     }
-    
+
     private var visibleRsiEma9: [Double?] {
         Array(rsiEma9Series.prefix(visibleBars.count))
     }
-    
+
     // WMA 45 of RSI 14
     private var rsiWma45Series: [Double?] {
         MomentumEngine.computeWMA(series: rsiSeries, period: 45)
     }
-    
+
     private var visibleRsiWma45: [Double?] {
         Array(rsiWma45Series.prefix(visibleBars.count))
     }
-    
+
     private func rsiPlotView(size: CGSize, stepX: CGFloat? = nil, panOffset: CGFloat = 0) -> some View {
         let rightAxisWidth: CGFloat = 55
         let bottomAxisHeight: CGFloat = 18
         let plotWidth = max(10, size.width - rightAxisWidth)
         let plotHeight = max(10, size.height - bottomAxisHeight)
-        
+
         let stX: CGFloat = {
             if let s = stepX, s > 0 { return s }
             let baseCount = max(visibleBars.count, min(totalBarsCount, 50))
@@ -700,58 +927,58 @@ public struct CandleChartView: View {
             let slotCount = max(8, Double(baseCount) / Double(effectiveZoom))
             return plotWidth / CGFloat(max(1, slotCount))
         }()
-        
+
         let y70 = plotHeight * 0.30
         let y50 = plotHeight * 0.50
         let y30 = plotHeight * 0.70
         let bandH = y30 - y70
-        
+
         return ZStack(alignment: .topLeading) {
             // Shaded 30-70 band
             Rectangle()
                 .fill(Color(red: 0.65, green: 0.45, blue: 0.95).opacity(0.06))
                 .frame(width: plotWidth, height: bandH)
                 .position(x: plotWidth / 2.0, y: y70 + bandH / 2.0)
-            
+
             // 70 Line & Label
             Path { path in
                 path.move(to: CGPoint(x: 0, y: y70))
                 path.addLine(to: CGPoint(x: plotWidth, y: y70))
             }
             .stroke(AppColors.loss.opacity(0.4), style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
-            
+
             Text("70")
                 .font(AppTypography.number(8, weight: .regular))
                 .foregroundColor(AppColors.loss.opacity(0.7))
                 .frame(width: 50, alignment: .leading)
                 .position(x: plotWidth + 28, y: y70)
-            
+
             // 50 Line & Label
             Path { path in
                 path.move(to: CGPoint(x: 0, y: y50))
                 path.addLine(to: CGPoint(x: plotWidth, y: y50))
             }
             .stroke(AppColors.secondaryText.opacity(0.25), style: StrokeStyle(lineWidth: 1, dash: [2, 2]))
-            
+
             Text("50")
                 .font(AppTypography.number(8, weight: .regular))
                 .foregroundColor(AppColors.secondaryText.opacity(0.6))
                 .frame(width: 50, alignment: .leading)
                 .position(x: plotWidth + 28, y: y50)
-            
+
             // 30 Line & Label
             Path { path in
                 path.move(to: CGPoint(x: 0, y: y30))
                 path.addLine(to: CGPoint(x: plotWidth, y: y30))
             }
             .stroke(AppColors.profit.opacity(0.4), style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
-            
+
             Text("30")
                 .font(AppTypography.number(8, weight: .regular))
                 .foregroundColor(AppColors.profit.opacity(0.7))
                 .frame(width: 50, alignment: .leading)
                 .position(x: plotWidth + 28, y: y30)
-            
+
             // 1. RSI Curve (Wilder's RSI 14 - Purple)
             Path { path in
                 var isFirst = true
@@ -770,7 +997,7 @@ public struct CandleChartView: View {
             }
             .stroke(Color(red: 0.65, green: 0.45, blue: 0.95), style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
             .clipped()
-            
+
             // 2. EMA 9 Curve of RSI 14 (Sky Blue / Cyan)
             Path { path in
                 var isFirst = true
@@ -789,7 +1016,7 @@ public struct CandleChartView: View {
             }
             .stroke(Color(red: 0.22, green: 0.74, blue: 0.97), style: StrokeStyle(lineWidth: 1.2, lineCap: .round, lineJoin: .round))
             .clipped()
-            
+
             // 3. WMA 45 Curve of RSI 14 (Gold / Amber)
             Path { path in
                 var isFirst = true
@@ -808,7 +1035,7 @@ public struct CandleChartView: View {
             }
             .stroke(Color(red: 1.0, green: 0.82, blue: 0.2), style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
             .clipped()
-            
+
             // 4. Active / Hovered dot and cursor line
             if let hIdx = hoveredBarIndex, hIdx < visibleBars.count {
                 let hX = CGFloat(hIdx) * stX + (stX / 2.0) + panOffset
@@ -817,7 +1044,7 @@ public struct CandleChartView: View {
                         .fill(AppColors.primaryText.opacity(0.4))
                         .frame(width: 1, height: plotHeight)
                         .position(x: hX, y: plotHeight / 2.0)
-                    
+
                     // RSI dot
                     if hIdx < visibleRsi.count, let rsi = visibleRsi[hIdx] {
                         let rsiY = plotHeight - CGFloat(rsi / 100.0) * plotHeight
@@ -827,7 +1054,7 @@ public struct CandleChartView: View {
                             .frame(width: 5, height: 5)
                             .position(x: hX, y: clampedY)
                     }
-                    
+
                     // EMA 9 dot
                     if hIdx < visibleRsiEma9.count, let ema = visibleRsiEma9[hIdx] {
                         let emaY = plotHeight - CGFloat(ema / 100.0) * plotHeight
@@ -837,7 +1064,7 @@ public struct CandleChartView: View {
                             .frame(width: 5, height: 5)
                             .position(x: hX, y: clampedY)
                     }
-                    
+
                     // WMA 45 dot
                     if hIdx < visibleRsiWma45.count, let ma = visibleRsiWma45[hIdx] {
                         let maY = plotHeight - CGFloat(ma / 100.0) * plotHeight
@@ -849,7 +1076,7 @@ public struct CandleChartView: View {
                     }
                 }
             }
-            
+
             // Time Axis at bottom of RSI
             timeAxis(width: plotWidth, height: plotHeight, stepX: stX, fullHeight: size.height, panOffset: panOffset)
         }

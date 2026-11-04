@@ -1,4 +1,4 @@
-import SwiftUI
+﻿import SwiftUI
 import UIKit
 
 // MARK: - Pre-Trade Multi-Timeframe Chart Vision Card
@@ -14,10 +14,12 @@ public struct PreTradeChartCard: View {
     public let activeProvider: String
     public let onEnlarge: () -> Void
     public let onAttachPhoto: () -> Void
-    
+
     @State private var keyLevels: [KeyLevel] = []
+    @State private var sessionProfiles: [SessionProfileSnapshot] = []
+    @State private var developingProfile: DevelopingProfile? = nil
     @State private var patterns: [DetectedCandlePattern] = []
-    
+
     public init(
         symbol: String,
         selectedTimeframe: Binding<String>,
@@ -41,7 +43,7 @@ public struct PreTradeChartCard: View {
         self.onEnlarge = onEnlarge
         self.onAttachPhoto = onAttachPhoto
     }
-    
+
     private var activeTimeframeTitle: String {
         switch selectedTimeframe {
         case "1d": return "D1"
@@ -50,7 +52,7 @@ public struct PreTradeChartCard: View {
         default: return "M15"
         }
     }
-    
+
     public var body: some View {
         AppCard {
             VStack(alignment: .leading, spacing: 8) {
@@ -60,9 +62,9 @@ public struct PreTradeChartCard: View {
                         .font(AppTypography.cardHeaderUppercase)
                         .foregroundColor(AppColors.secondaryText)
                         .tracking(0.5)
-                    
+
                     Spacer()
-                    
+
                     // Timeframe Picker Tabs (M15, H1, H4, D1)
                     AppSegmentedBar(
                         selection: $selectedTimeframe,
@@ -79,7 +81,7 @@ public struct PreTradeChartCard: View {
                         height: 28
                     )
                 }
-                
+
                 // Chart View Container
                 if !activeBars.isEmpty {
                     VStack(spacing: 4) {
@@ -88,19 +90,23 @@ public struct PreTradeChartCard: View {
                             symbol: symbol,
                             timeframe: activeTimeframeTitle,
                             keyLevels: keyLevels,
+                            sessionProfiles: sessionProfiles,
+                            developingProfile: developingProfile,
                             patterns: patterns
                         )
                         .frame(height: 210)
                         .appSubCardStyle(cornerRadius: 8, padding: 0)
                         .contentShape(Rectangle())
                         .onTapGesture(perform: onEnlarge)
-                        
+
                         chartFooterActions
                     }
                     .task(id: activeBars.count) {
                         guard !activeBars.isEmpty else { return }
                         let res = await SessionFootprintCoordinator.shared.loadKeyLevels(for: symbol, recentBars: activeBars)
                         self.keyLevels = res.levels
+                        self.sessionProfiles = res.profiles
+                        self.developingProfile = res.developing
                         self.patterns = SessionFootprintCoordinator.shared.scanConfluentPatterns(bars: activeBars, keyLevels: res.levels)
                     }
                 } else {
@@ -110,7 +116,7 @@ public struct PreTradeChartCard: View {
             .padding(.vertical, 2)
         }
     }
-    
+
     private var chartFooterActions: some View {
         HStack(alignment: .center) {
             HStack(spacing: 5) {
@@ -121,13 +127,13 @@ public struct PreTradeChartCard: View {
                     .font(AppTypography.captionMicro)
                     .foregroundColor(AppColors.secondaryText)
             }
-            
+
             Spacer()
-            
+
             HStack(spacing: 8) {
                 // Attach custom chart image icon button
                 ModalCircleButton(icon: "photo.badge.plus", label: "Attach chart image", action: onAttachPhoto)
-                
+
                 // Enlarge full-screen lightbox icon button
                 ModalCircleButton(icon: "arrow.up.left.and.arrow.down.right", color: AppColors.brand, label: "Enlarge chart", action: onEnlarge)
             }
@@ -135,7 +141,7 @@ public struct PreTradeChartCard: View {
         .padding(.horizontal, 2)
         .padding(.top, 2)
     }
-    
+
     private var emptyLoadingView: some View {
         LoadingView("Fetching \(symbol) \(activeTimeframeTitle) candles...", size: 36)
             .padding(.vertical, 24)

@@ -1,4 +1,4 @@
-import SwiftUI
+﻿import SwiftUI
 
 /// Trade Replay screen to review historical candlesticks and execution progression step-by-step.
 /// Ported 1:1 from `trade-market-data.tsx`, `trade-replay.ts`, and `excursions.ts`.
@@ -9,9 +9,9 @@ public struct TradeReplayView: View {
     public let isModal: Bool
     let trade: Trade
     let executions: [Execution]
-    
+
     public static let replayResolutions: [MarketResolution] = [.m15, .h1, .h4]
-    
+
     @State private var bars: [MarketBar] = []
     @State private var rawSourceBars: [MarketBar] = []
     @State private var currentStep: Int = 0
@@ -25,7 +25,11 @@ public struct TradeReplayView: View {
     @State private var showMarketStructure: Bool = true
     @State private var showRSI: Bool = true
     @State private var showLandscapeChart: Bool = false
-    
+    @State private var keyLevels: [KeyLevel] = []
+    @State private var sessionProfiles: [SessionProfileSnapshot] = []
+    @State private var developingProfile: DevelopingProfile? = nil
+    @State private var priceActionPatterns: [DetectedCandlePattern] = []
+
     public init(trade: Trade, executions: [Execution], isModal: Bool = false) {
         self.trade = trade
         self.executions = executions
@@ -37,7 +41,7 @@ public struct TradeReplayView: View {
             if minutes <= 60 * 24 * 14 { return .h1 }
             return .h4
         }()
-        
+
         let cached = TradeReplayCacheStore.shared.getBars(for: trade.id, resolution: res.rawValue) ?? []
         if !cached.isEmpty {
             self._selectedResolution = State(initialValue: res)
@@ -60,7 +64,7 @@ public struct TradeReplayView: View {
             self._excursionEstimate = State(initialValue: nil)
         }
     }
-    
+
     private var frame: ReplayFrame {
         TradeReplayEngine.frame(
             bars: bars,
@@ -70,7 +74,7 @@ public struct TradeReplayView: View {
             resolution: selectedResolution
         )
     }
-    
+
     public var body: some View {
         NavigationStack {
             ScrollView {
@@ -84,10 +88,10 @@ public struct TradeReplayView: View {
                         isLoadingCandles: isLoadingCandles,
                         reportingCurrency: env.currentCurrency
                     )
-                    
+
                     // Professional Candlestick Chart (with integrated 15m/1h/4h timeframe selector and pure gesture pinch-zoom)
                     chartCard
-                    
+
                     // Replay Playback Controls (Play/Pause, Step, Speed, Fullscreen)
                     TradeReplayControlsCard(
                         currentStep: $currentStep,
@@ -104,7 +108,7 @@ public struct TradeReplayView: View {
                         onSpeedChanged: restartTimerIfPlaying,
                         onOpenLandscape: { showLandscapeChart = true }
                     )
-                    
+
                     // MAE & MFE Excursion Statistics
                     TradeReplayExcursionCard(
                         excursionEstimate: excursionEstimate,
@@ -112,7 +116,7 @@ public struct TradeReplayView: View {
                         barsCount: bars.count,
                         reportingCurrency: env.currentCurrency
                     )
-                    
+
                     // Broker Data Notes
                     dataCoverageNote
                 }
@@ -122,13 +126,13 @@ public struct TradeReplayView: View {
             }
             .scrollDismissesKeyboard(.interactively)
             .background(AppColors.background)
-            .navigationTitle("Replay · \(trade.symbol)")
+            .navigationTitle("Replay Â· \(trade.symbol)")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     ModalDismissButton { dismiss() }
                 }
-                
+
                 ToolbarItem(placement: .topBarTrailing) {
                     ModalPrimaryButton("Done") { dismiss() }
                 }
@@ -155,6 +159,10 @@ public struct TradeReplayView: View {
                 isLoadingCandles: isLoadingCandles,
                 reportingCurrency: env.currentCurrency,
                 timeZone: env.currentTimeZone,
+                keyLevels: keyLevels,
+                sessionProfiles: sessionProfiles,
+                developingProfile: developingProfile,
+                patterns: priceActionPatterns,
                 onTogglePlay: togglePlay,
                 onStep: { delta in step(by: delta) },
                 onReset: resetReplay,
@@ -164,7 +172,7 @@ public struct TradeReplayView: View {
             )
         }
     }
-    
+
     // MARK: - Candlestick Chart Card
     private var chartCard: some View {
         VStack(spacing: 8) {
@@ -179,7 +187,7 @@ public struct TradeReplayView: View {
                 }
                 .appSubCardStyle(cornerRadius: 6, padding: 8)
             }
-            
+
             if isLoadingCandles && bars.isEmpty {
                 LoadingView("Fetching candles for \(trade.symbol) (\(selectedResolution == .d1 ? "1D" : selectedResolution.rawValue))", size: 64)
                     .frame(height: 270)
@@ -207,41 +215,45 @@ public struct TradeReplayView: View {
                         resolution: selectedResolution,
                         showMarketStructure: true,
                         showRSI: true,
+                        keyLevels: keyLevels,
+                        sessionProfiles: sessionProfiles,
+                        developingProfile: developingProfile,
+                        patterns: priceActionPatterns,
                         onResolutionChange: { newRes in
                             self.selectedResolution = newRes
                         }
                     )
-                    
+
                     // Floating Updating Pill (Replaces the cramped loading indicator in Resolution bar)
                     if isLoadingCandles {
-                        AppBadge("Updating…", variant: .secondary)
+                        AppBadge("Updatingâ€¦", variant: .secondary)
                             .padding(8)
                     }
                 }
             }
         }
     }
-    
+
     // MARK: - Data Coverage Note
     private var dataCoverageNote: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Data coverage & estimate limits:")
                 .font(AppTypography.captionBold)
                 .foregroundColor(AppColors.secondaryText)
-            
+
             Text("Candles are revealed at bar close; this is not a tick-by-tick simulation. Excursion estimates use observed candles only.")
                 .font(AppTypography.caption)
                 .foregroundColor(AppColors.secondaryText.opacity(0.8))
         }
         .padding(.horizontal, 4)
     }
-    
+
     // MARK: - Replay Actions & Data Loading
     private func loadMarketCandles() async {
         stopTimer()
-        
+
         let isOpenTrade = (trade.status == .open || trade.closedAt == nil)
-        
+
         // 1. Check local disk cache for this exact resolution ONLY if trade is fully closed
         if !isOpenTrade,
            let cached = TradeReplayCacheStore.shared.getBars(for: trade.id, resolution: selectedResolution.rawValue),
@@ -255,13 +267,14 @@ public struct TradeReplayView: View {
                 resolution: selectedResolution
             )
             persistExcursionsIfCalculated(self.excursionEstimate)
+            await updateFootprintAndPatterns(for: cached)
             self.isLoadingCandles = false
             return
         }
-        
+
         isLoadingCandles = true
         candleErrorMessage = ""
-        
+
         do {
             let (_, fetchedBars) = try await MarketDataService.shared.fetchBarsForTrade(
                 trade: trade,
@@ -269,7 +282,7 @@ public struct TradeReplayView: View {
                 resolution: selectedResolution.rawValue,
                 forceRefresh: isOpenTrade
             )
-            
+
             if !fetchedBars.isEmpty {
                 // Auto-align broker server timezone offset and trim to replay window
                 // (80 bars before open for market swings and RSI-14 warmup, 15 bars after close)
@@ -300,9 +313,23 @@ public struct TradeReplayView: View {
             candleErrorMessage = "Unable to fetch market data: \(error.localizedDescription). Displaying simulated estimate."
             applySimulatedBars()
         }
+
+        await updateFootprintAndPatterns(for: self.bars)
         isLoadingCandles = false
     }
-    
+
+    private func updateFootprintAndPatterns(for activeBars: [MarketBar]) async {
+        guard !activeBars.isEmpty else { return }
+        let (levels, profiles, dev) = await SessionFootprintCoordinator.shared.loadKeyLevels(for: trade.symbol, recentBars: activeBars)
+        let pats = SessionFootprintCoordinator.shared.scanConfluentPatterns(bars: activeBars, keyLevels: levels)
+        await MainActor.run {
+            self.keyLevels = levels
+            self.sessionProfiles = profiles
+            self.developingProfile = dev
+            self.priceActionPatterns = pats
+        }
+    }
+
     private func applySimulatedBars() {
         let simulated = TradeReplayEngine.generateBarsFromTrade(
             trade: trade,
@@ -319,7 +346,7 @@ public struct TradeReplayView: View {
         )
         persistExcursionsIfCalculated(self.excursionEstimate)
     }
-    
+
     private func persistExcursionsIfCalculated(_ estimate: ExcursionEstimate?) {
         guard let estimate = estimate, (estimate.mae != nil || estimate.mfe != nil) else { return }
         Task { @MainActor in
@@ -332,7 +359,7 @@ public struct TradeReplayView: View {
             )
         }
     }
-    
+
     private func togglePlay() {
         if isPlaying {
             pauseReplay()
@@ -340,7 +367,7 @@ public struct TradeReplayView: View {
             startReplay()
         }
     }
-    
+
     private func startReplay() {
         guard !bars.isEmpty else { return }
         if currentStep >= bars.count {
@@ -349,12 +376,12 @@ public struct TradeReplayView: View {
         isPlaying = true
         startTimer()
     }
-    
+
     private func pauseReplay() {
         isPlaying = false
         stopTimer()
     }
-    
+
     private func startTimer() {
         stopTimer()
         playbackTask = Task { @MainActor in
@@ -372,28 +399,28 @@ public struct TradeReplayView: View {
             }
         }
     }
-    
+
     private func restartTimerIfPlaying() {
         if isPlaying {
             startTimer()
         }
     }
-    
+
     private func stopTimer() {
         playbackTask?.cancel()
         playbackTask = nil
     }
-    
+
     private func step(by delta: Int) {
         pauseReplay()
         currentStep = max(1, min(bars.count, currentStep + delta))
     }
-    
+
     private func resetReplay() {
         pauseReplay()
         currentStep = 1
     }
-    
+
     private func forwardToEnd() {
         pauseReplay()
         currentStep = bars.count

@@ -1,4 +1,4 @@
-import SwiftUI
+﻿import SwiftUI
 
 /// Dedicated Fullscreen Landscape Chart View for Trade Replay.
 /// Maximizes horizontal chart real estate for deep market structure and 3-line RSI momentum inspection.
@@ -16,15 +16,19 @@ public struct TradeReplayLandscapeChartView: View {
     let isLoadingCandles: Bool
     let reportingCurrency: String
     let timeZone: TimeZone
+    let keyLevels: [KeyLevel]
+    let sessionProfiles: [SessionProfileSnapshot]
+    let developingProfile: DevelopingProfile?
+    let patterns: [DetectedCandlePattern]
     let onTogglePlay: () -> Void
     let onStep: (Int) -> Void
     let onReset: () -> Void
     let onForwardToEnd: () -> Void
     let onSpeedChanged: () -> Void
     let onDismiss: () -> Void
-    
+
     @State private var isForceLandscape90: Bool = true
-    
+
     public init(
         trade: Trade,
         executions: [Execution],
@@ -39,6 +43,10 @@ public struct TradeReplayLandscapeChartView: View {
         isLoadingCandles: Bool,
         reportingCurrency: String,
         timeZone: TimeZone,
+        keyLevels: [KeyLevel] = [],
+        sessionProfiles: [SessionProfileSnapshot] = [],
+        developingProfile: DevelopingProfile? = nil,
+        patterns: [DetectedCandlePattern] = [],
         onTogglePlay: @escaping () -> Void,
         onStep: @escaping (Int) -> Void,
         onReset: @escaping () -> Void,
@@ -59,6 +67,10 @@ public struct TradeReplayLandscapeChartView: View {
         self.isLoadingCandles = isLoadingCandles
         self.reportingCurrency = reportingCurrency
         self.timeZone = timeZone
+        self.keyLevels = keyLevels
+        self.sessionProfiles = sessionProfiles
+        self.developingProfile = developingProfile
+        self.patterns = patterns
         self.onTogglePlay = onTogglePlay
         self.onStep = onStep
         self.onReset = onReset
@@ -66,26 +78,26 @@ public struct TradeReplayLandscapeChartView: View {
         self.onSpeedChanged = onSpeedChanged
         self.onDismiss = onDismiss
     }
-    
+
     public var body: some View {
         GeometryReader { geo in
             let isNativeLandscape = geo.size.width > geo.size.height
             let rotate = !isNativeLandscape && isForceLandscape90
             let targetWidth = rotate ? geo.size.height : geo.size.width
             let targetHeight = rotate ? geo.size.width : geo.size.height
-            
+
             ZStack {
                 VStack(spacing: 6) {
                     // 1. Top Navigation & Info Bar
                     topNavBar
-                    
+
                     // 2. Timeframes & Indicators Bar (Clean two-column layout like Replay)
                     controlsBar
-                    
+
                     // 3. Wide Edge-to-Edge Candlestick Chart
                     chartContainer
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    
+
                     // 4. Bottom Center Replay Playback Controller
                     HStack {
                         Spacer()
@@ -105,7 +117,7 @@ public struct TradeReplayLandscapeChartView: View {
         }
         .statusBarHidden(true)
     }
-    
+
     // MARK: - 1. Top Navigation & Status Bar
     private var topNavBar: some View {
         HStack(spacing: 10) {
@@ -113,20 +125,20 @@ public struct TradeReplayLandscapeChartView: View {
             ModalDismissButton {
                 onDismiss()
             }
-            
+
             // Symbol & Direction
             Text(trade.symbol)
                 .font(AppTypography.rowPrimary)
                 .foregroundColor(AppColors.primaryText)
                 .lineLimit(1)
                 .fixedSize()
-            
+
             AppBadge(
                 text: trade.direction.rawValue.uppercased(),
                 color: trade.direction == .long ? AppColors.profit : AppColors.loss
             )
             .fixedSize()
-            
+
             // Unrealized / Realized P&L Badge
             let pnl = frame.unrealizedPnl
             let pnlColor = pnl >= 0 ? AppColors.profit : AppColors.loss
@@ -135,9 +147,9 @@ public struct TradeReplayLandscapeChartView: View {
                 style: pnl >= 0 ? .profit : .loss
             )
             .fixedSize()
-            
+
             Spacer()
-            
+
             // Current candle timestamp
             if let curBar = frame.currentBar {
                 HStack(spacing: 4) {
@@ -151,14 +163,14 @@ public struct TradeReplayLandscapeChartView: View {
                         .fixedSize()
                 }
             }
-            
-            // Orientation flip button (toggles 90° rotation for devices with portrait orientation lock)
+
+            // Orientation flip button (toggles 90Â° rotation for devices with portrait orientation lock)
             ModalCircleButton(icon: "rotate.right", label: "Toggle Landscape Rotation") {
                 isForceLandscape90.toggle()
             }
         }
     }
-    
+
     // MARK: - 2. Timeframes & Indicators Bar
     private var controlsBar: some View {
         HStack(spacing: 8) {
@@ -168,7 +180,7 @@ public struct TradeReplayLandscapeChartView: View {
                 .foregroundColor(AppColors.secondaryText)
                 .lineLimit(1)
                 .fixedSize()
-            
+
             AppSegmentedBar(
                 selection: $selectedResolution,
                 items: TradeReplayView.replayResolutions,
@@ -182,16 +194,16 @@ public struct TradeReplayLandscapeChartView: View {
                 },
                 height: 28
             )
-            
+
             Spacer()
         }
     }
-    
+
     // MARK: - 3. Candlestick Chart Container
     private var chartContainer: some View {
         Group {
             if bars.isEmpty {
-                LoadingView("Loading Candles…", size: 48)
+                LoadingView("Loading Candlesâ€¦", size: 48)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .appCardStyle(cornerRadius: 12)
             } else {
@@ -208,12 +220,16 @@ public struct TradeReplayLandscapeChartView: View {
                     resolution: selectedResolution,
                     showMarketStructure: true,
                     showRSI: true,
-                    isLandscape: true
+                    isLandscape: true,
+                    keyLevels: keyLevels,
+                    sessionProfiles: sessionProfiles,
+                    developingProfile: developingProfile,
+                    patterns: patterns
                 )
             }
         }
     }
-    
+
     // MARK: - 4. Bottom Center Replay Playback Controller Capsule
     private var bottomPlayerBar: some View {
         AppFloatingBar {
@@ -224,7 +240,7 @@ public struct TradeReplayLandscapeChartView: View {
                     })
             .disabled(bars.isEmpty)
             .accessibilityLabel("Reset Replay")
-            
+
             // Step back 1 bar
             ModalCircleButton(icon: "chevron.left", action: {
                 NativeHaptics.lightImpact()
@@ -232,7 +248,7 @@ public struct TradeReplayLandscapeChartView: View {
             })
             .disabled(currentStep <= 1 || bars.isEmpty)
             .accessibilityLabel("Step Backward")
-            
+
             // Play / Pause (Large central button)
             ModalCircleButton(icon: isPlaying ? "pause.fill" : "play.fill", action: {
                         NativeHaptics.mediumImpact()
@@ -240,7 +256,7 @@ public struct TradeReplayLandscapeChartView: View {
                     })
             .disabled(bars.isEmpty)
             .accessibilityLabel(isPlaying ? "Pause" : "Play")
-            
+
             // Step forward 1 bar
             ModalCircleButton(icon: "chevron.right", action: {
                 NativeHaptics.lightImpact()
@@ -248,7 +264,7 @@ public struct TradeReplayLandscapeChartView: View {
             })
             .disabled(currentStep >= bars.count || bars.isEmpty)
             .accessibilityLabel("Step Forward")
-            
+
             // Forward to end
             ModalCircleButton(icon: "forward.end.fill", action: {
                         NativeHaptics.lightImpact()
@@ -256,12 +272,12 @@ public struct TradeReplayLandscapeChartView: View {
                     })
             .disabled(bars.isEmpty)
             .accessibilityLabel("Forward To End")
-            
+
             // Divider
             Divider()
                 .frame(height: 18)
                 .background(AppColors.border.opacity(0.6))
-            
+
             // Scrubber Slider
             if bars.count > 1 {
                 Slider(
@@ -275,7 +291,7 @@ public struct TradeReplayLandscapeChartView: View {
                 .tint(AppColors.brand)
                 .frame(width: 140)
             }
-            
+
             // Step Counter
             Text("\(currentStep)/\(bars.count)")
                 .font(AppTypography.number(11, weight: .semibold))
@@ -283,7 +299,7 @@ public struct TradeReplayLandscapeChartView: View {
                 .frame(minWidth: 46)
                 .lineLimit(1)
                 .fixedSize()
-            
+
             // Speed Menu
             AppCompactDropdown(
                 selection: Binding(
@@ -291,7 +307,7 @@ public struct TradeReplayLandscapeChartView: View {
                     set: { replaySpeed = $0; onSpeedChanged() }
                 ),
                 options: [1.0, 2.0, 4.0],
-                titleFor: { "\(Int($0))×" },
+                titleFor: { "\(Int($0))Ã—" },
                 height: 28
             )
         }

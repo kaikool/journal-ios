@@ -1,4 +1,4 @@
-import SwiftUI
+﻿import SwiftUI
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -76,13 +76,13 @@ public enum AppColors {
     public static let surface = adaptiveColor(dark: "#101013", light: "#fcfcfb")
     public static let input = adaptiveColor(dark: "#26262c", light: "#e1e0d9")
     public static let border = adaptiveColor(dark: "#222228", light: "#e1e0d9")
-    
+
     // Brand & Interactive Accents (LuxAlgo cyan blue)
     public static let brand = adaptiveColor(dark: "#1197e2", light: "#0b7cbd")
     public static let brandPrimary = brand
     public static let accent = adaptiveColor(dark: "#1197e2", light: "#0b7cbd")
     public static let ring = adaptiveColor(dark: "#1197e2", light: "#0b7cbd")
-    
+
     // Financial P&L convention (Traders Emerald / Crimson)
     public static let profit = adaptiveColor(dark: "#0ca30c", light: "#006300")
     public static let profitFill = adaptiveColor(dark: "#0ca30c", light: "#0ca30c").opacity(0.15)
@@ -90,7 +90,7 @@ public enum AppColors {
     public static let lossFill = Color(hex: "#d03b3b").opacity(0.15)
     public static let breakeven = adaptiveColor(dark: "#8b8b95", light: "#686760")
     public static let warning = adaptiveColor(dark: "#c98500", light: "#eda100")
-    
+
     // Typography & Accents
     public static let primaryText = adaptiveColor(dark: "#f4f4f4", light: "#0b0b0b")
     public static let secondaryText = adaptiveColor(dark: "#9c9ca6", light: "#52514e")
@@ -99,4 +99,18 @@ public enum AppColors {
     public static let mutedText = adaptiveColor(dark: "#9c9ca6", light: "#52514e")
     public static let brandTextOnDark = Color(hex: "#ffffff")
     public static let buttonText = Color.white
+
+    // Session Footprint POC Palette (TradingView Footprint)
+    public static let sessionTokyo = adaptiveColor(dark: "#00b8d4", light: "#00838f")
+    public static let sessionLondon = adaptiveColor(dark: "#ffb300", light: "#f57f17")
+    public static let sessionNewYork = adaptiveColor(dark: "#ab47bc", light: "#7b1fa2")
+    public static let sessionDaily = adaptiveColor(dark: "#00c853", light: "#2e7d32")
+    public static let sessionWeekly = adaptiveColor(dark: "#2962ff", light: "#1565c0")
+    public static let sessionMonthly = adaptiveColor(dark: "#ff6d00", light: "#e65100")
+    public static let sessionNaked = adaptiveColor(dark: "#ff1744", light: "#c62828")
+
+    // Candlestick Pattern Highlights (Clean Chart Highlighting)
+    public static let patternBullish = adaptiveColor(dark: "#00e5ff", light: "#0097a7")
+    public static let patternBearish = adaptiveColor(dark: "#ff9100", light: "#ef6c00")
+    public static let patternNeutral = adaptiveColor(dark: "#b388ff", light: "#651fff")
 }
