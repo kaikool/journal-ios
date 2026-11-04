@@ -31,7 +31,7 @@ extension SupabaseService {
     
     public func upsertSessionProfiles(_ items: [SessionProfileSnapshot]) async throws {
         guard isConfigured, !items.isEmpty else { return }
-        let dtos = items.map { SupabaseSessionProfileRecord(snapshot: $0, userId: currentUserId) }
+        let dtos = items.map { SupabaseSessionProfileRecord(snapshot: $0) }
         try await upsertBatches(endpoint: "session_footprint_profiles", items: dtos)
     }
     
