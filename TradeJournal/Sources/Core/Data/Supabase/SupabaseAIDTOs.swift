@@ -28,8 +28,6 @@ public struct SupabaseAIMemoryRecord: Codable {
     }
     
     public init(record: AIMemoryRecord) {
-        let iso = ISO8601DateFormatter()
-        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         self.id = record.id
         self.category = record.category.rawValue
         self.symbol = record.symbol
@@ -41,8 +39,8 @@ public struct SupabaseAIMemoryRecord: Codable {
         self.sourceType = record.sourceType.rawValue
         self.sourceId = record.sourceId
         self.metadataJson = record.metadataJson
-        self.createdAt = iso.string(from: record.createdAt)
-        self.updatedAt = iso.string(from: record.updatedAt)
+        self.createdAt = Formatters.iso8601String(from: record.createdAt)
+        self.updatedAt = Formatters.iso8601String(from: record.updatedAt)
     }
     
     public init(from decoder: Decoder) throws {
@@ -80,10 +78,8 @@ public struct SupabaseAIMemoryRecord: Codable {
     }
     
     public func toRecord() -> AIMemoryRecord {
-        let iso = ISO8601DateFormatter()
-        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        let created = iso.date(from: createdAt) ?? ISO8601DateFormatter().date(from: createdAt) ?? Date()
-        let updated = iso.date(from: updatedAt) ?? ISO8601DateFormatter().date(from: updatedAt) ?? Date()
+        let created = Formatters.parseISO8601(createdAt) ?? Date()
+        let updated = Formatters.parseISO8601(updatedAt) ?? Date()
         
         return AIMemoryRecord(
             id: id,
@@ -148,8 +144,8 @@ public struct SupabaseTradeLessonEvaluationRecord: Codable, Sendable {
         self.verifiedCount = evaluation.verifiedCount
         self.violatedCount = evaluation.violatedCount
         self.metadataJson = evaluation.metadataJson
-        self.createdAt = ISO8601DateFormatter().string(from: evaluation.createdAt)
-        self.updatedAt = ISO8601DateFormatter().string(from: evaluation.updatedAt)
+        self.createdAt = Formatters.iso8601String(from: evaluation.createdAt, fractionalSeconds: false)
+        self.updatedAt = Formatters.iso8601String(from: evaluation.updatedAt, fractionalSeconds: false)
     }
     
     public init(from decoder: Decoder) throws {
@@ -189,9 +185,8 @@ public struct SupabaseTradeLessonEvaluationRecord: Codable, Sendable {
     }
     
     public func toEvaluation() -> TradeLessonEvaluation {
-        let formatter = ISO8601DateFormatter()
-        let cDate = createdAt.flatMap { formatter.date(from: $0) } ?? Date()
-        let uDate = updatedAt.flatMap { formatter.date(from: $0) } ?? Date()
+        let cDate = Formatters.parseISO8601(createdAt) ?? Date()
+        let uDate = Formatters.parseISO8601(updatedAt) ?? Date()
         return TradeLessonEvaluation(
             id: id,
             tradeId: tradeId,
@@ -261,8 +256,8 @@ public struct SupabaseAIResearchProjectRecord: Codable, Sendable {
         let metaData = (try? encoder.encode(metaDict)) ?? Data()
         self.metadataJson = String(data: metaData, encoding: .utf8) ?? "{}"
         
-        self.createdAt = ISO8601DateFormatter().string(from: project.createdAt)
-        self.updatedAt = ISO8601DateFormatter().string(from: project.updatedAt)
+        self.createdAt = Formatters.iso8601String(from: project.createdAt, fractionalSeconds: false)
+        self.updatedAt = Formatters.iso8601String(from: project.updatedAt, fractionalSeconds: false)
     }
     
     public init(from decoder: Decoder) throws {
@@ -298,9 +293,8 @@ public struct SupabaseAIResearchProjectRecord: Codable, Sendable {
     }
     
     public func toProject() -> AIResearchProject {
-        let formatter = ISO8601DateFormatter()
-        let cDate = createdAt.flatMap { formatter.date(from: $0) } ?? Date()
-        let uDate = updatedAt.flatMap { formatter.date(from: $0) } ?? Date()
+        let cDate = Formatters.parseISO8601(createdAt) ?? Date()
+        let uDate = Formatters.parseISO8601(updatedAt) ?? Date()
         
         let decoder = JSONDecoder()
         var criteria = AIResearchSampleCriteria()

@@ -15,12 +15,11 @@ public struct SupabasePlaybookRecord: Codable {
     }
     
     public init(playbook: Playbook) {
-        let fmt = ISO8601DateFormatter()
         self.id = playbook.id
         self.name = playbook.name
         self.description = playbook.description
         self.rulesJson = (try? String(data: JSONEncoder().encode(playbook.rules), encoding: .utf8)) ?? "[]"
-        self.createdAt = fmt.string(from: playbook.createdAt)
+        self.createdAt = Formatters.iso8601String(from: playbook.createdAt, fractionalSeconds: false)
     }
     
     public init(from decoder: Decoder) throws {
@@ -64,10 +63,9 @@ public struct SupabaseJournalDayRecord: Codable {
     }
     
     public init(journalNote: JournalNote) {
-        let fmt = ISO8601DateFormatter()
         self.date = journalNote.date
         self.note = journalNote.content
-        self.updatedAt = fmt.string(from: journalNote.updatedAt)
+        self.updatedAt = Formatters.iso8601String(from: journalNote.updatedAt, fractionalSeconds: false)
     }
     
     public init(from decoder: Decoder) throws {

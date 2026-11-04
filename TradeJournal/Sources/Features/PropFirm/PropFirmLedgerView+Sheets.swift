@@ -81,9 +81,7 @@ public struct NewPropAccountSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     ModalPrimaryButton("Save") {
-                        let formatter = DateFormatter()
-                        formatter.dateFormat = "yyyy-MM-dd"
-                        let today = formatter.string(from: Date())
+                        let today = Formatters.isoDayString(from: Date())
                         let sizeMinor = (Int64(sizeText) ?? 0) * 100
                         
                         let acc = PropAccountItem(
@@ -363,9 +361,7 @@ public struct NewPropEntrySheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     ModalPrimaryButton("Save", isEnabled: !amountText.trimmingCharacters(in: .whitespaces).isEmpty) {
-                        let formatter = DateFormatter()
-                        formatter.dateFormat = "yyyy-MM-dd"
-                        let today = formatter.string(from: Date())
+                        let today = Formatters.isoDayString(from: Date())
                         let minor = (try? PropFirmEngine.toMinor(value: amountText, currency: defaultCurrency)) ?? 0
                         let feeMinor = (try? PropFirmEngine.toMinor(value: feeText, currency: defaultCurrency)) ?? 0
                         let splitBps = ((Int(splitText) ?? 100) * 100)
@@ -439,9 +435,7 @@ public struct AddReceiptSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     ModalPrimaryButton("Confirm", isEnabled: !amountText.trimmingCharacters(in: .whitespaces).isEmpty) {
-                        let formatter = DateFormatter()
-                        formatter.dateFormat = "yyyy-MM-dd"
-                        let today = formatter.string(from: Date())
+                        let today = Formatters.isoDayString(from: Date())
                         let minor = (try? PropFirmEngine.toMinor(value: amountText, currency: payout.currency)) ?? 0
                         
                         let rcpt = PropReceiptItem(
@@ -507,9 +501,7 @@ public struct AddRefundSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     ModalPrimaryButton("Save", isEnabled: !amountText.trimmingCharacters(in: .whitespaces).isEmpty) {
-                        let formatter = DateFormatter()
-                        formatter.dateFormat = "yyyy-MM-dd"
-                        let today = formatter.string(from: Date())
+                        let today = Formatters.isoDayString(from: Date())
                         let minor = (try? PropFirmEngine.toMinor(value: amountText, currency: expense.currency)) ?? 0
                         
                         let refundEntry = PropEntryItem(

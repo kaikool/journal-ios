@@ -120,14 +120,9 @@ extension PropFirmLedgerView {
                             .foregroundColor(AppColors.secondaryText)
                             .tracking(0.5)
                         
-                        let dateFormatter: DateFormatter = {
-                            let df = DateFormatter()
-                            df.dateFormat = "yyyy-MM-dd"
-                            df.timeZone = TimeZone(identifier: "UTC")
-                            return df
-                        }()
+                        let utcTimeZone = TimeZone(identifier: "UTC") ?? .current
                         let parsedTimeline = timelinePoints.compactMap { pt -> (id: String, date: Date, val: Double)? in
-                            guard let d = dateFormatter.date(from: pt.date) else { return nil }
+                            guard let d = Formatters.date(fromIsoDay: pt.date, timeZone: utcTimeZone) else { return nil }
                             return (id: pt.date, date: d, val: Double(pt.netMinor) / 100.0)
                         }
                         

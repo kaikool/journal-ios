@@ -25,7 +25,6 @@ public struct SupabaseAccountRecord: Codable {
     }
     
     public init(account: Account) {
-        let fmt = ISO8601DateFormatter()
         self.id = account.id
         self.name = account.name
         self.broker = account.broker
@@ -34,9 +33,9 @@ public struct SupabaseAccountRecord: Codable {
         self.initialBalance = account.initialBalance
         self.profitCalcMethod = account.profitCalcMethod.rawValue
         self.autoSync = account.autoSync
-        self.lastSyncAt = account.lastSyncAt.map { fmt.string(from: $0) }
-        self.archivedAt = account.archivedAt.map { fmt.string(from: $0) }
-        self.createdAt = fmt.string(from: account.createdAt)
+        self.lastSyncAt = account.lastSyncAt.map { Formatters.iso8601String(from: $0, fractionalSeconds: false) }
+        self.archivedAt = account.archivedAt.map { Formatters.iso8601String(from: $0, fractionalSeconds: false) }
+        self.createdAt = Formatters.iso8601String(from: account.createdAt, fractionalSeconds: false)
     }
     
     /// Balances are encoded as exact decimal strings (see `SupabaseTradeRecord.encode`).

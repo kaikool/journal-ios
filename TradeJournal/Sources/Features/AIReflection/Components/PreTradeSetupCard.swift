@@ -6,12 +6,6 @@ public struct PreTradeSetupCard: View {
     public let plan: AdvisorCommitmentRecord
     public let timeZone: String
     
-    private static let dateFormatter: DateFormatter = {
-        let df = DateFormatter()
-        df.dateFormat = "yyyy-MM-dd HH:mm"
-        return df
-    }()
-    
     public init(plan: AdvisorCommitmentRecord, timeZone: String = "UTC") {
         self.plan = plan
         self.timeZone = timeZone
@@ -28,9 +22,7 @@ public struct PreTradeSetupCard: View {
     }
     
     private var formattedDateTime: String {
-        let df = Self.dateFormatter
-        df.timeZone = TimeZone(identifier: timeZone) ?? .current
-        return df.string(from: plan.timestamp)
+        Formatters.isoDateTime(plan.timestamp, timeZone: TimeZone(identifier: timeZone) ?? .current)
     }
     
     private func isValidValue(_ val: String?) -> Bool {

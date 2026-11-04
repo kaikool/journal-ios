@@ -236,6 +236,15 @@ public enum Formatters {
         guard let v = value else { return "N/A" }
         return price(v, symbol: symbol)
     }
+
+    /// Formats raw numeric price without grouping separators for technical prompts and machine parsing
+    public static func rawPrice(_ value: Decimal) -> String {
+        let d = (value as NSDecimalNumber).doubleValue
+        let absD = abs(d)
+        if absD >= 100 { return String(format: "%.2f", d) }
+        if absD >= 10 { return String(format: "%.3f", d) }
+        return String(format: "%.5f", d)
+    }
     
     /// Formats price excursion points / pips (e.g. 15.2, 0.5)
     public static func points(_ value: Decimal) -> String {
@@ -462,4 +471,14 @@ public enum Formatters {
         return weekdayFormatter.string(from: date)
     }
     
+    /// Formats a Date into an ISO8601 internet date-time string
+    public static func iso8601String(from date: Date) -> String {
+        isoBasicFormatter.string(from: date)
+    }
+    
+    /// Parses an ISO8601 string (fractional or basic) into a Date
+    public static func parseISO8601(_ raw: String?) -> Date? {
+        guard let s = raw?.trimmingCharacters(in: .whitespacesAndNewlines), !s.isEmpty else { return nil }
+        return isoFractionalFormatter.date(from: s) ?? isoBasicFormatter.date(from: s) ?? FlexibleDateParser.parse(s)
+    }
 }

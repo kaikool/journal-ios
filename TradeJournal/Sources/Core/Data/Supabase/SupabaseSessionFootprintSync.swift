@@ -37,9 +37,7 @@ extension SupabaseService {
     
     public func markProfileMitigated(id: String, mitigatedAt: Date) async throws {
         guard isConfigured else { return }
-        let isoFormatter = ISO8601DateFormatter()
-        isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        let mStr = isoFormatter.string(from: mitigatedAt)
+        let mStr = Formatters.iso8601String(from: mitigatedAt)
         
         let payload: [String: Any] = [
             "is_naked": false,

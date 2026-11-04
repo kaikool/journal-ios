@@ -103,9 +103,7 @@ public struct PropFirmLedgerView: View {
     }
     
     var payoutItems: [PayoutProgressResult] {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        let today = formatter.string(from: Date())
+        let today = Formatters.isoDayString(from: Date())
         return PropFirmEngine.payoutProgress(
             entries: filteredEntries,
             receipts: dataStore.propReceipts,
