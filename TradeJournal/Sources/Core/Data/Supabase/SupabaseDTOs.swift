@@ -1627,6 +1627,8 @@ public struct SupabaseTradeLessonEvaluationRecord: Codable, Sendable {
     }
 }
 
+// MARK: - PostgREST DTO for ai_research_projects (Module E)
+public struct SupabaseAIResearchProjectRecord: Codable, Sendable {
     public let id: String
     public let title: String
     public let hypothesis: String

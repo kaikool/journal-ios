@@ -283,7 +283,7 @@ public struct MarketCandleChartView: View {
         case .sessionPoc(.daily):
             return AppColors.profit // Green
         case .sessionPoc(.weekly):
-            return AppColors.accentBlue // Blue
+            return AppColors.accent // Blue
         case .nakedPoc:
             return AppColors.loss.opacity(0.85) // Reddish dotted ray
         case .pdh, .pdl, .pdc:
