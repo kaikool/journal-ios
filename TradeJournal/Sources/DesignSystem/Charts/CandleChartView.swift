@@ -881,8 +881,11 @@ public struct CandleChartView: View {
 
     @ViewBuilder
     private func daySeparators(plotWidth: CGFloat, plotHeight: CGFloat, stepX: CGFloat, clampedPan: CGFloat) -> some View {
-        var cal = Calendar(identifier: .gregorian)
-        cal.timeZone = SessionFootprintEngine.sessionTimeZone
+        let cal: Calendar = {
+            var c = Calendar(identifier: .gregorian)
+            c.timeZone = SessionFootprintEngine.sessionTimeZone
+            return c
+        }()
 
         ForEach(1..<visibleBars.count, id: \.self) { i in
             let curr = visibleBars[i]

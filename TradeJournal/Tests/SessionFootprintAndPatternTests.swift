@@ -249,5 +249,46 @@ final class SessionFootprintAndPatternTests: XCTestCase {
         XCTAssertEqual(dailyStep?.priorPoc, 239.0)
         XCTAssertTrue(dailyStep?.stepDirection.contains("LOWER STEP") ?? false)
     }
+
+    // MARK: - 6. Test Universal Footprint Tick Row Sizing across All Asset Classes
+    func testUniversalRowSizeAcrossAllAssetClasses() {
+        // Forex 5-digit pairs
+        XCTAssertEqual(SessionFootprintEngine.defaultRowSize(for: "EURUSD"), Decimal(string: "0.0001"))
+        XCTAssertEqual(SessionFootprintEngine.defaultRowSize(for: "GBP_USD"), Decimal(string: "0.0001"))
+        XCTAssertEqual(SessionFootprintEngine.defaultRowSize(for: "AUD/USD"), Decimal(string: "0.0001"))
+        XCTAssertEqual(SessionFootprintEngine.defaultRowSize(for: "NZDUSD"), Decimal(string: "0.0001"))
+        XCTAssertEqual(SessionFootprintEngine.defaultRowSize(for: "USDCAD"), Decimal(string: "0.0001"))
+        XCTAssertEqual(SessionFootprintEngine.defaultRowSize(for: "USDCHF"), Decimal(string: "0.0001"))
+
+        // Forex JPY pairs
+        XCTAssertEqual(SessionFootprintEngine.defaultRowSize(for: "USDJPY"), Decimal(string: "0.01"))
+        XCTAssertEqual(SessionFootprintEngine.defaultRowSize(for: "EUR_JPY"), Decimal(string: "0.01"))
+        XCTAssertEqual(SessionFootprintEngine.defaultRowSize(for: "GBPJPY"), Decimal(string: "0.01"))
+
+        // Metals & Energies
+        XCTAssertEqual(SessionFootprintEngine.defaultRowSize(for: "XAUUSD"), Decimal(1.0))
+        XCTAssertEqual(SessionFootprintEngine.defaultRowSize(for: "GOLD"), Decimal(1.0))
+        XCTAssertEqual(SessionFootprintEngine.defaultRowSize(for: "XAGUSD"), Decimal(string: "0.02"))
+        XCTAssertEqual(SessionFootprintEngine.defaultRowSize(for: "USOIL"), Decimal(string: "0.10"))
+        XCTAssertEqual(SessionFootprintEngine.defaultRowSize(for: "BRENT"), Decimal(string: "0.10"))
+
+        // Indices
+        XCTAssertEqual(SessionFootprintEngine.defaultRowSize(for: "US30"), Decimal(10.0))
+        XCTAssertEqual(SessionFootprintEngine.defaultRowSize(for: "DJI"), Decimal(10.0))
+        XCTAssertEqual(SessionFootprintEngine.defaultRowSize(for: "NAS100"), Decimal(5.0))
+        XCTAssertEqual(SessionFootprintEngine.defaultRowSize(for: "USTEC"), Decimal(5.0))
+        XCTAssertEqual(SessionFootprintEngine.defaultRowSize(for: "SPX500"), Decimal(1.0))
+        XCTAssertEqual(SessionFootprintEngine.defaultRowSize(for: "GER40"), Decimal(5.0))
+        XCTAssertEqual(SessionFootprintEngine.defaultRowSize(for: "DAX"), Decimal(5.0))
+
+        // Crypto
+        XCTAssertEqual(SessionFootprintEngine.defaultRowSize(for: "BTCUSD"), Decimal(25.0))
+        XCTAssertEqual(SessionFootprintEngine.defaultRowSize(for: "ETHUSD"), Decimal(2.0))
+        XCTAssertEqual(SessionFootprintEngine.defaultRowSize(for: "SOLUSD"), Decimal(string: "0.20"))
+
+        // Dynamic Fallback
+        XCTAssertEqual(SessionFootprintEngine.defaultRowSize(for: "EXOTIC1", samplePrice: Decimal(2500)), Decimal(1.0))
+        XCTAssertEqual(SessionFootprintEngine.defaultRowSize(for: "EXOTIC2", samplePrice: Decimal(1.15)), Decimal(string: "0.0001"))
+    }
 }
 

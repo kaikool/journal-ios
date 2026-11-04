@@ -3,17 +3,17 @@ import SwiftUI
 
 // MARK: - Accounts & Multi-Account Management Extension
 extension TradeDataStore {
-    
+
     public var availableCurrencies: [String] {
         if selectedAccountId != "all" && !selectedAccountId.isEmpty {
             if let sel = selectedAccount {
                 return [sel.currency.uppercased()]
             }
         }
-        
+
         let activeAccountIdsWithTrades = Set(trades.map(\.accountId))
         let targetAccounts = visibleAccounts.isEmpty ? accounts : visibleAccounts
-        
+
         // Only include accounts that have actual trades, unless no accounts have trades yet
         let accountsWithTrades = targetAccounts.filter { acc in
             activeAccountIdsWithTrades.contains(acc.id) ||
@@ -22,13 +22,13 @@ extension TradeDataStore {
             activeAccountIdsWithTrades.contains(acc.id.ctraderCanonicalId) ||
             activeAccountIdsWithTrades.contains(acc.id.exnessCanonicalId)
         }
-        
+
         let pool = accountsWithTrades.isEmpty ? targetAccounts : accountsWithTrades
         let list = pool.map { $0.currency.uppercased().trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
         let unique = Array(Set(list)).sorted()
         return unique.isEmpty ? ["USD"] : unique
     }
-    
+
     public func refreshActiveAccountCache() {
         var activeIds = Set<String>()
         var inactiveIds = Set<String>()
@@ -51,7 +51,7 @@ extension TradeDataStore {
         activePropAccountIdsCache = activeIds
         inactivePropAccountIdsCache = inactiveIds
     }
-    
+
     public func isAccountActive(_ account: Account) -> Bool {
         if account.archivedAt != nil { return false }
         if activePropAccountIdsCache == nil {
@@ -167,14 +167,14 @@ extension TradeDataStore {
         if _cachedMostRecentActiveAccountValid {
             return _cachedMostRecentActiveAccount
         }
-        
+
         let active = activeAccounts
         guard !active.isEmpty else {
             _cachedMostRecentActiveAccount = accounts.first
             _cachedMostRecentActiveAccountValid = true
             return accounts.first
         }
-        
+
         var latestTradeDateByAccountId: [String: Date] = [:]
         for trade in trades {
             let id = trade.accountId
@@ -186,10 +186,10 @@ extension TradeDataStore {
                 latestTradeDateByAccountId[id] = trade.openedAt
             }
         }
-        
+
         var bestAccount: Account? = nil
         var bestDate: Date = .distantPast
-        
+
         for acc in active {
             let candidates = [
                 acc.id,
@@ -205,7 +205,7 @@ extension TradeDataStore {
                 }
             }
         }
-        
+
         let result = bestAccount ?? active.first ?? accounts.first
         _cachedMostRecentActiveAccount = result
         _cachedMostRecentActiveAccountValid = true
@@ -230,7 +230,7 @@ extension TradeDataStore {
             $0.id.isEquivalentAccountId(to: selId)
         }) ?? mostRecentActiveAccount ?? accounts.first
     }
-    
+
     public func selectAccount(id: String) {
         guard selectedAccountId != id else { return }
         selectedAccountId = id
@@ -242,7 +242,7 @@ extension TradeDataStore {
         saveToDisk()
         objectWillChange.send()
     }
-    
+
     @discardableResult
     public func addAccount(name: String, broker: String = "", currency: String = "USD", initialBalance: Decimal = 0, profitCalcMethod: ProfitCalcMethod = .fifo) -> Account {
         let newAccount = Account(
@@ -258,7 +258,7 @@ extension TradeDataStore {
         AppLogger.info("Added account: \(name) (\(newAccount.id))")
         return newAccount
     }
-    
+
     public func archiveAccount(id: String, archived: Bool) {
         if let idx = accounts.firstIndex(where: { $0.id == id }) {
             accounts[idx].archivedAt = archived ? Date() : nil
@@ -291,7 +291,7 @@ extension TradeDataStore {
             try? await SupabaseService.shared.upsertAccounts([updatedAcc])
         }
     }
-    
+
     public func deleteAccount(id: String) {
         accounts.removeAll(where: { $0.id == id })
         trades.removeAll(where: { $0.accountId == id })
@@ -306,14 +306,14 @@ extension TradeDataStore {
             try? await SupabaseService.shared.deleteAccount(id: id)
         }
     }
-    
+
     public func toggleAccountAutoSync(id: String) {
         if let idx = accounts.firstIndex(where: { $0.id == id }) {
             accounts[idx].autoSync.toggle()
             saveToDisk()
         }
     }
-    
+
     public func toggleAccountVisibility(id: String) {
         if let idx = accounts.firstIndex(where: { $0.id == id }) {
             let current = isAccountVisible(accounts[idx])
@@ -323,7 +323,7 @@ extension TradeDataStore {
             objectWillChange.send()
         }
     }
-    
+
     public func setBulkAccountVisibility(action: String) {
         for idx in accounts.indices {
             switch action {
@@ -341,10 +341,10 @@ extension TradeDataStore {
         saveToDisk()
         objectWillChange.send()
     }
-    
+
     public func deduplicateAndCleanAccounts() {
         refreshActiveAccountCache()
-        
+
         var canonicalMap: [String: String] = [:]
         for acc in accounts where !acc.name.hasPrefix("Account ") {
             let clean = acc.id.cleanAccountId
@@ -372,7 +372,7 @@ extension TradeDataStore {
         if tradesChanged {
             self.trades = updatedTrades
         }
-        
+
         if accounts.contains(where: { !$0.name.hasPrefix("Account ") }) && accounts.contains(where: { $0.name.hasPrefix("Account ") }) {
             accounts.removeAll(where: { $0.name.hasPrefix("Account ") })
         }
@@ -420,7 +420,7 @@ extension TradeDataStore {
         deduplicatePropReceipts()
         sanitizeAccountCurrencies()
     }
-    
+
     /// Normalizes accounts whose currency was erroneously detected as SEK or SGD (e.g. from cTrader demo asset leaks)
     /// when the user's actual executions and trades are exclusively in standard USD instruments.
     public func sanitizeAccountCurrencies() {
@@ -448,7 +448,7 @@ extension TradeDataStore {
             objectWillChange.send()
         }
     }
-    
+
     /// Audits and cleans up legacy corrupted The5ers records:
     /// - Purges test records accidentally created with "opaque" IDs from old builds
     /// - Enforces zero Net P&L on all open / unclosed positions
@@ -465,7 +465,7 @@ extension TradeDataStore {
                 rcpt.id.contains("opaque") || rcpt.payoutId.contains("opaque") || rcpt.reference.contains("opaque")
             })
         }
-        
+
         // 2. Remove orphaned receipts that don't match any active entry
         let activeEntryIds = Set(propEntries.map { $0.id })
         if propReceipts.contains(where: { $0.id.hasPrefix("the5ers_") && !activeEntryIds.contains($0.payoutId) }) {
@@ -473,7 +473,7 @@ extension TradeDataStore {
                 rcpt.id.hasPrefix("the5ers_") && !activeEntryIds.contains(rcpt.payoutId)
             })
         }
-        
+
         // 3. Purge legacy synthetic "ACCOUNT" summary/midnight trades and enforce zero Net P&L on open positions
         var localTrades = trades
         var modified = false
@@ -489,35 +489,43 @@ extension TradeDataStore {
                 localTrades[i].notes = nil
                 modified = true
             }
-            
+
             if localTrades[i].status == .open {
-                // An active open trade MUST stay open: closedAt is nil
-                if localTrades[i].closedAt != nil {
-                    localTrades[i].closedAt = nil
+                // Check if all volume has been closed (openQuantity <= 0 with exits)
+                if localTrades[i].openQuantity <= 0 && (!localTrades[i].exits.isEmpty || localTrades[i].avgExit != nil) {
+                    // Fully closed! Transition to completed trade
+                    localTrades[i].status = localTrades[i].netPnl > 0 ? .win : (localTrades[i].netPnl < 0 ? .loss : .breakeven)
+                    localTrades[i].openQuantity = Decimal.zero
+                    if localTrades[i].closedAt == nil {
+                        localTrades[i].closedAt = Date()
+                    }
                     modified = true
-                }
-                
-                let isPartial = !localTrades[i].exits.isEmpty || (localTrades[i].openQuantity > 0 && localTrades[i].openQuantity < localTrades[i].quantity)
-                if isPartial {
-                    // Respect partial close: preserve openQuantity (remaining lots) and netPnl (realized profit of closed portion)
-                    if localTrades[i].openQuantity > localTrades[i].quantity {
-                        localTrades[i].openQuantity = localTrades[i].quantity
-                        modified = true
-                    } else if localTrades[i].openQuantity <= 0 {
-                        localTrades[i].openQuantity = localTrades[i].quantity
-                        modified = true
-                    }
                 } else {
-                    // Fully open position with no exits: enforce openQuantity = quantity and zero realized P&L
-                    if localTrades[i].openQuantity != localTrades[i].quantity {
-                        localTrades[i].openQuantity = localTrades[i].quantity
+                    // An active open trade MUST stay open: closedAt is nil
+                    if localTrades[i].closedAt != nil {
+                        localTrades[i].closedAt = nil
                         modified = true
                     }
-                    if localTrades[i].netPnl != 0 || localTrades[i].grossPnl != 0 || localTrades[i].fees != 0 {
-                        localTrades[i].netPnl = 0
-                        localTrades[i].grossPnl = 0
-                        localTrades[i].fees = 0
-                        modified = true
+
+                    let isPartial = !localTrades[i].exits.isEmpty || (localTrades[i].openQuantity > 0 && localTrades[i].openQuantity < localTrades[i].quantity)
+                    if isPartial {
+                        // Respect partial close: preserve openQuantity (remaining lots) and netPnl (realized profit of closed portion)
+                        if localTrades[i].openQuantity > localTrades[i].quantity {
+                            localTrades[i].openQuantity = localTrades[i].quantity
+                            modified = true
+                        }
+                    } else {
+                        // Fully open position with no exits: enforce openQuantity = quantity and zero realized P&L
+                        if localTrades[i].openQuantity != localTrades[i].quantity {
+                            localTrades[i].openQuantity = localTrades[i].quantity
+                            modified = true
+                        }
+                        if localTrades[i].netPnl != 0 || localTrades[i].grossPnl != 0 || localTrades[i].fees != 0 {
+                            localTrades[i].netPnl = 0
+                            localTrades[i].grossPnl = 0
+                            localTrades[i].fees = 0
+                            modified = true
+                        }
                     }
                 }
             } else {
@@ -535,7 +543,7 @@ extension TradeDataStore {
         if modified {
             trades = localTrades
         }
-        
+
         // 4. Clean and normalize The5ers purchase expenses
         var entriesModified = false
         var localEntries = propEntries
@@ -556,7 +564,7 @@ extension TradeDataStore {
         if entriesModified {
             propEntries = localEntries
         }
-        
+
         // 5. Ensure all The5ers PropAccountItems have complete program rules, realized Net P&L, & reconciled trade stats
         var propsModified = false
         var currentTrades = trades
@@ -581,7 +589,7 @@ extension TradeDataStore {
                 let isStep2 = p.program == .verification || text.contains("- 2") || text.contains("step 2") || text.contains("phase 2")
                 let isBootcamp = text.contains("bootcamp")
                 let isHyperOrInstant = text.contains("hyper") || text.contains("instant") || p.program == .instantFunded
-                
+
                 if p.profitTargetMinor == nil {
                     let pct: Int64 = isHyperOrInstant ? 10 : (isBootcamp ? 6 : (isStep2 ? 5 : 8))
                     p.profitTargetMinor = (sizeMinor * pct) / 100
@@ -615,7 +623,7 @@ extension TradeDataStore {
                     p.netPnlMinor = expectedTradeNetMinor
                     changed = true
                 }
-                
+
                 var dailyMap: [String: Decimal] = [:]
                 for idx in closedIndices {
                     let t = currentTrades[idx]
@@ -660,13 +668,13 @@ extension TradeDataStore {
             propAccounts = localProps
         }
     }
-    
+
     /// Deduplicates propEntries by ID and semantic signature (firm, kind, currency, amount, date, account)
     public func deduplicatePropEntries() {
         var seenIds = Set<String>()
         var seenCanonicals = Set<String>()
         var cleaned: [PropEntryItem] = []
-        
+
         // Prioritize deterministic provider IDs ("the5ers_payout_...", "the5ers_purchase_...") over random UUIDs
         let sortedEntries = propEntries.sorted { a, b in
             let aIsDeterministic = a.id.hasPrefix("the5ers_payout_") || a.id.hasPrefix("the5ers_purchase_")
@@ -676,20 +684,20 @@ extension TradeDataStore {
             }
             return a.revision > b.revision
         }
-        
+
         for entry in sortedEntries {
             let canonId = PropFirmEngine.canonicalPayoutId(entry.id)
-            
+
             // 1. Direct duplicate ID check
             if seenIds.contains(entry.id) {
                 continue
             }
-            
+
             // 2. Canonical payout ID check
             if !canonId.isEmpty && canonId != entry.id && seenCanonicals.contains(canonId) {
                 continue
             }
-            
+
             // 3. Financial Reconciliation Match (firm, kind, currency, amountMinor, date within ±1 day)
             if let existingIdx = cleaned.firstIndex(where: { kept in
                 kept.firm.lowercased() == entry.firm.lowercased() &&
@@ -704,26 +712,26 @@ extension TradeDataStore {
                 }
                 continue
             }
-            
+
             seenIds.insert(entry.id)
             if !canonId.isEmpty {
                 seenCanonicals.insert(canonId)
             }
             cleaned.append(entry)
         }
-        
+
         if cleaned.count != propEntries.count {
             AppLogger.info("Deduplicated propEntries: \(propEntries.count) -> \(cleaned.count)")
             self.propEntries = cleaned
         }
     }
-    
+
     /// Deduplicates propReceipts by ID and semantic payout reference
     public func deduplicatePropReceipts() {
         var seenIds = Set<String>()
         var seenCanonicals = Set<String>()
         var cleaned: [PropReceiptItem] = []
-        
+
         // Prioritize deterministic provider IDs ("the5ers_rcpt_...") over random UUIDs
         let sortedReceipts = propReceipts.sorted { a, b in
             let aIsDeterministic = a.id.hasPrefix("the5ers_rcpt_")
@@ -733,41 +741,41 @@ extension TradeDataStore {
             }
             return a.id > b.id
         }
-        
+
         for rcpt in sortedReceipts {
             if seenIds.contains(rcpt.id) {
                 continue
             }
             let canonPayout = PropFirmEngine.canonicalPayoutId(rcpt.payoutId)
             let canonRcpt = PropFirmEngine.canonicalPayoutId(rcpt.id)
-            
+
             if !canonRcpt.isEmpty && canonRcpt != rcpt.id && seenCanonicals.contains(canonRcpt) {
                 continue
             }
-            
+
             // Financial matching against already kept receipts
             if let _ = cleaned.firstIndex(where: { kept in
                 abs(kept.amountMinor - rcpt.amountMinor) <= 50 &&
-                (kept.payoutId == rcpt.payoutId || 
+                (kept.payoutId == rcpt.payoutId ||
                  PropFirmEngine.canonicalPayoutId(kept.payoutId) == canonPayout ||
                  FlexibleDateParser.areDatesClose(kept.occurredOn, rcpt.occurredOn, maxDays: 1))
             }) {
                 continue
             }
-            
+
             seenIds.insert(rcpt.id)
             if !canonRcpt.isEmpty {
                 seenCanonicals.insert(canonRcpt)
             }
             cleaned.append(rcpt)
         }
-        
+
         if cleaned.count != propReceipts.count {
             AppLogger.info("Deduplicated propReceipts: \(propReceipts.count) -> \(cleaned.count)")
             self.propReceipts = cleaned
         }
     }
-    
+
     /// Reconciles orphan prop receipts to ensure a corresponding payout entry exists in propEntries
     public func reconcileReceiptsToEntries() {
         for rcpt in propReceipts where !rcpt.voided {
@@ -799,7 +807,7 @@ extension TradeDataStore {
             }
         }
     }
-    
+
     public func createInitialDefaultAccount() {
         let defaultAcc = Account(
             id: "default-acc",

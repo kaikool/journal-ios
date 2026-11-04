@@ -36,7 +36,7 @@ public struct EditManualTradeSheet: View {
         
         _symbol = State(initialValue: trade.symbol)
         _direction = State(initialValue: trade.direction)
-        _isClosed = State(initialValue: trade.closedAt != nil || trade.avgExit != nil)
+        _isClosed = State(initialValue: trade.closedAt != nil || trade.avgExit != nil || trade.status.isClosed)
         _quantityText = State(initialValue: Formatters.formatDecimalInput(trade.quantity, maxDecimals: 4))
         _entryPriceText = State(initialValue: Formatters.formatDecimalInput(trade.avgEntry, maxDecimals: 5))
         _exitPriceText = State(initialValue: Formatters.formatDecimalInput(trade.avgExit, maxDecimals: 5))

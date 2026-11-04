@@ -223,24 +223,24 @@ public struct MarketCandleChartView: View {
                 let bodyHeight = max(1.5, abs(yOpen - yClose))
                 let xCenter = CGFloat(i) * stepX + (stepX / 2.0) + clampedPan
 
-                guard xCenter >= -candleWidth && xCenter <= (plotWidth + candleWidth) else { EmptyView() }
+                if xCenter >= -candleWidth && xCenter <= (plotWidth + candleWidth) {
+                    ZStack {
+                        // Wick
+                        Rectangle()
+                            .fill(candleColor)
+                            .frame(width: isPattern ? 1.5 : 1.0, height: max(1, yLow - yHigh))
+                            .position(x: xCenter, y: (yHigh + yLow) / 2.0)
 
-                ZStack {
-                    // Wick
-                    Rectangle()
-                        .fill(candleColor)
-                        .frame(width: isPattern ? 1.5 : 1.0, height: max(1, yLow - yHigh))
-                        .position(x: xCenter, y: (yHigh + yLow) / 2.0)
-
-                    // Real Body
-                    RoundedRectangle(cornerRadius: 1)
-                        .fill(candleColor)
-                        .frame(width: candleWidth, height: bodyHeight)
-                        .position(x: xCenter, y: bodyTop + bodyHeight / 2.0)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 1)
-                                .stroke(candleColor.opacity(0.85), lineWidth: isPattern ? 1.0 : 0)
-                        )
+                        // Real Body
+                        RoundedRectangle(cornerRadius: 1)
+                            .fill(candleColor)
+                            .frame(width: candleWidth, height: bodyHeight)
+                            .position(x: xCenter, y: bodyTop + bodyHeight / 2.0)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 1)
+                                    .stroke(candleColor.opacity(0.85), lineWidth: isPattern ? 1.0 : 0)
+                            )
+                    }
                 }
             }
 
@@ -735,8 +735,11 @@ public struct MarketCandleChartView: View {
     // MARK: - 6d. TradingView Day / Session Vertical Dividers
     @ViewBuilder
     private func daySeparators(plotWidth: CGFloat, plotHeight: CGFloat, stepX: CGFloat, clampedPan: CGFloat) -> some View {
-        var cal = Calendar(identifier: .gregorian)
-        cal.timeZone = SessionFootprintEngine.sessionTimeZone
+        let cal: Calendar = {
+            var c = Calendar(identifier: .gregorian)
+            c.timeZone = SessionFootprintEngine.sessionTimeZone
+            return c
+        }()
 
         ForEach(1..<bars.count, id: \.self) { i in
             let curr = bars[i]

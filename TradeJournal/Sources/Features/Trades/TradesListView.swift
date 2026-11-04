@@ -298,7 +298,7 @@ public struct TradesListView: View {
             }()
             LazyVStack(spacing: 10) {
                 ForEach(filteredTrades) { trade in
-                    let isTradeOpen = trade.status == .open || trade.closedAt == nil
+                    let isTradeOpen = trade.status == .open
                     let pName = trade.playbookId.flatMap { playbookMap[$0] ?? $0 }
                     TradeTerminalRow(trade: trade, playbookName: pName)
                         .contentShape(Rectangle())
@@ -393,7 +393,7 @@ private struct TradeTerminalRow: View {
                     color: Formatters.statusColor(trade.status)
                 )
                 
-                if trade.isPartiallyClosed {
+                if trade.status == .open && trade.isPartiallyClosed {
                     AppBadge("PARTIAL", variant: .warning)
                 }
             }

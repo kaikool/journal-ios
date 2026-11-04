@@ -2665,7 +2665,7 @@ public final class The5ersService: ObservableObject {
                 let incomingIsDefective = (position.exit == nil || position.exit == position.entry) && position.netPnl == 0
                 let localIsComplete = existing.avgExit != nil && existing.avgExit != existing.avgEntry && existing.netPnl != 0
                 let shouldPreserveComplete = localIsComplete && incomingIsDefective
-                let shouldPreserveClosed = (existing.status != .open && existing.closedAt != nil) && !isClosed && position.openedAtDate.timeIntervalSinceNow < -86400
+                let shouldPreserveClosed = (existing.status != .open && existing.closedAt != nil) && !isClosed
                 if !shouldPreserveClosed && !shouldPreserveComplete {
                     existing.status = status
                     existing.closedAt = position.closedAtDate

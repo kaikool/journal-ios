@@ -9,25 +9,74 @@ public enum SessionFootprintEngine {
     // Timezone GMT+7 for institutional session alignment
     public static let sessionTimeZone: TimeZone = TimeZone(identifier: "Asia/Bangkok") ?? TimeZone(secondsFromGMT: 7 * 3600) ?? .current
 
-    // MARK: - 1. Tick Row Size Calculation
-    public static func defaultRowSize(for symbol: String) -> Decimal {
-        let clean = symbol.uppercased()
+    // MARK: - 1. Tick Row Size Calculation across ALL Currency Pairs & Asset Classes
+    public static func defaultRowSize(for symbol: String, samplePrice: Decimal? = nil) -> Decimal {
+        let clean = symbol.uppercased().replacingOccurrences(of: "/", with: "").replacingOccurrences(of: "_", with: "")
+
+        // 1. Precious Metals & Commodities
         if clean.contains("XAU") || clean.contains("GOLD") {
-            return Decimal(1.0) // 100 ticks of 0.01 = $1.00 per bin
+            return Decimal(1.0) // $1.00 per bin (100 ticks of 0.01)
         } else if clean.contains("XAG") || clean.contains("SILVER") {
-            return Decimal(string: "0.05") ?? Decimal(0.05)
-        } else if clean.contains("JPY") {
-            return Decimal(string: "0.05") ?? Decimal(0.05) // 50 ticks of 0.001 = 0.05
-        } else if clean.contains("US30") || clean.contains("DJ30") || clean.contains("DE30") || clean.contains("GER40") {
-            return Decimal(10.0)
-        } else if clean.contains("NAS100") || clean.contains("USTEC") || clean.contains("SPX500") {
-            return Decimal(5.0)
-        } else if clean.contains("BTC") {
-            return Decimal(50.0)
-        } else {
-            // Standard 5-digit Forex (EUR/USD, GBP/USD)
-            return Decimal(string: "0.0005") ?? Decimal(0.0005) // 50 ticks of 0.00001 = 5 pips
+            return Decimal(string: "0.02") ?? Decimal(0.02) // $0.02 per bin
+        } else if clean.contains("USOIL") || clean.contains("UKOIL") || clean.contains("WTI") || clean.contains("BRENT") || clean.contains("OIL") {
+            return Decimal(string: "0.10") ?? Decimal(0.10) // $0.10 per bin
         }
+
+        // 2. Major Equity Indices
+        if clean.contains("US30") || clean.contains("DJ30") || clean.contains("WS30") || clean.contains("DJI") {
+            return Decimal(10.0) // 10 points
+        } else if clean.contains("NAS100") || clean.contains("USTEC") || clean.contains("US100") || clean.contains("NDX") {
+            return Decimal(5.0) // 5 points
+        } else if clean.contains("SPX500") || clean.contains("US500") || clean.contains("SPX") {
+            return Decimal(1.0) // 1 point
+        } else if clean.contains("GER40") || clean.contains("DE30") || clean.contains("DE40") || clean.contains("DAX") {
+            return Decimal(5.0) // 5 points
+        } else if clean.contains("UK100") || clean.contains("FTSE") {
+            return Decimal(2.0)
+        } else if clean.contains("JP225") || clean.contains("NKY") {
+            return Decimal(10.0)
+        }
+
+        // 3. Crypto Currencies
+        if clean.contains("BTC") {
+            return Decimal(25.0) // $25.00
+        } else if clean.contains("ETH") {
+            return Decimal(2.0) // $2.00
+        } else if clean.contains("SOL") {
+            return Decimal(string: "0.20") ?? Decimal(0.20)
+        }
+
+        // 4. Forex JPY Pairs (USD/JPY, EUR/JPY, GBP/JPY, AUD/JPY, CAD/JPY, CHF/JPY, NZD/JPY)
+        if clean.contains("JPY") {
+            return Decimal(string: "0.01") ?? Decimal(0.01) // 1 pip (10 fractional ticks)
+        }
+
+        // 5. Forex Standard 5-digit Pairs (EUR/USD, GBP/USD, AUD/USD, NZD/USD, USD/CAD, USD/CHF, crosses)
+        let isStandardForex = clean.count >= 6 && (
+            clean.contains("USD") || clean.contains("EUR") || clean.contains("GBP") ||
+            clean.contains("AUD") || clean.contains("NZD") || clean.contains("CAD") ||
+            clean.contains("CHF")
+        )
+        if isStandardForex {
+            return Decimal(string: "0.0001") ?? Decimal(0.0001) // 1 pip (10 fractional ticks)
+        }
+
+        // 6. Dynamic Fallback based on Price Magnitude if symbol is unknown/exotic
+        if let price = samplePrice, price > 0 {
+            if price > Decimal(10000) {
+                return Decimal(10.0)
+            } else if price > Decimal(1000) {
+                return Decimal(1.0)
+            } else if price > Decimal(50) {
+                return Decimal(string: "0.05") ?? Decimal(0.05)
+            } else if price > Decimal(5) {
+                return Decimal(string: "0.01") ?? Decimal(0.01)
+            } else {
+                return Decimal(string: "0.0001") ?? Decimal(0.0001)
+            }
+        }
+
+        return Decimal(string: "0.0001") ?? Decimal(0.0001)
     }
 
     // MARK: - 2. Session Time Intervals in GMT+7
@@ -99,7 +148,7 @@ public enum SessionFootprintEngine {
     ) -> SessionProfileSnapshot? {
         guard !bars.isEmpty else { return nil }
 
-        let step = rowSize ?? defaultRowSize(for: symbol)
+        let step = rowSize ?? defaultRowSize(for: symbol, samplePrice: bars.first?.close)
         let stepDouble = NSDecimalNumber(decimal: step).doubleValue
         guard stepDouble > 0 else { return nil }
 
@@ -393,7 +442,7 @@ public enum SessionFootprintEngine {
         rowSize: Decimal? = nil
     ) -> [(timestamp: Int64, pocPrice: Decimal)] {
         guard !bars.isEmpty else { return [] }
-        let step = rowSize ?? defaultRowSize(for: symbol)
+        let step = rowSize ?? defaultRowSize(for: symbol, samplePrice: bars.first?.close)
         let stepDouble = NSDecimalNumber(decimal: step).doubleValue
         guard stepDouble > 0 else { return [] }
 
