@@ -30,6 +30,7 @@ public struct CandleChartView: View {
     @State private var lastMagnification: CGFloat = 1.0
     @State private var panOffset: CGFloat = 0.0
     @State private var lastDragX: CGFloat = 0.0
+    @State private var currentPlotWidth: CGFloat = 320
 
     public init(
         visibleBars: [MarketBar],
@@ -128,7 +129,7 @@ public struct CandleChartView: View {
                     .onChanged { value in
                         let delta = value / lastMagnification
                         lastMagnification = value
-                        zoomScale = max(0.6, min(4.0, zoomScale * delta))
+                        zoomScale = max(0.5, min(4.0, zoomScale * delta))
                     }
                     .onEnded { _ in
                         lastMagnification = 1.0
@@ -137,32 +138,35 @@ public struct CandleChartView: View {
             .simultaneousGesture(
                 DragGesture(minimumDistance: 1)
                     .onChanged { value in
+                        let plotW = max(10, currentPlotWidth)
                         let baseCount = max(visibleBars.count, min(totalBarsCount, 50))
                         let effectiveZoom = max(0.5, min(4.0, zoomScale))
                         let slotCount = max(8, Double(baseCount) / Double(effectiveZoom))
-                        let approxPlotWidth: CGFloat = isLandscape ? 600 : 300
-                        let stepX = approxPlotWidth / CGFloat(max(1, slotCount))
+                        let stepX = plotW / CGFloat(max(1, slotCount))
                         let totalW = CGFloat(visibleBars.count) * stepX
 
-                        if zoomScale > 1.05 && abs(value.translation.width) > 4 && totalW > approxPlotWidth {
+                        // Smooth panning when dragged horizontally and content exceeds visible viewport
+                        if abs(value.translation.width) > 6 && totalW > plotW {
                             let delta = value.translation.width - lastDragX
                             lastDragX = value.translation.width
-                            panOffset += delta
+                            let minOffset = plotW - totalW
+                            panOffset = min(0, max(minOffset, panOffset + delta))
                         } else {
-                            updateHoveredBar(at: value.location.x, totalWidth: approxPlotWidth, stepX: stepX, panOffset: panOffset)
+                            // Touch/Hover crosshair inspection with tactile haptic feedback
+                            updateHoveredBar(at: value.location.x, totalWidth: plotW, stepX: stepX, panOffset: panOffset)
                         }
                     }
                     .onEnded { _ in
                         lastDragX = 0
                         hoveredBarIndex = nil
+                        let plotW = max(10, currentPlotWidth)
                         let baseCount = max(visibleBars.count, min(totalBarsCount, 50))
                         let effectiveZoom = max(0.5, min(4.0, zoomScale))
                         let slotCount = max(8, Double(baseCount) / Double(effectiveZoom))
-                        let approxPlotWidth: CGFloat = isLandscape ? 600 : 300
-                        let stepX = approxPlotWidth / CGFloat(max(1, slotCount))
+                        let stepX = plotW / CGFloat(max(1, slotCount))
                         let totalW = CGFloat(visibleBars.count) * stepX
-                        if totalW > approxPlotWidth {
-                            let minOffset = approxPlotWidth - totalW
+                        if totalW > plotW {
+                            let minOffset = plotW - totalW
                             panOffset = min(0, max(minOffset, panOffset))
                         } else {
                             panOffset = 0
@@ -203,19 +207,29 @@ public struct CandleChartView: View {
     }
 
     private var hudHeaderView: some View {
-        let hoveredTimeStr: String? = hoveredBarIndex != nil ? activeHoveredBar.map { formatBarTime($0.timestamp) } : nil
-
-        return HStack(alignment: .center, spacing: 8) {
+        HStack(alignment: .center, spacing: 8) {
             // 1. Symbol
             Text(trade.symbol)
                 .font(AppTypography.actionButtonCompact)
                 .foregroundColor(AppColors.primaryText)
 
-            // 2. Hovered Time (if touching/scrubbing candle)
-            if let timeStr = hoveredTimeStr {
-                Text(timeStr)
-                    .font(AppTypography.monoCaption)
-                    .foregroundColor(AppColors.secondaryText)
+            // 2. TradingView OHLC Inspector (Active when hovering / scrubbing)
+            if let hBar = activeHoveredBar, hoveredBarIndex != nil {
+                HStack(spacing: 5) {
+                    Text("O \(Formatters.price(hBar.open, symbol: trade.symbol))")
+                        .foregroundColor(AppColors.secondaryText)
+                    Text("H \(Formatters.price(hBar.high, symbol: trade.symbol))")
+                        .foregroundColor(AppColors.secondaryText)
+                    Text("L \(Formatters.price(hBar.low, symbol: trade.symbol))")
+                        .foregroundColor(AppColors.secondaryText)
+                    Text("C \(Formatters.price(hBar.close, symbol: trade.symbol))")
+                        .foregroundColor(hBar.isUp ? AppColors.candleUp : AppColors.candleDown)
+                }
+                .font(AppTypography.captionMicro)
+            } else if let lastBar = visibleBars.last {
+                Text(Formatters.price(lastBar.close, symbol: trade.symbol))
+                    .font(AppTypography.captionMicro)
+                    .foregroundColor(lastBar.isUp ? AppColors.candleUp : AppColors.candleDown)
             }
 
             Spacer()
@@ -318,16 +332,16 @@ public struct CandleChartView: View {
                             candleColor = AppColors.patternBearish
                         }
                     } else {
-                        candleColor = bar.isUp ? AppColors.profit : AppColors.loss
+                        candleColor = bar.isUp ? AppColors.candleUp : AppColors.candleDown
                     }
 
                     var wickPath = Path()
                     wickPath.move(to: CGPoint(x: centerX, y: yHigh))
                     wickPath.addLine(to: CGPoint(x: centerX, y: yLow))
-                    context.stroke(wickPath, with: .color(candleColor), lineWidth: isPattern ? 2.0 : 1.5)
+                    context.stroke(wickPath, with: .color(candleColor), lineWidth: isPattern ? 1.5 : 1.0)
 
                     let bodyTop = min(yOpen, yClose)
-                    let bodyHeight = max(2.5, abs(yClose - yOpen))
+                    let bodyHeight = max(1.5, abs(yClose - yOpen))
                     let bodyRect = CGRect(
                         x: centerX - (candleWidth / 2.0),
                         y: bodyTop,
@@ -342,20 +356,21 @@ public struct CandleChartView: View {
             }
             .frame(width: plotWidth, height: plotHeight)
 
+            // TradingView Day / Session Vertical Dividers
+            daySeparators(plotWidth: plotWidth, plotHeight: plotHeight, stepX: stepX, clampedPan: clampedPan)
+
             // TradingView-aligned Footprint POC & Key Levels Overlay (Time-bounded segments + selective rays)
             footprintOverlay(plotWidth: plotWidth, plotHeight: plotHeight, stepX: stepX, minP: minP, span: priceSpan, panOffset: clampedPan)
 
             // Unified trade overlay (entry/exit lines, arrows, connecting line)
             tradeOverlay(plotWidth: plotWidth, plotHeight: plotHeight, stepX: stepX, minP: minP, span: priceSpan, panOffset: clampedPan)
 
+            // TradingView Current Live Price Line & Price Badge
+            currentPriceLine(plotWidth: plotWidth, plotHeight: plotHeight, minP: minP, span: priceSpan)
+
+            // Full Dual-Axis Crosshair (Vertical + Horizontal + Time/Price Badges)
             if let hIdx = hoveredBarIndex, hIdx < visibleBars.count {
-                let hX = CGFloat(hIdx) * stepX + (stepX / 2.0) + clampedPan
-                if hX >= 0 && hX <= plotWidth {
-                    Rectangle()
-                        .fill(AppColors.primaryText.opacity(0.4))
-                        .frame(width: 1, height: plotHeight)
-                        .position(x: hX, y: plotHeight / 2.0)
-                }
+                crosshairOverlay(hIdx: hIdx, plotWidth: plotWidth, plotHeight: plotHeight, stepX: stepX, minP: minP, span: priceSpan, clampedPan: clampedPan)
             }
 
             // Zoom scale pill indicator (shows dynamically during pinch zoom in landscape)
@@ -720,11 +735,11 @@ public struct CandleChartView: View {
                 path.move(to: CGPoint(x: 0, y: y))
                 path.addLine(to: CGPoint(x: width, y: y))
             }
-            .stroke(AppColors.border.opacity(0.6), style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
+            .stroke(AppColors.border.opacity(0.18), style: StrokeStyle(lineWidth: 0.8, dash: [2, 4]))
 
-            Text(Formatters.price(Decimal(price)))
-                .font(AppTypography.number(9, weight: .medium))
-                .foregroundColor(AppColors.secondaryText)
+            Text(Formatters.price(Decimal(price), symbol: trade.symbol))
+                .font(AppTypography.captionMicro)
+                .foregroundColor(AppColors.secondaryText.opacity(0.8))
                 .frame(width: 50, alignment: .leading)
                 .position(x: width + 28, y: clampedY)
         }
@@ -740,7 +755,7 @@ public struct CandleChartView: View {
                 if x >= 0 && x <= width {
                     let timeStr = formatBarTime(visibleBars[i].timestamp)
                     Text(timeStr)
-                        .font(AppTypography.number(9, weight: .regular))
+                        .font(AppTypography.captionMicro)
                         .foregroundColor(AppColors.secondaryText)
                         .position(x: x, y: height + 10)
                 }
@@ -753,7 +768,7 @@ public struct CandleChartView: View {
     private func volumeHistogram(plotWidth: CGFloat, plotHeight: CGFloat, stepX: CGFloat, candleWidth: CGFloat, panOffset: CGFloat = 0) -> some View {
         let maxVol = visibleBars.map { ($0.volume as NSDecimalNumber).doubleValue }.max() ?? 1.0
         let safeMaxVol = max(1.0, maxVol)
-        let volAreaHeight = plotHeight * 0.18
+        let volAreaHeight = plotHeight * 0.16
 
         return ForEach(0..<visibleBars.count, id: \.self) { i in
             let bar = visibleBars[i]
@@ -763,9 +778,124 @@ public struct CandleChartView: View {
             if x >= -candleWidth && x <= (plotWidth + candleWidth) {
                 let y = plotHeight - barH
                 Rectangle()
-                    .fill((bar.isUp ? AppColors.profit : AppColors.loss).opacity(0.25))
-                    .frame(width: max(1.5, candleWidth * 0.8), height: barH)
+                    .fill((bar.isUp ? AppColors.candleUp : AppColors.candleDown).opacity(0.22))
+                    .frame(width: max(1.5, candleWidth * 0.75), height: barH)
                     .position(x: x, y: y + barH / 2.0)
+            }
+        }
+    }
+
+    // MARK: - 4b. TradingView Live Current Price Line & Badge
+
+    @ViewBuilder
+    private func currentPriceLine(plotWidth: CGFloat, plotHeight: CGFloat, minP: Double, span: Double) -> some View {
+        if let lastBar = visibleBars.last {
+            let lastPriceD = (lastBar.close as NSDecimalNumber).doubleValue
+            let y = plotHeight - CGFloat((lastPriceD - minP) / span) * plotHeight
+            let col = lastBar.isUp ? AppColors.candleUp : AppColors.candleDown
+
+            // 1. Horizontal dashed line across chart
+            Path { path in
+                path.move(to: CGPoint(x: 0, y: y))
+                path.addLine(to: CGPoint(x: plotWidth, y: y))
+            }
+            .stroke(col.opacity(0.75), style: StrokeStyle(lineWidth: 1.0, dash: [2, 3]))
+
+            // 2. Right Axis Price Badge (only if crosshair is NOT hovering over a different bar)
+            if hoveredBarIndex == nil {
+                Text(Formatters.price(lastBar.close, symbol: trade.symbol))
+                    .font(AppTypography.captionMicro)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 1.5)
+                    .background(col)
+                    .clipShape(RoundedRectangle(cornerRadius: 3))
+                    .position(x: plotWidth + 28, y: max(8, min(plotHeight - 8, y)))
+            }
+        }
+    }
+
+    // MARK: - 4c. Dual-Axis Crosshair Overlay (Vertical + Horizontal + Badges)
+
+    @ViewBuilder
+    private func crosshairOverlay(
+        hIdx: Int,
+        plotWidth: CGFloat,
+        plotHeight: CGFloat,
+        stepX: CGFloat,
+        minP: Double,
+        span: Double,
+        clampedPan: CGFloat
+    ) -> some View {
+        if hIdx < visibleBars.count {
+            let hBar = visibleBars[hIdx]
+            let hX = CGFloat(hIdx) * stepX + (stepX / 2.0) + clampedPan
+            let closeD = (hBar.close as NSDecimalNumber).doubleValue
+            let y = plotHeight - CGFloat((closeD - minP) / span) * plotHeight
+
+            // 1. Vertical Hairline
+            Path { path in
+                path.move(to: CGPoint(x: hX, y: 0))
+                path.addLine(to: CGPoint(x: hX, y: plotHeight))
+            }
+            .stroke(AppColors.secondaryText.opacity(0.4), style: StrokeStyle(lineWidth: 1.0, dash: [2, 2]))
+
+            // 2. Horizontal Hairline
+            Path { path in
+                path.move(to: CGPoint(x: 0, y: y))
+                path.addLine(to: CGPoint(x: plotWidth, y: y))
+            }
+            .stroke(AppColors.secondaryText.opacity(0.4), style: StrokeStyle(lineWidth: 1.0, dash: [2, 2]))
+
+            // 3. Right Axis Price Badge
+            Text(Formatters.price(hBar.close, symbol: trade.symbol))
+                .font(AppTypography.captionMicro)
+                .foregroundColor(AppColors.primaryText)
+                .padding(.horizontal, 4)
+                .padding(.vertical, 1.5)
+                .background(AppColors.cardBackground)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 3)
+                        .stroke(AppColors.secondaryText.opacity(0.6), lineWidth: 1)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 3))
+                .position(x: plotWidth + 28, y: max(8, min(plotHeight - 8, y)))
+
+            // 4. Bottom Time Badge
+            Text(formatBarTime(hBar.timestamp))
+                .font(AppTypography.captionMicro)
+                .foregroundColor(AppColors.primaryText)
+                .padding(.horizontal, 4)
+                .padding(.vertical, 1.5)
+                .background(AppColors.cardBackground)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 3)
+                        .stroke(AppColors.secondaryText.opacity(0.6), lineWidth: 1)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 3))
+                .position(x: max(32, min(plotWidth - 32, hX)), y: plotHeight + 10)
+        }
+    }
+
+    // MARK: - 4d. TradingView Day / Session Vertical Dividers
+
+    @ViewBuilder
+    private func daySeparators(plotWidth: CGFloat, plotHeight: CGFloat, stepX: CGFloat, clampedPan: CGFloat) -> some View {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = SessionFootprintEngine.sessionTimeZone
+
+        ForEach(1..<visibleBars.count, id: \.self) { i in
+            let curr = visibleBars[i]
+            let prev = visibleBars[i - 1]
+            if !cal.isDate(curr.date, inSameDayAs: prev.date) {
+                let x = CGFloat(i) * stepX + clampedPan
+                if x >= 0 && x <= plotWidth {
+                    Path { path in
+                        path.move(to: CGPoint(x: x, y: 0))
+                        path.addLine(to: CGPoint(x: x, y: plotHeight))
+                    }
+                    .stroke(AppColors.secondaryText.opacity(0.12), style: StrokeStyle(lineWidth: 1.0, dash: [2, 4]))
+                }
             }
         }
     }

@@ -96,10 +96,8 @@ public struct PreTradeChartCard: View {
                             developingProfiles: developingProfiles,
                             patterns: patterns
                         )
-                        .frame(height: 210)
+                        .frame(height: 260)
                         .appSubCardStyle(cornerRadius: 8, padding: 0)
-                        .contentShape(Rectangle())
-                        .onTapGesture(perform: onEnlarge)
 
                         chartFooterActions
                     }

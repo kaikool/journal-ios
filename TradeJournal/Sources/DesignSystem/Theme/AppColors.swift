@@ -1,4 +1,4 @@
-﻿import SwiftUI
+import SwiftUI
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -113,4 +113,8 @@ public enum AppColors {
     public static let patternBullish = adaptiveColor(dark: "#00e5ff", light: "#0097a7")
     public static let patternBearish = adaptiveColor(dark: "#ff9100", light: "#ef6c00")
     public static let patternNeutral = adaptiveColor(dark: "#b388ff", light: "#651fff")
+
+    // TradingView Candlestick Palette (Emerald Teal / Coral Red)
+    public static let candleUp = adaptiveColor(dark: "#089981", light: "#089981")
+    public static let candleDown = adaptiveColor(dark: "#f23645", light: "#f23645")
 }

@@ -122,7 +122,7 @@ public struct TradeAICoachChartCard: View {
                         developingProfiles: developingProfiles,
                         patterns: patterns
                     )
-                    .frame(height: 250)
+                    .frame(height: 330)
                     .appCardStyle(cornerRadius: 10, padding: 0)
                     .task(id: validBars.count) {
                         let res = await SessionFootprintCoordinator.shared.loadKeyLevels(for: trade.symbol, recentBars: validBars)

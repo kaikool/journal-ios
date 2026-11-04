@@ -15,6 +15,11 @@ public struct MarketCandleChartView: View {
     public let patterns: [DetectedCandlePattern]
 
     @State private var hoveredBarIndex: Int? = nil
+    @State private var zoomScale: CGFloat = 1.0
+    @State private var lastMagnification: CGFloat = 1.0
+    @State private var panOffset: CGFloat = 0.0
+    @State private var lastDragX: CGFloat = 0.0
+    @State private var currentPlotWidth: CGFloat = 320
 
     public init(
         bars: [MarketBar],
@@ -44,16 +49,65 @@ public struct MarketCandleChartView: View {
             hudHeaderView
 
             GeometryReader { geo in
+                let pw = max(10, geo.size.width - 55)
                 candlestickPlotView(size: geo.size)
-                    .gesture(
-                        DragGesture(minimumDistance: 0)
-                            .onChanged { value in
-                                updateHoveredBar(at: value.location.x, totalWidth: geo.size.width - 55)
-                            }
-                            .onEnded { _ in
-                                hoveredBarIndex = nil
-                            }
-                    )
+                    .onAppear {
+                        if currentPlotWidth != pw { currentPlotWidth = pw }
+                    }
+            }
+            .contentShape(Rectangle())
+            .gesture(
+                MagnificationGesture()
+                    .onChanged { value in
+                        let delta = value / lastMagnification
+                        lastMagnification = value
+                        zoomScale = max(0.5, min(4.0, zoomScale * delta))
+                    }
+                    .onEnded { _ in
+                        lastMagnification = 1.0
+                    }
+            )
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 1)
+                    .onChanged { value in
+                        let plotW = max(10, currentPlotWidth)
+                        let baseCount = max(bars.count, 40)
+                        let effectiveZoom = max(0.5, min(4.0, zoomScale))
+                        let slotCount = max(8, Double(baseCount) / Double(effectiveZoom))
+                        let stepX = plotW / CGFloat(max(1, slotCount))
+                        let totalW = CGFloat(bars.count) * stepX
+
+                        if abs(value.translation.width) > 6 && totalW > plotW {
+                            let delta = value.translation.width - lastDragX
+                            lastDragX = value.translation.width
+                            let minOffset = plotW - totalW
+                            panOffset = min(0, max(minOffset, panOffset + delta))
+                        } else {
+                            updateHoveredBar(at: value.location.x, totalWidth: plotW, stepX: stepX, panOffset: panOffset)
+                        }
+                    }
+                    .onEnded { _ in
+                        lastDragX = 0
+                        hoveredBarIndex = nil
+                        let plotW = max(10, currentPlotWidth)
+                        let baseCount = max(bars.count, 40)
+                        let effectiveZoom = max(0.5, min(4.0, zoomScale))
+                        let slotCount = max(8, Double(baseCount) / Double(effectiveZoom))
+                        let stepX = plotW / CGFloat(max(1, slotCount))
+                        let totalW = CGFloat(bars.count) * stepX
+                        if totalW > plotW {
+                            let minOffset = plotW - totalW
+                            panOffset = min(0, max(minOffset, panOffset))
+                        } else {
+                            panOffset = 0
+                        }
+                    }
+            )
+            .onTapGesture(count: 2) {
+                withAnimation(AppAnimations.springStandard) {
+                    zoomScale = 1.0
+                    panOffset = 0.0
+                }
             }
         }
     }
@@ -61,12 +115,39 @@ public struct MarketCandleChartView: View {
     // MARK: - 1. HUD Header Bar
     private var hudHeaderView: some View {
         HStack(alignment: .center, spacing: 8) {
-            // Symbol
-            Text(symbol)
-                .font(AppTypography.cardHeaderUppercase)
-                .foregroundColor(AppColors.primaryText)
+            // Symbol & Timeframe Badge
+            HStack(spacing: 5) {
+                Text(symbol)
+                    .font(AppTypography.actionButtonCompact)
+                    .foregroundColor(AppColors.primaryText)
+                AppBadge(timeframe, style: .neutral)
+            }
+
+            // TradingView OHLC Inspector
+            if let hIdx = hoveredBarIndex, hIdx < bars.count {
+                let hBar = bars[hIdx]
+                HStack(spacing: 5) {
+                    Text("O \(formatPrice(hBar.open))")
+                        .foregroundColor(AppColors.secondaryText)
+                    Text("H \(formatPrice(hBar.high))")
+                        .foregroundColor(AppColors.secondaryText)
+                    Text("L \(formatPrice(hBar.low))")
+                        .foregroundColor(AppColors.secondaryText)
+                    Text("C \(formatPrice(hBar.close))")
+                        .foregroundColor(hBar.isUp ? AppColors.candleUp : AppColors.candleDown)
+                }
+                .font(AppTypography.captionMicro)
+            } else if let lastBar = bars.last {
+                Text(formatPrice(lastBar.close))
+                    .font(AppTypography.captionMicro)
+                    .foregroundColor(lastBar.isUp ? AppColors.candleUp : AppColors.candleDown)
+            }
 
             Spacer()
+
+            if abs(zoomScale - 1.0) > 0.05 {
+                AppBadge(String(format: "%.1fx", zoomScale), style: .brand)
+            }
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
@@ -74,11 +155,18 @@ public struct MarketCandleChartView: View {
 
     // MARK: - 2. Candlestick Canvas Plot
     private func candlestickPlotView(size: CGSize) -> some View {
-        let count = max(1, bars.count)
         let plotWidth = max(10, size.width - 55)
         let plotHeight = max(10, size.height - 20)
-        let stepX = plotWidth / CGFloat(count)
-        let candleWidth = max(1.5, min(14.0, stepX * 0.75))
+
+        let baseCount = max(bars.count, 40)
+        let effectiveZoom = max(0.5, min(4.0, zoomScale))
+        let slotCount = max(8, Double(baseCount) / Double(effectiveZoom))
+        let stepX = plotWidth / CGFloat(max(1, slotCount))
+        let candleWidth = max(2.0, min(20.0, stepX * 0.72))
+
+        let totalContentWidth = CGFloat(bars.count) * stepX
+        let minPan = min(0, plotWidth - totalContentWidth)
+        let clampedPan = totalContentWidth > plotWidth ? min(0, max(minPan, panOffset)) : 0
 
         let allPrices = bars.flatMap { [($0.high as NSDecimalNumber).doubleValue, ($0.low as NSDecimalNumber).doubleValue] }
         let rawMin = allPrices.min() ?? 1.0
@@ -89,11 +177,14 @@ public struct MarketCandleChartView: View {
         let span = max(0.0001, maxP - minP)
 
         return ZStack(alignment: .topLeading) {
+            // Day / Session Vertical Dividers
+            daySeparators(plotWidth: plotWidth, plotHeight: plotHeight, stepX: stepX, clampedPan: clampedPan)
+
             // Price Grid & Right Axis
             gridAndPriceAxis(width: plotWidth, height: plotHeight, minP: minP, maxP: maxP)
 
             // Volume Histogram (Subtle background)
-            volumeHistogram(plotWidth: plotWidth, plotHeight: plotHeight, stepX: stepX, candleWidth: candleWidth)
+            volumeHistogram(plotWidth: plotWidth, plotHeight: plotHeight, stepX: stepX, candleWidth: candleWidth, panOffset: clampedPan)
 
             // TradingView-aligned Footprint POC & Key Levels Overlay (Time-bounded segments + selective rays)
             footprintOverlay(plotWidth: plotWidth, plotHeight: plotHeight, stepX: stepX, minP: minP, span: span)
@@ -115,7 +206,7 @@ public struct MarketCandleChartView: View {
                             return AppColors.patternBearish
                         }
                     }
-                    return bar.isUp ? AppColors.profit : AppColors.loss
+                    return bar.isUp ? AppColors.candleUp : AppColors.candleDown
                 }()
 
                 let highD = (bar.high as NSDecimalNumber).doubleValue
@@ -129,14 +220,16 @@ public struct MarketCandleChartView: View {
                 let yClose = plotHeight - CGFloat((closeD - minP) / span) * plotHeight
 
                 let bodyTop = min(yOpen, yClose)
-                let bodyHeight = max(1.0, abs(yOpen - yClose))
-                let xCenter = CGFloat(i) * stepX + (stepX / 2.0)
+                let bodyHeight = max(1.5, abs(yOpen - yClose))
+                let xCenter = CGFloat(i) * stepX + (stepX / 2.0) + clampedPan
+
+                guard xCenter >= -candleWidth && xCenter <= (plotWidth + candleWidth) else { EmptyView() }
 
                 ZStack {
                     // Wick
                     Rectangle()
                         .fill(candleColor)
-                        .frame(width: isPattern ? 1.5 : 1, height: max(1, yLow - yHigh))
+                        .frame(width: isPattern ? 1.5 : 1.0, height: max(1, yLow - yHigh))
                         .position(x: xCenter, y: (yHigh + yLow) / 2.0)
 
                     // Real Body
@@ -152,15 +245,14 @@ public struct MarketCandleChartView: View {
             }
 
             // Time Axis
-            timeAxis(width: plotWidth, height: plotHeight, stepX: stepX)
+            timeAxis(width: plotWidth, height: plotHeight, stepX: stepX, panOffset: clampedPan)
 
-            // Hover vertical crosshair line
+            // TradingView Live Current Price Line & Badge
+            currentPriceLine(plotWidth: plotWidth, plotHeight: plotHeight, minP: minP, span: span)
+
+            // Dual-Axis Crosshair (Vertical + Horizontal + Badges)
             if let hIdx = hoveredBarIndex, hIdx < bars.count {
-                let hX = CGFloat(hIdx) * stepX + (stepX / 2.0)
-                Rectangle()
-                    .fill(AppColors.primaryText.opacity(0.35))
-                    .frame(width: 1, height: plotHeight)
-                    .position(x: hX, y: plotHeight / 2.0)
+                crosshairOverlay(hIdx: hIdx, plotWidth: plotWidth, plotHeight: plotHeight, stepX: stepX, minP: minP, span: span, clampedPan: clampedPan)
             }
         }
     }
@@ -500,50 +592,165 @@ public struct MarketCandleChartView: View {
                 path.move(to: CGPoint(x: 0, y: y))
                 path.addLine(to: CGPoint(x: width, y: y))
             }
-            .stroke(AppColors.border.opacity(0.4), style: StrokeStyle(lineWidth: 0.8, dash: [3, 3]))
+            .stroke(AppColors.border.opacity(0.18), style: StrokeStyle(lineWidth: 0.8, dash: [2, 4]))
 
             Text(formatPrice(Decimal(price)))
-                .font(AppTypography.number(9, weight: .regular))
-                .foregroundColor(AppColors.secondaryText)
+                .font(AppTypography.captionMicro)
+                .foregroundColor(AppColors.secondaryText.opacity(0.8))
                 .frame(width: 50, alignment: .leading)
                 .position(x: width + 28, y: clampedY)
         }
     }
 
-    private func timeAxis(width: CGFloat, height: CGFloat, stepX: CGFloat) -> some View {
+    private func timeAxis(width: CGFloat, height: CGFloat, stepX: CGFloat, panOffset: CGFloat = 0) -> some View {
         let count = bars.count
         let markInterval = max(1, count / 4)
 
         return ForEach(0..<count, id: \.self) { i in
             if i % markInterval == 0 || i == count - 1 {
-                let x = CGFloat(i) * stepX + (stepX / 2.0)
-                let timeStr = formatBarTime(bars[i].timestamp)
-
-                Text(timeStr)
-                    .font(AppTypography.number(9, weight: .regular))
-                    .foregroundColor(AppColors.secondaryText)
-                    .position(x: x, y: height + 9)
+                let x = CGFloat(i) * stepX + (stepX / 2.0) + panOffset
+                if x >= 0 && x <= width {
+                    let timeStr = formatBarTime(bars[i].timestamp)
+                    Text(timeStr)
+                        .font(AppTypography.captionMicro)
+                        .foregroundColor(AppColors.secondaryText)
+                        .position(x: x, y: height + 9)
+                }
             }
         }
     }
 
     // MARK: - 6. Volume Histogram
-    private func volumeHistogram(plotWidth: CGFloat, plotHeight: CGFloat, stepX: CGFloat, candleWidth: CGFloat) -> some View {
+    private func volumeHistogram(plotWidth: CGFloat, plotHeight: CGFloat, stepX: CGFloat, candleWidth: CGFloat, panOffset: CGFloat = 0) -> some View {
         let maxVol = bars.map { ($0.volume as NSDecimalNumber).doubleValue }.max() ?? 1.0
         let safeMaxVol = max(1.0, maxVol)
-        let volAreaHeight = plotHeight * 0.18
+        let volAreaHeight = plotHeight * 0.16
 
         return ForEach(0..<bars.count, id: \.self) { i in
             let bar = bars[i]
             let vol = (bar.volume as NSDecimalNumber).doubleValue
             let height = CGFloat(vol / safeMaxVol) * volAreaHeight
-            let xCenter = CGFloat(i) * stepX + (stepX / 2.0)
-            let color = bar.isUp ? AppColors.profit.opacity(0.18) : AppColors.loss.opacity(0.18)
+            let xCenter = CGFloat(i) * stepX + (stepX / 2.0) + panOffset
 
-            Rectangle()
-                .fill(color)
-                .frame(width: max(1, candleWidth * 0.8), height: max(1, height))
-                .position(x: xCenter, y: plotHeight - height / 2.0)
+            if xCenter >= -candleWidth && xCenter <= (plotWidth + candleWidth) {
+                let color = (bar.isUp ? AppColors.candleUp : AppColors.candleDown).opacity(0.22)
+                Rectangle()
+                    .fill(color)
+                    .frame(width: max(1.5, candleWidth * 0.75), height: max(1, height))
+                    .position(x: xCenter, y: plotHeight - height / 2.0)
+            }
+        }
+    }
+
+    // MARK: - 6b. TradingView Live Current Price Line & Badge
+    @ViewBuilder
+    private func currentPriceLine(plotWidth: CGFloat, plotHeight: CGFloat, minP: Double, span: Double) -> some View {
+        if let lastBar = bars.last {
+            let lastPriceD = (lastBar.close as NSDecimalNumber).doubleValue
+            let y = plotHeight - CGFloat((lastPriceD - minP) / span) * plotHeight
+            let col = lastBar.isUp ? AppColors.candleUp : AppColors.candleDown
+
+            // 1. Horizontal dashed line across chart
+            Path { path in
+                path.move(to: CGPoint(x: 0, y: y))
+                path.addLine(to: CGPoint(x: plotWidth, y: y))
+            }
+            .stroke(col.opacity(0.75), style: StrokeStyle(lineWidth: 1.0, dash: [2, 3]))
+
+            // 2. Right Axis Price Badge (only if crosshair is NOT hovering over a different bar)
+            if hoveredBarIndex == nil {
+                Text(formatPrice(lastBar.close))
+                    .font(AppTypography.captionMicro)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 1.5)
+                    .background(col)
+                    .clipShape(RoundedRectangle(cornerRadius: 3))
+                    .position(x: plotWidth + 28, y: max(8, min(plotHeight - 8, y)))
+            }
+        }
+    }
+
+    // MARK: - 6c. Dual-Axis Crosshair Overlay (Vertical + Horizontal + Badges)
+    @ViewBuilder
+    private func crosshairOverlay(
+        hIdx: Int,
+        plotWidth: CGFloat,
+        plotHeight: CGFloat,
+        stepX: CGFloat,
+        minP: Double,
+        span: Double,
+        clampedPan: CGFloat
+    ) -> some View {
+        if hIdx < bars.count {
+            let hBar = bars[hIdx]
+            let hX = CGFloat(hIdx) * stepX + (stepX / 2.0) + clampedPan
+            let closeD = (hBar.close as NSDecimalNumber).doubleValue
+            let y = plotHeight - CGFloat((closeD - minP) / span) * plotHeight
+
+            // 1. Vertical Hairline
+            Path { path in
+                path.move(to: CGPoint(x: hX, y: 0))
+                path.addLine(to: CGPoint(x: hX, y: plotHeight))
+            }
+            .stroke(AppColors.secondaryText.opacity(0.4), style: StrokeStyle(lineWidth: 1.0, dash: [2, 2]))
+
+            // 2. Horizontal Hairline
+            Path { path in
+                path.move(to: CGPoint(x: 0, y: y))
+                path.addLine(to: CGPoint(x: plotWidth, y: y))
+            }
+            .stroke(AppColors.secondaryText.opacity(0.4), style: StrokeStyle(lineWidth: 1.0, dash: [2, 2]))
+
+            // 3. Right Axis Price Badge
+            Text(formatPrice(hBar.close))
+                .font(AppTypography.captionMicro)
+                .foregroundColor(AppColors.primaryText)
+                .padding(.horizontal, 4)
+                .padding(.vertical, 1.5)
+                .background(AppColors.cardBackground)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 3)
+                        .stroke(AppColors.secondaryText.opacity(0.6), lineWidth: 1)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 3))
+                .position(x: plotWidth + 28, y: max(8, min(plotHeight - 8, y)))
+
+            // 4. Bottom Time Badge
+            Text(formatBarTime(hBar.timestamp))
+                .font(AppTypography.captionMicro)
+                .foregroundColor(AppColors.primaryText)
+                .padding(.horizontal, 4)
+                .padding(.vertical, 1.5)
+                .background(AppColors.cardBackground)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 3)
+                        .stroke(AppColors.secondaryText.opacity(0.6), lineWidth: 1)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 3))
+                .position(x: max(32, min(plotWidth - 32, hX)), y: plotHeight + 10)
+        }
+    }
+
+    // MARK: - 6d. TradingView Day / Session Vertical Dividers
+    @ViewBuilder
+    private func daySeparators(plotWidth: CGFloat, plotHeight: CGFloat, stepX: CGFloat, clampedPan: CGFloat) -> some View {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = SessionFootprintEngine.sessionTimeZone
+
+        ForEach(1..<bars.count, id: \.self) { i in
+            let curr = bars[i]
+            let prev = bars[i - 1]
+            if !cal.isDate(curr.date, inSameDayAs: prev.date) {
+                let x = CGFloat(i) * stepX + clampedPan
+                if x >= 0 && x <= plotWidth {
+                    Path { path in
+                        path.move(to: CGPoint(x: x, y: 0))
+                        path.addLine(to: CGPoint(x: x, y: plotHeight))
+                    }
+                    .stroke(AppColors.secondaryText.opacity(0.12), style: StrokeStyle(lineWidth: 1.0, dash: [2, 4]))
+                }
+            }
         }
     }
 
@@ -551,17 +758,17 @@ public struct MarketCandleChartView: View {
     private func levelColor(for level: KeyLevel) -> Color {
         switch level.type {
         case .sessionPoc(.tokyo):
-            return Color(red: 0.0, green: 0.72, blue: 0.83) // Cyan
+            return AppColors.sessionTokyo
         case .sessionPoc(.london):
-            return Color(red: 1.0, green: 0.70, blue: 0.0) // Amber
+            return AppColors.sessionLondon
         case .sessionPoc(.newYork):
-            return Color(red: 0.67, green: 0.0, blue: 1.0) // Purple
+            return AppColors.sessionNewYork
         case .sessionPoc(.daily):
-            return AppColors.profit // Green
+            return AppColors.sessionDaily
         case .sessionPoc(.weekly):
-            return AppColors.accent // Blue
+            return AppColors.sessionWeekly
         case .nakedPoc:
-            return AppColors.loss.opacity(0.85) // Reddish dotted ray
+            return AppColors.sessionNaked
         case .pdh, .pdl, .pdc:
             return AppColors.primaryText.opacity(0.6)
         default:
@@ -569,11 +776,21 @@ public struct MarketCandleChartView: View {
         }
     }
 
-    private func updateHoveredBar(at x: CGFloat, totalWidth: CGFloat) {
+    private func updateHoveredBar(at x: CGFloat, totalWidth: CGFloat, stepX: CGFloat? = nil, panOffset: CGFloat = 0) {
         guard !bars.isEmpty, totalWidth > 0 else { return }
-        let stepX = totalWidth / CGFloat(bars.count)
-        let idx = Int(x / stepX)
-        hoveredBarIndex = max(0, min(bars.count - 1, idx))
+        let stX: CGFloat = {
+            if let s = stepX, s > 0 { return s }
+            let baseCount = max(bars.count, 40)
+            let effectiveZoom = max(0.5, min(4.0, zoomScale))
+            let slotCount = max(8, Double(baseCount) / Double(effectiveZoom))
+            return totalWidth / CGFloat(max(1, slotCount))
+        }()
+        let adjustedX = x - panOffset
+        let idx = Int(adjustedX / stX)
+        if idx >= 0 && idx < bars.count && self.hoveredBarIndex != idx {
+            self.hoveredBarIndex = idx
+            NativeHaptics.selection()
+        }
     }
 
     private func formatPrice(_ p: Decimal) -> String {
