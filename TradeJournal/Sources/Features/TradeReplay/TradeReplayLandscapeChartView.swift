@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Dedicated Fullscreen Landscape Chart View for Trade Replay.
-/// Maximizes horizontal chart real estate for deep market structure, EMA trend, and RSI inspection.
+/// Maximizes horizontal chart real estate for deep market structure and 3-line RSI momentum inspection.
 public struct TradeReplayLandscapeChartView: View {
     let trade: Trade
     let executions: [Execution]
@@ -160,11 +160,6 @@ public struct TradeReplayLandscapeChartView: View {
     }
     
     // MARK: - 2. Timeframes & Indicators Bar
-    private var currentTrendBias: TrendBias? {
-        guard !bars.isEmpty else { return nil }
-        return MovingAverageEngine.analyzeTimeframe(bars: frame.visibleBars, timeframe: selectedResolution.rawValue)?.trend
-    }
-    
     private var controlsBar: some View {
         HStack(spacing: 8) {
             // Timeframe Resolution Selector
@@ -189,23 +184,6 @@ public struct TradeReplayLandscapeChartView: View {
             )
             
             Spacer()
-            
-            // Trend Regime Pill
-            if let t = currentTrendBias {
-                let isBull = t == .bullish || t == .strongBullish
-                let isBear = t == .bearish || t == .strongBearish
-                let color = isBull ? AppColors.profit : (isBear ? AppColors.loss : AppColors.warning)
-                let icon = isBull ? "arrow.up" : (isBear ? "arrow.down" : "arrow.left.and.right")
-                let cleanLabel = t.label
-                    .replacingOccurrences(of: " ▲▲", with: "")
-                    .replacingOccurrences(of: " ▲", with: "")
-                    .replacingOccurrences(of: " ▼▼", with: "")
-                    .replacingOccurrences(of: " ▼", with: "")
-                    .replacingOccurrences(of: " ⇄", with: "")
-                    .replacingOccurrences(of: " ▬", with: "")
-                
-                AppBadge(cleanLabel, icon: icon, color: color)
-            }
         }
     }
     

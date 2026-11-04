@@ -48,7 +48,7 @@ extension AIPromptBuilder {
                 • Symbol: \(plan.symbol.isEmpty ? trade.symbol : plan.symbol) | Bias: \(plan.bias)
                 • Planned Entry Zone: \(plan.plannedEntry ?? "Market")
                 • Planned Stop Loss: \(plan.invalidationSL ?? "Structural")
-                • Planned Take Profit: \(plan.targetTP ?? "Liquidity Pool")
+                • Planned Take Profit: \(plan.targetTP ?? "Key Target")
                 • Stated Thesis: \(plan.thesisSummary)
                 """
             }

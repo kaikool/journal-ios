@@ -272,7 +272,7 @@ public struct TradeReplayView: View {
             
             if !fetchedBars.isEmpty {
                 // Auto-align broker server timezone offset and trim to replay window
-                // (80 bars before open for market swings, EMA & RSI-14 warmup, 15 bars after close)
+                // (80 bars before open for market swings and RSI-14 warmup, 15 bars after close)
                 let alignedBars = TradeReplayEngine.alignAndTrimBars(
                     bars: fetchedBars,
                     trade: trade,

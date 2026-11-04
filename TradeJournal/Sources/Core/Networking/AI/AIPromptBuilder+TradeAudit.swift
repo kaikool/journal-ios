@@ -98,7 +98,7 @@ extension AIPromptBuilder {
                 
                 [YOUR PREVIOUS PRE-TRADE ADVISORY COMMITMENT]:
                 • Time of Analysis: \(ptTimeStr)
-                • Your Recommended Setup: \(pt.bias) at [\(pt.plannedEntry ?? "Market")], SL: [\(pt.invalidationSL ?? "Structural")], TP: [\(pt.targetTP ?? "Liquidity")]
+                • Your Recommended Setup: \(pt.bias) at [\(pt.plannedEntry ?? "Market")], SL: [\(pt.invalidationSL ?? "Structural")], TP: [\(pt.targetTP ?? "Key Target")]
                 • Directive Summary: "\(pt.thesisSummary)"
                 """
             }
@@ -741,7 +741,7 @@ extension AIPromptBuilder {
                - Khi lệnh \(dirStr) có SL đã được dời vượt qua giá vào theo chiều có lợi (đối với SELL: SL nằm dưới giá vào; đối với BUY: SL nằm trên giá vào): ĐÂY LÀ HÀNH ĐỘNG DỜI SL DƯƠNG / TRAILING STOP ĐỂ BẢO VỆ VỐN VÀ KHÓA LÃI (RISK-FREE). BẮT BUỘC công nhận đây là kỹ năng quản trị rủi ro an toàn tuyệt đối, TUYỆT ĐỐI KHÔNG ĐƯỢC coi là lỗi kỹ thuật hay sai chiều.
                - Nếu có góc nhìn độc lập nào hiểu nhầm việc kéo SL bảo vệ thành lỗi kỹ thuật: BẮT BUỘC BÁC BỎ sự hiểu nhầm đó và khẳng định vị thế đã an toàn.
             2. CĂN CỨ VÀO ĐỘNG LƯỢNG VÀ CẤU TRÚC ĐA KHUNG:
-               - Kết hợp diễn biến giá so với EMA 21/50 và RSI 14 để đưa ra chỉ đạo hành động cụ thể.
+               - Kết hợp hành động giá nến và hệ thống 3 đường Động lượng RSI để đưa ra chỉ đạo hành động cụ thể.
             
             ĐỊNH DẠNG ĐẦU RA CHUẨN:
             \(isOpen ? """

@@ -95,7 +95,7 @@ public struct AIReflectionTemplates {
         AIReflectionTemplate(
             id: "pre_trade_market_bias",
             title: "Pre-Trade Market Bias",
-            subtitle: "Multi-timeframe liquidity sweep, supply/demand, and entry setup analysis (D1, H4, M15)",
+            subtitle: "Multi-timeframe price action, key levels, and entry setup analysis (D1, H4, M15)",
             icon: "scope",
             category: .execution,
             action: .ask,
@@ -308,7 +308,7 @@ public struct AIReflectionTemplates {
             
             TASK: CRITICAL FORENSIC POST-MORTEM & STRUCTURAL AUDIT
             1. Thesis Validation: Was entering \(side) at \(formatPrice(entry)) technically rational, aligned with HTF market structure, or was it an emotional FOMO/chasing mistake?
-            2. Multi-Timeframe & Liquidity Context: Did the trade get trapped in a liquidity sweep, or fight a major support/resistance barrier?
+            2. Multi-Timeframe Context: Did the trade fight a major support/resistance barrier, or honor market structure?
             3. Execution & Discipline Audit: Evaluate exit quality—was the trade closed according to plan (TP/SL hit) or cut early/held through unnecessary drawdown?
             4. 1 Non-Negotiable Operational Rule: State 1 sharp, uncompromising discipline rule for future setups.
             \(langInstruction)
@@ -316,7 +316,7 @@ public struct AIReflectionTemplates {
             
         case "pre_trade_market_bias":
             return """
-            FORWARD-LOOKING PRE-TRADE MARKET STRUCTURE & LIQUIDITY AUDIT (D1, H4, M15):
+            FORWARD-LOOKING PRE-TRADE MARKET STRUCTURE AUDIT (D1, H4, M15):
             - Horizon: Higher Timeframe Bias (D1), Institutional Order Flow (H4), Execution Trigger (M15).
             - Account Context: Ready to evaluate trade setups against risk budget and psychological discipline.
             
@@ -326,10 +326,9 @@ public struct AIReflectionTemplates {
             - What is the prevailing institutional trend on the Daily chart? Expansion, Retracement, or Range Consolidation?
             - Where are the Previous Day High (PDH) and Previous Day Low (PDL)?
             
-            ### 2. Key Supply/Demand Blocks & Liquidity Map (H4)
-            - Where are the unmitigated Order Blocks (OB) and Fair Value Gaps (FVG)?
-            - Where do retail stop-loss clusters sit (Buy-side Liquidity / Equal Highs vs Sell-side Liquidity / Equal Lows)?
-            - Has a liquidity sweep / stop hunt already occurred, or is price currently engineering liquidity to trap traders?
+            ### 2. Key Price Levels & Support/Resistance (H4)
+            - Identify key swing boundaries, previous day levels (PDH/PDL), and reaction points.
+            - Are candles showing rejection wicks or continuation momentum?
             
             ### 3. Actionable Setup & Entry Execution (M15)
             - Actionable verdict: [BUY / SELL / FLAT - NO EDGE].
@@ -433,8 +432,8 @@ public struct AIReflectionTemplates {
             - Primary symbols in recent trade history: \(topTradedSymbols.isEmpty ? "EURUSD, XAUUSD, GBPUSD" : topTradedSymbols)
             
             TASK: PRE-TRADE FORWARD-LOOKING MARKET STRUCTURE AUDIT (D1 - H4 - M15)
-            1. Higher Timeframe Liquidity: Evaluate where institutional Stop Loss clusters (Buy-side / Sell-side liquidity) are resting.
-            2. Supply / Demand Imbalance: Identify key Unmitigated Order Blocks (OB) and Fair Value Gaps (FVG).
+            1. Higher Timeframe Context: Evaluate key horizontal support/resistance levels.
+            2. Supply / Demand Imbalance: Identify key reaction zones and rejection wicks.
             3. Execution Guidance: Prescribe whether trader should BUY, SELL, or FLAT with entry invalidation criteria.
             \(langInstruction)
             """

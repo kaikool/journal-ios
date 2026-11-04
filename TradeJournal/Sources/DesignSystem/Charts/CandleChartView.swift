@@ -38,7 +38,6 @@ public struct CandleChartView: View {
         currency: String = "USD",
         resolution: MarketResolution = .m15,
         showMarketStructure: Bool = true,
-        showLiquidity: Bool = true,
         showRSI: Bool = true,
         rsiMAType: MomentumEngine.RSIMAType = .ema,
         isLandscape: Bool = false,
@@ -188,13 +187,7 @@ public struct CandleChartView: View {
         return visibleBars.isEmpty ? nil : (visibleBars.count - 1)
     }
     
-    private var currentTrendBias: TrendBias? {
-        guard visibleBars.count >= 10 else { return nil }
-        return MovingAverageEngine.analyzeTimeframe(bars: visibleBars, timeframe: resolution.rawValue)?.trend
-    }
-    
     private var hudHeaderView: some View {
-        let trend = currentTrendBias
         let hoveredTimeStr: String? = hoveredBarIndex != nil ? activeHoveredBar.map { formatBarTime($0.timestamp) } : nil
         
         return HStack(alignment: .center, spacing: 8) {
@@ -203,31 +196,7 @@ public struct CandleChartView: View {
                 .font(AppTypography.actionButtonCompact)
                 .foregroundColor(AppColors.primaryText)
             
-            // 2. Trend Capsule Pill (▲ Bullish, ▼ Bearish, ⇄ Pullback)
-            if let t = trend {
-                let isBull = t == .bullish || t == .strongBullish
-                let isBear = t == .bearish || t == .strongBearish
-                let color = isBull ? AppColors.profit : (isBear ? AppColors.loss : AppColors.warning)
-                
-                HStack(spacing: 4) {
-                    Text(isBull ? "▲" : (isBear ? "▼" : "⇄"))
-                        .font(AppTypography.badgeMicro)
-                    Text(t.label.replacingOccurrences(of: " ▲▲", with: "")
-                                .replacingOccurrences(of: " ▲", with: "")
-                                .replacingOccurrences(of: " ▼▼", with: "")
-                                .replacingOccurrences(of: " ▼", with: "")
-                                .replacingOccurrences(of: " ⇄", with: "")
-                                .replacingOccurrences(of: " ▬", with: ""))
-                        .font(AppTypography.badgeMicro)
-                }
-                .padding(.horizontal, 7)
-                .padding(.vertical, 2.5)
-                .background(color.opacity(0.12))
-                .foregroundColor(color)
-                .clipShape(Capsule())
-            }
-            
-            // 3. Hovered Time (if touching/scrubbing candle)
+            // 2. Hovered Time (if touching/scrubbing candle)
             if let timeStr = hoveredTimeStr {
                 Text(timeStr)
                     .font(AppTypography.monoCaption)
@@ -340,11 +309,6 @@ public struct CandleChartView: View {
                 }
             }
             .frame(width: plotWidth, height: plotHeight)
-            
-            // Dynamic EMA 21 & EMA 50 Overlay
-            if showMarketStructure {
-                emaOverlay(plotWidth: plotWidth, plotHeight: plotHeight, stepX: stepX, minP: minP, span: priceSpan, panOffset: clampedPan)
-            }
             
             // Unified trade overlay (entry/exit lines, arrows, connecting line)
             tradeOverlay(plotWidth: plotWidth, plotHeight: plotHeight, stepX: stepX, minP: minP, span: priceSpan, panOffset: clampedPan)
@@ -605,55 +569,6 @@ public struct CandleChartView: View {
             f.timeZone = timeZone
         }
         return f.string(from: date)
-    }
-    
-    // MARK: - 6. Dynamic EMA 21 & EMA 50 Overlay
-    
-    @ViewBuilder
-    private func emaOverlay(
-        plotWidth: CGFloat,
-        plotHeight: CGFloat,
-        stepX: CGFloat,
-        minP: Double,
-        span: Double,
-        panOffset: CGFloat = 0
-    ) -> some View {
-        if visibleBars.count >= 10 {
-            let ema21 = MovingAverageEngine.calculateEMA(period: 21, bars: visibleBars)
-            let ema50 = MovingAverageEngine.calculateEMA(period: 50, bars: visibleBars)
-            
-            ZStack {
-                // 1. EMA 50 (Orange)
-                if ema50.count == visibleBars.count {
-                    Path { path in
-                        for (idx, val) in ema50.enumerated() {
-                            let x = CGFloat(idx) * stepX + (stepX / 2.0) + panOffset
-                            let pD = (val as NSDecimalNumber).doubleValue
-                            let y = plotHeight - CGFloat((pD - minP) / span) * plotHeight
-                            let clampedY = max(2, min(plotHeight - 2, y))
-                            if idx == 0 { path.move(to: CGPoint(x: x, y: clampedY)) }
-                            else { path.addLine(to: CGPoint(x: x, y: clampedY)) }
-                        }
-                    }
-                    .stroke(Color.orange.opacity(0.85), lineWidth: 1.2)
-                }
-                
-                // 2. EMA 21 (Cyan)
-                if ema21.count == visibleBars.count {
-                    Path { path in
-                        for (idx, val) in ema21.enumerated() {
-                            let x = CGFloat(idx) * stepX + (stepX / 2.0) + panOffset
-                            let pD = (val as NSDecimalNumber).doubleValue
-                            let y = plotHeight - CGFloat((pD - minP) / span) * plotHeight
-                            let clampedY = max(2, min(plotHeight - 2, y))
-                            if idx == 0 { path.move(to: CGPoint(x: x, y: clampedY)) }
-                            else { path.addLine(to: CGPoint(x: x, y: clampedY)) }
-                        }
-                    }
-                    .stroke(Color.cyan.opacity(0.9), lineWidth: 1.4)
-                }
-            }
-        }
     }
     
     // MARK: - 8. RSI Sub-Window View & Plot

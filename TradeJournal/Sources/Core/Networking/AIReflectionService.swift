@@ -809,18 +809,15 @@ public actor AIReflectionService {
                 }()
                 let targetRiskDollarsStr = String(format: "$%.2f", (targetRiskDollars as NSDecimalNumber).doubleValue)
                 
-                let emaMulti = MovingAverageEngine.analyzeMultiTimeframe(
-                    barsD1: d1Bars,
-                    barsH4: h4Bars,
-                    barsH1: h1Bars,
-                    barsM15: m15Bars,
-                    symbol: symbol
-                )
-                
                 func fmtP(_ p: Decimal?) -> String {
                     guard let p = p else { return "N/A" }
                     return Formatters.price(p, symbol: symbol)
                 }
+                
+                let d1High = d1Bars.suffix(2).first?.high
+                let d1Low = d1Bars.suffix(2).first?.low
+                let h4High = h4Bars.suffix(24).map(\.high).max()
+                let h4Low = h4Bars.suffix(24).map(\.low).min()
                 
                 let execBars = !h1Bars.isEmpty ? h1Bars : m15Bars
                 let momWin = MomentumEngine.computeWindow(bars: execBars, windowSize: 15)
@@ -832,19 +829,15 @@ public actor AIReflectionService {
                 let divStr = isVi ? (momWin.divergenceVi ?? "Không có phân kỳ") : (momWin.divergenceEn ?? "None")
                 
                 let technicalGroundTruth = isVi ? """
-                • D1:  EMA 21 = \(fmtP(emaMulti.d1?.ema21)) | EMA 50 = \(fmtP(emaMulti.d1?.ema50)) | Xu hướng: \(emaMulti.d1?.trend.label ?? "N/A")
-                • H4:  EMA 21 = \(fmtP(emaMulti.h4?.ema21)) | EMA 50 = \(fmtP(emaMulti.h4?.ema50)) | Xu hướng: \(emaMulti.h4?.trend.label ?? "N/A")
-                • H1:  EMA 21 = \(fmtP(emaMulti.h1?.ema21)) | EMA 50 = \(fmtP(emaMulti.h1?.ema50)) | Xu hướng: \(emaMulti.h1?.trend.label ?? "N/A")
-                • M15: EMA 21 = \(fmtP(emaMulti.m15?.ema21)) | EMA 50 = \(fmtP(emaMulti.m15?.ema50)) | Xu hướng: \(emaMulti.m15?.trend.label ?? "N/A")
+                • D1:  Đỉnh PDH = \(fmtP(d1High)) | Đáy PDL = \(fmtP(d1Low))
+                • H4:  Biên độ 24 nến: Cao nhất = \(fmtP(h4High)) | Thấp nhất = \(fmtP(h4Low))
                 • Động lượng 3 đường RSI H1: RSI(14) = \(rVal) | EMA(9) = \(eVal) | WMA(45) = \(wVal)
                 • Trạng thái 3 đường RSI: \(alignStr)
                 • Nền động lượng (EMA 9 vs WMA 45): \(emaWmaStr)
                 • Phân kỳ RSI: \(divStr)
                 """ : """
-                • D1:  EMA 21 = \(fmtP(emaMulti.d1?.ema21)) | EMA 50 = \(fmtP(emaMulti.d1?.ema50)) | Trend: \(emaMulti.d1?.trend.label ?? "N/A")
-                • H4:  EMA 21 = \(fmtP(emaMulti.h4?.ema21)) | EMA 50 = \(fmtP(emaMulti.h4?.ema50)) | Trend: \(emaMulti.h4?.trend.label ?? "N/A")
-                • H1:  EMA 21 = \(fmtP(emaMulti.h1?.ema21)) | EMA 50 = \(fmtP(emaMulti.h1?.ema50)) | Trend: \(emaMulti.h1?.trend.label ?? "N/A")
-                • M15: EMA 21 = \(fmtP(emaMulti.m15?.ema21)) | EMA 50 = \(fmtP(emaMulti.m15?.ema50)) | Trend: \(emaMulti.m15?.trend.label ?? "N/A")
+                • D1:  PDH = \(fmtP(d1High)) | PDL = \(fmtP(d1Low))
+                • H4:  24-Bar Range: High = \(fmtP(h4High)) | Low = \(fmtP(h4Low))
                 • H1 3-Line RSI Momentum: RSI(14) = \(rVal) | EMA(9) = \(eVal) | WMA(45) = \(wVal)
                 • 3-Line RSI Alignment: \(alignStr)
                 • Momentum Baseline (EMA 9 vs WMA 45): \(emaWmaStr)

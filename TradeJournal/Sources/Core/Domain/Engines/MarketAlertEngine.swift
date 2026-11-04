@@ -27,13 +27,13 @@ public struct MarketAlertRecord: Identifiable, Codable, Equatable, Sendable {
     public let id: String
     public let symbol: String
     public let timeframe: String
-    public let emaPeriod: Int
+    public let levelName: String
     public let eventType: MarketAlertEventType
     public let barTimestamp: Int64
     public let barClose: Decimal
     public let barLow: Decimal
     public let barHigh: Decimal
-    public let emaValue: Decimal
+    public let levelValue: Decimal
     public let message: String
     public let triggeredAt: Date
     
@@ -41,35 +41,36 @@ public struct MarketAlertRecord: Identifiable, Codable, Equatable, Sendable {
         id: String = JournalIds.newId(),
         symbol: String,
         timeframe: String,
-        emaPeriod: Int,
+        levelName: String,
         eventType: MarketAlertEventType,
         barTimestamp: Int64,
         barClose: Decimal,
         barLow: Decimal,
         barHigh: Decimal,
-        emaValue: Decimal,
+        levelValue: Decimal,
         message: String,
         triggeredAt: Date = Date()
     ) {
         self.id = id
         self.symbol = symbol
         self.timeframe = timeframe
-        self.emaPeriod = emaPeriod
+        self.levelName = levelName
         self.eventType = eventType
         self.barTimestamp = barTimestamp
         self.barClose = barClose
         self.barLow = barLow
         self.barHigh = barHigh
-        self.emaValue = emaValue
+        self.levelValue = levelValue
         self.message = message
         self.triggeredAt = triggeredAt
     }
 }
 
-// MARK: - Market Alert Engine (EMA 21/50 Candle Close Precision Service)
+// MARK: - Market Alert Engine (Key Level & Market Structure Precision Service)
 /// Background candle-close evaluation engine.
-/// Evaluates price touches/rejections against EMA 21 and EMA 50 exactly at bar close boundaries
-/// (:01 seconds after bar close), eliminating 24/7 continuous tick streaming and conserving quota.
+/// Evaluates price touches/rejections and structural breakouts against Key Structural Levels
+/// (Swing High, Swing Low, PDH, PDL) exactly at bar close boundaries (:01 seconds after bar close),
+/// eliminating 24/7 continuous tick streaming and conserving quota.
 public final class MarketAlertEngine: ObservableObject, @unchecked Sendable {
     public static let shared = MarketAlertEngine()
     
@@ -103,8 +104,6 @@ public final class MarketAlertEngine: ObservableObject, @unchecked Sendable {
             UserDefaults.standard.set(monitoredTimeframes, forKey: "market_alert_timeframes")
         }
     }
-    
-    @Published public var enabledEMAPeriods: [Int] = [21, 50]
     
     public func toggleSymbol(_ symbol: String) {
         let clean = symbol.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
@@ -143,18 +142,18 @@ public final class MarketAlertEngine: ObservableObject, @unchecked Sendable {
     private init() {
         self.isEnabled = UserDefaults.standard.bool(forKey: "market_alert_enabled")
         
-        let savedSymbols = UserDefaults.standard.stringArray(forKey: "market_alert_symbols")
-        self.monitoredSymbols = (savedSymbols != nil && !savedSymbols!.isEmpty) ? savedSymbols! : ["XAUUSD", "EURUSD", "BTCUSD", "US30"]
+        let savedSymbols = UserDefaults.standard.stringArray(forKey: "market_alert_symbols") ?? ["XAUUSD", "EURUSD", "BTCUSD"]
+        self.monitoredSymbols = savedSymbols
         
-        let savedTfs = UserDefaults.standard.stringArray(forKey: "market_alert_timeframes")
-        self.monitoredTimeframes = (savedTfs != nil && !savedTfs!.isEmpty) ? savedTfs! : ["15m", "1h"]
+        let savedTfs = UserDefaults.standard.stringArray(forKey: "market_alert_timeframes") ?? ["15m", "1h"]
+        self.monitoredTimeframes = savedTfs
         
-        if isEnabled {
+        if self.isEnabled {
             startMonitoring()
         }
     }
     
-    // MARK: - 1. Monitoring Lifecycle
+    // MARK: - 1. Dynamic Scheduling Loop
     
     public func startMonitoring() {
         lock.lock()
@@ -163,11 +162,11 @@ public final class MarketAlertEngine: ObservableObject, @unchecked Sendable {
         guard schedulerTask == nil else { return }
         isMonitoring = true
         
-        schedulerTask = Task { [weak self] in
+        schedulerTask = Task.detached(priority: .background) { [weak self] in
+            guard let self = self else { return }
+            
             while !Task.isCancelled {
-                guard let self = self else { break }
-                
-                let nextWakeDate = self.calculateNextNearestCandleClose()
+                let nextWakeDate = self.calculateNextNearestCandleClose(referenceDate: Date())
                 let waitDuration = max(2.0, nextWakeDate.timeIntervalSince(Date()) + 1.5)
                 
                 do {
@@ -228,17 +227,16 @@ public final class MarketAlertEngine: ObservableObject, @unchecked Sendable {
         return referenceDate.addingTimeInterval(remaining)
     }
     
-    // MARK: - 3. Pure Candle Evaluation Engine
+    // MARK: - 3. Pure Candle Evaluation Against Key Structural Levels
     
-    /// Pure, causal evaluation of candles against EMA 21 and EMA 50.
-    /// Determines whether the last closed candle touched, bounced, or crossed the moving average.
+    /// Pure, causal evaluation of candles against Key Price Action Levels (Swing Highs, Swing Lows).
     public func evaluateCandles(
         symbol: String,
         timeframe: String,
         bars: [MarketBar],
         referenceDate: Date = Date()
     ) -> [MarketAlertRecord] {
-        guard bars.count >= 52 else { return [] }
+        guard bars.count >= 15 else { return [] }
         
         let durationMs = MarketResolution(rawValue: timeframe)?.durationMs ?? 900_000
         let nowMs = Int64(referenceDate.timeIntervalSince1970 * 1000)
@@ -258,34 +256,36 @@ public final class MarketAlertEngine: ObservableObject, @unchecked Sendable {
         let targetBar = bars[closedIndex]
         let prevBar = bars[closedIndex - 1]
         
+        // Extract 20-bar lookback high/low levels preceding targetBar
+        let lookback = Array(bars.prefix(closedIndex).suffix(20))
+        var levelsToTest: [(name: String, price: Decimal)] = []
+        if let h = lookback.map(\.high).max() {
+            levelsToTest.append(("Range High", h))
+        }
+        if let l = lookback.map(\.low).min() {
+            levelsToTest.append(("Range Low", l))
+        }
+        
         var generatedRecords: [MarketAlertRecord] = []
         
-        for period in enabledEMAPeriods {
-            let emaSeries = MovingAverageEngine.calculateEMA(period: period, bars: bars)
-            guard emaSeries.count > closedIndex else { continue }
-            
-            let curEMA = emaSeries[closedIndex]
-            let prevEMA = emaSeries[closedIndex - 1]
-            
-            // Check touch condition: candle wick or body spans across EMA
-            let touched = (targetBar.low <= curEMA && curEMA <= targetBar.high)
+        for (levelName, levelPrice) in levelsToTest {
+            let touched = (targetBar.low <= levelPrice && levelPrice <= targetBar.high)
             
             if touched {
-                // Determine specific reaction
                 let eventType: MarketAlertEventType
-                if targetBar.close > curEMA && targetBar.low <= curEMA {
+                if targetBar.close > levelPrice && targetBar.low <= levelPrice {
                     eventType = .bounceBullish
-                } else if targetBar.close < curEMA && targetBar.high >= curEMA {
+                } else if targetBar.close < levelPrice && targetBar.high >= levelPrice {
                     eventType = .bounceBearish
-                } else if prevBar.close <= prevEMA && targetBar.close > curEMA {
+                } else if prevBar.close <= levelPrice && targetBar.close > levelPrice {
                     eventType = .crossAbove
-                } else if prevBar.close >= prevEMA && targetBar.close < curEMA {
+                } else if prevBar.close >= levelPrice && targetBar.close < levelPrice {
                     eventType = .crossBelow
                 } else {
                     eventType = .touch
                 }
                 
-                let signature = "\(symbol)_\(timeframe)_\(targetBar.timestamp)_ema\(period)_\(eventType.rawValue)"
+                let signature = "\(symbol)_\(timeframe)_\(targetBar.timestamp)_\(levelName)_\(eventType.rawValue)"
                 
                 lock.lock()
                 let alreadyFired = firedAlertSignatures.contains(signature)
@@ -295,23 +295,23 @@ public final class MarketAlertEngine: ObservableObject, @unchecked Sendable {
                 lock.unlock()
                 
                 if !alreadyFired {
-                    let formattedEma = Formatters.price(curEMA, symbol: symbol)
+                    let formattedLevel = Formatters.price(levelPrice, symbol: symbol)
                     let formattedClose = Formatters.price(targetBar.close, symbol: symbol)
                     let formattedLow = Formatters.price(targetBar.low, symbol: symbol)
                     let formattedHigh = Formatters.price(targetBar.high, symbol: symbol)
                     
-                    let msg = "Price reached EMA \(period) (\(formattedEma)). Closed at \(formattedClose) (Range: \(formattedLow) - \(formattedHigh))."
+                    let msg = "Price reached \(levelName) (\(formattedLevel)). Closed at \(formattedClose) (Range: \(formattedLow) - \(formattedHigh))."
                     
                     let record = MarketAlertRecord(
                         symbol: symbol,
                         timeframe: timeframe,
-                        emaPeriod: period,
+                        levelName: levelName,
                         eventType: eventType,
                         barTimestamp: targetBar.timestamp,
                         barClose: targetBar.close,
                         barLow: targetBar.low,
                         barHigh: targetBar.high,
-                        emaValue: curEMA,
+                        levelValue: levelPrice,
                         message: msg,
                         triggeredAt: referenceDate
                     )
@@ -336,12 +336,11 @@ public final class MarketAlertEngine: ObservableObject, @unchecked Sendable {
         for symbol in symbols {
             for tf in timeframes {
                 do {
-                    // Leverages Unified Candle Hub with sub-slice cache reuse & coalescing
                     let (_, bars) = try await MarketDataService.shared.fetchBarsForSymbol(
                         symbol: symbol,
                         config: config,
                         resolution: tf,
-                        count: 60,
+                        count: 40,
                         forceRefresh: false
                     )
                     
@@ -376,7 +375,7 @@ public final class MarketAlertEngine: ObservableObject, @unchecked Sendable {
         AppNotificationManager.shared.dispatchNotification(
             id: "market_alert_\(record.id)",
             title: "[Trade Alert] \(record.symbol) (\(record.timeframe.uppercased()))",
-            subtitle: "Price \(record.eventType.label) EMA \(record.emaPeriod)",
+            subtitle: "Price \(record.eventType.label) \(record.levelName)",
             body: record.message,
             categoryIdentifier: "MARKET_ALERT",
             userInfo: [

@@ -6,15 +6,15 @@ public struct MarketCandleChartView: View {
     public let bars: [MarketBar]
     public let symbol: String
     public let timeframe: String
-    public let showEMA: Bool
+    public let showStructure: Bool
     
     @State private var hoveredBarIndex: Int? = nil
     
-    public init(bars: [MarketBar], symbol: String, timeframe: String = "M15", showEMA: Bool = true) {
+    public init(bars: [MarketBar], symbol: String, timeframe: String = "M15", showStructure: Bool = true, showEMA: Bool = false) {
         self.bars = bars
         self.symbol = symbol
         self.timeframe = timeframe
-        self.showEMA = showEMA
+        self.showStructure = showStructure
     }
     
     public var body: some View {
@@ -38,37 +38,11 @@ public struct MarketCandleChartView: View {
     
     // MARK: - 1. HUD Header Bar
     private var hudHeaderView: some View {
-        let trend = MovingAverageEngine.analyzeTimeframe(bars: bars, timeframe: timeframe, symbol: symbol)?.trend
-        
-        return HStack(alignment: .center, spacing: 8) {
-            // Symbol (without redundant timeframe, as tab is active right above)
+        HStack(alignment: .center, spacing: 8) {
+            // Symbol
             Text(symbol)
                 .font(AppTypography.cardHeaderUppercase)
                 .foregroundColor(AppColors.primaryText)
-            
-            // Trend Regime Pill
-            if let t = trend {
-                let isBull = t == .bullish || t == .strongBullish
-                let isBear = t == .bearish || t == .strongBearish
-                let color = isBull ? AppColors.profit : (isBear ? AppColors.loss : AppColors.warning)
-                
-                HStack(spacing: 4) {
-                    Text(isBull ? "▲" : (isBear ? "▼" : "⇄"))
-                        .font(AppTypography.captionMicro)
-                    Text(t.label.replacingOccurrences(of: " ▲▲", with: "")
-                                .replacingOccurrences(of: " ▲", with: "")
-                                .replacingOccurrences(of: " ▼▼", with: "")
-                                .replacingOccurrences(of: " ▼", with: "")
-                                .replacingOccurrences(of: " ⇄", with: "")
-                                .replacingOccurrences(of: " ▬", with: ""))
-                        .font(AppTypography.badgeMicro)
-                }
-                .padding(.horizontal, 7)
-                .padding(.vertical, 2.5)
-                .background(color.opacity(0.12))
-                .foregroundColor(color)
-                .clipShape(Capsule())
-            }
             
             Spacer()
         }
@@ -98,11 +72,6 @@ public struct MarketCandleChartView: View {
             
             // Volume Histogram (Subtle background)
             volumeHistogram(plotWidth: plotWidth, plotHeight: plotHeight, stepX: stepX, candleWidth: candleWidth)
-            
-            // Dynamic EMA 21 & EMA 50 Curves (Strictly Causal, No Lookahead Bias)
-            if showEMA {
-                emaCurvesOverlay(plotWidth: plotWidth, plotHeight: plotHeight, stepX: stepX, minP: minP, span: span)
-            }
             
             // Candlesticks
             ForEach(0..<bars.count, id: \.self) { i in
@@ -149,53 +118,6 @@ public struct MarketCandleChartView: View {
                     .fill(AppColors.primaryText.opacity(0.35))
                     .frame(width: 1, height: plotHeight)
                     .position(x: hX, y: plotHeight / 2.0)
-            }
-        }
-    }
-    
-    // MARK: - 2b. EMA Curves Overlay
-    @ViewBuilder
-    private func emaCurvesOverlay(
-        plotWidth: CGFloat,
-        plotHeight: CGFloat,
-        stepX: CGFloat,
-        minP: Double,
-        span: Double
-    ) -> some View {
-        if bars.count >= 2 {
-            let ema21 = MovingAverageEngine.calculateEMA(period: 21, bars: bars)
-            let ema50 = MovingAverageEngine.calculateEMA(period: 50, bars: bars)
-            
-            ZStack {
-                // EMA 50 (Orange)
-                if ema50.count == bars.count {
-                    Path { path in
-                        for (idx, val) in ema50.enumerated() {
-                            let x = CGFloat(idx) * stepX + (stepX / 2.0)
-                            let pD = (val as NSDecimalNumber).doubleValue
-                            let y = plotHeight - CGFloat((pD - minP) / span) * plotHeight
-                            let clampedY = max(2, min(plotHeight - 2, y))
-                            if idx == 0 { path.move(to: CGPoint(x: x, y: clampedY)) }
-                            else { path.addLine(to: CGPoint(x: x, y: clampedY)) }
-                        }
-                    }
-                    .stroke(Color.orange.opacity(0.85), lineWidth: 1.3)
-                }
-                
-                // EMA 21 (Cyan)
-                if ema21.count == bars.count {
-                    Path { path in
-                        for (idx, val) in ema21.enumerated() {
-                            let x = CGFloat(idx) * stepX + (stepX / 2.0)
-                            let pD = (val as NSDecimalNumber).doubleValue
-                            let y = plotHeight - CGFloat((pD - minP) / span) * plotHeight
-                            let clampedY = max(2, min(plotHeight - 2, y))
-                            if idx == 0 { path.move(to: CGPoint(x: x, y: clampedY)) }
-                            else { path.addLine(to: CGPoint(x: x, y: clampedY)) }
-                        }
-                    }
-                    .stroke(Color(red: 0.0, green: 0.85, blue: 1.0).opacity(0.95), lineWidth: 1.5)
-                }
             }
         }
     }

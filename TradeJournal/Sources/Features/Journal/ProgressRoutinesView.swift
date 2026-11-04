@@ -399,7 +399,7 @@ public struct AddProgressRoutineSheet: View {
     
     private static let quickSuggestions = [
         "Review ForexFactory Calendar",
-        "Mark HTF Key Levels & Liquidity",
+        "Mark HTF Key Levels & Range",
         "Enforce Max 1R Risk Per Trade",
         "Capture Entry & Exit Screenshot",
         "Perform Daily Post-Mortem Review"

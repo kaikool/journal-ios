@@ -11,7 +11,7 @@ extension AIPromptBuilder {
             [CÔNG CỤ TÍNH TOÁN XÁC THỰC SỐ LIỆU (DETERMINISTIC TOOLS)]:
             Hệ thống cung cấp sẵn các công cụ trích xuất dữ liệu thực tế (Tuyệt đối không tự bịa số liệu):
             • `query_trades`: Truy vấn và tính toán Win Rate, Profit Factor, P&L ròng của các lệnh trong quá khứ.
-            • `query_market_structure`: Xác định đỉnh/đáy Swing, trạng thái MSS và các đợt quét thanh khoản (Sweeps).
+            • `query_market_structure`: Xác định đỉnh/đáy then chốt, biên độ giá và các mốc PDH/PDL.
             • `query_trade_excursions`: Đo lường sụt giảm tối đa (MAE) và lợi nhuận tiềm năng cực đại (MFE).
             • `query_memories`: Truy xuất bài học từ sai lầm quá khứ, cam kết kỷ luật và quy tắc đã thống nhất.
             • `query_research_projects`: Kiểm tra tiến độ và kết quả xác minh các giả thuyết nghiên cứu dài hạn.
@@ -23,7 +23,7 @@ extension AIPromptBuilder {
             [DETERMINISTIC FACTUAL TOOLS]:
             The system provides exact calculation tools (Never guess or hallucinate metrics):
             • `query_trades`: Queries and computes exact Win Rate, Profit Factor, and net P&L across historical trades.
-            • `query_market_structure`: Measures Swing Highs/Lows, MSS status, and liquidity sweeps.
+            • `query_market_structure`: Measures Highs/Lows, price range, and PDH/PDL levels.
             • `query_trade_excursions`: Measures exact Max Adverse Excursion (MAE) and Max Favorable Excursion (MFE).
             • `query_memories`: Retrieves persistent failure lessons, discipline commitments, and verified rules.
             • `query_research_projects`: Checks empirical research hypotheses, sample progress, and validation results.

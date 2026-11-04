@@ -244,7 +244,7 @@ public enum AIToolDispatcher {
             toolName: .queryMarketStructure,
             isSuccess: true,
             outputJson: "{\"symbol\":\"\(sym)\",\"status\":\"active\"}",
-            formattedMarkdown: "Xu hướng EMA 21/50 và thanh khoản tổ chức cho \(sym) được phân tích tự động."
+            formattedMarkdown: "Mức giá then chốt và động lượng nến cho \(sym) được phân tích tự động."
         )
     }
 }

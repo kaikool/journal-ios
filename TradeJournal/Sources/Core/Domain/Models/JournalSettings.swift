@@ -154,7 +154,7 @@ public struct TraderProfileConfig: Codable, Equatable, Sendable {
     public init(
         tradingStyle: String = "Day Trader / Intraday Scalper",
         accountObjective: String = "The5ers / Prop Firm High Stakes Evaluation & Sustainable Compounding",
-        primaryPlaybooks: String = "Liquidity Sweeps, Order Blocks, Market Structure Breaks, Fair Value Gaps",
+        primaryPlaybooks: String = "Price Action, Trend Following, Support & Resistance",
         maxRiskPerTrade: String = "0.5% - 1.0% per trade (Strict Stop Loss)",
         maxDailyLossPercent: Double = 3.0,
         targetRiskRewardRatio: Double = 2.0,
@@ -186,7 +186,7 @@ public struct TraderProfileConfig: Codable, Equatable, Sendable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         tradingStyle = try container.decodeIfPresent(String.self, forKey: .tradingStyle) ?? "Day Trader / Intraday Scalper"
         accountObjective = try container.decodeIfPresent(String.self, forKey: .accountObjective) ?? "The5ers / Prop Firm High Stakes Evaluation & Sustainable Compounding"
-        primaryPlaybooks = try container.decodeIfPresent(String.self, forKey: .primaryPlaybooks) ?? "Liquidity Sweeps, Order Blocks, Market Structure Breaks, Fair Value Gaps"
+        primaryPlaybooks = try container.decodeIfPresent(String.self, forKey: .primaryPlaybooks) ?? "Price Action, Trend Following, Support & Resistance"
         maxRiskPerTrade = try container.decodeIfPresent(String.self, forKey: .maxRiskPerTrade) ?? "0.5% - 1.0% per trade (Strict Stop Loss)"
         maxDailyLossPercent = try container.decodeIfPresent(Double.self, forKey: .maxDailyLossPercent) ?? 3.0
         

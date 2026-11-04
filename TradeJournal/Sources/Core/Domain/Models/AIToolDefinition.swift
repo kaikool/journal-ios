@@ -15,7 +15,7 @@ public enum AIToolName: String, Codable, CaseIterable, Sendable {
         case .queryTrades:
             return "Queries historical closed and open trades with exact mathematical metrics (Win Rate, Profit Factor, R-multiples)."
         case .queryMarketStructure:
-            return "Analyzes deterministic SMC market structure (Swings, MSS, Liquidity Sweeps) on candle series."
+            return "Analyzes price action range (High, Low, Open, Close, ADR) on candle series."
         case .queryTradeExcursions:
             return "Computes exact Maximum Adverse Excursion (MAE) and Maximum Favorable Excursion (MFE) for a trade."
         case .queryMemories:

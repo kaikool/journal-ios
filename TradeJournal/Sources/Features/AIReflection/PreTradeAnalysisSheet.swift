@@ -345,10 +345,8 @@ public struct PreTradeAnalysisSheet: View {
                 : ""
             
             // 3. Multi-Timeframe Context: H4 Context & 15-Candle H1 Series
-            let h4EMA = MovingAverageEngine.analyzeTimeframe(bars: self.h4Bars, timeframe: "H4", symbol: currentSymbol)
-            let h4_21 = h4EMA?.ema21.map { Formatters.price($0, symbol: currentSymbol) } ?? "N/A"
-            let h4_50 = h4EMA?.ema50.map { Formatters.price($0, symbol: currentSymbol) } ?? "N/A"
-            let h4Trend = h4EMA?.trend.label ?? "N/A"
+            let h4High = self.h4Bars.suffix(24).map(\.high).max().map { Formatters.price($0, symbol: currentSymbol) } ?? "N/A"
+            let h4Low = self.h4Bars.suffix(24).map(\.low).min().map { Formatters.price($0, symbol: currentSymbol) } ?? "N/A"
             let h4Candles = AIPromptBuilder.buildH4CandleSummary(bars: self.h4Bars, count: 3, isVi: isVi)
             
             let h1Series = AIPromptBuilder.buildH1CandleSeriesSummary(bars: activeBars, count: 15, symbol: currentSymbol, isVi: isVi)
@@ -366,11 +364,11 @@ public struct PreTradeAnalysisSheet: View {
                 • \(bufferStr)\(riskAlert)
                 [CẤU TRÚC ĐA KHUNG VÀ HÀNH ĐỘNG GIÁ THỜI GIAN THỰC]:
                 • Cặp tiền: \(currentSymbol) | Thị giá hiện tại: \(latestClose)
-                • Khung H4: Xu hướng [\(h4Trend)] | EMA(21) = \(h4_21) | EMA(50) = \(h4_50)
+                • Khung H4: Biên độ 24 nến: Cao nhất = \(h4High) | Thấp nhất = \(h4Low)
                 • 3 nến H4 gần nhất:
                 \(h4Candles)
 
-                • Chuỗi 15 nến H1 gần nhất (OHLC + EMA 21/50 + RSI 14):
+                • Chuỗi 15 nến H1 gần nhất (OHLC + Wilder RSI 14):
                 \(h1Series)
                 """
             } else {
@@ -383,11 +381,11 @@ public struct PreTradeAnalysisSheet: View {
                 • \(bufferStr)\(riskAlert)
                 [MULTI-TIMEFRAME & REAL-TIME PRICE ACTION]:
                 • Symbol: \(currentSymbol) | Current Price: \(latestClose)
-                • H4 Frame: Trend [\(h4Trend)] | EMA(21) = \(h4_21) | EMA(50) = \(h4_50)
+                • H4 Frame: 24-Bar Range: High = \(h4High) | Low = \(h4Low)
                 • Recent 3 H4 Bars:
                 \(h4Candles)
 
-                • Recent 15-Candle H1 Execution Series (OHLC + EMA 21/50 + Wilder RSI 14):
+                • Recent 15-Candle H1 Execution Series (OHLC + Wilder RSI 14):
                 \(h1Series)
                 """
             }

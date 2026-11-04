@@ -126,7 +126,7 @@ public struct NewPlaybookSheet: View {
                     .foregroundColor(AppColors.brand)
             }
             
-            AppTextField("Rule condition (e.g. Price above 200 EMA)", text: Binding(
+            AppTextField("Rule condition (e.g. Price above Previous Day High)", text: Binding(
                 get: {
                     guard index < rules.count else { return "" }
                     return rules[index]

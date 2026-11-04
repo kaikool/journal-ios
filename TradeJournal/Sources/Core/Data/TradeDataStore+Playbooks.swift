@@ -52,7 +52,7 @@ extension TradeDataStore {
     public static var defaultProgressRules: [ProgressRule] {
         [
             ProgressRule(id: "rule_news_check", title: "Check high-impact economic news", stage: "Before trading", weekdaysJson: "[1,2,3,4,5]"),
-            ProgressRule(id: "rule_levels_key", title: "Identify H1-H4 Key Price Levels & EMA Trend", stage: "Before trading", weekdaysJson: "[1,2,3,4,5]"),
+            ProgressRule(id: "rule_levels_key", title: "Identify H1-H4 Key Price Levels & Range", stage: "Before trading", weekdaysJson: "[1,2,3,4,5]"),
             ProgressRule(id: "rule_set_sl", title: "Always set Stop Loss before order fill", stage: "During trading", weekdaysJson: "[1,2,3,4,5]"),
             ProgressRule(id: "rule_hold_rr", title: "Do not move SL or hold beyond planned R:R", stage: "During trading", weekdaysJson: "[1,2,3,4,5]"),
             ProgressRule(id: "rule_emotional_notes", title: "Log emotional notes & post-trade review", stage: "After trading", weekdaysJson: "[1,2,3,4,5]"),

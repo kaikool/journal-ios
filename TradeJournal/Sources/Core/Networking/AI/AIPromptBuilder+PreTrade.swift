@@ -64,48 +64,7 @@ extension AIPromptBuilder {
             d1ADR = "N/A"
         }
         
-        // 2. Trend & Momentum Analysis (EMA 21/50 Multi-Timeframe)
-        let emaAnalysis = MovingAverageEngine.analyzeMultiTimeframe(
-            barsD1: d1Bars,
-            barsH4: h4Bars,
-            barsH1: h1Bars,
-            barsM15: m15Bars,
-            symbol: symbol
-        )
-        
-        func formatEMALevels(_ snap: TimeframeEMASnapshot?, tfName: String) -> String {
-            guard let snap = snap, let e21 = snap.ema21, let e50 = snap.ema50 else {
-                return isVi ? "Chua du du lieu nen tinh EMA 21/50" : "Insufficient bars for EMA 21/50"
-            }
-            let p21 = formatPrice(e21)
-            let p50 = formatPrice(e50)
-            let cur = snap.currentPrice
-            let dist = cur - e21
-            let distVal = formatPrice(abs(dist))
-            
-            let posDesc: String
-            if isVi {
-                posDesc = dist >= 0 ? "Gia tren EMA 21 (+\(distVal))" : "Gia duoi EMA 21 (-\(distVal))"
-            } else {
-                posDesc = dist >= 0 ? "Price above EMA 21 (+\(distVal))" : "Price below EMA 21 (-\(distVal))"
-            }
-            
-            let spreadDesc: String
-            if isVi {
-                spreadDesc = e21 >= e50 ? "EMA 21 > EMA 50 (Thien Tang)" : "EMA 21 < EMA 50 (Thien Giam)"
-            } else {
-                spreadDesc = e21 >= e50 ? "EMA 21 > EMA 50 (Bullish)" : "EMA 21 < EMA 50 (Bearish)"
-            }
-            
-            return "EMA(21) = \(p21) | EMA(50) = \(p50) | \(posDesc) | \(spreadDesc)"
-        }
-        
-        let d1EMAStr = formatEMALevels(emaAnalysis.d1, tfName: "D1")
-        let h4EMAStr = formatEMALevels(emaAnalysis.h4, tfName: "H4")
-        let h1EMAStr = formatEMALevels(emaAnalysis.h1, tfName: "H1")
-        let m15EMAStr = formatEMALevels(emaAnalysis.m15, tfName: "M15")
-        
-        // Key H4 Swing High & Swing Low Levels (Direct Structural Scanning)
+        // Key H4 High & Low Levels (Direct Price Range Scanning)
         let h4SwingHighStr: String = {
             if let maxBar = h4Bars.suffix(24).max(by: { $0.high < $1.high }) {
                 return formatPrice(maxBar.high)
@@ -122,10 +81,10 @@ extension AIPromptBuilder {
         // 3a. Recent H4 Candles (Last 3 bars OHLC)
         let h4CandlesSummary = buildH4CandleSummary(bars: h4Bars, count: 3, isVi: isVi)
         
-        // 3b. 24-Candle H1 Execution Series (OHLC + EMA 21/50 + Wilder RSI 14)
+        // 3b. 24-Candle H1 Execution Series (OHLC + Wilder RSI 14)
         let h1CandlesSummary = buildH1CandleSeriesSummary(bars: execBars, count: 24, symbol: symbol, isVi: isVi)
         
-        // 3c. 16-Candle M15 Micro-Execution Series
+        // 3c. 16-Candle M15 Micro-Execution Series (OHLC)
         let m15CandlesSummary = buildM15CandleSeriesSummary(bars: m15Bars, count: 16, symbol: symbol, isVi: isVi)
         
         // 3d. Live Unclosed Candle Dynamics (Current Price Action Pulse)
@@ -314,30 +273,24 @@ extension AIPromptBuilder {
             - \(dailyBufferStr)\(riskGuardrailWarning)
             \(contractSizingBlockVi)
             \(behavioralLeaksBlock)
-            [CẤU TRÚC THỊ TRƯỜNG & HỆ THỐNG CHỈ BÁO KỸ THUẬT (EMA 21/50 & RSI 14)]:
+            [CẤU TRÚC GIÁ THỰC TẾ & HỆ THỐNG ĐỘNG LƯỢNG 3 ĐƯỜNG RSI]:
             - Cặp tiền: \(symbol) | Thị giá hiện tại: \(currentPrice)
 
-            - Khung D1 (Macro Bias): Xu hướng [\(emaAnalysis.d1?.trend.label ?? "N/A")]
-              EMA D1: \(d1EMAStr)
-              Mốc giá then chốt: Đỉnh PDH: \(d1PDH) | Đáy PDL: \(d1PDL) | ADR 14 ngày: \(d1ADR)
+            - Khung D1 (Mốc then chốt):
+              Đỉnh PDH: \(d1PDH) | Đáy PDL: \(d1PDL) | Giá đóng PDC: \(d1PDC) | ADR 14 ngày: \(d1ADR)
 
-            - Khung H4 (Cấu trúc sóng và Cản TP/SL): Xu hướng [\(emaAnalysis.h4?.trend.label ?? "N/A")]
-              EMA H4: \(h4EMAStr)
-              Mốc giá then chốt: Swing High: \(h4SwingHighStr) | Swing Low: \(h4SwingLowStr)
+            - Khung H4 (Biên độ sóng & Cản TP/SL):
+              Đỉnh cao nhất (24 bar): \(h4SwingHighStr) | Đáy thấp nhất (24 bar): \(h4SwingLowStr)
               3 nến H4 gần nhất:
             \(h4CandlesSummary)
 
-            - Khung H1 (Thực thi và Động lượng): Xu hướng [\(emaAnalysis.h1?.trend.label ?? "N/A")]
-              EMA H1: \(h1EMAStr)
+            - Khung H1 (Thực thi và Động lượng):
               Hệ thống 3 đường Động lượng RSI (Wilder RSI 14 / EMA 9 / WMA 45):
                 • Giá trị: RSI(14) = \(rValStr) | EMA(9) = \(eValStr) | WMA(45) = \(wValStr)
                 • Cấu trúc sắp xếp: \(alignmentDesc)
                 • Nền trung hạn (EMA 9 vs WMA 45): \(emaVsWmaDesc)
                 • Tín hiệu phân kỳ: [\(divStr)]
-              Mốc tham chiếu then chốt: Đỉnh Swing H4: \(h4SwingHighStr) | Đáy Swing H4: \(h4SwingLowStr) | PDH: \(d1PDH) | PDL: \(d1PDL)
-
-            - Khung M15 (Vi mô kích hoạt): Xu hướng [\(emaAnalysis.m15?.trend.label ?? "N/A")]
-              EMA M15: \(m15EMAStr)
+              Mốc tham chiếu then chốt: Đỉnh H4: \(h4SwingHighStr) | Đáy H4: \(h4SwingLowStr) | PDH: \(d1PDH) | PDL: \(d1PDL)
 
             - HÀNH ĐỘNG GIÁ SỐNG (LIVE CANDLE PULSE):
             \(liveCandlePulse)
@@ -354,35 +307,35 @@ extension AIPromptBuilder {
             Bạn là một Senior Institutional Portfolio Manager & Master Trader (Chuyên gia Phân tích & Quản lý Quỹ).
             TRIẾT LÝ GIAO DỊCH VÀ NGUYÊN TẮC HÀNH ĐỘNG QUYẾT ĐOÁN:
             1. ƯU TIÊN ĐƯA RA KẾ HOẠCH GIAO DỊCH CỤ THỂ (BUY HOẶC SELL):
-               - Thị trường luôn dao động giữa Đỉnh và Đáy ngày/tuần. Việc giá nằm giữa Swing High và Swing Low là diễn biến hoàn toàn bình thường, TUYỆT ĐỐI KHÔNG ĐƯỢC coi đó là "kẹt thanh khoản" hay "bẫy thanh khoản" để bao biện cho việc kết luận FLAT (Đứng ngoài).
-               - Nhà giao dịch chuyên nghiệp tìm kiếm điểm vào lệnh tối ưu tại các nhịp hồi về vùng giá trị EMA 21 / EMA 50 hoặc giao dịch theo đà bứt phá cấu trúc.
-            2. ĐỊNH HƯỚNG THEO HỆ THỐNG XU HƯỚNG EMA 21 & EMA 50:
-               - KỊCH BẢN BUY: Khi D1/H4 xu hướng TĂNG (EMA 21 >= EMA 50, giá trên EMA) và H1/M15 hồi về kiểm tra EMA 21/50 hoặc nến từ chối giảm: Chủ động lập kế hoạch BUY với Entry tại vùng EMA, SL dưới đáy gần nhất / dưới EMA, TP tại Swing High (\(h4SwingHighStr)) hoặc PDH (\(d1PDH)).
-               - KỊCH BẢN SELL: Khi D1/H4 xu hướng GIẢM (EMA 21 <= EMA 50, giá dưới EMA) và H1/M15 hồi lên kiểm tra EMA 21/50 hoặc nến từ chối tăng: Chủ động lập kế hoạch SELL với Entry tại vùng EMA, SL trên đỉnh gần nhất / trên EMA, TP tại Swing Low (\(h4SwingLowStr)) hoặc PDL (\(d1PDL)).
+               - Thị trường dao động giữa các vùng đỉnh đáy then chốt (Swing High / Swing Low, PDH / PDL). Việc giá nằm giữa hai mốc là trạng thái bình thường; tuyệt đối không dùng đó làm lý do để đứng ngoài (FLAT).
+               - Nhà giao dịch chuyên nghiệp tìm kiếm điểm vào lệnh tối ưu tại các nhịp kiểm tra lại (retest) vùng cản cấu trúc bị phá vỡ, hoặc giao dịch theo đà bứt phá cấu trúc (Break of Structure).
+            2. ĐỊNH HƯỚNG THEO CẤU TRÚC THỊ TRƯỜNG & HÀNH ĐỘNG GIÁ:
+               - KỊCH BẢN BUY: Khi D1/H4 cấu trúc TĂNG (Đỉnh đáy nâng dần hoặc bứt phá Swing High) và H1/M15 có nến từ chối giảm (rút râu dưới, pinbar, nhấn chìm tăng): Chủ động lập kế hoạch BUY với Entry tại vùng hỗ trợ / retest cấu trúc, SL dưới đáy gần nhất, TP tại Swing High (\(h4SwingHighStr)) hoặc PDH (\(d1PDH)).
+               - KỊCH BẢN SELL: Khi D1/H4 cấu trúc GIẢM (Đỉnh đáy hạ dần hoặc bứt phá Swing Low) và H1/M15 có nến từ chối tăng (rút râu trên, pinbar, nhấn chìm giảm): Chủ động lập kế hoạch SELL với Entry tại vùng kháng cự / retest cấu trúc, SL trên đỉnh gần nhất, TP tại Swing Low (\(h4SwingLowStr)) hoặc PDL (\(d1PDL)).
             3. NGUYÊN TẮC HỆ THỐNG 3 ĐƯỜNG ĐỘNG LƯỢNG RSI (RSI 14 / EMA 9 / WMA 45):
-               - TĂNG ÁP ĐẢO (BULLISH ALIGNMENT): Khi RSI > EMA 9 > WMA 45 -> Động lượng phe mua thống trị. Canh BUY khi giá hồi về EMA 21/50 hoặc RSI retest EMA 9 / WMA 45 bật tăng.
-               - GIẢM ÁP ĐẢO (BEARISH ALIGNMENT): Khi RSI < EMA 9 < WMA 45 -> Động lượng phe bán áp đảo. Canh SELL khi giá hồi lên EMA 21/50 hoặc RSI retest EMA 9 / WMA 45 quay đầu giảm.
+               - TĂNG ÁP ĐẢO (BULLISH ALIGNMENT): Khi RSI > EMA 9 > WMA 45 -> Động lượng phe mua thống trị. Canh BUY thuận đà hoặc khi RSI bật tăng từ EMA 9 / WMA 45.
+               - GIẢM ÁP ĐẢO (BEARISH ALIGNMENT): Khi RSI < EMA 9 < WMA 45 -> Động lượng phe bán áp đảo. Canh SELL thuận đà hoặc khi RSI quay đầu giảm từ EMA 9 / WMA 45.
                - SÓNG HỒI KỸ THUẬT (COUNTER-TREND):
-                 • Nếu RSI > EMA 9 nhưng DƯỚI WMA 45: Nhịp hồi tăng ngắn hạn trong xu hướng giảm lớn (WMA 45 là cản động lượng). Không mua đuổi, canh SELL tại cản EMA đường giá.
+                 • Nếu RSI > EMA 9 nhưng DƯỚI WMA 45: Nhịp hồi tăng ngắn hạn trong xu hướng giảm lớn (WMA 45 là cản động lượng). Không mua đuổi, canh SELL tại cản kháng cự cấu trúc.
                  • Nếu RSI < EMA 9 nhưng TRÊN WMA 45: Nhịp điều chỉnh giảm lành mạnh trong xu hướng tăng lớn (WMA 45 là hỗ trợ động lượng). Canh BUY khi RSI cắt ngược lên EMA 9.
-               - CO THẮT NÉN ĐỘNG LƯỢNG (SQUEEZE): Khi EMA 9 và WMA 45 hội tụ sát nhau (chênh lệch < 1.0 điểm) -> Động lượng nén chặt chuẩn bị bùng nổ sóng mới.
+               - CO THẮT NÉN ĐỘNG LƯỢNG (SQUEEZE): Khi EMA 9 và WMA 45 hội tụ sát nhau (chênh lệch < 1.0 điểm) -> Động lượng nén chặt chuẩn bị bùng nổ sóng mới theo hướng phá vỡ cấu trúc.
             4. QUY ĐỊNH VỀ KẾT LUẬN FLAT (ĐỨNG NGOÀI):
                - CHỈ ĐƯỢC KẾT LUẬN FLAT trong trường hợp duy nhất: Thị trường hoàn toàn không có biên độ biến động (thị trường ngày lễ hoặc biên độ cả ngày nhỏ hơn 15% ADR) hoặc sắp công bố tin tức cực kỳ nguy hiểm trong vòng 15 phút.
-               - Trong mọi điều kiện thị trường có sóng bình thường: BẮT BUỘC ĐƯA RA HƯỚNG LỆNH CỤ THỂ (BUY hoặc SELL), kể cả lệnh chờ đón Limit tại vùng EMA!
+               - Trong mọi điều kiện thị trường có sóng bình thường: BẮT BUỘC ĐƯA RA HƯỚNG LỆNH CỤ THỂ (BUY hoặc SELL)!
 
             NHIỆM VỤ PHÂN TÍCH VÀ LẬP KẾ HOẠCH GIAO DỊCH (4 PHẦN):
 
             ### 1. Cấu trúc D1
-            - Xu hướng D1: Vị trí thị giá so với EMA 21 và EMA 50 D1, biên độ dao động PDH (\(d1PDH)) / PDL (\(d1PDL)) và mức ADR (\(d1ADR)).
+            - Xu hướng D1: Cấu trúc đỉnh đáy D1, biên độ dao động PDH (\(d1PDH)) / PDL (\(d1PDL)) và mức ADR (\(d1ADR)).
             - Xác định phe chủ đạo đang kiểm soát thị trường.
 
             ### 2. Cấu trúc H4 & Mức Cản Then Chốt
             - Cấu trúc sóng H4: Đỉnh Swing High (\(h4SwingHighStr)) và Đáy Swing Low (\(h4SwingLowStr)).
-            - Vị trí giá so với EMA 21 / EMA 50 H4: Giá đang bám trend tăng, đang trong nhịp hồi điều chỉnh (pullback), hay đang test cản.
-            - Xác định các vùng cản chốt lời tiềm năng theo xu hướng.
+            - Trạng thái giá: Đang bám sóng tiếp diễn, đang trong nhịp hồi điều chỉnh (pullback), hay đang test cản.
+            - Xác định các vùng cản chốt lời tiềm năng theo cấu trúc.
 
             ### 3. Tín hiệu vào lệnh H1/M15
-            - Hành động giá nến H1/M15: Nến từ chối tại EMA 21/50, nến nhấn chìm, hoặc lực đẩy phá vỡ.
+            - Hành động giá nến H1/M15: Nến từ chối tại hỗ trợ/kháng cự, nến nhấn chìm, hoặc lực đẩy phá vỡ.
             - Động lượng 3 đường RSI (14, EMA 9, WMA 45): Đang ở trạng thái Tăng áp đảo, Giảm áp đảo, Sóng hồi kỹ thuật, hay Squeeze co thắt; có phân kỳ đảo chiều không.
             - Xác định thời điểm và vùng kích hoạt lệnh tối ưu.
 
@@ -433,30 +386,24 @@ extension AIPromptBuilder {
             - \(dailyBufferStr)\(riskGuardrailWarning)
             \(contractSizingBlockEn)
             \(behavioralLeaksBlock)
-            [MARKET STRUCTURE & INDICATORS (EMA 21/50 & RSI 14)]:
+            [FACTUAL MARKET STRUCTURE & 3-LINE RSI MOMENTUM]:
             - Symbol: \(symbol) | Current Price: \(currentPrice)
 
-            - D1 Macro Bias: Trend [\(emaAnalysis.d1?.trend.label ?? "N/A")]
-              EMA D1: \(d1EMAStr)
-              Key Levels: PDH: \(d1PDH) | PDL: \(d1PDL) | 14-Day ADR: \(d1ADR)
+            - D1 Key Reference Levels:
+              PDH: \(d1PDH) | PDL: \(d1PDL) | PDC: \(d1PDC) | 14-Day ADR: \(d1ADR)
 
-            - H4 Swing Structure & Barriers: Trend [\(emaAnalysis.h4?.trend.label ?? "N/A")]
-              EMA H4: \(h4EMAStr)
-              Key Swing Levels: Swing High: \(h4SwingHighStr) | Swing Low: \(h4SwingLowStr)
+            - H4 24-Bar Range & Target Barriers:
+              Highest High: \(h4SwingHighStr) | Lowest Low: \(h4SwingLowStr)
               Recent 3 H4 Bars:
             \(h4CandlesSummary)
 
-            - H1 Execution & Momentum: Trend [\(emaAnalysis.h1?.trend.label ?? "N/A")]
-              EMA H1: \(h1EMAStr)
+            - H1 Execution & Momentum:
               3-Line RSI Momentum System (Wilder RSI 14 / EMA 9 / WMA 45):
                 • Values: RSI(14) = \(rValStr) | EMA(9) = \(eValStr) | WMA(45) = \(wValStr)
                 • Alignment: \(alignmentDesc)
                 • Baseline (EMA 9 vs WMA 45): \(emaVsWmaDesc)
                 • Divergence: [\(divStr)]
-              Key Reference Levels: H4 Swing High: \(h4SwingHighStr) | H4 Swing Low: \(h4SwingLowStr) | PDH: \(d1PDH) | PDL: \(d1PDL)
-
-            - M15 Micro Execution & Trigger: Trend [\(emaAnalysis.m15?.trend.label ?? "N/A")]
-              EMA M15: \(m15EMAStr)
+              Key Reference Levels: H4 High: \(h4SwingHighStr) | H4 Low: \(h4SwingLowStr) | PDH: \(d1PDH) | PDL: \(d1PDL)
 
             - LIVE CANDLE PULSE:
             \(liveCandlePulse)
@@ -473,30 +420,30 @@ extension AIPromptBuilder {
             You are a SENIOR INSTITUTIONAL PORTFOLIO MANAGER & MASTER TRADER.
             DECISIVE ACTION PHILOSOPHY:
             1. MANDATORY DECISIVE BIAS (BUY OR SELL):
-               - Markets naturally oscillate between daily and weekly highs and lows. The fact that price is between Swing High and Swing Low is entirely normal—NEVER treat this as "trapped liquidity" or an excuse to default to FLAT (stand aside).
-               - Elite traders hunt for optimal entries on pullbacks to value zones (EMA 21 / EMA 50) or trend breakouts.
-            2. MULTI-TIMEFRAME EMA TREND ALIGNMENT:
-               - BUY BIAS: When D1/H4 trend is BULLISH (EMA 21 >= EMA 50, price above EMAs) and H1/M15 pulls back to test EMA 21/50 or prints bullish rejection: Formulate an actionable BUY setup with Entry at EMA, SL below recent structural support, and TP at Swing High (\(h4SwingHighStr)) or PDH (\(d1PDH)).
-               - SELL BIAS: When D1/H4 trend is BEARISH (EMA 21 <= EMA 50, price below EMAs) and H1/M15 rallies to test EMA 21/50 or prints bearish rejection: Formulate an actionable SELL setup with Entry at EMA, SL above recent structural resistance, and TP at Swing Low (\(h4SwingLowStr)) or PDL (\(d1PDL)).
+               - Markets naturally oscillate between daily and weekly highs and lows. The fact that price is between Swing High and Swing Low is entirely normal; never use that to excuse standing aside (FLAT).
+               - Elite traders hunt for optimal entries on retests of broken structural levels or trend breakouts.
+            2. MARKET STRUCTURE & PRICE ACTION ALIGNMENT:
+               - BUY BIAS: When D1/H4 structure is BULLISH (Higher Highs / Higher Lows or breaking Swing High) and H1/M15 prints bullish rejection wicks, pinbars, or engulfing candles at support: Formulate an actionable BUY setup with Entry at retest/support, SL below structural swing low, and TP at Swing High (\(h4SwingHighStr)) or PDH (\(d1PDH)).
+               - SELL BIAS: When D1/H4 structure is BEARISH (Lower Highs / Lower Lows or breaking Swing Low) and H1/M15 prints bearish rejection wicks, pinbars, or engulfing candles at resistance: Formulate an actionable SELL setup with Entry at retest/resistance, SL above structural swing high, and TP at Swing Low (\(h4SwingLowStr)) or PDL (\(d1PDL)).
             3. 3-LINE RSI MOMENTUM SYSTEM (WILDER RSI 14 / EMA 9 / WMA 45):
-               - STRONG BULLISH: RSI > EMA 9 > WMA 45 -> Buyers dominate. Buy on pullbacks to EMA 21/50 or when RSI bounces off EMA 9 / WMA 45.
-               - STRONG BEARISH: RSI < EMA 9 < WMA 45 -> Sellers dominate. Sell on rallies to EMA 21/50 or when RSI retests EMA 9 / WMA 45 down.
-               - COUNTER-TREND REBOUND: RSI above EMA 9 but below WMA 45 -> Short-term counter-trend retracement in macro downtrend. Do not chase; sell near EMA value.
-               - SQUEEZE: EMA 9 & WMA 45 converging (gap < 1.0 pt) -> Momentum compression preceding major expansion.
+               - STRONG BULLISH: RSI > EMA 9 > WMA 45 -> Buyers dominate. Buy in trend direction or when RSI bounces off EMA 9 / WMA 45.
+               - STRONG BEARISH: RSI < EMA 9 < WMA 45 -> Sellers dominate. Sell in trend direction or when RSI rolls over from EMA 9 / WMA 45.
+               - COUNTER-TREND REBOUND: RSI above EMA 9 but below WMA 45 -> Short-term counter-trend retracement in macro downtrend. Do not chase; sell near structural resistance.
+               - SQUEEZE: EMA 9 & WMA 45 converging (gap < 1.0 pt) -> Momentum compression preceding structural expansion.
             4. STRICT RULES ON "FLAT":
-               - FLAT is ONLY permitted if the market is completely dead (< 15% of ADR) or major high-impact news is due within 15 minutes. In all normal trending/oscillating conditions, an actionable BUY or SELL plan (including Limit orders at EMA value) is MANDATORY.
+               - FLAT is ONLY permitted if the market is completely dead (< 15% of ADR) or major high-impact news is due within 15 minutes. In all normal conditions, an actionable BUY or SELL plan is MANDATORY.
 
             TASK: INSTITUTIONAL PRE-TRADE PLAN (4 SECTIONS):
 
             ### 1. D1 Structure
-            - Evaluate macro trend, extension relative to EMA 21 and 50, and key PDH (\(d1PDH)) / PDL (\(d1PDL)) boundaries.
+            - Evaluate macro structure, key PDH (\(d1PDH)) / PDL (\(d1PDL)) boundaries, and ADR (\(d1ADR)).
 
             ### 2. H4 Structure & Key Barriers
             - Map H4 swing high (\(h4SwingHighStr)) and swing low (\(h4SwingLowStr)).
-            - Identify pullback value zones around EMA 21 and 50 and key trend targets.
+            - Identify pullback retest zones and structural targets.
 
             ### 3. H1/M15 Confirmation & Trigger
-            - Read live candle pulse, rejection wicks at EMA 21/50, and 3-line RSI momentum state (RSI 14 / EMA 9 / WMA 45).
+            - Read live candle pulse, price action rejection wicks at support/resistance, and 3-line RSI momentum state (RSI 14 / EMA 9 / WMA 45).
 
             ### 4. Trade Plan & Risk Management
             - Verdict: [BUY or SELL] (Only FLAT if dead volatility < 15% ADR)
@@ -599,7 +546,7 @@ extension AIPromptBuilder {
         return lines.joined(separator: "\n")
     }
 
-    // MARK: - 24-Candle H1 Execution Series Helper (OHLC + EMA 21/50 + Wilder RSI 14)
+    // MARK: - 24-Candle H1 Execution Series Helper (OHLC + Wilder RSI 14)
     public static func buildH1CandleSeriesSummary(
         bars: [MarketBar],
         count: Int = 24,
@@ -608,8 +555,6 @@ extension AIPromptBuilder {
     ) -> String {
         guard !bars.isEmpty else { return isVi ? "Không có dữ liệu nến H1" : "No H1 candle data" }
         
-        let ema21 = MovingAverageEngine.calculateEMA(period: 21, bars: bars)
-        let ema50 = MovingAverageEngine.calculateEMA(period: 50, bars: bars)
         let momentumWindow = MomentumEngine.computeWindow(bars: bars, windowSize: count)
         
         let n = bars.count
@@ -638,9 +583,6 @@ extension AIPromptBuilder {
             let offset = n - 1 - i
             let timeLabel = offset == 0 ? (isVi ? "[Nến sống]" : "[Live]") : "[-t-\(offset)h]"
             
-            let e21Str = i < ema21.count ? fmt(ema21[i]) : "N/A"
-            let e50Str = i < ema50.count ? fmt(ema50[i]) : "N/A"
-            
             let rsiVal: String = {
                 if let r = rsiMap[bar.timestamp] {
                     return String(format: "%.1f", (r as NSDecimalNumber).doubleValue)
@@ -655,7 +597,7 @@ extension AIPromptBuilder {
             
             let num = lines.count + 1
             let numStr = num < 10 ? "0\(num)" : "\(num)"
-            let line = "  - #\(numStr) \(timeLabel): O: \(fmt(bar.open)) | H: \(fmt(bar.high)) | L: \(fmt(bar.low)) | C: \(fmt(bar.close)) | EMA21: \(e21Str) | EMA50: \(e50Str) | RSI: \(rsiVal)"
+            let line = "  - #\(numStr) \(timeLabel): O: \(fmt(bar.open)) | H: \(fmt(bar.high)) | L: \(fmt(bar.low)) | C: \(fmt(bar.close)) | RSI: \(rsiVal)"
             lines.append(line)
         }
         
@@ -670,9 +612,6 @@ extension AIPromptBuilder {
         isVi: Bool = true
     ) -> String {
         guard !bars.isEmpty else { return isVi ? "Không có dữ liệu nến M15" : "No M15 candle data" }
-        
-        let ema21 = MovingAverageEngine.calculateEMA(period: 21, bars: bars)
-        let ema50 = MovingAverageEngine.calculateEMA(period: 50, bars: bars)
         
         let n = bars.count
         let takeCount = min(count, n)
@@ -691,11 +630,9 @@ extension AIPromptBuilder {
             let bar = bars[i]
             let offset = n - 1 - i
             let timeLabel = offset == 0 ? (isVi ? "[Nến sống]" : "[Live]") : "[-t-\(offset * 15)m]"
-            let e21Str = i < ema21.count ? fmt(ema21[i]) : "N/A"
-            let e50Str = i < ema50.count ? fmt(ema50[i]) : "N/A"
             let num = lines.count + 1
             let numStr = num < 10 ? "0\(num)" : "\(num)"
-            let line = "  - #\(numStr) \(timeLabel): O: \(fmt(bar.open)) | H: \(fmt(bar.high)) | L: \(fmt(bar.low)) | C: \(fmt(bar.close)) | EMA21: \(e21Str) | EMA50: \(e50Str)"
+            let line = "  - #\(numStr) \(timeLabel): O: \(fmt(bar.open)) | H: \(fmt(bar.high)) | L: \(fmt(bar.low)) | C: \(fmt(bar.close))"
             lines.append(line)
         }
         return lines.joined(separator: "\n")

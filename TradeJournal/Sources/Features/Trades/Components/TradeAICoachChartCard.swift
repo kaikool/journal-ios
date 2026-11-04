@@ -109,7 +109,6 @@ public struct TradeAICoachChartCard: View {
                         executions: executions,
                         throughTimestamp: validBars.last?.timestamp ?? Int64(Date().timeIntervalSince1970 * 1000),
                         unrealizedPnl: trade.netPnl,
-                        showLiquidity: false,
                         showRSI: true
                     )
                     .frame(height: 250)

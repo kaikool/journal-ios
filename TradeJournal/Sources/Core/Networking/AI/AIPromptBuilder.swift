@@ -28,9 +28,9 @@ public enum AIPromptBuilder {
                  • GIAO DỊCH NGHỊCH XU HƯỚNG H4 (COUNTER-TREND): Khi giá phản ứng tại các vùng cản Cung/Cầu hoặc quét râu thanh khoản (Sweep SFP) trên H4, và M15 xuất hiện cấu trúc đảo chiều (MSS M15, CHoCH M15, RSI phân kỳ). Khi đó được phép khuyến nghị đánh nhịp hồi (reversal retracement) về vùng cản H4 đối diện.
                - Mức cắt lỗ (SL) đặt theo cấu trúc vi phạm M15; Mục tiêu chốt lời (TP1, TP2) đặt tại các vùng cản H4.
             
-            3. HỆ THỐNG XU HƯỚNG EMA 21/50 VÀ CÁC VÙNG CẢN THEN CHỐT (EMA TREND & KEY LEVELS):
-               - Đánh giá xu hướng đa khung dựa trên sự sắp xếp của EMA 21 và EMA 50.
-               - Nhận diện các vùng cản then chốt: Đỉnh/Đáy ngày hôm trước (PDH/PDL), Swing High/Low khung H4, biên độ dao động trung bình ngày ADR 14.
+            3. CÁC MỐC GIÁ THEN CHỐT VÀ HỆ THỐNG 3 ĐƯỜNG ĐỘNG LƯỢNG RSI (KEY LEVELS & 3-LINE RSI):
+               - Nhận diện các vùng cản then chốt: Đỉnh/Đáy ngày hôm trước (PDH/PDL), Đỉnh/Đáy biên độ H4, biên độ dao động trung bình ngày ADR 14.
+               - Kết hợp hệ thống 3 đường Động lượng RSI (Wilder RSI 14 / EMA 9 của RSI / WMA 45 của RSI) để đo lường xung lực phe mua/bán.
             
             4. TƯƠNG THÍCH TUYỆT ĐỐI VỚI HỒ SƠ TRADER (TRADER PROFILE ALIGNMENT):
                - Tự động bám sát phong cách giao dịch, playbooks chiến thuật, hạn mức rủi ro và các điểm yếu tâm lý đã khai báo trong Hồ sơ Trader.
@@ -80,9 +80,9 @@ public enum AIPromptBuilder {
                  • COUNTER-TREND H4: When price reacts off an H4 Supply/Demand zone or sweeps H4 liquidity, and M15 prints a reversal confirmation (M15 MSS, CHoCH, SFP wick rejection, RSI divergence). In this case, trading the counter-trend retracement toward the opposing H4 barrier is fully valid.
                - Stop Loss (SL) is anchored to M15 structural invalidation; Profit Targets (TP1, TP2) are anchored to H4 key barriers.
             
-            3. EMA 21/50 TREND SYSTEM & KEY STRUCTURAL LEVELS:
-               - Evaluate multi-timeframe trend alignment using EMA 21 and EMA 50 hierarchy and slope.
-               - Map key price boundaries: Previous Day High/Low (PDH/PDL), H4 Swing High/Low levels, and Average Daily Range (ADR 14).
+            3. KEY STRUCTURAL PRICE LEVELS & 3-LINE RSI MOMENTUM:
+               - Map key price boundaries: Previous Day High/Low (PDH/PDL), H4 High/Low range levels, and Average Daily Range (ADR 14).
+               - Integrate 3-line RSI momentum system (Wilder RSI 14 / EMA 9 of RSI / WMA 45 of RSI) to gauge momentum conviction.
             
             4. STRICT TRADER PROFILE ALIGNMENT:
                - Actively integrate the trader's declared Trading Style, Primary Playbooks, Risk Budget, and known psychological leaks from their profile.

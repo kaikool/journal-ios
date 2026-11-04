@@ -103,15 +103,15 @@ public struct MarketDataSettingsView: View {
                 }
             }
             
-            // Unified Candle Hub & EMA Alerts Card
+            // Unified Candle Hub & Key Level Alerts Card
             SettingsCard(
-                title: "EMA Candle Close Alerts",
-                footer: "Evaluates closed bars (:01s boundary) for EMA 21 & EMA 50 touches via Unified Candle Hub. Eliminates redundant streaming."
+                title: "Key Level & Market Structure Alerts",
+                footer: "Evaluates closed bars (:01s boundary) for Key Level (PDH, PDL, Swing High/Low) touches & breakouts via Unified Candle Hub. Eliminates redundant streaming."
             ) {
                 VStack(spacing: 12) {
                     AppToggleRow(
-                        "Enable EMA 21/50 Alerts",
-                        subtitle: "Alerts when candle touches or rejects EMA 21 or 50",
+                        "Enable Key Level Alerts",
+                        subtitle: "Alerts when candle tests or breaks Key Levels (PDH, PDL, Swing High/Low)",
                         isOn: $alertEngine.isEnabled
                     ) { enabled in
                         if enabled {
@@ -255,15 +255,15 @@ public struct MarketDataSettingsView: View {
     
     private func checkAlertsNow() {
         isCheckingAlerts = true
-        alertCheckStatus = "Evaluating EMA touches..."
+        alertCheckStatus = "Evaluating Key Level reactions..."
         Task {
             let fired = await alertEngine.evaluateAllMonitoredSymbols()
             await MainActor.run {
                 self.isCheckingAlerts = false
                 if fired.isEmpty {
-                    self.alertCheckStatus = "Checked: No EMA 21/50 touches on last closed bars."
+                    self.alertCheckStatus = "Checked: No Key Level touches on last closed bars."
                 } else {
-                    self.alertCheckStatus = "Detected \(fired.count) EMA alerts! Notifications dispatched."
+                    self.alertCheckStatus = "Detected \(fired.count) Key Level alerts! Notifications dispatched."
                 }
             }
         }

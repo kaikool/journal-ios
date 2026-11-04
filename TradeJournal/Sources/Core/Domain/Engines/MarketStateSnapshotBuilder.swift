@@ -15,23 +15,21 @@ public enum MarketStateSnapshotBuilder {
         let cleanSymbol = symbol.uppercased()
         let curPrice = barsM15.last?.close ?? barsH4.last?.close ?? Decimal.zero
         
-        // 1. Higher Timeframe (H4) EMA Trend & Range
-        let h4Ema = MovingAverageEngine.analyzeTimeframe(bars: barsH4, timeframe: "H4", symbol: cleanSymbol)
-        let h4Flow = h4Ema?.trend.rawValue.uppercased() ?? "NEUTRAL"
-        let h4LastHigh = barsH4.map(\.high).max()
-        let h4LastLow = barsH4.map(\.low).min()
-        let h4BrokenLevel: Decimal? = h4Ema?.ema50
+        // 1. Higher Timeframe (H4) Key Range
+        let h4LastHigh = barsH4.suffix(24).map(\.high).max()
+        let h4LastLow = barsH4.suffix(24).map(\.low).min()
+        let h4Flow = (barsH4.last?.close ?? 0) >= (barsH4.first?.open ?? 0) ? "BULLISH" : "BEARISH"
+        let h4BrokenLevel: Decimal? = nil
         
-        // 2. Execution Timeframe (M15) EMA Trend & Liquidity Sweeps
-        let m15Ema = MovingAverageEngine.analyzeTimeframe(bars: barsM15, timeframe: "M15", symbol: cleanSymbol)
-        let m15Flow = m15Ema?.trend.rawValue.uppercased() ?? "NEUTRAL"
-        let m15StateDesc = m15Ema?.summary
-        let triggerLvl = m15Ema?.ema21
+        // 2. Execution Timeframe (M15) Key Range
+        let m15Flow = (barsM15.last?.close ?? 0) >= (barsM15.first?.open ?? 0) ? "BULLISH" : "BEARISH"
+        let m15StateDesc: String? = nil
+        let triggerLvl: Decimal? = barsM15.last?.close
         
         let sweepDesc: String? = nil
         let nearestUnswept: Decimal? = nil
         
-        // 3. Technical Momentum (M15 Wilder RSI 14 / EMA 9 / WMA 45)
+        // 3. Technical Momentum (M15 Wilder RSI 14 / EMA 9 of RSI / WMA 45 of RSI)
         var rsiVal: Double? = nil
         var emaVal: Double? = nil
         var wmaVal: Double? = nil
@@ -96,8 +94,6 @@ public enum MarketStateSnapshotBuilder {
         let h4HighStr = snapshot.h4SwingHigh.map { Formatters.price($0) } ?? "N/A"
         let h4LowStr = snapshot.h4SwingLow.map { Formatters.price($0) } ?? "N/A"
         let m15TriggerStr = snapshot.m15TriggerLevel.map { Formatters.price($0) } ?? "N/A"
-        let m15SweepStr = snapshot.m15NearestSweep ?? (isVi ? "Chưa ghi nhận sweep gần" : "None detected")
-        let m15UnsweptStr = snapshot.m15NearestUnsweptPool.map { Formatters.price($0) } ?? "N/A"
         
         let rsiStr = snapshot.rsi14.map { String(format: "%.1f", $0) } ?? "N/A"
         let emaStr = snapshot.ema9.map { String(format: "%.2f", $0) } ?? "N/A"
@@ -126,9 +122,9 @@ public enum MarketStateSnapshotBuilder {
             
             [DỮ LIỆU ĐO LƯỜNG THỊ TRƯỜNG THỰC TẾ (OBJECTIVE MARKET FACTS)]:
             • Cặp tiền: \(snapshot.symbol) | Thị giá hiện tại: \(curPriceStr)
-            • Khung lớn H4 (Order Flow & Cản): Xu hướng: [\(snapshot.h4OrderFlow)] | Đỉnh Swing High: [\(h4HighStr)] | Đáy Swing Low: [\(h4LowStr)]
-            • Khung nhỏ M15 (Execution): Xu hướng: [\(snapshot.m15OrderFlow)] | Trạng thái cấu trúc: [\(snapshot.m15MssState ?? "Tiếp diễn")] | Mốc kích hoạt: [\(m15TriggerStr)]
-            • Động lượng M15: RSI(14) = [\(rsiStr)] | EMA(9) = [\(emaStr)] | WMA(45) = [\(wmaStr)]
+            • Khung lớn H4 (Order Flow & Cản): Cấu trúc: [\(snapshot.h4OrderFlow)] | Đỉnh Swing High: [\(h4HighStr)] | Đáy Swing Low: [\(h4LowStr)]
+            • Khung nhỏ M15 (Execution): Cấu trúc: [\(snapshot.m15OrderFlow)] | Trạng thái: [\(snapshot.m15MssState ?? "Tiếp diễn")] | Mốc kích hoạt: [\(m15TriggerStr)]
+            • Động lượng 3 đường RSI: RSI(14) = [\(rsiStr)] | EMA(9) = [\(emaStr)] | WMA(45) = [\(wmaStr)]
             • Tin tức kinh tế (Catalyst): \(newsBlock)
             """
         } else {
@@ -136,9 +132,9 @@ public enum MarketStateSnapshotBuilder {
             
             [OBJECTIVE MARKET FACTS & MULTI-TIMEFRAME MEASUREMENTS]:
             • Symbol: \(snapshot.symbol) | Current Price: \(curPriceStr)
-            • HTF H4 (Order Flow & Key Barriers): Trend: [\(snapshot.h4OrderFlow)] | Swing High: [\(h4HighStr)] | Swing Low: [\(h4LowStr)]
-            • LTF M15 (Execution): Trend: [\(snapshot.m15OrderFlow)] | Structural State: [\(snapshot.m15MssState ?? "Continuation")] | Trigger Level: [\(m15TriggerStr)]
-            • M15 Momentum: RSI(14) = [\(rsiStr)] | EMA(9) = [\(emaStr)] | WMA(45) = [\(wmaStr)]
+            • HTF H4 (Order Flow & Key Barriers): Structure: [\(snapshot.h4OrderFlow)] | Swing High: [\(h4HighStr)] | Swing Low: [\(h4LowStr)]
+            • LTF M15 (Execution): Structure: [\(snapshot.m15OrderFlow)] | State: [\(snapshot.m15MssState ?? "Continuation")] | Trigger Level: [\(m15TriggerStr)]
+            • 3-Line RSI Momentum: RSI(14) = [\(rsiStr)] | EMA(9) = [\(emaStr)] | WMA(45) = [\(wmaStr)]
             • Macro News Catalyst: \(newsBlock)
             """
         }

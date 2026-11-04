@@ -413,10 +413,10 @@ public struct TradeAICoachSheet: View {
                     isVi: isVi
                 )
                 let h1Block = isVi ? """
-                [DIỄN BIẾN CHUỖI 15 NẾN H1 GẦN NHẤT (OHLC + EMA 21/50 + WILDER RSI 14)]:
+                [DIỄN BIẾN CHUỖI 15 NẾN H1 GẦN NHẤT (OHLC + WILDER RSI 14)]:
                 \(h1Series)
                 """ : """
-                [RECENT 15-CANDLE H1 EXECUTION SERIES (OHLC + EMA 21/50 + WILDER RSI 14)]:
+                [RECENT 15-CANDLE H1 EXECUTION SERIES (OHLC + WILDER RSI 14)]:
                 \(h1Series)
                 """
                 promptComponents.append(h1Block)
@@ -429,7 +429,7 @@ public struct TradeAICoachSheet: View {
 
                 CHỈ THỊ PHÂN TÍCH & TRẢ LỜI:
                 - BẮT BUỘC: Trả lời 100% bằng TIẾNG VIỆT, đi thẳng vào câu hỏi của trader.
-                - Dựa vào diễn biến chuỗi 15 nến H1 và trạng thái vị thế ở trên để phân tích Price Action (rút râu, từ chối giá, cấu trúc nến, tương quan giá với EMA 21/50, phân kỳ RSI).
+                - Dựa vào diễn biến chuỗi 15 nến H1 và trạng thái vị thế ở trên để phân tích Price Action (rút râu, từ chối giá, cấu trúc nến, phân kỳ RSI).
                 - Đưa ra kết luận hành động dứt khoát: Giữ nguyên lệnh, Dời SL về hòa vốn (BE), hay Chốt một phần lợi nhuận (nêu rõ số lot chốt và mức SL mới).
                 """
             } else {
@@ -438,7 +438,7 @@ public struct TradeAICoachSheet: View {
 
                 ANALYSIS & RESPONSE DIRECTIVE:
                 - Respond directly and concisely in English to the trader's inquiry.
-                - Analyze Price Action from the 15-candle H1 sequence and real-time position state above (wicks, rejections, EMA 21/50 dynamic support/resistance, RSI divergence).
+                - Analyze Price Action from the 15-candle H1 sequence and real-time position state above (wicks, rejections, support/resistance, RSI divergence).
                 - Provide a decisive operational directive: Hold, Move SL to BE, Partial TP (state volume and new SL), or Close Now.
                 """
             }

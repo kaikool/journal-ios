@@ -125,7 +125,7 @@ public struct TraderProfileSheet: View {
                 AppFormField(
                     "Primary Playbooks & Technical Setups",
                     text: $primaryPlaybooks,
-                    placeholder: "e.g. Price Action, Support & Resistance, Liquidity Sweeps, FVG",
+                    placeholder: "e.g. Price Action, Support & Resistance, Trend Following",
                     height: 42
                 )
             }
