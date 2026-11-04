@@ -528,19 +528,6 @@ public struct CandleChartView: View {
                         }
                     }
                 }
-
-                // 3. Immediate Prior Staircase Step (for Daily & Weekly POCs)
-                if let priorPoc = snap.priorStepPocPrice, isD1orW1 {
-                    let priorD = (priorPoc as NSDecimalNumber).doubleValue
-                    if priorD >= (minP - span * 0.05) && priorD <= (minP + span * 1.05) {
-                        let priorY = plotHeight - CGFloat((priorD - minP) / span) * plotHeight
-                        Path { path in
-                            path.move(to: CGPoint(x: max(0, x1), y: priorY))
-                            path.addLine(to: CGPoint(x: min(plotWidth, segXEnd), y: priorY))
-                        }
-                        .stroke(col.opacity(0.4), style: StrokeStyle(lineWidth: 1.0, dash: [3, 3]))
-                    }
-                }
             }
         }
     }
@@ -755,7 +742,7 @@ public struct CandleChartView: View {
             }
             .stroke(AppColors.accent.opacity(0.85), style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
 
-            // 2. Entry marker & label: "EN" xanh khÃƒÂ´ng cÃ¡ÂºÂ§n giÃƒÂ¡
+            // 2. Entry marker & label: "EN" xanh khÃƒÆ’Ã‚Â´ng cÃƒÂ¡Ã‚ÂºÃ‚Â§n giÃƒÆ’Ã‚Â¡
             if let entryIdx = entryBarIdx {
                 let entryX = CGFloat(entryIdx) * stepX + (stepX / 2.0) + panOffset
 
@@ -774,7 +761,7 @@ public struct CandleChartView: View {
                     .position(x: entryX, y: trade.direction == .long ? yEntry + 8 : yEntry - 8)
             }
 
-            // 3. Exit line + label: "EX" Ã„â€˜Ã¡Â»Â khÃƒÂ´ng cÃ¡ÂºÂ§n giÃƒÂ¡ + connecting line
+            // 3. Exit line + label: "EX" Ãƒâ€žÃ¢â‚¬ËœÃƒÂ¡Ã‚Â»Ã‚Â khÃƒÆ’Ã‚Â´ng cÃƒÂ¡Ã‚ÂºÃ‚Â§n giÃƒÆ’Ã‚Â¡ + connecting line
             if let exitIdx = exitBarIdx, trade.status != .open {
                 let exitD = ((trade.avgExit ?? trade.avgEntry) as NSDecimalNumber).doubleValue
                 let yExit = plotHeight - CGFloat((exitD - minP) / span) * plotHeight
@@ -798,7 +785,7 @@ public struct CandleChartView: View {
                     .stroke(exitColor.opacity(0.6), style: StrokeStyle(lineWidth: 1.5, dash: [5, 3]))
                 }
 
-                // Exit badge: "EX" Ã„â€˜Ã¡Â»Â
+                // Exit badge: "EX" Ãƒâ€žÃ¢â‚¬ËœÃƒÂ¡Ã‚Â»Ã‚Â
                 Text("EX")
                     .font(AppTypography.badgeMarker)
                     .padding(.horizontal, 4)

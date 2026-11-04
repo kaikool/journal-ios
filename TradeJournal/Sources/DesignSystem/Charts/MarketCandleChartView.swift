@@ -329,19 +329,6 @@ public struct MarketCandleChartView: View {
                         }
                     }
                 }
-
-                // 3. Immediate Prior Staircase Step
-                if let priorPoc = snap.priorStepPocPrice, isD1orW1 {
-                    let priorD = (priorPoc as NSDecimalNumber).doubleValue
-                    if priorD >= (minP - span * 0.05) && priorD <= (minP + span * 1.05) {
-                        let priorY = plotHeight - CGFloat((priorD - minP) / span) * plotHeight
-                        Path { path in
-                            path.move(to: CGPoint(x: max(0, x1), y: priorY))
-                            path.addLine(to: CGPoint(x: min(plotWidth, segXEnd), y: priorY))
-                        }
-                        .stroke(col.opacity(0.4), style: StrokeStyle(lineWidth: 1.0, dash: [3, 3]))
-                    }
-                }
             }
         }
     }

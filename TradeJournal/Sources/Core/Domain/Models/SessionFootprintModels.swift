@@ -64,6 +64,7 @@ public struct SessionProfileSnapshot: Identifiable, Codable, Sendable, Equatable
     public let totalVolume: Decimal
     public var isNaked: Bool
     public var mitigatedAt: Date?
+    public var priorStepPocPrice: Decimal?
     public let createdAt: Date
 
     public init(
@@ -81,6 +82,7 @@ public struct SessionProfileSnapshot: Identifiable, Codable, Sendable, Equatable
         totalVolume: Decimal,
         isNaked: Bool = true,
         mitigatedAt: Date? = nil,
+        priorStepPocPrice: Decimal? = nil,
         createdAt: Date = Date()
     ) {
         self.id = id
@@ -97,6 +99,7 @@ public struct SessionProfileSnapshot: Identifiable, Codable, Sendable, Equatable
         self.totalVolume = totalVolume
         self.isNaked = isNaked
         self.mitigatedAt = mitigatedAt
+        self.priorStepPocPrice = priorStepPocPrice
         self.createdAt = createdAt
     }
 }
