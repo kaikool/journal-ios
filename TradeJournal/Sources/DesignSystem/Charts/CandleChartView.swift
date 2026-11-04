@@ -23,6 +23,7 @@ public struct CandleChartView: View {
     public let developingProfile: DevelopingProfile?
     public let developingProfiles: [DevelopingProfile]
     public let patterns: [DetectedCandlePattern]
+    public let onInteractionChanged: ((Bool) -> Void)?
     @State private var activeRSIMAType: MomentumEngine.RSIMAType
 
     @State private var hoveredBarIndex: Int? = nil
@@ -57,7 +58,8 @@ public struct CandleChartView: View {
         developingProfile: DevelopingProfile? = nil,
         developingProfiles: [DevelopingProfile] = [],
         patterns: [DetectedCandlePattern] = [],
-        onResolutionChange: ((MarketResolution) -> Void)? = nil
+        onResolutionChange: ((MarketResolution) -> Void)? = nil,
+        onInteractionChanged: ((Bool) -> Void)? = nil
     ) {
         self.visibleBars = visibleBars
         self.allBars = allBars.isEmpty ? visibleBars : allBars
@@ -78,6 +80,7 @@ public struct CandleChartView: View {
         self.developingProfiles = !developingProfiles.isEmpty ? developingProfiles : (developingProfile.map { [$0] } ?? [])
         self.patterns = patterns
         self.onResolutionChange = onResolutionChange
+        self.onInteractionChanged = onInteractionChanged
         self._activeRSIMAType = State(initialValue: rsiMAType)
     }
 
@@ -155,6 +158,7 @@ public struct CandleChartView: View {
                 }
             }
             .contentShape(Rectangle())
+            .overlay(ChartScrollLockOverlay(onTouchStateChanged: onInteractionChanged))
             .gesture(
                 MagnificationGesture()
                     .onChanged { value in

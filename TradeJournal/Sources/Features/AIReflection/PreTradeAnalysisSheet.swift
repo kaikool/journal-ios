@@ -49,6 +49,7 @@ public struct PreTradeAnalysisSheet: View {
     @State private var showCopiedAlert: Bool = false
     @State private var showLinkTicketSheet: Bool = false
     @State private var createdNoteId: String? = nil
+    @State private var isChartInteracting: Bool = false
     
     public init(initialSymbol: String = "XAUUSD") {
         self._selectedSymbol = State(initialValue: initialSymbol)
@@ -95,7 +96,10 @@ public struct PreTradeAnalysisSheet: View {
                                 self.activeFullScreenModal = .landscapeChart
                             }
                         },
-                        onAttachPhoto: { showPhotoPicker = true }
+                        onAttachPhoto: { showPhotoPicker = true },
+                        onInteractionChanged: { isInteracting in
+                            isChartInteracting = isInteracting
+                        }
                     )
                     
                     // 3. Quantitative Dynamic EMA Trend & Key Levels Summary
@@ -163,6 +167,7 @@ public struct PreTradeAnalysisSheet: View {
                 .padding(.vertical, 12)
                 .padding(.bottom, 24)
             }
+            .scrollDisabled(isChartInteracting)
             .safeAreaInset(edge: .bottom) {
                 if !analysisResult.isEmpty && !isAnalyzing && !isLoadingData {
                     PreTradeBottomFloatingInput(

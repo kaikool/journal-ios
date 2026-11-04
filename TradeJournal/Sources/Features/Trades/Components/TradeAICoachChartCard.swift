@@ -16,6 +16,7 @@ public struct TradeAICoachChartCard: View {
     public let onResolutionChanged: (String) -> Void
     public let onEnlarge: () -> Void
     public let onUpload: () -> Void
+    public let onInteractionChanged: ((Bool) -> Void)?
 
     @State private var keyLevels: [KeyLevel] = []
     @State private var sessionProfiles: [SessionProfileSnapshot] = []
@@ -34,7 +35,8 @@ public struct TradeAICoachChartCard: View {
         activeBarsCount: Int,
         onResolutionChanged: @escaping (String) -> Void,
         onEnlarge: @escaping () -> Void,
-        onUpload: @escaping () -> Void
+        onUpload: @escaping () -> Void,
+        onInteractionChanged: ((Bool) -> Void)? = nil
     ) {
         self.trade = trade
         self.executions = executions
@@ -47,6 +49,7 @@ public struct TradeAICoachChartCard: View {
         self.onResolutionChanged = onResolutionChanged
         self.onEnlarge = onEnlarge
         self.onUpload = onUpload
+        self.onInteractionChanged = onInteractionChanged
     }
 
     private var activeTimeframeTitle: String {
@@ -121,7 +124,8 @@ public struct TradeAICoachChartCard: View {
                             sessionProfiles: sessionProfiles,
                             developingProfile: developingProfile,
                             developingProfiles: developingProfiles,
-                            patterns: patterns
+                            patterns: patterns,
+                            onInteractionChanged: onInteractionChanged
                         )
                         .frame(height: 260)
 

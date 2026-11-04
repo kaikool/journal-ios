@@ -33,6 +33,7 @@ public struct TradeAICoachSheet: View {
     @State private var followUpMessages: [AICoachMessage] = []
     @State private var followUpQuery: String = ""
     @State private var isSubmittingFollowUp: Bool = false
+    @State private var isChartInteracting: Bool = false
 
     private enum AICoachFullScreenModal: Identifiable {
         case lightbox(UIImage)
@@ -103,7 +104,10 @@ public struct TradeAICoachSheet: View {
                                 activeFullScreenModal = .landscapeChart
                             }
                         },
-                        onUpload: { showPhotoPicker = true }
+                        onUpload: { showPhotoPicker = true },
+                        onInteractionChanged: { isInteracting in
+                            isChartInteracting = isInteracting
+                        }
                     )
                     
                     // 4. Loading, Error, or AI Result Document
@@ -143,6 +147,7 @@ public struct TradeAICoachSheet: View {
                 .padding(.vertical, 12)
                 .padding(.bottom, 24)
             }
+            .scrollDisabled(isChartInteracting)
             .safeAreaInset(edge: .bottom) {
                 if !coachingResult.isEmpty && !isLoading {
                     TradeAICoachBottomFloatingInput(

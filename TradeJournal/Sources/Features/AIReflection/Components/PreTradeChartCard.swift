@@ -14,6 +14,7 @@ public struct PreTradeChartCard: View {
     public let activeProvider: String
     public let onEnlarge: () -> Void
     public let onAttachPhoto: () -> Void
+    public let onInteractionChanged: ((Bool) -> Void)?
 
     @State private var keyLevels: [KeyLevel] = []
     @State private var sessionProfiles: [SessionProfileSnapshot] = []
@@ -31,7 +32,8 @@ public struct PreTradeChartCard: View {
         m15Bars: [MarketBar] = [],
         activeProvider: String,
         onEnlarge: @escaping () -> Void,
-        onAttachPhoto: @escaping () -> Void
+        onAttachPhoto: @escaping () -> Void,
+        onInteractionChanged: ((Bool) -> Void)? = nil
     ) {
         self.symbol = symbol
         self._selectedTimeframe = selectedTimeframe
@@ -43,6 +45,7 @@ public struct PreTradeChartCard: View {
         self.activeProvider = activeProvider
         self.onEnlarge = onEnlarge
         self.onAttachPhoto = onAttachPhoto
+        self.onInteractionChanged = onInteractionChanged
     }
 
     private var activeTimeframeTitle: String {
@@ -94,7 +97,8 @@ public struct PreTradeChartCard: View {
                             sessionProfiles: sessionProfiles,
                             developingProfile: developingProfile,
                             developingProfiles: developingProfiles,
-                            patterns: patterns
+                            patterns: patterns,
+                            onInteractionChanged: onInteractionChanged
                         )
                         .frame(height: 260)
 

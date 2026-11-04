@@ -13,6 +13,7 @@ public struct MarketCandleChartView: View {
     public let developingProfile: DevelopingProfile?
     public let developingProfiles: [DevelopingProfile]
     public let patterns: [DetectedCandlePattern]
+    public let onInteractionChanged: ((Bool) -> Void)?
 
     @State private var hoveredBarIndex: Int? = nil
     @State private var zoomScale: CGFloat = 1.0
@@ -36,7 +37,8 @@ public struct MarketCandleChartView: View {
         sessionProfiles: [SessionProfileSnapshot] = [],
         developingProfile: DevelopingProfile? = nil,
         developingProfiles: [DevelopingProfile] = [],
-        patterns: [DetectedCandlePattern] = []
+        patterns: [DetectedCandlePattern] = [],
+        onInteractionChanged: ((Bool) -> Void)? = nil
     ) {
         self.bars = bars
         self.symbol = symbol
@@ -47,6 +49,7 @@ public struct MarketCandleChartView: View {
         self.developingProfile = developingProfile
         self.developingProfiles = !developingProfiles.isEmpty ? developingProfiles : (developingProfile.map { [$0] } ?? [])
         self.patterns = patterns
+        self.onInteractionChanged = onInteractionChanged
     }
 
     public var body: some View {
@@ -69,6 +72,7 @@ public struct MarketCandleChartView: View {
             }
             .contentShape(Rectangle())
             .clipped()
+            .overlay(ChartScrollLockOverlay(onTouchStateChanged: onInteractionChanged))
             .gesture(
                 MagnificationGesture()
                     .onChanged { value in

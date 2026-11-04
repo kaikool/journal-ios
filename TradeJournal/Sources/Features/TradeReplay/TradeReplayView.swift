@@ -30,6 +30,7 @@ public struct TradeReplayView: View {
     @State private var developingProfile: DevelopingProfile? = nil
     @State private var developingProfiles: [DevelopingProfile] = []
     @State private var priceActionPatterns: [DetectedCandlePattern] = []
+    @State private var isChartInteracting: Bool = false
 
     public init(trade: Trade, executions: [Execution], isModal: Bool = false) {
         self.trade = trade
@@ -130,6 +131,7 @@ public struct TradeReplayView: View {
                     .padding(.top, 10)
                     .padding(.bottom, 32)
                 }
+                .scrollDisabled(isChartInteracting)
                 .scrollDismissesKeyboard(.interactively)
                 .background(AppColors.background)
                 .navigationTitle("Replay - \(trade.symbol)")
@@ -237,6 +239,9 @@ public struct TradeReplayView: View {
                         patterns: priceActionPatterns,
                         onResolutionChange: { newRes in
                             self.selectedResolution = newRes
+                        },
+                        onInteractionChanged: { isInteracting in
+                            isChartInteracting = isInteracting
                         }
                     )
 
