@@ -25,19 +25,11 @@ extension AIPromptBuilder {
     ) -> String {
         let isVi = language == "vi"
         
-        func formatPrice(_ p: Decimal) -> String {
-            let d = (p as NSDecimalNumber).doubleValue
-            if d >= 1000 { return String(format: "%.2f", d) }
-            if d >= 100 { return String(format: "%.2f", d) }
-            if d >= 10 { return String(format: "%.3f", d) }
-            return String(format: "%.5f", d)
-        }
-        
         let execBars = !h1Bars.isEmpty ? h1Bars : m15Bars
         
         let currentPrice: String = {
             if let last = execBars.last ?? h4Bars.last ?? d1Bars.last {
-                return formatPrice(last.close)
+                return Formatters.price(last.close, symbol: symbol)
             }
             return "N/A"
         }()
@@ -49,14 +41,14 @@ extension AIPromptBuilder {
         let d1ADR: String
         if d1Bars.count >= 2 {
             let prevDay = d1Bars[d1Bars.count - 2]
-            d1PDH = formatPrice(prevDay.high)
-            d1PDL = formatPrice(prevDay.low)
-            d1PDC = formatPrice(prevDay.close)
+            d1PDH = Formatters.price(prevDay.high, symbol: symbol)
+            d1PDL = Formatters.price(prevDay.low, symbol: symbol)
+            d1PDC = Formatters.price(prevDay.close, symbol: symbol)
             
             let lookback = min(14, d1Bars.count - 1)
             let ranges = d1Bars.suffix(lookback).map { $0.high - $0.low }
             let avgRange = ranges.reduce(Decimal.zero, +) / Decimal(lookback)
-            d1ADR = formatPrice(avgRange)
+            d1ADR = Formatters.price(avgRange, symbol: symbol)
         } else {
             d1PDH = "N/A"
             d1PDL = "N/A"
@@ -67,13 +59,13 @@ extension AIPromptBuilder {
         // Key H4 High & Low Levels (Direct Price Range Scanning)
         let h4SwingHighStr: String = {
             if let maxBar = h4Bars.suffix(24).max(by: { $0.high < $1.high }) {
-                return formatPrice(maxBar.high)
+                return Formatters.price(maxBar.high, symbol: symbol)
             }
             return "N/A"
         }()
         let h4SwingLowStr: String = {
             if let minBar = h4Bars.suffix(24).min(by: { $0.low < $1.low }) {
-                return formatPrice(minBar.low)
+                return Formatters.price(minBar.low, symbol: symbol)
             }
             return "N/A"
         }()

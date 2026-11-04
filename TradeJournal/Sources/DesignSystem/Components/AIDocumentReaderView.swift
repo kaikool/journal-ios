@@ -160,31 +160,12 @@ public enum AIDocumentParser {
             }
             
             // 0. Check for Markdown Table
-            if line.contains("|") && (i + 1 < lines.count) && isTableSeparator(lines[i + 1]) {
+            if let tableResult = JournalNotesParser.consumeMarkdownTable(from: lines, startingAt: i) {
                 flushParagraph()
-                let headers = parseTableCells(line)
-                i += 2
-                
-                var rows: [[String]] = []
-                while i < lines.count {
-                    let rowLine = lines[i].trimmingCharacters(in: .whitespaces)
-                    if rowLine.isEmpty || !rowLine.contains("|") {
-                        break
-                    }
-                    if isTableSeparator(rowLine) {
-                        i += 1
-                        continue
-                    }
-                    let cells = parseTableCells(rowLine)
-                    if !cells.isEmpty {
-                        rows.append(cells)
-                    }
-                    i += 1
+                if !tableResult.headers.isEmpty {
+                    currentBlocks.append(AIAnalysisBlock(kind: .table(headers: tableResult.headers, rows: tableResult.rows)))
                 }
-                
-                if !headers.isEmpty {
-                    currentBlocks.append(AIAnalysisBlock(kind: .table(headers: headers, rows: rows)))
-                }
+                i = tableResult.nextIndex
                 continue
             }
             
@@ -259,24 +240,6 @@ public enum AIDocumentParser {
         }
         
         return sections
-    }
-    
-    private static func isTableSeparator(_ line: String) -> Bool {
-        let trimmed = line.trimmingCharacters(in: .whitespaces)
-        guard trimmed.contains("|") || trimmed.contains("-") else { return false }
-        let clean = trimmed
-            .replacingOccurrences(of: "|", with: "")
-            .replacingOccurrences(of: ":", with: "")
-            .replacingOccurrences(of: "-", with: "")
-            .replacingOccurrences(of: " ", with: "")
-        return clean.isEmpty && trimmed.contains("-")
-    }
-    
-    private static func parseTableCells(_ line: String) -> [String] {
-        var trimmed = line.trimmingCharacters(in: .whitespaces)
-        if trimmed.hasPrefix("|") { trimmed.removeFirst() }
-        if trimmed.hasSuffix("|") { trimmed.removeLast() }
-        return trimmed.components(separatedBy: "|").map { $0.trimmingCharacters(in: .whitespaces) }
     }
     
     private static func sanitize(_ str: String) -> String {

@@ -608,58 +608,23 @@ public struct PreTradeAnalysisSheet: View {
     // MARK: - Actions
     private func saveToNotebook() {
         guard !analysisResult.isEmpty else { return }
-        let folderName = "Trade Insights"
-        let folder: NotebookFolder
-        if let existing = dataStore.folders.first(where: { $0.name.lowercased() == folderName.lowercased() }) {
-            folder = existing
-        } else {
-            do {
-                folder = try dataStore.createFolder(name: folderName)
-            } catch {
-                AppLogger.warning("Failed to create folder: \(error.localizedDescription)")
-                return
-            }
-        }
-        
         let dateStr = JournalIds.todayDateString()
         let title = "[Pre-Trade Bias] \(selectedSymbol) (\(dateStr))"
-        
         let tags = ["#pre-trade-bias", "#market-structure", "#\(selectedSymbol.lowercased())"]
-        let content = fullAnalysisContent()
-        
-        do {
-            if let existingId = createdNoteId {
-                _ = try dataStore.patchNote(
-                    id: existingId,
-                    title: title,
-                    content: content,
-                    tags: tags,
-                    folderId: folder.id
-                )
-            } else {
-                let note = try dataStore.createNote(
-                    folderId: folder.id,
-                    title: title,
-                    content: content,
-                    tags: tags,
-                    tradeKey: nil,
-                    dayDate: dateStr
-                )
-                createdNoteId = note.id
-            }
+        if let note = dataStore.upsertNotebookNoteInFolder(
+            folderName: "Trade Insights",
+            existingNoteId: createdNoteId,
+            title: title,
+            content: fullAnalysisContent(),
+            tags: tags,
+            dayDate: dateStr
+        ) {
+            createdNoteId = note.id
             isSavedToNotebook = true
-            NativeHaptics.success()
-        } catch {
-            AppLogger.warning("Failed to save note: \(error.localizedDescription)")
         }
     }
     
     private func copyToClipboard() {
-        UIPasteboard.general.string = fullAnalysisContent()
-        showCopiedAlert = true
-        NativeHaptics.lightImpact()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-            showCopiedAlert = false
-        }
+        TradeDataStore.copyToClipboard(fullAnalysisContent()) { showCopiedAlert = $0 }
     }
 }

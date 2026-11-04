@@ -346,33 +346,19 @@ public struct DayDetailSheet: View {
     
     private func applyFormat(marker: String) {
         NativeHaptics.lightImpact()
-        let res = NoteFormattingEngine.formatInlineSelection(
-            value: noteContent,
-            start: (noteContent as NSString).length,
-            end: (noteContent as NSString).length,
-            marker: marker
-        )
-        noteContent = res.value
+        noteContent = NoteFormattingEngine.appendInlineFormat(to: noteContent, marker: marker)
         save()
     }
     
     private func insertBullet() {
         NativeHaptics.lightImpact()
-        if noteContent.isEmpty || noteContent.hasSuffix("\n") {
-            noteContent += "- "
-        } else {
-            noteContent += "\n- "
-        }
+        noteContent = NoteFormattingEngine.appendBulletItem(to: noteContent)
         save()
     }
     
     private func insertNumberedList() {
         NativeHaptics.lightImpact()
-        if noteContent.isEmpty || noteContent.hasSuffix("\n") {
-            noteContent += "1. "
-        } else {
-            noteContent += "\n1. "
-        }
+        noteContent = NoteFormattingEngine.appendNumberedItem(to: noteContent)
         save()
     }
 

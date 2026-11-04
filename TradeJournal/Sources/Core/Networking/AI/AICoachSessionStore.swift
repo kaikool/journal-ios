@@ -20,17 +20,12 @@ public final class AICoachSessionStore: @unchecked Sendable {
     
     private var cache: [String: AICoachSessionData] = [:]
     private let lock = NSLock()
-    private let diskUrl: URL? = {
-        guard let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
-            return nil
-        }
-        let dir = appSupport.appendingPathComponent("TradeJournal", isDirectory: true)
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir.appendingPathComponent("ai_coach_sessions.json")
-    }()
+    private let diskUrl: URL = JSONDiskStore.appSupportFileURL(filename: "ai_coach_sessions.json")
     
     private init() {
-        loadFromDisk()
+        if let decoded = JSONDiskStore.load([String: AICoachSessionData].self, from: diskUrl) {
+            self.cache = decoded
+        }
     }
     
     public func get(key: String) -> (result: String, followUps: [AICoachMessage])? {
@@ -55,7 +50,7 @@ public final class AICoachSessionStore: @unchecked Sendable {
         let snapshot = cache
         lock.unlock()
         
-        saveToDiskAsync(snapshot: snapshot)
+        JSONDiskStore.saveAsync(snapshot, to: diskUrl)
     }
     
     public func clear(key: String) {
@@ -64,7 +59,7 @@ public final class AICoachSessionStore: @unchecked Sendable {
         let snapshot = cache
         lock.unlock()
         
-        saveToDiskAsync(snapshot: snapshot)
+        JSONDiskStore.saveAsync(snapshot, to: diskUrl)
     }
     
     public func clearAll() {
@@ -73,28 +68,6 @@ public final class AICoachSessionStore: @unchecked Sendable {
         let snapshot = cache
         lock.unlock()
         
-        saveToDiskAsync(snapshot: snapshot)
-    }
-    
-    // MARK: - Disk Persistence
-    
-    private func saveToDiskAsync(snapshot: [String: AICoachSessionData]) {
-        guard let url = diskUrl else { return }
-        Task.detached(priority: .utility) {
-            guard let data = try? JSONEncoder().encode(snapshot) else { return }
-            try? data.write(to: url, options: .atomic)
-        }
-    }
-    
-    private func loadFromDisk() {
-        guard let url = diskUrl, FileManager.default.fileExists(atPath: url.path) else { return }
-        guard let data = try? Data(contentsOf: url),
-              let decoded = try? JSONDecoder().decode([String: AICoachSessionData].self, from: data) else {
-            return
-        }
-        
-        lock.lock()
-        defer { lock.unlock() }
-        self.cache = decoded
+        JSONDiskStore.saveAsync(snapshot, to: diskUrl)
     }
 }

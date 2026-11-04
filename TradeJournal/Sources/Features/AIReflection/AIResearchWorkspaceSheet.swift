@@ -447,7 +447,7 @@ private struct AIResearchProjectCard: View {
                                         .foregroundColor(pf >= 1.5 ? AppColors.profit : AppColors.secondaryText)
                                 }
                                 Spacer()
-                                Text(formatDate(chk.timestamp))
+                                Text(Formatters.shortMonthDayTime(chk.timestamp))
                                     .font(AppTypography.microCaption)
                                     .foregroundColor(AppColors.secondaryText)
                             }
@@ -492,12 +492,6 @@ private struct AIResearchProjectCard: View {
         case .archived:
             AppBadge("Archived", variant: .secondary)
         }
-    }
-    
-    private func formatDate(_ d: Date) -> String {
-        let fmt = DateFormatter()
-        fmt.dateFormat = "MMM dd, HH:mm"
-        return fmt.string(from: d)
     }
 }
 

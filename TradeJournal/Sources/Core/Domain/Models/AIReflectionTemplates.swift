@@ -159,11 +159,6 @@ public struct AIReflectionTemplates {
         return String(format: "%.2f", val)
     }
     
-    private static func formatPrice(_ decimal: Decimal) -> String {
-        let val = NSDecimalNumber(decimal: decimal).doubleValue
-        return String(format: "%g", val)
-    }
-    
     // MARK: - Format Recent Trades for Rich Prompt Injection
     public static func buildRecentTradesSnippet(trades: [Trade], limit: Int = 10) -> String {
         let sorted = trades.filter { $0.closedAt != nil }.sorted { ($0.closedAt ?? Date.distantPast) > ($1.closedAt ?? Date.distantPast) }
@@ -284,9 +279,9 @@ public struct AIReflectionTemplates {
                 ? "⚠️ LƯU Ý QUAN TRỌNG: Đây là lệnh BÁN (SELL/SHORT). Trader có LÃI khi giá GIẢM (Giá thoát < Giá vào). TP nằm DƯỚI giá vào, SL nằm TRÊN giá vào. Tuyệt đối KHÔNG phân tích nhầm thành lệnh Mua."
                 : "⚠️ LƯU Ý QUAN TRỌNG: Đây là lệnh MUA (BUY/LONG). Trader có LÃI khi giá TĂNG (Giá thoát > Giá vào). TP nằm TRÊN giá vào, SL nằm DƯỚI giá vào."
             let entry = lastTrade?.entryPrice ?? Decimal.zero
-            let exit = lastTrade?.avgExit.map { formatPrice($0) } ?? "N/A"
-            let sl = lastTrade?.stopLoss.map { formatPrice($0) } ?? "Not Set"
-            let tp = lastTrade?.profitTarget.map { formatPrice($0) } ?? "Not Set"
+            let exit = lastTrade?.avgExit.map { Formatters.price($0, symbol: symbol) } ?? "N/A"
+            let sl = lastTrade?.stopLoss.map { Formatters.price($0, symbol: symbol) } ?? "Not Set"
+            let tp = lastTrade?.profitTarget.map { Formatters.price($0, symbol: symbol) } ?? "Not Set"
             let quantity = lastTrade?.quantity ?? Decimal.zero
             let mistakes = lastTrade?.mistakes.joined(separator: ", ") ?? ""
             let notes = lastTrade?.notes ?? ""
@@ -295,7 +290,7 @@ public struct AIReflectionTemplates {
             return """
             TARGET TRADE TO AUDIT (LATEST CLOSED POSITION):
             - Symbol: \(symbol) | Side: \(side) | Volume: \(format2Dec(quantity)) lots
-            - Entry Price: \(formatPrice(entry)) -> Exit Price: \(exit)
+            - Entry Price: \(Formatters.price(entry, symbol: symbol)) -> Exit Price: \(exit)
             - Planned Stop Loss: \(sl) | Planned Take Profit: \(tp)
             - Realized P&L: \(formatPnl(pnl))
             - Logged Mistakes: \(mistakes.isEmpty ? "None" : mistakes)
@@ -307,7 +302,7 @@ public struct AIReflectionTemplates {
             \(recentList)
             
             TASK: CRITICAL FORENSIC POST-MORTEM & STRUCTURAL AUDIT
-            1. Thesis Validation: Was entering \(side) at \(formatPrice(entry)) technically rational, aligned with HTF market structure, or was it an emotional FOMO/chasing mistake?
+            1. Thesis Validation: Was entering \(side) at \(Formatters.price(entry, symbol: symbol)) technically rational, aligned with HTF market structure, or was it an emotional FOMO/chasing mistake?
             2. Multi-Timeframe Context: Did the trade fight a major support/resistance barrier, or honor market structure?
             3. Execution & Discipline Audit: Evaluate exit quality—was the trade closed according to plan (TP/SL hit) or cut early/held through unnecessary drawdown?
             4. 1 Non-Negotiable Operational Rule: State 1 sharp, uncompromising discipline rule for future setups.

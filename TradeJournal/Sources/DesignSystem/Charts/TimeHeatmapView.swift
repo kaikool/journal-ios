@@ -257,16 +257,12 @@ public struct TimeHeatmapView: View {
                 .onChange(of: selectedHourKey) { newHour in
                     if let h = newHour, h != lastHapticHour {
                         lastHapticHour = h
-                        triggerHapticFeedback()
+                        NativeHaptics.selection()
                     } else if newHour == nil {
                         lastHapticHour = nil
                     }
                 }
             }
         }
-    }
-    
-    private func triggerHapticFeedback() {
-        NativeHaptics.selection()
     }
 }

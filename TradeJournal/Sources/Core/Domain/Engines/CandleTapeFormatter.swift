@@ -26,11 +26,11 @@ public enum CandleTapeFormatter: Sendable {
         
         for (offset, bar) in slice.enumerated() {
             let timeStr = f.string(from: bar.date)
-            let o = formatPrice(bar.open, symbol: symbol)
-            let h = formatPrice(bar.high, symbol: symbol)
-            let l = formatPrice(bar.low, symbol: symbol)
-            let c = formatPrice(bar.close, symbol: symbol)
-            let range = formatPrice(abs(bar.high - bar.low), symbol: symbol)
+            let o = Formatters.price(bar.open, symbol: symbol)
+            let h = Formatters.price(bar.high, symbol: symbol)
+            let l = Formatters.price(bar.low, symbol: symbol)
+            let c = Formatters.price(bar.close, symbol: symbol)
+            let range = Formatters.price(abs(bar.high - bar.low), symbol: symbol)
             
             let dir: String = {
                 if bar.close > bar.open { return "BULLISH ▲" }
@@ -68,15 +68,5 @@ public enum CandleTapeFormatter: Sendable {
             return "Doji / Indecision"
         }
         return "Normal"
-    }
-    
-    private static func formatPrice(_ p: Decimal, symbol: String?) -> String {
-        if let sym = symbol, !sym.isEmpty {
-            return Formatters.price(p, symbol: sym)
-        }
-        let d = (p as NSDecimalNumber).doubleValue
-        if d >= 500 { return String(format: "%.2f", d) }
-        if d >= 10 { return String(format: "%.3f", d) }
-        return String(format: "%.5f", d)
     }
 }

@@ -269,4 +269,66 @@ extension TradeDataStore {
         let fileUrl = attachmentsBaseUrl.appendingPathComponent(storagePath)
         return try? Data(contentsOf: fileUrl)
     }
+
+    // MARK: - Unified AI & Document Notebook Saving & Clipboard Helper
+
+    @discardableResult
+    public func upsertNotebookNoteInFolder(
+        folderName: String,
+        existingNoteId: String?,
+        title: String,
+        content: String,
+        tags: [String],
+        tradeKey: String? = nil,
+        dayDate: String? = JournalIds.todayDateString()
+    ) -> NotebookNote? {
+        guard !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        let folder: NotebookFolder
+        if let existing = folders.first(where: { $0.name.lowercased() == folderName.lowercased() }) {
+            folder = existing
+        } else {
+            do {
+                folder = try createFolder(name: folderName)
+            } catch {
+                AppLogger.warning("Failed to create folder '\(folderName)': \(error.localizedDescription)")
+                return nil
+            }
+        }
+
+        do {
+            let note: NotebookNote
+            if let existingId = existingNoteId {
+                note = try patchNote(
+                    id: existingId,
+                    title: title,
+                    content: content,
+                    tags: tags,
+                    folderId: folder.id
+                )
+            } else {
+                note = try createNote(
+                    folderId: folder.id,
+                    title: title,
+                    content: content,
+                    tags: tags,
+                    tradeKey: tradeKey,
+                    dayDate: dayDate
+                )
+            }
+            NativeHaptics.success()
+            return note
+        } catch {
+            AppLogger.warning("Failed to save note to '\(folderName)': \(error.localizedDescription)")
+            return nil
+        }
+    }
+
+    public static func copyToClipboard(_ text: String, onStateChanged: @escaping (Bool) -> Void) {
+        UIPasteboard.general.string = text
+        onStateChanged(true)
+        NativeHaptics.lightImpact()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            onStateChanged(false)
+        }
+    }
 }

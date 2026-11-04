@@ -89,66 +89,29 @@ public struct AIReflectionResultView: View {
     
     // MARK: - Actions
     private func saveToNotebook() {
-        guard !resultText.isEmpty else { return }
-        
-        let targetFolderName = "AI Reflections"
-        let folder: NotebookFolder
-        if let existing = dataStore.folders.first(where: { $0.name.lowercased() == targetFolderName.lowercased() }) {
-            folder = existing
-        } else {
-            do {
-                folder = try dataStore.createFolder(name: targetFolderName)
-            } catch {
-                AppLogger.warning("Failed to create AI Reflections folder: \(error.localizedDescription)")
-                return
-            }
-        }
-        
         let activeTemplate = template ?? AIReflectionTemplates.defaultTemplate
         let title = AIReflectionTemplates.generateNoteTitle(
             template: activeTemplate,
             metrics: metrics
         )
-        
         var tags = ["#ai-reflections", activeTemplate.tag]
         if activeTemplate.category == .cadence {
             tags.append("#recap")
         }
-        
-        do {
-            if let existingId = savedNoteId {
-                _ = try dataStore.patchNote(
-                    id: existingId,
-                    title: title,
-                    content: resultText,
-                    tags: tags,
-                    folderId: folder.id
-                )
-            } else {
-                let note = try dataStore.createNote(
-                    folderId: folder.id,
-                    title: title,
-                    content: resultText,
-                    tags: tags,
-                    tradeKey: nil,
-                    dayDate: JournalIds.todayDateString()
-                )
-                savedNoteId = note.id
-            }
+        if let note = dataStore.upsertNotebookNoteInFolder(
+            folderName: "AI Reflections",
+            existingNoteId: savedNoteId,
+            title: title,
+            content: resultText,
+            tags: tags
+        ) {
+            savedNoteId = note.id
             savedNoteTitle = title
             isSavedToNotebook = true
-            NativeHaptics.success()
-        } catch {
-            AppLogger.warning("Failed to save AI reflection note: \(error.localizedDescription)")
         }
     }
     
     private func copyToClipboard() {
-        UIPasteboard.general.string = resultText
-        showCopiedAlert = true
-        NativeHaptics.lightImpact()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-            showCopiedAlert = false
-        }
+        TradeDataStore.copyToClipboard(resultText) { showCopiedAlert = $0 }
     }
 }

@@ -332,7 +332,7 @@ private struct AIMemoryCard: View {
                 
                 // Footer
                 HStack {
-                    Text("\(sourceLabel(memory.sourceType)) • \(formatDate(memory.createdAt))")
+                    Text("\(sourceLabel(memory.sourceType)) • \(Formatters.formatDate(memory.createdAt))")
                         .font(AppTypography.microCaption)
                         .foregroundColor(AppColors.secondaryText.opacity(0.7))
                     
@@ -379,12 +379,6 @@ private struct AIMemoryCard: View {
         case .research:   return "Research"
         case .manual:     return "Manual"
         }
-    }
-    
-    private func formatDate(_ d: Date) -> String {
-        let fmt = DateFormatter()
-        fmt.dateFormat = "MMM dd, yyyy"
-        return fmt.string(from: d)
     }
 }
 

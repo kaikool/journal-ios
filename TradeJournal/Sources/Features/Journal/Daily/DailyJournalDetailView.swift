@@ -315,33 +315,19 @@ public struct DailyJournalDetailView: View {
     
     internal func applyFormat(marker: String) {
         NativeHaptics.lightImpact()
-        let res = NoteFormattingEngine.formatInlineSelection(
-            value: noteText,
-            start: (noteText as NSString).length,
-            end: (noteText as NSString).length,
-            marker: marker
-        )
-        noteText = res.value
+        noteText = NoteFormattingEngine.appendInlineFormat(to: noteText, marker: marker)
         scheduleSaveNote(noteText)
     }
     
     internal func insertBullet() {
         NativeHaptics.lightImpact()
-        if noteText.isEmpty || noteText.hasSuffix("\n") {
-            noteText += "- "
-        } else {
-            noteText += "\n- "
-        }
+        noteText = NoteFormattingEngine.appendBulletItem(to: noteText)
         scheduleSaveNote(noteText)
     }
     
     internal func insertNumberedList() {
         NativeHaptics.lightImpact()
-        if noteText.isEmpty || noteText.hasSuffix("\n") {
-            noteText += "1. "
-        } else {
-            noteText += "\n1. "
-        }
+        noteText = NoteFormattingEngine.appendNumberedItem(to: noteText)
         scheduleSaveNote(noteText)
     }
     

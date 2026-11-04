@@ -480,4 +480,17 @@ public enum NoteFormattingEngine {
             selectionEnd: newSelectionEnd
         )
     }
+
+    public static func appendInlineFormat(to text: String, marker: String) -> String {
+        let len = (text as NSString).length
+        return formatInlineSelection(value: text, start: len, end: len, marker: marker).value
+    }
+
+    public static func appendBulletItem(to text: String) -> String {
+        (text.isEmpty || text.hasSuffix("\n")) ? (text + "- ") : (text + "\n- ")
+    }
+
+    public static func appendNumberedItem(to text: String) -> String {
+        (text.isEmpty || text.hasSuffix("\n")) ? (text + "1. ") : (text + "\n1. ")
+    }
 }

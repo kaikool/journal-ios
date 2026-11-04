@@ -7,15 +7,12 @@ public final class NoteInquirySessionStore: @unchecked Sendable {
     
     private var memoryCache: [String: [AICoachMessage]] = [:]
     private let lock = NSLock()
-    private let diskUrl: URL
+    private let diskUrl: URL = JSONDiskStore.appSupportFileURL(directory: "NoteInquiries", filename: "sessions.json")
     
     private init() {
-        let fileManager = FileManager.default
-        let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first ?? fileManager.temporaryDirectory
-        let dir = appSupport.appendingPathComponent("NoteInquiries", isDirectory: true)
-        try? fileManager.createDirectory(at: dir, withIntermediateDirectories: true)
-        self.diskUrl = dir.appendingPathComponent("sessions.json")
-        loadFromDisk()
+        if let decoded = JSONDiskStore.load([String: [AICoachMessage]].self, from: diskUrl) {
+            memoryCache = decoded
+        }
     }
     
     public func getMessages(noteId: String) -> [AICoachMessage] {
@@ -30,7 +27,7 @@ public final class NoteInquirySessionStore: @unchecked Sendable {
         let snapshot = memoryCache
         lock.unlock()
         
-        saveToDiskAsync(snapshot: snapshot)
+        JSONDiskStore.saveAsync(snapshot, to: diskUrl, priority: .background)
     }
     
     public func clear(noteId: String) {
@@ -39,23 +36,6 @@ public final class NoteInquirySessionStore: @unchecked Sendable {
         let snapshot = memoryCache
         lock.unlock()
         
-        saveToDiskAsync(snapshot: snapshot)
-    }
-    
-    private func loadFromDisk() {
-        guard let data = try? Data(contentsOf: diskUrl),
-              let decoded = try? JSONDecoder().decode([String: [AICoachMessage]].self, from: data) else {
-            return
-        }
-        lock.lock()
-        memoryCache = decoded
-        lock.unlock()
-    }
-    
-    private func saveToDiskAsync(snapshot: [String: [AICoachMessage]]) {
-        Task.detached(priority: .background) { [diskUrl = self.diskUrl] in
-            guard let data = try? JSONEncoder().encode(snapshot) else { return }
-            try? data.write(to: diskUrl, options: .atomic)
-        }
+        JSONDiskStore.saveAsync(snapshot, to: diskUrl, priority: .background)
     }
 }

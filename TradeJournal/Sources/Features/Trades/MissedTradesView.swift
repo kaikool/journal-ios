@@ -99,7 +99,7 @@ public struct MissedTradesView: View {
                 
                 Spacer()
                 
-                Text(formatDate(trade.observedAt))
+                Text(Formatters.formatIsoTimestamp(trade.observedAt))
                     .font(AppTypography.caption)
                     .monospacedDigit()
                     .foregroundColor(AppColors.secondaryText)
@@ -152,15 +152,6 @@ public struct MissedTradesView: View {
                 Label("Delete", systemImage: "trash")
             }
         }
-    }
-    
-    private func formatDate(_ iso: String) -> String {
-        if let d = FlexibleDateParser.parse(iso) {
-            let f = DateFormatter()
-            f.dateFormat = "dd/MM/yyyy HH:mm"
-            return f.string(from: d)
-        }
-        return iso
     }
 }
 

@@ -742,60 +742,27 @@ public struct TradeAICoachSheet: View {
     
     private func saveToNotebook() {
         guard !coachingResult.isEmpty else { return }
-        let targetFolderName = "Trade Insights"
-        let folder: NotebookFolder
-        if let existing = dataStore.folders.first(where: { $0.name.lowercased() == targetFolderName.lowercased() }) {
-            folder = existing
-        } else {
-            do {
-                folder = try dataStore.createFolder(name: targetFolderName)
-            } catch {
-                AppLogger.warning("Failed to create folder: \(error.localizedDescription)")
-                return
-            }
-        }
-        
         let dateStr = JournalIds.todayDateString()
         let title = isOpen
             ? "[Risk AI Live] \(trade.symbol) \(trade.side.uppercased()) (\(dateStr))"
             : "[Risk AI Audit] \(trade.symbol) \(trade.side.uppercased()) (\(dateStr))"
-        let content = fullCoachingContent()
         let tags = ["#risk-ai", "#trade-audit", "#\(trade.symbol.lowercased())"]
-        
-        do {
-            if let existingNoteId = createdNotebookNoteId {
-                _ = try dataStore.patchNote(
-                    id: existingNoteId,
-                    title: title,
-                    content: content,
-                    tags: tags,
-                    folderId: folder.id
-                )
-            } else {
-                let note = try dataStore.createNote(
-                    folderId: folder.id,
-                    title: title,
-                    content: content,
-                    tags: tags,
-                    tradeKey: trade.key,
-                    dayDate: dateStr
-                )
-                createdNotebookNoteId = note.id
-            }
+        if let note = dataStore.upsertNotebookNoteInFolder(
+            folderName: "Trade Insights",
+            existingNoteId: createdNotebookNoteId,
+            title: title,
+            content: fullCoachingContent(),
+            tags: tags,
+            tradeKey: trade.key,
+            dayDate: dateStr
+        ) {
+            createdNotebookNoteId = note.id
             isSavedToNotebook = true
-            NativeHaptics.success()
-        } catch {
-            AppLogger.warning("Failed to save note: \(error.localizedDescription)")
         }
     }
     
     private func copyToClipboard() {
-        UIPasteboard.general.string = fullCoachingContent()
-        showCopiedAlert = true
-        NativeHaptics.lightImpact()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-            showCopiedAlert = false
-        }
+        TradeDataStore.copyToClipboard(fullCoachingContent()) { showCopiedAlert = $0 }
     }
     
     // MARK: - Linked Pre-Trade Setup Card Component
@@ -851,7 +818,8 @@ public struct TradeAICoachSheet: View {
                     preTradeParamRow(label: "Volume:", value: vol)
                 }
                 
-                preTradeParamRow(label: "Date time:", value: formatDateTime(plan.timestamp))
+                let tz = TimeZone(identifier: dataStore.generalSettings.displayTimeZone) ?? .current
+                preTradeParamRow(label: "Date time:", value: Formatters.isoDateTime(plan.timestamp, timeZone: tz))
             }
         }
         .appCardStyle(cornerRadius: 10, padding: 10)
@@ -891,12 +859,5 @@ public struct TradeAICoachSheet: View {
             return "\(Formatters.formatDecimal(trade.quantity, maxDecimals: 2)) lots"
         }
         return nil
-    }
-    
-    private func formatDateTime(_ date: Date) -> String {
-        let df = DateFormatter()
-        df.dateFormat = "yyyy-MM-dd HH:mm"
-        df.timeZone = TimeZone(identifier: dataStore.generalSettings.displayTimeZone) ?? .current
-        return df.string(from: date)
     }
 }

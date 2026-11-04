@@ -305,7 +305,7 @@ public struct DailyBarsView: View {
                 .onChange(of: selectedDateObj) { newDate in
                     if let d = activeDatum?.date, d != lastHapticDate {
                         lastHapticDate = d
-                        triggerHapticFeedback()
+                        NativeHaptics.selection()
                     } else if newDate == nil {
                         lastHapticDate = nil
                     }
@@ -412,9 +412,5 @@ public struct DailyBarsView: View {
             return Self.hudDateFormatter.string(from: d)
         }
         return dateStr
-    }
-    
-    private func triggerHapticFeedback() {
-        NativeHaptics.selection()
     }
 }

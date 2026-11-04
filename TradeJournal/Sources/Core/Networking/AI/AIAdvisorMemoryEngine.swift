@@ -113,14 +113,7 @@ public final class AIAdvisorMemoryEngine: @unchecked Sendable {
     private var lessons: [TraderAILesson] = []
     private let lock = NSLock()
     
-    private let persistenceUrl: URL? = {
-        guard let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
-            return nil
-        }
-        let dir = appSupport.appendingPathComponent("TradeJournal", isDirectory: true)
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir.appendingPathComponent("ai_advisor_memory.json")
-    }()
+    private let persistenceUrl: URL? = JSONDiskStore.appSupportFileURL(filename: "ai_advisor_memory.json")
     
     private init() {
         loadFromDisk()
@@ -938,21 +931,13 @@ public final class AIAdvisorMemoryEngine: @unchecked Sendable {
     }
     
     private func saveToDisk() {
-        guard let url = persistenceUrl else { return }
         let payload = PersistedMemoryV2(memories: memories, commitments: commitments, lessons: lessons)
-        if let encoded = try? JSONEncoder().encode(payload) {
-            try? encoded.write(to: url, options: .atomic)
-        }
+        JSONDiskStore.save(payload, to: persistenceUrl)
     }
     
     private func loadFromDisk() {
-        guard let url = persistenceUrl, FileManager.default.fileExists(atPath: url.path) else { return }
-        guard let data = try? Data(contentsOf: url) else { return }
-        
-        let decoder = JSONDecoder()
-        
         // 1. Attempt V2 Decode
-        if let decodedV2 = try? decoder.decode(PersistedMemoryV2.self, from: data) {
+        if let decodedV2 = JSONDiskStore.load(PersistedMemoryV2.self, from: persistenceUrl) {
             self.memories = decodedV2.memories ?? []
             self.commitments = decodedV2.commitments ?? []
             self.lessons = decodedV2.lessons ?? []
@@ -972,7 +957,7 @@ public final class AIAdvisorMemoryEngine: @unchecked Sendable {
         }
         
         // 2. Fallback to Legacy Decode
-        if let decodedLegacy = try? decoder.decode(PersistedMemoryLegacy.self, from: data) {
+        if let decodedLegacy = JSONDiskStore.load(PersistedMemoryLegacy.self, from: persistenceUrl) {
             self.commitments = decodedLegacy.commitments
             self.lessons = decodedLegacy.lessons
             self.memories = []

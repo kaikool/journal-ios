@@ -165,7 +165,7 @@ public struct SessionBreakdownChart: View {
                     .onChange(of: selectedSession) { newSession in
                         if let s = newSession, s != lastHapticSession {
                             lastHapticSession = s
-                            triggerHapticFeedback()
+                            NativeHaptics.selection()
                         } else if newSession == nil {
                             lastHapticSession = nil
                         }
@@ -214,9 +214,5 @@ public struct SessionBreakdownChart: View {
                 }
             }
         }
-    }
-    
-    private func triggerHapticFeedback() {
-        NativeHaptics.selection()
     }
 }

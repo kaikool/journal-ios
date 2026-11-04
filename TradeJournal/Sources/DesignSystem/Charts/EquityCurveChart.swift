@@ -459,7 +459,7 @@ public struct EquityCurveChart: View {
                        let match = points.min(by: { abs($0.date.timeIntervalSince(target)) < abs($1.date.timeIntervalSince(target)) }),
                        match.id != lastHapticPointId {
                         lastHapticPointId = match.id
-                        triggerHapticFeedback()
+                        NativeHaptics.selection()
                     } else if newDate == nil {
                         lastHapticPointId = nil
                     }
@@ -595,9 +595,5 @@ public struct EquityCurveChart: View {
         .frame(height: 38)
         .padding(.horizontal, 2)
         .padding(.bottom, 2)
-    }
-    
-    private func triggerHapticFeedback() {
-        NativeHaptics.selection()
     }
 }

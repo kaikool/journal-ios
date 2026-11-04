@@ -209,13 +209,18 @@ public enum Formatters {
         return 2                        // Gold (2745.50), BTC (67500.50), Indices (42350.25)
     }
 
-    /// Formats execution price (2 to 5+ decimal places dynamically based on symbol or price magnitude)
-    public static func price(_ value: Decimal, symbol: String? = nil) -> String {
-        let decimals = decimalPlaces(for: symbol, price: value)
+    private static let dynamicPriceFormatter: NumberFormatter = {
         let f = NumberFormatter()
         f.numberStyle = .decimal
         f.locale = Locale(identifier: "en_US")
         f.usesGroupingSeparator = true
+        return f
+    }()
+
+    /// Formats execution price (2 to 5+ decimal places dynamically based on symbol or price magnitude)
+    public static func price(_ value: Decimal, symbol: String? = nil) -> String {
+        let decimals = decimalPlaces(for: symbol, price: value)
+        let f = dynamicPriceFormatter
         if decimals >= 4 {
             f.minimumFractionDigits = min(4, decimals)
         } else if decimals == 3 {
@@ -347,6 +352,25 @@ public enum Formatters {
         return f
     }()
 
+    private static let isoDateTimeFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd HH:mm"
+        return f
+    }()
+
+    private static let shortMonthDayTimeFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US")
+        f.dateFormat = "MMM dd, HH:mm"
+        return f
+    }()
+
+    private static let slashDateTimeFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "dd/MM/yyyy HH:mm"
+        return f
+    }()
+
     private static let weekdayFormatter: DateFormatter = {
         let f = DateFormatter()
         f.dateFormat = "EEEE"
@@ -387,6 +411,24 @@ public enum Formatters {
     
     public static func formatDate(_ date: Date, timeZone: TimeZone = .current) -> String {
         dateOnly(date, timeZone: timeZone)
+    }
+
+    public static func isoDateTime(_ date: Date, timeZone: TimeZone = .current) -> String {
+        isoDateTimeFormatter.timeZone = timeZone
+        return isoDateTimeFormatter.string(from: date)
+    }
+
+    public static func shortMonthDayTime(_ date: Date, timeZone: TimeZone = .current) -> String {
+        shortMonthDayTimeFormatter.timeZone = timeZone
+        return shortMonthDayTimeFormatter.string(from: date)
+    }
+
+    public static func formatIsoTimestamp(_ iso: String, timeZone: TimeZone = .current) -> String {
+        if let d = FlexibleDateParser.parse(iso) {
+            slashDateTimeFormatter.timeZone = timeZone
+            return slashDateTimeFormatter.string(from: d)
+        }
+        return iso
     }
     
     private static let monthYearFormatter: DateFormatter = {

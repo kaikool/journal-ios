@@ -149,7 +149,7 @@ public struct WeekdayChart: View {
                     .onChange(of: selectedDay) { newDay in
                         if let d = newDay, d != lastHapticDay {
                             lastHapticDay = d
-                            triggerHapticFeedback()
+                            NativeHaptics.selection()
                         } else if newDay == nil {
                             lastHapticDay = nil
                         }
@@ -194,9 +194,5 @@ public struct WeekdayChart: View {
                 }
             }
         }
-    }
-    
-    private func triggerHapticFeedback() {
-        NativeHaptics.selection()
     }
 }

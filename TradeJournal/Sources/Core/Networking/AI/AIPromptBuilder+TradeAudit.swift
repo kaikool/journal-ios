@@ -258,9 +258,6 @@ extension AIPromptBuilder {
             return AssetContractEngine.contractMultiplier(for: trade.symbol)
         }()
         let entry = trade.avgEntry
-        func formatPrice(_ p: Decimal) -> String {
-            Formatters.price(p, symbol: trade.symbol)
-        }
         let isShort = trade.direction == .short
         let directionStrVi = isShort ? "SELL / SHORT (BÁN KHỐNG - Kỳ vọng giá GIẢM)" : "BUY / LONG (MUA - Kỳ vọng giá TĂNG)"
         let directionStrEn = isShort ? "SELL / SHORT (Short position - Expects price to FALL)" : "BUY / LONG (Long position - Expects price to RISE)"
@@ -287,8 +284,8 @@ extension AIPromptBuilder {
                 )
             }
 
-            let slPriceStr = formatPrice(sl)
-            let entryPriceStr = formatPrice(entry)
+            let slPriceStr = Formatters.price(sl, symbol: trade.symbol)
+            let entryPriceStr = Formatters.price(entry, symbol: trade.symbol)
 
             if isShort {
                 // SELL / SHORT Position:
@@ -345,8 +342,8 @@ extension AIPromptBuilder {
                         return "N/A"
                     }()
                     return ProtectionStatus(
-                        labelVi: "SL tại \(slPriceStr) TRÊN giá vào \(entryPriceStr) -> VỊ THẾ ĐANG RỦI RO VỐN (Khoảng cách SL = \(formatPrice(riskPts)), Rủi ro tối đa 1R = \(riskStr)).",
-                        labelEn: "SL at \(slPriceStr) ABOVE entry \(entryPriceStr) -> ACTIVE CAPITAL RISK (SL distance = \(formatPrice(riskPts)), Max 1R Risk = \(riskStr)).",
+                        labelVi: "SL tại \(slPriceStr) TRÊN giá vào \(entryPriceStr) -> VỊ THẾ ĐANG RỦI RO VỐN (Khoảng cách SL = \(Formatters.price(riskPts, symbol: trade.symbol)), Rủi ro tối đa 1R = \(riskStr)).",
+                        labelEn: "SL at \(slPriceStr) ABOVE entry \(entryPriceStr) -> ACTIVE CAPITAL RISK (SL distance = \(Formatters.price(riskPts, symbol: trade.symbol)), Max 1R Risk = \(riskStr)).",
                         risk1RStr: riskStr,
                         realizedRStr: rStr,
                         isRiskFree: false,
@@ -408,8 +405,8 @@ extension AIPromptBuilder {
                         return "N/A"
                     }()
                     return ProtectionStatus(
-                        labelVi: "SL tại \(slPriceStr) DƯỚI giá vào \(entryPriceStr) -> VỊ THẾ ĐANG RỦI RO VỐN (Khoảng cách SL = \(formatPrice(riskPts)), Rủi ro tối đa 1R = \(riskStr)).",
-                        labelEn: "SL at \(slPriceStr) BELOW entry \(entryPriceStr) -> ACTIVE CAPITAL RISK (SL distance = \(formatPrice(riskPts)), Max 1R Risk = \(riskStr)).",
+                        labelVi: "SL tại \(slPriceStr) DƯỚI giá vào \(entryPriceStr) -> VỊ THẾ ĐANG RỦI RO VỐN (Khoảng cách SL = \(Formatters.price(riskPts, symbol: trade.symbol)), Rủi ro tối đa 1R = \(riskStr)).",
+                        labelEn: "SL at \(slPriceStr) BELOW entry \(entryPriceStr) -> ACTIVE CAPITAL RISK (SL distance = \(Formatters.price(riskPts, symbol: trade.symbol)), Max 1R Risk = \(riskStr)).",
                         risk1RStr: riskStr,
                         realizedRStr: rStr,
                         isRiskFree: false,

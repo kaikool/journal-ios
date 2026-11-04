@@ -10,14 +10,7 @@ public final class AIResearchWorkspaceEngine: @unchecked Sendable {
     private var projects: [AIResearchProject] = []
     private let lock = NSLock()
     
-    private let diskUrl: URL? = {
-        guard let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
-            return nil
-        }
-        let dir = appSupport.appendingPathComponent("TradeJournal", isDirectory: true)
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir.appendingPathComponent("ai_research_projects.json")
-    }()
+    private let diskUrl: URL? = JSONDiskStore.appSupportFileURL(filename: "ai_research_projects.json")
     
     private init() {
         loadFromDisk()
@@ -185,23 +178,16 @@ public final class AIResearchWorkspaceEngine: @unchecked Sendable {
     // MARK: - Disk Persistence
     
     private func saveToDisk() {
-        guard let url = diskUrl else { return }
         lock.lock()
         let copy = projects
         lock.unlock()
-        
-        if let data = try? JSONEncoder().encode(copy) {
-            try? data.write(to: url, options: .atomic)
-        }
+        JSONDiskStore.save(copy, to: diskUrl)
     }
     
     private func loadFromDisk() {
-        guard let url = diskUrl, FileManager.default.fileExists(atPath: url.path),
-              let data = try? Data(contentsOf: url),
-              let decoded = try? JSONDecoder().decode([AIResearchProject].self, from: data) else {
-            return
+        if let decoded = JSONDiskStore.load([AIResearchProject].self, from: diskUrl) {
+            self.projects = decoded
         }
-        self.projects = decoded
     }
     
     // MARK: - Supabase Synchronization

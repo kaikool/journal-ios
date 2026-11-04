@@ -50,7 +50,7 @@ public struct DrawdownChart: View {
         VStack(alignment: .leading, spacing: 6) {
             // Header: Relative Drawdown and Max / Active Value
             HStack(alignment: .center) {
-                Text(activePoint.map { formatDate($0.date) } ?? "Relative Drawdown")
+                Text(activePoint.map { Formatters.formatDate($0.date) } ?? "Relative Drawdown")
                     .font(AppTypography.cardHeaderUppercase)
                     .foregroundColor(AppColors.secondaryText)
                     .textCase(.uppercase)
@@ -156,23 +156,12 @@ public struct DrawdownChart: View {
                        let match = points.min(by: { abs($0.date.timeIntervalSince(target)) < abs($1.date.timeIntervalSince(target)) }),
                        match.id != lastHapticPointId {
                         lastHapticPointId = match.id
-                        triggerHapticFeedback()
+                        NativeHaptics.selection()
                     } else if newDate == nil {
                         lastHapticPointId = nil
                     }
                 }
             }
         }
-    }
-    
-    private func formatDate(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .none
-        return formatter.string(from: date)
-    }
-    
-    private func triggerHapticFeedback() {
-        NativeHaptics.selection()
     }
 }

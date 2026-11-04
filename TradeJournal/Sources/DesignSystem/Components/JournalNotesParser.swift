@@ -50,31 +50,12 @@ public enum JournalNotesParser {
             }
             
             // 0. Markdown Table Detection: line has '|' and next line is table separator
-            if line.contains("|") && (i + 1 < rawLines.count) && isTableSeparator(rawLines[i + 1]) {
+            if let tableResult = consumeMarkdownTable(from: rawLines, startingAt: i) {
                 flushParagraph()
-                let headers = parseTableCells(line)
-                i += 2 // skip header line and separator line
-                
-                var rows: [[String]] = []
-                while i < rawLines.count {
-                    let rowLine = rawLines[i].trimmingCharacters(in: .whitespaces)
-                    if rowLine.isEmpty || !rowLine.contains("|") {
-                        break
-                    }
-                    if isTableSeparator(rowLine) {
-                        i += 1
-                        continue
-                    }
-                    let cells = parseTableCells(rowLine)
-                    if !cells.isEmpty {
-                        rows.append(cells)
-                    }
-                    i += 1
+                if !tableResult.headers.isEmpty {
+                    blocks.append(.table(headers: tableResult.headers, rows: tableResult.rows))
                 }
-                
-                if !headers.isEmpty {
-                    blocks.append(.table(headers: headers, rows: rows))
-                }
+                i = tableResult.nextIndex
                 continue
             }
             
@@ -149,7 +130,37 @@ public enum JournalNotesParser {
         return blocks
     }
     
-    private static func isTableSeparator(_ line: String) -> Bool {
+    public static func consumeMarkdownTable(
+        from rawLines: [String],
+        startingAt startIndex: Int
+    ) -> (headers: [String], rows: [[String]], nextIndex: Int)? {
+        guard startIndex < rawLines.count else { return nil }
+        let line = rawLines[startIndex].trimmingCharacters(in: .whitespaces)
+        guard line.contains("|"), (startIndex + 1 < rawLines.count), isTableSeparator(rawLines[startIndex + 1]) else {
+            return nil
+        }
+        let headers = parseTableCells(line)
+        var i = startIndex + 2
+        var rows: [[String]] = []
+        while i < rawLines.count {
+            let rowLine = rawLines[i].trimmingCharacters(in: .whitespaces)
+            if rowLine.isEmpty || !rowLine.contains("|") {
+                break
+            }
+            if isTableSeparator(rowLine) {
+                i += 1
+                continue
+            }
+            let cells = parseTableCells(rowLine)
+            if !cells.isEmpty {
+                rows.append(cells)
+            }
+            i += 1
+        }
+        return (headers: headers, rows: rows, nextIndex: i)
+    }
+
+    public static func isTableSeparator(_ line: String) -> Bool {
         let trimmed = line.trimmingCharacters(in: .whitespaces)
         guard trimmed.contains("|") || trimmed.contains("-") else { return false }
         let clean = trimmed
@@ -160,7 +171,7 @@ public enum JournalNotesParser {
         return clean.isEmpty && trimmed.contains("-")
     }
     
-    private static func parseTableCells(_ line: String) -> [String] {
+    public static func parseTableCells(_ line: String) -> [String] {
         var trimmed = line.trimmingCharacters(in: .whitespaces)
         if trimmed.hasPrefix("|") { trimmed.removeFirst() }
         if trimmed.hasSuffix("|") { trimmed.removeLast() }
