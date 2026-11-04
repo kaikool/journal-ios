@@ -2,12 +2,12 @@
 
 /**
  * ========================================================================
- * TRADEJOURNAL IOS - 25 ARCHITECTURAL STANDARDS CI GATEKEEPER
+ * TRADEJOURNAL IOS - 26 ARCHITECTURAL STANDARDS CI GATEKEEPER
  * ========================================================================
  * 
  * Strict Single Source of Truth & Zero Inline Code Governance.
- * Audits all Swift source files against the 25 Architectural Standards.
- * Ordered sequentially from Standard 01 to Standard 25:
+ * Audits all Swift source files against the 26 Architectural Standards.
+ * Ordered sequentially from Standard 01 to Standard 26:
  * 
  * --- PART 1: CONTENT & CONTROLS (Standards 01 - 11) ---
  * Standard 01: Buttons & Actions (AppButton, AppPrimaryButton, ModalToolbarButtons)
@@ -30,7 +30,7 @@
  * Standard 16: Native Haptics Feedback (NativeHaptics - Zero raw UIKit)
  * Standard 17: Animation Presets (AppAnimations - Zero hardcoded .spring)
  * 
- * --- PART 3: FINTECH POLISH & PRODUCTION RESILIENCE (Standards 18 - 25) ---
+ * --- PART 3: FINTECH POLISH & PRODUCTION RESILIENCE (Standards 18 - 26) ---
  * Standard 18: Financial Formatters (Formatters - Zero raw currency concat)
  * Standard 19: Semantic Color Hierarchy (AppColors - Zero ad-hoc Color(hex:))
  * Standard 20: Timezone & Date Alignment (env.currentTimeZone, JournalIds)
@@ -39,6 +39,7 @@
  * Standard 23: Offline-First & Network Resilience (TradeDataStore cache-first)
  * Standard 24: Zero Unsafe Force-Unwrapping & Safe Math (Safe math & optionals)
  * Standard 25: Push Notifications & Alert Dispatching (AppNotificationManager - Zero raw UNNotification in views)
+ * Standard 26: Source Size Limits (no Swift file over MAX_FILE_LINES lines)
  */
 
 const fs = require('fs');
@@ -577,8 +578,45 @@ files.forEach(f => {
   });
 });
 
+// --- STANDARD 26: SOURCE SIZE LIMITS ---
+// No Swift source file may exceed MAX_FILE_LINES lines. Split by responsibility into focused
+// extension / model files instead. Functions longer than WARN_FUNCTION_LINES are reported as
+// non-blocking warnings so they can be decomposed incrementally.
+const MAX_FILE_LINES = 800;
+const WARN_FUNCTION_LINES = 150;
+const sizeWarnings = [];
+files.forEach(f => {
+  const rel = path.relative(ROOT_DIR, f).replace(/\\\\/g, '/');
+  const srcLines = fs.readFileSync(f, 'utf8').split(/\r?\n/);
+  let total = srcLines.length;
+  while (total > 0 && srcLines[total - 1].trim() === '') total--;
+  if (total > MAX_FILE_LINES) {
+    violations.push({
+      std: 'Standard 26: Source Size Limits',
+      rule: 'PROHIBIT_OVERSIZED_SOURCE_FILE',
+      file: rel,
+      line: total,
+      code: `File has ${total} lines (limit ${MAX_FILE_LINES})`,
+      fix: 'Split the file into focused extension / model files grouped by responsibility'
+    });
+  }
+  srcLines.forEach((line, idx) => {
+    const m = line.match(/^(\s*).*\bfunc\s+\w+.*\{\s*$/);
+    if (!m) return;
+    const indent = m[1].length;
+    for (let j = idx + 1; j < srcLines.length; j++) {
+      const s = srcLines[j];
+      if (s.trim().startsWith('}') && (s.length - s.trimStart().length) === indent) {
+        if (j - idx + 1 > WARN_FUNCTION_LINES) {
+          sizeWarnings.push({ file: rel, line: idx + 1, length: j - idx + 1 });
+        }
+        break;
+      }
+    }
+  });
+});
 console.log('========================================================================');
-console.log('        TRADEJOURNAL IOS - 25 ARCHITECTURAL STANDARDS CI GATE           ');
+console.log('        TRADEJOURNAL IOS - 26 ARCHITECTURAL STANDARDS CI GATE           ');
 console.log('========================================================================');
 console.log(`Audited ${files.length} Swift files across ${SOURCES_DIR}\n`);
 
@@ -607,7 +645,8 @@ const standardRegistry = [
   { code: '22', title: 'Safe Keyboard Handling (ScrollView Form Safety)' },
   { code: '23', title: 'Offline & Network Resilience (TradeDataStore Cache-First)' },
   { code: '24', title: 'Zero Unsafe Force-Unwrapping (Defensive Optionals & Safe Math)' },
-  { code: '25', title: 'Push Notifications & Alerts (AppNotificationManager)' }
+  { code: '25', title: 'Push Notifications & Alerts (AppNotificationManager)' },
+  { code: '26', title: 'Source Size Limits (Max 800 Lines per File)' }
 ];
 
 standardRegistry.forEach(std => {
@@ -618,6 +657,13 @@ standardRegistry.forEach(std => {
   console.log(`${label.padEnd(72, '.')} ${status}`);
 });
 
+if (sizeWarnings.length > 0) {
+  console.log(`\n⚠️  Standard 26 advisory: ${sizeWarnings.length} function(s) exceed ${WARN_FUNCTION_LINES} lines (non-blocking):`);
+  sizeWarnings
+    .sort((a, b) => b.length - a.length)
+    .forEach(w => console.log(`    ${w.file}:${w.line} (${w.length} lines)`));
+}
+
 console.log('\n========================================================================');
 if (violations.length > 0) {
   console.error(`❌ BLOCKED BY GITHUB CI: Found ${violations.length} architectural violation(s)!\n`);
@@ -627,9 +673,9 @@ if (violations.length > 0) {
     console.error(`    Code:   ${v.code}`);
     console.error(`    Fix:    ${v.fix}\n`);
   });
-  console.error('⛔ Commit rejected: All code must adhere to the 25 Architectural Standards.');
+  console.error('⛔ Commit rejected: All code must adhere to the 26 Architectural Standards.');
   process.exit(1);
 } else {
-  console.log('✅ PASS: 100% compliance across all 25 Architectural Standards!');
+  console.log('✅ PASS: 100% compliance across all 26 Architectural Standards!');
   process.exit(0);
 }
