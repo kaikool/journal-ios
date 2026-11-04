@@ -110,6 +110,13 @@ public final class TradeDataStore: ObservableObject {
         playbooksStore.playbookAssessments = playbookAssessments
         playbooksStore.progressRules = progressRules
         playbooksStore.progressChecks = progressChecks
+        
+        // Standard 27: Evaluate Discipline (Tilt) and Schedule Daily Journal Review
+        AppNotificationCoordinator.shared.evaluateTiltAndRevengeTrading(trades: trades)
+        AppNotificationCoordinator.shared.scheduleDailyJournalReview(
+            trades: trades,
+            timeZone: AppEnvironment.shared.currentTimeZone
+        )
     }
     
     internal var persistenceUrl: URL {

@@ -10,6 +10,7 @@ public enum SettingsSection: String, CaseIterable, Identifiable {
     case currencyConversion = "currency-conversion"
     case marketData = "market-data"
     case connections = "the5ers"
+    case notifications = "notifications"
     case aiSettings = "ai-settings"
     case yourData = "your-data"
     
@@ -22,6 +23,7 @@ public enum SettingsSection: String, CaseIterable, Identifiable {
         case .currencyConversion: return "Currency conversion"
         case .marketData: return "Market data"
         case .connections: return "Connections"
+        case .notifications: return "Notifications"
         case .aiSettings: return "AI"
         case .yourData: return "Data & backups"
         }
@@ -34,6 +36,7 @@ public enum SettingsSection: String, CaseIterable, Identifiable {
         case .currencyConversion: return "arrow.left.arrow.right"
         case .marketData: return "chart.xyaxis.line"
         case .connections: return "link"
+        case .notifications: return "bell.badge"
         case .aiSettings: return "sparkles"
         case .yourData: return "cylinder.split.1x2"
         }
@@ -51,6 +54,8 @@ public enum SettingsSection: String, CaseIterable, Identifiable {
             return "Connect price history and market data feeds for replay and trade analysis."
         case .connections:
             return "Connect broker APIs, cTrader accounts, and prop firm feeds."
+        case .notifications:
+            return "Configure economic news alerts, discipline triggers, and session routines."
         case .aiSettings:
             return "Configure AI provider, language, and trader profile rules."
         case .yourData:
@@ -83,6 +88,8 @@ public struct SettingsView: View {
                         MarketDataSettingsView()
                     case .connections:
                         ConnectionsSettingsView()
+                    case .notifications:
+                        NotificationSettingsView()
                     case .aiSettings:
                         AiSettingsView()
                     case .yourData:

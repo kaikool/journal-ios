@@ -40,6 +40,7 @@
  * Standard 24: Zero Unsafe Force-Unwrapping & Safe Math (Safe math & optionals)
  * Standard 25: Push Notifications & Alert Dispatching (AppNotificationManager - Zero raw UNNotification in views)
  * Standard 26: Source Size Limits (no Swift file over MAX_FILE_LINES lines)
+ * Standard 27: Unified Alerting & Notification Architecture (AppNotificationCoordinator, Zero Emoji in Alerts)
  */
 
 const fs = require('fs');
@@ -575,6 +576,20 @@ files.forEach(f => {
         fix: 'Use AppNotificationManager.shared for dispatching notifications and managing permissions'
       });
     }
+
+    // --- STANDARD 27: UNIFIED ALERTING & NOTIFICATION ARCHITECTURE ---
+    // Enforces institutional professional tone: Prohibits emoji / icons in alert titles or bodies.
+    const EMOJI_IN_NOTIF_REGEX = /[\u{1F300}-\u{1F64F}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1F1E0}-\u{1F1FF}]/u;
+    if ((trimmed.includes('dispatchNotification') || trimmed.includes('scheduleNotification')) && EMOJI_IN_NOTIF_REGEX.test(trimmed)) {
+      violations.push({
+        std: 'Standard 27: Unified Alerting & Notification Architecture',
+        rule: 'PROHIBIT_EMOJI_IN_NOTIFICATION_STRINGS',
+        file: rel,
+        line: lineNum,
+        code: trimmed,
+        fix: 'Standard 27 strictly requires 100% Institutional Professional English with ZERO emojis or icons in notifications'
+      });
+    }
   });
 });
 
@@ -616,7 +631,7 @@ files.forEach(f => {
   });
 });
 console.log('========================================================================');
-console.log('        TRADEJOURNAL IOS - 26 ARCHITECTURAL STANDARDS CI GATE           ');
+console.log('        TRADEJOURNAL IOS - 27 ARCHITECTURAL STANDARDS CI GATE           ');
 console.log('========================================================================');
 console.log(`Audited ${files.length} Swift files across ${SOURCES_DIR}\n`);
 
@@ -646,7 +661,8 @@ const standardRegistry = [
   { code: '23', title: 'Offline & Network Resilience (TradeDataStore Cache-First)' },
   { code: '24', title: 'Zero Unsafe Force-Unwrapping (Defensive Optionals & Safe Math)' },
   { code: '25', title: 'Push Notifications & Alerts (AppNotificationManager)' },
-  { code: '26', title: 'Source Size Limits (Max 800 Lines per File)' }
+  { code: '26', title: 'Source Size Limits (Max 800 Lines per File)' },
+  { code: '27', title: 'Alerting Architecture (AppNotificationCoordinator - Zero Emoji)' }
 ];
 
 standardRegistry.forEach(std => {
@@ -673,9 +689,9 @@ if (violations.length > 0) {
     console.error(`    Code:   ${v.code}`);
     console.error(`    Fix:    ${v.fix}\n`);
   });
-  console.error('⛔ Commit rejected: All code must adhere to the 26 Architectural Standards.');
+  console.error('⛔ Commit rejected: All code must adhere to the 27 Architectural Standards.');
   process.exit(1);
 } else {
-  console.log('✅ PASS: 100% compliance across all 26 Architectural Standards!');
+  console.log('✅ PASS: 100% compliance across all 27 Architectural Standards!');
   process.exit(0);
 }

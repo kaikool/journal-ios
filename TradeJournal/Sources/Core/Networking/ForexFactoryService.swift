@@ -207,6 +207,18 @@ public final class ForexFactoryService: ObservableObject, ForexFactoryProviding 
             let now = Date()
             UserDefaults.standard.set(now, forKey: lastFetchedKey)
             self.lastUpdated = now
+            
+            Task { @MainActor in
+                let trades = TradeDataStore.shared.trades
+                let watchlist = MarketAlertEngine.shared.monitoredSymbols
+                let tz = AppEnvironment.shared.currentTimeZone
+                AppNotificationCoordinator.shared.evaluateNewsRadar(
+                    events: self.usdEvents,
+                    activeTrades: trades,
+                    watchlist: watchlist,
+                    timeZone: tz
+                )
+            }
         }
     }
     

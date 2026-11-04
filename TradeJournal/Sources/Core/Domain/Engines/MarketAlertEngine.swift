@@ -369,21 +369,17 @@ public final class MarketAlertEngine: ObservableObject, @unchecked Sendable {
         return allFired
     }
     
-    // MARK: - 5. System Notification Dispatcher
+    // MARK: - 5. System Notification Dispatcher (Standard 27 Unified Coordinator)
     
     public func dispatchNotification(for record: MarketAlertRecord) {
-        AppNotificationManager.shared.dispatchNotification(
-            id: "market_alert_\(record.id)",
-            title: "[Trade Alert] \(record.symbol) (\(record.timeframe.uppercased()))",
-            subtitle: "Price \(record.eventType.label) \(record.levelName)",
-            body: record.message,
-            categoryIdentifier: "MARKET_ALERT",
-            userInfo: [
-                "symbol": record.symbol,
-                "timeframe": record.timeframe,
-                "alertId": record.id
-            ]
-        )
+        Task { @MainActor in
+            AppNotificationCoordinator.shared.dispatchMarketStructureAlert(
+                symbol: record.symbol,
+                levelName: record.levelName,
+                price: record.levelValue,
+                timeframe: record.timeframe
+            )
+        }
     }
     
     public func requestNotificationPermission() async -> Bool {

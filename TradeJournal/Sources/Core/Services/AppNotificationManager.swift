@@ -67,7 +67,52 @@ public final class AppNotificationManager: NSObject, ObservableObject, @unchecke
         #endif
     }
     
-    // MARK: - Dispatching
+    // MARK: - Dispatching & Scheduling
+    
+    /// Schedules a local notification to fire at a specific Date in the future
+    public func scheduleNotification(
+        id: String = UUID().uuidString,
+        title: String,
+        subtitle: String? = nil,
+        body: String,
+        categoryIdentifier: String? = nil,
+        badge: NSNumber? = nil,
+        date: Date,
+        userInfo: [AnyHashable: Any] = [:]
+    ) {
+        #if canImport(UserNotifications)
+        let interval = date.timeIntervalSinceNow
+        guard interval > 0 else { return }
+        
+        let content = UNMutableNotificationContent()
+        content.title = title
+        if let sub = subtitle, !sub.isEmpty {
+            content.subtitle = sub
+        }
+        content.body = body
+        content.sound = .default
+        if let b = badge {
+            content.badge = b
+        }
+        content.userInfo = userInfo
+        if let cat = categoryIdentifier {
+            content.categoryIdentifier = cat
+        }
+        
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: interval, repeats: false)
+        let request = UNNotificationRequest(
+            identifier: id,
+            content: content,
+            trigger: trigger
+        )
+        
+        UNUserNotificationCenter.current().add(request) { error in
+            if let err = error {
+                AppLogger.warning("Failed to schedule notification (\(id)): \(err.localizedDescription)")
+            }
+        }
+        #endif
+    }
     
     /// Dispatches a structured local notification with sound, badge, and optional payload
     public func dispatchNotification(
@@ -145,21 +190,24 @@ public final class AppNotificationManager: NSObject, ObservableObject, @unchecke
     
     private func registerNotificationCategories() {
         #if canImport(UserNotifications)
-        let marketAlertCategory = UNNotificationCategory(
-            identifier: "MARKET_ALERT",
-            actions: [],
-            intentIdentifiers: [],
-            options: [.customDismissAction]
-        )
+        let categories = [
+            "ECONOMIC_NEWS",
+            "DISCIPLINE_TILT",
+            "PRE_SESSION_ROUTINE",
+            "DAILY_JOURNAL_REVIEW",
+            "MARKET_STRUCTURE",
+            "MARKET_ALERT",
+            "TRADE_ALERT"
+        ].map { id in
+            UNNotificationCategory(
+                identifier: id,
+                actions: [],
+                intentIdentifiers: [],
+                options: [.customDismissAction]
+            )
+        }
         
-        let tradeAlertCategory = UNNotificationCategory(
-            identifier: "TRADE_ALERT",
-            actions: [],
-            intentIdentifiers: [],
-            options: [.customDismissAction]
-        )
-        
-        UNUserNotificationCenter.current().setNotificationCategories([marketAlertCategory, tradeAlertCategory])
+        UNUserNotificationCenter.current().setNotificationCategories(Set(categories))
         #endif
     }
 }
@@ -176,15 +224,28 @@ extension AppNotificationManager: UNUserNotificationCenterDelegate {
         completionHandler([.banner, .sound, .badge, .list])
     }
     
-    /// Handles user interaction when tapping a banner or notification action
+    /// Handles user interaction when tapping a banner or notification action with centralized Deep Linking
     public func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse,
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
-        let userInfo = response.notification.request.content.userInfo
-        if let symbol = userInfo["symbol"] as? String {
-            AppLogger.info("User tapped notification for \(symbol)")
+        let category = response.notification.request.content.categoryIdentifier
+        Task { @MainActor in
+            switch category {
+            case "ECONOMIC_NEWS":
+                AppEnvironment.shared.selectedTab = .calendar
+            case "DAILY_JOURNAL_REVIEW":
+                AppEnvironment.shared.selectedTab = .journal
+                AppEnvironment.shared.requestOpenTodayJournal = true
+            case "PRE_SESSION_ROUTINE", "DISCIPLINE_TILT":
+                AppEnvironment.shared.selectedTab = .dashboard
+                AppEnvironment.shared.requestAddTrade = true
+            case "MARKET_STRUCTURE", "MARKET_ALERT":
+                AppEnvironment.shared.selectedTab = .trades
+            default:
+                break
+            }
         }
         completionHandler()
     }

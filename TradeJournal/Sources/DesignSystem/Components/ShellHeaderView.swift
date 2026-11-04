@@ -11,6 +11,7 @@ public struct ShellHeaderView: View {
     
     @State private var showPreTradeAnalysis: Bool = false
     @State private var showAiReflection: Bool = false
+    @State private var showNotificationCenter: Bool = false
     
     public init() {}
     
@@ -116,6 +117,11 @@ public struct ShellHeaderView: View {
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(28)
+        }
+        .sheet(isPresented: $showNotificationCenter) {
+            NotificationCenterSheet()
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
         }
     }
     
@@ -301,6 +307,7 @@ public struct ShellHeaderView: View {
             
             switch env.selectedTab {
             case .dashboard:
+                notificationBellButton
                 syncActionButton
                 aiScannerButton
                 
@@ -395,6 +402,37 @@ public struct ShellHeaderView: View {
     }
     
     // MARK: - Trailing Action Buttons
+    
+    private var notificationBellButton: some View {
+        Button {
+            NativeHaptics.lightImpact()
+            showNotificationCenter = true
+        } label: {
+            ZStack(alignment: .topTrailing) {
+                Circle()
+                    .fill(AppColors.cardBackground)
+                    .frame(width: 32, height: 32)
+                    .overlay(
+                        Circle()
+                            .stroke(AppColors.border.opacity(0.55), lineWidth: 0.6)
+                    )
+                Image(systemName: "bell.fill")
+                    .font(AppTypography.actionButtonCompact)
+                    .foregroundColor(AppColors.secondaryText)
+                    .frame(width: 32, height: 32)
+                
+                if AppNotificationCoordinator.shared.unreadCount > 0 {
+                    Circle()
+                        .fill(AppColors.loss)
+                        .frame(width: 8, height: 8)
+                        .offset(x: 1, y: 1)
+                }
+            }
+            .contentShape(Circle())
+        }
+        .buttonStyle(ApplePressableButtonStyle())
+        .accessibilityLabel("Open notifications")
+    }
     
     private var aiScannerButton: some View {
         Button {

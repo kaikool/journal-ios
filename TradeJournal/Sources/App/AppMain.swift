@@ -9,6 +9,9 @@ public struct TradeJournalApp: App {
     
     public init() {
         AppNotificationManager.shared.configure()
+        Task { @MainActor in
+            AppNotificationCoordinator.shared.schedulePreSessionRoutines(timeZone: AppEnvironment.shared.currentTimeZone)
+        }
     }
     
     public var body: some Scene {
@@ -27,7 +30,12 @@ public struct TradeJournalApp: App {
             }
             .animation(.easeInOut(duration: 0.22), value: dataStore.isLoaded)
             .onChange(of: scenePhase) { newPhase in
-                if newPhase == .background {
+                if newPhase == .active {
+                    Task { @MainActor in
+                        AppNotificationCoordinator.shared.schedulePreSessionRoutines(timeZone: env.currentTimeZone)
+                        AppNotificationCoordinator.shared.scheduleDailyJournalReview(trades: dataStore.trades, timeZone: env.currentTimeZone)
+                    }
+                } else if newPhase == .background {
                     // Safe non-blocking background save protected by iOS UIBackgroundTask
                     dataStore.performSaveToDiskAsync(isBackgroundTrigger: true)
                 }
