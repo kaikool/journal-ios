@@ -9,6 +9,9 @@ public enum MarketStateSnapshotBuilder {
         symbol: String,
         barsH4: [MarketBar],
         barsM15: [MarketBar],
+        keyLevels: [KeyLevel] = [],
+        patterns: [DetectedCandlePattern] = [],
+        valueMigration: String? = nil,
         events: [ForexFactoryEvent] = [],
         referenceDate: Date = Date()
     ) -> MarketStateSnapshot {
@@ -80,6 +83,9 @@ public enum MarketStateSnapshotBuilder {
             ema9: emaVal,
             wma45: wmaVal,
             emaVsWmaGap: gapVal,
+            keyLevels: keyLevels,
+            detectedPatterns: patterns,
+            valueMigration: valueMigration,
             nearestHighImpactNewsTitle: nearestEventTitle,
             newsCountdownMinutes: countdownMins,
             timestamp: referenceDate
@@ -98,6 +104,18 @@ public enum MarketStateSnapshotBuilder {
         let rsiStr = snapshot.rsi14.map { String(format: "%.1f", $0) } ?? "N/A"
         let emaStr = snapshot.ema9.map { String(format: "%.2f", $0) } ?? "N/A"
         let wmaStr = snapshot.wma45.map { String(format: "%.2f", $0) } ?? "N/A"
+        
+        let keyLevelsStr: String = {
+            if snapshot.keyLevels.isEmpty { return isVi ? "Chưa nạp mốc cản" : "None" }
+            return snapshot.keyLevels.prefix(6).map { "\($0.label): \(Formatters.price($0.price))" }.joined(separator: " | ")
+        }()
+        
+        let patternsStr: String = {
+            if snapshot.detectedPatterns.isEmpty { return isVi ? "Không có mẫu nến đặc biệt gần cản" : "None" }
+            return snapshot.detectedPatterns.prefix(3).map { $0.summary }.joined(separator: " • ")
+        }()
+        
+        let migrationStr = snapshot.valueMigration ?? (isVi ? "Cân bằng / Dao động" : "Balanced")
         
         let newsBlock: String = {
             guard let title = snapshot.nearestHighImpactNewsTitle, let mins = snapshot.newsCountdownMinutes else {
@@ -124,6 +142,9 @@ public enum MarketStateSnapshotBuilder {
             • Cặp tiền: \(snapshot.symbol) | Thị giá hiện tại: \(curPriceStr)
             • Khung lớn H4 (Order Flow & Cản): Cấu trúc: [\(snapshot.h4OrderFlow)] | Đỉnh Swing High: [\(h4HighStr)] | Đáy Swing Low: [\(h4LowStr)]
             • Khung nhỏ M15 (Execution): Cấu trúc: [\(snapshot.m15OrderFlow)] | Trạng thái: [\(snapshot.m15MssState ?? "Tiếp diễn")] | Mốc kích hoạt: [\(m15TriggerStr)]
+            • Mốc giá trị then chốt (Footprint Key Levels): \(keyLevelsStr)
+            • Xu hướng giá trị phiên (Value Migration): [\(migrationStr)]
+            • Hành vi nến Price Action tại cản: \(patternsStr)
             • Động lượng 3 đường RSI: RSI(14) = [\(rsiStr)] | EMA(9) = [\(emaStr)] | WMA(45) = [\(wmaStr)]
             • Tin tức kinh tế (Catalyst): \(newsBlock)
             """
@@ -134,6 +155,9 @@ public enum MarketStateSnapshotBuilder {
             • Symbol: \(snapshot.symbol) | Current Price: \(curPriceStr)
             • HTF H4 (Order Flow & Key Barriers): Structure: [\(snapshot.h4OrderFlow)] | Swing High: [\(h4HighStr)] | Swing Low: [\(h4LowStr)]
             • LTF M15 (Execution): Structure: [\(snapshot.m15OrderFlow)] | State: [\(snapshot.m15MssState ?? "Continuation")] | Trigger Level: [\(m15TriggerStr)]
+            • Footprint Key Levels: \(keyLevelsStr)
+            • Value Area Migration: [\(migrationStr)]
+            • Candlestick Price Action at Key Levels: \(patternsStr)
             • 3-Line RSI Momentum: RSI(14) = [\(rsiStr)] | EMA(9) = [\(emaStr)] | WMA(45) = [\(wmaStr)]
             • Macro News Catalyst: \(newsBlock)
             """

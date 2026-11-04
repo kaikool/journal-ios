@@ -18,6 +18,8 @@ public struct CandleChartView: View {
     let showMarketStructure: Bool
     let showRSI: Bool
     let isLandscape: Bool
+    public let keyLevels: [KeyLevel]
+    public let patterns: [DetectedCandlePattern]
     @State private var activeRSIMAType: MomentumEngine.RSIMAType
     
     @State private var hoveredBarIndex: Int? = nil
@@ -41,6 +43,8 @@ public struct CandleChartView: View {
         showRSI: Bool = true,
         rsiMAType: MomentumEngine.RSIMAType = .ema,
         isLandscape: Bool = false,
+        keyLevels: [KeyLevel] = [],
+        patterns: [DetectedCandlePattern] = [],
         onResolutionChange: ((MarketResolution) -> Void)? = nil
     ) {
         self.visibleBars = visibleBars
@@ -56,6 +60,8 @@ public struct CandleChartView: View {
         self.showMarketStructure = showMarketStructure
         self.showRSI = showRSI
         self.isLandscape = isLandscape
+        self.keyLevels = keyLevels
+        self.patterns = patterns
         self.onResolutionChange = onResolutionChange
         self._activeRSIMAType = State(initialValue: rsiMAType)
     }
@@ -310,6 +316,10 @@ public struct CandleChartView: View {
             }
             .frame(width: plotWidth, height: plotHeight)
             
+            // Footprint Key Levels & Candlestick Patterns Overlays
+            keyLevelsOverlay(width: plotWidth, height: plotHeight, minP: minP, span: priceSpan, panOffset: clampedPan)
+            patternsOverlay(plotWidth: plotWidth, plotHeight: plotHeight, stepX: stepX, minP: minP, span: priceSpan, panOffset: clampedPan)
+            
             // Unified trade overlay (entry/exit lines, arrows, connecting line)
             tradeOverlay(plotWidth: plotWidth, plotHeight: plotHeight, stepX: stepX, minP: minP, span: priceSpan, panOffset: clampedPan)
             
@@ -334,6 +344,83 @@ public struct CandleChartView: View {
                     .clipShape(Capsule())
                     .position(x: 32, y: 16)
             }
+        }
+    }
+    
+    // MARK: - Footprint Key Levels Overlay
+    private func keyLevelsOverlay(width: CGFloat, height: CGFloat, minP: Double, span: Double, panOffset: CGFloat) -> some View {
+        ForEach(keyLevels) { level in
+            let priceD = (level.price as NSDecimalNumber).doubleValue
+            if priceD >= minP && priceD <= (minP + span) {
+                let y = height - CGFloat((priceD - minP) / span) * height
+                let color = levelColor(for: level)
+                let isDotted = level.isNaked
+                
+                ZStack(alignment: .trailing) {
+                    Path { path in
+                        path.move(to: CGPoint(x: 0, y: y))
+                        path.addLine(to: CGPoint(x: width, y: y))
+                    }
+                    .stroke(color, style: StrokeStyle(lineWidth: isDotted ? 1.0 : 1.2, dash: isDotted ? [4, 4] : []))
+                    
+                    Text(level.label)
+                        .font(AppTypography.captionMicro)
+                        .foregroundColor(color)
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 1)
+                        .background(AppColors.cardBackground.opacity(0.9))
+                        .cornerRadius(2)
+                        .position(x: width - 36, y: max(8, min(height - 8, y - 8)))
+                }
+            }
+        }
+    }
+    
+    private func patternsOverlay(plotWidth: CGFloat, plotHeight: CGFloat, stepX: CGFloat, minP: Double, span: Double, panOffset: CGFloat) -> some View {
+        ForEach(patterns) { pat in
+            if let idx = visibleBars.firstIndex(where: { $0.timestamp == pat.barTimestamp }) {
+                let bar = visibleBars[idx]
+                let xCenter = CGFloat(idx) * stepX + (stepX / 2.0) + panOffset
+                if xCenter >= 0 && xCenter <= plotWidth {
+                    let highD = (bar.high as NSDecimalNumber).doubleValue
+                    let lowD = (bar.low as NSDecimalNumber).doubleValue
+                    let yHigh = plotHeight - CGFloat((highD - minP) / span) * plotHeight
+                    let yLow = plotHeight - CGFloat((lowD - minP) / span) * plotHeight
+                    
+                    let yPos = pat.type.isBullish ? min(plotHeight - 6, yLow + 12) : max(6, yHigh - 12)
+                    let col = pat.type.isBullish ? AppColors.profit : AppColors.loss
+                    
+                    Text(pat.type.rawValue)
+                        .font(AppTypography.captionMicro)
+                        .foregroundColor(col)
+                        .padding(.horizontal, 3)
+                        .padding(.vertical, 1)
+                        .background(AppColors.cardBackground.opacity(0.9))
+                        .cornerRadius(2)
+                        .position(x: xCenter, y: yPos)
+                }
+            }
+        }
+    }
+
+    private func levelColor(for level: KeyLevel) -> Color {
+        switch level.type {
+        case .sessionPoc(.tokyo):
+            return Color(red: 0.0, green: 0.72, blue: 0.83) // Cyan
+        case .sessionPoc(.london):
+            return Color(red: 1.0, green: 0.70, blue: 0.0) // Amber
+        case .sessionPoc(.newYork):
+            return Color(red: 0.67, green: 0.0, blue: 1.0) // Purple
+        case .sessionPoc(.daily):
+            return AppColors.profit // Green
+        case .sessionPoc(.weekly):
+            return AppColors.accentBlue // Blue
+        case .nakedPoc:
+            return AppColors.loss.opacity(0.85) // Reddish dotted ray
+        case .pdh, .pdl, .pdc:
+            return AppColors.primaryText.opacity(0.6)
+        default:
+            return AppColors.secondaryText
         }
     }
     

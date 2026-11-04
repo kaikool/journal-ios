@@ -26,6 +26,11 @@ public struct MarketStateSnapshot: Equatable, Sendable {
     public let wma45: Double?
     public let emaVsWmaGap: Double?
     
+    // Footprint Session Key Levels & Value Migration
+    public let keyLevels: [KeyLevel]
+    public let detectedPatterns: [DetectedCandlePattern]
+    public let valueMigration: String?
+    
     // Macro Catalyst / News Proximity
     public let nearestHighImpactNewsTitle: String?
     public let newsCountdownMinutes: Int? // e.g. +45 (in 45 mins), -15 (15 mins ago)
@@ -47,6 +52,9 @@ public struct MarketStateSnapshot: Equatable, Sendable {
         ema9: Double? = nil,
         wma45: Double? = nil,
         emaVsWmaGap: Double? = nil,
+        keyLevels: [KeyLevel] = [],
+        detectedPatterns: [DetectedCandlePattern] = [],
+        valueMigration: String? = nil,
         nearestHighImpactNewsTitle: String? = nil,
         newsCountdownMinutes: Int? = nil,
         timestamp: Date = Date()
@@ -66,6 +74,9 @@ public struct MarketStateSnapshot: Equatable, Sendable {
         self.ema9 = ema9
         self.wma45 = wma45
         self.emaVsWmaGap = emaVsWmaGap
+        self.keyLevels = keyLevels
+        self.detectedPatterns = detectedPatterns
+        self.valueMigration = valueMigration
         self.nearestHighImpactNewsTitle = nearestHighImpactNewsTitle
         self.newsCountdownMinutes = newsCountdownMinutes
         self.timestamp = timestamp

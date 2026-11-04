@@ -15,6 +15,9 @@ public struct PreTradeChartCard: View {
     public let onEnlarge: () -> Void
     public let onAttachPhoto: () -> Void
     
+    @State private var keyLevels: [KeyLevel] = []
+    @State private var patterns: [DetectedCandlePattern] = []
+    
     public init(
         symbol: String,
         selectedTimeframe: Binding<String>,
@@ -83,7 +86,9 @@ public struct PreTradeChartCard: View {
                         MarketCandleChartView(
                             bars: activeBars,
                             symbol: symbol,
-                            timeframe: activeTimeframeTitle
+                            timeframe: activeTimeframeTitle,
+                            keyLevels: keyLevels,
+                            patterns: patterns
                         )
                         .frame(height: 210)
                         .appSubCardStyle(cornerRadius: 8, padding: 0)
@@ -91,6 +96,12 @@ public struct PreTradeChartCard: View {
                         .onTapGesture(perform: onEnlarge)
                         
                         chartFooterActions
+                    }
+                    .task(id: activeBars.count) {
+                        guard !activeBars.isEmpty else { return }
+                        let res = await SessionFootprintCoordinator.shared.loadKeyLevels(for: symbol, recentBars: activeBars)
+                        self.keyLevels = res.levels
+                        self.patterns = SessionFootprintCoordinator.shared.scanConfluentPatterns(bars: activeBars, keyLevels: res.levels)
                     }
                 } else {
                     emptyLoadingView

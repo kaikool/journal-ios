@@ -264,6 +264,34 @@ extension AIPromptBuilder {
                 : "\n[PRIOR TRADING PLAN]:\n\"\"\"\n\(condensedPrev)\n\"\"\"\n[CONTINUITY]: Check if the entry trigger occurred or if the structure was invalidated.\n"
         }
         
+        let footprintBlockVi: String = {
+            if let snap = marketSnapshot, !snap.keyLevels.isEmpty {
+                let lvls = snap.keyLevels.prefix(6).map { "\($0.label): \(Formatters.price($0.price))" }.joined(separator: " | ")
+                let pats = snap.detectedPatterns.isEmpty ? "Không có mẫu nến đặc biệt gần cản" : snap.detectedPatterns.prefix(3).map { $0.summary }.joined(separator: " • ")
+                let mig = snap.valueMigration ?? "Cân bằng / Dao động"
+                return """
+                  Mốc cản then chốt: \(lvls)
+                  Xu hướng giá trị phiên (Value Migration): [\(mig)]
+                  Hành vi nến Price Action tại cản: \(pats)
+                """
+            }
+            return "  Mốc cản then chốt: Đang cập nhật từ Footprint Engine"
+        }()
+        
+        let footprintBlockEn: String = {
+            if let snap = marketSnapshot, !snap.keyLevels.isEmpty {
+                let lvls = snap.keyLevels.prefix(6).map { "\($0.label): \(Formatters.price($0.price))" }.joined(separator: " | ")
+                let pats = snap.detectedPatterns.isEmpty ? "None near key barriers" : snap.detectedPatterns.prefix(3).map { $0.summary }.joined(separator: " • ")
+                let mig = snap.valueMigration ?? "Balanced / Ranging"
+                return """
+                  Key Levels (POC/VA): \(lvls)
+                  Value Migration: [\(mig)]
+                  Candlestick Price Action at Key Levels: \(pats)
+                """
+            }
+            return "  Key Levels: Updating from Footprint Engine"
+        }()
+        
         if isVi {
             return """
             [THÔNG TIN TÀI KHOẢN VÀ TRẠNG THÁI RỦI RO]:
@@ -275,6 +303,9 @@ extension AIPromptBuilder {
             \(behavioralLeaksBlock)
             [CẤU TRÚC GIÁ THỰC TẾ & HỆ THỐNG ĐỘNG LƯỢNG 3 ĐƯỜNG RSI]:
             - Cặp tiền: \(symbol) | Thị giá hiện tại: \(currentPrice)
+
+            - Mốc Giá trị Then chốt Footprint (Session POCs & Naked POCs):
+            \(footprintBlockVi)
 
             - Khung D1 (Mốc then chốt):
               Đỉnh PDH: \(d1PDH) | Đáy PDL: \(d1PDL) | Giá đóng PDC: \(d1PDC) | ADR 14 ngày: \(d1ADR)
@@ -388,6 +419,9 @@ extension AIPromptBuilder {
             \(behavioralLeaksBlock)
             [FACTUAL MARKET STRUCTURE & 3-LINE RSI MOMENTUM]:
             - Symbol: \(symbol) | Current Price: \(currentPrice)
+
+            - Footprint Key Levels (Session POCs & Naked POCs):
+            \(footprintBlockEn)
 
             - D1 Key Reference Levels:
               PDH: \(d1PDH) | PDL: \(d1PDL) | PDC: \(d1PDC) | 14-Day ADR: \(d1ADR)

@@ -48,6 +48,7 @@ public final class MarketDataCacheStore: @unchecked Sendable {
     
     private let lock = NSLock()
     private var memoryCache: [String: CacheEntry] = [:]
+    private var sessionProfileCache: [String: [SessionProfileSnapshot]] = [:]
     private var inFlightTasks: [String: Task<[MarketBar], Error>] = [:]
     
     private let fileManager = FileManager.default
@@ -340,11 +341,50 @@ public final class MarketDataCacheStore: @unchecked Sendable {
         }
     }
     
+    // MARK: - 5. Session Footprint Profile Local Caching
+    public func getSessionProfiles(symbol: String) -> [SessionProfileSnapshot]? {
+        let clean = symbol.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        lock.lock()
+        if let cached = sessionProfileCache[clean], !cached.isEmpty {
+            lock.unlock()
+            return cached
+        }
+        lock.unlock()
+        
+        let fileUrl = cacheDirectoryUrl.appendingPathComponent("session_profiles_\(clean).json")
+        guard let data = try? Data(contentsOf: fileUrl),
+              let decoded = try? JSONDecoder().decode([SessionProfileSnapshot].self, from: data) else {
+            return nil
+        }
+        
+        lock.lock()
+        sessionProfileCache[clean] = decoded
+        lock.unlock()
+        return decoded
+    }
+    
+    public func saveSessionProfiles(_ profiles: [SessionProfileSnapshot], symbol: String) {
+        guard !profiles.isEmpty else { return }
+        let clean = symbol.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        lock.lock()
+        sessionProfileCache[clean] = profiles
+        lock.unlock()
+        
+        let dir = self.cacheDirectoryUrl
+        DispatchQueue.global(qos: .utility).async {
+            let fileUrl = dir.appendingPathComponent("session_profiles_\(clean).json")
+            if let data = try? JSONEncoder().encode(profiles) {
+                try? data.write(to: fileUrl, options: [.atomic])
+            }
+        }
+    }
+    
     // MARK: - 6. Cache Eviction & Cleanup
     
     public func clearAll() {
         lock.lock()
         memoryCache.removeAll()
+        sessionProfileCache.removeAll()
         inFlightTasks.removeAll()
         lock.unlock()
         

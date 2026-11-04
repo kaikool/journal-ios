@@ -1627,8 +1627,6 @@ public struct SupabaseTradeLessonEvaluationRecord: Codable, Sendable {
     }
 }
 
-// MARK: - PostgREST DTO for ai_research_projects (Module E)
-public struct SupabaseAIResearchProjectRecord: Codable, Sendable {
     public let id: String
     public let title: String
     public let hypothesis: String
@@ -1754,3 +1752,123 @@ public struct SupabaseAIResearchProjectRecord: Codable, Sendable {
         )
     }
 }
+
+// MARK: - PostgREST Session Footprint Profile DTO
+public struct SupabaseSessionProfileRecord: Codable, Sendable {
+    public let id: String
+    public let userId: String?
+    public let symbol: String
+    public let sessionType: String
+    public let sessionDate: String
+    public let startTime: String
+    public let endTime: String
+    public let pocPrice: String
+    public let vahPrice: String
+    public let valPrice: String
+    public let profileHigh: String
+    public let profileLow: String
+    public let totalVolume: String
+    public let isNaked: Bool
+    public let mitigatedAt: String?
+    public let createdAt: String
+
+    public init(snapshot: SessionProfileSnapshot, userId: String? = nil) {
+        let isoFormatter = ISO8601DateFormatter()
+        isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        
+        self.id = snapshot.id
+        self.userId = userId
+        self.symbol = snapshot.symbol
+        self.sessionType = snapshot.sessionType.rawValue
+        self.sessionDate = snapshot.sessionDate
+        self.startTime = isoFormatter.string(from: snapshot.startTime)
+        self.endTime = isoFormatter.string(from: snapshot.endTime)
+        self.pocPrice = supabaseDecimalString(snapshot.pocPrice)
+        self.vahPrice = supabaseDecimalString(snapshot.vahPrice)
+        self.valPrice = supabaseDecimalString(snapshot.valPrice)
+        self.profileHigh = supabaseDecimalString(snapshot.profileHigh)
+        self.profileLow = supabaseDecimalString(snapshot.profileLow)
+        self.totalVolume = supabaseDecimalString(snapshot.totalVolume)
+        self.isNaked = snapshot.isNaked
+        self.mitigatedAt = snapshot.mitigatedAt.map { isoFormatter.string(from: $0) }
+        self.createdAt = isoFormatter.string(from: snapshot.createdAt)
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: AnyCodingKey.self)
+        self.id = c.decodeString(forKeys: ["id"]) ?? JournalIds.newId()
+        self.userId = c.decodeString(forKeys: ["user_id", "userId"])
+        self.symbol = c.decodeString(forKeys: ["symbol"]) ?? ""
+        self.sessionType = c.decodeString(forKeys: ["session_type", "sessionType"]) ?? "daily"
+        self.sessionDate = c.decodeString(forKeys: ["session_date", "sessionDate"]) ?? ""
+        self.startTime = c.decodeString(forKeys: ["start_time", "startTime"]) ?? JournalIds.nowIso()
+        self.endTime = c.decodeString(forKeys: ["end_time", "endTime"]) ?? JournalIds.nowIso()
+        self.pocPrice = c.decodeString(forKeys: ["poc_price", "pocPrice"]) ?? "0"
+        self.vahPrice = c.decodeString(forKeys: ["vah_price", "vahPrice"]) ?? "0"
+        self.valPrice = c.decodeString(forKeys: ["val_price", "valPrice"]) ?? "0"
+        self.profileHigh = c.decodeString(forKeys: ["profile_high", "profileHigh"]) ?? "0"
+        self.profileLow = c.decodeString(forKeys: ["profile_low", "profileLow"]) ?? "0"
+        self.totalVolume = c.decodeString(forKeys: ["total_volume", "totalVolume"]) ?? "0"
+        self.isNaked = c.decodeBool(forKeys: ["is_naked", "isNaked"]) ?? true
+        self.mitigatedAt = c.decodeString(forKeys: ["mitigated_at", "mitigatedAt"])
+        self.createdAt = c.decodeString(forKeys: ["created_at", "createdAt"]) ?? JournalIds.nowIso()
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: AnyCodingKey.self)
+        try c.encode(id, forKey: AnyCodingKey(stringValue: "id")!)
+        if let uid = userId {
+            try c.encode(uid, forKey: AnyCodingKey(stringValue: "user_id")!)
+        }
+        try c.encode(symbol, forKey: AnyCodingKey(stringValue: "symbol")!)
+        try c.encode(sessionType, forKey: AnyCodingKey(stringValue: "session_type")!)
+        try c.encode(sessionDate, forKey: AnyCodingKey(stringValue: "session_date")!)
+        try c.encode(startTime, forKey: AnyCodingKey(stringValue: "start_time")!)
+        try c.encode(endTime, forKey: AnyCodingKey(stringValue: "end_time")!)
+        try c.encode(pocPrice, forKey: AnyCodingKey(stringValue: "poc_price")!)
+        try c.encode(vahPrice, forKey: AnyCodingKey(stringValue: "vah_price")!)
+        try c.encode(valPrice, forKey: AnyCodingKey(stringValue: "val_price")!)
+        try c.encode(profileHigh, forKey: AnyCodingKey(stringValue: "profile_high")!)
+        try c.encode(profileLow, forKey: AnyCodingKey(stringValue: "profile_low")!)
+        try c.encode(totalVolume, forKey: AnyCodingKey(stringValue: "total_volume")!)
+        try c.encode(isNaked, forKey: AnyCodingKey(stringValue: "is_naked")!)
+        if let m = mitigatedAt {
+            try c.encode(m, forKey: AnyCodingKey(stringValue: "mitigated_at")!)
+        }
+        try c.encode(createdAt, forKey: AnyCodingKey(stringValue: "created_at")!)
+    }
+
+    public func toSnapshot() -> SessionProfileSnapshot {
+        let sTime = FlexibleDateParser.parse(startTime) ?? Date()
+        let eTime = FlexibleDateParser.parse(endTime) ?? Date()
+        let cTime = FlexibleDateParser.parse(createdAt) ?? Date()
+        let mTime = FlexibleDateParser.parse(mitigatedAt)
+        
+        let pocDec = Decimal(string: pocPrice) ?? .zero
+        let vahDec = Decimal(string: vahPrice) ?? .zero
+        let valDec = Decimal(string: valPrice) ?? .zero
+        let hiDec = Decimal(string: profileHigh) ?? .zero
+        let loDec = Decimal(string: profileLow) ?? .zero
+        let volDec = Decimal(string: totalVolume) ?? .zero
+        let sType = FootprintSessionType(rawValue: sessionType) ?? .daily
+        
+        return SessionProfileSnapshot(
+            id: id,
+            symbol: symbol,
+            sessionType: sType,
+            sessionDate: sessionDate,
+            startTime: sTime,
+            endTime: eTime,
+            pocPrice: pocDec,
+            vahPrice: vahDec,
+            valPrice: valDec,
+            profileHigh: hiDec,
+            profileLow: loDec,
+            totalVolume: volDec,
+            isNaked: isNaked,
+            mitigatedAt: mTime,
+            createdAt: cTime
+        )
+    }
+}
+
